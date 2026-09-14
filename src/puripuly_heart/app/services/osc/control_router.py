@@ -9,7 +9,6 @@ from typing import Any, cast
 
 from puripuly_heart.app.ports.osc_control import (
     ASR_IDS,
-    FALLBACK_IDS,
     LANGUAGE_IDS,
     SECONDARY_LANGUAGE_IDS,
     TRANSLATION_CONNECTION_BY_MODEL_ID,
@@ -34,7 +33,6 @@ _COALESCED_CONTROLS = frozenset(
         "PuriPuly_SelfASR",
         "PuriPuly_PeerASR",
         "PuriPuly_Translator",
-        "PuriPuly_Fallback",
     }
 )
 
@@ -343,8 +341,6 @@ class OscControlRouter:
                 TRANSLATION_MODEL_IDS[value],
                 TRANSLATION_CONNECTION_BY_MODEL_ID.get(value),
             )
-        if message.name == "PuriPuly_Fallback":
-            return await app.set_fallback(FALLBACK_IDS[message.value])  # type: ignore[index]
         raise RuntimeError(f"unhandled PuriPuly OSC parameter: {message.name}")
 
     def _observe_task(self, task: asyncio.Task[OscDispatchResult]) -> None:

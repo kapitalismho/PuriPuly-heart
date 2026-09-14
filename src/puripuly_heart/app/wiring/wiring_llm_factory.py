@@ -43,7 +43,6 @@ from puripuly_heart.config.runtime_resolution import (
     PROVIDER_QWEN,
     DirectProviderRuntimeIntent,
     RuntimeResolutionInput,
-    TranslationFallbackRuntimeIntent,
     normalize_openrouter_runtime_intent,
     normalize_translation_runtime_intent,
     resolve_llm_config,
@@ -135,11 +134,6 @@ def runtime_resolution_input_from_vnext(settings: AppSettingsVNext) -> RuntimeRe
             connection=translation.connection,
             concurrency_limit=translation.concurrency_limit,
         ),
-        translation_fallback=TranslationFallbackRuntimeIntent(
-            enabled=translation.fallback.enabled,
-            model=translation.fallback.model,
-            connection=translation.fallback.connection,
-        ),
         openrouter=openrouter_intent,
         direct=DirectProviderRuntimeIntent(
             gemini_37_flash_model=translation.gemini.llm_model,
@@ -179,17 +173,21 @@ class _LazyFactoryLLMProvider(LLMProvider):
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> Translation:
         delegate = await self._ensure_delegate()
-        return await delegate.translate(
-            utterance_id=utterance_id,
-            text=text,
-            system_prompt=system_prompt,
-            source_language=source_language,
-            target_language=target_language,
-            context=context,
-            scene_participant_count=scene_participant_count,
-        )
+        kwargs = {
+            "utterance_id": utterance_id,
+            "text": text,
+            "system_prompt": system_prompt,
+            "source_language": source_language,
+            "target_language": target_language,
+            "context": context,
+            "scene_participant_count": scene_participant_count,
+        }
+        if max_output_tokens is not None:
+            kwargs["max_output_tokens"] = max_output_tokens
+        return await delegate.translate(**kwargs)  # type: ignore[arg-type]
 
     async def close(self) -> None:
         if self._delegate is not None:

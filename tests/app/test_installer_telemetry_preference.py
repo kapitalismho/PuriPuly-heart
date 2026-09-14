@@ -59,7 +59,13 @@ def test_upgrade_preserves_unrelated_settings_and_reenabling_creates_identity(
     assert enabled.state.telemetry.anonymous_id
 
 
-def test_installer_preference_uses_supported_legacy_telemetry_migration(tmp_path: Path) -> None:
+def test_installer_preference_uses_supported_legacy_telemetry_migration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from puripuly_heart.core.local_translation import assets
+
+    monkeypatch.setattr(assets, "default_models_dir", lambda: tmp_path / "models")
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
     raw["settings_version"] = 24

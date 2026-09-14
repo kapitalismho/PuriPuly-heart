@@ -53,6 +53,7 @@ LATE_ARRIVAL_WINDOW_SECONDS = 5.0
 VISIBLE_TTL_SECONDS = 8.0
 SELF_TRANSLATION_MIN_VISIBLE_SECONDS = 4.0
 SleepFn = Callable[[float], Awaitable[None]]
+PEER_REPLACEMENT_INTERVAL_SECONDS = 1.0
 
 
 class OverlayPresentationTransport(Protocol):
@@ -109,6 +110,8 @@ class OverlayPresenter(OverlaySink):
         default_factory=asyncio.Lock,
     )
     _closing: bool = field(init=False, default=False)
+    _last_new_occupant_at: float | None = field(init=False, default=None)
+    _peer_admission_changed: asyncio.Event = field(init=False, default_factory=asyncio.Event)
     _closed: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
@@ -340,6 +343,8 @@ class OverlayPresenter(OverlaySink):
         self._live_self_turn_key = None
         self._live_peer_turn_key = None
         self._revision = 0
+        self._last_new_occupant_at = None
+        self._signal_peer_admission_change()
         self._appearance_seq = 0
         self._retry_projection.clear_scene()
         self._diagnostic_projection.reset()
@@ -353,6 +358,8 @@ class OverlayPresenter(OverlaySink):
         await self._cancel_all_expiration_tasks_and_wait()
         self._clear_entries_for_reason("scene_reset")
         self._acceptance.reset()
+        self._last_new_occupant_at = None
+        self._signal_peer_admission_change()
         self._retired_preview_self_seqs.clear()
         self._live_self_turn_key = None
         self._live_peer_turn_key = None
@@ -436,6 +443,95 @@ class OverlayPresenter(OverlaySink):
             self._acceptance.remember_receipt(receipt_event, receipt)
             return receipt
 
+    async def emit_peer_when_admissible(
+        self,
+        event: OverlayEventUnion,
+    ) -> OverlayApplicationReceipt:
+        if event.channel != "peer" or not isinstance(
+            event, (PeerTranscriptFinal, TranslationFinal)
+        ):
+            return await self.emit(event)
+        while True:
+            wake: asyncio.Event | None = None
+            delay: float | None = None
+            async with self._ownership_transition_lock:
+                existing = self._acceptance.retained_receipt(event)
+                if existing is not None:
+                    return existing
+                normalized = self._acceptance.normalize_sequence(event, self._entries)
+                rejection_reason = self._application_rejection_reason(normalized)
+                if rejection_reason is not None:
+                    receipt = OverlayApplicationReceipt(
+                        stage="application_accepted",
+                        outcome="stale" if rejection_reason == "stale" else "not_applied",
+                        publication_id=normalized.event_id,
+                        scene_revision=self._revision,
+                        cause=rejection_reason,
+                    )
+                    self._acceptance.remember_receipt(event, receipt)
+                    return receipt
+                delay = self._peer_replacement_delay(normalized)
+                if delay is None:
+                    wake = self._peer_admission_changed
+                elif delay <= 0:
+                    await self._emit_serialized(normalized)
+                    receipt = OverlayApplicationReceipt(
+                        stage="application_accepted",
+                        outcome="applied",
+                        publication_id=normalized.event_id,
+                        scene_revision=self._revision,
+                    )
+                    self._acceptance.remember_receipt(event, receipt)
+                    return receipt
+                else:
+                    wake = self._peer_admission_changed
+            if wake is None:
+                continue
+            if delay is None:
+                await wake.wait()
+            else:
+                wake_task = asyncio.create_task(wake.wait())
+                deadline_task = asyncio.create_task(self.sleep(delay))
+                owned_tasks = (wake_task, deadline_task)
+                try:
+                    done, _ = await asyncio.wait(
+                        owned_tasks,
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    for task in done:
+                        await task
+                finally:
+                    for task in owned_tasks:
+                        if not task.done():
+                            task.cancel()
+                    await asyncio.gather(*owned_tasks, return_exceptions=True)
+
+    def _peer_replacement_delay(self, event: OverlayEventUnion) -> float | None:
+        key = self._entry_key(event.channel, event.utterance_id)
+        selected_ids = {block.id for block in self.snapshot().blocks}
+        if f"{key[0]}:{key[1]}" in selected_ids:
+            return 0.0
+        if len(selected_ids) < self.visible_window_target_blocks:
+            return 0.0
+        protected = {
+            candidate
+            for candidate in (self._live_self_turn_key, self._live_peer_turn_key)
+            if candidate is not None and f"{candidate[0]}:{candidate[1]}" in selected_ids
+        }
+        if len(protected) >= self.visible_window_target_blocks:
+            return None
+        if self._last_new_occupant_at is None:
+            return 0.0
+        return max(
+            0.0,
+            self._last_new_occupant_at + PEER_REPLACEMENT_INTERVAL_SECONDS - self.clock.now(),
+        )
+
+    def _signal_peer_admission_change(self) -> None:
+        previous = self._peer_admission_changed
+        self._peer_admission_changed = asyncio.Event()
+        previous.set()
+
     async def _emit_serialized(self, event: OverlayEventUnion) -> None:
         changed = self._apply_event(event)
         self._acceptance.record_entry_ordering(event, self._entries)
@@ -506,6 +602,7 @@ class OverlayPresenter(OverlaySink):
             if self._closed:
                 return
             self._closing = True
+            self._signal_peer_admission_change()
             await self.clear_for_runtime_detach()
             self.native_retry_enabled = False
             self._retry_projection.reset()
@@ -745,6 +842,7 @@ class OverlayPresenter(OverlaySink):
         now = self.clock.now()
         self._expire_closed_entries(now=now)
         previous_snapshot = self.snapshot()
+        previous_occupants = {block.id for block in previous_snapshot.blocks}
         selection = self._presentation_state.visible_block_selection(
             entries=self._entries,
             live_self_entry=self._live_self_entry(),
@@ -800,6 +898,7 @@ class OverlayPresenter(OverlaySink):
             and fresh_render_channel is None
             and not force_protocol_publish
         ):
+            self._signal_peer_admission_change()
             self._emit_turn_decision(
                 "overlay_turn_no_visible_change",
                 disposition="rendered_signature_unchanged",
@@ -850,6 +949,10 @@ class OverlayPresenter(OverlaySink):
             entry_ordering=self._acceptance.entry_ordering,
             semantic_retirement_frontiers=self._acceptance.retired_turn_frontiers,
         )
+        next_occupants = {block.id for block in snapshot.blocks}
+        if next_occupants - previous_occupants:
+            self._last_new_occupant_at = now
+        self._signal_peer_admission_change()
         blocks_summary = [
             {
                 "id": block.id,

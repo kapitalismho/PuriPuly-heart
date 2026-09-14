@@ -163,7 +163,7 @@ def test_settings_view_switches_prompt_on_llm_change(monkeypatch) -> None:
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
 
 
-def test_deepseek_managed_and_fallback_keep_single_prompt(monkeypatch) -> None:
+def test_deepseek_managed_keeps_single_prompt(monkeypatch) -> None:
     settings = _settings(
         model="gemini37_flash",
         connection="official_byok",
@@ -189,21 +189,6 @@ def test_deepseek_managed_and_fallback_keep_single_prompt(monkeypatch) -> None:
         _translation(pending).openrouter_selection_alias
         == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
     )
-    assert _prompt(pending) == "GEMINI CUSTOM"
-
-    view._on_openrouter_fallback_selected("openrouter_deepseek_v4_flash")
-    pending = view.build_provider_apply_settings()
-
-    assert view._prompt_editor.value == "GEMINI CUSTOM"
-    assert view._prompt_for_text.value == t(
-        "settings.prompt_for",
-        provider=provider_label(LLMProviderName.OPENROUTER.value),
-    )
-    assert pending is not None
-    fallback = _translation(pending).fallback
-    assert fallback.enabled is True
-    assert fallback.model == TranslationModel.DEEPSEEK_V4_FLASH.value
-    assert fallback.connection == TranslationConnection.OPENROUTER.value
     assert _prompt(pending) == "GEMINI CUSTOM"
 
 
@@ -381,15 +366,14 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
 
     assert values == [
         TranslationModel.GEMMA4_26B_31B.value,
-        TranslationModel.GEMMA4_31B.value,
         TranslationModel.DEEPSEEK_V4_FLASH.value,
         TranslationModel.DEEPSEEK_V4_FLASH_41.value,
         "managed_gemma_cpu",
         "managed_gemma_gpu",
-        TranslationModel.MANAGED_GEMMA_12B.value,
         TranslationModel.LOCAL_LLM.value,
         TranslationModel.CUSTOM_HTTP.value,
         TranslationModel.GEMMA4.value,
+        TranslationModel.GEMMA4_31B.value,
         TranslationModel.GEMINI_37_FLASH.value,
         TranslationModel.QWEN_38_FLASH.value,
     ]
@@ -414,21 +398,12 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
     assert managed["managed_gemma_gpu"].section == t(
         "settings.translation_model.section.gpu_inference"
     )
-    assert managed[TranslationModel.MANAGED_GEMMA_12B.value].label == t(
-        "provider.managed_gemma_12b"
-    )
-    assert managed[TranslationModel.MANAGED_GEMMA_12B.value].description == t(
-        "settings.translation_model.managed_gemma_12b.description"
-    )
-    assert managed[TranslationModel.MANAGED_GEMMA_12B.value].section == t(
-        "settings.translation_model.section.gpu_inference"
-    )
 
     gemma31 = next(
         option for option in options if option.value == TranslationModel.GEMMA4_31B.value
     )
-    assert gemma31.section == t("settings.translation_model.section.recommended_cloud")
-    assert gemma31.description == t("settings.translation_model.gemma4_31b.description")
+    assert gemma31.section == t("settings.translation_model.section.others")
+    assert gemma31.description == ""
 
     gemma26_a4b = next(
         option for option in options if option.value == TranslationModel.GEMMA4.value
@@ -449,6 +424,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
 
     others_options = [option for option in options if option.section == gemma26_a4b.section]
     assert others_options[0] is gemma26_a4b
+    assert others_options[1] is gemma31
 
 
 def test_gemma31_connection_modal_lists_managed_and_openrouter(monkeypatch) -> None:

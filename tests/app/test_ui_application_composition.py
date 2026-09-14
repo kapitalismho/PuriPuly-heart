@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import puripuly_heart.composition.ui_application as composition_module
 from puripuly_heart.app.services.canonical_settings_persistence import compose_settings_owner
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
@@ -62,7 +64,17 @@ def test_real_composition_returns_the_application_boundary(tmp_path: Path) -> No
     assert isinstance(application.settings_secrets(), SettingsSecretsOwner)
 
 
-def test_official_settings_loader_first_run_current_and_older_canonical(tmp_path: Path) -> None:
+def _redirect_models_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from puripuly_heart.core.local_translation import assets
+
+    monkeypatch.setattr(assets, "default_models_dir", lambda: tmp_path / "models")
+
+
+def test_official_settings_loader_first_run_current_and_older_canonical(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _redirect_models_dir(monkeypatch, tmp_path)
     missing = load_application_settings(settings=compose_settings_owner(tmp_path / "missing.json"))
     assert isinstance(missing, AppSettingsVNext)
     assert missing.settings_version == VNEXT_SETTINGS_SCHEMA_VERSION

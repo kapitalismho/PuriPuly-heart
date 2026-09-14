@@ -36,7 +36,8 @@ async def test_zeroconf_service_advertises_and_serves_the_puripuly_tree() -> Non
         assert response.split(b"\r\n", 1)[0] == b"HTTP/1.1 200 OK"
         payload = json.loads(response.split(b"\r\n\r\n", 1)[1])
         parameters = payload["CONTENTS"]["avatar"]["CONTENTS"]["parameters"]["CONTENTS"]
-        assert len(parameters) == 18
+        assert len(parameters) == 17
+        assert "PuriPuly_Fallback" not in parameters
         assert parameters["PuriPuly_Talk"]["TYPE"] == "T"
         assert parameters["PuriPuly_SelfASR"]["TYPE"] == "i"
         assert parameters["PuriPuly_SmartTurn"] == {

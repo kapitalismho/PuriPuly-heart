@@ -12,7 +12,6 @@ from puripuly_heart.core.osc.control_codec import (
 from puripuly_heart.core.osc.control_schema import (
     ASR_IDS,
     BOOLEAN_CONTROLS,
-    FALLBACK_IDS,
     INTEGER_CONTROLS,
     LANGUAGE_IDS,
     OSC_BOOLEAN_PARAMETER_NAMES,
@@ -45,7 +44,6 @@ def test_osc_abi_registries_are_explicit_and_cover_current_languages() -> None:
     }
     assert TRANSLATION_MODEL_IDS[0] == "gemma4_26b_31b"
     assert TRANSLATION_MODEL_IDS[9] == "custom_http"
-    assert FALLBACK_IDS[0] == "none"
 
 
 def test_gemini_osc_id_5_is_canonical_and_id_6_is_inbound_legacy_only() -> None:
@@ -89,6 +87,8 @@ def test_codec_rejects_wrong_types_unknown_ids_and_unknown_parameters() -> None:
         decode_control_message("/avatar/parameters/PuriPuly_SelfASR", 99)
     with pytest.raises(UnknownOscControlValueError):
         decode_control_message("/avatar/parameters/PuriPuly_SelfASR", 6)
+    with pytest.raises(UnknownOscControlValueError):
+        decode_control_message("/avatar/parameters/PuriPuly_Translator", 12)
     with pytest.raises(OscControlCodecError):
         decode_control_message("/avatar/parameters/PuriPuly_Unknown", True)
 
@@ -112,7 +112,7 @@ def test_codec_round_trips_new_asr_ids(asr_id: int, provider: str) -> None:
 def test_control_schema_keeps_boolean_and_integer_surfaces_separate() -> None:
     assert set(OSC_BOOLEAN_PARAMETER_NAMES).isdisjoint(OSC_INTEGER_PARAMETER_NAMES)
     assert len(OSC_BOOLEAN_PARAMETER_NAMES) == 8
-    assert len(OSC_INTEGER_PARAMETER_NAMES) == 9
+    assert len(OSC_INTEGER_PARAMETER_NAMES) == 8
 
 
 def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
@@ -135,7 +135,6 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         "PuriPuly_SelfASR",
         "PuriPuly_PeerASR",
         "PuriPuly_Translator",
-        "PuriPuly_Fallback",
     )
     assert dict(BOOLEAN_CONTROLS) == {
         "PuriPuly_Talk": "self_capture",
@@ -156,7 +155,6 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         "PuriPuly_SelfASR": "stt.provider",
         "PuriPuly_PeerASR": "peer_stt.provider",
         "PuriPuly_Translator": "translation.selection",
-        "PuriPuly_Fallback": "translation.fallback",
     }
     assert tuple(
         (name, definition.value_type, definition.target)
@@ -182,7 +180,6 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         ("PuriPuly_SelfASR", "int", "stt.provider"),
         ("PuriPuly_PeerASR", "int", "peer_stt.provider"),
         ("PuriPuly_Translator", "int", "translation.selection"),
-        ("PuriPuly_Fallback", "int", "translation.fallback"),
     )
     assert dict(ASR_IDS) == {
         0: "local_cpu_auto",
@@ -211,33 +208,15 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         9: "custom_http",
         10: "managed_gemma",
         11: "managed_gemma",
-        12: "managed_gemma_12b",
         13: "deepseek_v4_flash_41",
     }
     assert dict(TRANSLATION_CONNECTION_BY_MODEL_ID) == {
         10: "cpu",
         11: "gpu",
-        12: "gpu",
     }
     assert dict(TRANSLATION_MODEL_ID_BY_SELECTION) == {
         ("managed_gemma", "cpu"): 10,
         ("managed_gemma", "gpu"): 11,
-        ("managed_gemma_12b", "gpu"): 12,
-    }
-    assert dict(FALLBACK_IDS) == {
-        0: "none",
-        1: "deepseek_v4_flash_official",
-        2: "openrouter_deepseek_v4_flash",
-        3: "openrouter_gemma4_26b_a4b",
-        4: "openrouter_gemma4_26b_31b",
-        5: "openrouter_gemma4_31b",
-        6: "managed_gemma4_26b_31b",
-        7: "managed_gemma4_31b",
-        9: "openrouter_deepseek_v4_flash_41",
-        10: "deepseek_v4_flash_managed",
-        11: "deepseek_v4_flash_china",
-        12: "deepseek_v4_flash_41_managed",
-        13: "deepseek_v4_flash_41_china",
     }
     assert dict(LANGUAGE_IDS) == {
         0: "ar",

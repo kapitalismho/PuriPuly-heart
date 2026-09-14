@@ -56,18 +56,6 @@ def new_settings_for_first_run(system_locale: str | None = None) -> AppSettingsV
             openrouter_model="deepseek/deepseek-v4-flash-0731",
             openrouter_selection_alias="deepseek_v4_flash_managed",
             openrouter_provider_routing="deepseek_v4_flash_china",
-            fallback=replace(
-                translation.fallback,
-                selection_alias="deepseek_v4_flash_china",
-            ),
-        )
-    else:
-        translation = replace(
-            translation,
-            fallback=replace(
-                translation.fallback,
-                selection_alias="managed_gemma4_26b_31b",
-            ),
         )
     settings = replace(
         settings,

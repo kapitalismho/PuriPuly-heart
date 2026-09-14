@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 from dataclasses import replace
 from pathlib import Path
 
@@ -14,6 +15,9 @@ from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     ProviderVerificationEntry,
 )
+from puripuly_heart.core.local_translation.assets import remove_retired_managed_gemma_installs
+
+logger = logging.getLogger(__name__)
 
 
 class SettingsVNextCanonicalPersistenceAdapter:
@@ -23,6 +27,14 @@ class SettingsVNextCanonicalPersistenceAdapter:
             status = getattr(result.status, "value", result.status)
             message = result.error.message if result.error is not None else status
             raise CanonicalSettingsPersistenceError(str(status), message)
+        if result.migrated:
+            remove_retired_managed_gemma_installs(
+                on_failure=lambda retired_path, exc: logger.warning(
+                    "Failed to remove retired model asset %s: %s",
+                    retired_path,
+                    exc,
+                ),
+            )
         return CanonicalSettingsLoadResult(
             canonical_settings=result.settings,
             migrated=result.migrated,

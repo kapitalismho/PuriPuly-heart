@@ -15,8 +15,6 @@ from puripuly_heart.core.osc.control_schema import (
     ASR_ID_BY_PROVIDER,
     ASR_IDS,
     BOOLEAN_CONTROLS,
-    FALLBACK_ID_BY_ALIAS,
-    FALLBACK_IDS,
     INTEGER_CONTROLS,
     LANGUAGE_ID_BY_CODE,
     LANGUAGE_IDS,
@@ -90,8 +88,6 @@ class OscControlApplicationPort(Protocol):
         connection: str | None = None,
     ) -> object: ...
 
-    async def set_fallback(self, alias: str) -> object: ...
-
     async def set_mute_sync(self, enabled: bool) -> object: ...
 
     async def set_chatbox_source(self, enabled: bool) -> object: ...
@@ -102,8 +98,6 @@ __all__ = [
     "ASR_IDS",
     "ASR_ID_BY_PROVIDER",
     "BOOLEAN_CONTROLS",
-    "FALLBACK_IDS",
-    "FALLBACK_ID_BY_ALIAS",
     "INTEGER_CONTROLS",
     "LANGUAGE_IDS",
     "LANGUAGE_ID_BY_CODE",

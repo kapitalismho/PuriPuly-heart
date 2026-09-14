@@ -400,6 +400,7 @@ class PeerTranslationChannelOwner:
             created_at=self.clock.now(),
             channel="peer",
             final_language_runs=terminal.final_language_runs,
+            final_speaker_runs=terminal.final_speaker_runs,
             publication_generation=receipt.identity.activation_generation,
             source_order=receipt.identity.segment_order,
         )
@@ -585,30 +586,70 @@ class PeerTranslationChannelOwner:
                 ),
             )
         result = await self.translation_requests.process(
-            TranslationProcessRequest(
-                parent_utterance_id=child.parent_utterance_id,
-                utterance_id=child.utterance_id,
-                sequence=child.sequence,
-                text=child.transcript.text,
-                channel=runtime.channel,
-                source=child.source,
-                target_language=target_language,
-                context_policy=child.context_policy,
-                detected_language=child.detected_language,
-                config_snapshot=config_snapshot,
-                target_index=child.target_index,
-                turn_generation=child.turn_generation,
-                turn_order=child.turn_order,
-                publication_generation=child.transcript.publication_generation,
-                source_order=child.transcript.source_order,
-                turn_kind=child.turn_kind,
-                parent_output_count=child.parent_output_count,
-            ),
+            self._translation_process_request(child, target_language),
             cancellation_requested=cancellation_requested,
         )
         if cancellation_requested():
             raise asyncio.CancelledError
         return result
+
+    async def process_children(
+        self,
+        children: tuple[TranslationTurnChild, ...],
+        cancellation_requested: Callable[[], bool],
+    ) -> tuple[TranslationTurnProcessResult, ...]:
+        if any(child.channel != "peer" for child in children):
+            raise ValueError("Peer translation owner received a non-Peer batch")
+        requests = tuple(
+            self._translation_process_request(
+                child,
+                (
+                    self._target_language_for(self.runtime, child.config_snapshot.value)
+                    if child.target_language == "und"
+                    else child.target_language
+                ),
+            )
+            for child in children
+        )
+        return await self.translation_requests.process_batch(
+            requests,
+            cancellation_requested=cancellation_requested,
+        )
+
+    @staticmethod
+    def _translation_process_request(
+        child: TranslationTurnChild,
+        target_language: str,
+    ) -> TranslationProcessRequest:
+        return TranslationProcessRequest(
+            parent_utterance_id=child.parent_utterance_id,
+            utterance_id=child.utterance_id,
+            sequence=child.sequence,
+            text=child.transcript.text,
+            channel=child.channel,
+            source=child.source,
+            target_language=target_language,
+            context_policy=child.context_policy,
+            detected_language=child.detected_language,
+            speaker_id=(
+                child.transcript.final_speaker_runs[0].speaker_id
+                if child.transcript.final_speaker_runs
+                else None
+            ),
+            speaker_session_scope=(
+                child.transcript.final_speaker_runs[0].session_scope
+                if child.transcript.final_speaker_runs
+                else ""
+            ),
+            config_snapshot=child.config_snapshot,
+            target_index=child.target_index,
+            turn_generation=child.turn_generation,
+            turn_order=child.turn_order,
+            publication_generation=child.transcript.publication_generation,
+            source_order=child.transcript.source_order,
+            turn_kind=child.turn_kind,
+            parent_output_count=child.parent_output_count,
+        )
 
     async def on_child_started(
         self,

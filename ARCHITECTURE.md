@@ -291,7 +291,7 @@ Execution options:
 - Channels retain separate provider epochs, bounded buffers, cancellation, and retention policies.
 - Physical CPU/GPU resources remain shared through their runtime owners.
 - `STTSessionEventProjection` defines scoped turn updates and terminal receipts (`core/stt/backend.py`).
-- `STTScopedTurnNormalizer` assembles text and language runs. Provider updates are not final application transcripts.
+- `STTScopedTurnNormalizer` assembles text, language runs, and session-scoped speaker runs. Provider updates are not final application transcripts.
 
 Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
@@ -314,6 +314,8 @@ Provider adapters own:
 
 The managed local Gemma adapter remains behind `LLMProvider`; its application/runtime owners handle model installation, llama.cpp process health, CPU/Vulkan profile selection, language-pair prefix readiness, and shutdown.
 
+Cloud translation hedging is resolved runtime policy, not persisted user intent. Eligible primaries receive a second attempt with the same model, connection, credential, and routing after 1300 ms or a primary error. OpenRouter primaries retain the additional Gemma 31B ModelRun emergency attempt after 4400 ms. Custom HTTP, managed local Gemma, and local LLM primaries remain single-attempt. Settings schema 44 discards retired fallback selections; neither the settings UI nor OSC exposes a fallback selector.
+
 Translation owners retain:
 
 - turn lifecycle,
@@ -322,6 +324,8 @@ Translation owners retain:
 - publication handoff.
 
 `TranslationTurnLifecycleOwner` admits peer turns in source order. Self and peer speech have separate bounded queues with expiry; child translations share their parent slot.
+
+The turn owner segments LISTEN transcripts by language and speaker; LLM translation batches each transcript while preserving segment identity.
 
 Manual self turns share the ordered lifecycle but are not subject to speech eviction, expiry, or TALK OFF cancellation.
 
@@ -342,7 +346,7 @@ Delivery boundaries:
 - Self chatbox speech has bounded pending delivery and expiry. Manual messages are exempt from speech eviction and expiry.
 - Output handoff releases translation ordering without waiting for display. Sink failure does not replay recognition or translation.
 - Peer publications retain activation generation and source order through output. Retiring an activation cancels its deliveries and rejects late work.
-- Destination acceptance is not a remote display acknowledgement.
+- Destination admission and presenter application receipts are explicit; neither is a remote display acknowledgement.
 
 Caption and overlay settings control destinations, not peer capture. Explicit LISTEN OFF aborts capture and publication. Conversation errors share publication identity; runtime session status uses a separate path.
 
@@ -368,6 +372,8 @@ destination must not block or retire work for the others.
 | Native runtime (`native/overlay/src/runtime.rs`) | VR rendering, presentation retries, and GPU resources |
 
 Each generation owns its tasks and shutdown. Python owns caption lifetime; native owns presentation retries.
+
+`OverlayPresenter` owns provider-independent LISTEN admission and pacing; output retains waiting work within its existing bounded batches.
 
 ## Runtime Logging
 

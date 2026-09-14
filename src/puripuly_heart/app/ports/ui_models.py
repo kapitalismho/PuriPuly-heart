@@ -67,7 +67,6 @@ OscControlPresentationName = Literal[
     "PuriPuly_SelfASR",
     "PuriPuly_PeerASR",
     "PuriPuly_Translator",
-    "PuriPuly_Fallback",
 ]
 
 
@@ -104,10 +103,6 @@ class OscControlPresentationState:
     translation_connection_history: tuple[tuple[str, str], ...]
     translation_http_extension_id: str | None
     translation_previous_model: str | None
-    fallback: str
-    fallback_enabled: bool
-    fallback_model: str
-    fallback_connection: str
     smart_turn_enabled: bool = False
 
 

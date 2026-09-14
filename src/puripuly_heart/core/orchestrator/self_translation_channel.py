@@ -410,6 +410,7 @@ class SelfTranslationChannelOwner:
                     created_at=self.clock.now(),
                     channel="self",
                     final_language_runs=event.final_language_runs,
+                    final_speaker_runs=event.final_speaker_runs,
                 )
                 self._record_latency_stage(utterance_id=utterance_id, stage="stt_final")
                 await self._handle_transcript(transcript, is_final=True, source="Mic")

@@ -10,10 +10,7 @@ import pytest
 from puripuly_heart.app.services.canonical_settings_persistence import compose_settings_owner
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.facade import save_vnext_settings
-from puripuly_heart.config.settings_vnext.schema import (
-    AppSettingsVNext,
-    TranslationFallbackIntent,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 def _write_json(path: Path, value: dict[str, object]) -> bytes:
@@ -29,45 +26,7 @@ def _with_locale(settings: AppSettingsVNext, locale: str) -> AppSettingsVNext:
     )
 
 
-def test_owner_persists_default_gemma_fallback_selected_from_disabled_state(
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "settings.json"
-    canonical = AppSettingsVNext()
-    canonical = replace(
-        canonical,
-        intent=replace(
-            canonical.intent,
-            translation=replace(
-                canonical.intent.translation,
-                fallback=TranslationFallbackIntent(selection_alias="none"),
-            ),
-        ),
-    )
-    _write_json(path, serialization.to_dict(canonical))
-    owner = compose_settings_owner(path)
-    loaded = owner.start()
-    changed = replace(
-        loaded.settings,
-        intent=replace(
-            loaded.settings.intent,
-            translation=replace(
-                loaded.settings.intent.translation,
-                fallback=TranslationFallbackIntent(
-                    selection_alias="openrouter_gemma4_26b_31b",
-                ),
-            ),
-        ),
-    )
-
-    owner.apply_canonical_delta(loaded.settings, changed)
-    owner.persist()
-
-    reloaded = compose_settings_owner(path).start().settings
-    assert reloaded.intent.translation.fallback == changed.intent.translation.fallback
-
-
-def test_owner_unrelated_delta_preserves_disabled_fallback(tmp_path: Path) -> None:
+def test_owner_unrelated_delta_does_not_resurrect_retired_fallback(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
     raw["intent"]["translation"]["fallback"] = {
@@ -85,7 +44,9 @@ def test_owner_unrelated_delta_preserves_disabled_fallback(tmp_path: Path) -> No
     owner.persist()
 
     reloaded = compose_settings_owner(path).start().settings
-    assert reloaded.intent.translation.fallback.enabled is False
+    persisted = serialization.to_dict(reloaded)
+    assert reloaded.intent.ui.locale == "ja"
+    assert "fallback" not in persisted["intent"]["translation"]
 
 
 def test_owner_normalizes_missing_legacy_policies_to_fixed_defaults(tmp_path: Path) -> None:

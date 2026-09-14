@@ -828,14 +828,6 @@
       "deepseek_v4_flash_byok",
       "deepseek_v4_flash_41_byok"
     ],
-    "openrouter_fallback_selection_aliases": [
-      "none",
-      "deepseek_v4_flash",
-      "deepseek_v4_flash_china",
-      "deepseek_v4_flash_41",
-      "gemma4_26b_31b",
-      "gemma4_31b"
-    ],
     "legacy_selection_aliases": [
       "gemini31_flash_lite_byok",
       "openrouter:byok:google/gemma-4-26b-a4b-it",
@@ -843,13 +835,11 @@
       "openrouter:managed:google/gemma-4-26b-a4b-it",
       "openrouter:none:google/gemma-4-26b-a4b-it",
       "openrouter:none:qwen/qwen3.5-flash-02-23"
-    ],
-    "legacy_fallback_aliases": {}
+    ]
   },
   "provider_runtime_public_config": {
     "runtime_resolution_input_fields": [
       "translation",
-      "translation_fallback",
       "openrouter",
       "direct",
       "self_stt",
@@ -894,8 +884,7 @@
     ],
     "legacy_alias_normalization_boundary": "normalize_openrouter_runtime_intent",
     "resolved_runtime_forbidden_alias_fields": [
-      "selection_alias",
-      "fallback_selection_alias"
+      "selection_alias"
     ]
   },
   "guard_coverage": {
@@ -946,7 +935,6 @@
     ],
     "provider_aliases": [
       "tests/config/test_public_compatibility_surfaces.py::test_provider_alias_snapshot_matches_current_aliases_and_legacy_acceptance",
-      "tests/config/test_config_and_secrets.py::test_openrouter_fallback_aliases_include_curated_openrouter_models",
       "tests/config/test_config_and_secrets.py::test_openrouter_alias_for_fields_does_not_expose_deepseek_v4_pro"
     ],
     "provider_runtime_public_config": [

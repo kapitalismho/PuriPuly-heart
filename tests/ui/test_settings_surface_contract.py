@@ -52,7 +52,7 @@ class _SlotProvider:
                 "translation_provider",
                 "translation_connection",
                 "cloud_free_tier",
-                "translation_fallback",
+                "translation_placeholder",
                 "gpu_device",
                 "gpu_llm",
                 "gpu_refresh",
@@ -78,8 +78,8 @@ class _SlotProvider:
     def cloud_free_tier_control(self) -> ft.Control:
         return self.controls["cloud_free_tier"]
 
-    def translation_fallback_control(self) -> ft.Control:
-        return self.controls["translation_fallback"]
+    def translation_placeholder_control(self) -> ft.Control:
+        return self.controls["translation_placeholder"]
 
     def gpu_device_control(self) -> ft.Control:
         return self.controls["gpu_device"]
@@ -149,7 +149,7 @@ def test_settings_api_surface_places_every_slot_in_the_accepted_position() -> No
     assert surface.translation_connection_controls.controls == [
         provider.controls["cloud_free_tier"],
         provider.controls["translation_connection"],
-        provider.controls["translation_fallback"],
+        provider.controls["translation_placeholder"],
     ]
     assert surface.gpu_device_controls.controls == [
         provider.controls["gpu_device"],

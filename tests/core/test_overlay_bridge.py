@@ -307,6 +307,39 @@ async def test_overlay_bridge_emits_heartbeat_after_authentication() -> None:
 
 
 @pytest.mark.asyncio
+async def test_overlay_bridge_keeps_desktop_first_visible_connection_alive() -> None:
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        initial_snapshot=OverlayPresentationSnapshot(
+            revision=0,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[],
+        ),
+    )
+    await bridge.start()
+
+    try:
+        async with connect(bridge.url) as ws:
+            await ws.send(json.dumps({"type": "auth", "session_token": "expected-token"}))
+            await asyncio.wait_for(ws.recv(), timeout=0.5)
+            await ws.send(
+                json.dumps(
+                    {
+                        "type": "desktop_first_visible",
+                        "overlay_instance_id": "overlay-test",
+                        "generation": 1,
+                    }
+                )
+            )
+            queued = await asyncio.wait_for(bridge.messages.get(), timeout=0.5)
+
+            assert queued["type"] == "desktop_first_visible"
+            assert len(bridge._authenticated_connections) == 1
+    finally:
+        await bridge.stop()
+
+
+@pytest.mark.asyncio
 async def test_overlay_bridge_resets_one_time_token_after_stop_and_restart() -> None:
     bridge = OverlayBridge(
         session_token="expected-token",

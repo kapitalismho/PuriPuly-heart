@@ -34,8 +34,8 @@ def test_state_publisher_sends_full_snapshot_then_only_deltas() -> None:
     state = OscCanonicalState()
 
     full = publisher.start(state)
-    assert len(full) == 17
-    assert len(sender.messages) == 17
+    assert len(full) == 16
+    assert len(sender.messages) == 16
     assert (
         "/avatar/parameters/PuriPuly_SelfDstLang2",
         255,
@@ -47,9 +47,7 @@ def test_state_publisher_sends_full_snapshot_then_only_deltas() -> None:
     assert publisher.is_echo("PuriPuly_Trans", False) is True
     assert publisher.is_echo("PuriPuly_Trans", True) is False
 
-    changed = publisher.publish_delta(
-        OscCanonicalState(translation=True, mute_sync=True, fallback="none")
-    )
+    changed = publisher.publish_delta(OscCanonicalState(translation=True, mute_sync=True))
     assert {item.parameter for item in changed} == {"PuriPuly_Trans", "PuriPuly_MuteSync"}
 
 
@@ -61,7 +59,7 @@ def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:
     publisher.start(state)
     publisher.on_discovery(state)
 
-    assert len(sender.messages) == 34
+    assert len(sender.messages) == 32
 
 
 @pytest.mark.parametrize(
@@ -72,7 +70,6 @@ def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:
         (TranslationModel.CUSTOM_HTTP, TranslationConnection.CUSTOM_HTTP, 9),
         (TranslationModel.MANAGED_GEMMA, TranslationConnection.CPU, 10),
         (TranslationModel.MANAGED_GEMMA, TranslationConnection.GPU, 11),
-        (TranslationModel.MANAGED_GEMMA_12B, TranslationConnection.GPU, 12),
         (TranslationModel.DEEPSEEK_V4_FLASH, TranslationConnection.OPENROUTER, 3),
         (TranslationModel.DEEPSEEK_V4_FLASH_41, TranslationConnection.OFFICIAL_BYOK, 13),
     ],
@@ -100,58 +97,6 @@ def test_state_publisher_uses_translation_selection_ids(
     OscStatePublisher(sender).start(state)
 
     assert ("/avatar/parameters/PuriPuly_Translator", expected_id) in sender.messages
-
-
-@pytest.mark.parametrize(
-    ("model", "connection", "expected"),
-    [
-        (
-            TranslationModel.DEEPSEEK_V4_FLASH_41,
-            TranslationConnection.OFFICIAL_BYOK,
-            "deepseek_v4_flash_official",
-        ),
-        (
-            TranslationModel.DEEPSEEK_V4_FLASH,
-            TranslationConnection.OPENROUTER,
-            "openrouter_deepseek_v4_flash",
-        ),
-        (
-            TranslationModel.DEEPSEEK_V4_FLASH_41,
-            TranslationConnection.OPENROUTER,
-            "openrouter_deepseek_v4_flash_41",
-        ),
-        (TranslationModel.GEMMA4, TranslationConnection.OPENROUTER, "openrouter_gemma4_26b_a4b"),
-        (
-            TranslationModel.GEMMA4_26B_31B,
-            TranslationConnection.OPENROUTER,
-            "openrouter_gemma4_26b_31b",
-        ),
-        (TranslationModel.GEMMA4_31B, TranslationConnection.OPENROUTER, "openrouter_gemma4_31b"),
-        (TranslationModel.GEMMA4_26B_31B, TranslationConnection.MANAGED, "managed_gemma4_26b_31b"),
-        (TranslationModel.GEMMA4_31B, TranslationConnection.MANAGED, "managed_gemma4_31b"),
-    ],
-)
-def test_state_from_settings_publishes_each_fallback_alias(
-    model: TranslationModel,
-    connection: TranslationConnection,
-    expected: str,
-) -> None:
-    baseline = AppSettingsVNext()
-    settings = replace(
-        baseline,
-        intent=replace(
-            baseline.intent,
-            translation=replace(
-                baseline.intent.translation,
-                fallback=replace(
-                    baseline.intent.translation.fallback,
-                    selection_alias=expected,
-                ),
-            ),
-        ),
-    )
-
-    assert state_from_settings(settings).fallback == expected
 
 
 @pytest.mark.parametrize(

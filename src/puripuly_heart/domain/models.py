@@ -35,6 +35,13 @@ class FinalLanguageRun:
 
 
 @dataclass(frozen=True, slots=True)
+class FinalSpeakerRun:
+    text: str
+    speaker_id: str | None
+    session_scope: str
+
+
+@dataclass(frozen=True, slots=True)
 class Transcript:
     utterance_id: UUID
     text: str
@@ -42,6 +49,7 @@ class Transcript:
     created_at: float | None = None  # monotonic seconds (Clock)
     channel: ChannelId = "self"
     final_language_runs: tuple[FinalLanguageRun, ...] = ()
+    final_speaker_runs: tuple[FinalSpeakerRun, ...] = ()
     publication_generation: int | None = None
     source_order: int | None = None
 
@@ -49,6 +57,8 @@ class Transcript:
         _validate_channel(self.channel)
         if not self.is_final and self.final_language_runs:
             raise ValueError("partial transcripts cannot have final language runs")
+        if not self.is_final and self.final_speaker_runs:
+            raise ValueError("partial transcripts cannot have final speaker runs")
         if (self.publication_generation is None) != (self.source_order is None):
             raise ValueError("publication generation and source order must be provided together")
         if self.publication_generation is not None:

@@ -80,7 +80,6 @@ def _runtime_input(
     connection: str,
     openrouter: Any | None = None,
     direct: Any | None = None,
-    translation_fallback: Any | None = None,
     concurrency_limit: int = 5,
 ) -> Any:
     return runtime_resolution.RuntimeResolutionInput(
@@ -88,9 +87,6 @@ def _runtime_input(
             model=model,
             connection=connection,
             concurrency_limit=concurrency_limit,
-        ),
-        translation_fallback=(
-            translation_fallback or runtime_resolution.TranslationFallbackRuntimeIntent()
         ),
         openrouter=openrouter or runtime_resolution.OpenRouterRuntimeIntent(),
         direct=direct or runtime_resolution.DirectProviderRuntimeIntent(),
@@ -736,7 +732,11 @@ def test_translation_model_connection_matrix_resolves_llm_config(
     assert config.region == expected_region
     assert config.provider_routing == expected_provider_routing
     assert config.concurrency_limit == 5
-    assert config.fallback is None
+    if model in {"custom_http", "managed_gemma", "local_llm"}:
+        assert config.fallback is None
+    else:
+        assert config.fallback is not None
+        assert config.fallback.target == config.primary
 
 
 @pytest.mark.parametrize(
@@ -758,11 +758,6 @@ def test_managed_gemma_resolves_distinct_local_target_without_provider_fallback(
             runtime_resolution,
             model=runtime_resolution.TRANSLATION_MODEL_MANAGED_GEMMA,
             connection=connection,
-            translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
-                enabled=True,
-                model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
-                connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
-            ),
         )
     )
 
@@ -788,11 +783,6 @@ def test_local_llm_resolves_without_provider_fallback() -> None:
             runtime_resolution,
             model=runtime_resolution.TRANSLATION_MODEL_LOCAL_LLM,
             connection=runtime_resolution.TRANSLATION_CONNECTION_OLLAMA,
-            translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
-                enabled=True,
-                model=runtime_resolution.TRANSLATION_MODEL_GEMMA4_26B_31B,
-                connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
-            ),
         )
     )
 
@@ -807,35 +797,6 @@ def test_local_llm_resolves_without_provider_fallback() -> None:
     assert config.attempts[0].target == config.primary
 
 
-def test_managed_gemma_12b_resolves_gpu_local_target_without_provider_fallback() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    resolved = _resolved_module()
-
-    config = runtime_resolution.resolve_llm_config(
-        _runtime_input(
-            runtime_resolution,
-            model=runtime_resolution.TRANSLATION_MODEL_MANAGED_GEMMA_12B,
-            connection=runtime_resolution.TRANSLATION_CONNECTION_GPU,
-            translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
-                enabled=True,
-                model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
-                connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
-            ),
-        )
-    )
-
-    assert config.provider == runtime_resolution.PROVIDER_MANAGED_GEMMA
-    assert config.model == runtime_resolution.MANAGED_GEMMA_12B_MODEL
-    assert config.credential == resolved.ResolvedCredentialRequirement(
-        source=resolved.CREDENTIAL_SOURCE_NONE,
-        required=False,
-        reference=None,
-    )
-    assert config.provider_options == {"backend": "gpu"}
-    assert config.fallback is None
-    assert len(config.attempts) == 1
-
-
 def test_legacy_managed_gemma_provider_derives_cpu_product_intent() -> None:
     runtime_resolution = _runtime_resolution_module()
 
@@ -847,228 +808,46 @@ def test_legacy_managed_gemma_provider_derives_cpu_product_intent() -> None:
     assert intent.connection == runtime_resolution.TRANSLATION_CONNECTION_CPU
 
 
-@pytest.mark.parametrize(
-    (
-        "selection_alias",
-        "fallback_enabled",
-        "fallback_model",
-        "fallback_connection",
-        "expected_fallback_source",
-        "expected_fallback_reference",
-        "expected_fallback_provider",
-        "expected_fallback_model",
-        "expected_provider_routing",
-    ),
-    [
-        (
-            "none",
-            False,
-            "deepseek_v4_flash_41",
-            "official_byok",
-            None,
-            None,
-            None,
-            None,
-            None,
-        ),
-        (
-            "deepseek_v4_flash_official",
-            True,
-            "deepseek_v4_flash_41",
-            "official_byok",
-            "secret_store",
-            "deepseek:byok",
-            "deepseek",
-            "deepseek-flash",
-            None,
-        ),
-        (
-            "openrouter_deepseek_v4_flash",
-            True,
-            "deepseek_v4_flash",
-            "openrouter",
-            "secret_store",
-            "openrouter:byok",
-            "openrouter",
-            "deepseek/deepseek-v4-flash-0731",
-            "deepseek_v4_flash_latency",
-        ),
-        (
-            "openrouter_deepseek_v4_flash_41",
-            True,
-            "deepseek_v4_flash_41",
-            "openrouter",
-            "secret_store",
-            "openrouter:byok",
-            "openrouter",
-            "deepseek/deepseek-v4.1-flash",
-            "deepseek_v4_flash_41_strict",
-        ),
-        (
-            "openrouter_gemma4_26b_a4b",
-            True,
-            "gemma4",
-            "openrouter",
-            "secret_store",
-            "openrouter:byok",
-            "openrouter",
-            "google/gemma-4-26b-a4b-it",
-            "gemma4_26b_latency",
-        ),
-    ],
-)
-def test_canonical_translation_fallback_branch_resolves_explicit_provider_route(
-    selection_alias: str,
-    fallback_enabled: bool,
-    fallback_model: str,
-    fallback_connection: str,
-    expected_fallback_source: str,
-    expected_fallback_reference: str | None,
-    expected_fallback_provider: str,
-    expected_fallback_model: str,
-    expected_provider_routing: str | None,
-) -> None:
+def test_direct_cloud_primary_gets_exact_identity_hedge() -> None:
     runtime_resolution = _runtime_resolution_module()
-    resolved = _resolved_module()
-    original_fallback = runtime_resolution.TranslationFallbackRuntimeIntent(
-        enabled=fallback_enabled,
-        model=fallback_model,
-        connection=fallback_connection,
-    )
 
     config = runtime_resolution.resolve_llm_config(
         _runtime_input(
             runtime_resolution,
-            model=runtime_resolution.TRANSLATION_MODEL_GEMMA4,
-            connection=runtime_resolution.TRANSLATION_CONNECTION_MANAGED,
-            translation_fallback=original_fallback,
-        )
-    )
-
-    assert original_fallback == runtime_resolution.TranslationFallbackRuntimeIntent(
-        enabled=fallback_enabled,
-        model=fallback_model,
-        connection=fallback_connection,
-    )
-    if selection_alias == "none":
-        assert config.fallback is None
-        return
-    assert config.fallback is not None
-    assert config.fallback.target.provider == expected_fallback_provider
-    assert config.fallback.target.model == expected_fallback_model
-    assert config.fallback.target.credential == _credential_assertion(
-        resolved,
-        expected_fallback_source,
-        expected_fallback_reference,
-    )
-    assert config.fallback.target.provider_routing == expected_provider_routing
-
-
-def test_openrouter_no_fallback_selected_has_no_fallback_credential() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
-        selection_alias="gemma4_byok",
-    )
-
-    config = runtime_resolution.resolve_llm_config(
-        _runtime_input(
-            runtime_resolution,
-            model=runtime_resolution.TRANSLATION_MODEL_GEMMA4,
-            connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
-            openrouter=openrouter_intent,
-        )
-    )
-
-    assert config.fallback is None
-
-
-def test_openrouter_china_fallback_resolves_baidu_only_fallback_routing() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    resolved = _resolved_module()
-    openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
-        selection_alias="gemma4_managed",
-    )
-
-    config = runtime_resolution.resolve_llm_config(
-        _runtime_input(
-            runtime_resolution,
-            model=runtime_resolution.TRANSLATION_MODEL_GEMMA4,
-            connection=runtime_resolution.TRANSLATION_CONNECTION_MANAGED,
-            openrouter=openrouter_intent,
-            translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
-                enabled=True,
-                model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
-                connection=runtime_resolution.TRANSLATION_CONNECTION_MANAGED_CHINA,
-            ),
+            model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
+            connection=runtime_resolution.TRANSLATION_CONNECTION_OFFICIAL_BYOK,
         )
     )
 
     assert config.fallback is not None
-    assert config.fallback.target.provider == "openrouter"
-    assert config.fallback.target.model == "deepseek/deepseek-v4-flash-0731"
-    assert config.fallback.target.credential == resolved.ResolvedCredentialRequirement(
-        source=resolved.CREDENTIAL_SOURCE_MANAGED,
-        required=True,
-        reference="openrouter:managed_qq",
-    )
-    assert config.fallback.target.provider_routing == "deepseek_v4_flash_china"
-    assert config.fallback.force_managed_wrapper is True
+    assert config.fallback.target == config.primary
+    assert config.fallback.start_after_ms == 1300
+    assert config.fallback.start_on_primary_error is True
+    assert config.fallback.force_managed_wrapper is False
+    assert len(config.attempts) == 2
+    assert config.attempts[0].target == config.attempts[1].target
 
 
-def test_openrouter_gemma_fallback_preserves_duplicate_target_and_adds_emergency() -> None:
+def test_managed_openrouter_primary_gets_identity_hedge_and_emergency_route() -> None:
     runtime_resolution = _runtime_resolution_module()
-    openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
-        selection_alias="gemma4_byok",
-    )
-
-    config = runtime_resolution.resolve_llm_config(
-        _runtime_input(
-            runtime_resolution,
-            model=runtime_resolution.TRANSLATION_MODEL_GEMMA4,
-            connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
-            openrouter=openrouter_intent,
-            translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
-                enabled=True,
-                model=runtime_resolution.TRANSLATION_MODEL_GEMMA4,
-                connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
-            ),
-        )
-    )
-
-    assert config.fallback is not None
-    assert config.fallback.target.provider_routing == "gemma4_26b_latency"
-    assert len(config.attempts) == 3
-    assert config.attempts[1].target == config.fallback.target
-    assert config.attempts[2].target.provider_routing == "gemma4_31b_modelrun_only"
-
-
-def test_openrouter_deepseek_only_primary_keeps_fallback_and_emergency_schedule() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
-        selection_alias="deepseek_v4_flash_managed",
-        provider_routing="deepseek_only",
-    )
 
     config = runtime_resolution.resolve_llm_config(
         _runtime_input(
             runtime_resolution,
             model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
             connection=runtime_resolution.TRANSLATION_CONNECTION_MANAGED_CHINA,
-            openrouter=openrouter_intent,
-            translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
-                enabled=True,
-                model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
-                connection=runtime_resolution.TRANSLATION_CONNECTION_MANAGED_CHINA,
-            ),
         )
     )
 
-    assert config.provider == "openrouter"
-    assert config.model == "deepseek/deepseek-v4-flash-0731"
-    assert config.provider_routing == "deepseek_v4_flash_china"
     assert config.fallback is not None
-    assert config.fallback.target.provider_routing == "deepseek_v4_flash_china"
+    assert config.fallback.target == config.primary
+    assert config.fallback.force_managed_wrapper is True
     assert len(config.attempts) == 3
+    assert config.attempts[1].target == config.primary
+    assert config.attempts[1].start_after_ms == 1300
+    assert config.attempts[1].start_on_primary_error is True
+    assert config.attempts[2].start_after_ms == 4400
+    assert config.attempts[2].start_on_primary_error is False
     assert config.attempts[2].target.provider_routing == "gemma4_31b_modelrun_only"
 
 
@@ -1118,14 +897,13 @@ def test_standard_managed_resolves_standard_managed_credential_reference() -> No
     )
 
 
-def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_and_suppresses_fallback() -> None:
+def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_with_identity_hedge() -> None:
     runtime_resolution = _runtime_resolution_module()
     resolved = _resolved_module()
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
         provider_llm="openrouter",
         model="deepseek/deepseek-v4.1-flash",
         selected_source="byok",
-        fallback_selection_alias="qwen35_flash",
         routing_mode="parasail_first",
         provider_routing="deepseek_only",
         broker_base_url="https://broker.fixture.test/v1",
@@ -1157,7 +935,8 @@ def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_and_suppresses
     assert config.routing_mode == "latency"
     assert config.provider_routing == "deepseek_v4_flash_41_strict"
     assert config.service_endpoint == "https://broker.fixture.test/v1"
-    assert config.fallback is None
+    assert config.fallback is not None
+    assert config.fallback.target == config.primary
 
 
 def test_openrouter_runtime_intent_normalizes_legacy_deepseek_model() -> None:
@@ -1181,9 +960,6 @@ def test_legacy_current_openrouter_aliases_normalize_to_canonical_intent_and_res
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
         selection_alias=profiles.LEGACY_OPENROUTER_SELECTION_ALIAS_BYOK_GEMMA_4_26B_A4B_IT,
         selected_source=profiles.OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
-        fallback_selection_alias=(
-            profiles.LEGACY_OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMINI31_FLASH_LITE
-        ),
     )
 
     assert openrouter_intent.model == profiles.OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT
@@ -1207,7 +983,8 @@ def test_legacy_current_openrouter_aliases_normalize_to_canonical_intent_and_res
         required=True,
         reference="openrouter:byok",
     )
-    assert config.fallback is None
+    assert config.fallback is not None
+    assert config.fallback.target == config.primary
     assert config.concurrency_limit == 7
 
 
@@ -1318,7 +1095,6 @@ def test_legacy_openrouter_selection_aliases_normalize_before_resolved_runtime(
         provider_llm="openrouter",
         selected_source=selected_source,
         selection_alias=legacy_alias,
-        fallback_selection_alias="none",
     )
     translation_intent = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
         provider_llm="openrouter",
@@ -1366,7 +1142,6 @@ def test_old_openrouter_credential_source_keys_normalize_through_settings_to_res
         model=raw_openrouter["llm_model"],
         selected_source=raw_openrouter.get("selected_source") or raw_openrouter.get(legacy_key),
         selection_alias=raw_openrouter["selection_alias"],
-        fallback_selection_alias=raw_openrouter["fallback_selection_alias"],
     )
     translation_intent = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
         provider_llm="openrouter",
@@ -1446,7 +1221,6 @@ def test_current_and_legacy_setting_value_snapshots_convert_to_canonical_input_a
                 or raw_openrouter.get("selected_credential_source")
             ),
             selection_alias=raw_openrouter.get("selection_alias"),
-            fallback_selection_alias=raw_openrouter.get("fallback_selection_alias"),
             routing_mode=raw_openrouter.get("routing_mode"),
             provider_routing=raw_openrouter.get("provider_routing"),
             broker_base_url=raw_openrouter.get("broker_base_url"),
@@ -1490,7 +1264,6 @@ def test_derive_runtime_from_openrouter_gemini_compatibility_values() -> None:
         model="google/gemini-3.1-flash-lite",
         selected_source="byok",
         selection_alias="gemini31_flash_lite_byok",
-        fallback_selection_alias="none",
         routing_mode="latency",
         provider_routing="google_gemini_latency",
     )
@@ -1551,7 +1324,6 @@ def test_missing_translation_openrouter_compatibility_values_derive_exact_runtim
         model=raw_openrouter["llm_model"],
         selected_source=raw_openrouter["selected_source"],
         selection_alias=raw_openrouter["selection_alias"],
-        fallback_selection_alias=raw_openrouter["fallback_selection_alias"],
         routing_mode=raw_openrouter["routing_mode"],
         provider_routing=raw_openrouter["provider_routing"],
         broker_base_url=raw_openrouter["broker_base_url"],
@@ -1594,7 +1366,8 @@ def test_missing_translation_openrouter_compatibility_values_derive_exact_runtim
     assert config.provider_routing == "deepseek_v4_flash_latency"
     assert config.base_url is None
     assert config.service_endpoint == "https://broker.fixture.test/v1"
-    assert config.fallback is None
+    assert config.fallback is not None
+    assert config.fallback.target == config.primary
     assert config.concurrency_limit == 4
 
 
@@ -1616,7 +1389,6 @@ def test_openrouter_qwen_primary_compatibility_preserves_model_and_source(
         provider_llm="openrouter",
         model="qwen/qwen3.5-flash-02-23",
         selected_source=selected_source,
-        fallback_selection_alias="none",
         routing_mode="parasail_first",
         provider_routing="default",
         broker_base_url="https://broker.fixture.test/v1",
@@ -1646,17 +1418,17 @@ def test_openrouter_qwen_primary_compatibility_preserves_model_and_source(
     assert config.routing_mode == "latency"
     assert config.provider_routing == "default"
     assert config.service_endpoint == "https://broker.fixture.test/v1"
-    assert config.fallback is None
+    assert config.fallback is not None
+    assert config.fallback.target == config.primary
     assert config.concurrency_limit == 8
 
 
-def test_openrouter_qwen_primary_deepseek_only_preserves_routing_and_suppresses_fallback() -> None:
+def test_openrouter_qwen_primary_deepseek_only_preserves_routing_with_identity_hedge() -> None:
     runtime_resolution = _runtime_resolution_module()
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
         provider_llm="openrouter",
         model="qwen/qwen3.5-flash-02-23",
         selected_source="byok",
-        fallback_selection_alias="deepseek_v4_flash",
         routing_mode="parasail_first",
         provider_routing="deepseek_only",
         broker_base_url="https://broker.fixture.test/v1",
@@ -1681,7 +1453,8 @@ def test_openrouter_qwen_primary_deepseek_only_preserves_routing_and_suppresses_
     assert config.model == "qwen/qwen3.5-flash-02-23"
     assert config.provider_routing == "deepseek_only"
     assert config.routing_mode == "latency"
-    assert config.fallback is None
+    assert config.fallback is not None
+    assert config.fallback.target == config.primary
 
 
 def test_missing_openrouter_source_defaults_to_byok_for_openrouter_provider() -> None:
@@ -1705,7 +1478,6 @@ def test_missing_openrouter_source_defaults_to_byok_for_openrouter_provider() ->
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
         provider_llm=raw_settings["provider"]["llm"],
         model=raw_openrouter["llm_model"],
-        fallback_selection_alias=raw_openrouter["fallback_selection_alias"],
         routing_mode=raw_openrouter["routing_mode"],
         provider_routing=raw_openrouter["provider_routing"],
         broker_base_url=raw_openrouter["broker_base_url"],
@@ -1742,7 +1514,8 @@ def test_missing_openrouter_source_defaults_to_byok_for_openrouter_provider() ->
     assert config.routing_mode == "latency"
     assert config.provider_routing == "gemma4_26b_latency"
     assert config.service_endpoint == "https://broker.fixture.test/v1"
-    assert config.fallback is None
+    assert config.fallback is not None
+    assert config.fallback.target == config.primary
     assert config.concurrency_limit == 3
 
 
@@ -1795,7 +1568,6 @@ def test_missing_translation_direct_provider_compatibility_values_derive_exact_c
         model=raw_openrouter["llm_model"],
         selected_source=raw_openrouter["selected_source"],
         selection_alias=raw_openrouter["selection_alias"],
-        fallback_selection_alias=raw_openrouter["fallback_selection_alias"],
         routing_mode=raw_openrouter["routing_mode"],
         provider_routing=raw_openrouter["provider_routing"],
         broker_base_url=raw_openrouter["broker_base_url"],
@@ -1835,7 +1607,8 @@ def test_missing_translation_direct_provider_compatibility_values_derive_exact_c
     assert config.region is None
     assert config.routing_mode is None
     assert config.provider_routing is None
-    assert config.fallback is None
+    assert config.fallback is not None
+    assert config.fallback.target == config.primary
     assert config.concurrency_limit == 6
 
 
@@ -1849,11 +1622,6 @@ def test_resolved_output_uses_lookup_references_not_raw_secret_values() -> None:
             connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
             openrouter=runtime_resolution.OpenRouterRuntimeIntent(
                 selected_source=runtime_resolution.OPENROUTER_SOURCE_BYOK,
-            ),
-            translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
-                enabled=True,
-                model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
-                connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
             ),
         )
     )
@@ -1875,14 +1643,3 @@ def test_resolved_output_uses_lookup_references_not_raw_secret_values() -> None:
     assert config.fallback.target.credential.reference is not None
     assert "sk-" not in config.fallback.target.credential.reference
     assert "secret" not in config.fallback.target.credential.reference
-
-
-def test_runtime_fallback_rejects_custom_http() -> None:
-    runtime_resolution = _runtime_resolution_module()
-
-    with pytest.raises(ValueError, match="cannot be used as fallback"):
-        runtime_resolution.TranslationFallbackRuntimeIntent(
-            enabled=True,
-            model=runtime_resolution.TRANSLATION_MODEL_CUSTOM_HTTP,
-            connection=runtime_resolution.TRANSLATION_CONNECTION_CUSTOM_HTTP,
-        )

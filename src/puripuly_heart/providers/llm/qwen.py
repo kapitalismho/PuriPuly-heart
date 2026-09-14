@@ -133,6 +133,7 @@ class QwenClient(Protocol):
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> str: ...
 
 
@@ -157,6 +158,7 @@ class QwenLLMProvider:
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> Translation:
         client = self.client or DashScopeQwenClient(
             api_key=self.api_key,
@@ -164,14 +166,17 @@ class QwenLLMProvider:
             base_url=self.base_url,
             runtime_logging=self.runtime_logging,
         )
-        translated = await client.translate(
-            text=text,
-            system_prompt=system_prompt,
-            source_language=source_language,
-            target_language=target_language,
-            context=context,
-            scene_participant_count=scene_participant_count,
-        )
+        kwargs = {
+            "text": text,
+            "system_prompt": system_prompt,
+            "source_language": source_language,
+            "target_language": target_language,
+            "context": context,
+            "scene_participant_count": scene_participant_count,
+        }
+        if max_output_tokens is not None:
+            kwargs["max_output_tokens"] = max_output_tokens
+        translated = await client.translate(**kwargs)  # type: ignore[arg-type]
         return Translation(utterance_id=utterance_id, text=translated)
 
     async def close(self) -> None:
@@ -287,6 +292,7 @@ class DashScopeQwenClient:
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> str:
 
         def _call() -> str:
@@ -298,6 +304,13 @@ class DashScopeQwenClient:
                 context=context,
                 scene_participant_count=scene_participant_count,
             )
+            compatible_body: dict[str, object] = {
+                "model": self.model,
+                "messages": messages,
+                "enable_thinking": False,
+            }
+            if max_output_tokens is not None:
+                compatible_body["max_tokens"] = max_output_tokens
             if _is_qwen_compatible_model(self.model):
                 compatible_base_url = _to_compatible_base_url(self.base_url)
                 response = httpx.post(
@@ -306,11 +319,7 @@ class DashScopeQwenClient:
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json",
                     },
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "enable_thinking": False,
-                    },
+                    json=compatible_body,
                     timeout=30.0,
                 )
                 if response.status_code != 200:
@@ -342,11 +351,14 @@ class DashScopeQwenClient:
 
             dashscope.api_key = self.api_key
             dashscope.base_http_api_url = self.base_url
-            response = dashscope.Generation.call(
-                model=self.model,
-                messages=messages,
-                result_format="message",
-            )
+            call_kwargs: dict[str, object] = {
+                "model": self.model,
+                "messages": messages,
+                "result_format": "message",
+            }
+            if max_output_tokens is not None:
+                call_kwargs["max_tokens"] = max_output_tokens
+            response = dashscope.Generation.call(**call_kwargs)
             output = getattr(response, "output", None)
             if not output:
                 status = getattr(response, "status_code", None)

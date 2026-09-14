@@ -145,15 +145,6 @@ async def test_managed_local_models_control_materializes_provider_and_connection
     assert updated.intent.translation.model == TranslationModel.MANAGED_GEMMA.value
     assert updated.intent.translation.connection == TranslationConnection.GPU.value
 
-    await application.set_translation_model(
-        TranslationModel.MANAGED_GEMMA_12B.value,
-        TranslationConnection.GPU.value,
-    )
-
-    updated = applied[2]
-    assert updated.intent.translation.model == TranslationModel.MANAGED_GEMMA_12B.value
-    assert updated.intent.translation.connection == TranslationConnection.GPU.value
-
 
 @pytest.mark.asyncio
 async def test_custom_http_control_preserves_the_previous_llm_selection() -> None:
@@ -403,48 +394,6 @@ async def test_asr_controls_skip_apply_when_provider_matches() -> None:
     assert applied == 1
     assert current.intent.stt.provider == "local_parakeet_v3"
     assert current.intent.peer_stt.provider == "soniox"
-
-
-@pytest.mark.asyncio
-async def test_fallback_control_skips_apply_when_alias_matches() -> None:
-    current = _with_translation(
-        AppSettingsVNext(),
-        fallback=replace(
-            AppSettingsVNext().intent.translation.fallback,
-            selection_alias="none",
-        ),
-    )
-    applied = 0
-
-    async def apply_settings(settings: object) -> object:
-        nonlocal current
-        nonlocal applied
-        assert isinstance(settings, AppSettingsVNext)
-        applied += 1
-        current = settings
-        return True
-
-    application = SettingsBackedOscControlApplication(
-        settings_provider=lambda: current,
-        apply_settings=apply_settings,
-        translation_model_normalizer=materialize_canonical_translation_settings,
-    )
-
-    assert (await application.set_fallback("none")) is True
-    assert applied == 0
-
-    assert (await application.set_fallback("deepseek_v4_flash_41_managed")) is True
-    assert applied == 1
-    assert current.intent.translation.fallback.enabled is True
-    assert current.intent.translation.fallback.model == "deepseek_v4_flash_41"
-    assert current.intent.translation.fallback.connection == "managed"
-
-    assert (await application.set_fallback("none")) is True
-    assert applied == 2
-    assert current.intent.translation.fallback.enabled is False
-
-    with pytest.raises(ValueError, match="unknown OSC fallback alias"):
-        await application.set_fallback("cerebras_gemma4_31b")
 
 
 @pytest.mark.asyncio

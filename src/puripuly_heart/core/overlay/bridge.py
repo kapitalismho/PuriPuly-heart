@@ -56,6 +56,7 @@ _REVERSE_KNOWN_TYPES = frozenset(
         "shutdown_complete",
         "overlay_trace",
         "overlay_event",
+        "desktop_first_visible",
     }
 )
 

@@ -72,10 +72,7 @@ def managed_gemma_prefix_refresh_required(
 ) -> bool:
     settings = transition.settings
     model = settings.intent.translation.model
-    if model not in {
-        TranslationModel.MANAGED_GEMMA.value,
-        TranslationModel.MANAGED_GEMMA_12B.value,
-    }:
+    if model != TranslationModel.MANAGED_GEMMA.value:
         return False
     previous = transition.previous_settings
     return bool(

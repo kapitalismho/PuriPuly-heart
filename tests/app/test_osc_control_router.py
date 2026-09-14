@@ -60,10 +60,6 @@ class FakeApplication:
         self.calls.append(("model", (model, connection)))
         return None
 
-    async def set_fallback(self, alias: str) -> object:
-        self.calls.append(("fallback", alias))
-        return None
-
     async def set_mute_sync(self, enabled: bool) -> object:
         self.calls.append(("mute_sync", enabled))
         return None
@@ -148,7 +144,6 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("PuriPuly_SelfASR", 7),
         ("PuriPuly_PeerASR", 1),
         ("PuriPuly_Translator", 5),
-        ("PuriPuly_Fallback", 0),
     ]
 
     for name, value in packets:
@@ -172,9 +167,8 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         "self_asr",
         "peer_asr",
         "model",
-        "fallback",
     ]
-    assert application.calls[-9:] == [
+    assert application.calls[-8:] == [
         ("languages", ("ja", "en", "en", "ko")),
         ("languages", ("ja", "en", "en", "ko")),
         ("secondary_language", "ja"),
@@ -183,7 +177,6 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("self_asr", "soniox"),
         ("peer_asr", "local_parakeet_v3"),
         ("model", ("gemini37_flash", None)),
-        ("fallback", "none"),
     ]
     assert projected == [name for name, _value in packets]
     await router.close()
@@ -196,12 +189,10 @@ async def test_router_routes_on_device_translation_model_ids() -> None:
 
     assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 10)
     assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 11)
-    assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 12)
 
     assert application.calls == [
         ("model", ("managed_gemma", "cpu")),
         ("model", ("managed_gemma", "gpu")),
-        ("model", ("managed_gemma_12b", "gpu")),
     ]
     await router.close()
 
@@ -330,10 +321,9 @@ async def test_router_republishes_canonical_state_after_invalid_id() -> None:
     )
 
     assert router.handle_packet("/avatar/parameters/PuriPuly_SelfASR", 99) is False
-    assert router.handle_packet("/avatar/parameters/PuriPuly_Fallback", 8) is False
     assert router.handle_packet("/avatar/parameters/PuriPuly_Talk", 1) is False
     assert delta_republish_calls == 0
-    assert full_republish_calls == 3
+    assert full_republish_calls == 2
     assert application.calls == []
     assert projected == []
     await router.close()

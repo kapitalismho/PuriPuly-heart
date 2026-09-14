@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
@@ -394,6 +395,22 @@ class RecordingSequencedTranslateLLMProvider(LLMProvider):
         _ = (system_prompt, source_language, target_language, context)
         self.calls.append((utterance_id, text))
         await asyncio.sleep(self.delay_s)
+        if "Input: " in text:
+            segments = json.loads(text.split("Input: ", 1)[1])["segments"]
+            if len(self.responses) < len(segments):
+                raise AssertionError("no translate response configured")
+            translated = [self.responses.pop(0) for _segment in segments]
+            return Translation(
+                utterance_id=utterance_id,
+                text=json.dumps(
+                    {
+                        "segments": [
+                            {"id": segment["id"], "text": response}
+                            for segment, response in zip(segments, translated, strict=True)
+                        ]
+                    }
+                ),
+            )
         if not self.responses:
             raise AssertionError("no translate response configured")
         return Translation(utterance_id=utterance_id, text=self.responses.pop(0))
@@ -1031,7 +1048,7 @@ async def test_peer_source_only_overlay_emit_records_source_as_secondary_len() -
 
 
 @pytest.mark.asyncio
-async def test_peer_final_runs_in_one_parent_are_serial_and_close_after_last_child() -> None:
+async def test_adjacent_same_language_runs_share_one_child_and_close_after_it() -> None:
     parent_vad_id = uuid4()
     sink = RecordingOverlaySink()
     llm = RecordingSequencedTranslateLLMProvider(
@@ -1071,10 +1088,9 @@ async def test_peer_final_runs_in_one_parent_are_serial_and_close_after_last_chi
 
     translation_events = [event for event in sink.events if event.type == "translation_final"]
     close_events = [event for event in sink.events if event.type == "utterance_closed"]
-    assert [event.text for event in translation_events] == ["첫 번째 번역", "두 번째 번역"]
+    assert [event.text for event in translation_events] == ["첫 번째 번역"]
     assert [event.source_text for event in translation_events] == [
-        "What about now?",
-        "Can you hear me?",
+        "What about now? Can you hear me?",
     ]
     assert [event.utterance_id for event in close_events] == [
         event.utterance_id for event in translation_events
@@ -1086,8 +1102,7 @@ async def test_peer_final_runs_in_one_parent_are_serial_and_close_after_last_chi
     assert translation_done_ids == [event.utterance_id for event in translation_events]
     assert parent_vad_id not in translation_done_ids
     assert [text for _utterance_id, text in llm.calls] == [
-        "What about now?",
-        "Can you hear me?",
+        "What about now? Can you hear me?",
     ]
 
 

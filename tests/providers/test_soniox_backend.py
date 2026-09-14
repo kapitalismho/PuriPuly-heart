@@ -236,6 +236,66 @@ async def test_soniox_session_emits_ordered_adjacent_final_language_runs() -> No
 
 
 @pytest.mark.asyncio
+async def test_soniox_preserves_present_and_missing_speakers_in_session_scope() -> None:
+    first = _make_session(enable_language_identification=True)
+    second = _make_session(enable_language_identification=True)
+    await _request_finalize(first)
+    first._handle_message(
+        json.dumps(
+            {
+                "tokens": [
+                    {
+                        "text": "one ",
+                        "language": "en",
+                        "speaker": "1",
+                        "confidence": 0.01,
+                        "is_final": True,
+                    },
+                    {
+                        "text": "unknown ",
+                        "language": "en",
+                        "speaker": False,
+                        "is_final": True,
+                    },
+                    {
+                        "text": "again",
+                        "language": "en",
+                        "speaker": "1",
+                        "confidence": 0.99,
+                        "is_final": True,
+                    },
+                    {"text": "<fin>", "is_final": True},
+                ]
+            }
+        )
+    )
+
+    event = first._event_projection._legacy_events.get_nowait()
+    assert [(run.text, run.speaker_id) for run in event.final_speaker_runs] == [
+        ("one ", "1"),
+        ("unknown ", None),
+        ("again", "1"),
+    ]
+    assert {run.session_scope for run in event.final_speaker_runs} == {first.speaker_session_scope}
+    await _request_finalize(first)
+    first._handle_message(
+        json.dumps(
+            {
+                "tokens": [
+                    {"text": "next", "speaker": "1", "is_final": True},
+                    {"text": "<fin>", "is_final": True},
+                ]
+            }
+        )
+    )
+    next_event = first._event_projection._legacy_events.get_nowait()
+    assert {run.session_scope for run in next_event.final_speaker_runs} == {
+        first.speaker_session_scope
+    }
+    assert second.speaker_session_scope != first.speaker_session_scope
+
+
+@pytest.mark.asyncio
 async def test_soniox_terminal_cleanup_keeps_final_runs_equal_to_emitted_text() -> None:
     session = _make_session(enable_language_identification=True)
     await _request_finalize(session)
@@ -977,6 +1037,7 @@ async def test_soniox_session_start_send_recv_and_close(monkeypatch) -> None:
     assert config["context"]["terms"] == ["Puripuly", "VRChat"]
     assert config["language_hints"] == ["en"]
     assert config["language_hints_strict"] is True
+    assert config["enable_speaker_diarization"] is True
 
     payloads = [
         payload

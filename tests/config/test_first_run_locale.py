@@ -128,14 +128,10 @@ def test_first_run_settings_preserve_provider_defaults() -> None:
     assert translation.model == "deepseek_v4_flash"
     assert translation.connection == "managed_china"
     assert translation.openrouter_selected_source == "managed"
-    assert translation.fallback.enabled is True
-    assert translation.fallback.model == "deepseek_v4_flash"
-    assert translation.fallback.connection == "managed_china"
-    assert translation.fallback.selection_alias == "deepseek_v4_flash_china"
 
 
 @pytest.mark.parametrize("system_locale", ["en_US", "ko_KR", "ja_JP", None])
-def test_first_run_settings_use_managed_gemma_fallback_default(
+def test_first_run_settings_use_managed_gemma_primary_default(
     system_locale: str | None,
 ) -> None:
     settings = _new_first_run_settings(system_locale)
@@ -143,10 +139,6 @@ def test_first_run_settings_use_managed_gemma_fallback_default(
     translation = settings.intent.translation
     assert translation.model == "gemma4_26b_31b"
     assert translation.connection == "managed"
-    assert translation.fallback.enabled is True
-    assert translation.fallback.model == "gemma4_26b_31b"
-    assert translation.fallback.connection == "managed"
-    assert translation.fallback.selection_alias == "managed_gemma4_26b_31b"
 
 
 def test_first_run_settings_roundtrip_through_dict_serialization() -> None:
@@ -199,11 +191,10 @@ def test_main_first_run_uses_detected_system_locale(
     assert loaded.intent.translation.connection == "managed_china"
     assert loaded.intent.translation.openrouter_selection_alias == "deepseek_v4_flash_managed"
     assert loaded.intent.translation.openrouter_provider_routing == "deepseek_v4_flash_china"
-    assert loaded.intent.translation.fallback.selection_alias == "deepseek_v4_flash_china"
     assert not path.exists()
 
 
-def test_main_first_run_non_china_uses_managed_gemma_fallback_default(
+def test_main_first_run_non_china_uses_managed_gemma_primary_default(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -215,17 +206,14 @@ def test_main_first_run_non_china_uses_managed_gemma_fallback_default(
     assert loaded.intent.ui.locale == "ko"
     assert loaded.intent.translation.model == "gemma4_26b_31b"
     assert loaded.intent.translation.connection == "managed"
-    assert loaded.intent.translation.fallback.selection_alias == "managed_gemma4_26b_31b"
     assert not path.exists()
 
 
 @pytest.mark.parametrize(
-    ("system_locale", "model", "connection", "fallback_model", "fallback_connection", "credential"),
+    ("system_locale", "model", "connection", "credential"),
     [
         (
             "zh_CN",
-            "deepseek_v4_flash",
-            "managed_china",
             "deepseek_v4_flash",
             "managed_china",
             "openrouter:managed_qq",
@@ -234,18 +222,14 @@ def test_main_first_run_non_china_uses_managed_gemma_fallback_default(
             "en_US",
             "gemma4_26b_31b",
             "managed",
-            "gemma4_26b_31b",
-            "managed",
             "openrouter:managed",
         ),
     ],
 )
-def test_first_run_locale_resolves_primary_and_fallback_without_byok(
+def test_first_run_locale_resolves_primary_and_identity_hedge_without_byok(
     system_locale: str,
     model: str,
     connection: str,
-    fallback_model: str,
-    fallback_connection: str,
     credential: str,
 ) -> None:
     from puripuly_heart.app.wiring.wiring_llm_factory import runtime_resolution_input_from_vnext
@@ -258,13 +242,10 @@ def test_first_run_locale_resolves_primary_and_fallback_without_byok(
     assert config.primary.provider == "openrouter"
     assert config.primary.credential.reference == credential
     assert config.fallback is not None
-    assert config.fallback.target.provider == "openrouter"
-    assert config.fallback.target.credential.reference == credential
+    assert config.fallback.target == config.primary
     settings = _new_first_run_settings(system_locale)
     assert settings.intent.translation.model == model
     assert settings.intent.translation.connection == connection
-    assert settings.intent.translation.fallback.model == fallback_model
-    assert settings.intent.translation.fallback.connection == fallback_connection
 
 
 def test_main_first_run_populates_default_system_prompt(

@@ -33,7 +33,7 @@ def compose_settings_api_surface(
         [
             slots.cloud_free_tier,
             slots.translation_connection,
-            slots.translation_fallback,
+            slots.translation_placeholder,
         ],
         spacing=SETTINGS_ROW_SPACING,
         expand=True,

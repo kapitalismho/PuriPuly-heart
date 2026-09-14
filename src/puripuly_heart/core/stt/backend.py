@@ -14,7 +14,7 @@ from puripuly_heart.core.audio.ownership import (
 )
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
-from puripuly_heart.domain.models import FinalLanguageRun
+from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +82,7 @@ class STTProviderTurnUpdate:
     assembly: Literal["append", "replace"]
     text: str
     final_language_runs: tuple[FinalLanguageRun, ...] = ()
+    final_speaker_runs: tuple[FinalSpeakerRun, ...] = ()
     provenance: STTNativeProvenance = STTNativeProvenance()
     contribution: STTTextContribution | None = None
 
@@ -92,6 +93,7 @@ class STTProviderTurnTerminal:
     outcome: SegmentTerminalOutcome
     text: str = ""
     final_language_runs: tuple[FinalLanguageRun, ...] = ()
+    final_speaker_runs: tuple[FinalSpeakerRun, ...] = ()
     text_authority: Literal["authoritative", "degraded", "none"] = "none"
     failure_reason: str | None = None
     epoch_disposition: Literal["reuse", "retire"] = "reuse"
@@ -221,6 +223,7 @@ class STTBackendTranscriptEvent:
     text: str
     is_final: bool
     final_language_runs: tuple[FinalLanguageRun, ...] = ()
+    final_speaker_runs: tuple[FinalSpeakerRun, ...] = ()
 
 
 class RecoverableSTTSessionError(RuntimeError):

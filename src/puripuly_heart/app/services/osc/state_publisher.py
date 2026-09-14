@@ -7,7 +7,6 @@ from typing import Any
 from puripuly_heart.app.ports.osc_control import (
     ASR_ID_BY_PROVIDER,
     BOOLEAN_CONTROLS,
-    FALLBACK_ID_BY_ALIAS,
     LANGUAGE_ID_BY_CODE,
     OSC_PARAMETER_ADDRESS_PREFIX,
     SECONDARY_LANGUAGE_ID_BY_CODE,
@@ -37,7 +36,6 @@ class OscCanonicalState:
     peer_asr: str = "local_cpu_auto"
     translation_model: str = "gemma4_26b_31b"
     translation_connection: str = "managed"
-    fallback: str = "none"
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,7 +164,6 @@ class OscStatePublisher:
                     fields_by_name["translation_model"],
                     fields_by_name["translation_connection"],
                 ),
-                "PuriPuly_Fallback": FALLBACK_ID_BY_ALIAS[fields_by_name["fallback"]],
             }
         )
         return values
@@ -201,7 +198,6 @@ def state_from_settings(
         peer_asr=_osc_asr_provider(intent.peer_stt.provider, intent.stt.custom.mode),
         translation_model=translation_intent.model,
         translation_connection=translation_intent.connection,
-        fallback=fallback_alias_from_settings(settings),
     )
 
 
@@ -214,33 +210,9 @@ def _osc_asr_provider(provider: object, custom_mode: object) -> str:
     return "custom_offline"
 
 
-def fallback_alias_from_settings(settings: Any) -> str:
-    fallback = settings.intent.translation.fallback
-    if not fallback.enabled:
-        return "none"
-    model = fallback.model
-    connection = fallback.connection
-    aliases = {
-        ("deepseek_v4_flash_41", "official_byok"): "deepseek_v4_flash_official",
-        ("deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
-        ("deepseek_v4_flash_41", "openrouter"): "openrouter_deepseek_v4_flash_41",
-        ("deepseek_v4_flash", "managed"): "deepseek_v4_flash_managed",
-        ("deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
-        ("deepseek_v4_flash_41", "managed"): "deepseek_v4_flash_41_managed",
-        ("deepseek_v4_flash_41", "managed_china"): "deepseek_v4_flash_41_china",
-        ("gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
-        ("gemma4_26b_31b", "openrouter"): "openrouter_gemma4_26b_31b",
-        ("gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
-        ("gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
-        ("gemma4_31b", "managed"): "managed_gemma4_31b",
-    }
-    return aliases.get((str(model), str(connection)), "none")
-
-
 __all__ = [
     "OscCanonicalState",
     "OscPublishedValue",
     "OscStatePublisher",
-    "fallback_alias_from_settings",
     "state_from_settings",
 ]

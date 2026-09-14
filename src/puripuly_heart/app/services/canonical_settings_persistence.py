@@ -714,8 +714,6 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
             "openrouter_provider_routing": "default",
             "qwen": replace(translation.qwen, llm_model="qwen3.8-flash"),
         }
-    elif model in {"managed_gemma", "managed_gemma_12b"}:
-        updates = {"openrouter_provider_routing": "default"}
     else:
         updates = {"openrouter_provider_routing": "default"}
     return replace(
