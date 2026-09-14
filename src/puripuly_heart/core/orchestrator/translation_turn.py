@@ -18,7 +18,13 @@ from puripuly_heart.core.translation_policy import (
     TranslationContextPolicy,
     TranslationRuntimePolicy,
 )
-from puripuly_heart.domain.models import ChannelId, FinalLanguageRun, Transcript, Translation
+from puripuly_heart.domain.models import (
+    ChannelId,
+    FinalLanguageRun,
+    FinalSpeakerRun,
+    Transcript,
+    Translation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +56,105 @@ def _translation_turn_child_id(
         parent_utterance_id,
         f"{turn_kind}:{run_index}:{target_index}:{run_language}:{target_language}",
     )
+
+
+@dataclass(frozen=True, slots=True)
+class _FinalTranscriptSegment:
+    text: str
+    language: str
+    speaker_id: str | None = None
+    speaker_session_scope: str = ""
+
+
+def _final_transcript_segments(transcript: Transcript) -> tuple[_FinalTranscriptSegment, ...]:
+    text = transcript.text
+    language_runs = transcript.final_language_runs or (FinalLanguageRun(text, ""),)
+    speaker_runs = transcript.final_speaker_runs or (FinalSpeakerRun(text, None, ""),)
+    if "".join(run.text for run in language_runs) != text:
+        language_runs = (FinalLanguageRun(text, ""),)
+    if "".join(run.text for run in speaker_runs) != text:
+        speaker_runs = (FinalSpeakerRun(text, None, ""),)
+    boundaries = {0, len(text)}
+    offset = 0
+    for run in language_runs:
+        offset += len(run.text)
+        boundaries.add(offset)
+    offset = 0
+    for run in speaker_runs:
+        offset += len(run.text)
+        boundaries.add(offset)
+    positions = sorted(boundaries)
+    raw: list[_FinalTranscriptSegment] = []
+    language_index = 0
+    speaker_index = 0
+    language_end = len(language_runs[0].text)
+    speaker_end = len(speaker_runs[0].text)
+    for start, end in zip(positions, positions[1:]):
+        while start >= language_end and language_index + 1 < len(language_runs):
+            language_index += 1
+            language_end += len(language_runs[language_index].text)
+        while start >= speaker_end and speaker_index + 1 < len(speaker_runs):
+            speaker_index += 1
+            speaker_end += len(speaker_runs[speaker_index].text)
+        language = language_runs[language_index].language
+        speaker = speaker_runs[speaker_index]
+        piece = text[start:end]
+        if not piece:
+            continue
+        segment = _FinalTranscriptSegment(
+            piece,
+            language,
+            speaker.speaker_id,
+            speaker.session_scope,
+        )
+        if (
+            raw
+            and raw[-1].language == segment.language
+            and raw[-1].speaker_id == segment.speaker_id
+            and raw[-1].speaker_session_scope == segment.speaker_session_scope
+        ):
+            previous = raw[-1]
+            raw[-1] = _FinalTranscriptSegment(
+                previous.text + piece,
+                segment.language,
+                segment.speaker_id,
+                segment.speaker_session_scope,
+            )
+        else:
+            raw.append(segment)
+    segments: list[_FinalTranscriptSegment] = []
+    leading = ""
+    for segment in raw:
+        if not any(character.isalnum() for character in segment.text):
+            if segments:
+                previous = segments[-1]
+                segments[-1] = _FinalTranscriptSegment(
+                    previous.text + segment.text,
+                    previous.language,
+                    previous.speaker_id,
+                    previous.speaker_session_scope,
+                )
+            else:
+                leading += segment.text
+            continue
+        if leading:
+            segment = _FinalTranscriptSegment(
+                leading + segment.text,
+                segment.language,
+                segment.speaker_id,
+                segment.speaker_session_scope,
+            )
+            leading = ""
+        segments.append(segment)
+    if leading and segments:
+        previous = segments[-1]
+        segments[-1] = _FinalTranscriptSegment(
+            previous.text + leading,
+            previous.language,
+            previous.speaker_id,
+            previous.speaker_session_scope,
+        )
+    return tuple(segments)
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,6 +360,10 @@ ChildProcessor = Callable[
     [TranslationTurnChild, ChildCancellationRequested],
     Awaitable[TranslationTurnProcessResult | TranslationTurnOutcome],
 ]
+ChildrenProcessor = Callable[
+    [tuple[TranslationTurnChild, ...], ChildCancellationRequested],
+    Awaitable[tuple[TranslationTurnProcessResult, ...]],
+]
 ChildTerminal = Callable[[TranslationTurnChild, TranslationTurnOutcome], Awaitable[None]]
 ParentClosed = Callable[[UUID], Awaitable[None]]
 ParentRejected = Callable[[UUID], Awaitable[None]]
@@ -270,6 +379,7 @@ class TranslationTurnLifecycleOwner:
     on_child_terminal: ChildTerminal
     on_parent_closed: ParentClosed
     on_parent_rejected: ParentRejected
+    process_children: ChildrenProcessor | None = None
     on_parent_admitted: ParentAdmitted | None = None
     predecessor_wait_observer: Callable[[str, Mapping[str, object]], None] | None = None
     turn_generation_observer: TurnGenerationAdvanced | None = None
@@ -635,28 +745,26 @@ class TranslationTurnLifecycleOwner:
         turn_generation: int,
         turn_order: int,
     ) -> tuple[TranslationTurnChild, ...]:
-        runs = request.transcript.final_language_runs or (
-            FinalLanguageRun(text=request.transcript.text, language=""),
-        )
+        segments = _final_transcript_segments(request.transcript)
         child_specs = [
-            (run_index, target_index, run, target_language)
-            for run_index, run in enumerate(runs)
-            if run.text.strip()
+            (segment_index, target_index, segment, target_language)
+            for segment_index, segment in enumerate(segments)
+            if segment.text.strip()
             for target_index, target_language in enumerate(request.target_languages)
         ]
-        nonempty_run_count = sum(1 for run in runs if run.text.strip())
+        nonempty_run_count = sum(1 for segment in segments if segment.text.strip())
         primary_uses_parent_identity = nonempty_run_count == 1 and request.turn_kind in {
             "manual",
             "self",
         }
         children: list[TranslationTurnChild] = []
-        for sequence, (run_index, target_index, run, target_language) in enumerate(child_specs):
+        for sequence, (run_index, target_index, segment, target_language) in enumerate(child_specs):
             child_id = _translation_turn_child_id(
                 request.transcript.utterance_id,
                 turn_kind=request.turn_kind,
                 run_index=run_index,
                 target_index=target_index,
-                run_language=run.language,
+                run_language=segment.language,
                 target_language=target_language,
                 primary_uses_parent_identity=primary_uses_parent_identity,
             )
@@ -670,15 +778,26 @@ class TranslationTurnLifecycleOwner:
                     turn_order=turn_order,
                     transcript=Transcript(
                         utterance_id=child_id,
-                        text=run.text,
+                        text=segment.text,
                         is_final=True,
                         created_at=request.transcript.created_at,
                         channel=request.transcript.channel,
-                        final_language_runs=(run,),
+                        final_language_runs=(FinalLanguageRun(segment.text, segment.language),),
+                        final_speaker_runs=(
+                            (
+                                FinalSpeakerRun(
+                                    segment.text,
+                                    segment.speaker_id,
+                                    segment.speaker_session_scope,
+                                ),
+                            )
+                            if segment.speaker_session_scope
+                            else ()
+                        ),
                         publication_generation=request.transcript.publication_generation,
                         source_order=request.transcript.source_order,
                     ),
-                    detected_language=run.language or None,
+                    detected_language=segment.language or None,
                     target_language=target_language,
                     source=request.source,
                     turn_kind=request.turn_kind,
@@ -742,6 +861,13 @@ class TranslationTurnLifecycleOwner:
                     if child.utterance_id not in parent.completed_child_ids
                 )
                 await asyncio.gather(*child_runners)
+                return
+            if (
+                parent.channel == "peer"
+                and len(parent.children) > 1
+                and self.process_children is not None
+            ):
+                await self._run_children_batch(parent, predecessor)
                 return
             for child in parent.children:
                 if child.utterance_id in parent.completed_child_ids:
@@ -842,6 +968,59 @@ class TranslationTurnLifecycleOwner:
             raise RuntimeError("translation child task is unavailable")
         await self.on_child_started(child, child_task)
         return await self._execute_child(child, predecessor)
+
+    async def _run_children_batch(
+        self,
+        parent: _TranslationTurnParent,
+        predecessor: _TranslationTurnParent | None,
+    ) -> None:
+        children = tuple(
+            child
+            for child in parent.children
+            if child.utterance_id not in parent.completed_child_ids
+        )
+        processor = self.process_children
+        if processor is None:
+            raise RuntimeError("translation batch processor is unavailable")
+        task = start_lifecycle_task(
+            self._scope,
+            processor(
+                children,
+                lambda: self._parent_cancellation_requested(parent),
+            ),
+            name=f"peer-batch:{parent.parent_utterance_id}",
+            eager_start=True,
+        )
+        try:
+            for child in children:
+                self._active_tasks[child.utterance_id] = task
+                await self.on_child_started(child, task)
+            results = await asyncio.wait_for(task, timeout=self.child_watchdog_s)
+            if len(results) != len(children):
+                raise ValueError("batch processor returned an incomplete result set")
+            if self._parent_cancellation_requested(parent):
+                raise asyncio.CancelledError
+            for child in children:
+                self._mark_child_semantic_done(child)
+            if predecessor is not None:
+                await predecessor.closed_event.wait()
+            for child, result in zip(children, results, strict=True):
+                if result.output is not None and self.output is not None:
+                    await self.output.submit_translation_output(result.output)
+                    self._output_submitted_child_ids.add(child.utterance_id)
+                await self._terminalize_child(child, result.outcome)
+        except asyncio.CancelledError:
+            await self._terminalize_parent_remaining(parent, "cancelled")
+            raise
+        except Exception:
+            logger.exception("translation batch execution failed")
+            await self._terminalize_parent_remaining(parent, "failed")
+        finally:
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+            for child in children:
+                self._active_tasks.pop(child.utterance_id, None)
 
     async def _execute_child(
         self,

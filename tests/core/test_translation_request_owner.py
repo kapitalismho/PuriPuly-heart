@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from dataclasses import dataclass, field, replace
 from types import SimpleNamespace
@@ -191,6 +192,92 @@ def process_request(
         publication_generation=0 if channel == "peer" else None,
         source_order=1 if channel == "peer" else None,
     )
+
+
+def peer_batch_requests(fixture: OwnerFixture) -> tuple[TranslationProcessRequest, ...]:
+    parent_id = uuid4()
+    return tuple(
+        TranslationProcessRequest(
+            parent_utterance_id=parent_id,
+            utterance_id=uuid4(),
+            sequence=sequence,
+            text=text,
+            channel="peer",
+            source="Peer",
+            target_language="ja",
+            context_policy="integrated_preferred",
+            config_snapshot=fixture.configuration.snapshot(),
+            detected_language=language,
+            speaker_id=speaker,
+            speaker_session_scope="soniox-session",
+            publication_generation=0,
+            source_order=1,
+            parent_output_count=3,
+        )
+        for sequence, (text, language, speaker) in enumerate(
+            (("one ", "en", "1"), ("둘 ", "ko", None), ("three", "en", "1"))
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_llm_peer_batch_uses_one_parent_call_and_explicit_id_mapping() -> None:
+    provider = RecordingProvider()
+    fixture = build_owner(provider)
+    requests = peer_batch_requests(fixture)
+    provider.response = json.dumps(
+        {
+            "segments": [
+                {"id": str(requests[2].utterance_id), "text": "三"},
+                {"id": str(requests[0].utterance_id), "text": "一"},
+                {"id": str(requests[1].utterance_id), "text": "二"},
+            ]
+        }
+    )
+
+    results = await fixture.owner.process_batch(requests)
+
+    assert len(provider.calls) == 1
+    assert [result.output.translation.text for result in results if result.output] == [
+        "一",
+        "二",
+        "三",
+    ]
+    batch_input = json.loads(provider.calls[0]["text"].split("Input: ", 1)[1])
+    assert [item["id"] for item in batch_input["segments"]] == [
+        str(request.utterance_id) for request in requests
+    ]
+    assert [item["speaker_id"] for item in batch_input["segments"]] == ["1", None, "1"]
+    assert [item["speaker_session_scope"] for item in batch_input["segments"]] == [
+        "soniox-session",
+        "soniox-session",
+        "soniox-session",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_incomplete_llm_peer_batch_fails_closed_for_every_segment() -> None:
+    provider = RecordingProvider()
+    fixture = build_owner(provider)
+    requests = peer_batch_requests(fixture)
+    provider.response = json.dumps(
+        {"segments": [{"id": str(requests[0].utterance_id), "text": "一"}]}
+    )
+
+    results = await fixture.owner.process_batch(requests)
+
+    assert len(provider.calls) == 1
+    assert [result.outcome for result in results] == [
+        "source_only",
+        "source_only",
+        "source_only",
+    ]
+    assert [result.output.failure_code for result in results if result.output] == [
+        "batch_translation_invalid",
+        "batch_translation_invalid",
+        "batch_translation_invalid",
+    ]
+    assert len(fixture.presentation.messages) == 1
 
 
 def test_clear_context_clears_both_channels_and_emits_established_diagnostic(

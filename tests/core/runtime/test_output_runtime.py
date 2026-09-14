@@ -9,12 +9,15 @@ from uuid import uuid4
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import (
+    OverlayApplicationReceipt,
     OverlayEventAdapter,
     OverlayEventUnion,
     UtteranceClosed,
 )
-from puripuly_heart.domain.models import OSCMessage
+from puripuly_heart.domain.models import OSCMessage, Transcript
+from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
@@ -212,6 +215,30 @@ class BlockingOverlaySink(RecordingOverlaySink):
         except asyncio.CancelledError:
             self.cancelled.set()
             raise
+
+
+class PacedOverlaySink(RecordingOverlaySink):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def emit(self, _event: OverlayEventUnion) -> None:
+        raise AssertionError("Peer writer must use presenter-paced admission")
+
+    async def emit_peer_when_admissible(
+        self,
+        event: OverlayEventUnion,
+    ) -> OverlayApplicationReceipt:
+        self.started.set()
+        await self.release.wait()
+        self.events.append(event)
+        return OverlayApplicationReceipt(
+            stage="application_accepted",
+            outcome="applied",
+            publication_id=event.event_id,
+            scene_revision=1,
+        )
 
 
 class CloseRaceFailingOverlaySink(RecordingOverlaySink):
@@ -1603,6 +1630,32 @@ async def _wait_for_done(task: asyncio.Task[object]) -> None:
 
 
 @pytest.mark.asyncio
+async def test_peer_writer_awaits_presenter_pacing_before_application_receipt() -> None:
+    OutputRuntime = _output_runtime_class()
+    overlay = PacedOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=overlay,
+    )
+    event = _overlay_event(event_id="paced", channel="peer")
+
+    accepted = await _publish_peer_overlay(owner, event, source_order=1)
+    await asyncio.wait_for(overlay.started.wait(), timeout=0.5)
+    assert accepted.decision.reason == "accepted_handoff"
+    assert overlay.events == []
+
+    overlay.release.set()
+    await owner.wait_for_peer_output_idle()
+
+    assert overlay.events == [event]
+    decision = owner.routing_decisions[-1]
+    assert decision.reason == "application_applied"
+    assert decision.metadata["physical_ack"] is False
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_peer_overlay_queue_evicts_oldest_unsent_batch_above_eight() -> None:
     OutputRuntime = _output_runtime_class()
     overlay = BlockingOverlaySink()
@@ -1633,6 +1686,127 @@ async def test_peer_overlay_queue_evicts_oldest_unsent_batch_above_eight() -> No
 
     assert overlay.events == [events[0], *events[2:]]
     await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_output_presenter_five_ready_peers_follow_two_slot_pacing_schedule() -> None:
+    OutputRuntime = _output_runtime_class()
+    clock = FakeClock(_now=10.0)
+    sleep_calls: list[float] = []
+
+    async def controlled_sleep(delay: float) -> None:
+        sleep_calls.append(delay)
+        if delay > 1.0:
+            await asyncio.Event().wait()
+        clock.advance(delay)
+        await asyncio.sleep(0)
+
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        sleep=controlled_sleep,
+        translation_enabled=False,
+        visible_window_target_blocks=2,
+    )
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=clock,
+        overlay_sink=presenter,
+    )
+    adapter = OverlayEventAdapter(clock=clock)
+    turn_ids = [uuid4() for _ in range(5)]
+
+    for order, turn_id in enumerate(turn_ids, start=1):
+        event = adapter.transcript_final(
+            Transcript(
+                utterance_id=turn_id,
+                channel="peer",
+                text=f"peer {order}",
+                is_final=True,
+                created_at=clock.now(),
+            ),
+            source_language="en",
+            target_language="ja",
+        )
+        result = await _publish_peer_overlay(owner, event, source_order=order)
+        assert result.decision.reason == "accepted_handoff"
+    await owner.wait_for_peer_output_idle()
+
+    assert [delay for delay in sleep_calls if delay <= 1.0] == [1.0, 1.0, 1.0]
+    assert clock.now() == 13.0
+    assert [block.id for block in presenter.snapshot().blocks] == [
+        f"peer:{turn_ids[3]}",
+        f"peer:{turn_ids[4]}",
+    ]
+    assert (
+        sum(decision.reason == "application_applied" for decision in owner.routing_decisions) == 5
+    )
+    await owner.close()
+    await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_retirement_cancels_presenter_paced_peer_and_preserves_self_occupant() -> None:
+    OutputRuntime = _output_runtime_class()
+    clock = FakeClock(_now=10.0)
+
+    async def blocked_sleep(_delay: float) -> None:
+        await asyncio.Event().wait()
+
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        sleep=blocked_sleep,
+        translation_enabled=False,
+        visible_window_target_blocks=1,
+    )
+    adapter = OverlayEventAdapter(clock=clock)
+    self_turn = uuid4()
+    await presenter.emit(
+        adapter.self_active_update(
+            text="self remains",
+            utterance_id=self_turn,
+            occupant_key=f"self:{self_turn}",
+            source_language="en",
+            target_language="ja",
+            created_at=clock.now(),
+        )
+    )
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=clock,
+        overlay_sink=presenter,
+    )
+    peer_turn = uuid4()
+    event = adapter.transcript_final(
+        Transcript(
+            utterance_id=peer_turn,
+            channel="peer",
+            text="retired pending peer",
+            is_final=True,
+            created_at=clock.now(),
+        ),
+        source_language="en",
+        target_language="ja",
+    )
+
+    accepted = await _publish_peer_overlay(owner, event, source_order=1)
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert accepted.decision.reason == "accepted_handoff"
+    assert presenter.snapshot().blocks[0].id == f"self:{self_turn}"
+
+    owner.retire_peer_generation(1)
+    await owner.wait_for_peer_output_idle()
+
+    assert presenter.snapshot().blocks[0].id == f"self:{self_turn}"
+    assert any(
+        decision.publication_id == event.event_id
+        and decision.reason == "publication_generation_retired"
+        for decision in owner.routing_decisions
+    )
+    await owner.close()
+    await presenter.close()
 
 
 @pytest.mark.asyncio

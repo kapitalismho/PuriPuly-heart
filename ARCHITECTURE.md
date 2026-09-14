@@ -121,6 +121,13 @@ loopback or process audio
 
 Peer output must not reach the VRChat chatbox.
 
+Soniox final-token metadata preserves language runs and speaker runs as independent
+dimensions. Speaker identifiers are scoped to one concrete Soniox connection and
+must not be compared across session scopes. The translation turn owner intersects
+both dimensions into text-conserving Peer children; missing or malformed speaker
+metadata becomes an unknown-speaker span, and punctuation-only spans attach to
+neighboring spoken content.
+
 ### Audio ownership
 
 - Capture preserves source order and timing. Audio loss is explicit, not silence.
@@ -291,7 +298,7 @@ Execution options:
 - Channels retain separate provider epochs, bounded buffers, cancellation, and retention policies.
 - Physical CPU/GPU resources remain shared through their runtime owners.
 - `STTSessionEventProjection` defines scoped turn updates and terminal receipts (`core/stt/backend.py`).
-- `STTScopedTurnNormalizer` assembles text and language runs. Provider updates are not final application transcripts.
+- `STTScopedTurnNormalizer` assembles text, language runs, and independently scoped speaker runs under the same bounded provider-result budget. Provider updates are not final application transcripts.
 
 Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
@@ -323,6 +330,12 @@ Translation owners retain:
 
 `TranslationTurnLifecycleOwner` admits peer turns in source order. Self and peer speech have separate bounded queues with expiry; child translations share their parent slot.
 
+For a multi-segment LISTEN parent, LLM-backed translation uses one logical
+whole-parent request per target language and maps the response to child identities
+explicitly. Custom HTTP extensions keep their existing per-request contract.
+Malformed or incomplete batch responses fail closed to source-only child outcomes.
+SELF and manual translation execution remain unchanged.
+
 Manual self turns share the ordered lifecycle but are not subject to speech eviction, expiry, or TALK OFF cancellation.
 
 ## Output
@@ -340,9 +353,15 @@ Delivery boundaries:
 
 - Peer UI and overlay destinations have independent bounded queues and writers.
 - Self chatbox speech has bounded pending delivery and expiry. Manual messages are exempt from speech eviction and expiry.
-- Output handoff releases translation ordering without waiting for display. Sink failure does not replay recognition or translation.
+- Translation ordering releases only after the parent's source-ordered child outputs have been handed to the output owner.
 - Peer publications retain activation generation and source order through output. Retiring an activation cancels its deliveries and rejects late work.
-- Destination acceptance is not a remote display acknowledgement.
+- Destination admission and presenter application receipts are explicit; neither is a remote display acknowledgement.
+
+Paced captions remain charged to the existing destination batch until application
+or an explicit terminal disposition. There is no presentation-wait TTL: under
+sustained pressure, the established latest-conversation-first policy may retire the
+oldest wholly unsent parent rather than replaying historical captions or accelerating
+replacement cadence. Parent count therefore does not imply a maximum caption wait.
 
 Caption and overlay settings control destinations, not peer capture. Explicit LISTEN OFF aborts capture and publication. Conversation errors share publication identity; runtime session status uses a separate path.
 
@@ -374,6 +393,13 @@ Overlay split:
 
 - Python: overlay selection, caption state and expiry, scene delivery, process lifecycle.
 - Native: VR rendering, render retries, and GPU resources.
+
+The overlay presenter owns provider-neutral Peer caption pacing. Free logical slots
+and updates to an already selected logical block apply immediately. A newly selected
+Peer replacement in a full window observes a one-second minimum interval from the
+latest new occupant transition, including SELF occupants. The existing bounded
+output writer retains the candidate while it waits; pacing adds no unbounded caption
+buffer, and expiry, replacement, and shutdown wake or cancel pending work.
 
 Application recovery coordinates generation replacement. Each generation owns its
 tasks and shutdown.

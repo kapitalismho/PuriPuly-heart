@@ -42,6 +42,7 @@ from puripuly_heart.core.overlay.sink import (
 )
 from puripuly_heart.core.runtime.output_batch import (
     COMPLETED_BATCH_LIMIT,
+    OUTPUT_BATCH_MAX_UNSENT,
     DestinationBatch,
     DestinationBatchAdmission,
     OutputDestination,
@@ -1101,7 +1102,7 @@ class OutputRuntime:
             self._latest_peer_source_order = max(self._latest_peer_source_order, order)
             batch = self._find_peer_batch(generation, order, parent_id)
             if batch is None:
-                if len(self._peer_overlay_batches) >= 8:
+                if len(self._peer_overlay_batches) >= OUTPUT_BATCH_MAX_UNSENT:
                     self._reject_peer_batch(
                         self._peer_overlay_batches.popleft(),
                         reason="output_overload",
@@ -1202,9 +1203,13 @@ class OutputRuntime:
                             reason="destination_unconfigured",
                         )
                         continue
+                    paced_emit = getattr(sink, "emit_peer_when_admissible", None)
                     receipt: OverlayApplicationReceipt | None = None
                     try:
-                        receipt = await asyncio.wait_for(sink.emit(event), timeout=5.0)
+                        if callable(paced_emit):
+                            receipt = await paced_emit(event)
+                        else:
+                            receipt = await asyncio.wait_for(sink.emit(event), timeout=5.0)
                     except TimeoutError:
                         self._reject_peer_event(
                             event,
@@ -1318,13 +1323,13 @@ class OutputRuntime:
             route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
             publication_id=event.event_id,
             publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
-            reason="physical_delivery_ack",
+            reason="application_applied",
             metadata={
                 "channel": "peer",
                 "publication_generation": peer_batch.publication_generation,
                 "source_order": peer_batch.source_order,
                 "accepted_handoff": True,
-                "physical_ack": True,
+                "physical_ack": False,
                 "stage": receipt.stage,
                 "outcome": receipt.outcome,
                 "scene_revision": receipt.scene_revision,
@@ -1386,6 +1391,8 @@ class OutputRuntime:
 
     def _reject_peer_batch(self, batch: _PeerOverlayBatch, *, reason: str) -> None:
         for event, publication_key, publication_scope, destination_batch in batch.events:
+            if publication_key not in self._publications_in_flight:
+                continue
             self._reject_peer_event(
                 event,
                 publication_key,
@@ -1640,9 +1647,15 @@ class OutputRuntime:
         self._peer_writer_cancel_reason = (
             "destination_replaced" if replacement else "output_runtime_closing"
         )
+        active_peer_batch = self._peer_active_batch
         if peer_worker is not None and not peer_worker.done():
             peer_worker.cancel()
             await asyncio.gather(peer_worker, return_exceptions=True)
+        if active_peer_batch is not None:
+            self._reject_peer_batch(
+                active_peer_batch,
+                reason=self._peer_writer_cancel_reason or "output_runtime_closing",
+            )
         self._peer_writer_cancel_reason = None
         self._peer_overlay_worker = None
         peer_reason = "destination_replaced" if replacement else "output_runtime_closing"
