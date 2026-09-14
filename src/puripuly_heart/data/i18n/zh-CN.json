@@ -119,6 +119,8 @@
   "settings.cloud_free_tier.count": "{count}个",
   "settings.cloud_free_tier.inactive": "仅自动选择",
   "settings.cloud_free_tier.modal_title": "请指定自动选择要考虑的提供方\n只填写一个密钥也能使用",
+  "settings.soniox_speaker_diarization": "说话人切换检测",
+  "settings.soniox_speaker_diarization.inactive": "仅限 Soniox",
   "settings.managed_trial_usage.remaining_placeholder": "查询中",
   "settings.managed_trial_usage.remaining": "剩余 {percent}%",
   "settings.managed_key.title": "Managed Key",

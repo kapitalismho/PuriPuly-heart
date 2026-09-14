@@ -119,6 +119,8 @@
   "settings.cloud_free_tier.count": "{count}",
   "settings.cloud_free_tier.inactive": "Auto Select only",
   "settings.cloud_free_tier.modal_title": "Choose which providers Auto Select should consider\nIt still works with just one API key",
+  "settings.soniox_speaker_diarization": "Speaker Change Detection",
+  "settings.soniox_speaker_diarization.inactive": "Soniox only",
   "settings.managed_trial_usage.remaining_placeholder": "Checking",
   "settings.managed_trial_usage.remaining": "{percent}% remaining",
   "settings.managed_key.title": "Managed Key",

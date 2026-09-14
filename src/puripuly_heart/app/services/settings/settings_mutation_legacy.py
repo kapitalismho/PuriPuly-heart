@@ -83,6 +83,7 @@ ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "intent.stt.soniox.endpoint",
     "intent.stt.soniox.keepalive_interval_s",
     "intent.stt.soniox.trailing_silence_ms",
+    "intent.stt.soniox.enable_speaker_diarization",
     "intent.stt.custom.mode",
     "intent.stt.custom.compatibility",
     "intent.stt.custom.endpoint",

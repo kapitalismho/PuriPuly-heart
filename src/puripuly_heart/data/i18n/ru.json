@@ -119,6 +119,8 @@
   "settings.cloud_free_tier.count": "{count}",
   "settings.cloud_free_tier.inactive": "Только автовыбор",
   "settings.cloud_free_tier.modal_title": "Укажите провайдеров, которые должен учитывать автовыбор\nДостаточно одного ключа",
+  "settings.soniox_speaker_diarization": "Определение смены говорящего",
+  "settings.soniox_speaker_diarization.inactive": "Только Soniox",
   "settings.managed_trial_usage.remaining_placeholder": "Проверка",
   "settings.managed_trial_usage.remaining": "{percent}% осталось",
   "settings.managed_key.title": "Управляемый ключ",

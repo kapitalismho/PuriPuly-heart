@@ -373,6 +373,10 @@ def _copy_provider_prompt_apply_fields(
                 target.intent.stt,
                 provider=source.intent.stt.provider,
                 cloud_free_tier_providers=list(source.intent.stt.cloud_free_tier_providers),
+                soniox=replace(
+                    target.intent.stt.soniox,
+                    enable_speaker_diarization=source.intent.stt.soniox.enable_speaker_diarization,
+                ),
             ),
             peer_stt=replace(target.intent.peer_stt, provider=source.intent.peer_stt.provider),
             translation=copy.deepcopy(source.intent.translation),

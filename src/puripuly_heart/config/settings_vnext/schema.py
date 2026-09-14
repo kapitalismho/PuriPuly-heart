@@ -352,6 +352,7 @@ class SonioxSTTIntent:
     endpoint: str = "wss://stt-rt.soniox.com/transcribe-websocket"
     keepalive_interval_s: float = 10.0
     trailing_silence_ms: int = 100
+    enable_speaker_diarization: bool = True
 
 
 @dataclass(frozen=True, slots=True)

@@ -762,6 +762,7 @@ class STTRuntimeIntent:
     soniox_keepalive_interval_s: float = SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S
     soniox_trailing_silence_ms: int = SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS
     soniox_enable_language_identification: bool = False
+    soniox_enable_speaker_diarization: bool = True
     soniox_language_hints: tuple[str, ...] | None = None
     soniox_language_hints_strict: bool = False
     qwen_audio_language_hints: tuple[str, ...] | None = None
@@ -1370,6 +1371,7 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
         provider_options = {
             "keepalive_interval_s": intent.soniox_keepalive_interval_s,
             "trailing_silence_ms": intent.soniox_trailing_silence_ms,
+            "enable_speaker_diarization": intent.soniox_enable_speaker_diarization,
         }
         if intent.soniox_enable_language_identification:
             provider_options = {

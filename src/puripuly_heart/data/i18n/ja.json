@@ -119,6 +119,8 @@
   "settings.cloud_free_tier.count": "{count}個",
   "settings.cloud_free_tier.inactive": "自動選択専用",
   "settings.cloud_free_tier.modal_title": "自動選択が考慮するプロバイダーを指定してください\nキーは1つだけでも動作します",
+  "settings.soniox_speaker_diarization": "話者交代検出",
+  "settings.soniox_speaker_diarization.inactive": "Soniox専用",
   "settings.managed_trial_usage.remaining_placeholder": "確認中",
   "settings.managed_trial_usage.remaining": "{percent}% 残り",
   "settings.managed_key.title": "Managed Key",

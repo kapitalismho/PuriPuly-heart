@@ -267,6 +267,7 @@ def self_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         soniox_endpoint=intent.stt.soniox.endpoint,
         soniox_keepalive_interval_s=intent.stt.soniox.keepalive_interval_s,
         soniox_trailing_silence_ms=intent.stt.soniox.trailing_silence_ms,
+        soniox_enable_speaker_diarization=intent.stt.soniox.enable_speaker_diarization,
         soniox_language_hints=soniox_language_hints,
         soniox_language_hints_strict=soniox_language_hints_strict,
         custom_stt_mode=custom_mode,
@@ -382,6 +383,7 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         soniox_endpoint=intent.stt.soniox.endpoint,
         soniox_keepalive_interval_s=intent.stt.soniox.keepalive_interval_s,
         soniox_trailing_silence_ms=intent.stt.soniox.trailing_silence_ms,
+        soniox_enable_speaker_diarization=intent.stt.soniox.enable_speaker_diarization,
         soniox_enable_language_identification=automatic_soniox,
         soniox_language_hints=language_hints,
         soniox_language_hints_strict=language_hints_strict,
@@ -645,6 +647,11 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
             if provider == STTProviderName.SONIOX.value
             else None
         ),
+        (
+            intent.stt.soniox.enable_speaker_diarization
+            if provider == STTProviderName.SONIOX.value
+            else None
+        ),
         intent.stt.custom.mode if is_custom_stt_provider(provider) else None,
         intent.stt.custom.compatibility if is_custom_stt_provider(provider) else None,
         intent.stt.custom.endpoint if is_custom_stt_provider(provider) else None,
@@ -710,6 +717,11 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         ),
         (
             intent.stt.soniox.trailing_silence_ms
+            if provider == STTProviderName.SONIOX.value
+            else None
+        ),
+        (
+            intent.stt.soniox.enable_speaker_diarization
             if provider == STTProviderName.SONIOX.value
             else None
         ),
@@ -1202,7 +1214,11 @@ def create_stt_backend_from_resolved_config(
                 "enable_language_identification",
                 default=False,
             ),
-            enable_speaker_diarization=config.channel == "peer",
+            enable_speaker_diarization=_resolved_bool_option(
+                config.provider_options,
+                "enable_speaker_diarization",
+                default=True,
+            ),
             language_hints_strict=_resolved_bool_option(
                 config.provider_options,
                 "language_hints_strict",
@@ -1370,6 +1386,7 @@ def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         resolved.provider_options.get("keepalive_interval_s"),
         resolved.provider_options.get("trailing_silence_ms"),
         resolved.provider_options.get("enable_language_identification", False),
+        resolved.provider_options.get("enable_speaker_diarization", True),
         resolved.provider_options.get("language_hints"),
         resolved.provider_options.get("language_codes"),
         resolved.provider_options.get("language_code"),

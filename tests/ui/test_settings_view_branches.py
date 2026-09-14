@@ -679,6 +679,7 @@ def _make_llm_selection_view(
     )
     view._update_peer_provider_visibility = lambda: None
     view._sync_cloud_free_tier_card = lambda settings=None: None
+    view._sync_soniox_speaker_diarization_card = lambda settings=None: None
     return view
 
 
@@ -4932,6 +4933,7 @@ def test_api_translation_connection_row_places_cloud_free_tier_card(
     assert len(cards) == 3
     assert _row_card_titles(view._translation_connection_row) == [
         t("settings.cloud_free_tier"),
+        t("settings.soniox_speaker_diarization"),
         t("settings.translation_connection"),
     ]
     assert {card.height for card in cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
@@ -4940,8 +4942,42 @@ def test_api_translation_connection_row_places_cloud_free_tier_card(
     assert view._cloud_free_tier_text.content.value == t("settings.cloud_free_tier.inactive")
     assert view._cloud_free_tier_text.on_click is None
     assert view._cloud_free_tier_card.ignore_interactions is True
-    assert cards[2] is view._translation_placeholder_card
-    assert cards[2].ignore_interactions is True
+    assert cards[1] is view._soniox_speaker_diarization_card
+    assert view._soniox_speaker_diarization_text.content.value == t(
+        "settings.soniox_speaker_diarization.inactive"
+    )
+    assert view._soniox_speaker_diarization_text.on_click is None
+    assert cards[1].ignore_interactions is True
+    assert cards[2] is view._translation_connection_card
+
+
+def test_soniox_speaker_detection_toggle_preserves_draft_across_provider_switches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(
+        _vnext(stt_provider="soniox"),
+        config_path=Path("settings.json"),
+    )
+
+    assert view._soniox_speaker_diarization_text.content.value == t("settings.option.on")
+    assert view._soniox_speaker_diarization_card.ignore_interactions is False
+
+    view._on_soniox_speaker_diarization_click(None)
+    assert view._provider_draft is not None
+    assert view._provider_draft.soniox_speaker_diarization_enabled is False
+    assert view._soniox_speaker_diarization_text.content.value == t("settings.option.off")
+
+    view._on_stt_selected("deepgram")
+    assert view._soniox_speaker_diarization_text.content.value == t(
+        "settings.soniox_speaker_diarization.inactive"
+    )
+    assert view._soniox_speaker_diarization_text.on_click is None
+    assert view._soniox_speaker_diarization_card.ignore_interactions is True
+    assert view._provider_draft.soniox_speaker_diarization_enabled is False
+
+    view._on_stt_selected("soniox")
+    assert view._soniox_speaker_diarization_text.content.value == t("settings.option.off")
 
 
 @pytest.mark.parametrize("locale", ["en", "ko", "ja", "ru", "zh-CN"])
@@ -4965,6 +5001,7 @@ def test_general_osc_card_is_locale_independent(
         ]
         assert _row_card_titles(api_row) == [
             t("settings.cloud_free_tier"),
+            t("settings.soniox_speaker_diarization"),
             t("settings.translation_connection"),
         ]
         assert t("settings.cloud_free_tier") in _control_labels(_row_cards(api_row)[0])
@@ -5025,6 +5062,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     ]
     assert _row_card_titles(api_controls[1]) == [
         t("settings.cloud_free_tier"),
+        t("settings.soniox_speaker_diarization"),
         t("settings.translation_connection"),
     ]
     assert api_controls[2] is view._http_extension_host

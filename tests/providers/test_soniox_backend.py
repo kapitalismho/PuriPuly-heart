@@ -973,8 +973,11 @@ async def test_soniox_verify_api_key_handles_timeout(monkeypatch):
     assert config["model"] == "stt-rt-v5"
 
 
+@pytest.mark.parametrize("speaker_diarization", [True, False])
 @pytest.mark.asyncio
-async def test_soniox_session_start_send_recv_and_close(monkeypatch) -> None:
+async def test_soniox_session_start_send_recv_and_close(
+    monkeypatch, speaker_diarization: bool
+) -> None:
     recv_queue: asyncio.Queue[object] = asyncio.Queue()
 
     class FakeWebSocket:
@@ -1013,6 +1016,7 @@ async def test_soniox_session_start_send_recv_and_close(monkeypatch) -> None:
         trailing_silence_ms=50,
         connect_timeout_s=5.0,
         language_hints_strict=True,
+        enable_speaker_diarization=speaker_diarization,
     )
 
     await session.start()
@@ -1037,7 +1041,7 @@ async def test_soniox_session_start_send_recv_and_close(monkeypatch) -> None:
     assert config["context"]["terms"] == ["Puripuly", "VRChat"]
     assert config["language_hints"] == ["en"]
     assert config["language_hints_strict"] is True
-    assert config["enable_speaker_diarization"] is True
+    assert config["enable_speaker_diarization"] is speaker_diarization
 
     payloads = [
         payload

@@ -119,6 +119,8 @@
   "settings.cloud_free_tier.count": "{count}개",
   "settings.cloud_free_tier.inactive": "자동 선택 전용",
   "settings.cloud_free_tier.modal_title": "자동 선택이 고려할 프로바이더를 지정해주세요\n키를 하나만 넣어도 동작해요",
+  "settings.soniox_speaker_diarization": "화자 전환 감지",
+  "settings.soniox_speaker_diarization.inactive": "Soniox 전용",
   "settings.managed_trial_usage.remaining_placeholder": "확인 중",
   "settings.managed_trial_usage.remaining": "{percent}% 남음",
   "settings.managed_key.title": "매니지드 키",

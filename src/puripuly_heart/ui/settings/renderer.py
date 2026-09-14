@@ -32,8 +32,8 @@ def compose_settings_api_surface(
     translation_connection_controls = ft.Row(
         [
             slots.cloud_free_tier,
+            slots.soniox_speaker_diarization,
             slots.translation_connection,
-            slots.translation_placeholder,
         ],
         spacing=SETTINGS_ROW_SPACING,
         expand=True,

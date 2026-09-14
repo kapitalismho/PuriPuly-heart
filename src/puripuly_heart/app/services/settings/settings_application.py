@@ -52,6 +52,7 @@ from puripuly_heart.app.ports.settings_view import (
     QwenRegionEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
+    SonioxSpeakerDiarizationEdit,
     SttGpuDeviceEdit,
     SystemPromptEdit,
     TranslationHttpExtensionEdit,
@@ -218,6 +219,7 @@ def settings_view_surface_snapshots(
         cloud_free_tier_providers=normalize_cloud_free_tier_providers(
             intent.stt.cloud_free_tier_providers
         ),
+        soniox_speaker_diarization_enabled=intent.stt.soniox.enable_speaker_diarization,
         llm_provider=LLMProviderName(
             provider_llm_for_translation(translation.model, translation.connection)
         ),
@@ -616,6 +618,17 @@ def materialize_provider_apply_intent(
                         provider.value
                         for provider in normalize_cloud_free_tier_providers(edit.providers)
                     ],
+                ),
+            )
+        elif isinstance(edit, SonioxSpeakerDiarizationEdit):
+            updated = _with_intent(
+                updated,
+                stt=replace(
+                    updated.intent.stt,
+                    soniox=replace(
+                        updated.intent.stt.soniox,
+                        enable_speaker_diarization=edit.enabled,
+                    ),
                 ),
             )
         elif isinstance(edit, PeerSttProviderEdit):

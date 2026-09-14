@@ -1941,8 +1941,40 @@ def test_self_soniox_is_strict_while_manual_peer_uses_a_soft_hint() -> None:
     assert self_backend.language_hints_strict is True
     assert peer_backend.language_hints == ["en"]
     assert peer_backend.language_hints_strict is False
-    assert self_backend.enable_speaker_diarization is False
+    assert self_backend.enable_speaker_diarization is True
     assert peer_backend.enable_speaker_diarization is True
+
+
+def test_soniox_speaker_diarization_setting_rebuilds_and_configures_both_channels() -> None:
+    enabled_settings = _vnext(stt_provider="soniox", peer_stt_provider="soniox")
+    settings = enabled_settings
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            stt=replace(
+                settings.intent.stt,
+                soniox=replace(
+                    settings.intent.stt.soniox,
+                    enable_speaker_diarization=False,
+                ),
+            ),
+        ),
+    )
+    secrets = InMemorySecretStore()
+    secrets.set("soniox_api_key", "soniox-key")
+
+    self_backend = create_stt_backend(settings, secrets=secrets)
+    peer_backend = create_peer_stt_backend(settings, secrets=secrets)
+
+    assert build_self_stt_runtime_signature(settings) != build_self_stt_runtime_signature(
+        enabled_settings
+    )
+    assert build_peer_stt_provider_signature(settings) != build_peer_stt_provider_signature(
+        enabled_settings
+    )
+    assert self_backend.enable_speaker_diarization is False
+    assert peer_backend.enable_speaker_diarization is False
 
 
 def test_build_peer_stt_provider_signature_uses_fixed_16khz_runtime_contract() -> None:
