@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "failures": [],
+  "checks": [
+    "finite authorized envelope",
+    "one native pass per source",
+    "effective profile",
+    "selected-policy text conservation",
+    "same-QPC causal blocker evidence",
+    "raw and receiver artifact identities"
+  ]
+}

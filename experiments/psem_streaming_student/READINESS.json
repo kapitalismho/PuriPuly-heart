@@ -1,0 +1,19 @@
+{
+  "status": "ready",
+  "config_sha256": "74662984d0912f4cda350554f3a8b254dedca6862a6e33703d8c7469a81696c2",
+  "checks": [
+    {
+      "meeting": "ES2009d",
+      "wav_exists": true,
+      "approved_geometry": true
+    },
+    {
+      "meeting": "EN2009d",
+      "wav_exists": true,
+      "approved_geometry": true
+    }
+  ],
+  "model_execution_cap_s": 1800,
+  "training": "not authorized and not run",
+  "network_api": "not authorized and not run"
+}

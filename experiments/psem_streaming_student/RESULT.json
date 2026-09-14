@@ -1,0 +1,730 @@
+{
+  "schema": "PSEM-STREAMING-STUDENT-TEACHER-BASELINE-RESULT-1",
+  "status": "completed_with_supported_receiver_blocker",
+  "scope": "#164 authorized non-training Vulkan teacher/receiver baseline only",
+  "authorization": {
+    "issue": 164,
+    "authorization_meaning": "Maintainer explicitly requested local Vulkan execution and selected Baseline before later training discussion.",
+    "authorized_activity": "non-training teacher/receiver baseline only",
+    "combined_model_wall_cap_seconds": 1800,
+    "paid_api_calls": 0,
+    "training_updates": 0,
+    "holdout_eval_access": false
+  },
+  "identities": {
+    "config_sha256": "74662984d0912f4cda350554f3a8b254dedca6862a6e33703d8c7469a81696c2",
+    "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+    "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+    "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "ownership_override_sha256": "650d26b7d1d5edafff80b76f7925d9e7ef547aea5b06402d18087e158ccea772",
+    "decoder_sha256": "eef709441a660261d09f925eee55245cb4a5543e59d6e5a17fe7699f70d74dbc",
+    "runner_sha256_after_analysis_fix": "a623358aec51099962ad3c4ca239e2ac0c526e73263743241cb3ff8f6c7b9c0e",
+    "analysis_sha256": "3736e49822de0c2a349add98f68530234c9b9a505e163872a0e389608bce9153"
+  },
+  "execution": {
+    "sources": [
+      "ES2009d",
+      "EN2009d"
+    ],
+    "native_passes_per_source": 1,
+    "approved_audio_s": 244.4,
+    "combined_model_execution_wall_s": 261.5262206000043,
+    "cap_s": 1800,
+    "cap_held": true,
+    "training_backward_updates": 0,
+    "paid_or_cloud_calls": 0,
+    "holdout_eval_opened": false
+  },
+  "measurements": {
+    "native_transition_events": {
+      "ES2009d": 9,
+      "EN2009d": 6
+    },
+    "annotation_conditions": {
+      "ES2009d": {
+        "annotation_identities": [
+          {
+            "role": "A",
+            "sha256": "7af476b4e2a4b8eeee51c9d0e09542b1b748f91a633123651a2b18a6fc1853ae"
+          },
+          {
+            "role": "B",
+            "sha256": "a35d1fa1758ee2143d35e97054e6003f081689828e6303dd250c4c895a48c0d0"
+          },
+          {
+            "role": "C",
+            "sha256": "126110a0853c6a4d97c43cdfa21ce07b63d28d44d29e2622a186398606130d14"
+          },
+          {
+            "role": "D",
+            "sha256": "c4a9a4be601ecdf51df928ed8ba09ea2ba8a0e8f7789b758d27f939024450bdc"
+          }
+        ],
+        "lexical_words": 369,
+        "distinct_nonoverlap_role_changes": 6,
+        "transition_witnesses": [
+          {
+            "sample": 620960,
+            "from": "D",
+            "to": "C",
+            "left": "it",
+            "right": "Ready"
+          },
+          {
+            "sample": 671680,
+            "from": "C",
+            "to": "A",
+            "left": "this",
+            "right": "All"
+          },
+          {
+            "sample": 938560,
+            "from": "A",
+            "to": "C",
+            "left": "fun",
+            "right": "Oh"
+          },
+          {
+            "sample": 977920,
+            "from": "C",
+            "to": "A",
+            "left": "man",
+            "right": "So"
+          },
+          {
+            "sample": 1301600,
+            "from": "D",
+            "to": "A",
+            "left": "Huh",
+            "right": "I"
+          },
+          {
+            "sample": 1718400,
+            "from": "A",
+            "to": "D",
+            "left": "it",
+            "right": "Yeah"
+          }
+        ],
+        "overlap_intersections": 12,
+        "overlap_seconds_sum_not_union": 3.8900000000000077,
+        "retained_parent_guards": {},
+        "interpretation": "Conditions are reported from accessible AMI word intervals and retained parent guard labels; overlap count is pairwise intersections, not a DER metric or disjoint duration."
+      },
+      "EN2009d": {
+        "annotation_identities": [
+          {
+            "role": "A",
+            "sha256": "332665c43d5b956cb0ce1f06f6949e94faf6ddabffa132fc92424f241d0c5644"
+          },
+          {
+            "role": "B",
+            "sha256": "bc28cf56f5963ddcc58f3d623ef9b35d82f2a7d4c0dc7e119314a45f10496ae1"
+          },
+          {
+            "role": "C",
+            "sha256": "0d5a53a8340736b4024a81e1d1f645566efbd368913267db78ab9c25838c8292"
+          },
+          {
+            "role": "D",
+            "sha256": "86797d223dc9b9187db01bc6147360c09696096462cd8051e717c3d83a15c455"
+          }
+        ],
+        "lexical_words": 172,
+        "distinct_nonoverlap_role_changes": 3,
+        "transition_witnesses": [
+          {
+            "sample": 61600,
+            "from": "B",
+            "to": "A",
+            "left": "want",
+            "right": "So"
+          },
+          {
+            "sample": 96160,
+            "from": "B",
+            "to": "A",
+            "left": "Okay",
+            "right": "Um"
+          },
+          {
+            "sample": 770080,
+            "from": "B",
+            "to": "A",
+            "left": "finer",
+            "right": "Yeah"
+          }
+        ],
+        "overlap_intersections": 56,
+        "overlap_seconds_sum_not_union": 7.829999999999997,
+        "retained_parent_guards": {},
+        "interpretation": "Conditions are reported from accessible AMI word intervals and retained parent guard labels; overlap count is pairwise intersections, not a DER metric or disjoint duration."
+      }
+    },
+    "selected_changed_parents": {
+      "ES2009d": 0,
+      "EN2009d": 0
+    },
+    "selected_suppressed_boundaries": {
+      "ES2009d": 0,
+      "EN2009d": 0
+    },
+    "text_conservation_failures": {
+      "ES2009d": 0,
+      "EN2009d": 0
+    },
+    "cost": {
+      "ES2009d": {
+        "complete_path_wall_s": 196.5730014,
+        "native_process_cpu_s": 1.015625,
+        "native_peak_working_set_bytes_observed": 339570688,
+        "rss_sampling": "Native process working set was observed. Receiver-wrapper RSS failed, so the native peak is only a complete-path lower bound and no complete-path peak sum is claimed.",
+        "gpu_memory": {
+          "status": "observed_process_counter",
+          "counter": "GPU Process Memory(pid_NATIVE_*) Dedicated Usage",
+          "samples": 194,
+          "peak_bytes": 167706624,
+          "global_gpu_usage_used": false,
+          "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included."
+        },
+        "receiver_wrapper_cpu_measurement": {
+          "status": "unavailable",
+          "raw_returned_value": 0.0,
+          "reason": "The original execution probe's Windows pseudo-handle measurement returned zero; zero is retained but not reported as receiver processing cost."
+        },
+        "receiver_wrapper_working_set_measurement": {
+          "status": "unavailable",
+          "raw_returned_value": 0,
+          "reason": "The original execution probe's Windows pseudo-handle measurement returned zero; zero is retained but not reported as receiver memory."
+        },
+        "complete_path_working_set_lower_bound_bytes": 339570688
+      },
+      "EN2009d": {
+        "complete_path_wall_s": 48.7370018,
+        "native_process_cpu_s": 0.125,
+        "native_peak_working_set_bytes_observed": 314396672,
+        "rss_sampling": "Native process working set was observed. Receiver-wrapper RSS failed, so the native peak is only a complete-path lower bound and no complete-path peak sum is claimed.",
+        "gpu_memory": {
+          "status": "observed_process_counter",
+          "counter": "GPU Process Memory(pid_NATIVE_*) Dedicated Usage",
+          "samples": 48,
+          "peak_bytes": 167706624,
+          "global_gpu_usage_used": false,
+          "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included."
+        },
+        "receiver_wrapper_cpu_measurement": {
+          "status": "unavailable",
+          "raw_returned_value": 0.0,
+          "reason": "The original execution probe's Windows pseudo-handle measurement returned zero; zero is retained but not reported as receiver processing cost."
+        },
+        "receiver_wrapper_working_set_measurement": {
+          "status": "unavailable",
+          "raw_returned_value": 0,
+          "reason": "The original execution probe's Windows pseudo-handle measurement returned zero; zero is retained but not reported as receiver memory."
+        },
+        "complete_path_working_set_lower_bound_bytes": 314396672
+      }
+    },
+    "causal_receiver": {
+      "ES2009d": {
+        "meeting": "ES2009d",
+        "native_events": 9,
+        "gt_nonoverlap_transitions": 6,
+        "gt_matches_within_250ms": 3,
+        "matched_transitions": [
+          {
+            "gt_sample": 671680,
+            "roles": [
+              "C",
+              "A"
+            ],
+            "native_sample": 672000,
+            "boundary_error_s": 0.02,
+            "confirmation_availability_lag_s": 0.8369061000000002
+          },
+          {
+            "gt_sample": 1301600,
+            "roles": [
+              "D",
+              "A"
+            ],
+            "native_sample": 1303040,
+            "boundary_error_s": 0.09,
+            "confirmation_availability_lag_s": 0.7740861999999993
+          },
+          {
+            "gt_sample": 1718400,
+            "roles": [
+              "A",
+              "D"
+            ],
+            "native_sample": 1719040,
+            "boundary_error_s": 0.04,
+            "confirmation_availability_lag_s": 1.163928999999996
+          }
+        ],
+        "accepted_parents": 28,
+        "parents_with_native_event_inside": 2,
+        "parents_with_timely_native_event_inside": 2,
+        "timely_event_parents_blocked_by_receiver": {
+          "684dd105-8c15-498b-9848-4911f3a5f825": [
+            "insufficient_evidence_coverage"
+          ],
+          "8465ae6c-5f27-457f-bcc1-42944ff0294e": [
+            "insufficient_evidence_coverage"
+          ]
+        },
+        "late_after_commit_events": [
+          {
+            "parent_id": "684dd105-8c15-498b-9848-4911f3a5f825",
+            "accepted_text": "It's from the previous meeting. Oh, really? Okay. I think. I don't know.",
+            "event_id": "e.6",
+            "boundary_sample": 1303040,
+            "receiver_receipt_minus_admission_s": 0.4130251,
+            "timely": false,
+            "receiver_result": [
+              "insufficient_evidence_coverage"
+            ],
+            "uncertain_tokens": []
+          }
+        ],
+        "selected_policy_changed_parents": 0,
+        "selected_policy_removed_boundaries": 0,
+        "text_conservation_failures": 0,
+        "retained_guard_counts": {
+          "same_speaker": 9,
+          "verified_change": 19,
+          "mixed_or_overlap": 3
+        },
+        "annotation_overlap_witnesses": [
+          {
+            "span_samples": [
+              881120,
+              899360
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "experiment",
+              "Yeah"
+            ]
+          },
+          {
+            "span_samples": [
+              899360,
+              901760
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "Yeah",
+              "which"
+            ]
+          },
+          {
+            "span_samples": [
+              901760,
+              903360
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "Yeah",
+              "is"
+            ]
+          },
+          {
+            "span_samples": [
+              903360,
+              905440
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "Yeah",
+              "kind"
+            ]
+          },
+          {
+            "span_samples": [
+              1260160,
+              1263040
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "meeting",
+              "Oh"
+            ]
+          },
+          {
+            "span_samples": [
+              1277760,
+              1278720
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "Okay",
+              "I"
+            ]
+          },
+          {
+            "span_samples": [
+              1278720,
+              1279840
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "Okay",
+              "think"
+            ]
+          },
+          {
+            "span_samples": [
+              1288480,
+              1294880
+            ],
+            "roles": [
+              "A",
+              "D"
+            ],
+            "words": [
+              "think",
+              "Huh"
+            ]
+          },
+          {
+            "span_samples": [
+              1737600,
+              1747200
+            ],
+            "roles": [
+              "A",
+              "D"
+            ],
+            "words": [
+              "you",
+              "No"
+            ]
+          },
+          {
+            "span_samples": [
+              1747200,
+              1751520
+            ],
+            "roles": [
+              "A",
+              "D"
+            ],
+            "words": [
+              "you",
+              "That's"
+            ]
+          },
+          {
+            "span_samples": [
+              1751520,
+              1753440
+            ],
+            "roles": [
+              "A",
+              "D"
+            ],
+            "words": [
+              "you",
+              "how"
+            ]
+          },
+          {
+            "span_samples": [
+              1753440,
+              1764160
+            ],
+            "roles": [
+              "A",
+              "D"
+            ],
+            "words": [
+              "you",
+              "the"
+            ]
+          }
+        ],
+        "interpretation": "Actual receiver consumption reached confirmed native events before admission in every listed timely parent, but unchanged whole-parent coverage/uncertain-timing gates returned a whole-parent unit. Later events are post-commit observations only and were not retrospectively applied."
+      },
+      "EN2009d": {
+        "meeting": "EN2009d",
+        "native_events": 6,
+        "gt_nonoverlap_transitions": 3,
+        "gt_matches_within_250ms": 2,
+        "matched_transitions": [
+          {
+            "gt_sample": 61600,
+            "roles": [
+              "B",
+              "A"
+            ],
+            "native_sample": 64000,
+            "boundary_error_s": 0.15,
+            "confirmation_availability_lag_s": 0.9217145000000002
+          },
+          {
+            "gt_sample": 96160,
+            "roles": [
+              "B",
+              "A"
+            ],
+            "native_sample": 97280,
+            "boundary_error_s": 0.07,
+            "confirmation_availability_lag_s": 0.7681863
+          }
+        ],
+        "accepted_parents": 10,
+        "parents_with_native_event_inside": 4,
+        "parents_with_timely_native_event_inside": 4,
+        "timely_event_parents_blocked_by_receiver": {
+          "333454d7-cf3c-4110-bbc6-bf037c3e739f": [
+            "insufficient_evidence_coverage"
+          ],
+          "2ccf4440-bd38-42b1-93c5-179b4270a47a": [
+            "insufficient_evidence_coverage"
+          ],
+          "5b09905d-fcc2-4c75-b03e-316edfe2df95": [
+            "insufficient_evidence_coverage"
+          ],
+          "d3f6e255-8baf-475b-9a51-6766afaf95c8": [
+            "insufficient_evidence_coverage"
+          ]
+        },
+        "late_after_commit_events": [
+          {
+            "parent_id": "333454d7-cf3c-4110-bbc6-bf037c3e739f",
+            "accepted_text": "Which data man. You know? Yeah. I want everything, and then I'll decide whatI want. So this was that face to face meeting? Okay.",
+            "event_id": "e.2",
+            "boundary_sample": 85760,
+            "receiver_receipt_minus_admission_s": 0.8889346,
+            "timely": false,
+            "receiver_result": [
+              "insufficient_evidence_coverage"
+            ],
+            "uncertain_tokens": []
+          }
+        ],
+        "selected_policy_changed_parents": 0,
+        "selected_policy_removed_boundaries": 0,
+        "text_conservation_failures": 0,
+        "retained_guard_counts": {
+          "verified_change": 6,
+          "mixed_or_overlap": 4,
+          "same_speaker": 4
+        },
+        "annotation_overlap_witnesses": [
+          {
+            "span_samples": [
+              24960,
+              26880
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "know",
+              "Yeah"
+            ]
+          },
+          {
+            "span_samples": [
+              26880,
+              29120
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "Yeah",
+              "I"
+            ]
+          },
+          {
+            "span_samples": [
+              85280,
+              90240
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "meeting",
+              "Okay"
+            ]
+          },
+          {
+            "span_samples": [
+              616000,
+              616160
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "for",
+              "We"
+            ]
+          },
+          {
+            "span_samples": [
+              616160,
+              618400
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "We",
+              "up-translation"
+            ]
+          },
+          {
+            "span_samples": [
+              618400,
+              621120
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "up-translation",
+              "can"
+            ]
+          },
+          {
+            "span_samples": [
+              621120,
+              624480
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "up-translation",
+              "get"
+            ]
+          },
+          {
+            "span_samples": [
+              624480,
+              624640
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "get",
+              "to"
+            ]
+          },
+          {
+            "span_samples": [
+              624640,
+              625760
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "to",
+              "back"
+            ]
+          },
+          {
+            "span_samples": [
+              625760,
+              627200
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "back",
+              "the"
+            ]
+          },
+          {
+            "span_samples": [
+              627200,
+              628480
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "back",
+              "other"
+            ]
+          },
+          {
+            "span_samples": [
+              628480,
+              629920
+            ],
+            "roles": [
+              "A",
+              "B"
+            ],
+            "words": [
+              "other",
+              "to"
+            ]
+          }
+        ],
+        "interpretation": "Actual receiver consumption reached confirmed native events before admission in every listed timely parent, but unchanged whole-parent coverage/uncertain-timing gates returned a whole-parent unit. Later events are post-commit observations only and were not retrospectively applied."
+      }
+    }
+  },
+  "decision": {
+    "baseline_target_usable": false,
+    "disposition": "SUPPORTED_NAMED_TIMING_MAPPING_FAILURE",
+    "failure": "Confirmed native events were consumed before the no-wait admission cutoff for 2/2 event-bearing ES parents and 4/4 event-bearing EN parents, but whole-parent eligibility did not produce a partition. All six failed complete evidence coverage at that cutoff; one ES parent additionally has an unmapped accepted token. The fixed selected UNKNOWN-only suppression therefore had no eligible boundary to change.",
+    "not_a_teacher_finetuning_finding": true,
+    "compression_training": "not run; awaiting later discussion",
+    "quality_scope": "The approved prefixes contain actual non-overlap transitions, overlap intervals, and retained same-speaker guards, but this baseline does not establish translation effect or general teacher quality.",
+    "requested_next_decision": "Discuss R4 training independently under its own authority; retain, separately repair, or scope out the receiver coverage/admission gap without changing the fixed policy by implication. No extra source/model pass is authorized here."
+  },
+  "architecture": {
+    "product_source_changed": false,
+    "production_160_duplicated": false,
+    "runtime_boundary": "Experiment-local pinned archive plus ownership override; no product mutation.",
+    "api_or_display_evidence": "none"
+  },
+  "source_results": [
+    "experiments\\psem_streaming_student\\runs\\ES2009d\\RESULT.json",
+    "experiments\\psem_streaming_student\\runs\\EN2009d\\RESULT.json"
+  ]
+}

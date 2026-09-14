@@ -1,0 +1,3 @@
+runs/*/input.wav
+runs/*/dump/diar.hidden.f32
+runs/*/dump/diar.logits.f32

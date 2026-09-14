@@ -1,0 +1,10 @@
+{
+  "schema": "PSEM-STREAMING-STUDENT-WINDOWS-METRICS-SMOKE-1",
+  "status": "passed",
+  "command": "python -c \"import os, ctypes; from experiments.psem_streaming_student.run_baseline import open_process_handle, process_memory, cpu_seconds; h=open_process_handle(os.getpid()); w,p=process_memory(h); c=cpu_seconds(h); ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(h)); assert w>0 and p>=w and c>=0; print(...)\"",
+  "working_set_bytes": 23384064,
+  "peak_working_set_bytes": 25485312,
+  "cpu_seconds": 0.015625,
+  "model_execution": false,
+  "interpretation": "The corrected real-handle, 64-bit ctypes helper works on the current process. This smoke result does not revise the original baseline receiver CPU/RSS failure or complete R2 cost evidence."
+}
