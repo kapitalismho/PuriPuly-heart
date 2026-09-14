@@ -49,7 +49,6 @@ INTEGER_CONTROLS: Final[Mapping[str, str]] = MappingProxyType(
         "PuriPuly_SelfASR": "stt.provider",
         "PuriPuly_PeerASR": "peer_stt.provider",
         "PuriPuly_Translator": "translation.selection",
-        "PuriPuly_Fallback": "translation.fallback",
     }
 )
 
@@ -100,7 +99,6 @@ TRANSLATION_MODEL_IDS: Final[Mapping[int, str]] = MappingProxyType(
         9: "custom_http",
         10: "managed_gemma",
         11: "managed_gemma",
-        12: "managed_gemma_12b",
         13: "deepseek_v4_flash_41",
     }
 )
@@ -109,27 +107,9 @@ TRANSLATION_CONNECTION_BY_MODEL_ID: Final[Mapping[int, str]] = MappingProxyType(
     {
         10: "cpu",
         11: "gpu",
-        12: "gpu",
     }
 )
 
-FALLBACK_IDS: Final[Mapping[int, str]] = MappingProxyType(
-    {
-        0: "none",
-        1: "deepseek_v4_flash_official",
-        2: "openrouter_deepseek_v4_flash",
-        3: "openrouter_gemma4_26b_a4b",
-        4: "openrouter_gemma4_26b_31b",
-        5: "openrouter_gemma4_31b",
-        6: "managed_gemma4_26b_31b",
-        7: "managed_gemma4_31b",
-        9: "openrouter_deepseek_v4_flash_41",
-        10: "deepseek_v4_flash_managed",
-        11: "deepseek_v4_flash_china",
-        12: "deepseek_v4_flash_41_managed",
-        13: "deepseek_v4_flash_41_china",
-    }
-)
 
 _LANGUAGE_ABI_ENTRIES: Final[tuple[tuple[int, str], ...]] = (
     (0, "ar"),
@@ -188,18 +168,13 @@ TRANSLATION_MODEL_ID_BY_VALUE: Final[Mapping[str, int]] = MappingProxyType(
         **{value: identifier for identifier, value in TRANSLATION_MODEL_IDS.items()},
         "gemini37_flash": 5,
         "managed_gemma": 10,
-        "managed_gemma_12b": 12,
     }
 )
 TRANSLATION_MODEL_ID_BY_SELECTION: Final[Mapping[tuple[str, str], int]] = MappingProxyType(
     {
         ("managed_gemma", "cpu"): 10,
         ("managed_gemma", "gpu"): 11,
-        ("managed_gemma_12b", "gpu"): 12,
     }
-)
-FALLBACK_ID_BY_ALIAS: Final[Mapping[str, int]] = MappingProxyType(
-    {value: identifier for identifier, value in FALLBACK_IDS.items()}
 )
 LANGUAGE_ID_BY_CODE: Final[Mapping[str, int]] = MappingProxyType(
     {value: identifier for identifier, value in LANGUAGE_IDS.items()}
@@ -217,7 +192,6 @@ OSC_INTEGER_REGISTRIES: Final[Mapping[str, Mapping[int, str]]] = MappingProxyTyp
         "PuriPuly_SelfASR": ASR_IDS,
         "PuriPuly_PeerASR": ASR_IDS,
         "PuriPuly_Translator": TRANSLATION_MODEL_IDS,
-        "PuriPuly_Fallback": FALLBACK_IDS,
     }
 )
 
@@ -240,7 +214,7 @@ def registry_for_parameter(name: str) -> Mapping[int, str] | None:
 
 
 def translation_model_id_for_selection(model: str, connection: str) -> int:
-    if model in {"managed_gemma", "managed_gemma_12b"}:
+    if model == "managed_gemma":
         return TRANSLATION_MODEL_ID_BY_SELECTION[(model, connection)]
     return TRANSLATION_MODEL_ID_BY_VALUE[model]
 
@@ -257,8 +231,6 @@ __all__ = [
     "ASR_IDS",
     "ASR_ID_BY_PROVIDER",
     "BOOLEAN_CONTROLS",
-    "FALLBACK_IDS",
-    "FALLBACK_ID_BY_ALIAS",
     "INTEGER_CONTROLS",
     "LANGUAGE_IDS",
     "LANGUAGE_ID_BY_CODE",

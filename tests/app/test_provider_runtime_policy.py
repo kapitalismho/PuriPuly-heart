@@ -7,10 +7,7 @@ from puripuly_heart.app.wiring_provider_runtime_policy import (
 )
 
 from puripuly_heart.config.provider_values import OpenRouterSelectionAlias
-from puripuly_heart.config.settings_vnext.schema import (
-    AppSettingsVNext,
-    TranslationFallbackIntent,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 
 
@@ -36,37 +33,30 @@ def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
         connection="openrouter",
         openrouter_selected_source="managed",
         openrouter_selection_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED.value,
-        fallback=TranslationFallbackIntent(selection_alias="openrouter_deepseek_v4_flash"),
     )
     different_selection = _with_translation(
         canonical,
         openrouter_selection_alias=OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED.value,
     )
-    different_fallback = _with_translation(
-        canonical,
-        fallback=TranslationFallbackIntent(selection_alias="none"),
-    )
 
     assert _signature(canonical) != _signature(different_selection)
-    assert _signature(canonical) != _signature(different_fallback)
 
-    managed_fallback = _with_translation(
+    direct = _with_translation(
         baseline,
         model="gemini37_flash",
         connection="official_byok",
-        fallback=TranslationFallbackIntent(selection_alias="deepseek_v4_flash_china"),
     )
     different_identity = replace(
-        managed_fallback,
+        direct,
         state=replace(
-            managed_fallback.state,
+            direct.state,
             managed_connection=replace(
-                managed_fallback.state.managed_connection,
-                verified_hardware_hash="fallback-managed-hash",
+                direct.state.managed_connection,
+                verified_hardware_hash="unrelated-managed-hash",
             ),
         ),
     )
-    assert _signature(managed_fallback) != _signature(different_identity)
+    assert _signature(direct) == _signature(different_identity)
 
     routed = _with_translation(
         canonical,
@@ -127,28 +117,26 @@ def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
     assert _signature(local) != _signature(changed_body)
 
 
-def test_managed_gemma_signature_ignores_disabled_provider_fallback_but_tracks_prefix() -> None:
+def test_managed_gemma_signature_tracks_prefix_and_ignores_cloud_state() -> None:
     baseline = AppSettingsVNext()
     base = _with_translation(
         baseline,
         model="managed_gemma",
         connection="cpu",
-        fallback=TranslationFallbackIntent(selection_alias="deepseek_v4_flash_china"),
     )
-    disabled = _with_translation(base, fallback=TranslationFallbackIntent(selection_alias="none"))
-    changed_fallback = replace(
-        disabled,
+    changed_cloud_state = replace(
+        base,
         intent=replace(
-            disabled.intent,
+            base.intent,
             translation=replace(
-                disabled.intent.translation,
+                base.intent.translation,
                 openrouter_broker_base_url="https://different.example",
             ),
         ),
         state=replace(
-            disabled.state,
+            base.state,
             managed_connection=replace(
-                disabled.state.managed_connection,
+                base.state.managed_connection,
                 verified_hardware_hash="different",
             ),
         ),
@@ -169,7 +157,7 @@ def test_managed_gemma_signature_ignores_disabled_provider_fallback_but_tracks_p
     )
     changed_backend = _with_translation(base, connection="gpu")
 
-    assert _signature(base) == _signature(changed_fallback)
+    assert _signature(base) == _signature(changed_cloud_state)
     assert _signature(base) != _signature(changed_language)
     assert _signature(base) != _signature(changed_prompt)
     assert _signature(base) != _signature(changed_backend)

@@ -2,15 +2,12 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-import pytest
-
 from puripuly_heart.app.services.canonical_settings_persistence import (
     materialize_canonical_translation_settings,
 )
 from puripuly_heart.config.provider_values import LLMProviderName, QwenRegion
-from puripuly_heart.config.runtime_resolution import TranslationFallbackRuntimeIntent
 from puripuly_heart.config.settings_vnext import serialization
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, TranslationFallbackIntent
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 
 
@@ -29,7 +26,6 @@ def _custom_settings() -> AppSettingsVNext:
                     TranslationModel.QWEN_38_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
                     TranslationModel.CUSTOM_HTTP.value: TranslationConnection.CUSTOM_HTTP.value,
                 },
-                fallback=TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_a4b"),
                 http_extension_id="libretranslate",
                 previous_llm_model=TranslationModel.QWEN_38_FLASH.value,
                 qwen=replace(
@@ -66,21 +62,11 @@ def test_custom_http_settings_roundtrip_preserves_inactive_llm_state() -> None:
     assert loaded.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
     assert loaded.intent.translation.http_extension_id == "libretranslate"
     assert loaded.intent.translation.previous_llm_model == TranslationModel.QWEN_38_FLASH.value
-    assert loaded.intent.translation.fallback == settings.intent.translation.fallback
     assert loaded.intent.translation.qwen.region == QwenRegion.SINGAPORE.value
     assert loaded.intent.translation.qwen.llm_model == "qwen3.8-flash"
 
 
-def test_custom_http_cannot_be_used_as_translation_fallback() -> None:
-    with pytest.raises(ValueError, match="cannot be used as fallback"):
-        TranslationFallbackRuntimeIntent(
-            enabled=True,
-            model=TranslationModel.CUSTOM_HTTP.value,
-            connection=TranslationConnection.CUSTOM_HTTP.value,
-        )
-
-
-def test_switching_custom_http_and_llm_preserves_model_connection_and_fallback() -> None:
+def test_switching_custom_http_and_llm_preserves_model_connection() -> None:
     current = AppSettingsVNext()
     settings = replace(
         current,
@@ -94,7 +80,6 @@ def test_switching_custom_http_and_llm_preserves_model_connection_and_fallback()
                     TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
                     TranslationModel.QWEN_38_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
                 },
-                fallback=TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_a4b"),
                 qwen=replace(
                     current.intent.translation.qwen,
                     region=QwenRegion.SINGAPORE.value,
@@ -105,7 +90,6 @@ def test_switching_custom_http_and_llm_preserves_model_connection_and_fallback()
     )
     expected_region = settings.intent.translation.qwen.region
     expected_qwen_model = settings.intent.translation.qwen.llm_model
-    expected_fallback = settings.intent.translation.fallback
     expected_history = dict(settings.intent.translation.connection_history)
 
     custom = materialize_canonical_translation_settings(
@@ -126,7 +110,6 @@ def test_switching_custom_http_and_llm_preserves_model_connection_and_fallback()
 
     assert custom.intent.translation.qwen.region == expected_region
     assert custom.intent.translation.qwen.llm_model == expected_qwen_model
-    assert custom.intent.translation.fallback == expected_fallback
     assert custom.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
     assert custom.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
     for key, value in expected_history.items():
@@ -148,5 +131,4 @@ def test_switching_custom_http_and_llm_preserves_model_connection_and_fallback()
 
     assert restored.intent.translation.qwen.region == expected_region
     assert restored.intent.translation.qwen.llm_model == expected_qwen_model
-    assert restored.intent.translation.fallback == expected_fallback
     assert LLMProviderName.QWEN.value == "qwen"

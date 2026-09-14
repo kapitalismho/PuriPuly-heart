@@ -43,7 +43,6 @@ from puripuly_heart.config.runtime_resolution import (
     PROVIDER_QWEN,
     DirectProviderRuntimeIntent,
     RuntimeResolutionInput,
-    TranslationFallbackRuntimeIntent,
     normalize_openrouter_runtime_intent,
     normalize_translation_runtime_intent,
     resolve_llm_config,
@@ -134,11 +133,6 @@ def runtime_resolution_input_from_vnext(settings: AppSettingsVNext) -> RuntimeRe
             model=translation.model,
             connection=translation.connection,
             concurrency_limit=translation.concurrency_limit,
-        ),
-        translation_fallback=TranslationFallbackRuntimeIntent(
-            enabled=translation.fallback.enabled,
-            model=translation.fallback.model,
-            connection=translation.fallback.connection,
         ),
         openrouter=openrouter_intent,
         direct=DirectProviderRuntimeIntent(

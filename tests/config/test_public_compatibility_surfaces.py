@@ -33,7 +33,11 @@ from puripuly_heart.config.provider_values import (
     SecretsBackend,
 )
 from puripuly_heart.config.settings_vnext import serialization
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, SecretsIntent
+from puripuly_heart.config.settings_vnext.schema import (
+    VNEXT_SETTINGS_SCHEMA_VERSION,
+    AppSettingsVNext,
+    SecretsIntent,
+)
 from puripuly_heart.core import (
     managed_identity,
     openrouter_credentials,
@@ -241,7 +245,9 @@ def _render_command_template(parts: list[str], **values: str) -> tuple[str, ...]
 
 
 def _inno_define_literals(script: str) -> dict[str, str]:
-    return dict(re.findall(r'^\s*#define\s+([A-Za-z0-9_]+)\s+"([^"]*)"', script, re.M))
+    quoted = re.findall(r'^\s*#define\s+([A-Za-z0-9_]+)\s+"([^"]*)"', script, re.M)
+    numeric = re.findall(r"^\s*#define\s+([A-Za-z0-9_]+)\s+(\d+)\s*$", script, re.M)
+    return dict([*quoted, *numeric])
 
 
 def _powershell_string_variable(script: str, variable_name: str) -> str:
@@ -690,11 +696,6 @@ def _local_llm_runtime_input() -> runtime_resolution.RuntimeResolutionInput:
             model="local_llm",
             connection="ollama",
             concurrency_limit=1,
-        ),
-        translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
-            enabled=False,
-            model="local_llm",
-            connection="ollama",
         ),
         openrouter=runtime_resolution.normalize_openrouter_runtime_intent(
             model="google/gemma-4-26b-a4b-it",
@@ -1459,6 +1460,8 @@ def test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract() -> 
     for setup_line in snapshot["setup_lines"]:
         assert setup_line in installer_script
 
+    assert defines["CanonicalSettingsVersion"] == str(VNEXT_SETTINGS_SCHEMA_VERSION)
+
     assert snapshot["production_installer_build"] in release_script
     assert (
         _powershell_string_variable(release_script, "InstallerTestAppId")
@@ -1511,20 +1514,12 @@ def test_provider_alias_snapshot_matches_current_aliases_and_legacy_acceptance()
     assert tuple(snapshot["openrouter_main_selection_aliases"]) == (
         llm_profiles.OPENROUTER_MAIN_SELECTION_ALIASES
     )
-    assert tuple(snapshot["openrouter_fallback_selection_aliases"]) == (
-        llm_profiles.OPENROUTER_FALLBACK_SELECTION_ALIASES
-    )
     assert tuple(snapshot["legacy_selection_aliases"]) == tuple(
         sorted(llm_profiles.LEGACY_PROFILE_BY_ALIAS)
     )
-    assert snapshot["legacy_fallback_aliases"] == llm_profiles.LEGACY_FALLBACK_ALIAS_TO_ALIAS
 
     for alias in snapshot["legacy_selection_aliases"]:
         assert llm_profiles.get_openrouter_llm_profile(alias) is not None
-    for legacy_alias, canonical_alias in snapshot["legacy_fallback_aliases"].items():
-        assert llm_profiles.normalize_openrouter_fallback_selection_alias(legacy_alias) == (
-            canonical_alias
-        )
 
 
 def test_provider_runtime_public_config_snapshot_matches_resolved_contracts() -> None:

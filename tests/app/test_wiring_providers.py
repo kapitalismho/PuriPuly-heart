@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from dataclasses import asdict, replace
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,10 +13,8 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
     materialize_canonical_translation_settings,
 )
 from puripuly_heart.app.wiring import (
-    ManagedIdentityStateAdapter,
     ResolvedPeerSTTConfig,
     _LazyFactoryLLMProvider,
-    build_openrouter_release_runtime_config,
     build_peer_stt_provider_signature,
     build_peer_stt_provider_signature_from_vnext,
     build_self_stt_runtime_signature,
@@ -61,16 +59,12 @@ from puripuly_heart.config.resolved import (
     ResolvedLLMTarget,
     ResolvedSTTConfig,
 )
-from puripuly_heart.config.runtime_resolution import (
-    TranslationFallbackRuntimeIntent,
-    resolve_stt_config,
-)
+from puripuly_heart.config.runtime_resolution import resolve_stt_config
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     DesktopFletOverlayIntent,
     DesktopFletOverlayPositionIntent,
     DesktopFletOverlayVisualIntent,
-    TranslationFallbackIntent,
 )
 from puripuly_heart.core.language import get_deepgram_language
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
@@ -124,7 +118,6 @@ from puripuly_heart.core.local_asr.local_stt_assets import default_local_stt_mod
 from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterLLMProvider,
     ManagedOpenRouterReleaseService,
-    _resolve_managed_issue_model,
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore, SecretStore
 from puripuly_heart.core.stt.backend import STTBackend
@@ -183,7 +176,6 @@ def _vnext(
     model: str | None = None,
     connection: str | None = None,
     concurrency_limit: int | None = None,
-    fallback_alias: str | None = None,
     openrouter_model: str | None = None,
     openrouter_source: str | None = None,
     openrouter_alias: str | None = None,
@@ -244,10 +236,6 @@ def _vnext(
         )
     if concurrency_limit is not None:
         translation = replace(translation, concurrency_limit=concurrency_limit)
-    translation = replace(
-        translation,
-        fallback=TranslationFallbackIntent(selection_alias=fallback_alias or "none"),
-    )
     if openrouter_routing_mode is not None:
         translation = replace(translation, openrouter_routing_mode=openrouter_routing_mode)
     if gemini_model is not None:
@@ -390,30 +378,9 @@ def create_llm_provider(
     **kwargs: object,
 ) -> LLMProvider:
     extras = kwargs.pop("extras", None)
-    fallback_model = kwargs.pop("fallback_model", None)
-    fallback_connection = kwargs.pop("fallback_connection", None)
     if settings.intent.translation.openrouter_selected_source == "none":
         raise ValueError("OpenRouter selected source must not be `none` for execution")
     runtime_input = runtime_resolution_input_from_vnext(settings)
-    fallback = settings.intent.translation.fallback
-    if fallback_model is not None and fallback_connection is not None:
-        runtime_input = replace(
-            runtime_input,
-            translation_fallback=TranslationFallbackRuntimeIntent(
-                enabled=True,
-                model=str(fallback_model),
-                connection=str(fallback_connection),
-            ),
-        )
-    elif fallback.enabled:
-        runtime_input = replace(
-            runtime_input,
-            translation_fallback=TranslationFallbackRuntimeIntent(
-                enabled=True,
-                model=fallback.model,
-                connection=fallback.connection,
-            ),
-        )
     return create_llm_provider_from_runtime_input(
         runtime_input,
         secrets=secrets,
@@ -549,9 +516,9 @@ def test_create_llm_provider_gemini_uses_secret_and_concurrency_limit() -> None:
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, GeminiLLMProvider)
-    assert provider.inner.api_key == "k"
-    assert provider.inner.model == "gemini-3.7-flash"
+    assert isinstance(provider.inner.primary, GeminiLLMProvider)
+    assert provider.inner.primary.api_key == "k"
+    assert provider.inner.primary.model == "gemini-3.7-flash"
     assert_bounded_concurrency(provider, 3)
 
 
@@ -562,8 +529,8 @@ def test_create_llm_provider_gemini_uses_selected_model() -> None:
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, GeminiLLMProvider)
-    assert provider.inner.model == "gemini-3.7-flash"
+    assert isinstance(provider.inner.primary, GeminiLLMProvider)
+    assert provider.inner.primary.model == "gemini-3.7-flash"
 
 
 def test_create_llm_provider_gemini_passes_runtime_logging() -> None:
@@ -575,8 +542,8 @@ def test_create_llm_provider_gemini_passes_runtime_logging() -> None:
     provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, GeminiLLMProvider)
-    assert provider.inner.runtime_logging is runtime_logging
+    assert isinstance(provider.inner.primary, GeminiLLMProvider)
+    assert provider.inner.primary.runtime_logging is runtime_logging
 
 
 def test_create_llm_provider_qwen_uses_secret() -> None:
@@ -587,10 +554,10 @@ def test_create_llm_provider_qwen_uses_secret() -> None:
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, AsyncQwenLLMProvider)
-    assert provider.inner.api_key == "k2"
-    assert provider.inner.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    assert provider.inner.model == "qwen3.8-flash"
+    assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
+    assert provider.inner.primary.api_key == "k2"
+    assert provider.inner.primary.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    assert provider.inner.primary.model == "qwen3.8-flash"
     assert_bounded_concurrency(provider, 5)
 
 
@@ -603,8 +570,8 @@ def test_create_llm_provider_qwen_low_latency_passes_runtime_logging() -> None:
     provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, AsyncQwenLLMProvider)
-    assert provider.inner.runtime_logging is runtime_logging
+    assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
+    assert provider.inner.primary.runtime_logging is runtime_logging
 
 
 def test_create_llm_provider_qwen_uses_singapore_region() -> None:
@@ -618,10 +585,12 @@ def test_create_llm_provider_qwen_uses_singapore_region() -> None:
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, AsyncQwenLLMProvider)
-    assert provider.inner.api_key == "k3"
-    assert provider.inner.base_url == "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-    assert provider.inner.model == "qwen3.8-flash"
+    assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
+    assert provider.inner.primary.api_key == "k3"
+    assert (
+        provider.inner.primary.base_url == "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    )
+    assert provider.inner.primary.model == "qwen3.8-flash"
 
 
 def test_create_llm_provider_qwen_uses_legacy_alibaba_secret_key() -> None:
@@ -631,8 +600,8 @@ def test_create_llm_provider_qwen_uses_legacy_alibaba_secret_key() -> None:
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, AsyncQwenLLMProvider)
-    assert provider.inner.api_key == "legacy-k2"
+    assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
+    assert provider.inner.primary.api_key == "legacy-k2"
     # Legacy key should be backfilled to region-specific key for future runs.
     assert secrets.get("alibaba_api_key_beijing") == "legacy-k2"
 
@@ -648,10 +617,10 @@ def test_create_llm_provider_qwen_historical_false_still_uses_async_provider() -
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, AsyncQwenLLMProvider)
-    assert provider.inner.api_key == "k2"
-    assert provider.inner.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    assert provider.inner.model == "qwen3.8-flash"
+    assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
+    assert provider.inner.primary.api_key == "k2"
+    assert provider.inner.primary.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    assert provider.inner.primary.model == "qwen3.8-flash"
 
 
 def test_create_llm_provider_qwen_historical_false_passes_runtime_logging() -> None:
@@ -663,8 +632,8 @@ def test_create_llm_provider_qwen_historical_false_passes_runtime_logging() -> N
     provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, AsyncQwenLLMProvider)
-    assert provider.inner.runtime_logging is runtime_logging
+    assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
+    assert provider.inner.primary.runtime_logging is runtime_logging
 
 
 def test_create_llm_provider_qwen_historical_false_uses_async_singapore() -> None:
@@ -679,10 +648,12 @@ def test_create_llm_provider_qwen_historical_false_uses_async_singapore() -> Non
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, AsyncQwenLLMProvider)
-    assert provider.inner.api_key == "k3"
-    assert provider.inner.base_url == "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-    assert provider.inner.model == "qwen3.5-flash"
+    assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
+    assert provider.inner.primary.api_key == "k3"
+    assert (
+        provider.inner.primary.base_url == "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    )
+    assert provider.inner.primary.model == "qwen3.5-flash"
 
 
 def test_create_llm_provider_deepseek_uses_secret_and_model() -> None:
@@ -693,10 +664,10 @@ def test_create_llm_provider_deepseek_uses_secret_and_model() -> None:
     provider = create_llm_provider(settings, secrets=secrets)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, DeepSeekLLMProvider)
-    assert provider.inner.api_key == "ds-key"
-    assert provider.inner.model == "deepseek-flash"
-    assert provider.inner.base_url == "https://api.deepseek.com"
+    assert isinstance(provider.inner.primary, DeepSeekLLMProvider)
+    assert provider.inner.primary.api_key == "ds-key"
+    assert provider.inner.primary.model == "deepseek-flash"
+    assert provider.inner.primary.base_url == "https://api.deepseek.com"
     assert_bounded_concurrency(provider, 4)
 
 
@@ -708,8 +679,8 @@ def test_create_llm_provider_deepseek_uses_flash_model() -> None:
     provider = create_llm_provider(settings, secrets=secrets)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, DeepSeekLLMProvider)
-    assert provider.inner.model == "deepseek-flash"
+    assert isinstance(provider.inner.primary, DeepSeekLLMProvider)
+    assert provider.inner.primary.model == "deepseek-flash"
 
 
 def test_create_llm_provider_deepseek_passes_runtime_logging() -> None:
@@ -721,8 +692,8 @@ def test_create_llm_provider_deepseek_passes_runtime_logging() -> None:
     provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, DeepSeekLLMProvider)
-    assert provider.inner.runtime_logging is runtime_logging
+    assert isinstance(provider.inner.primary, DeepSeekLLMProvider)
+    assert provider.inner.primary.runtime_logging is runtime_logging
 
 
 def test_create_llm_provider_local_llm_uses_settings_without_secret(
@@ -824,7 +795,6 @@ def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
         concurrency_limit=4,
         openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
         openrouter_routing_mode=OpenRouterRoutingMode.LATENCY.value,
-        fallback_alias="none",
         openrouter_source="byok",
     )
     secrets = InMemorySecretStore()
@@ -833,11 +803,11 @@ def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
     provider = create_llm_provider(settings, secrets=secrets)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, OpenRouterLLMProvider)
-    assert provider.inner.api_key == "or-key"
-    assert provider.inner.model == "google/gemma-4-26b-a4b-it"
-    assert provider.inner.base_url == "https://openrouter.ai/api/v1"
-    assert provider.inner.routing_mode == OpenRouterRoutingMode.LATENCY
+    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
+    assert provider.inner.primary.api_key == "or-key"
+    assert provider.inner.primary.model == "google/gemma-4-26b-a4b-it"
+    assert provider.inner.primary.base_url == "https://openrouter.ai/api/v1"
+    assert provider.inner.primary.routing_mode == OpenRouterRoutingMode.LATENCY
     assert_bounded_concurrency(provider, 4)
 
 
@@ -879,7 +849,6 @@ def test_create_llm_provider_openrouter_byok_still_uses_user_owned_secret_after_
         llm="openrouter",
         openrouter_source="byok",
         openrouter_alias=OpenRouterSelectionAlias.GEMMA4_BYOK.value,
-        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "pkce-user-key")
@@ -888,8 +857,8 @@ def test_create_llm_provider_openrouter_byok_still_uses_user_owned_secret_after_
     provider = create_llm_provider(settings, secrets=secrets)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, OpenRouterLLMProvider)
-    assert provider.inner.api_key == "pkce-user-key"
+    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
+    assert provider.inner.primary.api_key == "pkce-user-key"
 
 
 def test_create_llm_provider_openrouter_qwen_byok_alias_uses_resolved_qwen_model() -> None:
@@ -897,7 +866,6 @@ def test_create_llm_provider_openrouter_qwen_byok_alias_uses_resolved_qwen_model
         llm="openrouter",
         openrouter_source="byok",
         openrouter_alias=OpenRouterSelectionAlias.QWEN35_FLASH_BYOK.value,
-        fallback_alias="none",
         openrouter_routing_mode="latency",
     )
     secrets = InMemorySecretStore()
@@ -906,19 +874,18 @@ def test_create_llm_provider_openrouter_qwen_byok_alias_uses_resolved_qwen_model
     provider = create_llm_provider(settings, secrets=secrets)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, OpenRouterLLMProvider)
-    assert provider.inner.api_key == "qwen-byok-key"
-    assert provider.inner.model == OpenRouterLLMModel.QWEN_35_FLASH_02_23.value
-    assert provider.inner.routing_mode == OpenRouterRoutingMode.LATENCY
-    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEFAULT
+    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
+    assert provider.inner.primary.api_key == "qwen-byok-key"
+    assert provider.inner.primary.model == OpenRouterLLMModel.QWEN_35_FLASH_02_23.value
+    assert provider.inner.primary.routing_mode == OpenRouterRoutingMode.LATENCY
+    assert provider.inner.primary.provider_routing == OpenRouterProviderRouting.DEFAULT
 
 
-def test_create_llm_provider_openrouter_qwen_byok_deepseek_only_skips_fallback_racing() -> None:
+def test_create_llm_provider_openrouter_qwen_byok_deepseek_only_keeps_identity_hedge() -> None:
     settings = _vnext(
         llm="openrouter",
         openrouter_source="byok",
         openrouter_alias=OpenRouterSelectionAlias.QWEN35_FLASH_BYOK.value,
-        fallback_alias="none",
         openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
     )
     secrets = InMemorySecretStore()
@@ -927,17 +894,16 @@ def test_create_llm_provider_openrouter_qwen_byok_deepseek_only_skips_fallback_r
     provider = create_llm_provider(settings, secrets=secrets)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, OpenRouterLLMProvider)
-    assert not isinstance(provider.inner, FallbackRacingLLMProvider)
-    assert provider.inner.model == OpenRouterLLMModel.QWEN_35_FLASH_02_23.value
-    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert isinstance(provider.inner, FallbackRacingLLMProvider)
+    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
+    assert provider.inner.primary.model == OpenRouterLLMModel.QWEN_35_FLASH_02_23.value
+    assert provider.inner.primary.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
 
 
 def test_create_llm_provider_openrouter_passes_runtime_logging() -> None:
     settings = _vnext(
         llm="openrouter",
         openrouter_source="byok",
-        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "or-key")
@@ -946,8 +912,8 @@ def test_create_llm_provider_openrouter_passes_runtime_logging() -> None:
     provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, OpenRouterLLMProvider)
-    assert provider.inner.runtime_logging is runtime_logging
+    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
+    assert provider.inner.primary.runtime_logging is runtime_logging
 
 
 def test_create_llm_provider_openrouter_uses_env_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -955,22 +921,20 @@ def test_create_llm_provider_openrouter_uses_env_fallback(monkeypatch: pytest.Mo
     settings = _vnext(
         llm="openrouter",
         openrouter_source="byok",
-        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
 
     provider = create_llm_provider(settings, secrets=secrets)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, OpenRouterLLMProvider)
-    assert provider.inner.api_key == "env-or-key"
+    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
+    assert provider.inner.primary.api_key == "env-or-key"
 
 
 def test_create_llm_provider_openrouter_uses_selected_managed_key() -> None:
     settings = _vnext(
         llm="openrouter",
         openrouter_source="managed",
-        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "byok-key")
@@ -984,11 +948,11 @@ def test_create_llm_provider_openrouter_uses_selected_managed_key() -> None:
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, OpenRouterLLMProvider)
-    assert provider.inner.api_key == "managed-key"
+    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
+    assert provider.inner.primary.api_key == "managed-key"
 
 
-def test_create_llm_provider_openrouter_deepseek_only_skips_openrouter_fallback_racing() -> None:
+def test_create_llm_provider_openrouter_deepseek_only_keeps_identity_hedge() -> None:
     settings = _vnext(
         llm="openrouter",
         model="deepseek_v4_flash",
@@ -996,7 +960,6 @@ def test_create_llm_provider_openrouter_deepseek_only_skips_openrouter_fallback_
         openrouter_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value,
         openrouter_source="managed",
         openrouter_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value,
-        fallback_alias="none",
         openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
         managed_credential_ref="managed-ref-qq",
     )
@@ -1010,18 +973,20 @@ def test_create_llm_provider_openrouter_deepseek_only_skips_openrouter_fallback_
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, OpenRouterLLMProvider)
-    assert provider.inner.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA
+    assert isinstance(provider.inner, FallbackRacingLLMProvider)
+    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
+    assert provider.inner.primary.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
+    assert (
+        provider.inner.primary.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA
+    )
 
 
-def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_skips_fallback_racing() -> None:
+def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_keeps_identity_hedge() -> None:
     settings = _vnext(
         llm="openrouter",
         openrouter_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value,
         openrouter_source="byok",
         openrouter_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value,
-        fallback_alias="none",
         openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
     )
     secrets = InMemorySecretStore()
@@ -1030,64 +995,14 @@ def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_skips_fallba
     provider = create_llm_provider(settings, secrets=secrets)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, OpenRouterLLMProvider)
-    assert not isinstance(provider.inner, FallbackRacingLLMProvider)
-    assert provider.inner.api_key == "byok-key"
-    assert provider.inner.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY
-
-
-def test_create_llm_provider_deepseek_flash_official_fallback_uses_flash_model() -> None:
-    settings = _vnext(
-        llm="deepseek",
-        deepseek_model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value,
-        fallback_alias="deepseek_v4_flash_official",
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("deepseek_api_key", "deepseek-key")
-
-    provider = create_llm_provider(settings, secrets=secrets)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, FallbackRacingLLMProvider)
-    assert isinstance(provider.inner.primary, DeepSeekLLMProvider)
-    assert provider.inner.primary.model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
-    assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
-
-    fallback_delegate = provider.inner.fallback.factory()
-
-    assert isinstance(fallback_delegate, DeepSeekLLMProvider)
-    assert fallback_delegate.model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
-
-
-def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_baidu_routing() -> None:
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
-        openrouter_source="byok",
-        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_BYOK.value,
-        openrouter_routing="default",
-        fallback_alias="deepseek_v4_flash_china",
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("openrouter_api_key", "byok-key")
-    secrets.set("openrouter_managed_qq_api_key", "managed-qq-key")
-
-    provider = create_llm_provider(settings, secrets=secrets, managed_release_service=object())
-
-    assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, FallbackRacingLLMProvider)
     assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
-    assert provider.inner.primary.provider_routing == OpenRouterProviderRouting.GEMMA4_26B_LATENCY
-    assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
-
-    fallback_provider = provider.inner.fallback.factory()
-
-    assert isinstance(fallback_provider, ManagedOpenRouterLLMProvider)
-    fallback_delegate = fallback_provider.delegate_factory("managed-qq-key")
-    assert isinstance(fallback_delegate, OpenRouterLLMProvider)
-    assert fallback_delegate.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert fallback_delegate.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA
+    assert provider.inner.primary.api_key == "byok-key"
+    assert provider.inner.primary.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
+    assert (
+        provider.inner.primary.provider_routing
+        == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY
+    )
 
 
 def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_routing() -> None:
@@ -1156,7 +1071,6 @@ def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_use
     settings = _vnext(
         llm="openrouter",
         openrouter_source="managed",
-        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_managed_api_key", "managed-key")
@@ -1185,9 +1099,9 @@ def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_use
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, OpenRouterLLMProvider)
-    assert provider.inner.api_key == "managed-key"
-    assert provider.inner.user_identifier == "managed-user-123"
+    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
+    assert provider.inner.primary.api_key == "managed-key"
+    assert provider.inner.primary.user_identifier == "managed-user-123"
     assert calls == [OpenRouterCredentialSource.MANAGED]
 
 
@@ -1195,7 +1109,6 @@ def test_create_llm_provider_openrouter_requires_release_service_for_managed_mod
     settings = _vnext(
         llm="openrouter",
         openrouter_source="managed",
-        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "byok-key")
@@ -1211,7 +1124,6 @@ def test_create_llm_provider_openrouter_uses_managed_wrapper_when_release_servic
     settings = _vnext(
         llm="openrouter",
         openrouter_source="managed",
-        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     managed_release_service = object()
@@ -1225,9 +1137,11 @@ def test_create_llm_provider_openrouter_uses_managed_wrapper_when_release_servic
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, ManagedOpenRouterLLMProvider)
-    assert _unwrap_release_service(provider.inner.release_service) is managed_release_service
-    delegate = provider.inner.delegate_factory("delegate-key")
+    assert isinstance(provider.inner.primary, ManagedOpenRouterLLMProvider)
+    assert (
+        _unwrap_release_service(provider.inner.primary.release_service) is managed_release_service
+    )
+    delegate = provider.inner.primary.delegate_factory("delegate-key")
     assert isinstance(delegate, OpenRouterLLMProvider)
     assert delegate.runtime_logging is runtime_logging
 
@@ -1238,7 +1152,6 @@ def test_create_llm_provider_openrouter_managed_delegate_factory_loads_user_iden
     settings = _vnext(
         llm="openrouter",
         openrouter_source="managed",
-        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     current_user_identifier: str | None = None
@@ -1268,54 +1181,15 @@ def test_create_llm_provider_openrouter_managed_delegate_factory_loads_user_iden
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, ManagedOpenRouterLLMProvider)
+    assert isinstance(provider.inner.primary, ManagedOpenRouterLLMProvider)
     assert load_calls == 0
 
     current_user_identifier = "managed-user-123"
-    delegate = provider.inner.delegate_factory("delegate-key")
+    delegate = provider.inner.primary.delegate_factory("delegate-key")
 
     assert isinstance(delegate, OpenRouterLLMProvider)
     assert delegate.user_identifier == "managed-user-123"
     assert load_calls == 1
-
-
-def test_create_llm_provider_openrouter_wraps_primary_with_source_locked_openrouter_fallback() -> (
-    None
-):
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
-        openrouter_source="byok",
-        openrouter_routing_mode="latency",
-        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_BYOK.value,
-        fallback_alias="openrouter_deepseek_v4_flash",
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("openrouter_api_key", "or-key")
-    runtime_logging = object()
-
-    provider = create_llm_provider(
-        settings,
-        secrets=secrets,
-        runtime_logging=runtime_logging,
-    )
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, FallbackRacingLLMProvider)
-    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
-    assert provider.inner.primary.api_key == "or-key"
-    assert provider.inner.primary.model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    assert provider.inner.primary.routing_mode == OpenRouterRoutingMode.LATENCY
-    assert provider.inner.primary.runtime_logging is runtime_logging
-    assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
-
-    fallback_delegate = provider.inner.fallback.factory()
-
-    assert isinstance(fallback_delegate, OpenRouterLLMProvider)
-    assert fallback_delegate.api_key == "or-key"
-    assert fallback_delegate.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert fallback_delegate.routing_mode == OpenRouterRoutingMode.LATENCY
-    assert fallback_delegate.runtime_logging is runtime_logging
 
 
 def test_create_llm_provider_openrouter_byok_paths_omit_managed_user_identifier(
@@ -1327,7 +1201,6 @@ def test_create_llm_provider_openrouter_byok_paths_omit_managed_user_identifier(
         openrouter_source="byok",
         openrouter_routing_mode="latency",
         openrouter_alias=OpenRouterSelectionAlias.GEMMA4_BYOK.value,
-        fallback_alias="openrouter_deepseek_v4_flash",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "or-key")
@@ -1355,248 +1228,16 @@ def test_create_llm_provider_openrouter_byok_paths_omit_managed_user_identifier(
     assert provider.inner.primary.user_identifier is None
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
 
-    fallback_delegate = provider.inner.fallback.factory()
+    hedge_delegate = provider.inner.fallback.factory()
 
-    assert isinstance(fallback_delegate, OpenRouterLLMProvider)
-    assert fallback_delegate.user_identifier is None
-
-
-def test_create_llm_provider_openrouter_legacy_qwen_fallback_alias_is_ignored() -> None:
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
-        openrouter_source="managed",
-        openrouter_routing_mode="latency",
-        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED.value,
-        fallback_alias="none",
-    )
-    secrets = InMemorySecretStore()
-    managed_release_service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
-        managed_state=ManagedIdentityStateAdapter(
-            SimpleNamespace(**asdict(settings.state.managed_connection)),
-            lambda _updated: None,
-        ),
-        secrets=secrets,
-        client=object(),
-        app_version="2.0.0",
-        raw_hardware_fingerprint_provider=lambda: "raw-hardware-fingerprint-test",
-    )
-
-    provider = create_llm_provider(
-        settings,
-        secrets=secrets,
-        managed_release_service=managed_release_service,
-    )
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, ManagedOpenRouterLLMProvider)
-    assert _unwrap_release_service(provider.inner.release_service) is managed_release_service
-    assert (
-        settings.intent.translation.openrouter_selection_alias
-        == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
-    )
-    assert (
-        settings.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    )
-
-
-def test_create_llm_provider_openrouter_managed_deepseek_fallback_uses_fallback_specific_release_service() -> (
-    None
-):
-    deepseek_model = getattr(OpenRouterLLMModel, "DEEPSEEK_V4_FLASH", None)
-
-    assert deepseek_model is not None
-
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
-        openrouter_source="managed",
-        openrouter_routing_mode="latency",
-        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED.value,
-        fallback_alias="none",
-    )
-    secrets = InMemorySecretStore()
-    managed_release_service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
-        managed_state=ManagedIdentityStateAdapter(
-            SimpleNamespace(**asdict(settings.state.managed_connection)),
-            lambda _updated: None,
-        ),
-        secrets=secrets,
-        client=object(),
-        app_version="2.0.0",
-        raw_hardware_fingerprint_provider=lambda: "raw-hardware-fingerprint-test",
-    )
-
-    provider = create_llm_provider(
-        settings,
-        secrets=secrets,
-        managed_release_service=managed_release_service,
-        fallback_model="deepseek_v4_flash",
-        fallback_connection="managed",
-    )
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, FallbackRacingLLMProvider)
-    assert isinstance(provider.inner.primary, ManagedOpenRouterLLMProvider)
-    assert (
-        _unwrap_release_service(provider.inner.primary.release_service) is managed_release_service
-    )
-    assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
-
-    fallback_delegate = provider.inner.fallback.factory()
-
-    assert isinstance(fallback_delegate, ManagedOpenRouterLLMProvider)
-    fallback_release_service = _unwrap_release_service(fallback_delegate.release_service)
-    assert isinstance(fallback_release_service, ManagedOpenRouterReleaseService)
-    assert fallback_release_service is not managed_release_service
-    assert fallback_release_service.openrouter_config.selection_alias is None
-    assert fallback_release_service.openrouter_config.llm_model == deepseek_model
-    assert (
-        _resolve_managed_issue_model(fallback_release_service.openrouter_config)
-        == deepseek_model.value
-    )
-    assert (
-        settings.intent.translation.openrouter_selection_alias
-        == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
-    )
-    assert (
-        settings.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    )
-
-    fallback_openrouter_delegate = fallback_delegate.delegate_factory("managed-key")
-
-    assert isinstance(fallback_openrouter_delegate, OpenRouterLLMProvider)
-    assert fallback_openrouter_delegate.model == deepseek_model.value
-    assert fallback_openrouter_delegate.routing_mode == OpenRouterRoutingMode.LATENCY
-
-
-def test_create_llm_provider_openrouter_managed_fallback_delegate_factory_loads_user_identifier_lazily(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_source="managed",
-        fallback_alias="none",
-    )
-    secrets = InMemorySecretStore()
-    current_user_identifier: str | None = None
-    load_calls = 0
-
-    def fake_load_managed_openrouter_user_identifier(
-        loaded_settings: AppSettingsVNext,
-        *,
-        secrets: InMemorySecretStore,
-    ) -> str | None:
-        nonlocal load_calls
-        _ = loaded_settings, secrets
-        load_calls += 1
-        return current_user_identifier
-
-    monkeypatch.setattr(
-        wiring_llm_factory_module,
-        "load_managed_openrouter_user_identifier",
-        fake_load_managed_openrouter_user_identifier,
-        raising=False,
-    )
-
-    provider = create_llm_provider(
-        settings,
-        secrets=secrets,
-        managed_release_service=object(),
-        fallback_model="deepseek_v4_flash",
-        fallback_connection="managed",
-    )
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, FallbackRacingLLMProvider)
-    assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
-    assert load_calls == 0
-
-    fallback_provider = provider.inner.fallback.factory()
-
-    assert isinstance(fallback_provider, ManagedOpenRouterLLMProvider)
-    assert load_calls == 0
-
-    current_user_identifier = "managed-user-456"
-    fallback_delegate = fallback_provider.delegate_factory("delegate-key")
-
-    assert isinstance(fallback_delegate, OpenRouterLLMProvider)
-    assert fallback_delegate.user_identifier == "managed-user-456"
-    assert load_calls == 1
-
-
-def test_create_llm_provider_openrouter_managed_deepseek_fallback_clears_primary_alias_for_issue_identity() -> (
-    None
-):
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
-        openrouter_source="managed",
-        openrouter_routing_mode="latency",
-        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED.value,
-        fallback_alias="none",
-    )
-    secrets = InMemorySecretStore()
-    managed_release_service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
-        managed_state=ManagedIdentityStateAdapter(
-            SimpleNamespace(**asdict(settings.state.managed_connection)),
-            lambda _updated: None,
-        ),
-        secrets=secrets,
-        client=object(),
-        app_version="2.0.0",
-        raw_hardware_fingerprint_provider=lambda: "raw-hardware-fingerprint-test",
-    )
-
-    provider = create_llm_provider(
-        settings,
-        secrets=secrets,
-        managed_release_service=managed_release_service,
-        fallback_model="deepseek_v4_flash",
-        fallback_connection="managed",
-    )
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, FallbackRacingLLMProvider)
-    assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
-
-    fallback_delegate = provider.inner.fallback.factory()
-
-    assert isinstance(fallback_delegate, ManagedOpenRouterLLMProvider)
-    fallback_release_service = _unwrap_release_service(fallback_delegate.release_service)
-    assert isinstance(fallback_release_service, ManagedOpenRouterReleaseService)
-    assert fallback_release_service is not managed_release_service
-    assert fallback_release_service.openrouter_config.selection_alias is None
-    assert (
-        fallback_release_service.openrouter_config.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-    )
-    assert (
-        _resolve_managed_issue_model(fallback_release_service.openrouter_config)
-        == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    )
-    assert (
-        settings.intent.translation.openrouter_selection_alias
-        == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
-    )
-    assert (
-        settings.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    )
-
-    fallback_openrouter_delegate = fallback_delegate.delegate_factory("managed-key")
-
-    assert isinstance(fallback_openrouter_delegate, OpenRouterLLMProvider)
-    assert fallback_openrouter_delegate.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert fallback_openrouter_delegate.routing_mode == OpenRouterRoutingMode.LATENCY
+    assert isinstance(hedge_delegate, OpenRouterLLMProvider)
+    assert hedge_delegate.user_identifier is None
 
 
 def test_create_llm_provider_openrouter_rejects_none_selected_source_even_with_keys() -> None:
     settings = _vnext(
         llm="openrouter",
         openrouter_source="none",
-        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "byok-key")

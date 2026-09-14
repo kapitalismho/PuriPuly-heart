@@ -23,10 +23,7 @@ from puripuly_heart.app.wiring.wiring_managed_gemma import managed_gemma_selecti
 from puripuly_heart.app.wiring.wiring_translation_backend import (
     create_translation_backend,
 )
-from puripuly_heart.config.settings_vnext.schema import (
-    AppSettingsVNext,
-    TranslationFallbackIntent,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
@@ -266,7 +263,6 @@ def _settings(backend: str) -> object:
                 canonical.intent.translation,
                 model="managed_gemma",
                 connection=backend,
-                fallback=TranslationFallbackIntent(selection_alias="deepseek_v4_flash_official"),
             ),
             languages=replace(
                 canonical.intent.languages,

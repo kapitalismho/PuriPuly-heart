@@ -11,17 +11,7 @@ from puripuly_heart.config.provider_values import (
     QwenRegion,
     STTProviderName,
 )
-from puripuly_heart.config.translation_values import (
-    TranslationConnection,
-    TranslationModel,
-)
-
-
-@dataclass(frozen=True, slots=True)
-class TranslationFallbackSnapshot:
-    enabled: bool
-    model: TranslationModel
-    connection: TranslationConnection
+from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,7 +19,6 @@ class TranslationSelectionSnapshot:
     model: TranslationModel
     connection: TranslationConnection
     connection_history: tuple[tuple[TranslationModel, TranslationConnection], ...]
-    fallback: TranslationFallbackSnapshot
     http_extension_id: str | None
     previous_llm_model: TranslationModel | None
     gpu_device_id: str
@@ -304,11 +293,6 @@ class TranslationSelectionEdit:
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationFallbackEdit:
-    fallback: TranslationFallbackSnapshot
-
-
-@dataclass(frozen=True, slots=True)
 class TranslationHttpExtensionEdit:
     extension_id: str
 
@@ -365,7 +349,6 @@ ProviderSettingsEdit: TypeAlias = (
     | SttGpuDeviceEdit
     | LlmGpuDeviceEdit
     | TranslationSelectionEdit
-    | TranslationFallbackEdit
     | TranslationHttpExtensionEdit
     | QwenRegionEdit
     | LocalLlmBaseUrlEdit
@@ -445,8 +428,6 @@ __all__ = [
     "SelfVadSettingsIntent",
     "SttGpuDeviceEdit",
     "SystemPromptEdit",
-    "TranslationFallbackSnapshot",
-    "TranslationFallbackEdit",
     "TranslationSelectionSnapshot",
     "TranslationSelectionEdit",
     "TranslationHttpExtensionEdit",

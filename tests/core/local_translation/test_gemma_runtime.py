@@ -6,7 +6,11 @@ from pathlib import Path
 import pytest
 
 import puripuly_heart.core.local_translation.runtime as runtime_module
-from puripuly_heart.core.local_translation.assets import GEMMA_12B_SPEC
+from puripuly_heart.core.local_translation.assets import (
+    GEMMA_LICENSE,
+    GEMMA_LICENSE_URL,
+    GemmaModelSpec,
+)
 from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaMetrics,
     ManagedGemmaResponse,
@@ -466,6 +470,18 @@ async def test_gpu_device_change_restarts_runtime_with_new_device(tmp_path: Path
 @pytest.mark.asyncio
 async def test_model_spec_change_restarts_runtime_without_mtp(tmp_path: Path) -> None:
     owner, commands, processes, _transports, provision_calls, _logs = _runtime(tmp_path)
+    drafter_less_spec = GemmaModelSpec(
+        model_id="gemma-4-test-qat",
+        repo_id="example/drafter-less",
+        revision="abc123",
+        model_filename="target.gguf",
+        draft_filename=None,
+        install_dirname="gemma-drafter-less",
+        upstream_repo_id="example/upstream",
+        license=GEMMA_LICENSE,
+        license_url=GEMMA_LICENSE_URL,
+        assets=(),
+    )
     arguments = {
         "backend": "gpu",
         "source_language": "ko",
@@ -474,13 +490,13 @@ async def test_model_spec_change_restarts_runtime_without_mtp(tmp_path: Path) ->
     }
 
     await owner.prepare(**arguments)
-    await owner.prepare(**arguments, spec=GEMMA_12B_SPEC)
+    await owner.prepare(**arguments, spec=drafter_less_spec)
 
     assert len(commands) == 2
     assert len(provision_calls) == 2
     assert processes[0].terminated
-    assert provision_calls[1]["spec"] == GEMMA_12B_SPEC
-    assert str(tmp_path / "models" / GEMMA_12B_SPEC.model_filename) in commands[1]
+    assert provision_calls[1]["spec"] == drafter_less_spec
+    assert str(tmp_path / "models" / drafter_less_spec.model_filename) in commands[1]
     assert not any(item.startswith("--spec-") for item in commands[1])
 
 
