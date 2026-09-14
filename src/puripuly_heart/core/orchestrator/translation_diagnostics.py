@@ -77,6 +77,8 @@ class TranslationSkipDiagnostic:
     parent_utterance_id: UUID | None = None
     target_index: int | None = None
     target_language: str | None = None
+    cause: str | None = None
+    segment_count: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -377,21 +379,21 @@ class TranslationLatencyDiagnosticsOwner:
         return report
 
     def record_translation_skip(self, diagnostic: TranslationSkipDiagnostic) -> None:
+        parts = [
+            "[Translation] turn_result",
+            f"channel={diagnostic.channel}",
+            f"parent_utterance_id={diagnostic.parent_utterance_id}",
+            f"target_index={diagnostic.target_index}",
+            f"target_language={diagnostic.target_language}",
+            "translation=skipped",
+            f"destination_chatbox={'intended' if diagnostic.publish_chatbox else 'disabled'}",
+            f"cause={self._translation_skip_reason(diagnostic)}",
+        ]
+        if diagnostic.segment_count is not None:
+            parts.append(f"segment_count={diagnostic.segment_count}")
         self.emit(
             RuntimeDiagnostic(
-                message=(
-                    "[Translation] turn_result channel=%s parent_utterance_id=%s "
-                    "target_index=%s target_language=%s translation=skipped "
-                    "destination_chatbox=%s cause=%s"
-                ),
-                args=(
-                    diagnostic.channel,
-                    diagnostic.parent_utterance_id,
-                    diagnostic.target_index,
-                    diagnostic.target_language,
-                    "intended" if diagnostic.publish_chatbox else "disabled",
-                    self._translation_skip_reason(diagnostic),
-                ),
+                message=" ".join(parts),
                 fallback_level=logging.INFO,
             )
         )
@@ -842,6 +844,8 @@ class TranslationLatencyDiagnosticsOwner:
 
     @staticmethod
     def _translation_skip_reason(diagnostic: TranslationSkipDiagnostic) -> str:
+        if diagnostic.cause is not None:
+            return diagnostic.cause
         if not diagnostic.llm_available:
             return "provider_unavailable"
         if not diagnostic.configuration.translation_enabled:

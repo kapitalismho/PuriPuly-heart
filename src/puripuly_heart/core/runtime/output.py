@@ -1135,6 +1135,7 @@ class OutputRuntime:
                 "physical_ack": False,
                 "stage": "admission_accepted",
                 "outcome": "pending",
+                "pending_batches": len(self._peer_overlay_batches),
             },
         )
 
@@ -1209,9 +1210,60 @@ class OutputRuntime:
                         continue
                     paced_emit = getattr(sink, "emit_peer_when_admissible", None)
                     receipt: OverlayApplicationReceipt | None = None
+                    pacing_started_at: float | None = None
+                    pacing_wait_reason: str | None = None
+
+                    def observe_pacing_wait(wait_reason: str) -> None:
+                        nonlocal pacing_started_at, pacing_wait_reason
+                        if pacing_started_at is not None or wait_reason not in {
+                            "replacement_gate",
+                            "protected_rows",
+                        }:
+                            return
+                        pacing_started_at = self.clock.now()
+                        pacing_wait_reason = wait_reason
+                        self._observe_decision(
+                            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
+                            route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
+                            publication_id=event.event_id,
+                            publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
+                            reason="logical_pacing_wait",
+                            metadata={
+                                "channel": "peer",
+                                "publication_generation": batch.publication_generation,
+                                "source_order": batch.source_order,
+                                "physical_ack": False,
+                                "stage": "logical_pacing",
+                                "outcome": "waiting",
+                                "pending_batches": len(self._peer_overlay_batches),
+                                "wait_reason": wait_reason,
+                            },
+                        )
+
+                    def pacing_outcome() -> dict[str, str | int | float | bool | None]:
+                        metadata: dict[str, str | int | float | bool | None] = {
+                            "pending_batches": len(self._peer_overlay_batches)
+                        }
+                        if pacing_started_at is not None:
+                            metadata["handoff_wait_ms"] = int(
+                                max(0.0, self.clock.now() - pacing_started_at) * 1000
+                            )
+                        if pacing_wait_reason is not None:
+                            metadata["wait_reason"] = pacing_wait_reason
+                        return metadata
+
                     try:
                         if callable(paced_emit):
-                            receipt = await paced_emit(event)
+                            try:
+                                supports_wait_observer = (
+                                    "on_wait" in inspect.signature(paced_emit).parameters
+                                )
+                            except (TypeError, ValueError):
+                                supports_wait_observer = False
+                            if supports_wait_observer:
+                                receipt = await paced_emit(event, on_wait=observe_pacing_wait)
+                            else:
+                                receipt = await paced_emit(event)
                         else:
                             receipt = await asyncio.wait_for(sink.emit(event), timeout=5.0)
                     except TimeoutError:
@@ -1221,6 +1273,7 @@ class OutputRuntime:
                             publication_scope,
                             destination_batch,
                             reason="destination_write_timeout",
+                            pacing_metadata=pacing_outcome(),
                         )
                     except asyncio.CancelledError:
                         cancel_reason = self._peer_writer_cancel_reason or (
@@ -1239,6 +1292,7 @@ class OutputRuntime:
                                 destination_batch,
                                 batch,
                                 receipt,
+                                pacing_metadata=pacing_outcome(),
                             )
                         else:
                             self._reject_peer_event(
@@ -1247,6 +1301,7 @@ class OutputRuntime:
                                 publication_scope,
                                 destination_batch,
                                 reason=cancel_reason,
+                                pacing_metadata=pacing_outcome(),
                             )
                         for (
                             pending_event,
@@ -1270,6 +1325,7 @@ class OutputRuntime:
                             destination_batch,
                             reason="destination_publish_failed",
                             error_type=type(exc).__name__,
+                            pacing_metadata=pacing_outcome(),
                         )
                     else:
                         resolved_receipt = receipt or OverlayApplicationReceipt(
@@ -1286,6 +1342,7 @@ class OutputRuntime:
                                 destination_batch,
                                 batch,
                                 resolved_receipt,
+                                pacing_metadata=pacing_outcome(),
                             )
                         else:
                             self._reject_peer_event(
@@ -1295,6 +1352,7 @@ class OutputRuntime:
                                 destination_batch,
                                 reason=resolved_receipt.cause or resolved_receipt.outcome,
                                 scene_revision=resolved_receipt.scene_revision,
+                                pacing_metadata=pacing_outcome(),
                             )
                 self._peer_active_batch = None
         finally:
@@ -1310,6 +1368,8 @@ class OutputRuntime:
         destination_batch: DestinationBatch,
         peer_batch: _PeerOverlayBatch,
         receipt: OverlayApplicationReceipt,
+        *,
+        pacing_metadata: Mapping[str, str | int | float | bool | None] | None = None,
     ) -> None:
         self._publications_in_flight.discard(publication_key)
         self._remember_delivered_publication(
@@ -1337,6 +1397,7 @@ class OutputRuntime:
                 "stage": receipt.stage,
                 "outcome": receipt.outcome,
                 "scene_revision": receipt.scene_revision,
+                **(pacing_metadata or {}),
             },
         )
         observer = self._peer_overlay_delivery_observer
@@ -1415,6 +1476,7 @@ class OutputRuntime:
         reason: str,
         error_type: str | None = None,
         scene_revision: int | None = None,
+        pacing_metadata: Mapping[str, str | int | float | bool | None] | None = None,
     ) -> None:
         self._publications_in_flight.discard(publication_key)
         self._remember_delivered_publication(
@@ -1430,6 +1492,8 @@ class OutputRuntime:
             "outcome": "not_applied",
             "scene_revision": scene_revision,
         }
+        if pacing_metadata is not None:
+            metadata.update(pacing_metadata)
         if error_type is not None:
             metadata["error_type"] = error_type
         decision = self._observe_decision(

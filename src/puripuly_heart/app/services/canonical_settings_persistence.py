@@ -9,6 +9,7 @@ from pathlib import Path
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
+from puripuly_heart.app.ports.application_runtime_logging import ApplicationRuntimeLoggingPort
 from puripuly_heart.app.ports.canonical_settings_persistence import (
     CanonicalSettingsPersistencePort,
     ProviderVerificationBinding,
@@ -138,8 +139,13 @@ class CanonicalSettingsPatchRepository:
         )
 
 
-def compose_canonical_settings_persistence() -> CanonicalSettingsPersistencePort:
-    return SettingsVNextCanonicalPersistenceAdapter()
+def compose_canonical_settings_persistence(
+    *,
+    retired_asset_cleanup_logging: ApplicationRuntimeLoggingPort | None = None,
+) -> CanonicalSettingsPersistencePort:
+    return SettingsVNextCanonicalPersistenceAdapter(
+        retired_asset_cleanup_logging=retired_asset_cleanup_logging
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -722,8 +728,17 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
     )
 
 
-def compose_settings_owner(path: Path) -> SettingsOwner:
-    return SettingsOwner(path=path, persistence=compose_canonical_settings_persistence())
+def compose_settings_owner(
+    path: Path,
+    *,
+    retired_asset_cleanup_logging: ApplicationRuntimeLoggingPort | None = None,
+) -> SettingsOwner:
+    return SettingsOwner(
+        path=path,
+        persistence=compose_canonical_settings_persistence(
+            retired_asset_cleanup_logging=retired_asset_cleanup_logging
+        ),
+    )
 
 
 __all__ = [

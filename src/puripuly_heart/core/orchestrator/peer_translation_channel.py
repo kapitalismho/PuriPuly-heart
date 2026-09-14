@@ -666,6 +666,31 @@ class PeerTranslationChannelOwner:
     ) -> None:
         if any(child.channel != "peer" for child in children):
             raise ValueError("Peer translation owner received a non-Peer parent")
+        segment_count = 0
+        unknown_span_count = 0
+        for child in children:
+            if child.target_index != 0:
+                continue
+            segment_count += 1
+            if (
+                not child.transcript.final_speaker_runs
+                or child.transcript.final_speaker_runs[0].speaker_id is None
+            ):
+                unknown_span_count += 1
+        self.diagnostics.emit(
+            RuntimeDiagnostic(
+                message=(
+                    "[Detailed][Translation] peer_final_segmentation "
+                    "parent_utterance_id=%s segment_count=%s unknown_span_count=%s"
+                ),
+                args=(
+                    children[0].parent_utterance_id if children else None,
+                    segment_count,
+                    unknown_span_count,
+                ),
+                detailed=True,
+            )
+        )
         if not await self.output_projection.admit_translation_parent(children):
             raise RuntimeError("Peer translation output admission rejected parent")
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import inspect
+import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,12 +46,23 @@ from puripuly_heart.core.stt.scoped_engine import (
     STTRecognitionWatchdogs,
     STTRetentionProfile,
 )
+from puripuly_heart.core.stt.scoped_normalizer import STTNormalizationDiagnostic
 
 from .wiring_stt_factory import create_stt_backend_from_resolved_config
 
 FinalTranscriptSuppressedSink = Callable[[FinalTranscriptSuppressedNotification], object]
-DiagnosticsEnabled = Callable[[], bool]
 FaultProfileProvider = Callable[[], object]
+DiagnosticsEnabled = Callable[[], bool]
+_ACTUAL_DEGRADATION_REASONS = frozenset(
+    {
+        "language_run_conservation_fallback",
+        "language_run_limit_fallback",
+        "invalid_language_run_fallback",
+        "speaker_run_conservation_fallback",
+        "speaker_run_limit_fallback",
+        "invalid_speaker_run_fallback",
+    }
+)
 
 
 @dataclass(slots=True)
@@ -122,6 +135,29 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                 if inspect.isawaitable(result):
                     await result
 
+        channel = str(config.channel)
+        runtime_logging = self.runtime_logging
+        provider_id = str(config.provider)
+
+        def _normalization_diagnostic_sink(
+            diagnostic: STTNormalizationDiagnostic,
+        ) -> None:
+            service = runtime_logging
+            if service is None:
+                return
+            reason = diagnostic.reason
+            degraded = reason in _ACTUAL_DEGRADATION_REASONS
+            message = (
+                "[STT][Normalization] "
+                f"channel={channel} provider={provider_id} "
+                f"reason={reason} degraded={str(degraded).lower()}"
+            )
+            with contextlib.suppress(Exception):
+                if degraded:
+                    service.emit_basic(message, level=logging.WARNING)
+                else:
+                    service.emit_detailed(message)
+
         return ScopedRecognitionEngine(
             channel=config.channel,
             session_factory=open_scoped_session,
@@ -138,6 +174,9 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
             backend_close=close_backend,
             event_drain_timeout_s=config.drain_timeout_s,
             terminal_failure_sink=on_terminal_failure,
+            diagnostic_sink=(
+                _normalization_diagnostic_sink if runtime_logging is not None else None
+            ),
         )
 
 

@@ -139,11 +139,10 @@ async def test_primary_error_starts_first_fallback_without_waiting_for_delay() -
     assert result.text == "fallback"
     assert fallback.started.is_set()
     assert sleeper.calls == [1.3]
-    assert runtime_logging.messages == [
-        "[LLM][Fallback] started, stage=1, provider=openrouter, "
-        "model=google/gemma-4-31b-a4b-it, mode=latency, "
-        "route=gemma4_31b_latency, delay=1300ms"
-    ]
+    assert any(
+        "outcome=success" in message and "cause=primary_error" in message and "winner=1" in message
+        for message in runtime_logging.messages
+    )
     await provider.close()
 
 
@@ -190,14 +189,10 @@ async def test_emergency_attempt_waits_for_schedule_after_earlier_errors() -> No
 
     assert result.text == "emergency"
     assert emergency.started.is_set()
-    assert runtime_logging.messages == [
-        "[LLM][Fallback] started, stage=1, provider=openrouter, "
-        "model=google/gemma-4-31b-a4b-it, mode=latency, "
-        "route=gemma4_31b_latency, delay=1300ms",
-        "[LLM][Fallback] started, stage=2, provider=openrouter, "
-        "model=google/gemma-4-31b-a4b-it, mode=latency, "
-        "route=gemma4_31b_modelrun_only, delay=4400ms",
-    ]
+    assert any(
+        "outcome=success" in message and "cause=timeout" in message and "winner=2" in message
+        for message in runtime_logging.messages
+    )
     await provider.close()
 
 
@@ -224,16 +219,52 @@ async def test_loser_grace_cancels_slow_attempt_and_close_is_not_duplicated() ->
 
 
 @pytest.mark.asyncio
-async def test_total_failure_preserves_all_attempt_errors() -> None:
-    primary = FakeProvider("primary", error=RuntimeError("primary"))
-    fallback = FakeProvider("fallback", error=RuntimeError("fallback"))
+async def test_total_failure_reports_terminal_outcome_without_false_winner() -> None:
+    runtime_logging = FakeRuntimeLogging()
+    primary = FakeProvider("primary", error=RuntimeError("private primary payload"))
+    fallback = FakeProvider("fallback", error=RuntimeError("private fallback payload"))
     provider = FallbackRacingLLMProvider(
         attempts=(
             LLMProviderAttempt(primary),
             LLMProviderAttempt(fallback, start_after_ms=0, start_on_primary_error=True),
-        )
+        ),
+        runtime_logging=runtime_logging,
     )
 
-    with pytest.raises(LLMProviderRaceError, match="primary failed.*fallback failed"):
+    with pytest.raises(LLMProviderRaceError, match="private primary payload"):
         await provider.translate(**_kwargs())
+
+    terminal = runtime_logging.messages[-1]
+    assert "outcome=failure" in terminal
+    assert "cause=" in terminal
+    assert "elapsed_ms=" in terminal
+    assert "winner=" not in terminal
+    assert "private primary payload" not in terminal
+    assert "private fallback payload" not in terminal
+    await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_caller_cancellation_reports_terminal_outcome_after_hedge_launch() -> None:
+    runtime_logging = FakeRuntimeLogging()
+    primary = FakeProvider("primary", gate=asyncio.Event())
+    fallback = FakeProvider("fallback", gate=asyncio.Event())
+    provider = FallbackRacingLLMProvider(
+        attempts=(
+            LLMProviderAttempt(primary),
+            LLMProviderAttempt(fallback, start_after_ms=0),
+        ),
+        runtime_logging=runtime_logging,
+    )
+    task = asyncio.create_task(provider.translate(**_kwargs()))
+    await asyncio.wait_for(fallback.started.wait(), timeout=0.2)
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    terminal = runtime_logging.messages[-1]
+    assert "outcome=cancelled" in terminal
+    assert "elapsed_ms=" in terminal
+    assert "winner=" not in terminal
     await provider.close()

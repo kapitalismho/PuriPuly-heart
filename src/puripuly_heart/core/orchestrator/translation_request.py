@@ -285,6 +285,12 @@ class _UnmappedDetectedLanguage(Exception):
     pass
 
 
+class _BatchTranslationResponseError(Exception):
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
+
+
 def _safe_user_message_params(params: Mapping[str, object]) -> dict[str, SafeMessageParam]:
     safe_params: dict[str, SafeMessageParam] = {}
     for key, value in params.items():
@@ -830,6 +836,18 @@ class TranslationRequestOwner:
                 for request in requests
             )
         if not self.translation_enabled_for("peer", configuration):
+            self.diagnostics.record_translation_skip(
+                TranslationSkipDiagnostic(
+                    stage="batch_final",
+                    channel="peer",
+                    publish_chatbox=False,
+                    llm_available=True,
+                    configuration=configuration,
+                    parent_utterance_id=requests[0].parent_utterance_id,
+                    target_language=requests[0].target_language,
+                    segment_count=len(requests),
+                )
+            )
             return tuple(
                 self._result(
                     request,
@@ -858,6 +876,21 @@ class TranslationRequestOwner:
                 continue
             source_languages[request.utterance_id] = request_source[0]
             eligible_requests.append(request)
+        unsupported_count = len(source_only_results)
+        if unsupported_count:
+            self.diagnostics.record_translation_skip(
+                TranslationSkipDiagnostic(
+                    stage="batch_final",
+                    channel="peer",
+                    publish_chatbox=False,
+                    llm_available=True,
+                    configuration=configuration,
+                    parent_utterance_id=requests[0].parent_utterance_id,
+                    target_language=requests[0].target_language,
+                    cause="unsupported_source_language",
+                    segment_count=unsupported_count,
+                )
+            )
         if not eligible_requests:
             return tuple(source_only_results[request.utterance_id] for request in requests)
         prepared_parent = self.prepare(
@@ -919,50 +952,88 @@ class TranslationRequestOwner:
             separators=(",", ":"),
         )
         batch_system_prompt = (
-            f"{prepared_parent.system_prompt.rstrip()}\n\n" f"{_BATCH_TRANSLATION_SYSTEM_CONTRACT}"
+            f"{prepared_parent.system_prompt.rstrip()}\n\n{_BATCH_TRANSLATION_SYSTEM_CONTRACT}"
         )
         try:
-            raw = await backend.translate(
-                TranslationBackendRequest(
-                    utterance_id=requests[0].parent_utterance_id,
-                    text=payload,
-                    system_prompt=batch_system_prompt,
-                    source_language=prepared_parent.source_language,
-                    target_language=requests[0].target_language,
-                    context=prepared_parent.context,
-                    scene_participant_count=_scene_participant_count(
-                        prepared_parent.scene_snapshot
-                    ),
-                    max_output_tokens=_batch_output_token_budget(len(eligible_requests)),
+            try:
+                raw = await backend.translate(
+                    TranslationBackendRequest(
+                        utterance_id=requests[0].parent_utterance_id,
+                        text=payload,
+                        system_prompt=batch_system_prompt,
+                        source_language=prepared_parent.source_language,
+                        target_language=requests[0].target_language,
+                        context=prepared_parent.context,
+                        scene_participant_count=_scene_participant_count(
+                            prepared_parent.scene_snapshot
+                        ),
+                        max_output_tokens=_batch_output_token_budget(len(eligible_requests)),
+                    )
                 )
-            )
+            except Exception:
+                self._raise_if_stale_provider_request(backend, generation)
+                raise
             self._raise_if_stale_provider_request(backend, generation)
             if cancellation_requested is not None and cancellation_requested():
                 raise asyncio.CancelledError
-            decoded = json.loads(raw.text)
+            try:
+                decoded = json.loads(raw.text)
+            except json.JSONDecodeError as exc:
+                raise _BatchTranslationResponseError("batch_translation_invalid_json") from exc
             items = decoded.get("segments") if isinstance(decoded, dict) else None
             if not isinstance(items, list):
-                raise ValueError("batch translation response has no segments")
+                raise _BatchTranslationResponseError("batch_translation_missing_segments")
+            expected = {request.utterance_id for request in eligible_requests}
             translations: dict[UUID, str] = {}
             for item in items:
                 if not isinstance(item, dict):
-                    raise ValueError("batch translation item is invalid")
-                item_id = UUID(str(item.get("id", "")))
+                    raise _BatchTranslationResponseError("batch_translation_invalid_item")
+                try:
+                    item_id = UUID(str(item.get("id", "")))
+                except (TypeError, ValueError) as exc:
+                    raise _BatchTranslationResponseError("batch_translation_invalid_id") from exc
                 item_text = item.get("text")
-                if (
-                    item_id in translations
-                    or not isinstance(item_text, str)
-                    or not item_text.strip()
-                ):
-                    raise ValueError("batch translation item is invalid")
+                if not isinstance(item_text, str) or not item_text.strip():
+                    raise _BatchTranslationResponseError("batch_translation_invalid_item")
+                if item_id not in expected or item_id in translations:
+                    raise _BatchTranslationResponseError("batch_translation_id_mismatch")
                 translations[item_id] = item_text
-            expected = {request.utterance_id for request in eligible_requests}
             if set(translations) != expected:
-                raise ValueError("batch translation response is incomplete")
+                raise _BatchTranslationResponseError("batch_translation_incomplete")
         except asyncio.CancelledError:
             raise
+        except StaleProviderCompletion:
+            return tuple(
+                source_only_results.get(request.utterance_id)
+                or self._result(
+                    request,
+                    "failed",
+                    "stale_provider_completion",
+                    source_language=source_languages[request.utterance_id],
+                )
+                for request in requests
+            )
+        except _BatchTranslationResponseError as exc:
+            report = self._record_failure(eligible_requests[0], exc)
+            await self._publish_failure(
+                eligible_requests[0],
+                self._translation_error_payload(exc, report),
+            )
+            invalid_eligible = {
+                request.utterance_id: self._result(
+                    request,
+                    "source_only",
+                    exc.code,
+                    source_language=source_languages[request.utterance_id],
+                )
+                for request in eligible_requests
+            }
+            return tuple(
+                source_only_results.get(request.utterance_id)
+                or invalid_eligible[request.utterance_id]
+                for request in requests
+            )
         except Exception as exc:
-            self._raise_if_stale_provider_request(backend, generation)
             report = self._record_failure(eligible_requests[0], exc)
             await self._publish_failure(
                 eligible_requests[0],
@@ -971,8 +1042,8 @@ class TranslationRequestOwner:
             failed_eligible = {
                 request.utterance_id: self._result(
                     request,
-                    "source_only",
-                    "batch_translation_invalid",
+                    "failed",
+                    "provider_error",
                     source_language=source_languages[request.utterance_id],
                 )
                 for request in eligible_requests

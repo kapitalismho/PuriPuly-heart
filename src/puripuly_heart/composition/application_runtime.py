@@ -430,7 +430,6 @@ def compose_application_runtime(
         Callable[[LocalASRProductionCompositionAccessPort], None] | None
     ) = None,
 ) -> UiApplicationPort:
-    settings = compose_settings_owner(config_path)
     http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
     http_extensions.reload()
     clock = SystemClock()
@@ -538,6 +537,10 @@ def compose_application_runtime(
         overlay_logging_mode_update_available=lambda: (
             overlay is not None and overlay.current_bridge() is not None
         ),
+    )
+    settings = compose_settings_owner(
+        config_path,
+        retired_asset_cleanup_logging=runtime_logging,
     )
 
     managed_gemma_basic_state: tuple[str, str | None, str | None] | None = None

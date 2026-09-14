@@ -1018,7 +1018,7 @@ async def test_session_runtime_logging_dispatches_provider_and_conversation_even
             translation_text="bonjour",
             source_language="en",
             target_language="fr",
-            metadata={"transcript_len": 5, "translation_len": 7},
+            metadata={"segment_index": 0, "transcript_len": 5, "translation_len": 7},
         )
         runtime_logging.record_conversation_observation(
             utterance_id="utt-1",
@@ -1027,7 +1027,16 @@ async def test_session_runtime_logging_dispatches_provider_and_conversation_even
             translation_text="duplicate translation",
             source_language="en",
             target_language="fr",
-            metadata={"transcript_len": 16, "translation_len": 21},
+            metadata={"segment_index": 0, "transcript_len": 16, "translation_len": 21},
+        )
+        runtime_logging.record_conversation_observation(
+            utterance_id="utt-1",
+            speaker_channel="self",
+            transcript_text="second segment",
+            translation_text="deuxième",
+            source_language="en",
+            target_language="fr",
+            metadata={"segment_index": 1},
         )
         await runner.drain()
 
@@ -1042,9 +1051,9 @@ async def test_session_runtime_logging_dispatches_provider_and_conversation_even
         assert isinstance(provider_event.correlation_id, str)
         assert provider_event.diagnostics is diagnostics
         assert dict(provider_event.fields) == {"status_code": 503}
-        assert len(sink.conversation_records) == 1
+        assert len(sink.conversation_records) == 2
 
-        conversation = sink.conversation_records[-1]
+        conversation = sink.conversation_records[0]
         assert conversation.utterance_id == "utt-1"
         assert conversation.speaker_channel == "self"
         assert conversation.transcript_text == "hello"
@@ -1054,7 +1063,13 @@ async def test_session_runtime_logging_dispatches_provider_and_conversation_even
         assert conversation.visibility == DIAGNOSTIC_VISIBILITY_BASIC
         assert conversation.content_policy == CONTENT_POLICY_RAW_USER_TEXT_ALLOWED
         assert isinstance(conversation.correlation_id, str)
-        assert dict(conversation.metadata) == {"transcript_len": 5, "translation_len": 7}
+        assert dict(conversation.metadata) == {
+            "segment_index": 0,
+            "transcript_len": 5,
+            "translation_len": 7,
+        }
+        assert sink.conversation_records[1].transcript_text == "second segment"
+        assert sink.conversation_records[1].translation_text == "deuxième"
     finally:
         runtime_logging.close()
 
@@ -1181,7 +1196,16 @@ async def test_session_runtime_logging_observes_destination_result_in_basic() ->
         publication_id="peer-utterance-1",
         publication_kind="peer_subtitle",
         reason="peer_chatbox_denied",
-        metadata={"channel": "peer", "unsafe": "secret peer transcript"},
+        metadata={
+            "channel": "peer",
+            "stage": "logical_pacing",
+            "outcome": "waiting",
+            "physical_ack": False,
+            "wait_reason": "protected_rows",
+            "handoff_wait_ms": 1250,
+            "pending_batches": 3,
+            "unsafe": "secret peer transcript",
+        },
     )
 
     try:
@@ -1193,6 +1217,12 @@ async def test_session_runtime_logging_observes_destination_result_in_basic() ->
         assert "route=self_chatbox" in log_text
         assert "publication_kind=peer_subtitle" in log_text
         assert "reason=peer_chatbox_denied" in log_text
+        assert "stage=logical_pacing" in log_text
+        assert "outcome=waiting" in log_text
+        assert "physical_ack=false" in log_text
+        assert "wait_reason=protected_rows" in log_text
+        assert "handoff_wait_ms=1250" in log_text
+        assert "pending_batches=3" in log_text
         assert "unsafe" not in log_text
         assert "secret peer transcript" not in log_text
     finally:

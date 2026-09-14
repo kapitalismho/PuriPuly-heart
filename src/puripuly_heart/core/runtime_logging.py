@@ -139,8 +139,8 @@ LATENCY_TRACE_POINT_CONTRACTS: dict[str, LatencyTracePointContract] = {
     ),
     "peer_overlay_first_emit": LatencyTracePointContract(
         name="peer_overlay_first_emit",
-        timing_semantics="Recorded at the first peer overlay output emitted by the output projection: paired source+translation when translation succeeds, or source-only fallback when translation is unavailable, fails, or is cancelled.",
-        acceptance_expectation="Use the first overlay_sink.emit call that carries peer-visible text for that peer logical turn; when translation is enabled and succeeds, wait for the paired source+translation overlay output.",
+        timing_semantics="Recorded when the output projection publishes the first peer overlay output into the output path, before any logical pacing wait: paired source+translation when translation succeeds, or source-only fallback when translation is unavailable, fails, or is cancelled.",
+        acceptance_expectation="Use the first pre-pacing projection publication that carries peer-visible text for that peer logical turn; this point does not claim logical admission, renderer delivery, or physical display.",
     ),
     "peer_overlay_first_render": LatencyTracePointContract(
         name="peer_overlay_first_render",
@@ -503,8 +503,10 @@ class SessionRuntimeLoggingService:
         self._session_handlers: list[logging.Handler] = []
         self._mode = SessionLoggingMode.BASIC
         self._closed = False
-        self._conversation_record_keys: set[tuple[str, str, int | None, str]] = set()
-        self._conversation_record_order: deque[tuple[str, str, int | None, str]] = deque()
+        self._conversation_record_keys: set[tuple[str, str, int | None, int | None, str]] = set()
+        self._conversation_record_order: deque[tuple[str, str, int | None, int | None, str]] = (
+            deque()
+        )
 
         file_output_handler = (
             getattr(self._sinks, "file_queue_handler", None) or self._sinks.file_handler
@@ -747,9 +749,11 @@ class SessionRuntimeLoggingService:
         values = dict(metadata or {})
         target_index_value = values.get("target_index")
         target_index = target_index_value if isinstance(target_index_value, int) else None
+        segment_index_value = values.get("segment_index")
+        segment_index = segment_index_value if isinstance(segment_index_value, int) else None
         disposition = str(values.get("disposition") or "accepted")
         record_kind = "translation" if translation_text is not None else "source"
-        key = (speaker_channel, utterance_id, target_index, record_kind)
+        key = (speaker_channel, utterance_id, segment_index, target_index, record_kind)
         if key in self._conversation_record_keys:
             return
         self._remember_conversation_key(key)
@@ -790,7 +794,7 @@ class SessionRuntimeLoggingService:
 
     def _remember_conversation_key(
         self,
-        key: tuple[str, str, int | None, str],
+        key: tuple[str, str, int | None, int | None, str],
     ) -> None:
         self._conversation_record_keys.add(key)
         self._conversation_record_order.append(key)
@@ -1030,7 +1034,16 @@ def _format_conversation_record(
         f"disposition={disposition}",
         f"source_language={record.source_language or 'unknown'}",
     ]
+    segment_index = metadata.get("segment_index")
+    if isinstance(segment_index, int) and not isinstance(segment_index, bool):
+        parts.append(f"segment_index={segment_index}")
+    parent_utterance_id = metadata.get("parent_utterance_id")
+    if parent_utterance_id and parent_utterance_id != record.utterance_id:
+        parts.append(f"parent_turn={json.dumps(parent_utterance_id, ensure_ascii=False)}")
     target_index = metadata.get("target_index")
+    failure_code = metadata.get("failure_code")
+    if _safe_routing_token(failure_code):
+        parts.append(f"cause={failure_code}")
     if target_index is not None:
         parts.append(f"target_index={target_index}")
     if record.target_language:
@@ -1130,13 +1143,37 @@ def _persisted_storage_key(log_file: object) -> str | None:
 
 
 def _format_output_routing_decision(decision: OutputRoutingDecision) -> str:
+    parts = [
+        "[Output] destination_result",
+        f"decision={decision.decision}",
+        f"route={decision.route}",
+        f"publication_id={decision.publication_id}",
+        f"publication_kind={decision.publication_kind}",
+        f"reason={decision.reason}",
+    ]
+    metadata = decision.metadata
+    for name in ("stage", "outcome"):
+        value = metadata.get(name)
+        if _safe_routing_token(value):
+            parts.append(f"{name}={value}")
+    physical_ack = metadata.get("physical_ack")
+    if isinstance(physical_ack, bool):
+        parts.append(f"physical_ack={str(physical_ack).lower()}")
+    wait_reason = metadata.get("wait_reason")
+    if wait_reason in {"replacement_gate", "protected_rows"}:
+        parts.append(f"wait_reason={wait_reason}")
+    for name in ("handoff_wait_ms", "pending_batches"):
+        value = metadata.get(name)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            parts.append(f"{name}={value}")
+    return " ".join(parts)
+
+
+def _safe_routing_token(value: object) -> bool:
     return (
-        "[Output] destination_result "
-        f"decision={decision.decision} "
-        f"route={decision.route} "
-        f"publication_id={decision.publication_id} "
-        f"publication_kind={decision.publication_kind} "
-        f"reason={decision.reason}"
+        isinstance(value, str)
+        and 0 < len(value) <= 64
+        and all(character.isalnum() or character in "_-" for character in value)
     )
 
 

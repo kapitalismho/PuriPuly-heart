@@ -1023,8 +1023,14 @@ class TranslationTurnLifecycleOwner:
         except asyncio.CancelledError:
             await self._terminalize_parent_remaining(parent, "cancelled")
             raise
-        except Exception:
-            logger.exception("translation batch execution failed")
+        except Exception as exc:
+            logger.error(
+                "translation batch execution failed "
+                "channel=%s parent_utterance_id=%s cause_type=%s",
+                parent.channel,
+                parent.parent_utterance_id,
+                type(exc).__name__,
+            )
             await self._terminalize_parent_remaining(parent, "failed")
         finally:
             if not task.done():
