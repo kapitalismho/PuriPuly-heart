@@ -1,0 +1,260 @@
+{
+  "schema": "BATCH-UNKNOWN-PROBE-PRIVATE-1",
+  "private": true,
+  "created_at": "2026-09-14T05:58:20.337604+00:00",
+  "cases_sha256": "ee237cc05944c22fbe3b1e39e94656295d23b20342dfb7894afc1c7764a1d507",
+  "entries": [
+    {
+      "opaque_case_id": "42824aa41fc3e6f34cdc913635a1c319",
+      "parent_id": "33c69f5e-bece-4c31-bec7-37d2fb42565b",
+      "replicate": 0,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "79154a6aff0027e9d5cb2e3eab9c2510",
+      "parent_id": "147e5b68-0232-4e76-a587-8ddfbb2b817a",
+      "replicate": 0,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "5f3799bcb61b6dc2406506a51756f227",
+      "parent_id": "8ee82188-f635-48d8-8502-352b673851ec",
+      "replicate": 0,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "b7d529ae0932839b150047128a9837a2",
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "replicate": 0,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "692533e6e3293db61b9a4dfab2f22763",
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "replicate": 1,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "0cb783f15ca87b1e73ca189f96369bcb",
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "replicate": 2,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "fe92e9a42ac72a37385b90fbde2c5244",
+      "parent_id": "eb86a37a-23b6-4054-a9aa-3d5b38e962a3",
+      "replicate": 0,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "a656a174330737c583607d1317afde28",
+      "parent_id": "5f8dedf2-a8e8-4520-8df4-36f5a4eeee63",
+      "replicate": 0,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "719e1bf67c15021b911834ee6b637160",
+      "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "replicate": 0,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "624a9629136e94e7518895d236b41537",
+      "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "replicate": 1,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "7f5cb59b15f011fa4af7705b6169c9e9",
+      "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "replicate": 2,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "e6f8dc4929adf23ce72062b3dbfa2e23",
+      "parent_id": "5c333233-1622-4850-a60e-ca8811613108",
+      "replicate": 0,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "419ab1d057158d4ee845b19c31b441f6",
+      "parent_id": "5c333233-1622-4850-a60e-ca8811613108",
+      "replicate": 1,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "145bf98008e70b6cb52265bc61c9377c",
+      "parent_id": "5c333233-1622-4850-a60e-ca8811613108",
+      "replicate": 2,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "a339772080b4c1167f0c0ee38f67868a",
+      "parent_id": "5b09905d-fcc2-4c75-b03e-316edfe2df95",
+      "replicate": 0,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "2fe46daa72c19deed09172524e38f1bb",
+      "parent_id": "4a8dca47-d874-420b-a30d-60dd9184cfde",
+      "replicate": 0,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "faf5c751080d1e1e89c1bab5697bbbb0",
+      "parent_id": "9eda2eee-8143-42d9-beef-8dc31af891e8",
+      "replicate": 0,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "aa1e8958cfd0bf104100031c35323e2c",
+      "parent_id": "9d25928d-e12d-4455-b608-66145abbb969",
+      "replicate": 0,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "7c5582e79e0fc8c21900547840281809",
+      "parent_id": "d928e75b-4caf-4368-a614-b230a84ab69b",
+      "replicate": 0,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "11d49bd6b78fd18adbd740434be78ea9",
+      "parent_id": "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4",
+      "replicate": 0,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "ac1a03bf0d9a9ac6b26345efbd8a8341",
+      "parent_id": "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4",
+      "replicate": 1,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "b51ef18050538ebf43edab18cb43a98f",
+      "parent_id": "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4",
+      "replicate": 2,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "28965f4cf0f8eff17ce67e4b44026327",
+      "parent_id": "a7dbe963-1731-4bb3-ba81-0377eab8b6a8",
+      "replicate": 0,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "4408943314c9d50ee2c8f786932c61d7",
+      "parent_id": "574c2f12-d8e7-49cd-957d-e1eec876671e",
+      "replicate": 0,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "2df8033da8c065e7dea7144c04b0097c",
+      "parent_id": "2b2a9153-b3cb-438b-b037-32fa5039b057",
+      "replicate": 0,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "396e45002842615b1dd15a513f30a0e4",
+      "parent_id": "3e085e5a-24ee-40e9-a5f2-74d368927071",
+      "replicate": 0,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    },
+    {
+      "opaque_case_id": "fa5bc346cfa36212acdfe5f4092b68ea",
+      "parent_id": "b1ca9396-ddeb-4f9e-9e2d-f0d6dc93f182",
+      "replicate": 0,
+      "mapping": {
+        "X": "A",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "74676ce6aef42eb0165a1309b7b534db",
+      "parent_id": "102972ae-4b2e-4055-ad0e-4f467b6b1ef7",
+      "replicate": 0,
+      "mapping": {
+        "X": "B",
+        "Y": "A"
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "BATCH-UNKNOWN-PROBE-EXECUTION-IDENTITY-1",
+  "plan_sha256": "4f9821bf26c8ad65862358e85fea03949f3ecc991e14be2f9be91c6cd8227550",
+  "cases_sha256": "ee237cc05944c22fbe3b1e39e94656295d23b20342dfb7894afc1c7764a1d507",
+  "code_sha256": {
+    "prepare.py": "8bcee206b519058277eaca8976d0e0166aa5c982fd721344106b4eb490d53ad6",
+    "run.py": "84a4b8209fa43925458dcb5f24639f282c3eee9957a536bd0ee0fd4f20180a3a"
+  },
+  "source_pins": {
+    "unknown-partition-probe/cases.jsonl": "30446bacef1f1a1a28eee111c5cff79d21a1a8b184d87874a7830458f7a704da",
+    "unknown-partition-probe/run.py": "e044bb3606aaa9ed97284ed2cec20239c85c739b0148445f408bebebeed3d15a",
+    "meaning-first-probe/run_e1.py": "a8850e7880a45c7ca7675a510efc35b07ac873b41cd085b01b9ff12a283d499c"
+  },
+  "prompt_sha256": "cdacb7ff12a4200ce599a00690703e8d6fe97c40e799930cc80f65bb52c114e0",
+  "catalog_sha256": "9de2986620cb14cf730ea205eed94c87a2930724ee469fa58def44b4fbb891b1",
+  "attempt_cap": 54,
+  "output_token_cap": 27648
+}

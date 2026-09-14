@@ -1,0 +1,19 @@
+{
+  "schema": "BATCH-UNKNOWN-PROBE-EXECUTION-PROVENANCE-1",
+  "mode": "official_provider",
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "cases_sha256": "ee237cc05944c22fbe3b1e39e94656295d23b20342dfb7894afc1c7764a1d507",
+  "journal_sha256": "4d4fcb64432332dd5fe0af4ac10d2779b207461409866770d668a966dfb24667",
+  "blind_packet_sha256": "bb712dc1efa856dac11624c2c968d4ce90f1ff95cf5f73716a449a9055eb3f18",
+  "execution_identity_sha256": "785ba3ef467ff1fd6c71f867674a77f8d44a71a09b49ba28862be28acc3b62f3",
+  "private_key_sha256": "e385bd9ee6a2f6a1e37c35a4c09e2311d0ef36098915c424220541c805942435",
+  "catalog_order_sha256": "0ac664b17e6fcf923f34da998bd063f80be53872cc45f46ca4394032b2aefc6b",
+  "attempt_started": 54,
+  "attempt_terminal": 54,
+  "rerun_duplicate_attempts": 0,
+  "indeterminate": 0,
+  "successful": 52,
+  "failed": 2,
+  "reported_completion_tokens": 4288,
+  "reported_cost": 0.0033252
+}

@@ -1,0 +1,383 @@
+{
+  "schema": "BATCH-TRANSLATION-RATINGS-1",
+  "rater": "batch-translation-rater (independent en->ko meaning rater, blind packet)",
+  "ratings": [
+    {
+      "opaque_case_id": "42824aa41fc3e6f34cdc913635a1c319",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "X",
+      "evidence": "All clauses are covered in both: X '손을 다치셨거나 그와 비슷한 상황이군요. 그래서 그 점부터 시작해서 진행해 보죠. 그러고 나서 만나요' vs Y '손을 다치셨거나 뭐 그런 것 같네요. 요. 그러니 거기서부터 차근차근 진행해 보죠. 그러고 나서 만나요.' X puts the 'And so' connective in the segment for 'And ' ('그래서 '), Y renders 'that. ' as a dangling '요.' and adds '차근차근' for 'work up'; no number, question, negation or attribution element differs.",
+      "source_uncertainty": "'work up from there' is topic-dependent, and the run-together 'there.And then we'll meet' leaves the final clause truncated so its intended continuation is unclear.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "79154a6aff0027e9d5cb2e3eab9c2510",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "X and Y are identical in both source segments and translations (7 segments: '네. | 알겠어요. | 완벽해요. | 고마워요, | 여러분. | 좋아요. 안녕히 계세요. | 당신도요. 알겠습니다.'), so no differential meaning or readability claim is observable.",
+      "source_uncertainty": "'K.' is a truncated abbreviation, 'Bye.You.' is run together, and 'You. Alright.' has no stated referent or addressee.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "5f3799bcb61b6dc2406506a51756f227",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "Both render every clause once: X '완벽해요. 그러니까 당신이 여기서부터 이어받는 게 타당할 것 같네요. 그런 것 같네요.' vs Y '완벽해요. 그러니까 이제부터는 당신이 맡는 게 말이 될 것 같네요. 그런 것 같네요.'; 'take it from here' -> '여기서부터 이어받는' (X) / '이제부터는 당신이 맡는' (Y) and 'makes sense' -> '타당할 것 같네요' / '말이 될 것 같네요' are alternative renderings of the same content, with 'I guess so.' identical in both.",
+      "source_uncertainty": "'take it from here' depends on the unstated previous turn, and 'I guess so.' may be a different speaker agreeing, so who asserts the guess is unclear.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "b7d529ae0932839b150047128a9837a2",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "Source 'That's thirty five.' -> X keeps the numeral whole ('Nineteen fifty by two. That's thirty five. ' -> '1950 곱하기 2. 그럼 35네요.'), while Y splits it ('...That's thirty ' -> '그건 30 '; 'five. ' -> '5네요. '), so Y's concatenated text reads '그건 30 5네요' rather than 35; 'Right.' -> '맞아요.' and 'So' -> '그러니까' match in both.",
+      "source_uncertainty": "The arithmetic is ASR-garbled ('Nineteen fifty by two. That's thirty five.'), so whether 35 is a computed figure or a mis-transcription is unclear, and 'So' is left dangling.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "number_error",
+            "detail": "The number 'thirty five' is split across Y's segment boundary ('That's thirty ' -> '그건 30 ', 'five. ' -> '5네요. '), so the joined translation gives '30 5' instead of 35; X keeps the numeral in one segment ('그럼 35네요')."
+          }
+        ]
+      }
+    },
+    {
+      "opaque_case_id": "692533e6e3293db61b9a4dfab2f22763",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "Same parent and same Y split as the previous pair ('그건 30 ' + '5네요. '); X again keeps the numeral intact ('1950 곱하기 2. 그러면 35네요.') in a single segment. 'Right.' and 'So' are rendered identically ('맞아요.', '그러니까') in both.",
+      "source_uncertainty": "The arithmetic is ASR-garbled ('Nineteen fifty by two. That's thirty five.'), so the status of 35 as a computed figure is uncertain and 'So' has no continuation.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "number_error",
+            "detail": "'thirty five' is split across Y's segments ('That's thirty ' -> '그건 30 ', 'five. ' -> '5네요. '), so the joined text renders the number as '30 5' rather than 35; X outputs '35네요' in segment 's0'."
+          }
+        ]
+      }
+    },
+    {
+      "opaque_case_id": "0cb783f15ca87b1e73ca189f96369bcb",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "Same parent again; Y splits the numeral ('That's thirty ' -> '그건 30', 'five. ' -> '5네요. ') while X renders it whole ('1950 곱하기 2. 그건 35네요.'). '맞아요.'/ '그러니까' appear in both candidates.",
+      "source_uncertainty": "The garble 'Nineteen fifty by two. That's thirty five.' leaves the arithmetic and the role of 'thirty five' uncertain, and the segment 'So' is truncated.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "number_error",
+            "detail": "'thirty five' is emitted in two pieces by Y ('그건 30' + '5네요. '), which joins to '30 5' and no longer unambiguously denotes 35; X keeps '35네요' in one segment."
+          }
+        ]
+      }
+    },
+    {
+      "opaque_case_id": "fe92e9a42ac72a37385b90fbde2c5244",
+      "meaning_preference": "Y",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "The parent stops at 'but I think' with no complement. X's split segments 'but I ' -> '제 생각에는 ' and 'think' -> '그렇다고 생각해요' supply the missing complement ('제 생각에는 그렇다고 생각해요'), which the truncated source does not state; Y keeps '분명히 그렇겠지만, 제 생각에는' with the complement open. 'definitely' -> '확실히' (X) vs '분명히' (Y) is synonymous.",
+      "source_uncertainty": "'The solar power definitely would be' has no stated predicate and the parent ends mid-clause at 'but I think', so the missing complement cannot be recovered from the source.",
+      "new_severe_errors_relative_to_other": {
+        "X": [
+          {
+            "kind": "unsupported_addition",
+            "detail": "Source ends at 'but I think' with no object clause; X's 'think' segment becomes '그렇다고 생각해요', asserting 'I think so' and making the preceding 'but' contrast vacuous, whereas Y renders the same words as '제 생각에는' and leaves the complement unstated."
+          }
+        ],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "a656a174330737c583607d1317afde28",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "Both render the final clause identically ('그러니까 여기 피를린(peelerin)이 있었던 거군요') and collapse the repeated 'they had a they had a'; 'Organic, really.' -> X '유기농이라니, 정말이네요.' vs Y '정말 유기농이군요.', and 'That's brilliant' -> X '그건 훌륭해요' vs Y '그거 훌륭하네요' are equivalent exclamations with no content difference.",
+      "source_uncertainty": "'they had a they had a peelerin here' repeats and contains the unattested word 'peelerin', so what was present and who had it is uncertain.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "719e1bf67c15021b911834ee6b637160",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "evidence": "X is unavailable ('invalid_translation_output') while Y is available, so per the packet's unavailable rule meaning and readability are unjudgeable and both relative severe lists stay empty; Y's available text is '하지만 이 슬라이드가 그 슬라이드가 그랬던 건가요? 음흠. 저는 이걸 전혀 바꾸지 않았어요.'",
+      "source_uncertainty": "'But this slide was That slide was like that?' is garbled, overlapping speech and 'Mhmm.I didn't change' is run together, so whether one or two question utterances were produced is unclear.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "624a9629136e94e7518895d236b41537",
+      "meaning_preference": "X",
+      "clear_win": false,
+      "readability_preference": "Y",
+      "evidence": "The single source question 'That slide was like that?' is kept as one question by X ('was ' -> '그랬던 ', 'like ' -> '건가요 ', 'that? ' -> '요? ') though its ending is split into a stutter ('그랬던 건가요 요?'), while Y renders it twice ('was ' -> '그랬나요? ', 'like that? ' -> '그랬냐고요? '), adding a quotative echo question; both keep 'Mhmm' -> '음.'/'음흠.' and the negation 'didn't change this one at all' -> '전혀 바꾸지 않았어요'.",
+      "source_uncertainty": "The garbled overlapping parent 'this slide was That slide was like that?' makes it unclear whether one or two question utterances underlie the text, so a doubled rendering cannot be confirmed as an error.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "7f5cb59b15f011fa4af7705b6169c9e9",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "evidence": "Y is unavailable ('invalid_translation_output') while X is available, so meaning and readability are unjudgeable and both relative severe lists stay empty; X's available text is '하지만 이 슬라이드가 그 슬라이드가 그랬나요? 그랬던 건가요? 음흠. 저는 이걸 전혀 바꾸지 않았어요.'",
+      "source_uncertainty": "The same garbled overlapping parent makes the question count and speaker attribution of 'That slide was like that?' uncertain.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "e6f8dc4929adf23ce72062b3dbfa2e23",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "Y",
+      "evidence": "Both keep the negated contrast 'we don't look at the technology, but we look at the function': X '우리는 기술을 보는 것이 아니라, 우리는 기능을 봅니다' (clause split over three segments) vs Y '우리는 기술을 보는 게 아니라, 기능을 봅니다'; 'To a function. But' -> '기능에 대해서 말이죠. 하지만' (X) / '기능에 대해서요. 하지만' (Y), 'First.' -> '먼저요.' (X) / '우선요.' (Y) - the same content throughout, with X only repeating '우리는'.",
+      "source_uncertainty": "'To a function. But' has no main clause, 'Uh-huh' carries no marked speaker, and 'First.' is a fragment whose referent ('first' of what) is unclear.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "419ab1d057158d4ee845b19c31b441f6",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "X",
+      "evidence": "Same parent as the previous pair with the partition mirrored: Y splits the negated clause ('...기술을 보는 것이 아니라, ' + '우리는 ' + '기능을 봅니다.') while X keeps it whole ('...기술을 보는 것이 아니라, 기능을 봅니다.'); the only merged-text difference is Y's extra '우리는', and '먼저요.' and '알겠습니다.' are identical in both.",
+      "source_uncertainty": "'To a function. But' lacks a main clause, 'Uh-huh' has no marked speaker, and 'First.' is a fragment whose referent is unclear.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "145bf98008e70b6cb52265bc61c9377c",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "X",
+      "evidence": "X merges the negated clause ('우리는 기술을 보는 것이 아니라 기능을 봅니다.') while Y splits it after 'technology,' ('...것이 아니라, ' + '우리는 ' + '기능을 봅니다.'), giving Y an extra '우리는'; negation and contrast are preserved in both, and 'First.' -> '우선요.' (X) / '먼저요.' (Y).",
+      "source_uncertainty": "'To a function. But' has no main clause, 'Uh-huh' has no marked speaker, and 'First.' is a fragment with an unclear referent.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "a339772080b4c1167f0c0ee38f67868a",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "Both render 'We're not actually throwing anything away.' with the negation intact ('저희는 사실 아무것도 버리지 않고 있어요') and both repeat the clause for the source's repeated 'Not throwing anything away' (X '아무것도 버리지 않아요.', Y '아무것도 버리지 않고 있어요.'); X's local word alignment is shifted ('not ' -> '사실 ', 'actually throwing ' -> '아무것도 버리지 ') but the merged sentence matches Y's meaning.",
+      "source_uncertainty": "'We yeah.' is garbled, the trailing 'This' is truncated, and it is unclear whether the repeated 'Not throwing anything away' is a verbatim repetition by the same or another speaker.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "2fe46daa72c19deed09172524e38f1bb",
+      "meaning_preference": "Y",
+      "clear_win": true,
+      "readability_preference": "Y",
+      "evidence": "The source mentions 'task breakdown'/'taskbreakdown' twice. X's segment 'what It's a ' is translated '그게 작업 분할이에요. ' although '작업 분할' belongs to the following 'task ' and 'breakdown' segments, which are then also rendered ('작업 분할요.'), so X's merged text contains '작업 분할' three times ('그게 작업 분할이에요. 작업 분할요. ... 그건 작업 분할이 맞아요.'); Y keeps 'what ' -> '그게 ', 'It's a ' -> '그건 ' and emits each mention once ('업무 분할이에요' / '업무 분할입니다').",
+      "source_uncertainty": "'what It's a task breakdown' is garbled, 'It's just a second ish' is colloquial and ambiguous, and 'But for the verbal' is truncated, so the intended structure is unclear.",
+      "new_severe_errors_relative_to_other": {
+        "X": [
+          {
+            "kind": "content_duplication",
+            "detail": "For the single source mention 'It's a task breakdown', X's segment 'what It's a ' is rendered '그게 작업 분할이에요.' (anticipating the following 'task '/'breakdown' segments, which also render as '작업 분할요.'), so the phrase is said twice for one mention and three times overall where the source has two; Y renders 'what ' -> '그게 ' and 'It's a ' -> '그건 ' and gives each mention exactly once ('업무 분할이에요', '업무 분할입니다')."
+          }
+        ],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "faf5c751080d1e1e89c1bab5697bbbb0",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "Both preserve the negation ('you're not gonna want' -> '원하지 않는') and the conditional; the only differences are register and the explicit 'you': X '알겠습니다. 있잖아요, 그러니까 만약 당신이 그냥 말도 안 된다고 생각해서 원하지 않는 것들이 있다면, 그럼' vs Y '알겠어요. 있잖아요, 그러니까 만약 그냥 말도 안 된다고 생각해서 원하지 않는 것들이 있다면, 그럼'.",
+      "source_uncertainty": "'things that you just know are crazy' is colloquial and 'you're not gonna want, then' ends mid-clause with a dangling 'then'.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "aa1e8958cfd0bf104100031c35323e2c",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "X",
+      "evidence": "Both render 'Away. Yes. Yeah.' as '멀리요. 네. 네.' and keep the doubled \"That's that's\" as '그건 그건'; for the truncated 'a decision we'll' X supplies the collocation ('저희가 내릴 결정이에요') while Y leaves the subject postposed ('결정이에요 우리가') - the same content with no number, question or negation at stake.",
+      "source_uncertainty": "'Away.' is a fragment of the preceding sentence, \"That's that's\" is a false start, and 'we'll' is cut off before its verb.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "7c5582e79e0fc8c21900547840281809",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "X and Y are identical in both source segments and translations ('그게 | 할 수 | 있을까요, 구성 요소들을 안에 있는 내용으로 태그를 달 수 있을까요'), including the repeated interrogative '...태그를 달 수 있을까요', so no differential meaning or readability claim is observable.",
+      "source_uncertainty": "'Of Can we can we tag...' is garbled and repeated, and the parent stops at \"what's in\" with no question mark despite the interrogative content.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "11d49bd6b78fd18adbd740434be78ea9",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "Coarse X renders the final clause cleanly ('So you can't tell what is meant to replace that' -> '그러니까 무엇이 그것을 대체해야 하는지 알 수 없다는 거군요'), while fine Y splits it (\"can't tell what is meant \" -> '무엇을 의미하는지 알 수 없군요 ', 'to ' -> '그것을 ', 'replace that' -> '대체하려는 것이'), leaving '그것을 대체하려는 것이' dangling after the clause and shifting the interrogative onto the '의미하는지' clause; Y also moves 'make' into the 'in. ' segment ('안에 만들려고요. ').",
+      "source_uncertainty": "'To make all the triangles, red, and squares in.' is a garbled list whose 'in' dangles, and 'There at the moment.' has no stated subject.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "cross_segment_mapping",
+            "detail": "For 'you can't tell what is meant to replace that', Y maps \"can't tell what is meant \" -> '무엇을 의미하는지 알 수 없군요 ', 'to ' -> '그것을 ', 'replace that' -> '대체하려는 것이', so '그것을 대체하려는 것이' is left as an orphaned nominal after the clause and the source's 'what is meant to replace that' is not expressed as the interrogative complement; X renders the whole clause as '무엇이 그것을 대체해야 하는지 알 수 없다는 거군요'."
+          }
+        ]
+      }
+    },
+    {
+      "opaque_case_id": "ac1a03bf0d9a9ac6b26345efbd8a8341",
+      "meaning_preference": "Y",
+      "clear_win": true,
+      "readability_preference": "Y",
+      "evidence": "Fine X splits the final clause (\"can't tell what is meant \" -> '무엇을 의미하는지 알 수 없겠네요 ', 'to ' -> '그것을 ', 'replace that' -> '대체하려는 것이'), leaving '그것을 대체하려는 것이' dangling, and maps 'the moment.' -> '있잖아요.'; coarse Y keeps the clause whole and accurate ('그러니까 무엇이 그것을 대체하려는 것인지 알 수 없다는 말씀이시죠') and renders 'There at the moment.' as '지금 거기에 있습니다.' (Y also repeats '알겠습니다.', X '알겠어요.').",
+      "source_uncertainty": "'To make all the triangles, red, and squares in.' is a garbled list whose 'in' dangles, and 'There at the moment.' has no stated subject.",
+      "new_severe_errors_relative_to_other": {
+        "X": [
+          {
+            "kind": "cross_segment_mapping",
+            "detail": "The final clause is split (\"can't tell what is meant \" -> '무엇을 의미하는지 알 수 없겠네요 ', 'to ' -> '그것을 ', 'replace that' -> '대체하려는 것이'), so '그것을 대체하려는 것이' is left dangling and the source's 'what is meant to replace that' loses its interrogative relation; Y renders the clause whole as '무엇이 그것을 대체하려는 것인지 알 수 없다는 말씀이시죠'. X additionally realises 'make' inside the 'in. ' segment ('안에 만들려고요. ')."
+          }
+        ],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "b51ef18050538ebf43edab18cb43a98f",
+      "meaning_preference": "Y",
+      "clear_win": true,
+      "readability_preference": "Y",
+      "evidence": "Fine X again splits the final clause ('무엇을 의미하는지 알 수 없군요 ' + '그것을 ' + '대체하려는 것이', leaving it dangling) and renders the purpose fragment 'in. ' as a plain declarative '안에 만들다.'; coarse Y keeps the clause whole ('그래서 무엇이 그것을 대체하려는 것인지 알 수 없다는 말씀이시군요') and renders 'in. ' as '안에.' after '...만들기 위해소'.",
+      "source_uncertainty": "'To make all the triangles, red, and squares in.' is a garbled list whose 'in' dangles, and 'There at the moment.' has no stated subject.",
+      "new_severe_errors_relative_to_other": {
+        "X": [
+          {
+            "kind": "cross_segment_mapping",
+            "detail": "X's final segments ('무엇을 의미하는지 알 수 없군요 ' + '그것을 ' + '대체하려는 것이') leave '그것을 대체하려는 것이' as an orphaned nominal, so 'what is meant to replace that' is not tied to 'can't tell' as its complement; Y renders the whole clause as '무엇이 그것을 대체하려는 것인지 알 수 없다는 말씀이시군요'."
+          }
+        ],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "28965f4cf0f8eff17ce67e4b44026327",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "Both render 'No.' -> '아니요.' and the 'more than' comparison: X '제 말은, 단순히 똑같이 생긴 조각이 여러 개 있는 것 이상이라는 거예요.' vs Y '제 말은, 단순히 여러 개의 조각이 똑같이 생겼다는 것 이상이라는 뜻이에요.' - the same content with only the internal order changed.",
+      "source_uncertainty": "'there's more than there are multiple pieces that look the same' is garbled, so the intended comparison ('more than' what) is unclear.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "4408943314c9d50ee2c8f786932c61d7",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "Both keep the fragment order and the doubled numeral: X '네. 로봇이 어떻게 설정되어 있는지 음흠. 그러니까 만약 다섯 다섯 초록색'; Y '네. 어떻게 로봇이 설정되어 있는지 음흠. 그러니까 만약 다섯 다섯 초록색' - identical wording except for the placement of 'How'.",
+      "source_uncertainty": "'How the robot is set up to' is truncated before its complement and 'So if five five green' repeats and ends mid-condition.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "2df8033da8c065e7dea7144c04b0097c",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "Both preserve the elliptical negative: X '네. 네덜란드 부분이 안 됐어요.' vs Y '네. 네덜란드 쪽은 안 그랬어요.' for 'Dutch lot didn't.' (X specifying 'didn't work out', Y keeping 'didn't do so'), and the rest matches word for word ('...사실은 아마도 문서화의 문제일 거예요').",
+      "source_uncertainty": "'Dutch lot didn't.' is elliptical - the negated verb is unstated - and 'was actuallyWhich is probably a' is run together, so what was not done is unclear.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "396e45002842615b1dd15a513f30a0e4",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "Both render the negated 'didn't think about' as '생각하지 못했던' and keep the doubled elements ('Yeah. Right.Yeah.' -> '네. 맞아요. 네.', 'this this' -> '이건 이건'); 'Thing we didn't think about.' is merged by X as '우리가 생각하지 못했던 점이네요.' and split by Y as '우리가 생각하지 못했던 ' + '것이네요. ', which sum to the same text.",
+      "source_uncertainty": "'Thing we didn't think about.' has no head noun ('Thing' is a truncated subject) and 'Yeah. Right.Yeah.' is run together, so speaker boundaries are unclear.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "fa5bc346cfa36212acdfe5f4092b68ea",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "Both render 'That's clear.' as '그건 | 명확하네요.' and keep the doubled 'That that' -> '그게 그게' and the truncated 'I I before' -> '저 저 전에'; the only difference is 'that's great' -> X '정말 좋네요' vs Y '아주 좋네요' (synonymous intensifiers).",
+      "source_uncertainty": "'That that that's great' is a false start and 'I I before' is truncated, so the parent ends without a complete proposition.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "74676ce6aef42eb0165a1309b7b534db",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "Y",
+      "evidence": "Both keep the doubled 'if if' ('만약 만약') and render 'Joe could give it a couple of hours' as '조가 몇 시간 정도 ...낼 수 있다면'; for the garbled tail 'which it is what it might take just', X says '그게 아마 걸릴 수도 있는 시간인데 그냥' (keeping a trailing '그냥') while Y says '그게 바로 그게 필요할 수도 있는 시간이죠' (dropping 'just'); X adds '아주' for 'a lot', and 'you know' -> '있잖아요' (X) vs '그러니까' (Y).",
+      "source_uncertainty": "'if if' is doubled and 'which itis what it might take just' is garbled and truncated, so what 'take' refers to and whether 'just' begins a new clause is unclear.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    }
+  ],
+  "blind_packet_sha256": "bb712dc1efa856dac11624c2c968d4ce90f1ff95cf5f73716a449a9055eb3f18"
+}
