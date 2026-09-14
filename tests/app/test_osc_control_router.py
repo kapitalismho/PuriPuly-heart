@@ -330,9 +330,10 @@ async def test_router_republishes_canonical_state_after_invalid_id() -> None:
     )
 
     assert router.handle_packet("/avatar/parameters/PuriPuly_SelfASR", 99) is False
+    assert router.handle_packet("/avatar/parameters/PuriPuly_Fallback", 8) is False
     assert router.handle_packet("/avatar/parameters/PuriPuly_Talk", 1) is False
     assert delta_republish_calls == 0
-    assert full_republish_calls == 2
+    assert full_republish_calls == 3
     assert application.calls == []
     assert projected == []
     await router.close()

@@ -219,7 +219,6 @@ from puripuly_heart.config.provider_values import (
     QwenLLMModel,
     QwenRegion,
     STTProviderName,
-    qwen_cloud_stt_model_for_provider,
 )
 from puripuly_heart.config.resolved import OVERLAY_TARGET_STEAMVR
 from puripuly_heart.config.runtime_resolution import stt_supports_peer_auto_detection
@@ -961,7 +960,6 @@ def compose_application_runtime(
             STTProviderName.DEEPGRAM,
             STTProviderName.GEMINI_TRANSCRIBE,
             STTProviderName.ELEVENLABS_SCRIBE,
-            STTProviderName.QWEN_ASR,
             STTProviderName.QWEN_AUDIO,
             STTProviderName.SONIOX,
             STTProviderName.ROLLING_FREE,
@@ -1224,9 +1222,6 @@ def compose_application_runtime(
             peer_auto_detect_available=(
                 stt_supports_peer_auto_detection(
                     canonical.intent.peer_stt.provider,
-                    qwen_asr_model=qwen_cloud_stt_model_for_provider(
-                        canonical.intent.peer_stt.provider
-                    ),
                     rolling_members=canonical.intent.stt.cloud_free_tier_providers,
                 )
             ),

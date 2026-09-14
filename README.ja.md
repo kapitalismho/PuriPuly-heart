@@ -103,7 +103,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 |---|---|---|---|---|
 | **Gemma 4 E4B (Local)** | 無制限 | 無制限 | 5,000回 | 3,660回 |
 | **Gemma 4 26B A4B + 31B** | 13,940回 | 13,940回 | 3,680回 | 2,900回 |
-| **DeepSeek V4 Flash** | 11,620回 | 11,620回 | 3,500回 | 2,780回 |
+| **DeepSeek V4.1 Flash** | 16,800回 | 16,800回 | 3,860回 | 3,000回 |
 
 #### その他のモデル
 
@@ -112,7 +112,6 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 | **Gemma 4 12B (Local)** | 無制限 | 無制限 | 5,000回 | 3,660回 |
 | **Gemma 4 26B A4B** | 14,380回 | 14,380回 | 3,710回 | 2,920回 |
 | **Gemma 4 31B (OpenRouter)** | 10,940回 | 10,940回 | 3,430回 | 2,740回 |
-| **Gemma 4 31B (Cerebras)** | 920回 | 920回 | 770回 | 730回 |
 | **Gemini 3.7 Flash** | 1,160回 | 1,160回 | 940回 | 880回 |
 | **Qwen 3.8 Flash** | 7,460回 | 7,460回 | 2,990回 | 2,460回 |
 
@@ -124,7 +123,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 |---|---|---|---|---|
 | **Gemma 4 E4B (Local)** | 0円 | 0円 | ~0.03円 | ~0.04円 |
 | **Gemma 4 26B A4B + 31B** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
-| **DeepSeek V4 Flash** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
+| **DeepSeek V4.1 Flash** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
 
 #### その他のモデル
 
@@ -133,7 +132,6 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 | **Gemma 4 12B (Local)** | 0円 | 0円 | ~0.03円 | ~0.04円 |
 | **Gemma 4 26B A4B** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
 | **Gemma 4 31B (OpenRouter)** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
-| **Gemma 4 31B (Cerebras)** | ~0.16円 | ~0.16円 | ~0.19円 | ~0.20円 |
 | **Gemini 3.7 Flash** | ~0.13円 | ~0.13円 | ~0.16円 | ~0.17円 |
 | **Qwen 3.8 Flash** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.06円 |
 
@@ -142,8 +140,9 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 *   *すべてのコストと使用可能回数は概算*
 *   *DeepSeekはキャッシュヒット率70%を仮定しています*
 *   *Qwen APIコストは北京リージョン基準*
-*   *料金表基準: 2026年8月21日*
+*   *料金表基準: 2026年9月10日*
 *   *1ドル = 150円*
+*   *ベンチマークチャートはDeepSeek-V4 Flash 0731の測定値で、コスト表はV4.1 Flashの料金に基づきます。*
 
 ### 無料クレジット
 
@@ -211,7 +210,7 @@ GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダ�
 Soniox / Gemini / Deepgramへのアクセスがブロックされている地域の場合は、以下の組み合わせをお使いください。
 
 - STT: **Qwen Audio**
-- LLM: **DeepSeek V4 Flash**
+- LLM: **DeepSeek V4.1 Flash**
 
    > Discordの代わりにQQで認証できます。
 
@@ -403,36 +402,6 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 
 </details>
 
-<details>
-<summary><h3>Cerebras</h3></summary>
-
-1. [Cerebras](https://www.cerebras.ai/)にアクセスし、**Get started** ボタンを押してください。
-   ![step1](docs/images/cerebras/1.png)
-
-2. ログインしてください。
-   ![step2](docs/images/cerebras/2.png)
-
-3. 希望するプランを選択してください。最初は無料プランをおすすめします。
-   ![step3](docs/images/cerebras/3.png)
-
-4. APIキーをコピーしてPuriPulyに貼り付けてください。
-   ![step4](docs/images/cerebras/4.png)
-
-<details>
-<summary><h3>有料プランに切り替えるには</h3></summary>
-
-5. **Billing** タブに移動してください。
-   ![step5](docs/images/cerebras/5.png)
-
-6. 自分の名前を入力してください。
-   ![step6](docs/images/cerebras/6.png)
-
-7. 必要な分だけクレジットをチャージしてください。
-   ![step7](docs/images/cerebras/7.png)
-
-</details>
-
-</details>
 
 ---
 
@@ -580,6 +549,13 @@ VRChat OSC コントロールは [`docs/vrchat-osc.md`](docs/vrchat-osc.md) を�
 ## Special Thanks
 
 SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
+
+---
+
+## ポリシー
+
+- [Code signing policy](CODE_SIGNING.md)
+- [プライバシーポリシー](PRIVACY.md)
 
 ---
 

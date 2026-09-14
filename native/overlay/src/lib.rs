@@ -1,10 +1,14 @@
 pub mod bridge;
+mod frame_cycle;
 pub mod logging;
 pub mod manifest;
 pub mod openvr;
 pub mod presentation;
 pub mod renderer;
+mod retry_episode;
 pub mod runtime;
+mod runtime_diagnostics;
+mod spatial_policy;
 pub mod state;
 
 pub use bridge::{
@@ -47,5 +51,5 @@ pub use runtime::{
 pub use state::{
     NativeFreshRenderGenerations, OverlayCalibration, OverlayPresentationBlock,
     OverlayPresentationBlockVariant, OverlayPresentationCalibration, OverlayPresentationSnapshot,
-    OverlayScene, OverlaySlot, OverlayState, OverlayStateSnapshot,
+    OverlayScene, OverlaySlot, OverlayState, OverlayStateSnapshot, SemanticRetirementFrontier,
 };

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 TranslationTurnKind = Literal["manual", "self", "peer"]
 TranslationTurnOutcome = Literal["translated", "source_only", "cancelled", "failed"]
+_COMPLETED_PARENT_LIMIT = 4096
 
 
 def _default_config_snapshot() -> TranslationRuntimeConfigSnapshot:
@@ -30,6 +32,32 @@ def _default_config_snapshot() -> TranslationRuntimeConfigSnapshot:
         revision=0,
         value=TranslationRuntimeConfig(),
     )
+
+
+def _translation_turn_child_id(
+    parent_utterance_id: UUID,
+    *,
+    turn_kind: TranslationTurnKind,
+    run_index: int,
+    target_index: int,
+    run_language: str,
+    target_language: str,
+    primary_uses_parent_identity: bool,
+) -> UUID:
+    if primary_uses_parent_identity and target_index == 0:
+        return parent_utterance_id
+    return uuid5(
+        parent_utterance_id,
+        f"{turn_kind}:{run_index}:{target_index}:{run_language}:{target_language}",
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _PrestartedTranslation:
+    task: asyncio.Task[TranslationTurnProcessResult]
+    child_utterance_id: UUID
+    provider_generation: int
+    config_snapshot: TranslationRuntimeConfigSnapshot
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +68,11 @@ class TranslationTurnRequest:
     target_languages: tuple[str, ...]
     config_snapshot: TranslationRuntimeConfigSnapshot
     precomputed_translation: Translation | None = None
+    prestarted_secondary_translation: _PrestartedTranslation | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         if not self.transcript.is_final:
@@ -71,6 +104,28 @@ class TranslationTurnRequest:
             )
             if len(nonempty_runs) > 1:
                 raise ValueError("precomputed translation requires exactly one language run")
+        if self.prestarted_secondary_translation is not None:
+            runs = self.transcript.final_language_runs or (
+                FinalLanguageRun(text=self.transcript.text, language=""),
+            )
+            nonempty_runs = tuple(run for run in runs if run.text.strip())
+            if len(normalized_targets) != 2:
+                raise ValueError("prestarted secondary translation requires two target languages")
+            if self.turn_kind != "self" or len(nonempty_runs) != 1:
+                raise ValueError(
+                    "prestarted secondary translation requires exactly one language run"
+                )
+            child_id = _translation_turn_child_id(
+                self.transcript.utterance_id,
+                turn_kind=self.turn_kind,
+                run_index=next(index for index, run in enumerate(runs) if run.text.strip()),
+                target_index=1,
+                run_language=nonempty_runs[0].language,
+                target_language=normalized_targets[1],
+                primary_uses_parent_identity=True,
+            )
+            if self.prestarted_secondary_translation.child_utterance_id != child_id:
+                raise ValueError("prestarted secondary translation identity mismatch")
         object.__setattr__(self, "target_languages", normalized_targets)
 
 
@@ -90,6 +145,12 @@ class TranslationTurnChild:
     context_policy: TranslationContextPolicy
     config_snapshot: TranslationRuntimeConfigSnapshot
     precomputed_translation: Translation | None = None
+    parent_output_count: int = 1
+    prestarted_translation: _PrestartedTranslation | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
     @property
     def channel(self) -> ChannelId:
@@ -116,6 +177,8 @@ class TranslationOutputSubmission:
     turn_order: int | None = None
     publication_generation: int | None = None
     source_order: int | None = None
+    turn_kind: TranslationTurnKind | None = None
+    parent_output_count: int = 1
 
     def __post_init__(self) -> None:
         if self.outcome == "translated" and self.translation is None:
@@ -221,7 +284,9 @@ class TranslationTurnLifecycleOwner:
     self_speech_waiting_ttl_s: float = 12.0
     _output_submitted_child_ids: set[UUID] = field(default_factory=set, init=False)
     child_watchdog_s: float = 60.0
-    _closed_parent_ids: set[UUID] = field(default_factory=set)
+    _closed_parent_ids: OrderedDict[UUID, tuple[ChannelId, int, int]] = field(
+        default_factory=OrderedDict
+    )
     _cancelling_parent_ids: set[UUID] = field(default_factory=set)
     _parent_tasks: dict[UUID, asyncio.Task[None]] = field(default_factory=dict)
     _active_tasks: dict[UUID, asyncio.Task[TranslationTurnProcessResult]] = field(
@@ -318,6 +383,7 @@ class TranslationTurnLifecycleOwner:
     ) -> tuple[UUID, ...]:
         parent_id = request.transcript.utterance_id
         if parent_id in self._closed_parent_ids or parent_id in self._parents:
+            await self._cancel_prestarted_translation(request.prestarted_secondary_translation)
             await self._reject_parent(parent_id)
             return ()
         if (
@@ -325,6 +391,7 @@ class TranslationTurnLifecycleOwner:
             or self._closed
             or request.transcript.channel in self._blocked_channels
         ):
+            await self._cancel_prestarted_translation(request.prestarted_secondary_translation)
             await self._reject_parent(parent_id)
             return ()
         channel = request.transcript.channel
@@ -346,6 +413,7 @@ class TranslationTurnLifecycleOwner:
         )
         self._parents[parent_id] = parent
         if not children:
+            await self._cancel_prestarted_translation(request.prestarted_secondary_translation)
             await self._close_parent(parent)
             return ()
         await self.start()
@@ -460,16 +528,16 @@ class TranslationTurnLifecycleOwner:
         self,
         *,
         channel: ChannelId | None = None,
-        turn_kind: TranslationTurnKind | None = None,
+        turn_kinds: frozenset[TranslationTurnKind] | None = None,
     ) -> None:
         if self._closed:
             return
-        if turn_kind is not None and channel is None:
+        if turn_kinds is not None and channel is None:
             raise ValueError("turn-kind cancellation requires a channel")
         if channel is not None:
-            if turn_kind is None:
+            if turn_kinds is None:
                 self._advance_turn_generation(channel)
-            await self._cancel_channel(channel, turn_kind=turn_kind)
+            await self._cancel_channel(channel, turn_kinds=turn_kinds)
             return
         self._advance_turn_generation("self")
         self._advance_turn_generation("peer")
@@ -489,9 +557,9 @@ class TranslationTurnLifecycleOwner:
         self,
         channel: ChannelId,
         *,
-        turn_kind: TranslationTurnKind | None = None,
+        turn_kinds: frozenset[TranslationTurnKind] | None = None,
     ) -> None:
-        if turn_kind is None:
+        if turn_kinds is None:
             self._blocked_channels.add(channel)
         try:
             admission_lock = self._channel_admission_locks.setdefault(
@@ -504,8 +572,8 @@ class TranslationTurnLifecycleOwner:
                     for parent in self._parents.values()
                     if parent.channel == channel
                     and (
-                        turn_kind is None
-                        or any(child.turn_kind == turn_kind for child in parent.children)
+                        turn_kinds is None
+                        or any(child.turn_kind in turn_kinds for child in parent.children)
                     )
                 )
                 if not selected_parents:
@@ -532,7 +600,7 @@ class TranslationTurnLifecycleOwner:
                         *(parent.closed_event.wait() for parent in parents_to_await)
                     )
         finally:
-            if turn_kind is None:
+            if turn_kinds is None:
                 self._blocked_channels.discard(channel)
 
     async def wait_for_idle(self) -> None:
@@ -583,13 +651,14 @@ class TranslationTurnLifecycleOwner:
         }
         children: list[TranslationTurnChild] = []
         for sequence, (run_index, target_index, run, target_language) in enumerate(child_specs):
-            identity_key = (
-                f"{request.turn_kind}:{run_index}:{target_index}:{run.language}:{target_language}"
-            )
-            child_id = (
-                request.transcript.utterance_id
-                if primary_uses_parent_identity and target_index == 0
-                else uuid5(request.transcript.utterance_id, identity_key)
+            child_id = _translation_turn_child_id(
+                request.transcript.utterance_id,
+                turn_kind=request.turn_kind,
+                run_index=run_index,
+                target_index=target_index,
+                run_language=run.language,
+                target_language=target_language,
+                primary_uses_parent_identity=primary_uses_parent_identity,
             )
             children.append(
                 TranslationTurnChild(
@@ -623,6 +692,10 @@ class TranslationTurnLifecycleOwner:
                         )
                         if request.precomputed_translation is not None and target_index == 0
                         else None
+                    ),
+                    parent_output_count=len(child_specs),
+                    prestarted_translation=(
+                        request.prestarted_secondary_translation if target_index == 1 else None
                     ),
                     config_snapshot=request.config_snapshot,
                 )
@@ -911,6 +984,10 @@ class TranslationTurnLifecycleOwner:
                         target_index=child.target_index,
                         turn_generation=child.turn_generation,
                         turn_order=child.turn_order,
+                        publication_generation=child.transcript.publication_generation,
+                        source_order=child.transcript.source_order,
+                        turn_kind=child.turn_kind,
+                        parent_output_count=child.parent_output_count,
                     )
                 )
                 self._output_submitted_child_ids.add(child.utterance_id)
@@ -981,6 +1058,11 @@ class TranslationTurnLifecycleOwner:
         parent = self._parents.get(child.parent_utterance_id)
         if parent is None or parent.closed or child.utterance_id in parent.completed_child_ids:
             return
+        if (
+            child.prestarted_translation is not None
+            and child.prestarted_translation.task is not asyncio.current_task()
+        ):
+            await self._cancel_prestarted_translation(child.prestarted_translation)
         try:
             await self.on_child_terminal(child, outcome)
         except Exception:
@@ -991,6 +1073,17 @@ class TranslationTurnLifecycleOwner:
             self._mark_child_semantic_done(child)
             if parent.completed_child_ids == set(parent.child_ids):
                 await self._close_parent(parent)
+
+    @staticmethod
+    async def _cancel_prestarted_translation(
+        prestarted: _PrestartedTranslation | None,
+    ) -> None:
+        if prestarted is None:
+            return
+        task = prestarted.task
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
 
     async def _close_parent(self, parent: _TranslationTurnParent) -> None:
         if parent.closed:
@@ -1008,7 +1101,13 @@ class TranslationTurnLifecycleOwner:
         if self._channel_tails.get(parent.channel) is parent:
             self._channel_tails.pop(parent.channel, None)
         self._cancelling_parent_ids.discard(parent.parent_utterance_id)
-        self._closed_parent_ids.add(parent.parent_utterance_id)
+        self._closed_parent_ids[parent.parent_utterance_id] = (
+            parent.channel,
+            parent.turn_generation,
+            parent.turn_order,
+        )
+        while len(self._closed_parent_ids) > _COMPLETED_PARENT_LIMIT:
+            self._closed_parent_ids.popitem(last=False)
         try:
             try:
                 await self.on_parent_closed(parent.parent_utterance_id)

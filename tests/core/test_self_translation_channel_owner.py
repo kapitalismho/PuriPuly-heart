@@ -188,7 +188,9 @@ async def test_scoped_successor_before_real_end_uses_post_end_grace() -> None:
 
 
 @pytest.mark.asyncio
-async def test_recognition_configuration_change_is_merge_barrier_but_epoch_rotation_is_not() -> None:
+async def test_recognition_configuration_change_is_merge_barrier_but_epoch_rotation_is_not() -> (
+    None
+):
     harness = compose_translation_test_harness(
         stt=None,
         llm=None,
@@ -257,6 +259,7 @@ async def test_recognition_configuration_change_is_merge_barrier_but_epoch_rotat
     assert replacement.parts == ["three"]
     assert original.parts == ["one", "two"]
 
+
 @pytest.mark.asyncio
 async def test_self_owner_close_cancels_and_awaits_owned_runtime_tasks() -> None:
     harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
@@ -280,6 +283,7 @@ async def test_self_owner_close_cancels_and_awaits_owned_runtime_tasks() -> None
     assert finalize_task.done()
     assert owner.merge_buffer is None
     assert not owner.accepting_events
+
 
 @pytest.mark.asyncio
 async def test_scoped_readiness_restores_session_state_disclosure_and_failure_status() -> None:
@@ -357,9 +361,7 @@ async def test_scoped_readiness_restores_session_state_disclosure_and_failure_st
     assert osc.immediate_messages == ["PuriPuly ON!"]
     await harness.self_owner.submit_text("manual-after-recognition-failure")
     assert harness.peer_runtime.get_or_create_bundle(peer_id) is peer_bundle
-    assert any(
-        message.text == "manual-after-recognition-failure" for message in osc.messages
-    )
+    assert any(message.text == "manual-after-recognition-failure" for message in osc.messages)
 
 
 def test_self_owner_requires_self_runtime() -> None:

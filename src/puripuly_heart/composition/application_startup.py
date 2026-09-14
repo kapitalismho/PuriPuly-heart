@@ -157,7 +157,6 @@ class ApplicationStartupAdapter:
                 )
             else:
                 stt_key_map = {
-                    "qwen_asr": self.alibaba_verified_key(),
                     "qwen_audio": self.alibaba_verified_key(),
                 }
                 stt_verified_key = stt_key_map.get(stt_provider, stt_provider)
@@ -191,7 +190,6 @@ class ApplicationStartupAdapter:
                 )
             else:
                 peer_key_map = {
-                    "qwen_asr": self.alibaba_verified_key(),
                     "qwen_audio": self.alibaba_verified_key(),
                 }
                 peer_verified_key = peer_key_map.get(peer_stt_provider, peer_stt_provider)

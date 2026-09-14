@@ -4,12 +4,20 @@ import asyncio
 import inspect
 import os
 import sys
+from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
-from puripuly_heart.core.overlay import process as process_module
-from puripuly_heart.core.overlay.process import OverlayProcessManager
+from puripuly_heart.config.overlay_calibration import OverlayCalibration
+from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.overlay.bridge import OverlayBridge
+from puripuly_heart.core.overlay.presenter import OverlayPresenter
+from puripuly_heart.core.overlay.process import DefaultOverlayProcessRunner, OverlayProcessManager
+from puripuly_heart.core.overlay.process_adapter import _AsyncioOverlayProcess
+from puripuly_heart.core.overlay.sink import OverlayEventAdapter
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
+from puripuly_heart.domain.models import Transcript
 from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
@@ -72,9 +80,9 @@ class FakeManager:
         self.stop_calls = 0
         self.mark_shutdown_requested_calls = 0
 
-    def mark_shutdown_requested(self) -> None:
+    def mark_shutdown_requested(self, *, request_sent: bool = True) -> None:
         self.mark_shutdown_requested_calls += 1
-        self.events.append("manager.mark_shutdown_requested")
+        self.events.append(f"manager.mark_shutdown_requested(request_sent={request_sent})")
 
     async def stop(self) -> None:
         self.stop_calls += 1
@@ -310,8 +318,7 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
     assert monitor_task.done()
     assert renderer_task.done()
     assert events == [
-        "manager.mark_shutdown_requested",
-        "presenter.broadcast_shutdown",
+        "manager.mark_shutdown_requested(request_sent=False)",
         "start.cancelled",
         "monitor.cancelled",
         "renderer.cancelled",
@@ -321,7 +328,7 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
         "manager.stop",
         "bridge.stop",
     ]
-    assert presenter.broadcast_shutdown_calls == 1
+    assert presenter.broadcast_shutdown_calls == 0
     assert presenter.clear_for_runtime_detach_calls == 1
     assert presenter.detach_bridge_calls == 1
     assert presenter.reset_scene_calls == 1
@@ -345,15 +352,13 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
         preview_reset=output_projection.reset_overlay_preview,
         diagnostics_detach=diagnostics_detach,
     )
-    assert presenter.broadcast_shutdown_calls == 1
+    assert presenter.broadcast_shutdown_calls == 0
     assert manager.stop_calls == 1
     assert bridge.stop_calls == 1
 
 
 @pytest.mark.asyncio
-async def test_overlay_runtime_handle_close_detaches_output_ingress_before_shutdown_broadcast() -> (
-    None
-):
+async def test_overlay_runtime_handle_detaches_output_ingress_before_owner_teardown() -> None:
     events: list[str] = []
     diagnostics = object()
     presenter = IngressObservingPresenter(events)
@@ -371,8 +376,8 @@ async def test_overlay_runtime_handle_close_detaches_output_ingress_before_shutd
         diagnostics_detach=diagnostics_detach,
     )
 
-    assert presenter.ingress_detached_at_broadcast is True
-    assert presenter.broadcast_shutdown_calls == 1
+    assert presenter.ingress_detached_at_broadcast is None
+    assert presenter.broadcast_shutdown_calls == 0
     assert output_projection.overlay_sink is None
     assert diagnostics_detach.calls == [diagnostics]
     assert output_projection.reset_overlay_preview_calls == 1
@@ -411,18 +416,18 @@ async def test_overlay_runtime_handle_retains_presenter_for_output_detach_retry(
 
 
 @pytest.mark.asyncio
-async def test_overlay_runtime_marks_shutdown_before_broadcast_grace_exit_and_stop() -> None:
+async def test_overlay_runtime_delegates_graceful_exit_budget_to_process_manager() -> None:
     events: list[str] = []
 
-    class ExitingPresenter(FakePresenter):
-        async def broadcast_shutdown(self) -> None:
-            self.broadcast_shutdown_calls += 1
-            self.events.append("presenter.broadcast_shutdown")
+    class GracefulManager(FakeManager):
+        async def stop(self) -> None:
+            self.stop_calls += 1
+            self.events.append("manager.graceful_shutdown_request")
             await asyncio.sleep(0)
             self.events.append("native.exit:0")
 
-    presenter = ExitingPresenter(events)
-    manager = FakeManager(events)
+    presenter = FakePresenter(events)
+    manager = GracefulManager(events)
     handle = OverlayRuntimeHandle(shutdown_grace_s=0.001)
     handle.attach_presenter(presenter)
     handle.attach_process_manager(manager)
@@ -430,11 +435,10 @@ async def test_overlay_runtime_marks_shutdown_before_broadcast_grace_exit_and_st
     await handle.close(preserve_presenter_state=True)
 
     assert events == [
-        "manager.mark_shutdown_requested",
-        "presenter.broadcast_shutdown",
-        "native.exit:0",
+        "manager.mark_shutdown_requested(request_sent=False)",
         "presenter.detach_bridge",
-        "manager.stop",
+        "manager.graceful_shutdown_request",
+        "native.exit:0",
     ]
 
 
@@ -444,15 +448,11 @@ async def test_overlay_runtime_preserves_process_event_reader_until_manager_stop
     shutdown_sent = asyncio.Event()
     shutdown_acknowledged = asyncio.Event()
 
-    class ShutdownPresenter(FakePresenter):
-        async def broadcast_shutdown(self) -> None:
-            await super().broadcast_shutdown()
-            shutdown_sent.set()
-
     class AckDependentManager(FakeManager):
         async def stop(self) -> None:
             self.stop_calls += 1
             self.events.append("manager.stop.waiting_for_ack")
+            shutdown_sent.set()
             await asyncio.wait_for(shutdown_acknowledged.wait(), timeout=0.1)
             self.events.append("manager.stop.acknowledged")
 
@@ -461,7 +461,7 @@ async def test_overlay_runtime_preserves_process_event_reader_until_manager_stop
         events.append("process-reader.shutdown_complete")
         shutdown_acknowledged.set()
 
-    presenter = ShutdownPresenter(events)
+    presenter = FakePresenter(events)
     manager = AckDependentManager(events)
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
     handle.attach_presenter(presenter)
@@ -476,8 +476,7 @@ async def test_overlay_runtime_preserves_process_event_reader_until_manager_stop
     assert reader_task.done()
     assert not reader_task.cancelled()
     assert events == [
-        "manager.mark_shutdown_requested",
-        "presenter.broadcast_shutdown",
+        "manager.mark_shutdown_requested(request_sent=False)",
         "presenter.detach_bridge",
         "manager.stop.waiting_for_ack",
         "process-reader.shutdown_complete",
@@ -509,7 +508,7 @@ async def test_overlay_runtime_receives_real_subprocess_shutdown_ack_before_read
         stderr=asyncio.subprocess.PIPE,
     )
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
-    managed = process_module._AsyncioOverlayProcess(
+    managed = _AsyncioOverlayProcess(
         process=child,
         task_factory=handle.create_child_task,
     )
@@ -557,6 +556,212 @@ async def test_overlay_runtime_receives_real_subprocess_shutdown_ack_before_read
     assert "terminate_requested" not in manager_events
     assert handle.process_manager is None
     assert handle.child_task_names == ()
+    receipt = manager.shutdown_receipt()
+    assert receipt["graceful_request"] == "sent"
+    assert receipt["acknowledged"] is True
+    assert receipt["exit_confirmed"] is True
+    assert receipt["exit_code"] == 0
+    assert receipt["forced"] is False
+    assert receipt["reader_cleanup"] == "complete"
+    assert receipt["cleanup_succeeded"] is True
+
+
+@pytest.mark.skipif(os.getenv("INTEGRATION") != "1", reason="requires real subprocess")
+@pytest.mark.asyncio
+async def test_runtime_real_bridge_writer_delivers_one_shutdown_before_delayed_child_exit(
+    tmp_path: Path,
+) -> None:
+    script_path = tmp_path / "synthetic_overlay.py"
+    journal_path = script_path.with_suffix(".journal")
+    script_path.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env python3",
+                "import asyncio,json,sys",
+                "from pathlib import Path",
+                "from websockets.asyncio.client import connect",
+                "manifest=json.load(open(sys.argv[2],encoding='utf-8'))",
+                "journal=Path(__file__).with_suffix('.journal')",
+                "async def main():",
+                " async with connect(manifest['bridge_url'],ping_interval=None,compression=None) as ws:",
+                "  await ws.send(json.dumps({'type':'auth','session_token':manifest['session_token'],'contract_version':manifest['contract_version'],'overlay_instance_id':manifest['overlay_instance_id'],'runtime_generation':1,'capabilities':{'execution_contract':{'version':1,'revision':'r2'},'native_presentation_retry':{'version':1,'ownership':'exclusive'}}}))",
+                "  print(json.dumps({'type':'overlay_ready','overlay_instance_id':manifest['overlay_instance_id'],'runtime_generation':1,'capabilities':{'execution_contract':{'version':1,'revision':'r2'},'native_presentation_retry':{'version':1,'ownership':'exclusive'}}}),flush=True)",
+                "  while True:",
+                "   message=json.loads(await ws.recv())",
+                "   with journal.open('a',encoding='utf-8') as handle: handle.write(message['type']+'\\n')",
+                "   if message['type']=='shutdown':",
+                "    await asyncio.sleep(0.05)",
+                "    print(json.dumps({'type':'shutdown_complete','overlay_instance_id':manifest['overlay_instance_id'],'runtime_generation':1}),flush=True)",
+                "    return",
+                "asyncio.run(main())",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    script_path.chmod(0o755)
+    runtime = OverlayRuntimeHandle(shutdown_grace_s=3.0)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        task_factory=runtime.create_child_task,
+    )
+    runtime.adopt_presenter(presenter)
+    bridge = OverlayBridge(
+        session_token="runtime-bridge-shutdown-token",
+        initial_snapshot=presenter.snapshot(),
+        overlay_instance_id=runtime.overlay_instance_id,
+        runtime_generation=1,
+        task_factory=runtime.create_child_task,
+    )
+    runtime.attach_bridge(bridge)
+    await bridge.start()
+    presenter.attach_bridge(bridge)
+    runner = DefaultOverlayProcessRunner(
+        executable_path=script_path,
+        task_factory=runtime.create_child_task,
+    )
+    manager = OverlayProcessManager(
+        process_runner=runner,
+        bridge_url=bridge.url,
+        bridge_messages=bridge.messages,
+        session_token=bridge.session_token,
+        overlay_instance_id=runtime.overlay_instance_id,
+        startup_timeout_ms=1000,
+        graceful_shutdown_request=bridge.broadcast_shutdown,
+        graceful_shutdown_timeout_s=3.0,
+        selected_target="steamvr",
+        geometry_authority="native",
+        task_factory=runtime.create_child_task,
+    )
+    runtime.attach_process_manager(manager)
+
+    try:
+        await manager.start()
+        assert manager.state == "connected"
+        await asyncio.wait_for(
+            runtime.close(preserve_presenter_state=False),
+            timeout=4.0,
+        )
+    finally:
+        process = manager._process
+        if process is not None:
+            await process.terminate()
+
+    receipt = manager.shutdown_receipt()
+    assert receipt["graceful_completed"] is True
+    assert receipt["acknowledged"] is True
+    assert receipt["exit_confirmed"] is True
+    assert receipt["exit_code"] == 0
+    assert receipt["reader_cleanup"] == "complete"
+    assert receipt["forced"] is False
+    assert journal_path.read_text(encoding="utf-8").splitlines().count("shutdown") == 1
+
+
+@pytest.mark.asyncio
+async def test_preserved_presenter_rearms_original_expiration_deadline_in_new_runtime() -> None:
+    clock = FakeClock(_now=10.0)
+    sleep_calls: list[float] = []
+    sleep_releases: list[asyncio.Event] = []
+
+    async def controlled_sleep(delay: float) -> None:
+        sleep_calls.append(delay)
+        release = asyncio.Event()
+        sleep_releases.append(release)
+        await release.wait()
+
+    old_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        sleep=controlled_sleep,
+    )
+    old_runtime.adopt_presenter(presenter)
+    adapter = OverlayEventAdapter(clock=clock)
+    turn_id = uuid4()
+    await presenter.emit(
+        adapter.transcript_final(
+            Transcript(
+                utterance_id=turn_id,
+                channel="self",
+                text="preserved until original deadline",
+                is_final=True,
+                created_at=10.0,
+            ),
+            source_language="en",
+            target_language="ko",
+        )
+    )
+    await asyncio.sleep(0)
+    assert sleep_calls == [8.0]
+
+    await old_runtime.close(preserve_presenter_state=True, emit_shutdown=False)
+    preserved = old_runtime.detach_preserved_presenter()
+    assert preserved is presenter
+    assert presenter.snapshot().blocks[0].primary_text == "preserved until original deadline"
+
+    clock.advance(1.0)
+    new_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    new_runtime.adopt_presenter(presenter)
+    await presenter.begin_native_retry_epoch(enabled=True)
+    await asyncio.sleep(0)
+
+    assert sleep_calls == [8.0, 7.0]
+    assert new_runtime.child_task_names == (f"presenter-expiration:self:{turn_id}",)
+
+    clock.advance(7.0)
+    sleep_releases[-1].set()
+    for _ in range(10):
+        if not presenter.snapshot().blocks and not new_runtime.child_task_names:
+            break
+        await asyncio.sleep(0)
+
+    assert presenter.snapshot().blocks == []
+    assert new_runtime.child_task_names == ()
+    await new_runtime.close(preserve_presenter_state=False, emit_shutdown=False)
+
+
+@pytest.mark.asyncio
+async def test_preserved_presenter_drops_expired_caption_before_fresh_epoch_replay() -> None:
+    clock = FakeClock(_now=10.0)
+
+    async def blocked_sleep(_delay: float) -> None:
+        await asyncio.Event().wait()
+
+    old_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        sleep=blocked_sleep,
+    )
+    old_runtime.adopt_presenter(presenter)
+    adapter = OverlayEventAdapter(clock=clock)
+    turn_id = uuid4()
+    await presenter.emit(
+        adapter.transcript_final(
+            Transcript(
+                utterance_id=turn_id,
+                channel="self",
+                text="already expired during restart",
+                is_final=True,
+                created_at=10.0,
+            ),
+            source_language="en",
+            target_language="ko",
+        )
+    )
+    await asyncio.sleep(0)
+    await old_runtime.close(preserve_presenter_state=True, emit_shutdown=False)
+    preserved = old_runtime.detach_preserved_presenter()
+    assert preserved is presenter
+
+    clock.advance(31.0)
+    new_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    new_runtime.adopt_presenter(presenter)
+    await presenter.begin_native_retry_epoch(enabled=True)
+
+    assert presenter.snapshot().blocks == []
+    assert presenter.snapshot().native_fresh_render_targets is None
+    assert new_runtime.child_task_names == ()
+    await new_runtime.close(preserve_presenter_state=False, emit_shutdown=False)
 
 
 @pytest.mark.asyncio
@@ -614,8 +819,7 @@ async def test_overlay_runtime_handle_close_surfaces_owned_task_cleanup_failures
 
     assert task.done()
     assert events == [
-        "manager.mark_shutdown_requested",
-        "presenter.broadcast_shutdown",
+        "manager.mark_shutdown_requested(request_sent=False)",
         expected_failure_event,
         "presenter.clear_for_runtime_detach",
         "presenter.detach_bridge",
@@ -675,12 +879,14 @@ async def test_overlay_runtime_handle_close_keeps_failed_resources_for_retry() -
         await handle.close(preserve_presenter_state=True)
 
     assert handle.process_manager is manager
-    assert handle.bridge is None
-    assert bridge.stop_calls == 1
+    assert handle.bridge is bridge
+    assert bridge.stop_calls == 0
 
     await handle.close(preserve_presenter_state=True)
 
     assert handle.process_manager is None
+    assert handle.bridge is None
+    assert bridge.stop_calls == 1
     assert manager.stop_calls == 2
 
 

@@ -185,34 +185,6 @@ async def test_custom_http_control_preserves_the_previous_llm_selection() -> Non
 
 
 @pytest.mark.asyncio
-async def test_gemma_31b_control_keeps_an_active_cerebras_selection() -> None:
-    current = _with_translation(
-        AppSettingsVNext(),
-        model=TranslationModel.GEMMA4_31B.value,
-        connection=TranslationConnection.CEREBRAS.value,
-    )
-    applied = 0
-
-    async def apply_settings(_settings: object) -> object:
-        nonlocal applied
-        applied += 1
-        return True
-
-    application = SettingsBackedOscControlApplication(
-        settings_provider=lambda: current,
-        apply_settings=apply_settings,
-        translation_model_normalizer=materialize_canonical_translation_settings,
-    )
-
-    result = await application.set_translation_model(TranslationModel.GEMMA4_31B.value)
-
-    assert result is True
-    assert applied == 0
-    assert current.intent.translation.model == TranslationModel.GEMMA4_31B.value
-    assert current.intent.translation.connection == TranslationConnection.CEREBRAS.value
-
-
-@pytest.mark.asyncio
 async def test_settings_control_rejects_when_application_keeps_the_previous_state() -> None:
     current = AppSettingsVNext()
 
@@ -461,14 +433,18 @@ async def test_fallback_control_skips_apply_when_alias_matches() -> None:
     assert (await application.set_fallback("none")) is True
     assert applied == 0
 
-    assert (await application.set_fallback("cerebras_gemma4_31b")) is True
+    assert (await application.set_fallback("deepseek_v4_flash_41_managed")) is True
     assert applied == 1
     assert current.intent.translation.fallback.enabled is True
-    assert current.intent.translation.fallback.model == "gemma4_31b"
-    assert current.intent.translation.fallback.connection == "cerebras"
+    assert current.intent.translation.fallback.model == "deepseek_v4_flash_41"
+    assert current.intent.translation.fallback.connection == "managed"
 
-    assert (await application.set_fallback("cerebras_gemma4_31b")) is True
-    assert applied == 1
+    assert (await application.set_fallback("none")) is True
+    assert applied == 2
+    assert current.intent.translation.fallback.enabled is False
+
+    with pytest.raises(ValueError, match="unknown OSC fallback alias"):
+        await application.set_fallback("cerebras_gemma4_31b")
 
 
 @pytest.mark.asyncio

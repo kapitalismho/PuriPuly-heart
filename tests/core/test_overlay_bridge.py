@@ -3,18 +3,50 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import socket
+import time
+from typing import Any
+from uuid import uuid4
 
 import pytest
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosedError
 
+from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
+from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CONTRACT_VERSION,
+    OVERLAY_EXECUTION_CONTRACT,
+    OVERLAY_NATIVE_RETRY_CONTRACT,
+)
+from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.protocol import (
+    NativeFreshRenderTargets,
+    NativeQuietTailEpisode,
+    NativeQuietTailEpisodes,
     OverlayPresentationBlock,
     OverlayPresentationCalibration,
     OverlayPresentationSnapshot,
 )
+from puripuly_heart.core.overlay.sink import OverlayEventAdapter
+from puripuly_heart.ui.overlay_calibration import OverlayCalibration
+
+
+def _native_auth() -> str:
+    return json.dumps(
+        {
+            "type": "auth",
+            "session_token": "expected-token",
+            "contract_version": OVERLAY_CONTRACT_VERSION,
+            "overlay_instance_id": "overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+            },
+        }
+    )
 
 
 class _AbruptAuthenticatedConnection:
@@ -94,7 +126,27 @@ class _RecordingSendConnection:
         return None
 
 
-def _refresh_marker_snapshot(
+class _BlockingSendConnection(_RecordingSendConnection):
+    def __init__(self) -> None:
+        super().__init__()
+        self.send_started = asyncio.Event()
+        self.release_send = asyncio.Event()
+
+    async def send(self, payload: str) -> None:
+        self.send_started.set()
+        await self.release_send.wait()
+        await super().send(payload)
+
+
+async def _wait_until(condition) -> None:
+    async def poll() -> None:
+        while not condition():
+            await asyncio.sleep(0)
+
+    await asyncio.wait_for(poll(), timeout=0.5)
+
+
+def _coalescing_snapshot(
     *,
     revision: int,
     peer_session_scope: str | None,
@@ -132,7 +184,7 @@ def _refresh_marker_snapshot(
 
 
 @pytest.mark.asyncio
-async def test_overlay_bridge_stop_preserves_authenticated_connection_when_close_fails() -> None:
+async def test_overlay_bridge_stop_bounds_and_tracks_failed_connection_close() -> None:
     class FailingOnceCloseConnection:
         def __init__(self) -> None:
             self.close_calls = 0
@@ -146,20 +198,22 @@ async def test_overlay_bridge_stop_preserves_authenticated_connection_when_close
     connection = FailingOnceCloseConnection()
     bridge._authenticated_connections.add(connection)
 
-    with pytest.raises(RuntimeError, match="connection close failed"):
+    with pytest.raises(ExceptionGroup, match="OverlayBridge stop failed"):
         await bridge.stop()
 
-    assert connection in bridge._authenticated_connections
-
-    await bridge.stop()
-
-    assert connection.close_calls == 2
     assert connection not in bridge._authenticated_connections
+    assert connection in bridge._unresolved_connections
+
+    with pytest.raises(ExceptionGroup, match="OverlayBridge stop failed"):
+        await bridge.stop()
+
+    assert connection.close_calls == 1
+    assert connection in bridge._unresolved_connections
 
 
 @pytest.mark.asyncio
-async def test_overlay_bridge_stop_preserves_server_when_wait_closed_fails() -> None:
-    class FailingOnceServer:
+async def test_overlay_bridge_stop_clears_server_state_when_wait_closed_fails() -> None:
+    class FailingServer:
         def __init__(self) -> None:
             self.close_calls = 0
             self.wait_closed_calls = 0
@@ -169,31 +223,23 @@ async def test_overlay_bridge_stop_preserves_server_when_wait_closed_fails() -> 
 
         async def wait_closed(self) -> None:
             self.wait_closed_calls += 1
-            if self.wait_closed_calls == 1:
-                raise RuntimeError("server close failed")
+            raise RuntimeError("server close failed")
 
     bridge = OverlayBridge(session_token="expected-token")
-    server = FailingOnceServer()
+    server = FailingServer()
     bridge._server = server
     bridge.url = "ws://127.0.0.1:9999"
-    bridge._token_consumed = True
+    bridge._session_health.token_consumed = True
     await bridge.messages.put({"type": "pending"})
 
-    with pytest.raises(RuntimeError, match="server close failed"):
+    with pytest.raises(ExceptionGroup, match="OverlayBridge stop failed"):
         await bridge.stop()
 
-    assert bridge._server is server
-    assert bridge.url == "ws://127.0.0.1:9999"
-    assert bridge._token_consumed is True
-    assert bridge.messages.qsize() == 1
-
-    await bridge.stop()
-
-    assert server.close_calls == 2
-    assert server.wait_closed_calls == 2
+    assert server.close_calls == 1
+    assert server.wait_closed_calls == 1
     assert bridge._server is None
     assert bridge.url == ""
-    assert bridge._token_consumed is False
+    assert bridge._session_health.token_consumed is False
     assert bridge.messages.empty()
 
 
@@ -359,10 +405,10 @@ async def test_overlay_bridge_broadcasts_full_snapshot_replacements() -> None:
 
 
 @pytest.mark.asyncio
-async def test_overlay_bridge_broadcasts_every_refresh_marker_revision_and_cleanup() -> None:
+async def test_overlay_bridge_coalesces_unsent_revisions_to_latest_scene() -> None:
     bridge = OverlayBridge(
         session_token="expected-token",
-        initial_snapshot=_refresh_marker_snapshot(
+        initial_snapshot=_coalescing_snapshot(
             revision=1,
             peer_session_scope="session:peer",
             self_session_scope=None,
@@ -372,33 +418,34 @@ async def test_overlay_bridge_broadcasts_every_refresh_marker_revision_and_clean
     bridge._authenticated_connections.add(connection)  # type: ignore[arg-type]
 
     await bridge.replace_snapshot(
-        _refresh_marker_snapshot(
+        _coalescing_snapshot(
             revision=2,
-            peer_session_scope="session:peer|peer_presentation_refresh=1",
-            self_session_scope="self_presentation_refresh=1",
+            peer_session_scope="session:peer:translated",
+            self_session_scope="session:self",
         )
     )
     await bridge.replace_snapshot(
-        _refresh_marker_snapshot(
+        _coalescing_snapshot(
             revision=3,
-            peer_session_scope="session:peer|peer_presentation_refresh=2",
-            self_session_scope="self_presentation_refresh=2",
+            peer_session_scope="session:peer:retranslated",
+            self_session_scope="session:self:updated",
         )
     )
     await bridge.replace_snapshot(
-        _refresh_marker_snapshot(
+        _coalescing_snapshot(
             revision=4,
             peer_session_scope="session:peer",
             self_session_scope=None,
         )
     )
+    await _wait_until(lambda: len(connection.sent_payloads) == 1)
 
     snapshot_payloads = [
         payload["payload"]
         for payload in connection.sent_payloads
         if payload.get("type") == "snapshot"
     ]
-    assert [payload["revision"] for payload in snapshot_payloads] == [2, 3, 4]
+    assert [payload["revision"] for payload in snapshot_payloads] == [4]
     assert [
         (
             payload["blocks"][0]["primary_text"],
@@ -406,21 +453,11 @@ async def test_overlay_bridge_broadcasts_every_refresh_marker_revision_and_clean
             payload["blocks"][1]["primary_text"],
         )
         for payload in snapshot_payloads
-    ] == [
-        ("peer translated text", "peer source text", "self source text"),
-        ("peer translated text", "peer source text", "self source text"),
-        ("peer translated text", "peer source text", "self source text"),
-    ]
+    ] == [("peer translated text", "peer source text", "self source text")]
     assert [payload["blocks"][0].get("session_scope") for payload in snapshot_payloads] == [
-        "session:peer|peer_presentation_refresh=1",
-        "session:peer|peer_presentation_refresh=2",
-        "session:peer",
+        "session:peer"
     ]
-    assert [payload["blocks"][1].get("session_scope") for payload in snapshot_payloads] == [
-        "self_presentation_refresh=1",
-        "self_presentation_refresh=2",
-        None,
-    ]
+    assert [payload["blocks"][1].get("session_scope") for payload in snapshot_payloads] == [None]
 
 
 @pytest.mark.asyncio
@@ -452,6 +489,7 @@ async def test_overlay_bridge_does_not_send_stale_initial_snapshot_after_newer_l
     await asyncio.sleep(0)
     connection.release_initial_send.set()
     await asyncio.wait_for(replace_task, timeout=0.5)
+    await _wait_until(lambda: len(connection.sent_payloads) == 2)
     connection.allow_disconnect.set()
     await handle_task
 
@@ -482,6 +520,107 @@ async def test_overlay_bridge_ignores_stale_snapshot_replacements() -> None:
 
 
 @pytest.mark.asyncio
+async def test_overlay_bridge_revalidates_successor_age_after_stalled_send() -> None:
+    clock = FakeClock(_now=10.0)
+    bridge = OverlayBridge(session_token="expected-token", clock=clock)
+    connection = _BlockingSendConnection()
+    bridge._authenticated_connections.add(connection)  # type: ignore[arg-type]
+
+    await bridge.replace_snapshot(
+        OverlayPresentationSnapshot(
+            revision=1,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[
+                OverlayPresentationBlock(
+                    id="peer:first",
+                    occupant_key="peer:first",
+                    appearance_seq=1,
+                    channel="peer",
+                    block_variant="finalized",
+                    primary_text="first",
+                    secondary_text="",
+                    secondary_enabled=False,
+                )
+            ],
+        )
+    )
+    await connection.send_started.wait()
+    await bridge.replace_snapshot(
+        OverlayPresentationSnapshot(
+            revision=2,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[
+                OverlayPresentationBlock(
+                    id="peer:expired",
+                    occupant_key="peer:expired",
+                    appearance_seq=2,
+                    channel="peer",
+                    block_variant="finalized",
+                    primary_text="expired",
+                    secondary_text="",
+                    secondary_enabled=False,
+                )
+            ],
+            native_fresh_render_targets=NativeFreshRenderTargets(peer="peer:expired"),
+            native_quiet_tail_episodes=NativeQuietTailEpisodes(
+                peer=NativeQuietTailEpisode(phase="final", generation=1)
+            ),
+        ),
+        block_expirations={"peer:expired": 11.0},
+    )
+    clock.advance(2.0)
+    connection.release_send.set()
+    await _wait_until(lambda: len(connection.sent_payloads) == 2)
+
+    assert connection.sent_payloads[0]["payload"]["revision"] == 1
+    assert connection.sent_payloads[1]["payload"] == {
+        "revision": 2,
+        "calibration": OverlayPresentationCalibration().to_dict(),
+        "blocks": [],
+    }
+    await bridge.stop()
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_cancellation_is_ambiguous_and_replays_latest_on_reconnect() -> None:
+    bridge = OverlayBridge(session_token="expected-token")
+    stalled = _BlockingSendConnection()
+    bridge._authenticated_connections.add(stalled)  # type: ignore[arg-type]
+
+    await bridge.replace_snapshot(
+        OverlayPresentationSnapshot(
+            revision=1,
+            calibration=OverlayPresentationCalibration(distance=1.6),
+            blocks=[],
+        )
+    )
+    await stalled.send_started.wait()
+    writer = bridge._writer_task
+    assert writer is not None
+    writer.cancel()
+    await asyncio.gather(writer, return_exceptions=True)
+
+    ambiguous = [
+        receipt
+        for receipt in bridge.delivery_receipts
+        if receipt.outcome == "ambiguous" and receipt.scene_revision == 1
+    ]
+    assert len(ambiguous) == 1
+    assert ambiguous[0].stage == "ambiguous_receipt"
+    assert stalled not in bridge._authenticated_connections
+    assert len(bridge._unresolved_transport_tasks) == 1
+
+    stalled.release_send.set()
+    await _wait_until(lambda: not bridge._unresolved_transport_tasks)
+    reconnected = _AbruptAuthenticatedConnection()
+    await bridge._handle_connection(reconnected)  # type: ignore[arg-type]
+
+    assert [payload["payload"]["revision"] for payload in reconnected.sent_payloads] == [1]
+    assert reconnected.sent_payloads[0]["payload"]["calibration"]["distance"] == 1.6
+    await bridge.stop()
+
+
+@pytest.mark.asyncio
 async def test_overlay_bridge_replays_runtime_logging_mode_after_authentication() -> None:
     bridge = OverlayBridge(
         session_token="expected-token",
@@ -501,12 +640,11 @@ async def test_overlay_bridge_replays_runtime_logging_mode_after_authentication(
             runtime_control = json.loads(await asyncio.wait_for(ws.recv(), timeout=0.5))
     finally:
         await bridge.stop()
-
-    assert snapshot["type"] == "snapshot"
     assert runtime_control == {
         "type": "runtime_control",
         "payload": {"logging_mode": "detailed"},
     }
+    assert snapshot["type"] == "snapshot"
 
 
 @pytest.mark.asyncio
@@ -523,6 +661,7 @@ async def test_overlay_bridge_runtime_control_logging_wire_format_remains_exact(
     bridge._authenticated_connections.add(connection)  # type: ignore[arg-type]
 
     await bridge.broadcast_runtime_control(logging_mode="detailed")
+    await _wait_until(lambda: len(connection.sent_payloads) == 1)
 
     assert connection.sent_payloads == [
         {
@@ -548,6 +687,7 @@ async def test_overlay_bridge_desktop_runtime_control_broadcasts_payload_when_en
     payload = {"command": "set_interaction_mode", "mode": "edit"}
 
     await bridge.broadcast_desktop_runtime_control(payload)
+    await _wait_until(lambda: len(connection.sent_payloads) == 1)
 
     assert connection.sent_payloads == [
         {
@@ -683,6 +823,7 @@ async def test_overlay_bridge_replace_snapshot_does_not_log_snapshot_updated(
             blocks=[],
         )
     )
+    await _wait_until(lambda: len(connection.sent_payloads) == 1)
 
     assert connection.sent_payloads[-1]["type"] == "snapshot"
     assert not any(
@@ -717,21 +858,23 @@ async def test_overlay_bridge_records_disconnect_code_and_reason(
 
     try:
         async with connect(bridge.url) as ws:
-            await ws.send(json.dumps({"type": "auth", "session_token": "expected-token"}))
+            await ws.send(_native_auth())
             await asyncio.wait_for(ws.recv(), timeout=0.5)
             await ws.close(code=4001, reason="client_bye")
             await ws.wait_closed()
             await asyncio.wait_for(_wait_until_connection_closed(), timeout=2.0)
     finally:
         await bridge.stop()
-
     events = list(diagnostics.bridge_events)
+
     assert [event["event"] for event in events] == [
         "connection_authenticated",
+        "send_start",
+        "send_finish",
         "connection_closed",
         "connection_detached",
     ]
-    closed = events[1]
+    closed = events[3]
     assert closed["code"] == 4001
     assert closed["reason"] == "client_bye"
 
@@ -765,16 +908,20 @@ async def test_overlay_bridge_records_send_failures_and_prunes_stale_connections
             blocks=[],
         )
     )
+    await _wait_until(
+        lambda: any(event["event"] == "send_finish" for event in diagnostics.bridge_events)
+    )
 
     events = list(diagnostics.bridge_events)
     assert [event["event"] for event in events] == [
         "send_start",
         "send_failure",
+        "connection_retired",
         "send_finish",
     ]
     assert events[1]["removed"] is True
     assert events[1]["exception_type"]
-    assert events[2]["stale_connections"] == 1
+    assert events[3]["stale_connections"] == 1
     assert bridge._authenticated_connections == set()
 
 
@@ -840,6 +987,13 @@ async def test_overlay_bridge_snapshot_broadcast_logs_only_in_detailed_mode(
 
     await basic_bridge.replace_snapshot(snapshot)
     await detailed_bridge.replace_snapshot(snapshot)
+    await _wait_until(
+        lambda: any(
+            "[OverlayBridge][Broadcast] stage=finish overlay_instance_id=detailed-overlay"
+            in record.getMessage()
+            for record in caplog.records
+        )
+    )
 
     broadcast_messages = [
         record.getMessage()
@@ -893,6 +1047,9 @@ async def test_overlay_bridge_records_snapshot_send_stages_without_payload_text(
             blocks=[],
         )
     )
+    await _wait_until(
+        lambda: any(event["event"] == "send_finish" for event in recorder.bridge_events)
+    )
 
     events = list(recorder.bridge_events)
     assert [event["event"] for event in events[-2:]] == ["send_start", "send_finish"]
@@ -901,3 +1058,459 @@ async def test_overlay_bridge_records_snapshot_send_stages_without_payload_text(
     dumped = json.dumps(events)
     assert "primary_text" not in dumped
     assert "secondary_text" not in dumped
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_unresolved_transport_caps_one_epoch_and_rejects_replacement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import puripuly_heart.core.overlay.bridge as bridge_module
+
+    monkeypatch.setattr(bridge_module, "_SCENE_WRITE_TIMEOUT_SECONDS", 0.02)
+    monkeypatch.setattr(bridge_module, "_CLOSE_TIMEOUT_SECONDS", 0.02)
+
+    class IneffectiveTransport:
+        def __init__(self) -> None:
+            self.abort_calls = 0
+
+        def abort(self) -> None:
+            self.abort_calls += 1
+
+    class CancellationResistantConnection:
+        def __init__(self) -> None:
+            self.transport = IneffectiveTransport()
+            self.send_started = asyncio.Event()
+            self.close_started = asyncio.Event()
+            self.release = asyncio.Event()
+            self.send_calls = 0
+            self.send_completions = 0
+            self.close_calls = 0
+
+        async def send(self, _payload: str) -> None:
+            self.send_calls += 1
+            self.send_started.set()
+            while not self.release.is_set():
+                try:
+                    await self.release.wait()
+                except asyncio.CancelledError:
+                    continue
+            self.send_completions += 1
+
+        async def close(self) -> None:
+            self.close_calls += 1
+            self.close_started.set()
+            while not self.release.is_set():
+                try:
+                    await self.release.wait()
+                except asyncio.CancelledError:
+                    continue
+
+    bridge = OverlayBridge(session_token="expected-token")
+    original = CancellationResistantConnection()
+    bridge._authenticated_connections.add(original)  # type: ignore[arg-type]
+    await bridge.replace_snapshot(
+        OverlayPresentationSnapshot(
+            revision=1,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[],
+        )
+    )
+    await original.send_started.wait()
+    await original.close_started.wait()
+    await _wait_until(lambda: len(bridge._unresolved_transport_tasks) == 2)
+
+    replacements = [CancellationResistantConnection() for _ in range(6)]
+    for replacement in replacements:
+        await bridge._handle_connection(replacement)  # type: ignore[arg-type]
+
+    assert original.send_calls == 1
+    assert len(bridge._unresolved_connections) == 1
+    assert len(bridge._unresolved_transport_tasks) == 2
+    assert sum(replacement.transport.abort_calls for replacement in replacements) == 6
+    assert all(replacement.send_calls == 0 for replacement in replacements)
+    assert all(replacement.close_calls == 0 for replacement in replacements)
+
+    with pytest.raises(ExceptionGroup) as raised:
+        await bridge.stop()
+    assert len(raised.value.exceptions) == 2
+    assert original.close_calls == 1
+
+    original.release.set()
+    await _wait_until(lambda: not bridge._unresolved_transport_tasks)
+    assert original.send_completions == 1
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_reserves_shutdown_and_coalesces_control_overflow_retirement() -> None:
+    bridge = OverlayBridge(session_token="expected-token")
+    for index in range(8):
+        bridge._enqueue_control(
+            f"control-{index}",
+            {"type": f"control-{index}"},
+        )
+    await bridge.broadcast_shutdown()
+
+    assert len(bridge._mailbox.pending_controls) == 8
+    assert "shutdown" in bridge._mailbox.pending_controls
+
+    connection = _BlockingSendConnection()
+    bridge._authenticated_connections.add(connection)  # type: ignore[arg-type]
+    bridge._ensure_writer()
+    bridge._writer_wakeup.set()
+    await connection.send_started.wait()
+
+    bridge._enqueue_control("fill-after-shutdown", {"type": "fill-after-shutdown"})
+    for index in range(200):
+        with pytest.raises(RuntimeError, match="control capacity"):
+            bridge._enqueue_control(
+                f"overflow-{index}",
+                {"type": f"overflow-{index}"},
+            )
+    retirement_tasks = [
+        task
+        for task in asyncio.all_tasks()
+        if task.get_name() == "OverlayBridge:connection-retirement" and not task.done()
+    ]
+    assert len(retirement_tasks) == 1
+
+    connection.release_send.set()
+    await asyncio.gather(*retirement_tasks)
+    assert connection.sent_payloads[0]["type"] == "shutdown"
+    await bridge.stop()
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_stop_closes_ingress_and_terminalizes_pending_scene() -> None:
+    class ControlledServer:
+        def __init__(self) -> None:
+            self.release = asyncio.Event()
+
+        def close(self) -> None:
+            return None
+
+        async def wait_closed(self) -> None:
+            await self.release.wait()
+
+    bridge = OverlayBridge(session_token="expected-token")
+    server = ControlledServer()
+    bridge._server = server  # type: ignore[assignment]
+    admitted = await bridge.replace_snapshot(
+        OverlayPresentationSnapshot(
+            revision=1,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[],
+        )
+    )
+    stop_task = asyncio.create_task(bridge.stop())
+    await asyncio.sleep(0)
+    assert bridge._stopping
+
+    stopping = await bridge.replace_snapshot(
+        OverlayPresentationSnapshot(
+            revision=2,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[],
+        )
+    )
+    with pytest.raises(RuntimeError, match="not accepting controls"):
+        await bridge.broadcast_runtime_control(logging_mode="basic")
+    server.release.set()
+    await stop_task
+    stopped = await bridge.replace_snapshot(
+        OverlayPresentationSnapshot(
+            revision=3,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[],
+        )
+    )
+
+    assert admitted.outcome == "admitted"
+    assert stopping.outcome == "delivery_rejected"
+    assert stopping.cause == "bridge_stopping"
+    assert stopped.outcome == "delivery_rejected"
+    assert stopped.cause == "bridge_stopped"
+    assert any(
+        receipt.scene_revision == 1
+        and receipt.outcome == "delivery_rejected"
+        and receipt.cause == "bridge_stopping"
+        for receipt in bridge.delivery_receipts
+    )
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_real_socket_stopped_reader_stops_bounded_and_truthfully() -> None:
+    bridge = OverlayBridge(session_token="real-smoke-token")
+    await bridge.start()
+    client = await connect(
+        bridge.url,
+        ping_interval=None,
+        compression=None,
+        max_size=2 * 1024 * 1024,
+    )
+    raw_socket = client.transport.get_extra_info("socket")
+    raw_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+    await client.send('{"type":"auth","session_token":"real-smoke-token"}')
+    await client.recv()
+    client.transport.pause_reading()
+    payload = "x" * 900_000
+    blocked_revision = None
+
+    try:
+        for revision in range(1, 65):
+            await bridge.replace_snapshot(
+                OverlayPresentationSnapshot(
+                    revision=revision,
+                    calibration=OverlayPresentationCalibration(),
+                    blocks=[
+                        OverlayPresentationBlock(
+                            id="self:real-socket",
+                            occupant_key="self:real-socket",
+                            appearance_seq=1,
+                            channel="self",
+                            block_variant="finalized",
+                            primary_text=payload,
+                            secondary_text="",
+                            secondary_enabled=False,
+                            update_id=f"real-socket-{revision}",
+                        )
+                    ],
+                )
+            )
+            await asyncio.sleep(0.02)
+            if bridge._mailbox.active_scene is not None:
+                await asyncio.sleep(0.08)
+                if bridge._mailbox.active_scene is not None:
+                    blocked_revision = bridge._mailbox.active_scene.snapshot.revision
+                    break
+        assert blocked_revision is not None
+
+        started = time.perf_counter()
+        await bridge.stop()
+        elapsed = time.perf_counter() - started
+
+        assert elapsed < 3.0
+        assert bridge._stopped
+        assert bridge._authenticated_connections == set()
+        assert [task for task in bridge._unresolved_transport_tasks if not task.done()] == []
+    finally:
+        client.transport.resume_reading()
+        try:
+            await asyncio.wait_for(client.close(), timeout=1.0)
+        except Exception:
+            client.transport.abort()
+        if not bridge._stopped:
+            await bridge.stop()
+
+
+class _DeferredWriterFactory:
+    def __init__(self) -> None:
+        self.release = asyncio.Event()
+        self.writer_started = asyncio.Event()
+
+    def __call__(self, coroutine: Any, *, task_name: str) -> asyncio.Task[Any]:
+        if task_name != "writer":
+            return asyncio.create_task(coroutine, name=f"OverlayBridge:{task_name}")
+
+        async def deferred_writer() -> None:
+            self.writer_started.set()
+            await self.release.wait()
+            await coroutine
+
+        return asyncio.create_task(deferred_writer(), name="OverlayBridge:writer")
+
+
+async def _wait_for_pending_control(bridge: OverlayBridge, key: str) -> None:
+    deadline = asyncio.get_running_loop().time() + 2.0
+    while key not in bridge._mailbox.pending_controls:
+        if asyncio.get_running_loop().time() >= deadline:
+            raise AssertionError(f"control never became pending: {key}")
+        await asyncio.sleep(0.01)
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_real_socket_initial_snapshot_precedes_pending_controls() -> None:
+    writer_factory = _DeferredWriterFactory()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+    )
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        initial_snapshot=presenter.snapshot(),
+        overlay_instance_id="overlay-test",
+        runtime_generation=1,
+        runtime_logging_mode="basic",
+        task_factory=writer_factory,
+    )
+    presenter.attach_bridge(bridge)
+    turn_id = uuid4()
+    receipt = await presenter.emit(
+        OverlayEventAdapter().self_active_update(
+            text="bridge startup caption",
+            utterance_id=turn_id,
+            occupant_key="bridge-startup",
+        )
+    )
+    published_revision = bridge.snapshot().revision
+    assert published_revision == presenter.snapshot().revision
+    await bridge.start()
+    received: list[dict[str, Any]] = []
+
+    try:
+        async with connect(bridge.url, ping_interval=None, compression=None) as ws:
+            await ws.send(_native_auth())
+            await writer_factory.writer_started.wait()
+            await _wait_for_pending_control(bridge, "runtime_control")
+            await _wait_for_pending_control(bridge, "health_challenge")
+            writer_factory.release.set()
+
+            received.append(json.loads(await asyncio.wait_for(ws.recv(), timeout=1.0)))
+            while len(received) < 3:
+                received.append(json.loads(await asyncio.wait_for(ws.recv(), timeout=1.0)))
+    finally:
+        await presenter.close()
+        await bridge.stop()
+
+    assert receipt.outcome == "applied"
+    assert [message["type"] for message in received] == [
+        "snapshot",
+        "runtime_control",
+        "health_challenge",
+    ]
+    assert received[0]["payload"]["revision"] == published_revision
+    assert [block["id"] for block in received[0]["payload"]["blocks"]] == [f"self:{turn_id}"]
+    assert received[1]["payload"] == {"logging_mode": "basic"}
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_shutdown_during_startup_does_not_publish_pending_scene() -> None:
+    class _AuthOnceConnection:
+        def __init__(self) -> None:
+            self.sent_payloads: list[dict[str, Any]] = []
+            self.allow_disconnect = asyncio.Event()
+
+        async def recv(self) -> str:
+            return _native_auth()
+
+        async def send(self, payload: str) -> None:
+            self.sent_payloads.append(json.loads(payload))
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self) -> str:
+            await self.allow_disconnect.wait()
+            raise ConnectionClosedError(None, None)
+
+        async def close(self) -> None:
+            return None
+
+    writer_factory = _DeferredWriterFactory()
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        overlay_instance_id="overlay-test",
+        runtime_generation=1,
+        runtime_logging_mode="basic",
+        task_factory=writer_factory,
+    )
+    admitted = await bridge.replace_snapshot(
+        OverlayPresentationSnapshot(
+            revision=1,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[],
+        )
+    )
+    connection = _AuthOnceConnection()
+    handler_task = asyncio.create_task(bridge._handle_connection(connection))  # type: ignore[arg-type]
+
+    try:
+        await _wait_until(lambda: bool(bridge._authenticated_connections))
+        await bridge.broadcast_shutdown()
+        writer_factory.release.set()
+
+        def _shutdown_sent() -> bool:
+            payloads = connection.sent_payloads
+            return bool(payloads) and payloads[0]["type"] == "shutdown"
+
+        await _wait_until(_shutdown_sent)
+        await asyncio.sleep(0.05)
+        sent_types = [payload["type"] for payload in connection.sent_payloads]
+        assert sent_types[0] == "shutdown"
+        assert "snapshot" not in sent_types
+    finally:
+        connection.allow_disconnect.set()
+        await asyncio.gather(handler_task, return_exceptions=True)
+        await bridge.stop()
+
+    assert admitted.outcome == "admitted"
+    assert bridge.snapshot().revision == 1
+    assert not any(receipt.outcome == "written" for receipt in bridge.delivery_receipts)
+    assert any(
+        receipt.outcome == "delivery_rejected"
+        and receipt.cause == "shutdown_during_startup"
+        and receipt.scene_revision == 1
+        for receipt in bridge.delivery_receipts
+    )
+
+
+def test_overlay_bridge_health_challenge_window_is_bounded_at_cap_plus_one() -> None:
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        overlay_instance_id="overlay-test",
+        clock=FakeClock(_now=100.0),
+    )
+    for challenge_id in range(1, 6):
+        bridge._session_health.record_challenge(challenge_id, 100.0)
+
+    assert tuple(bridge._session_health.challenges) == (2, 3, 4, 5)
+
+
+def test_overlay_bridge_only_challenged_current_status_clears_acceptance_deadline() -> None:
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        overlay_instance_id="overlay-test",
+        clock=FakeClock(_now=100.0),
+    )
+    bridge._session_health.native_acceptance_revision = 7
+    bridge._session_health.native_acceptance_deadline = 102.0
+    status = {
+        "type": "owner_status",
+        "overlay_instance_id": "overlay-test",
+        "runtime_generation": 1,
+        "health_challenge_id": 5,
+        "latest_applied_revision": 7,
+    }
+
+    assert bridge._session_health.handle_owner_status(status)
+    assert bridge._session_health.native_acceptance_deadline == 102.0
+    bridge._session_health.record_challenge(5, 100.0)
+    assert bridge._session_health.handle_owner_status(status)
+    assert bridge._session_health.native_acceptance_deadline is None
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_retires_connection_on_obsolete_validity_challenge() -> None:
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        overlay_instance_id="overlay-test",
+        runtime_generation=1,
+    )
+    await bridge.start()
+    try:
+        async with connect(bridge.url) as ws:
+            await ws.send(_native_auth())
+            await asyncio.wait_for(ws.recv(), timeout=0.5)
+            await ws.send(
+                json.dumps(
+                    {
+                        "type": "validity_challenge",
+                        "challenge_id": 11,
+                        "overlay_instance_id": "overlay-test",
+                        "runtime_generation": 1,
+                    }
+                )
+            )
+            await _wait_until(lambda: not bridge._authenticated_connections)
+    finally:
+        await bridge.stop()
+    assert "validity_response" not in bridge._mailbox.pending_controls
+    assert bridge.messages.empty()

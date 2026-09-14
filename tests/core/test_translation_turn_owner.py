@@ -819,6 +819,41 @@ async def test_peer_cancellation_keeps_queued_self_turn_running() -> None:
 
 
 @pytest.mark.asyncio
+async def test_self_speech_reset_cancels_speech_without_cancelling_manual_parent() -> None:
+    speech_entered = asyncio.Event()
+    terminal_events: list[tuple[str, str]] = []
+
+    async def process(child, _cancellation_requested):
+        if child.turn_kind == "self":
+            speech_entered.set()
+            await asyncio.Future()
+        return "translated"
+
+    async def terminal(child, outcome) -> None:
+        terminal_events.append((child.turn_kind, outcome))
+
+    owner = _owner(process_child=process)
+    owner.on_child_terminal = terminal
+    speech_parent = uuid4()
+    manual_parent = uuid4()
+    try:
+        await owner.submit(_request(parent_id=speech_parent, turn_kind="self"))
+        await speech_entered.wait()
+        await owner.submit(_request(parent_id=manual_parent, turn_kind="manual"))
+        await owner.cancel_pending(
+            channel="self",
+            turn_kinds=frozenset({"self"}),
+        )
+        await asyncio.wait_for(owner.wait_for_idle(), timeout=1)
+    finally:
+        await owner.close()
+
+    assert sorted(terminal_events) == [("manual", "translated"), ("self", "cancelled")]
+    assert owner.is_parent_closed(speech_parent)
+    assert owner.is_parent_closed(manual_parent)
+
+
+@pytest.mark.asyncio
 async def test_blocked_peer_parent_does_not_serialize_self_parent() -> None:
     peer_entered = asyncio.Event()
 
@@ -1234,16 +1269,12 @@ async def test_self_speech_queue_has_two_running_and_eight_waiting_parents() -> 
         assert owner.self_speech_running_capacity == 2
         assert owner.self_speech_waiting_capacity == 8
         assert len(set(started)) == 2
-        retired = [
-            event for event in trace if event[0] == "terminal" and event[2] == "source_only"
-        ]
+        retired = [event for event in trace if event[0] == "terminal" and event[2] == "source_only"]
         assert len(retired) == 4
         closed_before_release = [event[1] for event in trace if event[0] == "closed"]
         assert closed_before_release == parent_ids[2:4]
         assert {item.parent_utterance_id for item in output.submissions} == set(parent_ids[2:4])
-        assert all(
-            item.failure_code == "translation_overload" for item in output.submissions
-        )
+        assert all(item.failure_code == "translation_overload" for item in output.submissions)
         assert all(item.outcome == "source_only" for item in output.submissions)
         release.set()
         await owner.wait_for_idle()
@@ -1252,6 +1283,7 @@ async def test_self_speech_queue_has_two_running_and_eight_waiting_parents() -> 
 
     assert len(set(started)) == 10
     assert not set(parent_ids[2:4]).intersection(started)
+
 
 @pytest.mark.asyncio
 async def test_self_speech_waiting_parent_expires_to_observable_source_only() -> None:
@@ -1311,7 +1343,7 @@ async def test_self_speech_cancellation_leaves_manual_parent_running() -> None:
         await owner.submit(_request(parent_id=manual_id, turn_kind="manual"))
         await asyncio.sleep(0)
 
-        await owner.cancel_pending(channel="self", turn_kind="self")
+        await owner.cancel_pending(channel="self", turn_kinds=frozenset({"self"}))
 
         assert owner.is_parent_closed(speech_id)
         assert not owner.is_parent_closed(manual_id)

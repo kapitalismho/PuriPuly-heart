@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -271,6 +271,196 @@ describe('broker direct deploy automation', () => {
       db.close();
     }
   });
+  it.skipIf(!bashAvailable)('keeps migration 0025 out of both ordinary deploy phases while preserving deferred 0021 and 0024', () => {
+    const workflow = readFileSync(deployWorkflow, 'utf8');
+    const stageScript = extractWorkflowRunBlock(
+      workflow,
+      'Stage ordinary broker deployment migrations',
+    );
+    const tempDir = createRepoTempDir();
+    const migrationsDir = join(tempDir, 'migrations');
+    mkdirSync(migrationsDir);
+    const migrationNames = [
+      '0020_network_identity_hmac.sql',
+      '0021_network_identity_purge.sql',
+      '0022_managed_operation_issuance_context.sql',
+      '0023_backfill_operation_route_rate_limits.sql',
+      '0024_allow_unattributed_request_events.sql',
+      '0025_drop_legacy_translation_telemetry.sql',
+    ];
+    for (const migrationName of migrationNames) {
+      writeFileSync(join(migrationsDir, migrationName), `SELECT '${migrationName}';\n`);
+    }
+
+    const result = runBashScript(stageScript, tempDir);
+    expect(result).toEqual({ status: 0, stderr: '' });
+    expect(
+      readdirSync(join(tempDir, '.deploy-direct', 'staged-migrations-pre-backfill')).sort(),
+    ).toEqual([
+      '0020_network_identity_hmac.sql',
+      '0022_managed_operation_issuance_context.sql',
+      '0023_backfill_operation_route_rate_limits.sql',
+    ]);
+    expect(
+      readdirSync(join(tempDir, '.deploy-direct', 'staged-migrations-post-backfill')).sort(),
+    ).toEqual([
+      '0020_network_identity_hmac.sql',
+      '0021_network_identity_purge.sql',
+      '0022_managed_operation_issuance_context.sql',
+      '0023_backfill_operation_route_rate_limits.sql',
+      '0024_allow_unattributed_request_events.sql',
+    ]);
+  });
+
+  it.skipIf(!bashAvailable)('requires the dedicated deletion inputs and a usable backup before staging and applying only migration 0025', () => {
+    const workflow = readFileSync(deployWorkflow, 'utf8');
+    const guardScript = extractWorkflowRunBlock(
+      workflow,
+      'Guard production deploy ref and confirmation',
+    );
+    for (const scenario of [
+      {
+        env: {
+          DELETE_LEGACY_TRANSLATION_TELEMETRY: undefined,
+          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: undefined,
+        },
+        status: 0,
+      },
+      {
+        env: {
+          DELETE_LEGACY_TRANSLATION_TELEMETRY: 'false',
+          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: undefined,
+        },
+        status: 0,
+      },
+      {
+        env: {
+          DELETE_LEGACY_TRANSLATION_TELEMETRY: 'true',
+          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: 'deploy puripuly-heart-broker from dev',
+        },
+        status: 1,
+      },
+      {
+        env: {
+          DELETE_LEGACY_TRANSLATION_TELEMETRY: 'true',
+          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION:
+            'delete retired translation telemetry from production D1',
+        },
+        status: 0,
+      },
+    ]) {
+      expect(runGuardScript(guardScript, scenario.env).status).toBe(scenario.status);
+    }
+
+    const applyScript = extractWorkflowRunBlock(
+      workflow,
+      'Apply explicitly authorized legacy telemetry deletion',
+    );
+    const scenarios: Array<{
+      deletion: string | undefined;
+      confirmation: string | undefined;
+      status: number;
+      applied: boolean;
+      usableBackup?: boolean;
+    }> = [
+      { deletion: undefined, confirmation: undefined, status: 0, applied: false },
+      { deletion: 'false', confirmation: undefined, status: 0, applied: false },
+      { deletion: 'true', confirmation: 'wrong confirmation', status: 1, applied: false },
+      {
+        deletion: 'true',
+        confirmation: 'delete retired translation telemetry from production D1',
+        status: 0,
+        applied: true,
+      },
+      {
+        deletion: 'true',
+        confirmation: 'delete retired translation telemetry from production D1',
+        status: 1,
+        applied: false,
+        usableBackup: false,
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      const tempDir = createRepoTempDir();
+      const migrationsDir = join(tempDir, 'migrations');
+      mkdirSync(migrationsDir);
+      writeFileSync(
+        join(migrationsDir, '0025_drop_legacy_translation_telemetry.sql'),
+        'DROP TABLE IF EXISTS telemetry_active_days;\n',
+      );
+      const backupPath = join(tempDir, 'pre-migration-backup.sql');
+      const configPath = join(tempDir, 'legacy-deletion.jsonc');
+      const outputPath = join(tempDir, 'github-output.txt');
+      const pnpmLogPath = join(tempDir, 'pnpm.log');
+      const bashEnvPath = join(tempDir, 'bash-env.sh');
+      if (scenario.usableBackup !== false) {
+        writeFileSync(backupPath, 'production backup\n');
+      }
+      writeFileSync(configPath, '{}\n');
+      writeFileSync(outputPath, '');
+      writeFileSync(
+        bashEnvPath,
+        'pnpm() { printf \'%s\\n\' "$*" >> "$PNPM_LOG"; }\n',
+      );
+
+      const result = runBashScript(applyScript, tempDir, {
+        DELETE_LEGACY_TRANSLATION_TELEMETRY: scenario.deletion,
+        CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: scenario.confirmation,
+        LEGACY_DELETION_CONFIG_PATH: 'legacy-deletion.jsonc',
+        D1_BACKUP_PATH: 'pre-migration-backup.sql',
+        GITHUB_OUTPUT: 'github-output.txt',
+        PNPM_LOG: 'pnpm.log',
+        BASH_ENV: './bash-env.sh',
+      });
+      expect(result.status).toBe(scenario.status);
+
+      const stagedDir = join(
+        tempDir,
+        '.deploy-direct',
+        'staged-migrations-legacy-telemetry-deletion',
+      );
+      if (scenario.applied) {
+        expect(readdirSync(stagedDir)).toEqual([
+          '0025_drop_legacy_translation_telemetry.sql',
+        ]);
+        expect(readFileSync(pnpmLogPath, 'utf8').split('\n').filter(Boolean)).toEqual([
+          'exec wrangler types --config legacy-deletion.jsonc',
+          'exec wrangler d1 migrations apply puripuly-heart-broker --remote --config legacy-deletion.jsonc',
+        ]);
+        expect(readFileSync(outputPath, 'utf8')).toBe('applied=true\n');
+      } else {
+        expect(existsSync(stagedDir)).toBe(false);
+        expect(existsSync(pnpmLogPath)).toBe(false);
+        if (scenario.status === 0) {
+          expect(readFileSync(outputPath, 'utf8')).toBe('applied=false\n');
+        }
+      }
+    }
+
+    const backupUploadIndex = workflow.indexOf('Upload pre-migration D1 backup');
+    const workerDeployIndex = workflow.indexOf('Deploy canonical broker worker');
+    const healthCheckIndex = workflow.indexOf('Wait for deployed workers.dev healthz');
+    const smokeCheckIndex = workflow.indexOf(
+      'Run deployed broker production QQ issuance smoke test',
+    );
+    const deletionIndex = workflow.indexOf(
+      'Apply explicitly authorized legacy telemetry deletion',
+    );
+    for (const prerequisiteIndex of [
+      backupUploadIndex,
+      workerDeployIndex,
+      healthCheckIndex,
+      smokeCheckIndex,
+      deletionIndex,
+    ]) {
+      expect(prerequisiteIndex).toBeGreaterThanOrEqual(0);
+    }
+    expect(backupUploadIndex).toBeLessThan(deletionIndex);
+    expect(workerDeployIndex).toBeLessThan(deletionIndex);
+    expect(healthCheckIndex).toBeLessThan(deletionIndex);
+    expect(smokeCheckIndex).toBeLessThan(deletionIndex);
+  });
 
   it('ships a manual direct-deploy workflow that renders config, applies remote D1 changes, syncs the transitional and child-key management secrets, deploys the canonical worker, and runs production QQ issuance smoke', () => {
     const workflow = readFileSync(deployWorkflow, 'utf8');
@@ -378,9 +568,6 @@ describe('broker direct deploy automation', () => {
     const stagedMigrationRenderIndex = workflow.indexOf(
       'staged-migrations-pre-backfill',
     );
-    const stagedMigrationApplyIndex = workflow.indexOf(
-      'Apply remote D1 migrations except deferred 0021 and 0024',
-    );
     const networkIdentityBackfillAwaitIndex = workflow.indexOf(
       'Await network identity backfill until keyed_only',
     );
@@ -458,18 +645,11 @@ describe('broker direct deploy automation', () => {
     expect(workflow).toContain('0022_managed_operation_issuance_context.sql');
     expect(workflow).toContain('0023_backfill_operation_route_rate_limits.sql');
     expect(workflow).toContain('0024_allow_unattributed_request_events.sql');
-    expect(workflow).toContain(
-      "deferred_migrations='0021_network_identity_purge.sql 0024_allow_unattributed_request_events.sql'",
-    );
-    expect(workflow).toContain('for deferred_migration in $deferred_migrations');
-    expect(workflow).toContain('staged migrations must exclude $deferred_migration');
-    expect(workflow).toContain('staged_config_path');
     expect(workflow).toContain('migrations_dir');
     expect(workflow).toContain('network_identity_migration');
     expect(workflow).toContain('keyed_only');
     expect(workflow).toContain('pragma_table_info');
     expect(workflow).toContain('attempt_ip_hash');
-    expect(workflow).toContain('Apply remote D1 migrations except deferred 0021 and 0024');
     expect(workflow).toContain('Await network identity backfill until keyed_only');
     expect(workflow).toContain('Verify 0022 and 0023 applied with 0021 and 0024 still pending');
     expect(workflow).toContain('SELECT name FROM d1_migrations;');
@@ -592,8 +772,6 @@ describe('broker direct deploy automation', () => {
     expect(networkIdentityPreviousDeleteIndex).toBeGreaterThanOrEqual(0);
     expect(stagedMigrationRenderIndex).toBeGreaterThanOrEqual(0);
     expect(stagedMigrationRenderIndex).toBeLessThan(remoteD1MigrationIndex);
-    expect(stagedMigrationApplyIndex).toBeGreaterThanOrEqual(0);
-    expect(stagedMigrationApplyIndex).toBeLessThan(firstSecretSyncIndex);
     expect(networkIdentityHmacSyncIndex).toBeLessThan(
       workflow.indexOf('pnpm exec wrangler deploy'),
     );
@@ -663,6 +841,7 @@ describe('broker direct deploy automation', () => {
     expect(smokeSpec).toContain('ph-or-user-v');
     expect(smokeSpec).toContain('MANAGED_TRIAL_ALLOWED_MODELS');
     expect(smokeSpec).toContain('google/gemma-4-31b-it');
+    expect(smokeSpec).toContain('deepseek/deepseek-v4.1-flash');
     expect(smokeSpec).toContain('deepseek/deepseek-v4-flash-0731');
     expect(smokeSpec).toContain('deepseek/deepseek-v4-flash');
     expect(smokeSpec).toContain('MANAGED_TRIAL_ALLOWED_MODELS');
@@ -734,6 +913,7 @@ describe('broker direct deploy automation', () => {
     expect(readme).not.toContain('six-month expiry');
     expect(readme).toContain('optional `openrouter_user_id`');
     expect(readme).toContain('google/gemma-4-31b-it');
+    expect(readme).toContain('deepseek/deepseek-v4.1-flash');
     expect(readme).toContain('deepseek/deepseek-v4-flash-0731');
     expect(readme).toContain('deepseek/deepseek-v4-flash');
   });
@@ -926,6 +1106,7 @@ function guardScenarioEnv(overrides: Record<string, string | undefined>): Record
   const env: Record<string, string> = {
     GITHUB_REF: 'refs/heads/dev',
     CONFIRM_PRODUCTION_DEPLOY: 'deploy puripuly-heart-broker from dev',
+    DELETE_LEGACY_TRANSLATION_TELEMETRY: 'false',
     BROKER_CANONICAL_WORKERS_DEV_URL: 'https://puripuly-heart-broker.example.workers.dev',
     BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION: 'guard-scenario-disallowed-model',
     CLOUDFLARE_API_TOKEN: 'guard-scenario-api-token',
@@ -978,6 +1159,42 @@ function runGuardScript(
     }
     return { status: execError.status, stderr: String(execError.stderr ?? '') };
   }
+}
+function runBashScript(
+  script: string,
+  cwd: string,
+  overrides: Record<string, string | undefined> = {},
+): { status: number | null; stderr: string } {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  const assignments: string[] = [];
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) {
+      delete env[key];
+      assignments.push(`unset ${key}`);
+    } else {
+      env[key] = value;
+      assignments.push(`${key}='${value.replace(/'/g, `'"'"'`)}'`);
+    }
+  }
+  const bashCwd = relative(process.cwd(), cwd).split(sep).join('/');
+  const quotedBashCwd = bashCwd.replace(/'/g, `'"'"'`);
+  const sourceBashEnv = overrides.BASH_ENV === undefined ? '' : 'source "$BASH_ENV"\n';
+  const scriptPath = join(cwd, 'workflow-step-scenario.sh');
+  writeFileSync(
+    scriptPath,
+    `cd '${quotedBashCwd}'\n${assignments.join('\n')}\n${sourceBashEnv}${script}`,
+    'utf8',
+  );
+  const bashPath = relative(process.cwd(), scriptPath).split(sep).join('/');
+  const result = spawnSync(
+    'bash',
+    ['--noprofile', '--norc', '-e', '-o', 'pipefail', bashPath],
+    {
+      encoding: 'utf8',
+      env,
+    },
+  );
+  return { status: result.status, stderr: result.stderr };
 }
 
 function createRepoTempDir(): string {

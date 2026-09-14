@@ -624,6 +624,8 @@ class PeerTranslationChannelOwner:
                     turn_order=child.turn_order,
                     publication_generation=child.transcript.publication_generation,
                     source_order=child.transcript.source_order,
+                    turn_kind=child.turn_kind,
+                    parent_output_count=child.parent_output_count,
                 ),
             )
         result = await self.translation_requests.process(
@@ -643,6 +645,8 @@ class PeerTranslationChannelOwner:
                 turn_order=child.turn_order,
                 publication_generation=child.transcript.publication_generation,
                 source_order=child.transcript.source_order,
+                turn_kind=child.turn_kind,
+                parent_output_count=child.parent_output_count,
             ),
             cancellation_requested=cancellation_requested,
         )
@@ -658,6 +662,15 @@ class PeerTranslationChannelOwner:
         if child.channel != "peer":
             raise ValueError("Peer translation owner received a non-Peer child")
         self.runtime.translation_tasks[child.utterance_id] = task
+
+    async def on_parent_admitted(
+        self,
+        children: tuple[TranslationTurnChild, ...],
+    ) -> None:
+        if any(child.channel != "peer" for child in children):
+            raise ValueError("Peer translation owner received a non-Peer parent")
+        if not await self.output_projection.admit_translation_parent(children):
+            raise RuntimeError("Peer translation output admission rejected parent")
 
     async def on_child_terminal(
         self,
@@ -686,6 +699,14 @@ class PeerTranslationChannelOwner:
                 channel="peer",
                 utterance_id=child.utterance_id,
             )
+        await self.output_projection.complete_translation_parent_output(
+            parent_utterance_id=child.parent_utterance_id,
+            channel=child.channel,
+            turn_kind=child.turn_kind,
+            sequence=child.sequence,
+            target_index=child.target_index,
+            dual_target_self=False,
+        )
         self._complete_peer_logical_turn(
             child.utterance_id,
             preserve_parent_speech_end_time=True,
@@ -812,16 +833,33 @@ class PeerTranslationChannelOwner:
         runtime = self.runtime
         utterance_id = submission.child_utterance_id
         translation = submission.translation
-        if translation is not None:
-            runtime.get_or_create_bundle(utterance_id).with_translation(translation)
-        receipt = await self.output_projection.project_translation_result(submission)
-        if receipt.clear_runtime_latency_bookkeeping:
-            self._clear_runtime_latency_bookkeeping(
-                channel=runtime.channel,
-                utterance_id=utterance_id,
+        admitted_destinations = await self.output_projection.await_translation_parent_output(
+            submission
+        )
+        try:
+            if translation is not None:
+                runtime.get_or_create_bundle(utterance_id).with_translation(translation)
+            receipt = await self.output_projection.project_translation_result(
+                submission,
+                admitted_destinations=admitted_destinations,
             )
-        if receipt.complete_peer_logical_turn:
-            self._complete_peer_logical_turn(utterance_id)
+            if receipt.clear_runtime_latency_bookkeeping:
+                self._clear_runtime_latency_bookkeeping(
+                    channel=runtime.channel,
+                    utterance_id=utterance_id,
+                )
+            if receipt.complete_peer_logical_turn:
+                self._complete_peer_logical_turn(utterance_id)
+        finally:
+            await self.output_projection.complete_translation_parent_output(
+                parent_utterance_id=submission.parent_utterance_id,
+                channel=submission.channel,
+                turn_kind=submission.turn_kind or submission.channel,
+                sequence=submission.sequence,
+                target_index=submission.target_index,
+                dual_target_self=False,
+                destinations=admitted_destinations,
+            )
         return receipt
 
 

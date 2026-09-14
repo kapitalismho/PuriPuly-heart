@@ -152,7 +152,6 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert view._google_key.visible is False
     assert view._openrouter_key.visible is False
     assert view._deepseek_key.visible is False
-    assert view._cerebras_key.visible is False
 
     view._on_http_extension_selected("demo")
     pending = view.build_provider_apply_settings()

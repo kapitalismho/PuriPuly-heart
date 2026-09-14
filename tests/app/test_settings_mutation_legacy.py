@@ -136,7 +136,6 @@ def test_order22_stt_language_audio_patch_records_initial_covered_surface_list()
         "intent.stt.deepgram.model",
         "intent.stt.gemini_transcribe.model",
         "intent.stt.elevenlabs_scribe.model",
-        "intent.stt.qwen_asr.model",
         "intent.stt.soniox.model",
         "intent.stt.soniox.endpoint",
         "intent.stt.soniox.keepalive_interval_s",

@@ -27,7 +27,10 @@ from puripuly_heart.app.ports.canonical_settings_persistence import (
     CanonicalSettingsPersistencePort,
     ProviderVerificationBinding,
 )
-from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    SettingsOwner,
+    materialize_canonical_translation_settings,
+)
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
@@ -507,3 +510,73 @@ async def test_overlapping_provider_secret_changes_preserve_both_invalidations(
     assert reloaded.settings is not None
     assert reloaded.settings.state.provider_verification.openrouter.status == "unknown"
     assert reloaded.settings.state.provider_verification.deepseek.status == "unknown"
+
+
+@pytest.mark.parametrize("connection", ["managed", "managed_china", "openrouter"])
+def test_deepseek_40_materialization_restores_shipped_identity(connection: str) -> None:
+    canonical = AppSettingsVNext()
+    translation = replace(
+        canonical.intent.translation,
+        model="deepseek_v4_flash",
+        connection=connection,
+        openrouter_model="google/gemma-4-31b-it",
+        openrouter_provider_routing="gemma4_31b_latency",
+    )
+
+    result = materialize_canonical_translation_settings(
+        replace(canonical, intent=replace(canonical.intent, translation=translation))
+    ).intent.translation
+
+    assert result.model == "deepseek_v4_flash"
+    assert result.openrouter_model == "deepseek/deepseek-v4-flash-0731"
+    expected_route = (
+        "deepseek_v4_flash_china" if connection == "managed_china" else "deepseek_v4_flash_latency"
+    )
+    assert result.openrouter_provider_routing == expected_route
+    expected_alias = (
+        "deepseek_v4_flash_byok" if connection == "openrouter" else "deepseek_v4_flash_managed"
+    )
+    assert result.openrouter_selection_alias == expected_alias
+
+
+@pytest.mark.parametrize("connection", ["managed", "managed_china", "openrouter"])
+def test_deepseek_41_materialization_persists_distinct_identity(connection: str) -> None:
+    canonical = AppSettingsVNext()
+    translation = replace(
+        canonical.intent.translation,
+        model="deepseek_v4_flash_41",
+        connection=connection,
+        openrouter_model="deepseek/deepseek-v4-flash-0731",
+        openrouter_provider_routing="deepseek_v4_flash_latency",
+    )
+
+    result = materialize_canonical_translation_settings(
+        replace(canonical, intent=replace(canonical.intent, translation=translation))
+    ).intent.translation
+
+    assert result.model == "deepseek_v4_flash_41"
+    assert result.openrouter_model == "deepseek/deepseek-v4.1-flash"
+    assert result.openrouter_provider_routing == "deepseek_v4_flash_41_strict"
+    expected_alias = (
+        "deepseek_v4_flash_41_byok"
+        if connection == "openrouter"
+        else "deepseek_v4_flash_41_managed"
+    )
+    assert result.openrouter_selection_alias == expected_alias
+
+
+def test_old_official_deepseek_primary_materializes_as_41_direct() -> None:
+    canonical = AppSettingsVNext()
+    translation = replace(
+        canonical.intent.translation,
+        model="deepseek_v4_flash",
+        connection="official_byok",
+    )
+
+    result = materialize_canonical_translation_settings(
+        replace(canonical, intent=replace(canonical.intent, translation=translation))
+    ).intent.translation
+
+    assert result.model == "deepseek_v4_flash_41"
+    assert result.connection == "official_byok"
+    assert result.deepseek.llm_model == "deepseek-flash"

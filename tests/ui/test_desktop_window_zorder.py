@@ -383,6 +383,7 @@ async def test_windows_zorder_port_confirms_flet_owned_hidden_bounds_without_mut
         title_confirmed=True,
         bounds_confirmed=True,
         observed_bounds=(320, 720, 1344, 320),
+        hwnd_owner_pid=4321,
     )
     assert api.placement_calls == []
     assert api.show_calls == []
@@ -535,6 +536,8 @@ async def test_windows_zorder_port_requires_visibility_to_be_retained() -> None:
 
     assert result.confirmed is False
     assert result.reason == "visible_bounds_not_retained"
+    assert result.hwnd == 101
+    assert result.hwnd_owner_pid == 4321
     assert api.show_calls == []
 
 
@@ -714,3 +717,71 @@ def test_win32_startup_adapter_is_read_only_for_geometry_and_visibility() -> Non
         "_CtypesWin32WindowApi", set()
     ), "_CtypesWin32WindowApi must implement set_topmost_no_activate"
     assert "SetWindowPos" in referenced, "SetWindowPos must remain the single mutating Win32 call"
+
+
+class _FlipVisibleApi(FakeWin32WindowApi):
+    def __init__(self, *, flip_after: int = 2, **kwargs: object) -> None:
+        super().__init__(**kwargs)  # type: ignore[arg-type]
+        self.flip_after = flip_after
+        self.visible_calls = 0
+
+    def is_window_visible(self, hwnd: int) -> bool:
+        self.visible_calls += 1
+        return self.visible_calls > self.flip_after
+
+
+@pytest.mark.asyncio
+async def test_confirm_visible_fires_first_sample_before_retention() -> None:
+    api = _FlipVisibleApi(titles={101: "PuriPuly Overlay"}, visible=False, flip_after=2)
+    port = desktop_window_zorder.WindowsWindowZOrderPort(
+        api=api,
+        timeout_s=2.0,
+        poll_interval_s=0.005,
+        bounds_retain_s=0.0,
+        visibility_timeout_s=2.0,
+        visibility_retain_s=0.2,
+        sleep=asyncio.sleep,
+    )
+    port.bind_process(4321)
+    fired: list[float] = []
+    loop = asyncio.get_running_loop()
+    result = await port.confirm_window_visible(
+        "PuriPuly Overlay",
+        x=0,
+        y=0,
+        width=800,
+        height=600,
+        on_first_visible=lambda: fired.append(loop.time()),
+    )
+    assert result.confirmed is True
+    assert len(fired) == 1
+    assert loop.time() - fired[0] >= 0.1
+
+
+@pytest.mark.asyncio
+async def test_confirm_visible_stale_binding_never_fires_callback() -> None:
+    api = FakeWin32WindowApi(titles={101: "PuriPuly Overlay"}, visible=False)
+    port = desktop_window_zorder.WindowsWindowZOrderPort(
+        api=api,
+        visibility_timeout_s=1.0,
+        poll_interval_s=0.005,
+        sleep=asyncio.sleep,
+    )
+    port.bind_process(4321)
+    fired: list[None] = []
+    task = asyncio.create_task(
+        port.confirm_window_visible(
+            "PuriPuly Overlay",
+            x=0,
+            y=0,
+            width=800,
+            height=600,
+            on_first_visible=lambda: fired.append(None),
+        )
+    )
+    await asyncio.sleep(0.05)
+    port.bind_process(9999)
+    result = await asyncio.wait_for(task, timeout=2.0)
+    assert result.confirmed is False
+    assert result.reason == "binding_changed"
+    assert fired == []

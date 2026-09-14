@@ -47,6 +47,7 @@ class OverlayPeerPresentationState:
     peer_effective_enabled: bool
     peer_warning_reason: str | None
     peer_activation_starting: bool
+    desktop_first_visible: bool = False
 
 
 OscControlPresentationName = Literal[

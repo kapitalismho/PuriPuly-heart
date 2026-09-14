@@ -33,7 +33,7 @@ from puripuly_heart.core.self_capture import (
 
 _CLOUD_PROVIDERS = (
     STTProviderName.DEEPGRAM,
-    STTProviderName.QWEN_ASR,
+    STTProviderName.QWEN_AUDIO,
     STTProviderName.SONIOX,
 )
 
@@ -144,19 +144,6 @@ def _with_custom_terms(
                 settings.intent.stt,
                 custom_vocabulary_enabled=True,
                 custom_terms=terms,
-            ),
-        ),
-    )
-
-
-def _with_qwen_asr_model(settings: AppSettingsVNext, model: str) -> AppSettingsVNext:
-    return replace(
-        settings,
-        intent=replace(
-            settings.intent,
-            stt=replace(
-                settings.intent.stt,
-                qwen_asr=replace(settings.intent.stt.qwen_asr, model=model),
             ),
         ),
     )
@@ -291,20 +278,17 @@ def test_local_cpu_auto_model_identity_changes_with_source_language() -> None:
 
 
 @pytest.mark.parametrize(
-    ("provider", "qwen_model"),
+    "provider",
     (
-        (STTProviderName.DEEPGRAM, None),
-        (STTProviderName.SONIOX, None),
-        (STTProviderName.QWEN_AUDIO, None),
+        STTProviderName.DEEPGRAM,
+        STTProviderName.SONIOX,
+        STTProviderName.QWEN_AUDIO,
     ),
 )
 def test_custom_vocabulary_changes_supported_provider_signature(
     provider: STTProviderName,
-    qwen_model: str | None,
 ) -> None:
     initial = _settings(provider, "ko")
-    if qwen_model is not None:
-        initial = _with_qwen_asr_model(initial, qwen_model)
     initial = _with_custom_terms(initial, {"ko": ["Puripuly"]})
     updated = _with_custom_terms(initial, {"ko": ["Puripuly", "VRChat"]})
 
@@ -318,7 +302,7 @@ def test_qwen_audio_capture_provider_identity_matches_runtime_provider() -> None
     capture = build_self_capture_session_config(settings)
     request = build_self_stt_provider_request(settings)
 
-    assert capture.provider_id == STTProviderName.QWEN_ASR.value
+    assert capture.provider_id == STTProviderName.QWEN_AUDIO.value
     assert capture.provider_id == request.config.provider
 
 
@@ -330,30 +314,19 @@ def test_custom_vocabulary_does_not_change_unsupported_provider_signature() -> N
     assert build_self_stt_provider_signature(updated) == build_self_stt_provider_signature(initial)
 
 
-def test_custom_vocabulary_does_not_change_qwen_asr_realtime_signatures() -> None:
-    initial = _with_custom_terms(_settings(STTProviderName.QWEN_ASR, "ko"), {"ko": ["Puripuly"]})
-    updated = _with_custom_terms(initial, {"ko": ["Puripuly", "VRChat"]})
-
-    assert build_self_stt_runtime_signature(updated) == build_self_stt_runtime_signature(initial)
-    assert build_self_stt_provider_signature(updated) == build_self_stt_provider_signature(initial)
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("provider", "qwen_model"),
+    "provider",
     (
-        (STTProviderName.DEEPGRAM, None),
-        (STTProviderName.SONIOX, None),
-        (STTProviderName.QWEN_AUDIO, None),
+        STTProviderName.DEEPGRAM,
+        STTProviderName.SONIOX,
+        STTProviderName.QWEN_AUDIO,
     ),
 )
 async def test_custom_vocabulary_change_handoffs_supported_provider_with_new_terms(
     provider: STTProviderName,
-    qwen_model: str | None,
 ) -> None:
     initial = _settings(provider, "ko")
-    if qwen_model is not None:
-        initial = _with_qwen_asr_model(initial, qwen_model)
     initial = _with_custom_terms(initial, {"ko": ["Puripuly"]})
     updated = _with_custom_terms(initial, {"ko": ["Puripuly", "VRChat"]})
     settings_holder = {"settings": initial}

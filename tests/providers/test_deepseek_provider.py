@@ -126,7 +126,7 @@ async def test_deepseek_provider_close_cleans_up() -> None:
     assert provider._internal_client is None
 
 
-def test_deepseek_provider_passes_v4_flash_model_to_internal_httpx_client() -> None:
+def test_deepseek_provider_passes_flash_model_to_internal_httpx_client() -> None:
     from puripuly_heart.config.provider_values import DeepSeekLLMModel
 
     deepseek_model = DeepSeekLLMModel.DEEPSEEK_V4_FLASH
@@ -136,7 +136,7 @@ def test_deepseek_provider_passes_v4_flash_model_to_internal_httpx_client() -> N
     client = provider._get_client()
 
     assert isinstance(client, HttpxDeepSeekClient)
-    assert client.model == "deepseek-v4-flash"
+    assert client.model == "deepseek-flash"
 
 
 @pytest.mark.asyncio
@@ -146,7 +146,7 @@ async def test_httpx_deepseek_client_builds_non_thinking_request(monkeypatch) ->
 
     client = HttpxDeepSeekClient(
         api_key="test-key",
-        model="deepseek-v4-flash",
+        model="deepseek-flash",
         base_url="https://example.deepseek",
     )
     result = await client.translate(
@@ -164,7 +164,7 @@ async def test_httpx_deepseek_client_builds_non_thinking_request(monkeypatch) ->
     assert headers["Content-Type"] == "application/json"
 
     body = fake_client.last_request["json"]
-    assert body["model"] == "deepseek-v4-flash"
+    assert body["model"] == "deepseek-flash"
     assert "max_tokens" not in body
     assert body["thinking"] == {"type": "disabled"}
     assert body["temperature"] == 0.6
@@ -330,7 +330,7 @@ async def test_deepseek_verify_api_key_uses_chat_completion_probe(monkeypatch) -
     assert fake_client.last_request["headers"]["Authorization"] == "Bearer secret"
     body = fake_client.last_request["json"]
     assert body == {
-        "model": "deepseek-v4-flash",
+        "model": "deepseek-flash",
         "messages": [{"role": "user", "content": "ping"}],
         "thinking": {"type": "disabled"},
         "max_tokens": 1,

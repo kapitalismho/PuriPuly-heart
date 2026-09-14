@@ -84,7 +84,8 @@ class Manager:
         self.stop_calls = 0
         self.shutdown_calls = 0
 
-    def mark_shutdown_requested(self) -> None:
+    def mark_shutdown_requested(self, *, request_sent: bool = True) -> None:
+        _ = request_sent
         self.shutdown_calls += 1
 
     async def stop(self) -> None:

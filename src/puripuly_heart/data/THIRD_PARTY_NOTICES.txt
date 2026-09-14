@@ -19,8 +19,12 @@ Runtime/bundled notice-sensitive components:
 - huggingface-hub 1.26.0: Apache-2.0.
 - hf-xet 1.5.2 and its Windows native extension: Apache-2.0.
 - soxr / libsoxr: LGPL-2.1-or-later. Windows releases include the LGPL compliance bundle described below. The source-tree license text is `src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt`; installed releases stage it under the soxr compliance bundle.
+- python-zeroconf 0.150.0 and its Windows native extension modules: LGPL-2.1-or-later. The exact PyPI source distribution is included in the installed LGPL source bundle described below.
 - certifi: MPL-2.0.
-- NumPy binary wheels may include OpenBLAS, LAPACK, and GCC runtime library exception notices.
+- NumPy and SciPy binary wheels bundle OpenBLAS, LAPACK, and compiler runtime notices. NumPy carries its wheel-provided notices in the packaged distribution; SciPy's exact wheel-provided license bundle is included under `puripuly_heart\data\licenses\SCIPY-1.18.0-LICENSE.txt`.
+- CPython 3.12.10: the official distribution LICENSE.txt is packaged under `puripuly_heart\data\licenses\PYTHON-3.12.10-LICENSE.txt`.
+- Native Python wheels: their exact locked LICENSE, COPYING, NOTICE, AUTHORS, and third-party notice payloads are retained under their upstream package or `.dist-info` paths as detailed below.
+- sounddevice 0.5.5: releases retain its standard PortAudio runtime and upstream license metadata, but intentionally omit the ASIO-only DLL. `SD_ENABLE_ASIO=1` is unsupported in this distribution.
 - OpenVR runtime DLL: BSD-3-Clause.
 - llama.cpp CPU and Vulkan runtime: MIT.
 - Noto Sans CJK Medium TTC: SIL Open Font License 1.1.
@@ -43,7 +47,7 @@ For package-managed dependencies, the authoritative license texts are distribute
 - MIT: https://opensource.org/license/mit/
 - ISC: https://opensource.org/license/isc-license-txt/
 - MPL-2.0: https://www.mozilla.org/en-US/MPL/2.0/
-- LGPL-2.1-or-later: source-tree copy at src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt; installed release copy in the soxr compliance bundle.
+- LGPL-2.1-or-later: source-tree copy at src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt; installed release copy in third_party\soxr\ next to the LGPL source bundle.
 - SIL Open Font License 1.1: included below for bundled fonts.
 - CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/legalcode.en
 - PyInstaller bootloader exception: https://github.com/pyinstaller/pyinstaller/blob/develop/COPYING.txt
@@ -244,6 +248,76 @@ SOFTWARE.
 
 ----
 
+SciPy 1.18.0, OpenBLAS, LAPACK, and GCC runtime
+Wheel: https://files.pythonhosted.org/packages/2b/54/9a9edb45345bd6744da5ddfb6628e5d5185920494c6a67ec45b6381004cb/scipy-1.18.0-cp312-cp312-win_amd64.whl
+Wheel SHA-256: 71ccc8faa2dd16ac310233203474a8b5cb67f10dedd54a3116d34943f4b19132
+License member: scipy-1.18.0.dist-info/LICENSE.txt
+License member SHA-256: f0f5c56b298ec9795df1199edc328a987242716d14a1bde6813112e22dc15f99
+Packaged license path: puripuly_heart\data\licenses\SCIPY-1.18.0-LICENSE.txt
+
+The packaged SciPy native modules and
+scipy.libs\libscipy_openblas-197ee2fc9b4d071f7e048078cac74115.dll
+come from the exact CPython 3.12 Windows wheel pinned in uv.lock. The
+packaged license file is the wheel's complete LICENSE.txt member, preserved
+verbatim. It includes the notices and full license text the wheel supplies for
+SciPy and, depending on the wheel build, its bundled OpenBLAS, LAPACK, and GCC
+runtime components, including the GCC Runtime Library Exception. The wheel's
+additional component-specific license files under `scipy\_lib`,
+`scipy\fft`, `scipy\integrate`, and `scipy\spatial` are also retained at
+their original package-relative paths.
+
+----
+
+CPython 3.12.10 runtime
+Distribution archive: https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip
+Distribution archive SHA-256: 4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3
+License member: LICENSE.txt
+License member SHA-256: e502c6b880ff58d614901495a9009c136539cd0b1e2a2abb8fc00b934c203419
+Packaged license path: puripuly_heart\data\licenses\PYTHON-3.12.10-LICENSE.txt
+
+The official embedded distribution's runtime members are byte-identical to
+the CPython 3.12.10 runtime files collected by the Windows build. Its complete
+LICENSE.txt is preserved verbatim at the packaged path above.
+
+----
+
+Frozen native Python package license payloads
+
+Windows packaging retains the complete metadata directories for the exact
+locked distributions below. This preserves their upstream LICENSE, COPYING,
+NOTICE, and AUTHORS payloads at the original `.dist-info` paths:
+
+- aiohttp 3.13.2, including its vendored llhttp LICENSE.
+- cffi 2.0.0, including LICENSE and AUTHORS.
+- charset-normalizer 3.4.4.
+- frozenlist 1.8.0.
+- msgpack 1.2.1.
+- multidict 6.7.0.
+- propcache 0.4.1, including LICENSE and NOTICE.
+- psutil 7.2.2.
+- PyAudioWPatch 0.2.12.8.
+- PyYAML 6.0.3.
+- sherpa-onnx 1.13.4 and sherpa-onnx-core 1.13.4. The core wheel contains no
+  license-file member; both same-version wheels are from the sherpa-onnx
+  project, and the complete LICENSE supplied by the sherpa-onnx wheel is
+  retained together with both distributions' metadata.
+- sounddevice 0.5.5.
+- yarl 1.22.0, including LICENSE and NOTICE.
+- python-zeroconf 0.150.0.
+
+ONNX Runtime 1.28.0 supplies its license payloads in the package directory
+rather than `.dist-info`. Packaging therefore also retains
+`onnxruntime\LICENSE` and `onnxruntime\ThirdPartyNotices.txt` verbatim.
+
+The standard sounddevice runtime
+`_sounddevice_data\portaudio-binaries\libportaudio64bit.dll` is retained.
+The ASIO-specific sibling `libportaudio64bit-asio.dll` is intentionally not
+distributed. This preserves normal non-ASIO PortAudio host APIs while making
+`SD_ENABLE_ASIO=1` an intentionally unsupported environment option; packaging
+does not unset or special-case that variable at runtime.
+
+----
+
 Python-SoXR / libsoxr runtime pair
 Sources: https://pypi.org/project/soxr/ , https://sourceforge.net/projects/soxr/
 License: LGPL-2.1-or-later
@@ -258,8 +332,29 @@ Installed releases include an LGPL compliance bundle under third_party\soxr\ in 
 That installed bundle includes COPYING.LGPL-2.1.txt and the
 PuriPulyHeart-soxr-third-party-source-bundle.zip source bundle.
 
-The bundled source bundle exists to provide the exact python-soxr 1.1.0 and libsoxr 0.1.3 source archives used to build the packaged soxr.dll runtime pair,
-together with a manifest describing the staged wheel and source inputs.
+The bundled source bundle provides the pristine python-soxr 1.1.0 and libsoxr
+0.1.3 source archives used to build the packaged soxr.dll runtime pair. It also
+contains the applied python-soxr build patch, the exact build-tool versions and
+arguments, and the pristine python-zeroconf 0.150.0 source distribution
+supplied as corresponding source for the redistributed upstream wheel binaries.
+The manifest records every source URL and SHA-256 so recipients can verify the
+preserved upstream bytes and reconstruct the modified python-soxr source tree.
+
+----
+
+python-zeroconf
+Source: https://files.pythonhosted.org/packages/09/ea/34bb185645ecaa18d34e5883bffea71aa9bffbbb994634884e8b2f3ad0c4/zeroconf-0.150.0.tar.gz
+Source SHA-256: a5fe7feab1de6ef5e541e0a3d07e534fd91629b813fc27281593584100f63164
+Upstream repository: https://github.com/python-zeroconf/python-zeroconf
+Upstream tag: 0.150.0
+Upstream commit: 4f3fa73c504f7dc10d9f3ad5846b5db4805928cd
+License: LGPL-2.1-or-later
+Bundled runtime: zeroconf 0.150.0 Python package and Windows native extension modules
+Corresponding source: PuriPulyHeart-soxr-third-party-source-bundle.zip
+
+The release consumes the CPython 3.12 Windows wheel pinned in uv.lock. The
+source bundle preserves the release's exact PyPI source distribution; its hash
+is pinned in uv.lock and re-verified while preparing release inputs.
 
 ----
 

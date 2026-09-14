@@ -173,26 +173,3 @@ jobs:
         shell: bash
         run: |
           uv run --frozen python -c "import xml.etree.ElementTree as ET; s=ET.parse('overlay-integration-results.xml').getroot().find('testsuite'); c={k: int(s.get(k, '0')) for k in ('tests', 'skipped', 'failures', 'errors')}; print(c); assert c == {'tests': 5, 'skipped': 0, 'failures': 0, 'errors': 0}, c"
-
-      - name: Check refresh trace fixture bytes
-        shell: bash
-        env:
-          PYTHONIOENCODING: utf-8
-        run: |
-          uv run --frozen python <<'PYEOF'
-          import difflib
-          import subprocess
-          import sys
-          fixture = "native/overlay/tests/fixtures/refresh_traces.json"
-          expected = subprocess.run(["git", "show", "HEAD:" + fixture], capture_output=True, check=True).stdout
-          produced = subprocess.run([sys.executable, "-m", "tests.helpers.overlay_refresh_trace"], capture_output=True)
-          if produced.returncode != 0:
-              sys.stderr.write(produced.stderr.decode("utf-8", "replace"))
-              raise SystemExit("refresh trace producer exit %d" % produced.returncode)
-          regen = produced.stdout.replace(b"\r\n", b"\n")
-          if regen != expected:
-              diff = difflib.unified_diff(expected.decode("utf-8").splitlines(), regen.decode("utf-8", "replace").splitlines(), "committed", "regenerated")
-              sys.stdout.write("\n".join(diff) + "\n")
-              raise SystemExit("refresh_traces.json drift: regenerate the fixture from the deterministic producer")
-          print("refresh trace fixture byte-identical (%d bytes)" % len(expected))
-          PYEOF

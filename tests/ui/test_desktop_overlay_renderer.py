@@ -19,7 +19,11 @@ import pytest
 import websockets
 
 from puripuly_heart.core.overlay.bridge import OverlayBridge
-from puripuly_heart.core.overlay.manifest import OVERLAY_CONTRACT_VERSION, OverlayLaunchManifest
+from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CONTRACT_VERSION,
+    OVERLAY_EXECUTION_CONTRACT,
+    OverlayLaunchManifest,
+)
 from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationBlock,
     OverlayPresentationCalibration,
@@ -1385,6 +1389,7 @@ class RecordingWindowZOrderPort:
         y: int,
         width: int,
         height: int,
+        on_first_visible=None,
     ) -> desktop_window_zorder.WindowVisibilityConfirmation:
         _ = (x, y, width, height)
         self.reveal_titles.append(expected_title)
@@ -2503,7 +2508,7 @@ async def test_flet_launcher_patch_reports_started_process_pid(
     assert started_processes == [(4321, "pid-file")]
 
 
-def test_desktop_overlay_prefers_flet_pid_file_for_window_binding(tmp_path: Path) -> None:
+def test_desktop_overlay_stale_pid_file_cannot_redirect_window_binding(tmp_path: Path) -> None:
     pid_file = tmp_path / "flet.pid"
     pid_file.write_text("5678", encoding="utf-8")
     port = RecordingWindowZOrderPort()
@@ -2514,9 +2519,202 @@ def test_desktop_overlay_prefers_flet_pid_file_for_window_binding(tmp_path: Path
     )
 
     window._record_flet_process(4321, str(pid_file))
+    with pytest.raises(
+        desktop_overlay.DesktopOverlayStartupError, match="owner_pid=4321 pid_file_pid=5678"
+    ) as excinfo:
+        window._bind_window_z_order_process()
+
+    assert excinfo.value.failure_reason == "window_identity_failed"
+    assert port.bound_pids == []
+    assert excinfo.value.evidence is not None
+    assert excinfo.value.evidence["owner_pid"] == 4321
+    assert excinfo.value.evidence["pid_file_pid"] == 5678
+
+
+def test_desktop_overlay_matching_pid_file_binds_owner_pid(tmp_path: Path) -> None:
+    pid_file = tmp_path / "flet.pid"
+    pid_file.write_text("4321", encoding="utf-8")
+    port = RecordingWindowZOrderPort()
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=FakeFletApp().run,
+        window_z_order_port=port,
+        window_process_info_provider=lambda: None,
+    )
+
+    window._record_flet_process(4321, str(pid_file))
     window._bind_window_z_order_process()
 
-    assert port.bound_pids == [5678]
+    assert port.bound_pids == [4321]
+
+
+def test_desktop_overlay_missing_pid_file_binds_owner_pid() -> None:
+    port = RecordingWindowZOrderPort()
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=FakeFletApp().run,
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
+    )
+
+    window._bind_window_z_order_process()
+
+    assert port.bound_pids == [4321]
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_classifies_hidden_canonical_loss_as_reveal_lost() -> None:
+    app = FakeFletApp()
+    port = RecordingWindowZOrderPort(
+        reveal_result=desktop_window_zorder.WindowVisibilityConfirmation(
+            confirmed=False,
+            reason="visible_bounds_not_retained",
+            hwnd=4242,
+            title_confirmed=True,
+            visible_confirmed=False,
+            bounds_confirmed=True,
+            observed_bounds=(320, 720, 1344, 320),
+            hwnd_owner_pid=4321,
+        )
+    )
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
+    )
+    window.prime_startup_runtime_controls(
+        (
+            {
+                "command": "apply_window_bounds",
+                "x": 320,
+                "y": 720,
+                "width": 1344,
+                "height": 320,
+            },
+        )
+    )
+
+    with pytest.raises(desktop_overlay.DesktopOverlayStartupError) as excinfo:
+        await window._confirm_window_visible()
+
+    assert excinfo.value.failure_reason == "window_reveal_lost"
+    evidence = excinfo.value.evidence
+    assert evidence is not None
+    assert evidence["port_reason"] == "visible_bounds_not_retained"
+    assert evidence["bounds_drift"] is False
+    assert evidence["hwnd"] == 4242
+    assert evidence["hwnd_owner_pid"] == 4321
+    assert evidence["win32_error"] is None
+    assert evidence["desktop_target"] is True
+    await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_classifies_drifted_loss_as_visibility_unstable() -> None:
+    app = FakeFletApp()
+    port = RecordingWindowZOrderPort(
+        reveal_result=desktop_window_zorder.WindowVisibilityConfirmation(
+            confirmed=False,
+            reason="visible_bounds_not_retained",
+            hwnd=4242,
+            title_confirmed=True,
+            visible_confirmed=False,
+            bounds_confirmed=False,
+            observed_bounds=(400, 720, 1344, 320),
+            hwnd_owner_pid=4321,
+        )
+    )
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
+    )
+    window.prime_startup_runtime_controls(
+        (
+            {
+                "command": "apply_window_bounds",
+                "x": 320,
+                "y": 720,
+                "width": 1344,
+                "height": 320,
+            },
+        )
+    )
+
+    with pytest.raises(desktop_overlay.DesktopOverlayStartupError) as excinfo:
+        await window._confirm_window_visible()
+
+    assert excinfo.value.failure_reason == "window_visibility_unstable"
+    assert excinfo.value.evidence is not None
+    assert excinfo.value.evidence["bounds_drift"] is True
+    await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_run_reports_visibility_evidence_with_instance() -> None:
+    token = "visibility-evidence-token"
+    bridge = OverlayBridge(
+        session_token=token,
+        initial_snapshot=OverlayPresentationSnapshot(revision=1),
+        desktop_runtime_controls_enabled=True,
+    )
+    bridge.set_initial_desktop_runtime_controls(
+        [
+            {
+                "command": "apply_window_bounds",
+                "x": 320,
+                "y": 720,
+                "width": 1344,
+                "height": 320,
+            },
+        ]
+    )
+    await bridge.start()
+    app = FakeFletApp()
+    port = RecordingWindowZOrderPort(
+        reveal_result=desktop_window_zorder.WindowVisibilityConfirmation(
+            confirmed=False,
+            reason="visible_bounds_not_retained",
+            hwnd=4242,
+            title_confirmed=True,
+            visible_confirmed=False,
+            bounds_confirmed=True,
+            observed_bounds=(320, 720, 1344, 320),
+            hwnd_owner_pid=4321,
+        )
+    )
+    renderer = desktop_overlay.DesktopOverlayRenderer(
+        _manifest(bridge_url=bridge.url, session_token=token),
+        window=desktop_overlay.FletDesktopRendererWindow(
+            app_runner=app.run,
+            event_sink=RecordingLifecycleSink().emit,
+            locale="en",
+            window_z_order_port=port,
+            window_process_info_provider=lambda: (4321, None),
+        ),
+        lifecycle_sink=RecordingLifecycleSink(),
+        parent_monitor=FakeParentMonitor(),
+    )
+
+    try:
+        assert await renderer.run() == 1
+        bridge_event = await _next_bridge_event(bridge, expected_type="startup_error")
+    finally:
+        await renderer.shutdown()
+        await bridge.stop()
+
+    assert bridge_event["failure_reason"] == "window_reveal_lost"
+    assert bridge_event["overlay_instance_id"] == "desktop-overlay-test"
+    assert bridge_event["startup_phase"] == "bounds_confirmed"
+    evidence = bridge_event["evidence"]
+    assert evidence["overlay_instance_id"] == "desktop-overlay-test"
+    assert evidence["port_reason"] == "visible_bounds_not_retained"
+    assert evidence["bounds_drift"] is False
+    assert evidence["hwnd"] == 4242
+    assert evidence["title_confirmed"] is True
+    assert evidence["win32_error"] is None
 
 
 def test_desktop_overlay_requires_process_provider_for_custom_runner_and_zorder() -> None:
@@ -2798,6 +2996,7 @@ async def test_desktop_overlay_start_waits_for_visible_confirmation_before_ready
             y: int,
             width: int,
             height: int,
+            on_first_visible=None,
         ) -> desktop_window_zorder.WindowVisibilityConfirmation:
             _ = (x, y, width, height)
             self.reveal_titles.append(expected_title)
@@ -5195,12 +5394,16 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
         assert ready_event == {
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
         assert window.started.is_set()
         assert window.snapshots[0].revision == 7
         assert sink.events[-1] == {
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
         assert token not in json.dumps(sink.events)
 
@@ -5218,7 +5421,14 @@ async def test_desktop_overlay_malformed_initial_snapshot_is_startup_error_with_
 
     async def handler(connection: Any) -> None:
         auth = json.loads(await connection.recv())
-        assert auth == {"type": "auth", "session_token": token}
+        assert auth == {
+            "type": "auth",
+            "session_token": token,
+            "contract_version": OVERLAY_CONTRACT_VERSION,
+            "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+        }
         await connection.send(
             json.dumps(
                 {
@@ -5266,7 +5476,14 @@ async def test_desktop_overlay_rejects_unframed_initial_runtime_controls() -> No
 
     async def handler(connection: Any) -> None:
         auth = json.loads(await connection.recv())
-        assert auth == {"type": "auth", "session_token": token}
+        assert auth == {
+            "type": "auth",
+            "session_token": token,
+            "contract_version": OVERLAY_CONTRACT_VERSION,
+            "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+        }
         await connection.send(
             json.dumps(
                 {
@@ -5330,10 +5547,13 @@ async def test_desktop_overlay_rejects_flet_startup_without_canonical_bounds() -
         await renderer.shutdown()
         await bridge.stop()
 
-    assert bridge_event == {
-        "type": "startup_error",
-        "failure_reason": "window_configuration_failed",
-    }
+    assert bridge_event["type"] == "startup_error"
+    assert bridge_event["failure_reason"] == "window_bounds_failed"
+    assert bridge_event["overlay_instance_id"] == "desktop-overlay-test"
+    assert bridge_event["startup_phase"] == "launched"
+    assert bridge_event["evidence"]["failure_reason"] == "window_bounds_failed"
+    assert bridge_event["evidence"]["port_reason"] == "canonical_bounds_missing"
+    assert bridge_event["evidence"]["desktop_target"] is True
     assert app.page.visibility_updates == []
 
 
@@ -5394,16 +5614,53 @@ async def test_desktop_overlay_window_start_failure_reports_window_configuration
 @pytest.mark.asyncio
 async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_dispatch() -> None:
     token = "later-snapshot-token"
-    bridge = OverlayBridge(
-        session_token=token,
-        initial_snapshot=OverlayPresentationSnapshot(revision=1),
-        heartbeat_interval_ms=20,
-        desktop_runtime_controls_enabled=True,
-    )
-    await bridge.start()
+    received: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+    release_shutdown = asyncio.Event()
+
+    async def handler(connection: Any) -> None:
+        auth = json.loads(await connection.recv())
+        assert auth == {
+            "type": "auth",
+            "session_token": token,
+            "contract_version": OVERLAY_CONTRACT_VERSION,
+            "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+        }
+        await connection.send(
+            json.dumps(
+                {
+                    "type": "snapshot",
+                    "payload": OverlayPresentationSnapshot(revision=1).to_dict(),
+                    "startup_runtime_controls": [],
+                }
+            )
+        )
+        await received.put(json.loads(await asyncio.wait_for(connection.recv(), timeout=1.0)))
+        await connection.send(
+            json.dumps(
+                {
+                    "type": "snapshot",
+                    "payload": {"revision": 2, "calibration": {}, "blocks": "bad"},
+                }
+            )
+        )
+        await connection.send(
+            json.dumps(
+                {
+                    "type": "runtime_control",
+                    "payload": {"command": "set_interaction_mode", "mode": "edit"},
+                }
+            )
+        )
+        await release_shutdown.wait()
+        await connection.send(json.dumps({"type": "shutdown"}))
+
+    server = await websockets.serve(handler, "127.0.0.1", 0, ping_interval=None)
+    host, port = server.sockets[0].getsockname()[:2]
     window = FakeRendererWindow()
     renderer = desktop_overlay.DesktopOverlayRenderer(
-        _manifest(bridge_url=bridge.url, session_token=token),
+        _manifest(bridge_url=f"ws://{host}:{port}", session_token=token),
         window=window,
         lifecycle_sink=RecordingLifecycleSink(),
         parent_monitor=FakeParentMonitor(),
@@ -5411,14 +5668,12 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
 
     try:
         run_task = asyncio.create_task(renderer.run())
-        await _next_bridge_event(bridge, expected_type="overlay_ready")
-
-        await bridge._broadcast_json(  # noqa: SLF001 - inject malformed renderer input
-            {"type": "snapshot", "payload": {"revision": 2, "calibration": {}, "blocks": "bad"}}
-        )
-        await bridge.broadcast_desktop_runtime_control(
-            {"command": "set_interaction_mode", "mode": "edit"}
-        )
+        assert await asyncio.wait_for(received.get(), timeout=1.0) == {
+            "type": "overlay_ready",
+            "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+        }
 
         async def _wait_until_runtime_control_dispatched() -> None:
             while len(window.runtime_controls) != 1:
@@ -5429,11 +5684,13 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
         assert [snapshot.revision for snapshot in window.snapshots] == [1]
         assert window.runtime_controls == [{"command": "set_interaction_mode", "mode": "edit"}]
 
-        await bridge.broadcast_shutdown()
+        release_shutdown.set()
         assert await asyncio.wait_for(run_task, timeout=1.0) == 0
     finally:
+        release_shutdown.set()
         await renderer.shutdown()
-        await bridge.stop()
+        server.close()
+        await server.wait_closed()
 
 
 @pytest.mark.asyncio
@@ -5699,17 +5956,37 @@ async def test_desktop_overlay_lifecycle_sink_ignores_closed_parent_stream(
 @pytest.mark.asyncio
 async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dispatch() -> None:
     token = "runtime-control-token"
-    bridge = OverlayBridge(
-        session_token=token,
-        initial_snapshot=OverlayPresentationSnapshot(revision=1),
-        heartbeat_interval_ms=20,
-        desktop_runtime_controls_enabled=True,
-    )
-    await bridge.start()
+    received: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+
+    async def handler(connection: Any) -> None:
+        auth = json.loads(await connection.recv())
+        assert auth == {
+            "type": "auth",
+            "session_token": token,
+            "contract_version": OVERLAY_CONTRACT_VERSION,
+            "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+        }
+        await connection.send(
+            json.dumps(
+                {
+                    "type": "snapshot",
+                    "payload": OverlayPresentationSnapshot(revision=1).to_dict(),
+                    "startup_runtime_controls": [],
+                }
+            )
+        )
+        await received.put(json.loads(await asyncio.wait_for(connection.recv(), timeout=1.0)))
+        await connection.send(json.dumps({"type": "runtime_control", "payload": ["bad"]}))
+        await received.put(json.loads(await asyncio.wait_for(connection.recv(), timeout=1.0)))
+
+    server = await websockets.serve(handler, "127.0.0.1", 0, ping_interval=None)
+    host, port = server.sockets[0].getsockname()[:2]
     sink = RecordingLifecycleSink()
     window = FakeRendererWindow()
     renderer = desktop_overlay.DesktopOverlayRenderer(
-        _manifest(bridge_url=bridge.url, session_token=token),
+        _manifest(bridge_url=f"ws://{host}:{port}", session_token=token),
         window=window,
         lifecycle_sink=sink,
         parent_monitor=FakeParentMonitor(),
@@ -5717,12 +5994,13 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
 
     try:
         run_task = asyncio.create_task(renderer.run())
-        await _next_bridge_event(bridge, expected_type="overlay_ready")
-
-        await bridge._broadcast_json(
-            {"type": "runtime_control", "payload": ["bad"]}
-        )  # noqa: SLF001
-        runtime_error = await _next_bridge_event(bridge, expected_type="runtime_error")
+        assert await asyncio.wait_for(received.get(), timeout=1.0) == {
+            "type": "overlay_ready",
+            "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+        }
+        runtime_error = await asyncio.wait_for(received.get(), timeout=1.0)
 
         assert runtime_error == {
             "type": "runtime_error",
@@ -5732,7 +6010,8 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
         assert await asyncio.wait_for(run_task, timeout=1.0) == 1
     finally:
         await renderer.shutdown()
-        await bridge.stop()
+        server.close()
+        await server.wait_closed()
 
 
 @pytest.mark.asyncio
@@ -5806,8 +6085,6 @@ async def test_desktop_renderer_off_live_peer_source_uses_primary_typography() -
         calibration=OverlayCalibration(),
         clock=clock,
         translation_enabled=False,
-        peer_presentation_refresh_burst=False,
-        self_presentation_refresh_burst=False,
     )
     adapter = OverlayEventAdapter(clock=clock)
     peer_turn_id = uuid4()

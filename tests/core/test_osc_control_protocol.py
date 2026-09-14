@@ -35,7 +35,6 @@ def test_osc_abi_registries_are_explicit_and_cover_current_languages() -> None:
         3: "local_qwen",
         4: "local_qwen_gpu",
         5: "deepgram",
-        6: "qwen_asr",
         7: "soniox",
         8: "custom_offline",
         9: "custom_realtime",
@@ -88,6 +87,8 @@ def test_codec_rejects_wrong_types_unknown_ids_and_unknown_parameters() -> None:
         decode_control_message("/avatar/parameters/PuriPuly_Talk", 1)
     with pytest.raises(UnknownOscControlValueError):
         decode_control_message("/avatar/parameters/PuriPuly_SelfASR", 99)
+    with pytest.raises(UnknownOscControlValueError):
+        decode_control_message("/avatar/parameters/PuriPuly_SelfASR", 6)
     with pytest.raises(OscControlCodecError):
         decode_control_message("/avatar/parameters/PuriPuly_Unknown", True)
 
@@ -190,7 +191,6 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         3: "local_qwen",
         4: "local_qwen_gpu",
         5: "deepgram",
-        6: "qwen_asr",
         7: "soniox",
         8: "custom_offline",
         9: "custom_realtime",
@@ -212,6 +212,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         10: "managed_gemma",
         11: "managed_gemma",
         12: "managed_gemma_12b",
+        13: "deepseek_v4_flash_41",
     }
     assert dict(TRANSLATION_CONNECTION_BY_MODEL_ID) == {
         10: "cpu",
@@ -232,7 +233,11 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         5: "openrouter_gemma4_31b",
         6: "managed_gemma4_26b_31b",
         7: "managed_gemma4_31b",
-        8: "cerebras_gemma4_31b",
+        9: "openrouter_deepseek_v4_flash_41",
+        10: "deepseek_v4_flash_managed",
+        11: "deepseek_v4_flash_china",
+        12: "deepseek_v4_flash_41_managed",
+        13: "deepseek_v4_flash_41_china",
     }
     assert dict(LANGUAGE_IDS) == {
         0: "ar",

@@ -174,10 +174,10 @@ class ProcessAudioCaptureSource:
     @property
     def queue_drop_count(self) -> int:
         return self._queue_drop_count
+
     @property
     def capture_progression_snapshot(self) -> CaptureProgressionSnapshot:
         return self._progression.snapshot
-
 
     async def frames(self) -> AsyncIterator[AudioFrameF32]:
         while True:

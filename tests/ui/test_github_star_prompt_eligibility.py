@@ -83,8 +83,10 @@ def _patch_settings_save(monkeypatch: pytest.MonkeyPatch, callback) -> None:
 def _settings_for_connection(connection: str) -> AppSettingsVNext:
     settings = AppSettingsVNext()
     model = settings.intent.translation.model
-    if connection in {"managed_china", "official_byok"}:
+    if connection == "managed_china":
         model = "deepseek_v4_flash"
+    elif connection == "official_byok":
+        model = "deepseek_v4_flash_41"
     elif connection == "ollama":
         model = "local_llm"
     history = dict(settings.intent.translation.connection_history)
@@ -129,7 +131,7 @@ async def _wait_until(predicate, *, attempts: int = 20) -> None:
 def test_official_byok_fixture_uses_supported_model_provider_combo() -> None:
     settings = _settings_for_connection("official_byok")
 
-    assert settings.intent.translation.model == "deepseek_v4_flash"
+    assert settings.intent.translation.model == "deepseek_v4_flash_41"
     assert settings.intent.translation.connection == "official_byok"
 
 

@@ -147,6 +147,7 @@ async def test_process_source_bridges_fixed_stereo_float32_frames_and_drops_with
 
     await source.close()
 
+
 @pytest.mark.asyncio
 async def test_process_terminal_preserves_admitted_pcm_before_end_of_stream() -> None:
     factory = FakeFactory()

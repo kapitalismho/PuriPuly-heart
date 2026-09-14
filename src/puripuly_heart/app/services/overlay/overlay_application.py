@@ -45,14 +45,16 @@ from .overlay_generation_start import (
 from .overlay_session_transition import (
     OverlaySessionShutdownExecution,
     OverlaySessionStartExecution,
+    OverlaySessionStartStatus,
     OverlaySessionTransitionDiagnostic,
     OverlaySessionTransitionOwner,
 )
 
 OVERLAY_STARTUP_TIMEOUT_MS = 15000
-OVERLAY_SHUTDOWN_GRACE_S = 0.05
+OVERLAY_SHUTDOWN_GRACE_S = 3.0
 OVERLAY_TERMINAL_RESTART_MAX = 3
 OVERLAY_TERMINAL_RESTART_BACKOFF_S = 0.05
+OVERLAY_TERMINAL_RESTART_WINDOW_S = 60.0
 OVERLAY_STEAMVR_FALLBACK_POLICY: Literal["retry_every_enable"] = "retry_every_enable"
 OVERLAY_FAILURE_REASONS = frozenset(
     {
@@ -71,17 +73,44 @@ OVERLAY_FAILURE_REASONS = frozenset(
         "hmd_not_found",
         "openvr_init_failed",
         "renderer_init_failed",
+        "render_failed",
+        "openvr_failed",
         "gpu_readiness_late",
         "gpu_readiness_cancelled",
         "gpu_query_failed",
         "gpu_stalled",
         "runtime_disconnected",
         "window_configuration_failed",
+        "native_acceptance_timeout",
+        "native_owner_unresponsive",
+        "unsupported_binary",
+        "termination_unconfirmed",
+        "window_reveal_lost",
+        "window_visibility_unstable",
+        "window_identity_failed",
+        "window_observation_failed",
+        "window_bounds_failed",
+        "window_native_ready_failed",
         "runtime_control_invalid",
         "runtime_crashed",
+        "shutdown_not_acknowledged",
+        "runtime_exit_nonzero",
+        "shutdown_forced",
+        "shutdown_cleanup_failed",
         "unknown",
     }
 )
+DESKTOP_STARTUP_RECOVERABLE_REASONS = frozenset(
+    {
+        "window_reveal_lost",
+        "window_visibility_unstable",
+        "window_observation_failed",
+        "window_bounds_failed",
+        "window_native_ready_failed",
+        "window_identity_failed",
+    }
+)
+DESKTOP_STARTUP_RECOVERY_MAX_ATTEMPTS = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +121,8 @@ class OverlayApplicationSnapshot:
     active_target: str | None
     fallback_active: bool
     fallback_policy: Literal["retry_every_enable"]
+    recovery_active: bool = False
+    recovery_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,9 +195,17 @@ class OverlayApplicationOwner:
     _auto_restart_scheduled: bool = field(init=False, default=False, repr=False)
     _terminal_restart_attempts: int = field(init=False, default=0, repr=False)
     _recovering_from_crash: bool = field(init=False, default=False, repr=False)
+    _recovery_episode_started_at: float | None = field(init=False, default=None, repr=False)
+    _recovery_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _shutting_down: bool = field(init=False, default=False, repr=False)
     _active_target: str | None = field(init=False, default=None, repr=False)
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
     _translation_sync_generation: int = field(init=False, default=0, repr=False)
+    _desktop_startup_recovery_attempted: bool = field(init=False, default=False, repr=False)
+    _startup_recovery: dict[str, object] | None = field(init=False, default=None, repr=False)
+    _last_startup_recovery: dict[str, object] | None = field(init=False, default=None, repr=False)
+    _startup_recovery_generation: int = field(init=False, default=0, repr=False)
+    _startup_recovery_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _transition_owner: OverlaySessionTransitionOwner = field(init=False, repr=False)
     _generation_owner: OverlayGenerationStartOwner = field(init=False, repr=False)
     _fallback_owner: OverlaySessionFallbackOwner = field(init=False, repr=False)
@@ -239,6 +278,7 @@ class OverlayApplicationOwner:
 
     @property
     def snapshot(self) -> OverlayApplicationSnapshot:
+        recovery = self._startup_recovery
         return OverlayApplicationSnapshot(
             state=self._state,
             failure_reason=self._failure_reason,
@@ -246,7 +286,23 @@ class OverlayApplicationOwner:
             active_target=self._active_target,
             fallback_active=self._fallback_owner.active,
             fallback_policy=OVERLAY_STEAMVR_FALLBACK_POLICY,
+            recovery_active=recovery is not None,
+            recovery_reason=(
+                str(recovery.get("failure_reason"))
+                if recovery is not None and recovery.get("failure_reason") is not None
+                else None
+            ),
         )
+
+    @property
+    def startup_recovery(self) -> dict[str, object] | None:
+        recovery = self._startup_recovery
+        return dict(recovery) if recovery is not None else None
+
+    @property
+    def last_startup_recovery(self) -> dict[str, object] | None:
+        recovery = self._last_startup_recovery
+        return dict(recovery) if recovery is not None else None
 
     @staticmethod
     def normalized_target(value: object) -> str:
@@ -295,7 +351,37 @@ class OverlayApplicationOwner:
             peer_effective_enabled=peer.effective_enabled,
             peer_warning_reason=peer.process_warning_reason,
             peer_activation_starting=peer.activation_starting or peer.model_loading,
+            desktop_first_visible=self._current_desktop_first_visible(),
         )
+
+    def _current_desktop_first_visible(self) -> bool:
+        runtime = self._runtime
+        if runtime is None:
+            return False
+        if self._active_target != OVERLAY_TARGET_DESKTOP:
+            return False
+        manager = runtime.process_manager
+        if manager is None:
+            return False
+        return bool(getattr(manager, "desktop_first_visible", False))
+
+    def on_desktop_first_visible(
+        self,
+        runtime: OverlayRuntimeHandle,
+        overlay_instance_id: str | None,
+    ) -> None:
+        try:
+            if self._runtime is not runtime:
+                return
+            if not self.runtime_is_current(runtime, overlay_instance_id=overlay_instance_id):
+                return
+            if self._state not in {"starting", "recovering"}:
+                return
+            if self._active_target != OVERLAY_TARGET_DESKTOP:
+                return
+        except Exception:
+            return
+        self.publish_presentation()
 
     def publish_presentation(self) -> None:
         with contextlib.suppress(Exception):
@@ -318,11 +404,17 @@ class OverlayApplicationOwner:
         self.overlay_intent_sink(bool(enabled))
         if not enabled:
             self.clear_fallback()
-        self.publish_presentation()
-        if enabled:
-            await self.begin_start()
+            self._cancel_startup_recovery()
+            self.publish_presentation()
+            await self.shutdown(preserve_failure_reason=True)
             return
-        await self.shutdown(preserve_failure_reason=True)
+        try:
+            status = await self.begin_start()
+        except Exception:
+            self.publish_presentation()
+            raise
+        if status != "started":
+            self.publish_presentation()
 
     def new_runtime(self) -> OverlayRuntimeHandle:
         runtime = OverlayRuntimeHandle(shutdown_grace_s=OVERLAY_SHUTDOWN_GRACE_S)
@@ -369,7 +461,7 @@ class OverlayApplicationOwner:
         runtime = self._runtime
         start_task = runtime.start_task if runtime is not None else None
         return bool(
-            self._state in {"starting", "connected"}
+            self._state in {"starting", "recovering", "connected"}
             or (runtime is not None and runtime.bridge is not None)
             or (runtime is not None and runtime.process_manager is not None)
             or (start_task is not None and not start_task.done())
@@ -377,7 +469,7 @@ class OverlayApplicationOwner:
 
     def current_presenter(self) -> OverlayPresenter | None:
         runtime = self._runtime
-        if runtime is None or self._state not in {"starting", "connected"}:
+        if runtime is None or self._state not in {"starting", "recovering", "connected"}:
             return None
         return cast(OverlayPresenter | None, runtime.current_presenter_for_ingress())
 
@@ -503,10 +595,12 @@ class OverlayApplicationOwner:
             if not detailed_emitted:
                 self.log_basic(message, logging.WARNING)
 
-    async def begin_start(self) -> None:
+    async def begin_start(self) -> OverlaySessionStartStatus | None:
         if self._ingress_stopped:
-            return
-        await self._transition_owner.begin_start(self._start_execution)
+            return None
+        self._cancel_startup_recovery()
+        await self._drain_startup_recovery_task()
+        return await self._transition_owner.begin_start(self._start_execution)
 
     async def _begin_fallback_start(self) -> None:
         generation = self._fallback_owner.generation
@@ -522,9 +616,24 @@ class OverlayApplicationOwner:
             raise
         if status == "started":
             return
-        if status == "already_active" and self._state in {"starting", "connected"}:
+        if status == "already_active" and self._state in {"starting", "recovering", "connected"}:
             return
         await self._complete_fallback_failure(reason, generation=generation)
+
+    def _cancel_startup_recovery(self) -> None:
+        self._startup_recovery_generation += 1
+        self._startup_recovery = None
+        task = self._startup_recovery_task
+        if task is not None and task is not asyncio.current_task() and not task.done():
+            task.cancel()
+
+    async def _drain_startup_recovery_task(self) -> None:
+        task = self._startup_recovery_task
+        if task is None or task is asyncio.current_task():
+            return
+        await asyncio.gather(task, return_exceptions=True)
+        if self._startup_recovery_task is task:
+            self._startup_recovery_task = None
 
     def _start_execution(
         self,
@@ -546,24 +655,16 @@ class OverlayApplicationOwner:
         if self._runtime is not runtime:
             raise RuntimeError("overlay start transition runtime is not current")
         self._active_target = target
+        if self._startup_recovery is not None:
+            return
         if not self._recovering_from_crash:
             self._auto_restart_scheduled = False
             self._terminal_restart_attempts = 0
+            self._recovery_episode_started_at = None
+        self._desktop_startup_recovery_attempted = False
         if self._state != "starting":
             self._transition_state("starting")
             self._notify_state()
-
-    async def _apply_retry_ownership(
-        self,
-        runtime: OverlayRuntimeHandle,
-        presenter: OverlayPresenter,
-        manager: OverlayProcessManager,
-        *,
-        confirmed: bool,
-    ) -> None:
-        if not self.runtime_is_current(runtime) or runtime.process_manager is not manager:
-            return
-        await presenter.update_native_retry_ownership(confirmed)
 
     async def run_start(self, runtime: OverlayRuntimeHandle | None = None) -> None:
         if runtime is None:
@@ -591,7 +692,6 @@ class OverlayApplicationOwner:
             clock=self.clock,
             startup_timeout_ms=OVERLAY_STARTUP_TIMEOUT_MS,
             fallback_reason=self._fallback_owner.reason if self._fallback_owner.active else None,
-            recovering_from_crash=self._recovering_from_crash,
             translation_enabled=bool(self.translation_enabled_provider()),
         )
 
@@ -631,14 +731,6 @@ class OverlayApplicationOwner:
             track_bounds_control=self.bounds_control_sink,
             process_runner=self.process_runner,
             run_renderer_events=self.renderer_event_consumer,
-            apply_retry_ownership=lambda runtime, presenter, manager, confirmed: (
-                self._apply_retry_ownership(
-                    runtime,
-                    presenter,
-                    manager,
-                    confirmed=confirmed,
-                )
-            ),
             handle_failure=self.handle_start_failure,
             mark_connected=self.mark_connected,
             refresh_dependencies=self.refresh_peer_dependencies,
@@ -648,37 +740,58 @@ class OverlayApplicationOwner:
                 runtime=runtime,
                 overlay_instance_id=instance_id,
             ),
+            notify_first_visible=self.on_desktop_first_visible,
         )
 
     def _should_restart_after_terminal_failure(self, manager: OverlayProcessManager) -> bool:
-        if not manager.restart_scheduled:
+        if manager.restart_refill_ready:
+            self._terminal_restart_attempts = 0
+            self._recovery_episode_started_at = None
+            manager.restart_refill_ready = False
+        if not manager.restart_scheduled or manager.failure_reason == "termination_unconfirmed":
             return False
         if self._ingress_stopped:
             return False
         state = self.state_provider()
         if not state.settings_available or not state.overlay_intent_enabled:
             return False
-        return self._terminal_restart_attempts < OVERLAY_TERMINAL_RESTART_MAX
+        if self._terminal_restart_attempts >= OVERLAY_TERMINAL_RESTART_MAX:
+            return False
+        started_at = self._recovery_episode_started_at
+        return (
+            started_at is None or self.clock.now() - started_at < OVERLAY_TERMINAL_RESTART_WINDOW_S
+        )
 
     async def _restart_after_terminal_failure(
         self,
         *,
         failure_reason: str | None,
+        runtime: OverlayRuntimeHandle,
     ) -> None:
+        if self._recovery_episode_started_at is None:
+            self._recovery_episode_started_at = self.clock.now()
         self._terminal_restart_attempts += 1
+        self.log_basic(
+            f"[Overlay] Recovery requested: attempt={self._terminal_restart_attempts} "
+            f"failure_reason={failure_reason}",
+            logging.INFO,
+        )
         self._recovering_from_crash = True
         self._auto_restart_scheduled = True
         self._failure_reason = None
         if self._state != "starting":
             self._transition_state("starting")
             self._notify_state()
-        presenter = None
-        runtime = self._runtime
-        if runtime is not None:
-            presenter = runtime.presenter
-        if isinstance(presenter, OverlayPresenter):
-            await presenter.discard_epoch_retry_intent()
         await asyncio.sleep(OVERLAY_TERMINAL_RESTART_BACKOFF_S * self._terminal_restart_attempts)
+        if not self.runtime_is_current(runtime) or self._shutting_down:
+            return
+        episode_started_at = self._recovery_episode_started_at
+        if (
+            episode_started_at is not None
+            and self.clock.now() - episode_started_at >= OVERLAY_TERMINAL_RESTART_WINDOW_S
+        ):
+            await self._fail_terminal_restart(failure_reason)
+            return
         if self._ingress_stopped or not self.state_provider().overlay_intent_enabled:
             self._recovering_from_crash = False
             self._auto_restart_scheduled = False
@@ -769,18 +882,111 @@ class OverlayApplicationOwner:
                 return
             if manager.state != "failed":
                 return
-            if self._should_restart_after_terminal_failure(manager):
-                await self._restart_after_terminal_failure(
-                    failure_reason=manager.failure_reason,
-                )
+            if self._ingress_stopped or self._shutting_down:
                 return
-            self.on_start_failed(manager.failure_reason)
-            await self.teardown(preserve_presenter_state=True)
-            await self.refresh_peer_dependencies()
+            if self._recovery_task is not None and not self._recovery_task.done():
+                return
+            self._recovery_task = asyncio.create_task(
+                self._handle_runtime_failure(manager, runtime, runtime.monitor_task),
+                name="overlay-application-recovery",
+            )
+            self._recovery_task.add_done_callback(self._clear_recovery_task)
         except asyncio.CancelledError:
             raise
 
+    def _clear_recovery_task(self, task: asyncio.Task[None]) -> None:
+        if self._recovery_task is task:
+            self._recovery_task = None
+        if not task.cancelled() and (error := task.exception()) is not None:
+            self.log_basic(
+                f"[Overlay] Recovery task failed: exception_type={type(error).__name__}",
+                logging.ERROR,
+            )
+
+    async def _handle_runtime_failure(
+        self,
+        manager: OverlayProcessManager,
+        runtime: OverlayRuntimeHandle,
+        watcher: asyncio.Task[object] | None,
+    ) -> None:
+        if watcher is not None:
+            await asyncio.shield(watcher)
+        if (
+            self._ingress_stopped
+            or self._shutting_down
+            or not self.runtime_is_current(runtime)
+            or runtime.process_manager is not manager
+        ):
+            return
+        if self._should_restart_after_terminal_failure(manager):
+            await self._restart_after_terminal_failure(
+                failure_reason=manager.failure_reason,
+                runtime=runtime,
+            )
+            return
+        await self._fail_terminal_restart(manager.failure_reason)
+
+    async def _cancel_recovery(self) -> None:
+        task = self._recovery_task
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            if self._recovery_task is task:
+                self._recovery_task = None
+
+    def _desktop_startup_recovery_candidate(
+        self,
+        failure_reason: str | None,
+    ) -> tuple[object | None, dict[str, object] | None, str | None, str | None]:
+        if self._ingress_stopped:
+            return None, None, None, None
+        if self._state not in {"starting", "recovering"}:
+            return None, None, None, None
+        if self._desktop_startup_recovery_attempted or self._startup_recovery is not None:
+            return None, None, None, None
+        try:
+            state = self.state_provider()
+        except Exception:
+            return None, None, None, None
+        if not state.settings_available or not state.overlay_intent_enabled:
+            return None, None, None, None
+        if self._active_target != OVERLAY_TARGET_DESKTOP:
+            return None, None, None, None
+        runtime = self._runtime
+        if runtime is None:
+            return None, None, None, None
+        instance_id = runtime.overlay_instance_id
+        if instance_id is None or not self.runtime_is_current(
+            runtime, overlay_instance_id=instance_id
+        ):
+            return None, None, None, None
+        manager = runtime.process_manager
+        if manager is None or getattr(manager, "state", None) != "failed":
+            return None, None, None, None
+        reason = self.normalize_failure_reason(getattr(manager, "failure_reason", failure_reason))
+        if reason not in DESKTOP_STARTUP_RECOVERABLE_REASONS:
+            return None, None, None, None
+        if not bool(getattr(manager, "startup_recovery_eligible", False)):
+            return None, None, None, None
+        raw_evidence = getattr(manager, "startup_failure_evidence", None)
+        if raw_evidence is None:
+            evidence: dict[str, object] = {}
+        elif isinstance(raw_evidence, dict):
+            evidence = dict(raw_evidence)
+        else:
+            return None, None, None, None
+        return manager, evidence, reason, instance_id
+
     async def handle_start_failure(self, failure_reason: str | None) -> None:
+        candidate = self._desktop_startup_recovery_candidate(failure_reason)
+        if candidate[0] is not None:
+            await self._run_desktop_startup_recovery(
+                manager=candidate[0],
+                evidence=candidate[1] or {},
+                reason=candidate[2] or self.normalize_failure_reason(failure_reason),
+                failed_instance_id=candidate[3],
+            )
+            return
         reason = self.normalize_failure_reason(failure_reason)
         if self.should_fallback(reason):
             self.log_basic(
@@ -794,25 +1000,191 @@ class OverlayApplicationOwner:
                 await self._complete_fallback_failure(reason)
                 return
             self._failure_reason = None
-            try:
-                await self.refresh_peer_dependencies()
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                self.log_detailed(
-                    "[Overlay] Peer dependency refresh failed during desktop fallback",
-                    logging.WARNING,
-                    exc,
-                )
-                await self._complete_fallback_failure(reason)
-                return
             self.publish_fallback(True)
             if not self._fallback_owner.schedule():
                 await self._complete_fallback_failure(reason)
             return
+        if self._startup_recovery is not None:
+            await self._finish_startup_recovery_terminal(
+                self.normalize_failure_reason(failure_reason)
+            )
+            return
         self.on_start_failed(failure_reason)
         await self.teardown(preserve_presenter_state=True)
         await self.refresh_peer_dependencies()
+
+    async def _run_desktop_startup_recovery(
+        self,
+        *,
+        manager: object,
+        evidence: dict[str, object],
+        reason: str,
+        failed_instance_id: str | None,
+    ) -> None:
+        recovery_generation = self._startup_recovery_generation
+        self._desktop_startup_recovery_attempted = True
+        self._startup_recovery = {
+            "failure_reason": reason,
+            "failed_overlay_instance_id": failed_instance_id,
+            "evidence": dict(evidence),
+            "attempt": DESKTOP_STARTUP_RECOVERY_MAX_ATTEMPTS,
+            "generation": recovery_generation,
+            "replacement_started": False,
+        }
+        self.log_detailed(
+            "[Overlay] Desktop startup recovery eligible: "
+            f"failure_reason={reason} "
+            f"failed_overlay_instance_id={failed_instance_id} "
+            f"fallback_active={self._fallback_owner.active}",
+            logging.WARNING,
+            None,
+        )
+        self._transition_state("recovering")
+        self._notify_state()
+        previous = self._runtime
+        held_manager = manager
+        teardown_succeeded = await self.teardown(preserve_presenter_state=True)
+        cleanup_complete = bool(getattr(held_manager, "desktop_cleanup_complete", False))
+        if (
+            not teardown_succeeded
+            or previous is None
+            or not previous.is_closed
+            or not previous.transfer_reap_complete()
+            or not cleanup_complete
+        ):
+            self.log_detailed(
+                "[Overlay] Desktop startup recovery teardown uncertain; terminal",
+                logging.WARNING,
+                None,
+            )
+            await self._finish_startup_recovery_terminal(reason)
+            return
+        if (
+            recovery_generation != self._startup_recovery_generation
+            or self._ingress_stopped
+            or self._state != "recovering"
+        ):
+            return
+        previous_task = self._startup_recovery_task
+        if (
+            previous_task is not None
+            and not previous_task.done()
+            and previous_task is not asyncio.current_task()
+        ):
+            previous_task.cancel()
+            await asyncio.gather(previous_task, return_exceptions=True)
+            if self._startup_recovery_task is previous_task:
+                self._startup_recovery_task = None
+        self._startup_recovery_task = asyncio.create_task(
+            self._start_recovery_replacement(
+                previous=previous,
+                reason=reason,
+                recovery_generation=recovery_generation,
+            ),
+            name="OverlayApplicationOwner:startup-recovery-replacement",
+        )
+
+    async def _start_recovery_replacement(
+        self,
+        *,
+        previous: OverlayRuntimeHandle,
+        reason: str,
+        recovery_generation: int,
+    ) -> None:
+        await asyncio.sleep(0)
+        try:
+            if (
+                recovery_generation != self._startup_recovery_generation
+                or self._ingress_stopped
+                or self._state != "recovering"
+                or self._startup_recovery is None
+            ):
+                return
+            try:
+                state = self.state_provider()
+            except Exception:
+                await self._finish_startup_recovery_terminal(reason)
+                return
+            if not state.settings_available or not state.overlay_intent_enabled:
+                self._startup_recovery = None
+                return
+            try:
+                status = await self._transition_owner.begin_start(
+                    lambda: self._start_execution(replace_starting=True)
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                await self._finish_startup_recovery_terminal(reason)
+                return
+            if status == "started":
+                recovery = self._startup_recovery
+                if recovery is not None:
+                    recovery["replacement_started"] = True
+                if not self._recovery_replacement_still_valid(recovery_generation):
+                    await self.teardown(preserve_presenter_state=False)
+                return
+            if status == "already_active" and self._state in {
+                "recovering",
+                "starting",
+                "connected",
+            }:
+                return
+            await self._finish_startup_recovery_terminal(reason)
+        finally:
+            if self._startup_recovery_task is asyncio.current_task():
+                self._startup_recovery_task = None
+
+    def _recovery_replacement_still_valid(self, recovery_generation: int) -> bool:
+        if recovery_generation != self._startup_recovery_generation:
+            return False
+        if self._ingress_stopped or self._state != "recovering":
+            return False
+        if self._startup_recovery is None:
+            return False
+        try:
+            state = self.state_provider()
+        except Exception:
+            return False
+        return bool(state.settings_available and state.overlay_intent_enabled)
+
+    async def _finish_startup_recovery_terminal(self, failure_reason: str | None) -> None:
+        recovery = self._startup_recovery
+        reason = self.normalize_failure_reason(failure_reason)
+        try:
+            if recovery is not None:
+                replacement_id = None
+                if recovery.get("replacement_started"):
+                    replacement_id = (
+                        self._runtime.overlay_instance_id if self._runtime is not None else None
+                    )
+                self._last_startup_recovery = {
+                    "failure_reason": recovery.get("failure_reason"),
+                    "failed_overlay_instance_id": recovery.get("failed_overlay_instance_id"),
+                    "replacement_overlay_instance_id": replacement_id,
+                    "evidence": (
+                        dict(recovery.get("evidence", {}))
+                        if isinstance(recovery.get("evidence"), dict)
+                        else recovery.get("evidence")
+                    ),
+                    "outcome": "failed",
+                    "terminal_reason": reason,
+                }
+        except Exception:
+            pass
+        self._startup_recovery = None
+        self.on_start_failed(reason)
+        await self.teardown(preserve_presenter_state=True)
+        try:
+            await self.refresh_peer_dependencies()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self.log_detailed(
+                "[Overlay] Peer dependency refresh failed after desktop recovery terminal",
+                logging.WARNING,
+                exc,
+            )
 
     async def _complete_fallback_failure(
         self,
@@ -841,6 +1213,7 @@ class OverlayApplicationOwner:
         self._failure_reason = self.normalize_failure_reason(failure_reason)
         self._auto_restart_scheduled = False
         self._recovering_from_crash = False
+        self._startup_recovery = None
         self._transition_state("failed")
         self._notify_state()
 
@@ -863,11 +1236,17 @@ class OverlayApplicationOwner:
             logging.INFO,
             None,
         )
-        await self._transition_owner.shutdown(
-            lambda: self._shutdown_execution(
-                preserve_failure_reason=preserve_failure_reason,
+        self._shutting_down = True
+        try:
+            await self._cancel_recovery()
+            await self._transition_owner.shutdown(
+                lambda: self._shutdown_execution(
+                    preserve_failure_reason=preserve_failure_reason,
+                )
             )
-        )
+            await self._drain_startup_recovery_task()
+        finally:
+            self._shutting_down = False
 
     def _shutdown_execution(
         self,
@@ -893,6 +1272,7 @@ class OverlayApplicationOwner:
 
     def _mark_stopping(self) -> None:
         self._auto_restart_scheduled = False
+        self._cancel_startup_recovery()
         self._transition_state("stopping")
         self._notify_state()
 
@@ -924,7 +1304,26 @@ class OverlayApplicationOwner:
         preserve_presenter_state: bool,
         emit_shutdown: bool = False,
     ) -> bool:
-        runtime = self.ensure_runtime()
+        existing = self._runtime
+        if existing is None:
+            await self.cancel_bounds_persistence()
+            self._active_target = None
+            self.clear_bounds_suppressed()
+            if not preserve_presenter_state:
+                self.interaction_mode_sink(self.edit_interaction_mode)
+            return True
+        if existing.is_closed and (
+            preserve_presenter_state or not self.runtime_has_resources(existing)
+        ):
+            await self.cancel_bounds_persistence()
+            if not self.runtime_has_resources(existing):
+                self._runtime = None
+            self._active_target = None
+            self.clear_bounds_suppressed()
+            if not preserve_presenter_state:
+                self.interaction_mode_sink(self.edit_interaction_mode)
+            return True
+        runtime = existing
         await self.cancel_bounds_persistence()
         close_succeeded = True
         try:
@@ -950,10 +1349,38 @@ class OverlayApplicationOwner:
         return close_succeeded
 
     def mark_connected(self) -> None:
+        recovery = self._startup_recovery
+        if recovery is not None:
+            try:
+                failed_id = recovery.get("failed_overlay_instance_id")
+                replacement_id = (
+                    self._runtime.overlay_instance_id if self._runtime is not None else None
+                )
+                self._last_startup_recovery = {
+                    "failure_reason": recovery.get("failure_reason"),
+                    "failed_overlay_instance_id": failed_id,
+                    "replacement_overlay_instance_id": replacement_id,
+                    "evidence": (
+                        dict(recovery.get("evidence", {}))
+                        if isinstance(recovery.get("evidence"), dict)
+                        else recovery.get("evidence")
+                    ),
+                    "outcome": "connected",
+                }
+                self.log_detailed(
+                    "[Overlay] Desktop startup recovery connected: "
+                    f"failure_reason={recovery.get('failure_reason')} "
+                    f"failed_overlay_instance_id={failed_id} "
+                    f"replacement_overlay_instance_id={replacement_id}",
+                    logging.INFO,
+                    None,
+                )
+            except Exception:
+                pass
+            self._startup_recovery = None
         self._failure_reason = None
         self._auto_restart_scheduled = False
         self._recovering_from_crash = False
-        self._terminal_restart_attempts = 0
         self._transition_state("connected")
         self._notify_state()
 
@@ -973,7 +1400,10 @@ class OverlayApplicationOwner:
         self._state = next_state
         self._log_state_transition(previous, next_state)
         self.sync_peer_effective()
-        if next_state not in {"starting", "connected"} and not preserve_peer_activation:
+        if (
+            next_state not in {"starting", "recovering", "connected"}
+            and not preserve_peer_activation
+        ):
             self.cancel_peer_activation()
 
     def _notify_state(self) -> None:
@@ -1023,6 +1453,14 @@ class OverlayApplicationOwner:
         ]
         if diagnostic.failure_type is not None:
             fields.append(f"failure_type={diagnostic.failure_type}")
+        if diagnostic.stage is not None:
+            fields.append(f"stage={diagnostic.stage}")
+        if diagnostic.outcome in {"failed", "teardown_failed"}:
+            self.log_basic(
+                f"[Overlay] session_transition {' '.join(fields)}",
+                logging.WARNING,
+            )
+            return
         self.log_detailed(
             f"[Overlay] session_transition {' '.join(fields)}",
             (
@@ -1056,6 +1494,7 @@ class OverlayApplicationOwner:
 
     def stop_ingress(self) -> None:
         self._ingress_stopped = True
+        self._cancel_startup_recovery()
         self._fallback_owner.stop_ingress()
 
     async def close(self) -> None:
@@ -1063,9 +1502,12 @@ class OverlayApplicationOwner:
         await self.shutdown(preserve_failure_reason=True)
         self.clear_fallback()
         await self._fallback_owner.close()
+        await self._drain_startup_recovery_task()
 
 
 __all__ = [
+    "DESKTOP_STARTUP_RECOVERABLE_REASONS",
+    "DESKTOP_STARTUP_RECOVERY_MAX_ATTEMPTS",
     "OVERLAY_FAILURE_REASONS",
     "OVERLAY_SHUTDOWN_GRACE_S",
     "OVERLAY_STEAMVR_FALLBACK_POLICY",

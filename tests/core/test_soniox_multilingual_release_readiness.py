@@ -463,7 +463,6 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
         parent_id = uuid4()
         presenter = OverlayPresenter(
             calibration=OverlayCalibration(),
-            peer_presentation_refresh_burst=False,
             show_peer_original=show_peer_original,
         )
         overlay = _RecordingOverlaySink(presenter=presenter)

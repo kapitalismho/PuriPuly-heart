@@ -518,15 +518,17 @@ class PhysicalCaptureProgression:
     ) -> AudioCaptureDiscontinuity | None:
         admitted_epoch = self._admitted_capture_epoch
         admitted_end = self._admitted_source_end_sample
-        if force_unknown or (
-            admitted_epoch is not None and admitted_epoch != capture_epoch
-        ):
+        if force_unknown or (admitted_epoch is not None and admitted_epoch != capture_epoch):
             return AudioCaptureDiscontinuity(
                 kind="unknown_loss",
                 lost_source_samples=None,
                 observed_at_monotonic_s=observed_at_monotonic_s,
             )
-        if admitted_epoch == capture_epoch and admitted_end is not None and start_sample > admitted_end:
+        if (
+            admitted_epoch == capture_epoch
+            and admitted_end is not None
+            and start_sample > admitted_end
+        ):
             return AudioCaptureDiscontinuity(
                 kind="known_loss",
                 lost_source_samples=start_sample - admitted_end,
@@ -639,9 +641,7 @@ class SoundDeviceAudioSource(AudioSource):
         stream = sd.InputStream(**stream_kwargs)
         actual_sample_rate_hz = int(stream.samplerate)
         self._actual_sample_rate_hz = actual_sample_rate_hz
-        self._progression = PhysicalCaptureProgression(
-            sample_rate_hz=actual_sample_rate_hz
-        )
+        self._progression = PhysicalCaptureProgression(sample_rate_hz=actual_sample_rate_hz)
         try:
             stream.start()
         except Exception:

@@ -111,8 +111,6 @@ class DesktopPeerPipeline:
     def terminal_discarded_capture(self) -> tuple[AudioCaptureSpan, ...]:
         return self._terminal_discarded_capture
 
-
-
     def _maybe_log_peer_diagnostics(
         self,
         *,

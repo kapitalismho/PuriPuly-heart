@@ -17,7 +17,6 @@ from puripuly_heart.core.messages import (
 )
 from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
-from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
@@ -95,13 +94,6 @@ class ProviderVerifierAdapter(ProviderVerifierPort):
             if model is not None:
                 kwargs["model"] = model
             return await DeepSeekLLMProvider.verify_api_key(api_key, **kwargs)
-        if normalized_provider == "cerebras":
-            kwargs: dict[str, str] = {}
-            if base_url is not None:
-                kwargs["base_url"] = base_url
-            if model is not None:
-                kwargs["model"] = model
-            return await CerebrasLLMProvider.verify_api_key(api_key, **kwargs)
         if normalized_provider in {"alibaba_beijing", "alibaba_singapore", "qwen"}:
             qwen_base_url = base_url or (
                 _ALIBABA_SINGAPORE_BASE_URL

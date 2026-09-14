@@ -223,6 +223,7 @@ async def test_desktop_pipeline_close_closes_underlying_source():
 
     assert source.closed is True
 
+
 @pytest.mark.asyncio
 async def test_desktop_pipeline_discards_resampler_residue_on_unexpected_source_loss():
     capture = AudioCaptureSpan(

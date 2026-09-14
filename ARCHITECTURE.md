@@ -329,12 +329,10 @@ Manual self turns share the ordered lifecycle but are not subject to speech evic
 
 `OutputRuntime` owns:
 
-- route selection,
-- chatbox state,
-- overlay deliveries,
+- route selection and chatbox state,
+- destination-scoped admission and delivery receipts,
+- duplicate and retired-publication rejection,
 - UI event bridge,
-- delivery tasks,
-- duplicate protection,
 - destination replacement,
 - shutdown cleanup.
 
@@ -357,6 +355,28 @@ Caption and overlay settings control destinations, not peer capture. Explicit LI
 
 
 Destination adapters must not bypass routing policy.
+
+Each destination has independent admission and delivery state. Replacing one
+destination must not block or retire work for the others.
+
+### Overlays
+
+| Responsibility | Key path |
+| --- | --- |
+| Overlay selection and recovery | `app/services/overlay/` |
+| Caption state, scene delivery, and process lifecycle | `core/overlay/` |
+| Generation tasks and shutdown | `core/runtime/overlay.py` |
+| Native VR presentation | `native/overlay/src/runtime.rs` |
+
+Python paths are relative to `src/puripuly_heart/`.
+
+Overlay split:
+
+- Python: overlay selection, caption state and expiry, scene delivery, process lifecycle.
+- Native: VR rendering, render retries, and GPU resources.
+
+Application recovery coordinates generation replacement. Each generation owns its
+tasks and shutdown.
 
 ## Lifecycle
 

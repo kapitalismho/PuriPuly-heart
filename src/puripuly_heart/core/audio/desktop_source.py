@@ -116,9 +116,7 @@ class DesktopLoopbackAudioSource:
             self._actual_sample_rate_hz = resolved.sample_rate_hz
             self._used_default_fallback = resolution.used_default_fallback
             self._manager = manager
-            self._progression = PhysicalCaptureProgression(
-                sample_rate_hz=resolved.sample_rate_hz
-            )
+            self._progression = PhysicalCaptureProgression(sample_rate_hz=resolved.sample_rate_hz)
 
             continue_flag = getattr(pyaudio, "paContinue", 0)
             float32_format = getattr(pyaudio, "paFloat32")
@@ -205,10 +203,10 @@ class DesktopLoopbackAudioSource:
     @property
     def last_callback_status(self) -> object | None:
         return self._last_callback_status
+
     @property
     def capture_progression_snapshot(self) -> CaptureProgressionSnapshot:
         return self._progression.snapshot
-
 
     async def frames(self) -> AsyncIterator[AudioFrameF32]:
         while True:

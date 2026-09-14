@@ -14,6 +14,7 @@ $PinnedOpenVrVendorDllSha256 = "bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db
 $PinnedNotoCjkFontSha256 = "197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce"
 $PrepareFletRuntimeScript = Join-Path $PSScriptRoot "prepare-flet-runtime.ps1"
 $ManagedGemmaDistributionModule = "puripuly_heart.release_evidence.managed_gemma_distribution"
+$ReleaseIdentityModule = "puripuly_heart.release_evidence.release_identity"
 
 function Invoke-External {
     param(
@@ -145,6 +146,105 @@ function Get-FileSha256 {
     }
 
     return (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Get-DirectoryContentSha256 {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $root = [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
+    if (-not (Test-Path -LiteralPath $root -PathType Container)) {
+        throw "Directory not found for content SHA256 calculation: $root"
+    }
+
+    $inventory = foreach ($item in Get-ChildItem -LiteralPath $root -Force -Recurse) {
+        $relativePath = $item.FullName.Substring($root.Length).TrimStart('\')
+        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            "reparse`t$relativePath`t$($item.LinkType)`t$($item.Target -join ',')"
+        } elseif ($item.PSIsContainer) {
+            "directory`t$relativePath"
+        } else {
+            "file`t$relativePath`t$($item.Length)`t$((Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant())"
+        }
+    }
+    $inventoryText = (@($inventory) | Sort-Object) -join "`n"
+    $inventoryBytes = [System.Text.Encoding]::UTF8.GetBytes($inventoryText)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return ([System.BitConverter]::ToString($sha256.ComputeHash($inventoryBytes))).Replace("-", "").ToLowerInvariant()
+    } finally {
+        $sha256.Dispose()
+    }
+}
+
+function Remove-InstallerSmokeOwnedArtifacts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$OwnedPaths,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$AllowedRoots,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RunId,
+
+        [Parameter(Mandatory = $true)]
+        [string]$UninstallRegistryPath,
+
+        [Parameter(Mandatory = $true)]
+        [bool]$OwnsUninstallRegistryKey
+    )
+
+    $cleanupErrors = [System.Collections.Generic.List[string]]::new()
+    foreach ($ownedPath in ($OwnedPaths | Select-Object -Unique | Sort-Object Length -Descending)) {
+        if (-not (Test-Path -LiteralPath $ownedPath)) {
+            continue
+        }
+
+        try {
+            $fullOwnedPath = [System.IO.Path]::GetFullPath($ownedPath).TrimEnd('\')
+            $isAllowed = $false
+            foreach ($allowedRoot in $AllowedRoots) {
+                $fullAllowedRoot = [System.IO.Path]::GetFullPath($allowedRoot).TrimEnd('\')
+                if ($fullOwnedPath.StartsWith("$fullAllowedRoot\", [System.StringComparison]::OrdinalIgnoreCase) -and
+                    $fullOwnedPath.Contains($RunId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $isAllowed = $true
+                    break
+                }
+            }
+            if (-not $isAllowed) {
+                throw "Refusing cleanup outside the current-run expected namespace and known-folder roots: $fullOwnedPath"
+            }
+
+            $ownedRootItem = Get-Item -LiteralPath $fullOwnedPath -Force
+            if (($ownedRootItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                Remove-Item -LiteralPath $fullOwnedPath -Force -ErrorAction Stop
+                continue
+            }
+            foreach ($reparsePoint in @(Get-ChildItem -LiteralPath $fullOwnedPath -Force -Recurse -Attributes ReparsePoint -ErrorAction Stop | Sort-Object { $_.FullName.Length } -Descending)) {
+                Remove-Item -LiteralPath $reparsePoint.FullName -Force -ErrorAction Stop
+            }
+            Remove-Item -LiteralPath $fullOwnedPath -Recurse -Force -ErrorAction Stop
+        } catch {
+            $cleanupErrors.Add($_.Exception.Message)
+        }
+    }
+
+    if ($OwnsUninstallRegistryKey -and (Test-Path -LiteralPath $UninstallRegistryPath)) {
+        try {
+            if (-not $UninstallRegistryPath.StartsWith("HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{", [System.StringComparison]::Ordinal) -or
+                -not $UninstallRegistryPath.EndsWith("}_is1", [System.StringComparison]::Ordinal)) {
+                throw "Refusing cleanup of unexpected uninstall registry path: $UninstallRegistryPath"
+            }
+            Remove-Item -LiteralPath $UninstallRegistryPath -Recurse -Force -ErrorAction Stop
+        } catch {
+            $cleanupErrors.Add($_.Exception.Message)
+        }
+    }
+
+    return @($cleanupErrors)
 }
 
 function Get-PinnedSha256FromFile {
@@ -344,6 +444,28 @@ function Invoke-ProcessCaptureRuntimeSmokeCheck {
     $helperHash = Get-FileSha256 -Path $HelperExePath
     if ($helperHash -ne ([string]$report.helper_executable_sha256)) {
         throw "$Label release-only process-capture smoke helper hash mismatch"
+    }
+}
+
+function Assert-InstallerPayloadPathLengths {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ArtifactRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationRoot
+    )
+
+    $resolvedArtifactRoot = [System.IO.Path]::GetFullPath($ArtifactRoot)
+    foreach ($artifactFile in Get-ChildItem -LiteralPath $resolvedArtifactRoot -Recurse -File) {
+        $relativePath = [System.IO.Path]::GetRelativePath($resolvedArtifactRoot, $artifactFile.FullName)
+        $destinationPath = Join-Path $DestinationRoot $relativePath
+        if ($artifactFile.FullName.Length -ge 260) {
+            throw "Installer helper source path exceeds the supported Windows path length: $relativePath"
+        }
+        if ($destinationPath.Length -ge 260) {
+            throw "Installed helper path exceeds the supported Windows path length: $relativePath"
+        }
     }
 }
 
@@ -599,6 +721,17 @@ if (-not (Test-Path $packagedOnnxRuntimeDllPath)) {
 if (-not (Test-Path $packagedOnnxRuntimeProvidersSharedDllPath)) {
     throw "Packaged Local Qwen runtime providers DLL not found: $packagedOnnxRuntimeProvidersSharedDllPath"
 }
+
+$packagedSounddeviceRuntimeDir = Join-Path $distDir "_sounddevice_data\portaudio-binaries"
+$packagedStandardPortAudioDllPath = Join-Path $packagedSounddeviceRuntimeDir "libportaudio64bit.dll"
+$packagedAsioPortAudioDllPath = Join-Path $packagedSounddeviceRuntimeDir "libportaudio64bit-asio.dll"
+if (-not (Test-Path $packagedStandardPortAudioDllPath -PathType Leaf)) {
+    throw "Packaged application is missing the standard sounddevice PortAudio runtime: $packagedStandardPortAudioDllPath"
+}
+if (Test-Path $packagedAsioPortAudioDllPath) {
+    throw "Packaged application must omit the unsupported sounddevice ASIO-only runtime: $packagedAsioPortAudioDllPath"
+}
+
 if (-not (Test-Path $soxrReleaseInputsManifestPath)) {
     throw "Prepared soxr release inputs manifest not found: $soxrReleaseInputsManifestPath"
 }
@@ -646,49 +779,21 @@ if (-not (Test-Path $soxrLicenseTextPath)) {
     throw "soxr LGPL license text not found: $soxrLicenseTextPath"
 }
 
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$sourceBundleArchive = [System.IO.Compression.ZipFile]::OpenRead($soxrSourceBundlePath)
-try {
-    $sourceBundleEntries = @($sourceBundleArchive.Entries | ForEach-Object { $_.FullName })
-    $sourceBundleManifestEntry = $sourceBundleArchive.GetEntry("manifest.json")
-    if ($null -eq $sourceBundleManifestEntry) {
-        throw "soxr third-party source bundle is missing manifest.json"
-    }
-
-    $sourceBundleManifestReader = New-Object System.IO.StreamReader($sourceBundleManifestEntry.Open())
-    try {
-        $sourceBundleManifest = $sourceBundleManifestReader.ReadToEnd() | ConvertFrom-Json
-    } finally {
-        $sourceBundleManifestReader.Dispose()
-    }
-
-    $requiredSourceFilenames = @($sourceBundleManifest.sources | ForEach-Object { $_.filename })
-    if ($requiredSourceFilenames.Count -eq 0) {
-        throw "soxr third-party source bundle manifest is missing source entries"
-    }
-
-    foreach ($requiredSourceFilename in $requiredSourceFilenames) {
-        if ([string]::IsNullOrWhiteSpace($requiredSourceFilename)) {
-            throw "soxr third-party source bundle manifest contains a blank source filename"
-        }
-        if ($sourceBundleEntries -notcontains $requiredSourceFilename) {
-            throw "soxr third-party source bundle is missing source archive: $requiredSourceFilename"
-        }
-    }
-} finally {
-    $sourceBundleArchive.Dispose()
-}
 
 New-Item -ItemType Directory -Force -Path $packagedSoxrComplianceDir | Out-Null
 Copy-Item -Path $soxrLicenseTextPath -Destination $packagedSoxrLicensePath -Force
 Copy-Item -Path $soxrSourceBundlePath -Destination $packagedSoxrSourceBundlePath -Force
 
-if (-not (Test-Path $packagedSoxrLicensePath)) {
-    throw "Packaged soxr LGPL license text not found: $packagedSoxrLicensePath"
-}
-if (-not (Test-Path $packagedSoxrSourceBundlePath)) {
-    throw "Packaged soxr source bundle not found: $packagedSoxrSourceBundlePath"
-}
+Write-Host "Verifying packaged license and source-bundle provenance..."
+Invoke-External -FilePath $pythonCommand -ArgumentList @(
+    "-m",
+    $ReleaseIdentityModule,
+    "verify-packaged-licenses",
+    "--package-dir",
+    $distDir,
+    "--repo-root",
+    $PWD
+)
 
 $packagedOverlayPath = Join-Path $PWD "dist/PuriPulyHeart/PuriPulyHeartOverlay.exe"
 $packagedGpuWorkerPath = Join-Path $PWD "dist/PuriPulyHeart/PuriPulyHeartGpuWorker.exe"
@@ -710,21 +815,49 @@ New-Item -ItemType Directory -Force -Path $soxrRuntimeReportDir | Out-Null
 Remove-Item -Recurse -Force $processCaptureRuntimeReportDir -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $processCaptureRuntimeReportDir | Out-Null
 
-Write-Host "Smoke-testing packaged executable..."
-$versionSmokeTest = Start-Process -FilePath $exePath -ArgumentList @("--version") -Wait -PassThru
-if ($versionSmokeTest.ExitCode -ne 0) {
-    throw "Packaged executable version smoke test failed with exit code $($versionSmokeTest.ExitCode)"
+$packagedSmokeUserStateBase = Join-Path $env:TEMP "PuriPulyHeart-Packaged-Smoke-$([Guid]::NewGuid().ToString('N'))"
+if (Test-Path -LiteralPath $packagedSmokeUserStateBase) {
+    throw "Packaged smoke requires an unused isolated user-state path: $packagedSmokeUserStateBase"
 }
+$packagedSmokeLocalAppData = Join-Path $packagedSmokeUserStateBase "LocalAppData"
+$packagedSmokeRoamingAppData = Join-Path $packagedSmokeUserStateBase "RoamingAppData"
+$previousPackagedSmokeLocalAppData = $env:LOCALAPPDATA
+$previousPackagedSmokeAppData = $env:APPDATA
+New-Item -ItemType Directory -Path $packagedSmokeLocalAppData | Out-Null
+New-Item -ItemType Directory -Path $packagedSmokeRoamingAppData | Out-Null
+$env:LOCALAPPDATA = $packagedSmokeLocalAppData
+$env:APPDATA = $packagedSmokeRoamingAppData
+try {
+    Write-Host "Smoke-testing packaged executable..."
+    $versionSmokeTest = Start-Process -FilePath $exePath -ArgumentList @("--version") -Wait -PassThru
+    if ($versionSmokeTest.ExitCode -ne 0) {
+        throw "Packaged executable version smoke test failed with exit code $($versionSmokeTest.ExitCode)"
+    }
 
-Invoke-GuiStartupSmokeCheck -ExePath $exePath -Label "Packaged"
+    Invoke-GuiStartupSmokeCheck -ExePath $exePath -Label "Packaged"
 
-$localQwenRuntimeSmokeTest = Start-Process -FilePath $exePath -ArgumentList @("local-qwen-runtime-check") -Wait -PassThru
-if ($localQwenRuntimeSmokeTest.ExitCode -ne 0) {
-    throw "Local Qwen runtime smoke test failed with exit code $($localQwenRuntimeSmokeTest.ExitCode)"
+    $localQwenRuntimeSmokeTest = Start-Process -FilePath $exePath -ArgumentList @("local-qwen-runtime-check") -Wait -PassThru
+    if ($localQwenRuntimeSmokeTest.ExitCode -ne 0) {
+        throw "Local Qwen runtime smoke test failed with exit code $($localQwenRuntimeSmokeTest.ExitCode)"
+    }
+
+    Invoke-SoxrRuntimeSmokeCheck -ExePath $exePath -ReportPath $packagedSoxrRuntimeReportPath -ExpectedExtensionPath $packagedSoxrExtensionPath -ExpectedSoxrDllPath $packagedSoxrDllPath -Label "Packaged"
+    Invoke-ProcessCaptureRuntimeSmokeCheck -HelperExePath $processCaptureSmokeHelperPath -ArtifactRoot $processCaptureSmokeArtifactRoot -ReportPath $packagedProcessCaptureRuntimeReportPath -Label "Packaged production-collected smoke"
+} finally {
+    if ($null -eq $previousPackagedSmokeLocalAppData) {
+        Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+    } else {
+        $env:LOCALAPPDATA = $previousPackagedSmokeLocalAppData
+    }
+    if ($null -eq $previousPackagedSmokeAppData) {
+        Remove-Item Env:APPDATA -ErrorAction SilentlyContinue
+    } else {
+        $env:APPDATA = $previousPackagedSmokeAppData
+    }
+    if (Test-Path -LiteralPath $packagedSmokeUserStateBase) {
+        Remove-Item -LiteralPath $packagedSmokeUserStateBase -Recurse -Force
+    }
 }
-
-Invoke-SoxrRuntimeSmokeCheck -ExePath $exePath -ReportPath $packagedSoxrRuntimeReportPath -ExpectedExtensionPath $packagedSoxrExtensionPath -ExpectedSoxrDllPath $packagedSoxrDllPath -Label "Packaged"
-Invoke-ProcessCaptureRuntimeSmokeCheck -HelperExePath $processCaptureSmokeHelperPath -ArtifactRoot $processCaptureSmokeArtifactRoot -ReportPath $packagedProcessCaptureRuntimeReportPath -Label "Packaged production-collected smoke"
 
 Write-Host "Smoke-testing packaged overlay executable..."
 Invoke-External -FilePath $packagedOverlayPath -ArgumentList @("--check-startup-contract")
@@ -769,11 +902,34 @@ if ($currentInnoVersion -ne $InnoSetupVersion) {
 $installerPath = Join-Path $PWD "installer_output/PuriPulyHeart-Setup-$AppVersion.exe"
 $installerHashPath = "$installerPath.sha256"
 $InstallerTestAppId = "{{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}"
-$InstallerSmokeBuildDir = Join-Path $env:TEMP "PuriPulyHeart-Installer-Smoke"
-$InstallerSmokeDir = Join-Path $env:LOCALAPPDATA "Programs\PuriPulyHeart-LocalSTT-Test"
-$InstallerSmokeAppDataRoot = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-AppData"
-$InstallerSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test.log"
-$InstallerReinstallSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-reinstall.log"
+if (-not $InstallerTestAppId.StartsWith("{{", [System.StringComparison]::Ordinal) -or
+    -not $InstallerTestAppId.EndsWith("}", [System.StringComparison]::Ordinal)) {
+    throw "Installer smoke AppId must use the Inno literal-brace form '{{GUID}'."
+}
+$InstallerTestRegistryId = $InstallerTestAppId.Substring(1)
+$InstallerSmokeRunId = "$(Get-Date -Format 'yyyyMMddTHHmmssZ')-$([Guid]::NewGuid().ToString('N').Substring(0, 8))"
+$InstallerTestNamespace = "puripuly-heart-installer-smoke-$InstallerSmokeRunId"
+$InstallerTestGroupName = "PuriPulyHeart-Installer-Smoke-$InstallerSmokeRunId"
+$actualLocalApplicationData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+$actualRoamingApplicationData = [Environment]::GetFolderPath([Environment+SpecialFolder]::ApplicationData)
+if ([string]::IsNullOrWhiteSpace($actualLocalApplicationData) -or [string]::IsNullOrWhiteSpace($actualRoamingApplicationData)) {
+    throw "Windows known-folder resolution failed for installer smoke AppData roots."
+}
+$InstallerSmokeBuildDir = Join-Path ([System.IO.Path]::GetTempPath()) (Join-Path "PuriPulyHeart-Installer-Smoke" $InstallerSmokeRunId)
+$InstallerSafetyBackupDir = Join-Path ([System.IO.Path]::GetTempPath()) (Join-Path "PuriPulyHeart-Installer-Smoke-Backup" $InstallerSmokeRunId)
+$InstallerSmokeDir = Join-Path $actualLocalApplicationData "Programs\PuriPulyHeart-Installer-Smoke-$InstallerSmokeRunId"
+$InstallerSmokeAppDataRoot = Join-Path $actualLocalApplicationData $InstallerTestNamespace
+$InstallerSmokeAppDataRootForIscc = $InstallerSmokeAppDataRoot.Replace(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+)
+$InstallerSmokeAppDataDirName = $InstallerTestNamespace
+$InstallerSmokeRedirectedLocalAppData = Join-Path $InstallerSmokeBuildDir "redirected-localappdata-$InstallerSmokeRunId"
+$InstallerSmokeRedirectedRoamingAppData = Join-Path $InstallerSmokeBuildDir "redirected-roamingappdata-$InstallerSmokeRunId"
+$InstallerSmokeProgramsGroupDir = Join-Path $actualRoamingApplicationData "Microsoft\Windows\Start Menu\Programs\$InstallerTestGroupName"
+$InstallerSmokeUninstallRegistryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$($InstallerTestRegistryId)_is1"
+$InstallerSmokeLogPath = Join-Path $InstallerSmokeBuildDir "install.log"
+$InstallerReinstallSmokeLogPath = Join-Path $InstallerSmokeBuildDir "reinstall.log"
 $installedProcessCaptureSmokeArtifactRoot = Join-Path $InstallerSmokeDir "process-capture-smoke"
 $installedProcessCaptureSmokeHelperPath = Join-Path $installedProcessCaptureSmokeArtifactRoot "PuriPulyHeartProcessCaptureSmoke.exe"
 $installedExePath = Join-Path $InstallerSmokeDir "PuriPulyHeart.exe"
@@ -797,54 +953,147 @@ if (Test-Path $installerPath) {
 if (Test-Path $installerHashPath) {
     Remove-Item -Path $installerHashPath -Force
 }
-if (Test-Path $InstallerSmokeBuildDir) {
-    Remove-Item -Recurse -Force $InstallerSmokeBuildDir -ErrorAction SilentlyContinue
+$installerSmokeOwnedPaths = [System.Collections.Generic.List[string]]::new()
+$installerSmokeAllowedCleanupRoots = @(
+    [System.IO.Path]::GetTempPath(),
+    $actualLocalApplicationData,
+    $actualRoamingApplicationData
+)
+$installerSmokeOwnsRegistryKey = $false
+$installerSmokeFailure = $null
+$installerSmokeCleanupErrors = [System.Collections.Generic.List[string]]::new()
+$previousLocalAppData = $env:LOCALAPPDATA
+$previousAppData = $env:APPDATA
+$productionAppDataRoot = Join-Path $actualLocalApplicationData "puripuly-heart"
+$productionAppDataRootExisted = Test-Path -LiteralPath $productionAppDataRoot
+$productionAppDataSentinelPath = Join-Path $productionAppDataRoot ".installer-smoke-$InstallerSmokeRunId.sentinel"
+$productionProtectedFingerprint = $null
+$productionBackupSnapshot = Join-Path $InstallerSafetyBackupDir "puripuly-heart"
+
+foreach ($unusedSmokePath in @(
+    $InstallerSmokeBuildDir,
+    $InstallerSafetyBackupDir,
+    $InstallerSmokeDir,
+    $InstallerSmokeAppDataRoot,
+    $InstallerSmokeProgramsGroupDir
+)) {
+    if (Test-Path -LiteralPath $unusedSmokePath) {
+        throw "Installer smoke refused unknown or preexisting occupancy and left it untouched: $unusedSmokePath. Inspect and remove it manually only after establishing ownership."
+    }
 }
-if (Test-Path $InstallerSmokeDir) {
-    Remove-Item -Recurse -Force $InstallerSmokeDir -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $InstallerSmokeUninstallRegistryPath) {
+    throw "Installer smoke refused an occupied alternate AppId registration and left it untouched: $InstallerSmokeUninstallRegistryPath. Inspect and remove it manually only after establishing ownership."
 }
-if (Test-Path $InstallerSmokeAppDataRoot) {
-    Remove-Item -Recurse -Force $InstallerSmokeAppDataRoot -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $productionAppDataSentinelPath) {
+    throw "Production AppData sentinel path is already in use: $productionAppDataSentinelPath"
 }
-if (Test-Path $InstallerSmokeLogPath) {
-    Remove-Item -Path $InstallerSmokeLogPath -Force -ErrorAction SilentlyContinue
-}
-if (Test-Path $InstallerReinstallSmokeLogPath) {
-    Remove-Item -Path $InstallerReinstallSmokeLogPath -Force -ErrorAction SilentlyContinue
+if ($productionAppDataRootExisted) {
+    $productionRootItem = Get-Item -LiteralPath $productionAppDataRoot -Force
+    if (($productionRootItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Installer smoke refuses to back up or hash a production AppData root that is a reparse point: $productionAppDataRoot"
+    }
+    if (@(Get-ChildItem -LiteralPath $productionAppDataRoot -Force -Recurse -Attributes ReparsePoint).Count -ne 0) {
+        throw "Installer smoke refuses to traverse, back up, or hash production AppData containing reparse points: $productionAppDataRoot"
+    }
 }
 
-Write-Host "Building installer..."
-Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @("installer.iss") -WorkingDirectory $PWD
+New-Item -ItemType Directory -Path $InstallerSmokeBuildDir | Out-Null
+$installerSmokeOwnedPaths.Add($InstallerSmokeBuildDir)
+$installerSmokeOwnedPaths.Add($InstallerSmokeDir)
+$installerSmokeOwnedPaths.Add($InstallerSmokeAppDataRoot)
+$installerSmokeOwnedPaths.Add($InstallerSmokeProgramsGroupDir)
+$installerSmokeOwnedPaths.Add($InstallerSmokeRedirectedLocalAppData)
+$installerSmokeOwnedPaths.Add($InstallerSmokeRedirectedRoamingAppData)
+$installerSmokeLedgerPath = Join-Path $InstallerSmokeBuildDir "ownership-ledger.json"
+@{
+    run_id = $InstallerSmokeRunId
+    owned_paths = @($installerSmokeOwnedPaths)
+    uninstall_registry_path = $InstallerSmokeUninstallRegistryPath
+    known_folder_local_app_data = $actualLocalApplicationData
+    known_folder_roaming_app_data = $actualRoamingApplicationData
+} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $installerSmokeLedgerPath -Encoding utf8
 
-if (-not (Test-Path $installerPath)) {
-    throw "Installer not found: $installerPath"
-}
-
-if (-not (Test-Path $packagedOverlayPath)) {
-    Copy-Item -Path $overlayStagedPath -Destination $packagedOverlayPath -Force
-}
-
-if (-not (Test-Path $packagedOverlayPath)) {
-    throw "Packaged overlay executable not found after installer build: $packagedOverlayPath"
-}
-
-Write-Host "Building smoke-test installer with alternate AppId..."
-Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @(
-    "/DMyAppId=$InstallerTestAppId",
-    "/DSkipLocalSttProvisioning=1",
-    "/DProcessCaptureSmokeArtifactRoot=$processCaptureSmokeArtifactRoot",
-    "/O$InstallerSmokeBuildDir",
-    "installer.iss"
-) -WorkingDirectory $PWD
-
-if (-not (Test-Path $smokeInstallerPath)) {
-    throw "Smoke installer not found: $smokeInstallerPath"
-}
-
-Write-Host "Smoke-testing installer with alternate AppId and isolated directory..."
-$previousLocalSttAppDataRoot = $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT
-$env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $InstallerSmokeAppDataRoot
 try {
+    $assertInstallerSmokeNamespaceAvailable = {
+        if (Test-Path -LiteralPath $InstallerSmokeUninstallRegistryPath) {
+            throw "Installer smoke alternate AppId is already registered: $InstallerSmokeUninstallRegistryPath"
+        }
+    }
+    & $assertInstallerSmokeNamespaceAvailable
+    New-Item -Path $InstallerSmokeUninstallRegistryPath -Force | Out-Null
+    $installerSmokeOwnsRegistryKey = $true
+    $occupiedRegistryGuardRejected = $false
+    try {
+        & $assertInstallerSmokeNamespaceAvailable
+    } catch {
+        $occupiedRegistryGuardRejected = $true
+        Write-Host "Installer smoke preflight rejected the controlled occupied test AppId registry key."
+    }
+    if (-not $occupiedRegistryGuardRejected) {
+        throw "Installer smoke registry preflight did not reject its controlled occupied test AppId key."
+    }
+    Remove-Item -LiteralPath $InstallerSmokeUninstallRegistryPath -Recurse -Force
+    $installerSmokeOwnsRegistryKey = $false
+    & $assertInstallerSmokeNamespaceAvailable
+    Write-Host "Installer smoke registry namespace guard accepted the test AppId only after its owned key was removed."
+
+    if ($productionAppDataRootExisted) {
+        New-Item -ItemType Directory -Path $InstallerSafetyBackupDir | Out-Null
+        $installerSmokeOwnedPaths.Add($InstallerSafetyBackupDir)
+        @{
+            run_id = $InstallerSmokeRunId
+            owned_paths = @($installerSmokeOwnedPaths)
+            uninstall_registry_path = $InstallerSmokeUninstallRegistryPath
+            known_folder_local_app_data = $actualLocalApplicationData
+            known_folder_roaming_app_data = $actualRoamingApplicationData
+        } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $installerSmokeLedgerPath -Encoding utf8
+        Copy-Item -LiteralPath $productionAppDataRoot -Destination $productionBackupSnapshot -Recurse
+        $productionFingerprintBeforeSentinel = Get-DirectoryContentSha256 -Path $productionAppDataRoot
+        $productionBackupFingerprint = Get-DirectoryContentSha256 -Path $productionBackupSnapshot
+        if ($productionBackupFingerprint -ne $productionFingerprintBeforeSentinel) {
+            throw "Production AppData safety backup does not match its source snapshot."
+        }
+    }
+    New-Item -ItemType Directory -Force -Path $productionAppDataRoot | Out-Null
+    $productionAppDataSentinel = [Guid]::NewGuid().ToString("N")
+    [System.IO.File]::WriteAllText($productionAppDataSentinelPath, $productionAppDataSentinel, [System.Text.Encoding]::ASCII)
+    $productionProtectedFingerprint = Get-DirectoryContentSha256 -Path $productionAppDataRoot
+
+    Write-Host "Building installer..."
+    Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @("installer.iss") -WorkingDirectory $PWD
+
+    if (-not (Test-Path $installerPath)) {
+        throw "Installer not found: $installerPath"
+    }
+
+    if (-not (Test-Path $packagedOverlayPath)) {
+        Copy-Item -Path $overlayStagedPath -Destination $packagedOverlayPath -Force
+    }
+
+    if (-not (Test-Path $packagedOverlayPath)) {
+        throw "Packaged overlay executable not found after installer build: $packagedOverlayPath"
+    }
+
+    Write-Host "Building smoke-test installer with alternate AppId..."
+    Assert-InstallerPayloadPathLengths -ArtifactRoot $processCaptureSmokeArtifactRoot -DestinationRoot $installedProcessCaptureSmokeArtifactRoot
+    Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @(
+        "/DMyAppId=$InstallerTestAppId",
+        "/DMyAppDataDirName=$InstallerSmokeAppDataDirName",
+        "/DInstallerSmokeAppDataRoot=$InstallerSmokeAppDataRootForIscc",
+        "/DMyAppGroupName=$InstallerTestGroupName",
+        "/DSkipLocalSttProvisioning=1",
+        "/DProcessCaptureSmokeArtifactRoot=$processCaptureSmokeArtifactRoot",
+        "/O$InstallerSmokeBuildDir",
+        "installer.iss"
+    ) -WorkingDirectory $PWD
+
+    if (-not (Test-Path $smokeInstallerPath)) {
+        throw "Smoke installer not found: $smokeInstallerPath"
+    }
+
+    Write-Host "Smoke-testing installer with redirected process AppData and isolated Windows known-folder state..."
+    $env:LOCALAPPDATA = $InstallerSmokeRedirectedLocalAppData
+    $env:APPDATA = $InstallerSmokeRedirectedRoamingAppData
     $installerSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
         "/CURRENTUSER",
         "/VERYSILENT",
@@ -852,16 +1101,16 @@ try {
         "/DIR=$InstallerSmokeDir",
         "/LOG=$InstallerSmokeLogPath"
     ) -Wait -PassThru
-} finally {
-    if ($null -eq $previousLocalSttAppDataRoot) {
-        Remove-Item Env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT -ErrorAction SilentlyContinue
-    } else {
-        $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $previousLocalSttAppDataRoot
-    }
-}
 if ($installerSmoke.ExitCode -ne 0) {
+    if (Test-Path -LiteralPath $InstallerSmokeUninstallRegistryPath) {
+        $installerSmokeOwnsRegistryKey = $true
+    }
     throw "Installer smoke test failed with exit code $($installerSmoke.ExitCode)"
 }
+if (-not (Test-Path -LiteralPath $InstallerSmokeUninstallRegistryPath)) {
+    throw "Installer smoke did not create the expected alternate AppId registration: $InstallerSmokeUninstallRegistryPath"
+}
+$installerSmokeOwnsRegistryKey = $true
 if (-not (Test-Path $InstallerSmokeLogPath)) {
     throw "Installer smoke log not found: $InstallerSmokeLogPath"
 }
@@ -877,6 +1126,13 @@ if ($installerSmokeLog -match [regex]::Escape("Local STT provisioning completed 
 }
 if (-not (Test-Path $installedExePath)) {
     throw "Installed app executable not found after installer smoke: $installedExePath"
+}
+if (-not (Test-Path $InstallerSmokeSettingsPath)) {
+    throw "Installer smoke did not create canonical settings: $InstallerSmokeSettingsPath"
+}
+$freshInstallerSettings = Get-Content -Path $InstallerSmokeSettingsPath -Raw | ConvertFrom-Json
+if ($freshInstallerSettings.intent.telemetry.enabled -ne $true) {
+    throw "Fresh silent installer smoke did not persist the default enabled telemetry preference"
 }
 if (-not (Test-Path $installedProcessCaptureSmokeHelperPath)) {
     throw "Installed release-only process-capture smoke helper not found: $installedProcessCaptureSmokeHelperPath"
@@ -957,25 +1213,28 @@ if (-not (Test-Path $installedLegacySoxrDllPath)) {
 if (-not (Test-Path $legacyRootLevelSoxrDllPath)) {
     throw "Failed to seed stale root-level soxr runtime DLL before reinstall smoke"
 }
+$disableTelemetry = Start-Process -FilePath $installedExePath -ArgumentList @(
+    "--config",
+    $InstallerSmokeSettingsPath,
+    "installer-telemetry-preference",
+    "disable"
+) -Wait -PassThru
+if ($disableTelemetry.ExitCode -ne 0) {
+    throw "Failed to seed disabled telemetry preference before reinstall smoke"
+}
+$disabledInstallerSettings = Get-Content -Path $InstallerSmokeSettingsPath -Raw | ConvertFrom-Json
+if ($disabledInstallerSettings.intent.telemetry.enabled -ne $false -or $null -ne $disabledInstallerSettings.state.telemetry.anonymous_id) {
+    throw "Disabled telemetry seed did not persist the canonical OFF invariant"
+}
 
 Write-Host "Smoke-testing installer reinstall replaces installed soxr runtime DLL..."
-$previousLocalSttAppDataRoot = $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT
-$env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $InstallerSmokeAppDataRoot
-try {
-    $installerReinstallSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
-        "/CURRENTUSER",
-        "/VERYSILENT",
-        "/SUPPRESSMSGBOXES",
-        "/DIR=$InstallerSmokeDir",
-        "/LOG=$InstallerReinstallSmokeLogPath"
-    ) -Wait -PassThru
-} finally {
-    if ($null -eq $previousLocalSttAppDataRoot) {
-        Remove-Item Env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT -ErrorAction SilentlyContinue
-    } else {
-        $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $previousLocalSttAppDataRoot
-    }
-}
+$installerReinstallSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
+    "/CURRENTUSER",
+    "/VERYSILENT",
+    "/SUPPRESSMSGBOXES",
+    "/DIR=$InstallerSmokeDir",
+    "/LOG=$InstallerReinstallSmokeLogPath"
+) -Wait -PassThru
 if ($installerReinstallSmoke.ExitCode -ne 0) {
     throw "Installer reinstall smoke test failed with exit code $($installerReinstallSmoke.ExitCode)"
 }
@@ -988,6 +1247,10 @@ if ($installerReinstallSmokeLog -match "Local STT provisioning failed" -or $inst
 }
 if ($installerReinstallSmokeLog -notmatch [regex]::Escape("Local STT provisioning skipped for isolated installer smoke.")) {
     throw "Installer reinstall smoke log is missing isolated no-network provisioning skip marker"
+}
+$reinstalledSettings = Get-Content -Path $InstallerSmokeSettingsPath -Raw | ConvertFrom-Json
+if ($reinstalledSettings.intent.telemetry.enabled -ne $false -or $null -ne $reinstalledSettings.state.telemetry.anonymous_id) {
+    throw "Installer reinstall smoke did not preserve the existing telemetry opt-out"
 }
 
 $reinstalledOpenVrDllHash = Get-FileSha256 -Path $installedOpenVrDllPath
@@ -1035,6 +1298,9 @@ $installedUninstallerPath = Join-Path $InstallerSmokeDir "unins000.exe"
 if (-not (Test-Path $installedUninstallerPath)) {
     throw "Isolated installer smoke uninstaller not found: $installedUninstallerPath"
 }
+New-Item -ItemType Directory -Force -Path $InstallerSmokeAppDataRoot | Out-Null
+$testAppDataSentinelPath = Join-Path $InstallerSmokeAppDataRoot "uninstall-delete.sentinel"
+[System.IO.File]::WriteAllText($testAppDataSentinelPath, "delete-with-test-namespace", [System.Text.Encoding]::ASCII)
 $uninstallSmoke = Start-Process -FilePath $installedUninstallerPath -ArgumentList @(
     "/VERYSILENT",
     "/SUPPRESSMSGBOXES",
@@ -1044,9 +1310,144 @@ if ($uninstallSmoke.ExitCode -ne 0) {
     throw "Isolated installer smoke cleanup failed with exit code $($uninstallSmoke.ExitCode)"
 }
 Start-Sleep -Seconds 1
-if (Test-Path $InstallerSmokeDir) {
+if (Test-Path -LiteralPath $InstallerSmokeDir) {
     throw "Isolated installer smoke directory remains after cleanup: $InstallerSmokeDir"
 }
+if (-not (Test-Path -LiteralPath $productionAppDataSentinelPath -PathType Leaf)) {
+    throw "Alternate-AppId uninstall deleted the production AppData sentinel in the Windows known folder."
+}
+if ([System.IO.File]::ReadAllText($productionAppDataSentinelPath, [System.Text.Encoding]::ASCII) -ne $productionAppDataSentinel) {
+    throw "Alternate-AppId uninstall modified the production AppData sentinel in the Windows known folder."
+}
+if ((Get-DirectoryContentSha256 -Path $productionAppDataRoot) -ne $productionProtectedFingerprint) {
+    throw "Alternate-AppId lifecycle modified production AppData content; the verified pre-run backup is retained for manual recovery."
+}
+if (Test-Path -LiteralPath $InstallerSmokeAppDataRoot) {
+    throw "Alternate-AppId uninstall did not delete its isolated AppData root in the Windows known folder: $InstallerSmokeAppDataRoot"
+}
+if (Test-Path -LiteralPath $InstallerSmokeProgramsGroupDir) {
+    throw "Alternate-AppId uninstall left its isolated Start Menu group: $InstallerSmokeProgramsGroupDir"
+}
+if (Test-Path -LiteralPath $InstallerSmokeUninstallRegistryPath) {
+    throw "Alternate-AppId uninstall left its isolated uninstall registration: $InstallerSmokeUninstallRegistryPath"
+}
+$installerSmokeOwnsRegistryKey = $false
+Write-Host "Installer lifecycle assertions passed; running owned final cleanup."
+} catch {
+    $installerSmokeFailure = $_
+} finally {
+    if ($null -eq $previousLocalAppData) {
+        Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+    } else {
+        $env:LOCALAPPDATA = $previousLocalAppData
+    }
+    if ($null -eq $previousAppData) {
+        Remove-Item Env:APPDATA -ErrorAction SilentlyContinue
+    } else {
+        $env:APPDATA = $previousAppData
+    }
+
+    if (Test-Path -LiteralPath $InstallerSmokeDir -PathType Container) {
+        $cleanupUninstallerPath = Join-Path $InstallerSmokeDir "unins000.exe"
+        if (Test-Path -LiteralPath $cleanupUninstallerPath -PathType Leaf) {
+            try {
+                $cleanupUninstall = Start-Process -FilePath $cleanupUninstallerPath -ArgumentList @(
+                    "/VERYSILENT",
+                    "/SUPPRESSMSGBOXES",
+                    "/NORESTART"
+                ) -Wait -PassThru
+                if ($cleanupUninstall.ExitCode -ne 0) {
+                    $installerSmokeCleanupErrors.Add("Owned failure-cleanup uninstaller exited $($cleanupUninstall.ExitCode).")
+                }
+            } catch {
+                $installerSmokeCleanupErrors.Add("Owned failure-cleanup uninstaller failed: $($_.Exception.Message)")
+            }
+        }
+    }
+
+    $productionDataChanged = $false
+    try {
+        if ($null -ne $productionProtectedFingerprint) {
+            if (-not (Test-Path -LiteralPath $productionAppDataRoot -PathType Container)) {
+                $productionDataChanged = $true
+                $installerSmokeCleanupErrors.Add("Production AppData root disappeared during installer smoke. Historical deleted data was not recreated.")
+            } elseif ((Get-DirectoryContentSha256 -Path $productionAppDataRoot) -ne $productionProtectedFingerprint) {
+                $productionDataChanged = $true
+                $installerSmokeCleanupErrors.Add("Production AppData content fingerprint changed during installer smoke.")
+            }
+        }
+    } catch {
+        $productionDataChanged = $true
+        $installerSmokeCleanupErrors.Add("Production AppData final fingerprint check failed: $($_.Exception.Message)")
+    }
+
+    try {
+        if (Test-Path -LiteralPath $productionAppDataSentinelPath -PathType Leaf) {
+            Remove-Item -LiteralPath $productionAppDataSentinelPath -Force
+        }
+        if ((-not $productionAppDataRootExisted) -and
+            (Test-Path -LiteralPath $productionAppDataRoot -PathType Container) -and
+            (@(Get-ChildItem -LiteralPath $productionAppDataRoot -Force).Count -eq 0)) {
+            Remove-Item -LiteralPath $productionAppDataRoot -Force
+        }
+    } catch {
+        $installerSmokeCleanupErrors.Add("Production AppData sentinel cleanup failed: $($_.Exception.Message)")
+    }
+
+    if ($productionDataChanged -and (Test-Path -LiteralPath $InstallerSafetyBackupDir -PathType Container)) {
+        [void]$installerSmokeOwnedPaths.Remove($InstallerSafetyBackupDir)
+        $installerSmokeCleanupErrors.Add("Verified production-data backup retained for manual recovery only: $InstallerSafetyBackupDir")
+    }
+
+    if ($null -ne $installerSmokeFailure) {
+        try {
+            $failureReceiptPath = Join-Path ([System.IO.Path]::GetTempPath()) "PuriPulyHeart-Installer-Smoke-Failure-$InstallerSmokeRunId.json"
+            $failureLogs = foreach ($failureLogPath in @($InstallerSmokeLogPath, $InstallerReinstallSmokeLogPath)) {
+                if (Test-Path -LiteralPath $failureLogPath -PathType Leaf) {
+                    @{
+                        name = [System.IO.Path]::GetFileName($failureLogPath)
+                        bytes = (Get-Item -LiteralPath $failureLogPath).Length
+                        sha256 = Get-FileSha256 -Path $failureLogPath
+                    }
+                }
+            }
+            @{
+                run_id = $InstallerSmokeRunId
+                error = $installerSmokeFailure.Exception.Message
+                log_inventory = @($failureLogs)
+                cleanup_disposition = "Only current-run journaled paths are eligible for automatic cleanup. Unknown or preexisting occupancy is never removed; inspect it manually after establishing ownership."
+            } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $failureReceiptPath -Encoding utf8
+            Write-Warning "Installer smoke failed; text evidence retained at $failureReceiptPath"
+        } catch {
+            $installerSmokeCleanupErrors.Add("Failure evidence receipt could not be written: $($_.Exception.Message)")
+        }
+    }
+
+    try {
+        $ownedCleanupErrors = @(Remove-InstallerSmokeOwnedArtifacts `
+            -OwnedPaths @($installerSmokeOwnedPaths) `
+            -AllowedRoots $installerSmokeAllowedCleanupRoots `
+            -RunId $InstallerSmokeRunId `
+            -UninstallRegistryPath $InstallerSmokeUninstallRegistryPath `
+            -OwnsUninstallRegistryKey $installerSmokeOwnsRegistryKey)
+        foreach ($ownedCleanupError in $ownedCleanupErrors) {
+            $installerSmokeCleanupErrors.Add($ownedCleanupError)
+        }
+    } catch {
+        $installerSmokeCleanupErrors.Add("Owned artifact cleanup failed unexpectedly: $($_.Exception.Message)")
+    }
+}
+
+if ($null -ne $installerSmokeFailure) {
+    foreach ($cleanupError in $installerSmokeCleanupErrors) {
+        Write-Warning "Installer smoke cleanup disposition: $cleanupError"
+    }
+    throw $installerSmokeFailure
+}
+if ($installerSmokeCleanupErrors.Count -ne 0) {
+    throw "Installer smoke behavior passed but owned cleanup failed: $($installerSmokeCleanupErrors -join ' | ')"
+}
+Write-Host "Installer smoke passed and all current-run owned install, data, registry, shortcut, log, and binary byproducts were removed."
 
 Write-Host "Generating SHA256..."
 $hash = (Get-FileHash -Path $installerPath -Algorithm SHA256).Hash

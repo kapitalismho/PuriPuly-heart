@@ -100,6 +100,15 @@ def build_parser() -> argparse.ArgumentParser:
     local_asr_production_evidence.add_argument("--audio", type=Path, required=True)
     local_asr_production_evidence.add_argument("--report", type=Path, required=True)
     local_asr_production_evidence.add_argument("--candidate", required=True)
+    installer_telemetry = sub.add_parser(
+        "installer-telemetry-preference",
+        help=argparse.SUPPRESS,
+    )
+    installer_telemetry.add_argument(
+        "action",
+        choices=("enable", "disable"),
+        help=argparse.SUPPRESS,
+    )
     local_asr_production_evidence.add_argument("--expected-gpu-name", required=True)
     run_gui = sub.add_parser("run-gui", help="Run the Graphical User Interface (Flet)")
     run_gui.add_argument(
@@ -285,6 +294,18 @@ def _settings_config_path(args: argparse.Namespace) -> tuple[Path, bool]:
     return default_settings_path(), False
 
 
+def _run_installer_telemetry_preference(path: Path, action: str) -> int:
+    from puripuly_heart.app.services.installer_telemetry_preference import (
+        persist_installer_telemetry_preference,
+    )
+
+    try:
+        persist_installer_telemetry_preference(path, action == "enable")
+        return 0
+    except Exception:
+        return 23
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -305,6 +326,9 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.command == "verify-desktop-overlay-repro":
         return _verify_desktop_overlay_repro(output_dir=args.output_dir)
+    if args.command == "installer-telemetry-preference":
+        settings_config_path, _ = _settings_config_path(args)
+        return _run_installer_telemetry_preference(settings_config_path, args.action)
 
     settings_config_path, explicit_settings_config = _settings_config_path(args)
     debug_ui_preview = bool(getattr(args, "debug_ui_preview", False))

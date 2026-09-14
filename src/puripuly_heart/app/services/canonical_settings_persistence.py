@@ -255,6 +255,28 @@ class SettingsOwner:
     ) -> AppSettingsVNext:
         return with_telemetry_enabled(settings, enabled)
 
+    def persist_telemetry_preference(self, enabled: bool) -> AppSettingsVNext:
+        if self.path.exists():
+            settings = self.persistence.load_active(self.path).canonical_settings
+        else:
+            settings = new_settings_for_first_run()
+        expected = self.with_telemetry_enabled(settings, enabled)
+        self.canonical = settings
+        self.begin(snapshot=settings)
+        self.canonical = expected
+        try:
+            self.persist()
+            verified = self.persistence.load_active(self.path).canonical_settings
+            if verified != expected:
+                raise RuntimeError("persisted telemetry preference did not verify")
+        except Exception:
+            self.rollback()
+            raise
+        self.canonical = verified
+        self.remember_projection(verified)
+        self.complete()
+        return verified
+
     def build_managed_openrouter_byok_target(
         self,
         current_settings: AppSettingsVNext | None = None,
@@ -569,6 +591,7 @@ class SettingsOwner:
 def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> AppSettingsVNext:
     from puripuly_heart.config.llm_profiles import (
         OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+        OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
         OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK,
         OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED,
         OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK,
@@ -585,6 +608,9 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
         translation = replace(translation, model="qwen38_flash")
         model = "qwen38_flash"
     connection = translation.connection
+    if model == "deepseek_v4_flash" and connection == "official_byok":
+        translation = replace(translation, model="deepseek_v4_flash_41")
+        model = "deepseek_v4_flash_41"
     if model == "custom_http":
         if connection == "custom_http":
             return settings
@@ -609,23 +635,17 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
             ),
         }
     elif model == "gemma4_31b":
-        if connection == "cerebras":
-            updates = {
-                "openrouter_provider_routing": "default",
-                "cerebras": replace(translation.cerebras, llm_model="gemma-4-31b"),
-            }
-        else:
-            selected_source = "managed" if connection == "managed" else "byok"
-            updates = {
-                "openrouter_model": "google/gemma-4-31b-it",
-                "openrouter_provider_routing": "gemma4_31b_latency",
-                "openrouter_selected_source": selected_source,
-                "openrouter_selection_alias": (
-                    OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED
-                    if connection == "managed"
-                    else OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK
-                ),
-            }
+        selected_source = "managed" if connection == "managed" else "byok"
+        updates = {
+            "openrouter_model": "google/gemma-4-31b-it",
+            "openrouter_provider_routing": "gemma4_31b_latency",
+            "openrouter_selected_source": selected_source,
+            "openrouter_selection_alias": (
+                OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED
+                if connection == "managed"
+                else OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK
+            ),
+        }
     elif model == "gemma4":
         selected_source = "managed" if connection == "managed" else "byok"
         openrouter_model = "google/gemma-4-26b-a4b-it"
@@ -639,19 +659,33 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
             ),
         }
     elif model == "deepseek_v4_flash":
+        selected_source = "managed" if connection in {"managed", "managed_china"} else "byok"
+        openrouter_model = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+        updates = {
+            "openrouter_model": openrouter_model,
+            "openrouter_provider_routing": (
+                "deepseek_v4_flash_china"
+                if connection == "managed_china"
+                else "deepseek_v4_flash_latency"
+            ),
+            "openrouter_selected_source": selected_source,
+            "openrouter_selection_alias": openrouter_alias_for_fields(
+                model=openrouter_model,
+                source=selected_source,
+            ),
+        }
+    elif model == "deepseek_v4_flash_41":
         if connection == "official_byok":
             updates = {
                 "openrouter_provider_routing": "default",
-                "deepseek": replace(translation.deepseek, llm_model="deepseek-v4-flash"),
+                "deepseek": replace(translation.deepseek, llm_model="deepseek-flash"),
             }
         else:
             selected_source = "managed" if connection in {"managed", "managed_china"} else "byok"
-            openrouter_model = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+            openrouter_model = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
             updates = {
                 "openrouter_model": openrouter_model,
-                "openrouter_provider_routing": (
-                    "deepseek_only" if connection == "managed_china" else "default"
-                ),
+                "openrouter_provider_routing": "deepseek_v4_flash_41_strict",
                 "openrouter_selected_source": selected_source,
                 "openrouter_selection_alias": openrouter_alias_for_fields(
                     model=openrouter_model,

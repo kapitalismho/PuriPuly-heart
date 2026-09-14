@@ -39,6 +39,7 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
 from puripuly_heart.core.orchestrator.translation_output_projection import TranslationUiMessage
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
+    TranslationTurnKind,
     TranslationTurnOutcome,
     TranslationTurnProcessResult,
 )
@@ -132,6 +133,7 @@ class TranslationRequestPort(Protocol):
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         source_language: str | None = None,
         target_language: str | None = None,
+        origin: str | None = None,
     ) -> None: ...
 
     def prepare(
@@ -183,6 +185,7 @@ class DirectTranslationRequest:
     detected_language: str | None = None
     target_language: str | None = None
     config_snapshot: TranslationRuntimeConfigSnapshot | None = None
+    expected_provider_generation: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,13 +205,20 @@ class TranslationProcessRequest:
     turn_order: int | None = None
     publication_generation: int | None = None
     source_order: int | None = None
+    turn_kind: TranslationTurnKind | None = None
+    parent_output_count: int = 1
+    expected_provider_generation: int | None = None
+    prestarted: bool = False
 
     def __post_init__(self) -> None:
         if (self.turn_generation is None) != (self.turn_order is None):
             raise ValueError("turn generation and order must be provided together")
+        if self.prestarted and self.expected_provider_generation is None:
+            raise ValueError("prestarted translation requires an expected provider generation")
         for name, value in (
             ("turn_generation", self.turn_generation),
             ("turn_order", self.turn_order),
+            ("expected_provider_generation", self.expected_provider_generation),
         ):
             if value is None:
                 continue
@@ -344,6 +354,7 @@ class TranslationRequestOwner:
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         source_language: str | None = None,
         target_language: str | None = None,
+        origin: str | None = None,
     ) -> None:
         runtime = self.runtime_for_channel(channel)
         config_snapshot = config_snapshot or self.config_snapshot()
@@ -353,6 +364,7 @@ class TranslationRequestOwner:
             timestamp=timestamp,
             source_language=source_language or self.source_language_for(channel, configuration),
             target_language=target_language or self.target_language_for(channel, configuration),
+            origin=origin,
             max_entries=max(
                 configuration.context_max_entries,
                 configuration.integrated_context_max_entries,
@@ -468,6 +480,7 @@ class TranslationRequestOwner:
                 config_snapshot=request.config_snapshot,
                 source_language=prepared.source_language,
                 target_language=prepared.target_language,
+                origin=request.turn_kind,
             )
         return {request.utterance_id: prepared for request, prepared in prepared_requests}
 
@@ -477,6 +490,11 @@ class TranslationRequestOwner:
         if provider_request is None:
             raise RuntimeError("translation backend is not configured")
         backend, generation = provider_request
+        if (
+            request.expected_provider_generation is not None
+            and generation != request.expected_provider_generation
+        ):
+            raise StaleProviderCompletion
         prepared = self.prepare(
             request.text,
             channel=request.channel,
@@ -544,6 +562,16 @@ class TranslationRequestOwner:
                 source_language=request.detected_language,
             )
         backend, generation = provider_request
+        if (
+            request.expected_provider_generation is not None
+            and generation != request.expected_provider_generation
+        ):
+            return self._result(
+                request,
+                "failed",
+                "stale_provider_completion",
+                source_language=request.detected_language,
+            )
         request_source = self._request_source_language(
             request.channel,
             detected_language=request.detected_language,
@@ -556,7 +584,8 @@ class TranslationRequestOwner:
             if outcome == "failed":
                 exc = _UnmappedDetectedLanguage()
                 report = self._record_failure(request, exc)
-                await self._publish_failure(request, report)
+                if not request.prestarted:
+                    await self._publish_failure(request, report)
             return self._result(
                 request,
                 outcome,
@@ -584,6 +613,7 @@ class TranslationRequestOwner:
                     config_snapshot=request.config_snapshot,
                     source_language=source_language,
                     target_language=request.target_language,
+                    origin=request.turn_kind,
                 )
             elif prepared.target_language != request.target_language:
                 raise ValueError("prepared translation target mismatch")
@@ -598,18 +628,58 @@ class TranslationRequestOwner:
                 turn_order=request.turn_order,
                 target_language=request.target_language,
             )
-            try:
-                raw_translation = await backend.translate(
-                    TranslationBackendRequest(
-                        utterance_id=request.utterance_id,
-                        text=request.text,
-                        system_prompt=prepared.system_prompt,
-                        source_language=source_language,
-                        target_language=request.target_language,
-                        context=prepared.context,
-                        scene_participant_count=_scene_participant_count(prepared.scene_snapshot),
+            provider_started_at = self.clock.now()
+            if request.prestarted:
+                self.diagnostics.emit(
+                    RuntimeDiagnostic(
+                        message=(
+                            "[Detailed][Translation] secondary_prestart_provider_started "
+                            "parent_utterance_id=%s target_index=%s target_language=%s "
+                            "provider_generation=%s"
+                        ),
+                        args=(
+                            request.parent_utterance_id,
+                            request.target_index,
+                            request.target_language,
+                            generation,
+                        ),
+                        detailed=True,
                     )
                 )
+            try:
+                try:
+                    raw_translation = await backend.translate(
+                        TranslationBackendRequest(
+                            utterance_id=request.utterance_id,
+                            text=request.text,
+                            system_prompt=prepared.system_prompt,
+                            source_language=source_language,
+                            target_language=request.target_language,
+                            context=prepared.context,
+                            scene_participant_count=_scene_participant_count(
+                                prepared.scene_snapshot
+                            ),
+                        )
+                    )
+                finally:
+                    if request.prestarted:
+                        self.diagnostics.emit(
+                            RuntimeDiagnostic(
+                                message=(
+                                    "[Detailed][Translation] secondary_prestart_provider_finished "
+                                    "parent_utterance_id=%s target_index=%s target_language=%s "
+                                    "provider_generation=%s elapsed_ms=%s"
+                                ),
+                                args=(
+                                    request.parent_utterance_id,
+                                    request.target_index,
+                                    request.target_language,
+                                    generation,
+                                    int((self.clock.now() - provider_started_at) * 1000),
+                                ),
+                                detailed=True,
+                            )
+                        )
             except Exception:
                 self._raise_if_stale_provider_request(backend, generation)
                 raise
@@ -644,7 +714,8 @@ class TranslationRequestOwner:
             )
         except Exception as exc:
             report = self._record_failure(request, exc)
-            await self._publish_failure(request, self._translation_error_payload(exc, report))
+            if not request.prestarted:
+                await self._publish_failure(request, self._translation_error_payload(exc, report))
             return self._result(
                 request,
                 "failed",
@@ -671,6 +742,8 @@ class TranslationRequestOwner:
                 turn_order=request.turn_order,
                 publication_generation=request.publication_generation,
                 source_order=request.source_order,
+                turn_kind=request.turn_kind,
+                parent_output_count=request.parent_output_count,
             ),
         )
 
@@ -839,6 +912,8 @@ class TranslationRequestOwner:
                 turn_order=request.turn_order,
                 publication_generation=request.publication_generation,
                 source_order=request.source_order,
+                turn_kind=request.turn_kind,
+                parent_output_count=request.parent_output_count,
             ),
         )
 

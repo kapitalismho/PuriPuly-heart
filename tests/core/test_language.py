@@ -8,11 +8,12 @@ from puripuly_heart.core.language import (
     get_deepgram_language,
     get_language_info,
     get_llm_language_name,
-    get_qwen_asr_language,
+    get_qwen3_asr_language,
     get_soniox_language_hints,
     get_stt_compatibility_warning,
     is_deepgram_supported,
-    is_qwen_asr_supported,
+    is_qwen3_asr_supported,
+    is_qwen_audio_asr_supported,
     is_soniox_supported,
     is_supported_language,
     map_detected_language_for_llm,
@@ -29,7 +30,7 @@ def test_get_language_info_handles_exact_and_regional_codes() -> None:
 def test_language_helpers_fallback_for_unknown() -> None:
     assert get_deepgram_language("xx") == "en"
     assert get_llm_language_name("xx") == "English"
-    assert get_qwen_asr_language("xx") == "en"
+    assert get_qwen3_asr_language("xx") == "en"
     assert get_soniox_language_hints("xx") == ["en"]
 
 
@@ -44,9 +45,9 @@ def test_detected_language_mapper_preserves_generic_chinese() -> None:
     assert map_detected_language_for_llm("xx") is None
 
 
-def test_qwen_asr_language_normalization() -> None:
-    assert get_qwen_asr_language("zh-TW") == "zh"
-    assert get_qwen_asr_language("ko-KR") == "ko"
+def test_qwen3_asr_language_normalization() -> None:
+    assert get_qwen3_asr_language("zh-TW") == "zh"
+    assert get_qwen3_asr_language("ko-KR") == "ko"
 
 
 def test_qwen_audio_hint_mapping_drops_unsupported_dedupes_and_limits() -> None:
@@ -142,7 +143,8 @@ def test_supported_language_checks() -> None:
     assert is_supported_language("xx") is False
     assert is_deepgram_supported("en") is True
     assert is_deepgram_supported("ar") is False
-    assert is_qwen_asr_supported("ar") is True
+    assert is_qwen3_asr_supported("tr") is True
+    assert is_qwen_audio_asr_supported("tr") is False
     assert is_soniox_supported("ja") is True
 
 
@@ -152,10 +154,10 @@ def test_stt_compatibility_warning_variants() -> None:
     assert warning.key == "warning.deepgram_suggest_qwen"
     assert warning.language_code == "ar"
 
-    warning = get_stt_compatibility_warning("bg", "qwen_asr")
+    warning = get_stt_compatibility_warning("tr", "qwen_audio")
     assert warning is not None
     assert warning.key == "warning.qwen_suggest_deepgram"
-    assert warning.language_code == "bg"
+    assert warning.language_code == "tr"
 
     warning = get_stt_compatibility_warning("bg", "qwen_audio")
     assert warning is None
@@ -164,7 +166,7 @@ def test_stt_compatibility_warning_variants() -> None:
     assert warning is not None
     assert warning.key == "warning.deepgram_not_supported"
 
-    warning = get_stt_compatibility_warning("xx", "qwen_asr")
+    warning = get_stt_compatibility_warning("xx", "qwen_audio")
     assert warning is not None
     assert warning.key == "warning.qwen_not_supported"
 

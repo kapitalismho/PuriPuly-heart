@@ -129,7 +129,6 @@ _WIRING_SECRET_KEYS_FOR_COMPATIBILITY_GUARD = (
     "alibaba_api_key_singapore",
     "alibaba_api_key",
     "local_llm_api_key",
-    "cerebras_api_key",
     "custom_stt_api_key",
 )
 
@@ -197,7 +196,6 @@ def compose_peer_capture_session_owner(
 _base_llm_provider_from_resolved_config = _llm_factory._base_llm_provider_from_resolved_config
 _openrouter_provider_from_resolved_config = _llm_factory._openrouter_provider_from_resolved_config
 _openrouter_provider_from_resolved_fields = _llm_factory._openrouter_provider_from_resolved_fields
-_cerebras_api_key_for_resolved_credential = _llm_factory._cerebras_api_key_for_resolved_credential
 _qwen_api_key_for_resolved_credential = _llm_factory._qwen_api_key_for_resolved_credential
 
 

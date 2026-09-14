@@ -77,17 +77,17 @@ def test_runtime_resolves_three_stage_plan_without_deduplicating_targets() -> No
     assert config.attempts[1].start_after_ms == 1300
     assert config.attempts[1].start_on_primary_error is True
     assert config.attempts[1].target == config.attempts[0].target
-    assert config.attempts[2].start_after_ms == 4500
+    assert config.attempts[2].start_after_ms == 4400
     assert config.attempts[2].start_on_primary_error is False
     assert config.attempts[2].target.model == llm_profiles.OPENROUTER_MODEL_GEMMA_4_31B_IT
-    assert config.attempts[2].target.provider_routing == "gemma4_31b_cerebras_only"
+    assert config.attempts[2].target.provider_routing == "gemma4_31b_modelrun_only"
     assert config.loser_grace_ms == 50
 
 
 def test_non_openrouter_primary_does_not_get_emergency_attempt() -> None:
     config = runtime_resolution.resolve_llm_config(
         _runtime_input(
-            model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
+            model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
             connection=runtime_resolution.TRANSLATION_CONNECTION_OFFICIAL_BYOK,
             fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
                 enabled=True,

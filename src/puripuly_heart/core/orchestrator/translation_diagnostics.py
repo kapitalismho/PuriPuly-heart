@@ -59,6 +59,7 @@ class SttEventLoopFailureDiagnostic:
     provider: object | None
     default_channel: ChannelId
 
+
 @dataclass(frozen=True, slots=True)
 class SttTurnFailureDiagnostic:
     exception: Exception

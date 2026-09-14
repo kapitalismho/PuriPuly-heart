@@ -221,15 +221,18 @@ def fallback_alias_from_settings(settings: Any) -> str:
     model = fallback.model
     connection = fallback.connection
     aliases = {
-        ("deepseek_v4_flash", "official_byok"): "deepseek_v4_flash_official",
+        ("deepseek_v4_flash_41", "official_byok"): "deepseek_v4_flash_official",
         ("deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
+        ("deepseek_v4_flash_41", "openrouter"): "openrouter_deepseek_v4_flash_41",
+        ("deepseek_v4_flash", "managed"): "deepseek_v4_flash_managed",
+        ("deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
+        ("deepseek_v4_flash_41", "managed"): "deepseek_v4_flash_41_managed",
+        ("deepseek_v4_flash_41", "managed_china"): "deepseek_v4_flash_41_china",
         ("gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
         ("gemma4_26b_31b", "openrouter"): "openrouter_gemma4_26b_31b",
         ("gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
         ("gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
         ("gemma4_31b", "managed"): "managed_gemma4_31b",
-        ("gemma4_31b", "cerebras"): "cerebras_gemma4_31b",
-        ("gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     }
     return aliases.get((str(model), str(connection)), "none")
 

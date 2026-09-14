@@ -25,6 +25,7 @@ class OverlayPeerToggleContract:
 class OverlayPeerConsumerContract:
     overlay: OverlayPeerToggleContract
     peer: OverlayPeerToggleContract
+    desktop_first_visible: bool = False
 
 
 def build_overlay_peer_consumer_contract(
@@ -36,6 +37,7 @@ def build_overlay_peer_consumer_contract(
     peer_effective_enabled: bool,
     peer_warning_reason: str | None = None,
     peer_activation_starting: bool = False,
+    desktop_first_visible: bool = False,
 ) -> OverlayPeerConsumerContract:
     overlay_contract = OverlayPeerToggleContract(
         intent_enabled=overlay_intent_enabled,
@@ -75,7 +77,11 @@ def build_overlay_peer_consumer_contract(
             overlay_failure_reason if resolved_peer_warning_reason == "overlay_failed" else None
         ),
     )
-    return OverlayPeerConsumerContract(overlay=overlay_contract, peer=peer_contract)
+    return OverlayPeerConsumerContract(
+        overlay=overlay_contract,
+        peer=peer_contract,
+        desktop_first_visible=bool(desktop_first_visible),
+    )
 
 
 def build_overlay_peer_consumer_contract_from_state(
@@ -89,6 +95,7 @@ def build_overlay_peer_consumer_contract_from_state(
         peer_effective_enabled=state.peer_effective_enabled,
         peer_warning_reason=state.peer_warning_reason,
         peer_activation_starting=state.peer_activation_starting,
+        desktop_first_visible=bool(getattr(state, "desktop_first_visible", False)),
     )
 
 
@@ -98,7 +105,7 @@ def _overlay_surface_state(
 ) -> OverlayPeerSurfaceState:
     if not overlay_intent_enabled:
         return "off"
-    if overlay_state in {"starting", "connected"}:
+    if overlay_state in {"starting", "recovering", "connected"}:
         return "on"
     return "warning"
 
@@ -107,7 +114,7 @@ def _overlay_warning_reason(
     overlay_intent_enabled: bool,
     overlay_state: str,
 ) -> str | None:
-    if not overlay_intent_enabled or overlay_state in {"starting", "connected"}:
+    if not overlay_intent_enabled or overlay_state in {"starting", "recovering", "connected"}:
         return None
     if overlay_state == "failed":
         return "overlay_failed"
@@ -164,7 +171,7 @@ def _resolve_peer_warning_reason(
         return None
     if peer_warning_reason is not None:
         return peer_warning_reason
-    if overlay_state == "starting":
+    if overlay_state in {"starting", "recovering"}:
         return "overlay_starting"
     if overlay_state == "stopping":
         return "overlay_stopping"

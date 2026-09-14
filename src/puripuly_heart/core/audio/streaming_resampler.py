@@ -78,6 +78,7 @@ class MonoFirstStreamingResampler:
             raise ValueError("2D samples channel count must match input_channels")
         return mixdown_to_mono_f32(reshaped)
 
+
 @dataclass(slots=True)
 class CaptureMappedStreamingResampler:
     input_sample_rate_hz: int
@@ -99,8 +100,7 @@ class CaptureMappedStreamingResampler:
         discarded: tuple[AudioCaptureSpan, ...] = ()
         if capture is not None:
             epoch_changed = (
-                self._capture_epoch is not None
-                and capture.capture_epoch != self._capture_epoch
+                self._capture_epoch is not None and capture.capture_epoch != self._capture_epoch
             )
             discontinuous = capture.discontinuity_before is not None or epoch_changed
             if discontinuous:
@@ -200,9 +200,7 @@ class CaptureMappedStreamingResampler:
         mapped = pending.slice_normalized(start, output_end)
         self._next_normalized_sample = output_end
         self._pending_capture = (
-            None
-            if output_end == end
-            else pending.slice_normalized(output_end, end)
+            None if output_end == end else pending.slice_normalized(output_end, end)
         )
         return mapped
 
@@ -223,9 +221,7 @@ class CaptureMappedStreamingResampler:
         return self._project_source_sample(capture.source_end_sample)
 
     def _project_source_sample(self, source_sample: int) -> int:
-        return round(
-            source_sample * self.output_sample_rate_hz / self.input_sample_rate_hz
-        )
+        return round(source_sample * self.output_sample_rate_hz / self.input_sample_rate_hz)
 
     def _new_resampler(self) -> MonoFirstStreamingResampler:
         return MonoFirstStreamingResampler(

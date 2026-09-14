@@ -12,10 +12,10 @@ use super::types::{BlockBounds, LayoutCacheKey, LineRole, TextStyleDescriptor, V
 #[cfg(windows)]
 use super::types::{BlockCacheKey, LineCacheKey};
 
-pub(crate) const TEXT_FORMAT_CACHE_CAP: usize = 32;
-pub(crate) const LAYOUT_CACHE_CAP: usize = 512;
-pub(crate) const LINE_CACHE_CAP: usize = 2048;
-pub(crate) const BLOCK_CACHE_CAP: usize = 1024;
+pub(crate) const TEXT_FORMAT_CACHE_CAP: usize = 16;
+pub(crate) const LAYOUT_CACHE_CAP: usize = 64;
+pub(crate) const LINE_CACHE_CAP: usize = 256;
+pub(crate) const BLOCK_CACHE_CAP: usize = 128;
 
 #[derive(Debug)]
 pub(crate) struct BoundedLruCache<K, V> {
@@ -177,6 +177,31 @@ impl Default for WindowsRendererCaches {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn selected_lru_caps_hold_at_capacity_and_capacity_plus_one() {
+        assert_eq!(
+            [
+                super::TEXT_FORMAT_CACHE_CAP,
+                super::LAYOUT_CACHE_CAP,
+                super::LINE_CACHE_CAP,
+                super::BLOCK_CACHE_CAP
+            ],
+            [16, 64, 256, 128],
+        );
+        for capacity in [16, 64, 256, 128] {
+            let mut cache = super::BoundedLruCache::with_capacity(capacity);
+            for key in 0..capacity {
+                cache.insert(key, key);
+            }
+            assert_eq!(cache.len(), capacity);
+            assert_eq!(cache.get(&0), Some(&0));
+            cache.insert(capacity, capacity);
+            assert_eq!(cache.len(), capacity);
+            assert_eq!(cache.get(&1), None);
+            assert_eq!(cache.get(&0), Some(&0));
+            assert_eq!(cache.get(&capacity), Some(&capacity));
+        }
+    }
     use super::{
         BoundedLruCache, CachedBlockLayoutTemplate, CachedLineLayoutTemplate, LayoutCache,
         LAYOUT_CACHE_CAP, LINE_CACHE_CAP,

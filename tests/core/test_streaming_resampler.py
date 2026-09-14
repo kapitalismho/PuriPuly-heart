@@ -191,8 +191,6 @@ class _StubSink:
         self.events.append(event)
 
 
-
-
 @pytest.mark.asyncio
 async def test_run_audio_vad_loop_logs_gate_summary_when_detailed() -> None:
     class MutedState:
@@ -392,10 +390,6 @@ async def test_run_audio_vad_loop_skips_vad_input_metrics_when_not_detailed(
             AssertionError("Basic mode must not log AudioDiag")
         ),
     )
-
-
-
-
 
 
 @pytest.mark.asyncio

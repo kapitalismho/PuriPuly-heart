@@ -31,16 +31,29 @@ _LOCAL_CPU_AUTO_PROVIDER = "local_cpu_auto"
 _LOCAL_QWEN_CPU_AUTO_MIGRATION_VERSION = 30
 _PEER_SOURCE_AUTO_MIGRATION_VERSION = 31
 _MULTI_MODEL_GEMMA_MIGRATION_VERSION = 32
-_CEREBRAS_CONNECTION_MIGRATION_VERSION = 35
+_CEREBRAS_RETIREMENT_MIGRATION_VERSION = 42
 _TELEMETRY_BOOLEAN_MIGRATION_VERSION = 37
 _PROMPT_RESET_AND_DEEPGRAM_ROLLING_VERSION = 39
+_DEEPSEEK_41_SAVED_CONNECTION_MIGRATION_VERSION = 41
+
+
+def _requires_cerebras_retirement_migration(settings_version: object) -> bool:
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        return settings_version < _CEREBRAS_RETIREMENT_MIGRATION_VERSION
+    if isinstance(settings_version, str) and settings_version.strip().isdigit():
+        return int(settings_version.strip()) < _CEREBRAS_RETIREMENT_MIGRATION_VERSION
+    return True
+
+
 _EXPLICIT_LEGACY_GEMMA_FALLBACK_ALIASES = frozenset({"openrouter_gemma4_26b_a4b"})
 
 _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
     "none": TranslationFallbackIntent(enabled=False),
     "deepseek_v4_flash_official": TranslationFallbackIntent(
         enabled=True,
-        model="deepseek_v4_flash",
+        model="deepseek_v4_flash_41",
         connection="official_byok",
         selection_alias="deepseek_v4_flash_official",
     ),
@@ -49,6 +62,36 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
         model="deepseek_v4_flash",
         connection="openrouter",
         selection_alias="openrouter_deepseek_v4_flash",
+    ),
+    "openrouter_deepseek_v4_flash_41": TranslationFallbackIntent(
+        enabled=True,
+        model="deepseek_v4_flash_41",
+        connection="openrouter",
+        selection_alias="openrouter_deepseek_v4_flash_41",
+    ),
+    "deepseek_v4_flash_managed": TranslationFallbackIntent(
+        enabled=True,
+        model="deepseek_v4_flash",
+        connection="managed",
+        selection_alias="deepseek_v4_flash_managed",
+    ),
+    "deepseek_v4_flash_china": TranslationFallbackIntent(
+        enabled=True,
+        model="deepseek_v4_flash",
+        connection="managed_china",
+        selection_alias="deepseek_v4_flash_china",
+    ),
+    "deepseek_v4_flash_41_managed": TranslationFallbackIntent(
+        enabled=True,
+        model="deepseek_v4_flash_41",
+        connection="managed",
+        selection_alias="deepseek_v4_flash_41_managed",
+    ),
+    "deepseek_v4_flash_41_china": TranslationFallbackIntent(
+        enabled=True,
+        model="deepseek_v4_flash_41",
+        connection="managed_china",
+        selection_alias="deepseek_v4_flash_41_china",
     ),
     "openrouter_gemma4_26b_a4b": TranslationFallbackIntent(
         enabled=True,
@@ -80,24 +123,22 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
         connection="managed",
         selection_alias="managed_gemma4_31b",
     ),
-    "cerebras_gemma4_31b": TranslationFallbackIntent(
-        enabled=True,
-        model="gemma4_31b",
-        connection="cerebras",
-        selection_alias="cerebras_gemma4_31b",
-    ),
 }
 _FALLBACK_FIELDS_ALIAS: dict[tuple[bool, str, str], str] = {
+    (False, "deepseek_v4_flash_41", "official_byok"): "none",
     (False, "deepseek_v4_flash", "official_byok"): "none",
+    (True, "deepseek_v4_flash_41", "official_byok"): "deepseek_v4_flash_official",
     (True, "deepseek_v4_flash", "official_byok"): "deepseek_v4_flash_official",
     (True, "deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
+    (True, "deepseek_v4_flash_41", "openrouter"): "openrouter_deepseek_v4_flash_41",
+    (True, "deepseek_v4_flash_41", "managed"): "deepseek_v4_flash_41_managed",
+    (True, "deepseek_v4_flash_41", "managed_china"): "deepseek_v4_flash_41_china",
+    (True, "deepseek_v4_flash", "managed"): "deepseek_v4_flash_managed",
     (True, "gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
     (True, "gemma4_26b_31b", "openrouter"): "openrouter_gemma4_26b_31b",
     (True, "gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
     (True, "gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
     (True, "gemma4_31b", "managed"): "managed_gemma4_31b",
-    (True, "gemma4_31b", "cerebras"): "cerebras_gemma4_31b",
-    (True, "gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
 }
 
@@ -107,11 +148,14 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     migrate_local_qwen = _requires_local_qwen_cpu_auto_migration(data.get("settings_version"))
     migrate_peer_source_auto = _requires_peer_source_auto_migration(data.get("settings_version"))
     migrate_multi_model_gemma = _requires_multi_model_gemma_migration(data.get("settings_version"))
-    migrate_cerebras_connection = _requires_cerebras_connection_migration(
+    migrate_cerebras_retirement = _requires_cerebras_retirement_migration(
         data.get("settings_version")
     )
     migrate_prompt_reset = _requires_prompt_reset_migration(data.get("settings_version"))
     migrate_deepgram_rolling = _requires_deepgram_rolling_migration(data.get("settings_version"))
+    migrate_deepseek_saved_connections = _requires_deepseek_41_saved_connection_migration(
+        data.get("settings_version")
+    )
     prepared = dict(copy.deepcopy(data))
     prepared["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
     intent = prepared.get("intent") if isinstance(prepared.get("intent"), dict) else {}
@@ -119,9 +163,8 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(intent, dict) and isinstance(translation, dict):
         if migrate_multi_model_gemma:
             _migrate_multi_model_gemma_translation(translation)
-        if migrate_cerebras_connection:
-            _migrate_cerebras_connection_translation(translation)
-        _migrate_deepseek_v4_pro_translation(translation)
+        if migrate_cerebras_retirement:
+            _migrate_retired_cerebras_translation(translation)
         _migrate_gemini_3_flash_translation(translation)
         _migrate_qwen_35_plus_translation(translation)
         _migrate_legacy_openrouter_model_translation(translation)
@@ -133,6 +176,10 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
                     openrouter_data=None,
                 )
             )
+        _migrate_deepseek_translation(
+            translation,
+            migrate_saved_connections=migrate_deepseek_saved_connections,
+        )
         translation.pop("fallback_selection_alias", None)
         translation.pop("openrouter_fallback_selection_alias", None)
         intent["translation"] = translation
@@ -510,16 +557,6 @@ def _requires_multi_model_gemma_migration(settings_version: object) -> bool:
     return True
 
 
-def _requires_cerebras_connection_migration(settings_version: object) -> bool:
-    if isinstance(settings_version, bool):
-        return True
-    if isinstance(settings_version, int):
-        return settings_version < _CEREBRAS_CONNECTION_MIGRATION_VERSION
-    if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _CEREBRAS_CONNECTION_MIGRATION_VERSION
-    return True
-
-
 def _requires_prompt_reset_migration(settings_version: object) -> bool:
     if isinstance(settings_version, bool):
         return True
@@ -532,6 +569,16 @@ def _requires_prompt_reset_migration(settings_version: object) -> bool:
 
 def _requires_deepgram_rolling_migration(settings_version: object) -> bool:
     return _requires_prompt_reset_migration(settings_version)
+
+
+def _requires_deepseek_41_saved_connection_migration(settings_version: object) -> bool:
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        return settings_version < _DEEPSEEK_41_SAVED_CONNECTION_MIGRATION_VERSION
+    if isinstance(settings_version, str) and settings_version.strip().isdigit():
+        return int(settings_version.strip()) < _DEEPSEEK_41_SAVED_CONNECTION_MIGRATION_VERSION
+    return True
 
 
 def _migrate_multi_model_gemma_translation(translation: dict[str, Any]) -> None:
@@ -568,35 +615,40 @@ def _migrate_multi_model_gemma_translation(translation: dict[str, Any]) -> None:
     )
 
 
-def _migrate_cerebras_connection_translation(translation: dict[str, Any]) -> None:
-    active_legacy_cerebras = translation.get("model") == "gemma4_31b_cerebras"
-    previous_legacy_cerebras = translation.get("previous_llm_model") == "gemma4_31b_cerebras"
-    if active_legacy_cerebras:
+def _migrate_retired_cerebras_translation(translation: dict[str, Any]) -> None:
+    retired_primary = translation.get("model") == "gemma4_31b_cerebras" or (
+        translation.get("model") == "gemma4_31b" and translation.get("connection") == "cerebras"
+    )
+    if retired_primary:
         translation["model"] = "gemma4_31b"
-        translation["connection"] = "cerebras"
-    if previous_legacy_cerebras:
+        translation["connection"] = "openrouter"
+        translation["openrouter_model"] = "google/gemma-4-31b-it"
+        translation["openrouter_selected_source"] = "byok"
+        translation["openrouter_selection_alias"] = "gemma4_31b_byok"
+        translation["openrouter_provider_routing"] = "gemma4_31b_latency"
+
+    if translation.get("previous_llm_model") == "gemma4_31b_cerebras":
         translation["previous_llm_model"] = "gemma4_31b"
 
     history = translation.get("connection_history")
     if isinstance(history, dict):
-        legacy_history_present = "gemma4_31b_cerebras" in history
-        history.pop("gemma4_31b_cerebras", None)
-        if active_legacy_cerebras or previous_legacy_cerebras:
-            history["gemma4_31b"] = "cerebras"
-        elif "gemma4_31b" not in history and legacy_history_present:
-            history["gemma4_31b"] = "cerebras"
+        retired_history = history.pop("gemma4_31b_cerebras", None)
+        if history.get("gemma4_31b") == "cerebras" or retired_history is not None:
+            history["gemma4_31b"] = "openrouter"
 
     fallback = translation.get("fallback")
-    if not isinstance(fallback, dict):
-        return
-    fallback_alias = fallback.get("selection_alias")
-    if fallback_alias == "cerebras_gemma4_31b" or (
-        fallback_alias is None and fallback.get("model") == "gemma4_31b_cerebras"
+    fallback_alias = fallback.get("selection_alias") if isinstance(fallback, dict) else None
+    if isinstance(fallback, dict) and (
+        fallback_alias == "cerebras_gemma4_31b"
+        or fallback.get("model") == "gemma4_31b_cerebras"
+        or (fallback.get("model") == "gemma4_31b" and fallback.get("connection") == "cerebras")
     ):
-        fallback["enabled"] = True
-        fallback["model"] = "gemma4_31b"
-        fallback["connection"] = "cerebras"
-        fallback["selection_alias"] = "cerebras_gemma4_31b"
+        fallback["enabled"] = False
+        fallback["model"] = "deepseek_v4_flash_41"
+        fallback["connection"] = "official_byok"
+        fallback["selection_alias"] = "none"
+
+    translation.pop("cerebras", None)
 
 
 def _migrate_gemini_3_flash_translation(translation: dict[str, Any]) -> None:
@@ -670,20 +722,104 @@ def _migrate_qwen_35_plus_translation(translation: dict[str, Any]) -> None:
                 history.pop(legacy_model, None)
 
 
-def _migrate_deepseek_v4_pro_translation(translation: dict[str, Any]) -> None:
+def _migrate_deepseek_translation(
+    translation: dict[str, Any],
+    *,
+    migrate_saved_connections: bool,
+) -> None:
     if translation.get("model") == "deepseek_v4_pro":
-        translation["model"] = "deepseek_v4_flash"
+        translation["model"] = "deepseek_v4_flash_41"
         translation["connection"] = "official_byok"
     if translation.get("previous_llm_model") == "deepseek_v4_pro":
-        translation["previous_llm_model"] = "deepseek_v4_flash"
+        translation["previous_llm_model"] = "deepseek_v4_flash_41"
+
     history = translation.get("connection_history")
     if isinstance(history, dict) and "deepseek_v4_pro" in history:
-        history["deepseek_v4_flash"] = "official_byok"
+        history["deepseek_v4_flash_41"] = "official_byok"
         history.pop("deepseek_v4_pro", None)
+
     fallback = translation.get("fallback")
     if isinstance(fallback, dict) and fallback.get("model") == "deepseek_v4_pro":
-        fallback["model"] = "deepseek_v4_flash"
+        fallback["model"] = "deepseek_v4_flash_41"
         fallback["connection"] = "official_byok"
+
+    primary_connection = translation.get("connection")
+    hidden_managed_primary = (
+        migrate_saved_connections
+        and translation.get("model") == "deepseek_v4_flash"
+        and primary_connection == "openrouter"
+        and translation.get("openrouter_selected_source") == "managed"
+        and translation.get("openrouter_selection_alias") == "deepseek_v4_flash_managed"
+    )
+    if hidden_managed_primary:
+        primary_connection = (
+            "managed_china"
+            if translation.get("openrouter_provider_routing") == "deepseek_only"
+            else "managed"
+        )
+        translation["connection"] = primary_connection
+    should_upgrade_primary = primary_connection == "official_byok" or (
+        migrate_saved_connections and primary_connection in {"managed", "managed_china"}
+    )
+    if translation.get("model") == "deepseek_v4_flash" and should_upgrade_primary:
+        translation["model"] = "deepseek_v4_flash_41"
+        if primary_connection in {"managed", "managed_china"}:
+            translation["openrouter_model"] = "deepseek/deepseek-v4.1-flash"
+            translation["openrouter_selection_alias"] = "deepseek_v4_flash_41_managed"
+            translation["openrouter_provider_routing"] = "deepseek_v4_flash_41_strict"
+    if translation.get("model") == "deepseek_v4_flash" and primary_connection == "openrouter":
+        translation["openrouter_model"] = "deepseek/deepseek-v4-flash-0731"
+        translation["openrouter_selection_alias"] = "deepseek_v4_flash_byok"
+        translation["openrouter_provider_routing"] = "deepseek_v4_flash_latency"
+        translation["openrouter_selected_source"] = "byok"
+    if translation.get("model") == "deepseek_v4_flash_41" and primary_connection == "official_byok":
+        translation["openrouter_model"] = "deepseek/deepseek-v4.1-flash"
+        translation["openrouter_provider_routing"] = "default"
+        deepseek = translation.get("deepseek")
+        if isinstance(deepseek, dict):
+            deepseek["llm_model"] = "deepseek-flash"
+
+    if isinstance(history, dict):
+        old_connection = history.get("deepseek_v4_flash")
+        should_upgrade_history = old_connection == "official_byok" or (
+            migrate_saved_connections and old_connection in {"managed", "managed_china"}
+        )
+        if should_upgrade_history:
+            history["deepseek_v4_flash_41"] = old_connection
+            history.pop("deepseek_v4_flash", None)
+    if (
+        translation.get("previous_llm_model") == "deepseek_v4_flash"
+        and isinstance(history, dict)
+        and "deepseek_v4_flash_41" in history
+    ):
+        translation["previous_llm_model"] = "deepseek_v4_flash_41"
+
+    if (
+        migrate_saved_connections
+        and isinstance(fallback, dict)
+        and translation.get("openrouter_fallback_selection_alias") == "deepseek_v4_flash"
+        and translation.get("openrouter_selected_source") == "managed"
+    ):
+        fallback["connection"] = "managed"
+    if isinstance(fallback, dict) and fallback.get("model") == "deepseek_v4_flash":
+        fallback_connection = fallback.get("connection")
+        should_upgrade_fallback = fallback_connection == "official_byok" or (
+            migrate_saved_connections and fallback_connection in {"managed", "managed_china"}
+        )
+        if should_upgrade_fallback:
+            fallback["model"] = "deepseek_v4_flash_41"
+            if bool(fallback.get("enabled", False)):
+                fallback["selection_alias"] = {
+                    "official_byok": "deepseek_v4_flash_official",
+                    "managed": "deepseek_v4_flash_41_managed",
+                    "managed_china": "deepseek_v4_flash_41_china",
+                }[fallback_connection]
+            else:
+                fallback["selection_alias"] = "none"
+
+    deepseek = translation.get("deepseek")
+    if isinstance(deepseek, dict) and deepseek.get("llm_model") == "deepseek-v4-flash":
+        deepseek["llm_model"] = "deepseek-flash"
 
 
 def _migrate_legacy_openrouter_model_translation(translation: dict[str, Any]) -> None:
@@ -707,23 +843,21 @@ def _migrate_peer_source_auto_mode(intent: dict[str, Any]) -> None:
 
 def _migrate_qwen_audio_provider(intent: dict[str, Any]) -> None:
     stt = intent.get("stt") if isinstance(intent.get("stt"), dict) else None
-    if not isinstance(stt, dict):
-        return
-    qwen_asr = stt.get("qwen_asr") if isinstance(stt.get("qwen_asr"), dict) else {}
-    if not isinstance(qwen_asr, dict):
-        return
-    if qwen_asr.get("model") != "qwen-audio-3.0-asr-flash-streaming":
-        return
-    peer_stt = intent.get("peer_stt") if isinstance(intent.get("peer_stt"), dict) else None
-    already_split = stt.get("provider") == "qwen_audio" or (
-        isinstance(peer_stt, dict) and peer_stt.get("provider") == "qwen_audio"
-    )
-    if not already_split:
+    languages = intent.get("languages") if isinstance(intent.get("languages"), Mapping) else {}
+    source_language = languages.get("source_language", "")
+    peer_source_language = languages.get("peer_source_language") or source_language
+    if isinstance(stt, dict):
         if stt.get("provider") == "qwen_asr":
-            stt["provider"] = "qwen_audio"
-        if isinstance(peer_stt, dict) and peer_stt.get("provider") == "qwen_asr":
-            peer_stt["provider"] = "qwen_audio"
-    qwen_asr["model"] = "qwen3-asr-flash-realtime"
+            stt["provider"] = _retired_qwen_provider_for_language(source_language)
+        stt.pop("qwen_asr", None)
+    peer_stt = intent.get("peer_stt") if isinstance(intent.get("peer_stt"), dict) else None
+    if isinstance(peer_stt, dict) and peer_stt.get("provider") == "qwen_asr":
+        peer_stt["provider"] = _retired_qwen_provider_for_language(peer_source_language)
+
+
+def _retired_qwen_provider_for_language(language: object) -> str:
+    normalized = language.strip().lower().split("-", 1)[0] if isinstance(language, str) else ""
+    return "rolling_free" if normalized in {"tr", "uk"} else "qwen_audio"
 
 
 def _migrate_canonical_local_qwen_provider(intent: dict[str, Any], key: str) -> None:

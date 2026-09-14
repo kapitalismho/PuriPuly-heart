@@ -112,7 +112,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | ------------------------- | --------- | ------------------- | ------ | ---------- |
 | **Gemma 4 E4B (Local)**   | 무제한       | 무제한                 | 5,000회 | 3,660회     |
 | **Gemma 4 26B A4B + 31B** | 13,940회   | 13,940회             | 3,680회 | 2,900회     |
-| **DeepSeek V4 Flash**     | 11,620회   | 11,620회             | 3,500회 | 2,780회     |
+| **DeepSeek V4.1 Flash**   | 16,800회   | 16,800회             | 3,860회 | 3,000회     |
 
 
 #### 기타 모델
@@ -123,7 +123,6 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | **Gemma 4 12B (Local)**      | 무제한       | 무제한                 | 5,000회 | 3,660회     |
 | **Gemma 4 26B A4B**          | 14,380회   | 14,380회             | 3,710회 | 2,920회     |
 | **Gemma 4 31B (OpenRouter)** | 10,940회   | 10,940회             | 3,430회 | 2,740회     |
-| **Gemma 4 31B (Cerebras)**   | 920회      | 920회                | 770회   | 730회       |
 | **Gemini 3.7 Flash**         | 1,160회    | 1,160회              | 940회   | 880회       |
 | **Qwen 3.8 Flash**            | 7,460회    | 7,460회              | 2,990회 | 2,460회     |
 
@@ -137,7 +136,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | ------------------------- | --------- | ------------------- | ------ | ---------- |
 | **Gemma 4 E4B (Local)**   | 0원        | 0원                  | ~0.3원  | ~0.4원      |
 | **Gemma 4 26B A4B + 31B** | ~0.1원     | ~0.1원               | ~0.4원  | ~0.5원      |
-| **DeepSeek V4 Flash**     | ~0.12원    | ~0.12원              | ~0.4원  | ~0.5원      |
+| **DeepSeek V4.1 Flash**   | ~0.08원    | ~0.08원              | ~0.4원  | ~0.5원      |
 
 
 #### 기타 모델
@@ -148,7 +147,6 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | **Gemma 4 12B (Local)**      | 0원        | 0원                  | ~0.3원  | ~0.4원      |
 | **Gemma 4 26B A4B**          | ~0.1원     | ~0.1원               | ~0.4원  | ~0.5원      |
 | **Gemma 4 31B (OpenRouter)** | ~0.13원    | ~0.13원              | ~0.4원  | ~0.5원      |
-| **Gemma 4 31B (Cerebras)**   | ~1.5원     | ~1.5원               | ~1.8원  | ~1.9원      |
 | **Gemini 3.7 Flash**         | ~1.2원     | ~1.2원               | ~1.5원  | ~1.6원      |
 | **Qwen 3.8 Flash**            | ~0.2원     | ~0.2원               | ~0.5원  | ~0.6원      |
 
@@ -158,8 +156,9 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 - *모든 비용과 사용 가능 횟수는 근사치 계산*
 - *DeepSeek의 경우 캐시 히트율 70% 가정 / 피크 타임은 고려하지 않음*
 - *Qwen API 비용은 베이징 리전 기준*
-- *요금표 기준: 2026년 8월 21일*
+- *요금표 기준: 2026년 9월 10일*
 - *1 달러 = 1400원*
+- *벤치마크 차트는 DeepSeek-V4 Flash 0731 측정값이며, 비용표는 V4.1 Flash 가격 기준입니다.*
 
 ### 무료 크레딧
 
@@ -232,7 +231,7 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 Soniox/Gemini/Deepgram이 차단된 지역이라면 아래와 같은 조합으로 사용해주세요.
 
 - STT: **Qwen Audio**
-- LLM: **DeepSeek V4 Flash**
+- LLM: **DeepSeek V4.1 Flash**
   > 디스코드 대신 QQ를 통해 인증할 수 있어요.
 
 ---
@@ -470,36 +469,6 @@ Authorize 버튼을 눌렀는데도 인증이 안되어 있다면 재시도 하�
 
 </details>
 
-<details>
-<summary><h3>Cerebras</h3></summary>
-
-1. [Cerebras](https://www.cerebras.ai/)에 접속하여 'Get started' 버튼 눌러주세요.
-   ![step1](docs/images/cerebras/1.png)
-
-2. 로그인을 해주세요.
-   ![step2](docs/images/cerebras/2.png)
-
-3. 원하는 플랜을 선택해주세요. 처음은 무료 티어를 추천해요.
-   ![step3](docs/images/cerebras/3.png)
-
-4. API 키를 복사하여 PuriPuly에 붙여넣으세요.
-   ![step4](docs/images/cerebras/4.png)
-
-<details>
-<summary><h3>유료 티어로 전환하려면</h3></summary>
-
-5. 'Billing' 탭으로 이동하세요.
-   ![step5](docs/images/cerebras/5.png)
-
-6. 자신의 이름을 적어주세요.
-   ![step6](docs/images/cerebras/6.png)
-
-7. 필요한만큼 크레딧을 충전하세요.
-   ![step7](docs/images/cerebras/7.png)
-
-</details>
-
-</details>
 
 
 ---
@@ -646,6 +615,13 @@ VRChat OSC 컨트롤은 [`docs/vrchat-osc.md`](docs/vrchat-osc.md)를 참조하�
 ## Special Thanks
 
 SUI32C, Nagikokoro, motoka96, Ykol魚, kascr, Just Monika V, FLUVIA, Han โชเล่ย์, EAPE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
+
+---
+
+## 정책
+
+- [Code signing policy](CODE_SIGNING.md)
+- [개인정보처리방침](PRIVACY.md)
 
 ---
 

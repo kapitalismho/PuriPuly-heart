@@ -65,6 +65,7 @@ class OverlaySessionTransitionDiagnostic:
         "teardown_failed",
     ]
     failure_type: str | None = None
+    stage: str | None = None
 
 
 OverlaySessionTransitionDiagnosticSink = Callable[
@@ -101,6 +102,7 @@ class OverlaySessionTransitionOwner:
                     )
                 )
                 return "already_active"
+            stage = "teardown"
             try:
                 teardown_succeeded = await execution.teardown()
                 if not teardown_succeeded:
@@ -108,18 +110,25 @@ class OverlaySessionTransitionOwner:
                         OverlaySessionTransitionDiagnostic(
                             operation="start",
                             outcome="teardown_failed",
+                            stage=stage,
                         )
                     )
                     return "teardown_failed"
                 preserved_presenter = None
                 previous_runtime = execution.previous_runtime
                 if previous_runtime is not None and previous_runtime.is_closed:
+                    stage = "detach_presenter"
                     preserved_presenter = previous_runtime.detach_preserved_presenter()
+                stage = "create_runtime"
                 runtime = execution.create_runtime()
                 if preserved_presenter is not None:
+                    stage = "adopt_presenter"
                     runtime.adopt_presenter(preserved_presenter)
+                stage = "resolve_target"
                 target = execution.resolve_target()
+                stage = "mark_starting"
                 execution.on_starting(runtime, target)
+                stage = "create_start_task"
                 runtime.create_start_task(execution.run_start(runtime))
             except asyncio.CancelledError:
                 self._emit(
@@ -135,6 +144,7 @@ class OverlaySessionTransitionOwner:
                         operation="start",
                         outcome="failed",
                         failure_type=type(exc).__name__,
+                        stage=stage,
                     )
                 )
                 raise

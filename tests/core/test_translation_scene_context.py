@@ -485,7 +485,6 @@ async def test_managed_openrouter_provider_forwards_scene_count() -> None:
 
 @pytest.mark.asyncio
 async def test_all_llm_outer_providers_forward_scene_to_inner_client() -> None:
-    from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
     from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
     from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
     from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
@@ -519,7 +518,6 @@ async def test_all_llm_outer_providers_forward_scene_to_inner_client() -> None:
         AsyncQwenLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
         OpenRouterLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
         DeepSeekLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
-        CerebrasLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
         GeminiLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
         LocalOpenAICompatibleLLMProvider(client=(inners.append(CapturingInner()) or inners[-1])),
     ]
@@ -601,21 +599,12 @@ def test_gemma_prefix_identity_ignores_scene_people() -> None:
 
 @pytest.mark.asyncio
 async def test_httpx_clients_embed_scene_in_request_body() -> None:
-    from puripuly_heart.providers.llm.cerebras import HttpxCerebrasClient
     from puripuly_heart.providers.llm.deepseek import HttpxDeepSeekClient
     from puripuly_heart.providers.llm.local_openai import HttpxLocalOpenAIClient
     from puripuly_heart.providers.llm.openrouter import HttpxOpenRouterClient
     from puripuly_heart.providers.llm.qwen_async import HttpxQwenClient
 
     bodies = [
-        HttpxCerebrasClient(api_key="k", model="m")._build_request_body(
-            text="hello",
-            system_prompt="system",
-            source_language="en",
-            target_language="ko",
-            context="prior",
-            scene_participant_count=2,
-        ),
         HttpxDeepSeekClient(api_key="k", model="m")._build_request_body(
             text="hello",
             system_prompt="system",

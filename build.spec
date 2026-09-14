@@ -31,6 +31,7 @@ from PyInstaller.utils.hooks import (
     collect_data_files,
     collect_dynamic_libs,
     collect_submodules,
+    copy_metadata,
     get_module_file_attribute,
 )
 
@@ -38,6 +39,11 @@ from PyInstaller.utils.hooks import (
 src_path = Path("src").resolve()
 sys.path.insert(0, str(src_path))
 from puripuly_heart._compat import moved_module_alias_targets
+from puripuly_heart.release_evidence.windows_product_metadata import (
+    PRODUCT_NAME,
+    ensure_pyinstaller_version_file,
+    read_project_version,
+)
 
 for moved_module_alias_parent in (
     "puripuly_heart.app",
@@ -55,6 +61,22 @@ entry_script = (
     else src_path / "puripuly_heart" / "main.py"
 )
 executable_name = "PuriPulyHeartProcessCaptureSmoke" if release_smoke else "PuriPulyHeart"
+
+_repo_root = Path.cwd()
+_project_version = read_project_version(_repo_root)
+from puripuly_heart import __version__ as _package_version
+
+if _project_version != _package_version:
+    raise SystemExit(
+        "Project version mismatch: pyproject.toml has "
+        f"{_project_version!r} but puripuly_heart.__version__ is {_package_version!r}."
+    )
+if PRODUCT_NAME != "PuriPuly <3":
+    raise SystemExit(f"Canonical ProductName drifted: {PRODUCT_NAME!r}.")
+windows_version_file = ensure_pyinstaller_version_file(
+    repo_root=_repo_root,
+    executable_name=executable_name,
+)
 
 overlay_staged_path = Path("build").resolve() / "overlay" / "PuriPulyHeartOverlay.exe"
 if not overlay_staged_path.exists():
@@ -90,6 +112,27 @@ NOTO_CJK_PROVENANCE_DIR = Path("third_party/noto-sans-cjk").resolve()
 NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR = Path("third_party/noto-sans-cjk")
 HTTP_EXTENSION_EXAMPLES_SOURCE_DIR = Path("examples/http_extensions").resolve()
 HTTP_EXTENSION_EXAMPLES_PACKAGED_DIR = Path("examples/http_extensions")
+THIRD_PARTY_LICENSE_METADATA_DISTRIBUTIONS = (
+    "aiohttp",
+    "cffi",
+    "charset-normalizer",
+    "frozenlist",
+    "msgpack",
+    "multidict",
+    "onnxruntime",
+    "propcache",
+    "psutil",
+    "PyAudioWPatch",
+    "PyYAML",
+    "sherpa-onnx",
+    "sherpa-onnx-core",
+    "sounddevice",
+    "yarl",
+    "zeroconf",
+)
+SOUNDDEVICE_PORTAUDIO_RUNTIME_DIR = "_sounddevice_data/portaudio-binaries"
+SOUNDDEVICE_ASIO_DLL = f"{SOUNDDEVICE_PORTAUDIO_RUNTIME_DIR}/libportaudio64bit-asio.dll"
+SOUNDDEVICE_STANDARD_DLL = f"{SOUNDDEVICE_PORTAUDIO_RUNTIME_DIR}/libportaudio64bit.dll"
 managed_gemma_runtime_datas = [] if release_smoke else pyinstaller_data_entries(Path.cwd())
 
 if not NOTO_CJK_SOURCE_FONT_PATH.is_file():
@@ -175,6 +218,51 @@ def _is_root_level_auto_collected_soxr_dll(binary) -> bool:
     normalized_destination_name = destination_name.replace("\\", "/")
     return normalized_destination_name == "soxr.dll"
 
+
+def exclude_sounddevice_asio_binary(binaries) -> None:
+    packaged_names = [
+        destination_name.replace("\\", "/").lower()
+        for destination_name, _source_path, _typecode in binaries
+    ]
+    asio_matches = [name for name in packaged_names if name == SOUNDDEVICE_ASIO_DLL.lower()]
+    if len(asio_matches) != 1:
+        raise SystemExit(
+            "Expected exactly one pinned sounddevice ASIO-only runtime before exclusion; "
+            f"found {len(asio_matches)}"
+        )
+
+    binaries[:] = [
+        binary
+        for binary in binaries
+        if binary[0].replace("\\", "/").lower() != SOUNDDEVICE_ASIO_DLL.lower()
+    ]
+    retained_names = {
+        destination_name.replace("\\", "/").lower()
+        for destination_name, _source_path, _typecode in binaries
+    }
+    if SOUNDDEVICE_ASIO_DLL.lower() in retained_names:
+        raise SystemExit("The unsupported sounddevice ASIO-only runtime survived exclusion")
+    if SOUNDDEVICE_STANDARD_DLL.lower() not in retained_names:
+        raise SystemExit("The standard sounddevice PortAudio runtime was not retained")
+
+
+third_party_license_metadata_datas = []
+for distribution_name in THIRD_PARTY_LICENSE_METADATA_DISTRIBUTIONS:
+    third_party_license_metadata_datas.extend(copy_metadata(distribution_name))
+third_party_license_metadata_datas.extend(
+    collect_data_files(
+        "onnxruntime",
+        includes=["LICENSE", "ThirdPartyNotices.txt"],
+    )
+)
+third_party_license_metadata_datas.extend(
+    collect_data_files(
+        "scipy",
+        includes=["**/LICENSE*", "**/COPYING*"],
+    )
+)
+
+
 # Collect data files
 datas = [
     # Project license text for packaged/installed distributions
@@ -192,7 +280,17 @@ datas = [
     (str(NOTO_CJK_PROVENANCE_DIR / "OFL.txt"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
     (str(NOTO_CJK_PROVENANCE_DIR / "README.md"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
     (str(NOTO_CJK_PROVENANCE_DIR / "SHA256SUMS.txt"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
-] + collect_data_files("flet_desktop") + collect_data_files("huggingface_hub") + managed_gemma_runtime_datas
+]
+datas = (
+    datas
+    + collect_data_files("flet_desktop")
+    + collect_data_files("huggingface_hub")
+    + third_party_license_metadata_datas
+    + managed_gemma_runtime_datas
+)
+
+if release_smoke:
+    datas = []
 
 runtime_binaries = collect_dynamic_libs(
     "onnxruntime", destdir=LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR.as_posix()
@@ -212,10 +310,13 @@ if not hf_xet_native_extension.is_file() or hf_xet_native_extension.name.lower()
     raise SystemExit("Pinned hf_xet package did not provide the Windows hf_xet.pyd extension")
 runtime_binaries += [(str(hf_xet_native_extension), "hf_xet")]
 
+if release_smoke:
+    runtime_binaries = proctap_runtime_binaries
+
 # Hidden imports for dynamic imports
 hiddenimports = [
     "puripuly_heart.providers.stt.deepgram",
-    "puripuly_heart.providers.stt.qwen_asr",
+    "puripuly_heart.providers.stt.qwen_audio",
     "puripuly_heart.providers.stt.soniox",
     "puripuly_heart.providers.llm.gemini",
     "puripuly_heart.providers.llm.qwen",
@@ -256,6 +357,17 @@ required_huggingface_hiddenimports = {"huggingface_hub", "hf_xet", "hf_xet.hf_xe
 if not required_huggingface_hiddenimports.issubset(set(hiddenimports)):
     raise SystemExit("Required Hugging Face/Xet hidden imports were not collected")
 
+if release_smoke:
+    hiddenimports = [
+        "janus",
+        "numpy._core._multiarray_umath",
+        "proctap",
+        "proctap._native",
+        "proctap.backends.windows",
+        "puripuly_heart.config.process_capture_platform",
+        "puripuly_heart.core.audio.process_source",
+    ] + collect_submodules("proctap")
+
 a = Analysis(
     [str(entry_script)],
     pathex=[str(src_path)],
@@ -279,6 +391,7 @@ a = Analysis(
 )
 
 normalize_soxr_runtime_binaries(a.binaries)
+exclude_sounddevice_asio_binary(a.binaries)
 normalize_pyinstaller_binaries(a.binaries, Path.cwd())
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
@@ -301,7 +414,7 @@ exe = EXE(
     entitlements_file=None,
     contents_directory=".",
     icon=str(src_path / "puripuly_heart" / "data" / "icons" / "icon.ico"),
-    version_info=None,
+    version=str(windows_version_file.resolve()),
 )
 
 coll = COLLECT(

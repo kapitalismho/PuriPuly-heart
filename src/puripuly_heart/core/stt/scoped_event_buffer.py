@@ -93,10 +93,7 @@ class STTProviderEventBuffer:
         self._events = deque(
             event
             for event in self._events
-            if not (
-                _is_provisional_snapshot(event)
-                and event.identity == incoming.identity
-            )
+            if not (_is_provisional_snapshot(event) and event.identity == incoming.identity)
         )
 
     def _discard_provisional_snapshots_until_room(self) -> None:

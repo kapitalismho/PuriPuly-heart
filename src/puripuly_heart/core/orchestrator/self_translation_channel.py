@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 from uuid import UUID, uuid4
 
 from puripuly_heart.core.audio.ownership import OwnedVadEvent
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.messages import UserErrorReport, UserMessageRef
 from puripuly_heart.core.orchestrator.channel_runtime import (
@@ -52,6 +53,8 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnOutcome,
     TranslationTurnProcessResult,
     TranslationTurnRequest,
+    _PrestartedTranslation,
+    _translation_turn_child_id,
 )
 from puripuly_heart.core.runtime.output import SELF_SPEECH_TYPING_REASON
 from puripuly_heart.core.stt.backend import (
@@ -120,10 +123,12 @@ class SelfTranslationChannelOwner:
     _scoped_publication_ids: dict[STTProviderTurnIdentity, UUID] = field(default_factory=dict)
     _scoped_publication_text: dict[STTProviderTurnIdentity, str] = field(default_factory=dict)
     _scoped_endpoint_publication_ids: dict[UUID, UUID] = field(default_factory=dict)
+    _task_scope: LifecycleScope = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.runtime.channel != "self":
             raise ValueError("Self translation owner requires the Self channel runtime")
+        self._task_scope = LifecycleScope("SelfTranslationChannelOwner")
 
     @property
     def merge_buffer(self) -> _MergeBuffer | None:
@@ -151,11 +156,28 @@ class SelfTranslationChannelOwner:
         self._admitted_requests.clear()
         self._clear_scoped_recognition_state()
         await self.runtime.reset_runtime_state()
+        await self._task_scope.close()
+        self.diagnostics.clear_latency_state(channel="self")
 
     async def reset_provider_channel(self, channel: str = "self") -> None:
         if channel != "self":
             raise ValueError("Self translation owner cannot reset a non-Self channel")
-        await self.translation_turns.cancel_pending(channel="self", turn_kind="self")
+        merge_buffer = self.runtime.merge_buffer
+        speculative_attempt = merge_buffer.speculative_attempt if merge_buffer is not None else None
+        secondary_task = (
+            speculative_attempt.secondary_task if speculative_attempt is not None else None
+        )
+        await self.translation_turns.cancel_pending(
+            channel="self",
+            turn_kinds=frozenset({"self"}),
+        )
+        if secondary_task is not None:
+            if not secondary_task.done():
+                secondary_task.cancel()
+            await asyncio.gather(secondary_task, return_exceptions=True)
+            for utterance_id, task in tuple(self.runtime.translation_tasks.items()):
+                if task is secondary_task:
+                    self.runtime.translation_tasks.pop(utterance_id, None)
         await self.output_projection.reset_overlay_preview()
         await self.runtime.clear_self_speech_state()
         self._clear_scoped_recognition_state()
@@ -401,9 +423,7 @@ class SelfTranslationChannelOwner:
                 )
             if self._scoped_terminal_requires_user_error(event):
                 scope_provider = (
-                    event.identity.settings_scope[0]
-                    if event.identity.settings_scope
-                    else "stt"
+                    event.identity.settings_scope[0] if event.identity.settings_scope else "stt"
                 )
                 report = self.diagnostics.record_stt_turn_failure(
                     SttTurnFailureDiagnostic(
@@ -577,6 +597,8 @@ class SelfTranslationChannelOwner:
             raise ValueError("Self translation owner received a non-Self parent")
         if not self.output_projection.admit_self_turn(children):
             raise RuntimeError("Self translation projection rejected parent admission")
+        if not await self.output_projection.admit_translation_parent(children):
+            raise RuntimeError("Self translation output admission rejected parent")
         admitted = self.translation_requests.admit(
             tuple(self._process_request_for_child(child) for child in children)
         )
@@ -603,6 +625,7 @@ class SelfTranslationChannelOwner:
                     config_snapshot=child.config_snapshot,
                     source_language=child.precomputed_translation.source_language,
                     target_language=target_language,
+                    origin=child.turn_kind,
                 )
             return TranslationTurnProcessResult(
                 "translated",
@@ -621,8 +644,47 @@ class SelfTranslationChannelOwner:
                     target_index=child.target_index,
                     turn_generation=child.turn_generation,
                     turn_order=child.turn_order,
+                    turn_kind=child.turn_kind,
+                    parent_output_count=child.parent_output_count,
                 ),
             )
+        if child.prestarted_translation is not None:
+            prestarted = child.prestarted_translation
+            result = await prestarted.task
+            if cancellation_requested():
+                raise asyncio.CancelledError
+            if (
+                result.outcome != "translated"
+                or result.output is None
+                or prestarted.provider_generation != self.translation_requests.provider_generation
+                or not self._translation_config_matches(
+                    prestarted.config_snapshot.value,
+                    child.config_snapshot.value,
+                )
+            ):
+                self._clear_latency_timeline(child.utterance_id)
+                result = await self.translation_requests.process(
+                    request,
+                    cancellation_requested=cancellation_requested,
+                    prepared=prepared,
+                )
+            elif result.output is not None:
+                result = replace(
+                    result,
+                    output=replace(
+                        result.output,
+                        source=child.source,
+                        source_text=child.transcript.text,
+                        config_snapshot=child.config_snapshot,
+                        turn_generation=child.turn_generation,
+                        turn_order=child.turn_order,
+                        turn_kind=child.turn_kind,
+                        parent_output_count=child.parent_output_count,
+                    ),
+                )
+            if cancellation_requested():
+                raise asyncio.CancelledError
+            return result
         result = await self.translation_requests.process(
             request,
             cancellation_requested=cancellation_requested,
@@ -648,7 +710,7 @@ class SelfTranslationChannelOwner:
                         "[Detailed][Translation] translation_target_started "
                         "parent_utterance_id=%s turn_generation=%s turn_order=%s "
                         "target_index=%s target_language=%s presentation_revision=%s "
-                        "precomputed=%s"
+                        "precomputed=%s prestarted=%s"
                     ),
                     args=(
                         child.parent_utterance_id,
@@ -658,6 +720,7 @@ class SelfTranslationChannelOwner:
                         child.target_language,
                         presentation_revision,
                         child.precomputed_translation is not None,
+                        child.prestarted_translation is not None,
                     ),
                     detailed=True,
                 )
@@ -673,6 +736,15 @@ class SelfTranslationChannelOwner:
         self._admitted_requests.pop(child.utterance_id, None)
         self.runtime.translation_tasks.pop(child.utterance_id, None)
         await self.output_projection.complete_self_target(child, outcome)
+        dual_target = len(child.config_snapshot.value.self_target_languages) == 2
+        await self.output_projection.complete_translation_parent_output(
+            parent_utterance_id=child.parent_utterance_id,
+            channel=child.channel,
+            turn_kind=child.turn_kind,
+            sequence=child.sequence,
+            target_index=child.target_index,
+            dual_target_self=dual_target,
+        )
         if outcome != "cancelled":
             return
         if len(child.config_snapshot.value.self_target_languages) == 2:
@@ -705,17 +777,34 @@ class SelfTranslationChannelOwner:
             raise ValueError("Self translation owner received non-Self output")
         translation = submission.translation
         dual_target = len(submission.config_snapshot.value.self_target_languages) == 2
-        if translation is not None and not dual_target:
-            self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
-                translation
+        admitted_destinations = await self.output_projection.await_translation_parent_output(
+            submission
+        )
+        try:
+            if translation is not None and not dual_target:
+                self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
+                    translation
+                )
+            receipt = await self.output_projection.project_translation_result(
+                submission,
+                admitted_destinations=admitted_destinations,
             )
-        receipt = await self.output_projection.project_translation_result(submission)
-        if translation is not None and dual_target and receipt.record_runtime_translation:
-            self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
-                translation
+            if translation is not None and dual_target and receipt.record_runtime_translation:
+                self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
+                    translation
+                )
+            if receipt.clear_runtime_latency_bookkeeping:
+                self._clear_runtime_latency_bookkeeping(submission.child_utterance_id)
+        finally:
+            await self.output_projection.complete_translation_parent_output(
+                parent_utterance_id=submission.parent_utterance_id,
+                channel=submission.channel,
+                turn_kind=submission.turn_kind or submission.channel,
+                sequence=submission.sequence,
+                target_index=submission.target_index,
+                dual_target_self=dual_target,
+                destinations=admitted_destinations,
             )
-        if receipt.clear_runtime_latency_bookkeeping:
-            self._clear_runtime_latency_bookkeeping(submission.child_utterance_id)
 
     async def translate_and_enqueue(
         self,
@@ -725,46 +814,31 @@ class SelfTranslationChannelOwner:
         cancellation_requested: Callable[[], bool] | None = None,
     ) -> None:
         config_snapshot = self.config_snapshot()
-        source = self.runtime.get_source(utterance_id) or "Mic"
-        if len(config_snapshot.value.self_target_languages) == 2:
-            if cancellation_requested is not None and cancellation_requested():
-                return
-            await self.translation_turns.submit(
-                TranslationTurnRequest(
-                    transcript=Transcript(
-                        utterance_id=utterance_id,
-                        text=text,
-                        is_final=True,
-                        created_at=self.clock.now(),
-                        channel="self",
-                    ),
-                    source=source,
-                    turn_kind="self",
-                    target_languages=config_snapshot.value.self_target_languages,
-                    config_snapshot=config_snapshot,
-                ),
-                wait_for_parent=True,
-            )
+        if cancellation_requested is not None and cancellation_requested():
             return
-        result = await self.translation_requests.process(
-            TranslationProcessRequest(
-                parent_utterance_id=utterance_id,
-                utterance_id=utterance_id,
-                sequence=0,
-                text=text,
-                channel="self",
-                source=source,
-                target_language=self.translation_requests.target_language_for(
-                    "self",
-                    config_snapshot.value,
+        source = self.runtime.get_source(utterance_id) or "Mic"
+        target_languages = config_snapshot.value.self_target_languages or (
+            self.translation_requests.target_language_for(
+                "self",
+                config_snapshot.value,
+            ),
+        )
+        await self.translation_turns.submit(
+            TranslationTurnRequest(
+                transcript=Transcript(
+                    utterance_id=utterance_id,
+                    text=text,
+                    is_final=True,
+                    created_at=self.clock.now(),
+                    channel="self",
                 ),
-                context_policy=self.translation_turns.policy.context_policy,
+                source=source,
+                turn_kind="self",
+                target_languages=target_languages,
                 config_snapshot=config_snapshot,
             ),
-            cancellation_requested=cancellation_requested,
+            wait_for_parent=True,
         )
-        if result.output is not None:
-            await self.submit_translation_output(result.output)
 
     async def _handle_transcript(
         self,
@@ -815,22 +889,28 @@ class SelfTranslationChannelOwner:
         *,
         turn_kind: TranslationTurnKind = "self",
         precomputed_translation: Translation | None = None,
+        prestarted_secondary_translation: _PrestartedTranslation | None = None,
         wait_for_parent: bool = False,
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> None:
         config_snapshot = config_snapshot or self.config_snapshot()
         source = self.runtime.get_source(transcript.utterance_id) or "Mic"
-        await self.translation_turns.submit(
+        child_ids = await self.translation_turns.submit(
             TranslationTurnRequest(
                 transcript=transcript,
                 source=source,
                 turn_kind=turn_kind,
                 target_languages=config_snapshot.value.self_target_languages,
                 precomputed_translation=precomputed_translation,
+                prestarted_secondary_translation=prestarted_secondary_translation,
                 config_snapshot=config_snapshot,
             ),
             wait_for_parent=wait_for_parent,
         )
+        if not child_ids and prestarted_secondary_translation is not None:
+            for utterance_id, task in tuple(self.runtime.translation_tasks.items()):
+                if task is prestarted_secondary_translation.task:
+                    self.runtime.translation_tasks.pop(utterance_id, None)
 
     def _process_request_for_child(
         self,
@@ -855,6 +935,8 @@ class SelfTranslationChannelOwner:
             target_index=child.target_index,
             turn_generation=child.turn_generation,
             turn_order=child.turn_order,
+            turn_kind=child.turn_kind,
+            parent_output_count=child.parent_output_count,
         )
 
     def _send_stt_connected_notification(self) -> None:
@@ -1101,6 +1183,16 @@ class SelfTranslationChannelOwner:
                 str(buffer.merge_id)[:8],
                 reason,
             )
+        if attempt.secondary_task is not None and not attempt.secondary_task.done():
+            attempt.secondary_task.cancel()
+        if (
+            attempt.secondary_utterance_id is not None
+            and self.runtime.translation_tasks.get(attempt.secondary_utterance_id)
+            is attempt.secondary_task
+        ):
+            self.runtime.translation_tasks.pop(attempt.secondary_utterance_id, None)
+        if attempt.secondary_utterance_id is not None:
+            self._clear_latency_timeline(attempt.secondary_utterance_id)
         attempt.latency_stage_times.clear()
         buffer.speculative_attempt = None
         return True
@@ -1439,6 +1531,11 @@ class SelfTranslationChannelOwner:
             return
 
         current_config_snapshot = self.config_snapshot()
+        prestarted_secondary_translation = self._take_prestarted_secondary_translation(
+            attempt,
+            final_text=final_text,
+            config_snapshot=current_config_snapshot,
+        )
         reuse_mode = None
         if (
             attempt is not None
@@ -1515,6 +1612,7 @@ class SelfTranslationChannelOwner:
             await self._ensure_translation(
                 transcript,
                 turn_kind="self",
+                prestarted_secondary_translation=prestarted_secondary_translation,
                 wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
                 config_snapshot=config_snapshot,
             )
@@ -1548,6 +1646,7 @@ class SelfTranslationChannelOwner:
                     transcript,
                     turn_kind="self",
                     precomputed_translation=translation,
+                    prestarted_secondary_translation=prestarted_secondary_translation,
                     wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
                     config_snapshot=config_snapshot,
                 )
@@ -1563,9 +1662,56 @@ class SelfTranslationChannelOwner:
         await self._ensure_translation(
             transcript,
             turn_kind="self",
+            prestarted_secondary_translation=prestarted_secondary_translation,
             wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
             config_snapshot=config_snapshot,
         )
+
+    def _take_prestarted_secondary_translation(
+        self,
+        attempt: _SpeculativeAttempt | None,
+        *,
+        final_text: str,
+        config_snapshot: TranslationRuntimeConfigSnapshot,
+    ) -> _PrestartedTranslation | None:
+        if attempt is None or attempt.secondary_task is None:
+            return None
+        target_languages = config_snapshot.value.self_target_languages
+        reusable = (
+            self.translation_requests.provider_available
+            and config_snapshot.value.translation_enabled
+            and len(target_languages) == 2
+            and target_languages[0] != target_languages[1]
+            and attempt.secondary_target_language == target_languages[1]
+            and attempt.provider_generation == self.translation_requests.provider_generation
+            and self._translation_config_matches(
+                attempt.config_snapshot.value,
+                config_snapshot.value,
+            )
+            and self.output_projection.soft_reuse_mode(attempt.source_text, final_text) is not None
+        )
+        task = attempt.secondary_task
+        attempt.secondary_task = None
+        if reusable:
+            if attempt.secondary_utterance_id is None:
+                task.cancel()
+                return None
+            return _PrestartedTranslation(
+                task=task,
+                child_utterance_id=attempt.secondary_utterance_id,
+                provider_generation=attempt.provider_generation,
+                config_snapshot=attempt.config_snapshot,
+            )
+        if not task.done():
+            task.cancel()
+        if (
+            attempt.secondary_utterance_id is not None
+            and self.runtime.translation_tasks.get(attempt.secondary_utterance_id) is task
+        ):
+            self.runtime.translation_tasks.pop(attempt.secondary_utterance_id, None)
+        if attempt.secondary_utterance_id is not None:
+            self._clear_latency_timeline(attempt.secondary_utterance_id)
+        return None
 
     def _continuation_blocker(self, buffer: _MergeBuffer) -> str | None:
         if buffer.resume_pending or buffer.resume_confirmed:
@@ -1735,6 +1881,7 @@ class SelfTranslationChannelOwner:
                     text=text,
                     record_latency=False,
                     config_snapshot=config_snapshot,
+                    expected_provider_generation=current_attempt.provider_generation,
                 )
             )
         except asyncio.CancelledError:
@@ -1832,11 +1979,6 @@ class SelfTranslationChannelOwner:
         if self.merge_buffer is None or self.merge_buffer is not buffer:
             return
         attempt = buffer.speculative_attempt
-        blocker = self._continuation_blocker(buffer)
-        if blocker is not None:
-            self._emit_continuation_blocker(buffer, blocker=blocker, reason=reason)
-            return
-
         final_text = self._merge_text(buffer.parts)
         if not final_text:
             return
@@ -1846,6 +1988,22 @@ class SelfTranslationChannelOwner:
             self.translation_requests.provider_available
             and config_snapshot.value.translation_enabled
         )
+        blocker = self._continuation_blocker(buffer)
+        if blocker is not None:
+            if (
+                blocker == "post_end_grace"
+                and attempt is not None
+                and not attempt.terminal_action_started
+            ):
+                self._maybe_prestart_secondary_translation(
+                    buffer,
+                    attempt=attempt,
+                    final_text=final_text,
+                    config_snapshot=config_snapshot,
+                    translation_active=translation_active,
+                )
+            self._emit_continuation_blocker(buffer, blocker=blocker, reason=reason)
+            return
         if attempt is None:
             await self._commit_merge(buffer, reason=reason)
             return
@@ -1859,6 +2017,14 @@ class SelfTranslationChannelOwner:
                 attempt.sequence,
             )
             return
+
+        self._maybe_prestart_secondary_translation(
+            buffer,
+            attempt=attempt,
+            final_text=final_text,
+            config_snapshot=config_snapshot,
+            translation_active=translation_active,
+        )
 
         if translation_active and attempt.status is _SpeculativeAttemptStatus.RUNNING:
             return
@@ -1895,6 +2061,79 @@ class SelfTranslationChannelOwner:
             attempt.sequence,
         )
         await self._commit_merge(buffer, reason=reason)
+
+    def _maybe_prestart_secondary_translation(
+        self,
+        buffer: _MergeBuffer,
+        *,
+        attempt: _SpeculativeAttempt,
+        final_text: str,
+        config_snapshot: TranslationRuntimeConfigSnapshot,
+        translation_active: bool,
+    ) -> None:
+        target_languages = config_snapshot.value.self_target_languages
+        if (
+            not translation_active
+            or len(target_languages) != 2
+            or target_languages[0] == target_languages[1]
+            or attempt.secondary_task is not None
+            or attempt.provider_generation != self.translation_requests.provider_generation
+            or not self._translation_config_matches(
+                attempt.config_snapshot.value,
+                config_snapshot.value,
+            )
+            or self.output_projection.soft_reuse_mode(attempt.source_text, final_text) is None
+        ):
+            return
+        target_language = target_languages[1]
+        child_id = _translation_turn_child_id(
+            buffer.merge_id,
+            turn_kind="self",
+            run_index=0,
+            target_index=1,
+            run_language="",
+            target_language=target_language,
+            primary_uses_parent_identity=True,
+        )
+        request = TranslationProcessRequest(
+            parent_utterance_id=buffer.merge_id,
+            utterance_id=child_id,
+            sequence=1,
+            text=attempt.source_text,
+            channel="self",
+            source=self.runtime.get_source(buffer.merge_id) or "Mic",
+            target_language=target_language,
+            context_policy=self.translation_turns.policy.context_policy,
+            config_snapshot=config_snapshot,
+            target_index=1,
+            expected_provider_generation=attempt.provider_generation,
+            prestarted=True,
+        )
+        try:
+            prepared = self.translation_requests.prepare(
+                request.text,
+                channel="self",
+                target_language=target_language,
+                context_policy=request.context_policy,
+                config_snapshot=config_snapshot,
+                parent_utterance_id=buffer.merge_id,
+                target_index=1,
+            )
+        except Exception:
+            return
+        attempt.secondary_target_language = target_language
+        attempt.secondary_utterance_id = child_id
+        attempt.secondary_task = start_lifecycle_task(
+            self._task_scope,
+            self.translation_requests.process(request, prepared=prepared),
+            name=f"secondary-prestart:{child_id}:{attempt.sequence}",
+        )
+        self.runtime.translation_tasks[child_id] = attempt.secondary_task
+        self._emit_metric(
+            "[Metric] secondary_prestart id=%s target_language=%s",
+            str(buffer.merge_id)[:8],
+            target_language,
+        )
 
     async def _sync_overlay_active_self(
         self,

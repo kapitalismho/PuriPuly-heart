@@ -16,8 +16,6 @@ from puripuly_heart.core.stt.notifications import FinalTranscriptSuppressedNotif
 LOCAL_QWEN_HALLUCINATION_GUIDANCE_TRIGGER_COUNT = 2
 
 
-
-
 @dataclass(slots=True)
 class AudioDiagnosticsApplicationOwner:
     presentation: UiPresentationPort

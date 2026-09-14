@@ -635,8 +635,6 @@ async def test_handle_stt_event_logs_basic_channel_state_breadcrumb() -> None:
         runtime_logging.close()
 
 
-
-
 @pytest.mark.asyncio
 async def test_handle_stt_partial_runtime_log_uses_metadata_without_transcript_text() -> None:
     runtime_logging, log_stream = _make_runtime_logging_capture()

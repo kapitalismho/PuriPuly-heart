@@ -52,13 +52,10 @@ OverlayGenerationRendererEvents = Callable[
     [asyncio.Queue[dict[str, object]], str],
     Coroutine[object, object, None],
 ]
-OverlayGenerationRetryOwnership = Callable[
-    [OverlayRuntimeHandle, OverlayPresenter, OverlayProcessManager, bool],
-    Coroutine[object, object, None],
-]
 OverlayGenerationFailureHandler = Callable[[str | None], Coroutine[object, object, None]]
 OverlayGenerationConnectedHandler = Callable[[], None]
 OverlayGenerationRefresh = Callable[[], Coroutine[object, object, None]]
+OverlayGenerationFirstVisible = Callable[[OverlayRuntimeHandle, str | None], None]
 OverlayGenerationMonitor = Callable[
     [OverlayProcessManager, asyncio.Task[None], OverlayRuntimeHandle, str],
     Coroutine[object, object, None],
@@ -72,7 +69,6 @@ class OverlayGenerationStartRequest:
     clock: Clock
     startup_timeout_ms: int
     fallback_reason: str | None = None
-    recovering_from_crash: bool = False
     translation_enabled: bool = True
 
     @property
@@ -98,11 +94,11 @@ class OverlayGenerationStartEffects:
     track_bounds_control: OverlayGenerationTrackBounds
     process_runner: OverlayGenerationProcessRunnerFactory
     run_renderer_events: OverlayGenerationRendererEvents
-    apply_retry_ownership: OverlayGenerationRetryOwnership
     handle_failure: OverlayGenerationFailureHandler
     mark_connected: OverlayGenerationConnectedHandler
     refresh_dependencies: OverlayGenerationRefresh
     watch_runtime: OverlayGenerationMonitor
+    notify_first_visible: OverlayGenerationFirstVisible | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,15 +150,13 @@ class OverlayGenerationStartOwner:
             runtime.attach_diagnostics(diagnostics)
             request = request_factory()
             effects.set_target(request.target)
-            peer_refresh_burst = not request.desktop
-            self_refresh_burst = not request.desktop
+            native_retry_enabled = not request.desktop
             effects.log_runtime(
                 "[Overlay][Start] "
                 f"target={request.target} "
                 f"overlay_instance_id={overlay_instance_id} "
                 f"logging_mode={effects.logging_mode()} "
-                f"peer_presentation_refresh_burst={peer_refresh_burst} "
-                f"self_presentation_refresh_burst={self_refresh_burst}"
+                f"native_retry_enabled={native_retry_enabled}"
             )
             if presenter is None:
                 presenter = OverlayPresenter(
@@ -173,8 +167,7 @@ class OverlayGenerationStartOwner:
                     show_translation=request.config.show_translation,
                     show_peer_original=request.config.show_peer_original,
                     task_factory=runtime.create_child_task,
-                    peer_presentation_refresh_burst=peer_refresh_burst,
-                    self_presentation_refresh_burst=self_refresh_burst,
+                    native_retry_enabled=native_retry_enabled,
                     translation_enabled=request.translation_enabled,
                 )
             else:
@@ -182,18 +175,12 @@ class OverlayGenerationStartOwner:
             presenter = cast(OverlayPresenter, runtime.adopt_presenter(presenter))
             presenter.runtime_log_detailed = effects.log_runtime
             await presenter.update_translation_enabled(request.translation_enabled)
-            if not request.desktop:
-                if request.recovering_from_crash:
-                    await presenter.discard_epoch_retry_intent()
-                else:
-                    await presenter.update_native_retry_ownership(False)
             await presenter.update_calibration(effects.calibration_snapshot())
             await presenter.update_display_preferences(
                 show_translation=request.config.show_translation,
                 show_peer_original=request.config.show_peer_original,
             )
-            await presenter.update_peer_presentation_refresh_burst(peer_refresh_burst)
-            await presenter.update_self_presentation_refresh_burst(self_refresh_burst)
+            await presenter.begin_native_retry_epoch(enabled=native_retry_enabled)
             bridge = OverlayBridge(
                 session_token=self.session_token_factory(),
                 initial_snapshot=presenter.snapshot(),
@@ -243,37 +230,50 @@ class OverlayGenerationStartOwner:
                 )
             else:
                 runtime.attach_renderer_events(None)
-            manager = OverlayProcessManager(
-                process_runner=effects.process_runner(
+            notify_first_visible = effects.notify_first_visible
+            first_visible_callback: Callable[[], None] | None = None
+            if notify_first_visible is not None:
+
+                def first_visible_callback(
+                    _runtime: OverlayRuntimeHandle = runtime,
+                    _overlay_instance_id: str | None = overlay_instance_id,
+                    _notify: Callable[
+                        [OverlayRuntimeHandle, str | None], None
+                    ] = notify_first_visible,
+                ) -> None:
+                    try:
+                        _notify(_runtime, _overlay_instance_id)
+                    except Exception:
+                        pass
+
+            manager_kwargs: dict[str, object] = {
+                "process_runner": effects.process_runner(
                     request.target,
                     runtime.create_child_task,
                 ),
-                bridge_url=bridge.url,
-                bridge_messages=bridge.messages,
-                session_token=bridge.session_token,
-                locale=effects.locale(),
-                log_dir=effects.log_dir(),
-                startup_timeout_ms=request.startup_timeout_ms,
-                renderer_events=renderer_events,
-                overlay_instance_id=overlay_instance_id,
-                logging_mode=effects.logging_mode(),
-                diagnostics=diagnostics,
-                task_factory=runtime.create_child_task,
-                selected_target=request.target,
-                fallback_reason=request.fallback_reason,
-                geometry_authority="flet" if request.desktop else "native",
-                graceful_shutdown_request=(bridge.broadcast_shutdown if request.desktop else None),
-                retry_ownership_changed=(
-                    None
-                    if request.desktop
-                    else lambda confirmed: effects.apply_retry_ownership(
-                        runtime,
-                        presenter,
-                        manager,
-                        confirmed,
-                    )
-                ),
-            )
+                "bridge_url": bridge.url,
+                "bridge_messages": bridge.messages,
+                "session_token": bridge.session_token,
+                "locale": effects.locale(),
+                "log_dir": effects.log_dir(),
+                "startup_timeout_ms": request.startup_timeout_ms,
+                "renderer_events": renderer_events,
+                "overlay_instance_id": overlay_instance_id,
+                "logging_mode": effects.logging_mode(),
+                "diagnostics": diagnostics,
+                "task_factory": runtime.create_child_task,
+                "selected_target": request.target,
+                "fallback_reason": request.fallback_reason,
+                "geometry_authority": "flet" if request.desktop else "native",
+                "graceful_shutdown_request": bridge.broadcast_shutdown,
+            }
+            if first_visible_callback is not None:
+                manager_kwargs["first_visible_callback"] = first_visible_callback
+            try:
+                manager = OverlayProcessManager(**manager_kwargs)  # type: ignore[arg-type]
+            except TypeError:
+                manager_kwargs.pop("first_visible_callback", None)
+                manager = OverlayProcessManager(**manager_kwargs)  # type: ignore[arg-type]
             runtime.attach_process_manager(manager)
             await manager.start()
             if not effects.is_current(runtime, overlay_instance_id):
@@ -288,7 +288,19 @@ class OverlayGenerationStartOwner:
                 self._emit("failed", request, overlay_instance_id)
                 return "failed"
             effects.mark_connected()
-            await effects.refresh_dependencies()
+            if request.fallback_reason is not None:
+                try:
+                    await effects.refresh_dependencies()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    effects.log_failure(
+                        "[Overlay] Peer dependency refresh failed after overlay connect",
+                        logging.WARNING,
+                        exc,
+                    )
+            else:
+                await effects.refresh_dependencies()
             monitor_task = getattr(manager, "_monitor_task", None)
             if monitor_task is not None:
                 runtime.create_monitor_task(
@@ -363,6 +375,7 @@ __all__ = [
     "OverlayGenerationDesktopControls",
     "OverlayGenerationFailureHandler",
     "OverlayGenerationFailureLogger",
+    "OverlayGenerationFirstVisible",
     "OverlayGenerationIsCurrent",
     "OverlayGenerationLocale",
     "OverlayGenerationLogDir",
@@ -373,7 +386,6 @@ __all__ = [
     "OverlayGenerationRendererEvents",
     "OverlayGenerationReplaceSink",
     "OverlayGenerationRequestFactory",
-    "OverlayGenerationRetryOwnership",
     "OverlayGenerationRuntimeLogger",
     "OverlayGenerationSetDiagnostics",
     "OverlayGenerationSetInteractionMode",

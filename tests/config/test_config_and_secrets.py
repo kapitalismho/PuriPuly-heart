@@ -43,6 +43,7 @@ def test_translation_model_public_member_names_and_values_match_plan() -> None:
         ("GEMMA4_31B", "gemma4_31b"),
         ("GEMMA4", "gemma4"),
         ("DEEPSEEK_V4_FLASH", "deepseek_v4_flash"),
+        ("DEEPSEEK_V4_FLASH_41", "deepseek_v4_flash_41"),
         ("GEMINI_37_FLASH", "gemini37_flash"),
         ("QWEN_38_FLASH", "qwen38_flash"),
         ("MANAGED_GEMMA", "managed_gemma"),
@@ -68,6 +69,11 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
         TranslationConnection.MANAGED,
         TranslationConnection.MANAGED_CHINA,
         TranslationConnection.OPENROUTER,
+    )
+    assert supported_translation_connections(TranslationModel.DEEPSEEK_V4_FLASH_41) == (
+        TranslationConnection.MANAGED,
+        TranslationConnection.MANAGED_CHINA,
+        TranslationConnection.OPENROUTER,
         TranslationConnection.OFFICIAL_BYOK,
     )
     assert supported_translation_connections(TranslationModel.GEMINI_37_FLASH) == (
@@ -83,7 +89,6 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
     assert supported_translation_connections(TranslationModel.GEMMA4_31B) == (
         TranslationConnection.MANAGED,
         TranslationConnection.OPENROUTER,
-        TranslationConnection.CEREBRAS,
     )
     assert default_translation_connection(TranslationModel.GEMMA4) == TranslationConnection.MANAGED
     assert (
@@ -156,13 +161,16 @@ def test_openrouter_fallback_aliases_include_curated_openrouter_models() -> None
     deepseek_china_fallback = getattr(
         OpenRouterFallbackSelectionAlias, "DEEPSEEK_V4_FLASH_CHINA", None
     )
+    deepseek_41_fallback = getattr(OpenRouterFallbackSelectionAlias, "DEEPSEEK_V4_FLASH_41", None)
     assert deepseek_fallback is not None
     assert deepseek_china_fallback is not None
+    assert deepseek_41_fallback is not None
 
     assert OPENROUTER_FALLBACK_SELECTION_ALIASES == (
         OpenRouterFallbackSelectionAlias.NONE.value,
         deepseek_fallback.value,
         deepseek_china_fallback.value,
+        deepseek_41_fallback.value,
         OpenRouterFallbackSelectionAlias.GEMMA4_26B_31B.value,
         OpenRouterFallbackSelectionAlias.GEMMA4_31B.value,
     )

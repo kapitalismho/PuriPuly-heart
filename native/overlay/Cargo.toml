@@ -3,6 +3,7 @@ name = "puripuly-heart-overlay"
 version = "2.6.1"
 edition = "2021"
 license = "AGPL-3.0-or-later"
+build = "build.rs"
 
 [lib]
 name = "puripuly_heart_overlay"
@@ -14,6 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 futures-util = "0.3"
+parking_lot = "0.12"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -34,7 +36,13 @@ windows = { version = "0.62", features = [
     "Win32_Graphics_DirectWrite",
     "Win32_Graphics_Dxgi",
     "Win32_Graphics_Dxgi_Common",
+    "Win32_System_IO",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
 ] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync", "time", "test-util"] }
+
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "3"

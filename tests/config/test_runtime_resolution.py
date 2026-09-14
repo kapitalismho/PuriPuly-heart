@@ -214,12 +214,11 @@ def test_stt_runtime_resolution_resolves_qwen_region_endpoint_and_custom_terms()
     config = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel=resolved.RUNTIME_CHANNEL_SELF,
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_language="ko-KR",
             input_host_api="Windows WASAPI",
             input_device="Microphone Array",
             qwen_region=runtime_resolution.QWEN_REGION_SINGAPORE,
-            qwen_asr_model="qwen3-asr-custom",
             custom_vocabulary_enabled=True,
             custom_terms={"ko-KR": ("Puripuly", "VRChat")},
         )
@@ -227,10 +226,10 @@ def test_stt_runtime_resolution_resolves_qwen_region_endpoint_and_custom_terms()
 
     assert config.channel == resolved.RUNTIME_CHANNEL_SELF
     assert config.source_language == "ko-KR"
-    assert config.provider == runtime_resolution.STT_PROVIDER_QWEN_ASR
-    assert config.model == "qwen3-asr-custom"
+    assert config.provider == runtime_resolution.STT_PROVIDER_QWEN_AUDIO
+    assert config.model == runtime_resolution.QWEN_AUDIO_STT_MODEL
     assert config.region == runtime_resolution.QWEN_REGION_SINGAPORE
-    assert config.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+    assert config.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
     assert config.input_host_api == "Windows WASAPI"
     assert config.input_device == "Microphone Array"
     assert config.credential == resolved.ResolvedCredentialRequirement(
@@ -275,36 +274,25 @@ def test_peer_auto_source_mode_requires_provider_capability() -> None:
     assert self_gpu.source_mode == "manual"
 
 
-def test_qwen_audio_runtime_keeps_auto_mode_while_realtime_does_not() -> None:
+def test_qwen_audio_runtime_keeps_peer_auto_mode_but_not_self_auto_mode() -> None:
     runtime_resolution = _runtime_resolution_module()
 
     audio = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel="peer",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
-            source_mode="auto",
-        )
-    )
-    realtime = runtime_resolution.resolve_stt_config(
-        runtime_resolution.STTRuntimeIntent(
-            channel="peer",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_REALTIME,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_mode="auto",
         )
     )
     self_audio = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel="self",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_mode="auto",
         )
     )
 
     assert audio.source_mode == "auto"
-    assert realtime.source_mode == "manual"
     assert self_audio.source_mode == "manual"
 
 
@@ -314,8 +302,7 @@ def test_qwen_audio_auto_resolution_propagates_expected_language_hints() -> None
     auto = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel="peer",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_mode="auto",
             qwen_audio_language_hints=("ja", "ja-JP", "zh"),
         )
@@ -323,16 +310,14 @@ def test_qwen_audio_auto_resolution_propagates_expected_language_hints() -> None
     no_hints = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel="peer",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_mode="auto",
         )
     )
     manual = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel="peer",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_mode="manual",
             qwen_audio_language_hints=("ja",),
         )
@@ -381,18 +366,12 @@ def test_gemini_transcribe_auto_resolution_keeps_expected_language_codes() -> No
     assert manual.provider_options["auto_language"] is False
 
 
-def test_stt_supports_peer_auto_detection_is_model_aware_for_qwen() -> None:
+def test_stt_supports_peer_auto_detection_includes_qwen_audio() -> None:
     runtime_resolution = _runtime_resolution_module()
 
     assert runtime_resolution.stt_supports_peer_auto_detection("soniox")
     assert runtime_resolution.stt_supports_peer_auto_detection("local_qwen_gpu")
     assert runtime_resolution.stt_supports_peer_auto_detection("qwen_audio")
-    assert runtime_resolution.stt_supports_peer_auto_detection(
-        "qwen_asr", qwen_asr_model="qwen-audio-3.0-asr-flash-streaming"
-    )
-    assert not runtime_resolution.stt_supports_peer_auto_detection(
-        "qwen_asr", qwen_asr_model="qwen3-asr-flash-realtime"
-    )
     assert not runtime_resolution.stt_supports_peer_auto_detection("deepgram")
     assert runtime_resolution.stt_supports_peer_auto_detection("rolling_free")
     assert runtime_resolution.stt_supports_peer_auto_detection(
@@ -595,7 +574,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "managed",
             "openrouter:managed",
             None,
-            "default",
+            "deepseek_v4_flash_latency",
         ),
         (
             "deepseek_v4_flash",
@@ -606,7 +585,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "managed",
             "openrouter:managed_qq",
             None,
-            "deepseek_only",
+            "deepseek_v4_flash_china",
         ),
         (
             "deepseek_v4_flash",
@@ -617,14 +596,36 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "secret_store",
             "openrouter:byok",
             None,
-            "default",
+            "deepseek_v4_flash_latency",
         ),
         (
-            "deepseek_v4_flash",
+            "deepseek_v4_flash_41",
+            "managed",
+            "managed",
+            "openrouter",
+            "deepseek/deepseek-v4.1-flash",
+            "managed",
+            "openrouter:managed",
+            None,
+            "deepseek_v4_flash_41_strict",
+        ),
+        (
+            "deepseek_v4_flash_41",
+            "openrouter",
+            "byok",
+            "openrouter",
+            "deepseek/deepseek-v4.1-flash",
+            "secret_store",
+            "openrouter:byok",
+            None,
+            "deepseek_v4_flash_41_strict",
+        ),
+        (
+            "deepseek_v4_flash_41",
             "official_byok",
             "byok",
             "deepseek",
-            "deepseek-v4-flash",
+            "deepseek-flash",
             "secret_store",
             "deepseek:byok",
             None,
@@ -683,17 +684,6 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "secret_store",
             "qwen:beijing",
             "beijing",
-            None,
-        ),
-        (
-            "gemma4_31b",
-            "cerebras",
-            "byok",
-            "cerebras",
-            "gemma-4-31b",
-            "secret_store",
-            "cerebras:byok",
-            None,
             None,
         ),
         (
@@ -873,7 +863,7 @@ def test_legacy_managed_gemma_provider_derives_cpu_product_intent() -> None:
         (
             "none",
             False,
-            "deepseek_v4_flash",
+            "deepseek_v4_flash_41",
             "official_byok",
             None,
             None,
@@ -884,12 +874,12 @@ def test_legacy_managed_gemma_provider_derives_cpu_product_intent() -> None:
         (
             "deepseek_v4_flash_official",
             True,
-            "deepseek_v4_flash",
+            "deepseek_v4_flash_41",
             "official_byok",
             "secret_store",
             "deepseek:byok",
             "deepseek",
-            "deepseek-v4-flash",
+            "deepseek-flash",
             None,
         ),
         (
@@ -904,6 +894,17 @@ def test_legacy_managed_gemma_provider_derives_cpu_product_intent() -> None:
             "deepseek_v4_flash_latency",
         ),
         (
+            "openrouter_deepseek_v4_flash_41",
+            True,
+            "deepseek_v4_flash_41",
+            "openrouter",
+            "secret_store",
+            "openrouter:byok",
+            "openrouter",
+            "deepseek/deepseek-v4.1-flash",
+            "deepseek_v4_flash_41_strict",
+        ),
+        (
             "openrouter_gemma4_26b_a4b",
             True,
             "gemma4",
@@ -913,17 +914,6 @@ def test_legacy_managed_gemma_provider_derives_cpu_product_intent() -> None:
             "openrouter",
             "google/gemma-4-26b-a4b-it",
             "gemma4_26b_latency",
-        ),
-        (
-            "cerebras_gemma4_31b",
-            True,
-            "gemma4_31b",
-            "cerebras",
-            "secret_store",
-            "cerebras:byok",
-            "cerebras",
-            "gemma-4-31b",
-            None,
         ),
     ],
 )
@@ -992,7 +982,7 @@ def test_openrouter_no_fallback_selected_has_no_fallback_credential() -> None:
     assert config.fallback is None
 
 
-def test_openrouter_china_fallback_resolves_deepseek_only_fallback_routing() -> None:
+def test_openrouter_china_fallback_resolves_baidu_only_fallback_routing() -> None:
     runtime_resolution = _runtime_resolution_module()
     resolved = _resolved_module()
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
@@ -1021,7 +1011,7 @@ def test_openrouter_china_fallback_resolves_deepseek_only_fallback_routing() -> 
         required=True,
         reference="openrouter:managed_qq",
     )
-    assert config.fallback.target.provider_routing == "deepseek_only"
+    assert config.fallback.target.provider_routing == "deepseek_v4_flash_china"
     assert config.fallback.force_managed_wrapper is True
 
 
@@ -1049,7 +1039,7 @@ def test_openrouter_gemma_fallback_preserves_duplicate_target_and_adds_emergency
     assert config.fallback.target.provider_routing == "gemma4_26b_latency"
     assert len(config.attempts) == 3
     assert config.attempts[1].target == config.fallback.target
-    assert config.attempts[2].target.provider_routing == "gemma4_31b_cerebras_only"
+    assert config.attempts[2].target.provider_routing == "gemma4_31b_modelrun_only"
 
 
 def test_openrouter_deepseek_only_primary_keeps_fallback_and_emergency_schedule() -> None:
@@ -1075,11 +1065,11 @@ def test_openrouter_deepseek_only_primary_keeps_fallback_and_emergency_schedule(
 
     assert config.provider == "openrouter"
     assert config.model == "deepseek/deepseek-v4-flash-0731"
-    assert config.provider_routing == "deepseek_only"
+    assert config.provider_routing == "deepseek_v4_flash_china"
     assert config.fallback is not None
-    assert config.fallback.target.provider_routing == "deepseek_only"
+    assert config.fallback.target.provider_routing == "deepseek_v4_flash_china"
     assert len(config.attempts) == 3
-    assert config.attempts[2].target.provider_routing == "gemma4_31b_cerebras_only"
+    assert config.attempts[2].target.provider_routing == "gemma4_31b_modelrun_only"
 
 
 def test_managed_china_resolves_explicit_qq_managed_credential_reference() -> None:
@@ -1102,7 +1092,7 @@ def test_managed_china_resolves_explicit_qq_managed_credential_reference() -> No
         required=True,
         reference="openrouter:managed_qq",
     )
-    assert config.provider_routing == "deepseek_only"
+    assert config.provider_routing == "deepseek_v4_flash_china"
 
 
 def test_standard_managed_resolves_standard_managed_credential_reference() -> None:
@@ -1133,7 +1123,7 @@ def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_and_suppresses
     resolved = _resolved_module()
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
         provider_llm="openrouter",
-        model="deepseek/deepseek-v4-flash-0731",
+        model="deepseek/deepseek-v4.1-flash",
         selected_source="byok",
         fallback_selection_alias="qwen35_flash",
         routing_mode="parasail_first",
@@ -1155,17 +1145,17 @@ def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_and_suppresses
         )
     )
 
-    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH
+    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41
     assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER
     assert config.provider == "openrouter"
-    assert config.model == "deepseek/deepseek-v4-flash-0731"
+    assert config.model == "deepseek/deepseek-v4.1-flash"
     assert config.credential == resolved.ResolvedCredentialRequirement(
         source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
         required=True,
         reference="openrouter:byok",
     )
     assert config.routing_mode == "latency"
-    assert config.provider_routing == "deepseek_only"
+    assert config.provider_routing == "deepseek_v4_flash_41_strict"
     assert config.service_endpoint == "https://broker.fixture.test/v1"
     assert config.fallback is None
 
@@ -1482,7 +1472,6 @@ def test_current_and_legacy_setting_value_snapshots_convert_to_canonical_input_a
 
         assert isinstance(config, resolved.ResolvedLLMConfig)
         assert config.provider in {
-            "cerebras",
             "deepseek",
             "gemini",
             "local_llm",
@@ -1533,33 +1522,6 @@ def test_derive_runtime_from_openrouter_gemini_compatibility_values() -> None:
     )
 
 
-def test_derive_runtime_from_cerebras_compatibility_values() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    resolved = _resolved_module()
-
-    translation_intent = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
-        provider_llm="cerebras",
-        cerebras_model="gemma-4-31b",
-        concurrency_limit=3,
-    )
-    config = runtime_resolution.resolve_llm_config(
-        runtime_resolution.RuntimeResolutionInput(
-            translation=translation_intent,
-            direct=runtime_resolution.DirectProviderRuntimeIntent(cerebras_model="gemma-4-31b"),
-        )
-    )
-
-    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_GEMMA4_31B
-    assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_CEREBRAS
-    assert config.provider == "cerebras"
-    assert config.model == "gemma-4-31b"
-    assert config.credential == resolved.ResolvedCredentialRequirement(
-        source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
-        required=True,
-        reference="cerebras:byok",
-    )
-
-
 def test_missing_translation_openrouter_compatibility_values_derive_exact_runtime_config() -> None:
     runtime_resolution = _runtime_resolution_module()
     resolved = _resolved_module()
@@ -1576,7 +1538,7 @@ def test_missing_translation_openrouter_compatibility_values_derive_exact_runtim
         },
         "gemini": {"llm_model": "gemini-3.7-flash"},
         "qwen": {"llm_model": "qwen3.8-flash", "region": "beijing"},
-        "deepseek": {"llm_model": "deepseek-v4-flash"},
+        "deepseek": {"llm_model": "deepseek-flash"},
         "local_llm": {
             "base_url": "http://127.0.0.1:11434/v1",
             "model": "llama3.1:8b",
@@ -1629,7 +1591,7 @@ def test_missing_translation_openrouter_compatibility_values_derive_exact_runtim
         reference="openrouter:byok",
     )
     assert config.routing_mode == "latency"
-    assert config.provider_routing == "default"
+    assert config.provider_routing == "deepseek_v4_flash_latency"
     assert config.base_url is None
     assert config.service_endpoint == "https://broker.fixture.test/v1"
     assert config.fallback is None
@@ -1736,7 +1698,7 @@ def test_missing_openrouter_source_defaults_to_byok_for_openrouter_provider() ->
         },
         "gemini": {"llm_model": "gemini-3.7-flash"},
         "qwen": {"llm_model": "qwen3.8-flash", "region": "beijing"},
-        "deepseek": {"llm_model": "deepseek-v4-flash"},
+        "deepseek": {"llm_model": "deepseek-flash"},
         "llm": {"concurrency_limit": 3},
     }
     raw_openrouter = raw_settings["openrouter"]
@@ -1825,7 +1787,7 @@ def test_missing_translation_direct_provider_compatibility_values_derive_exact_c
         },
         "gemini": {"llm_model": "gemini-3.7-flash"},
         "qwen": {"llm_model": "qwen3.8-flash", "region": "singapore"},
-        "deepseek": {"llm_model": "deepseek-v4-flash"},
+        "deepseek": {"llm_model": "deepseek-flash"},
         "llm": {"concurrency_limit": 6},
     }
     raw_openrouter = raw_settings["openrouter"]
@@ -1859,10 +1821,10 @@ def test_missing_translation_direct_provider_compatibility_values_derive_exact_c
         )
     )
 
-    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH
+    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41
     assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_OFFICIAL_BYOK
     assert config.provider == "deepseek"
-    assert config.model == "deepseek-v4-flash"
+    assert config.model == "deepseek-flash"
     assert config.credential == resolved.ResolvedCredentialRequirement(
         source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
         required=True,

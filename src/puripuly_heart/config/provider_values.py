@@ -5,14 +5,18 @@ from urllib.parse import urlsplit, urlunsplit
 
 from puripuly_heart.config.llm_profiles import (
     OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH,
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_CHINA,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_31B,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_NONE,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+    OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
     OPENROUTER_MODEL_GEMINI_37_FLASH,
     OPENROUTER_MODEL_GEMMA_4_31B_IT,
+    OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41_BYOK,
+    OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41_MANAGED,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED,
     OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK,
@@ -59,7 +63,6 @@ class STTProviderName(str, Enum):
     DEEPGRAM = "deepgram"
     GEMINI_TRANSCRIBE = "gemini_transcribe"
     ELEVENLABS_SCRIBE = "elevenlabs_scribe"
-    QWEN_ASR = "qwen_asr"
     QWEN_AUDIO = "qwen_audio"
     SONIOX = "soniox"
     ROLLING_FREE = "rolling_free"
@@ -119,7 +122,6 @@ def display_stt_provider(
     provider: STTProviderName,
     *,
     custom_mode: str = "offline",
-    qwen_asr_model: str | None = None,
 ) -> STTProviderName:
     if provider is STTProviderName.CUSTOM:
         if custom_mode == "realtime":
@@ -132,16 +134,7 @@ def is_qwen_cloud_stt_provider(provider: STTProviderName | str | None) -> bool:
     if provider is None:
         return False
     value = provider.value if isinstance(provider, STTProviderName) else str(provider)
-    return value in {STTProviderName.QWEN_ASR.value, STTProviderName.QWEN_AUDIO.value}
-
-
-def qwen_cloud_stt_model_for_provider(provider: STTProviderName | str) -> str | None:
-    value = provider.value if isinstance(provider, STTProviderName) else str(provider)
-    if value == STTProviderName.QWEN_AUDIO.value:
-        return QwenASRSTTModel.AUDIO_STREAMING.value
-    if value == STTProviderName.QWEN_ASR.value:
-        return QwenASRSTTModel.REALTIME.value
-    return None
+    return value == STTProviderName.QWEN_AUDIO.value
 
 
 def custom_stt_selection_for_provider(
@@ -163,7 +156,6 @@ class LLMProviderName(str, Enum):
     OPENROUTER = "openrouter"
     QWEN = "qwen"
     DEEPSEEK = "deepseek"
-    CEREBRAS = "cerebras"
     MANAGED_GEMMA = "managed_gemma"
     LOCAL_LLM = "local_llm"
 
@@ -178,11 +170,6 @@ class QwenLLMModel(str, Enum):
     QWEN_38_FLASH = "qwen3.8-flash"
 
 
-class QwenASRSTTModel(str, Enum):
-    REALTIME = "qwen3-asr-flash-realtime"
-    AUDIO_STREAMING = "qwen-audio-3.0-asr-flash-streaming"
-
-
 class SecretsBackend(str, Enum):
     KEYRING = "keyring"
     ENCRYPTED_FILE = "encrypted_file"
@@ -193,6 +180,7 @@ class OpenRouterLLMModel(str, Enum):
     GEMMA_4_31B_IT = OPENROUTER_MODEL_GEMMA_4_31B_IT
     QWEN_35_FLASH_02_23 = "qwen/qwen3.5-flash-02-23"
     DEEPSEEK_V4_FLASH = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+    DEEPSEEK_V4_FLASH_41 = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
     GEMINI_37_FLASH = OPENROUTER_MODEL_GEMINI_37_FLASH
 
 
@@ -216,11 +204,7 @@ class GeminiLLMModel(str, Enum):
 
 
 class DeepSeekLLMModel(str, Enum):
-    DEEPSEEK_V4_FLASH = "deepseek-v4-flash"
-
-
-class CerebrasLLMModel(str, Enum):
-    GEMMA_4_31B = "gemma-4-31b"
+    DEEPSEEK_V4_FLASH = "deepseek-flash"
 
 
 class LocalLLMBackend(str, Enum):
@@ -232,6 +216,7 @@ class OpenRouterFallbackSelectionAlias(str, Enum):
     QWEN35_FLASH = OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH
     DEEPSEEK_V4_FLASH = OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH
     DEEPSEEK_V4_FLASH_CHINA = OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_CHINA
+    DEEPSEEK_V4_FLASH_41 = OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41
     GEMMA4_26B_31B = OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B
     GEMMA4_31B = OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_31B
 
@@ -247,6 +232,8 @@ class OpenRouterSelectionAlias(str, Enum):
     QWEN35_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK
     DEEPSEEK_V4_FLASH_MANAGED = OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED
     DEEPSEEK_V4_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK
+    DEEPSEEK_V4_FLASH_41_MANAGED = OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41_MANAGED
+    DEEPSEEK_V4_FLASH_41_BYOK = OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41_BYOK
     GEMINI37_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK
 
 
@@ -285,7 +272,6 @@ def normalize_local_llm_base_url(value: str) -> str:
 
 
 __all__ = [
-    "CerebrasLLMModel",
     "DeepSeekLLMModel",
     "GeminiLLMModel",
     "LLMProviderName",
@@ -298,7 +284,6 @@ __all__ = [
     "OpenRouterLLMModel",
     "OpenRouterSelectionAlias",
     "QwenLLMModel",
-    "QwenASRSTTModel",
     "QwenRegion",
     "STTProviderName",
     "CLOUD_FREE_TIER_STT_PROVIDERS",
@@ -312,6 +297,5 @@ __all__ = [
     "is_custom_stt_provider",
     "is_qwen_cloud_stt_provider",
     "normalize_owned_referral_id",
-    "qwen_cloud_stt_model_for_provider",
     "normalize_local_llm_base_url",
 ]

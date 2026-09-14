@@ -116,6 +116,27 @@ async def open_fake(
     return backend, session, socket, first_id
 
 
+@pytest.mark.asyncio
+async def test_qwen_audio_backend_requires_api_key() -> None:
+    backend = QwenAudioStreamingSTTBackend(api_key="")
+
+    with pytest.raises(ValueError, match="api_key"):
+        await backend.open_session()
+
+
+@pytest.mark.asyncio
+async def test_qwen_audio_backend_requires_supported_sample_rate() -> None:
+    backend = QwenAudioStreamingSTTBackend(api_key="key", sample_rate_hz=44100)
+
+    with pytest.raises(ValueError, match="sample_rate_hz"):
+        await backend.open_session()
+
+
+@pytest.mark.asyncio
+async def test_qwen_audio_backend_rejects_empty_verification_key() -> None:
+    assert await QwenAudioStreamingSTTBackend.verify_api_key("") is False
+
+
 async def next_event(session: object):
     return await session.events().__anext__()
 
@@ -497,16 +518,15 @@ def test_qwen_audio_language_capabilities_are_model_specific() -> None:
 
 def test_qwen_audio_backend_contract_constants() -> None:
     from puripuly_heart.config.runtime_resolution import (
-        QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
+        QWEN_AUDIO_STT_MODEL,
         STTRuntimeIntent,
         resolve_stt_config,
     )
 
-    assert QWEN_ASR_STT_MODEL_AUDIO_STREAMING == QWEN_AUDIO_MODEL
+    assert QWEN_AUDIO_STT_MODEL == QWEN_AUDIO_MODEL
     resolved = resolve_stt_config(
         STTRuntimeIntent(
-            provider="qwen_asr",
-            qwen_asr_model=QWEN_AUDIO_MODEL,
+            provider="qwen_audio",
             qwen_region="singapore",
         )
     )
@@ -597,9 +617,8 @@ async def test_socket_close_reports_protocol_failure() -> None:
 def test_factory_selects_qwen_audio_protocol_and_source_terms() -> None:
     resolved = resolve_stt_config(
         STTRuntimeIntent(
-            provider="qwen_asr",
+            provider="qwen_audio",
             source_language="tl",
-            qwen_asr_model=QWEN_AUDIO_MODEL,
             qwen_region="singapore",
             custom_vocabulary_enabled=True,
             custom_terms={"tl": ("PuriPuly", "Qwen")},
@@ -612,6 +631,17 @@ def test_factory_selects_qwen_audio_protocol_and_source_terms() -> None:
     assert backend.language_hints == ("tl",)
     assert backend.endpoint.endswith("/api-ws/v1/inference")
     assert tuple(backend.hotwords) == ("PuriPuly", "Qwen")
+
+
+def test_factory_omits_manual_hint_for_unsupported_language() -> None:
+    resolved = resolve_stt_config(STTRuntimeIntent(provider="qwen_audio", source_language="tr"))
+    secrets = InMemorySecretStore()
+    secrets.set("alibaba_api_key_beijing", "test-key")
+
+    backend = create_stt_backend_from_resolved_config(resolved, secrets=secrets)
+
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
+    assert backend.language_hints == ()
 
 
 async def wait_for_condition(predicate) -> None:
@@ -1106,8 +1136,7 @@ async def test_real_qwen_audio_shared_engine_uses_one_sentence_join_projection(
             }
         )
     await wait_for_condition(
-        lambda: len([event for event in events if isinstance(event, STTProviderTurnUpdate)])
-        == 2
+        lambda: len([event for event in events if isinstance(event, STTProviderTurnUpdate)]) == 2
     )
     ending = asyncio.create_task(engine.handle_owned_vad_event(end))
     await wait_for_condition(
@@ -1126,9 +1155,7 @@ async def test_real_qwen_audio_shared_engine_uses_one_sentence_join_projection(
     assert terminal.outcome == "final"
     assert terminal.text == expected_text
     assert consumed == [sentences[0], expected_suffix]
-    assert [
-        (item.text_start, item.text_end) for item in terminal.included_contributions
-    ] == [
+    assert [(item.text_start, item.text_end) for item in terminal.included_contributions] == [
         (0, len(sentences[0])),
         (len(sentences[0]), len(expected_text)),
     ]

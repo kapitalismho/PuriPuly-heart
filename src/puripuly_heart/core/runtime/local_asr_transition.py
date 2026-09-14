@@ -160,7 +160,6 @@ class LocalASRTransitionCoordinator:
         if not self._closed:
             self._phase = "idle"
 
-
     async def close(self) -> None:
         if self._closed and self._worker_task is None and not self._prepared_candidates:
             return

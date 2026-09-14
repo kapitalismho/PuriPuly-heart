@@ -6,7 +6,6 @@ from typing import Literal
 
 import numpy as np
 
-
 CaptureDiscontinuityKind = Literal["known_loss", "unknown_loss"]
 
 
@@ -94,7 +93,11 @@ class AudioCaptureSpan:
         normalized_end = self.normalized_end_sample
         if normalized_start is None or normalized_end is None:
             raise ValueError("capture span has no normalized range")
-        if start_sample < normalized_start or end_sample > normalized_end or end_sample <= start_sample:
+        if (
+            start_sample < normalized_start
+            or end_sample > normalized_end
+            or end_sample <= start_sample
+        ):
             raise ValueError("slice must be inside the normalized range")
         normalized_count = normalized_end - normalized_start
         source_count = self.source_sample_count
@@ -111,8 +114,7 @@ class AudioCaptureSpan:
             source_end_sample=source_end,
             source_start_monotonic_s=self.source_start_monotonic_s
             + monotonic_duration * left_ratio,
-            source_end_monotonic_s=self.source_start_monotonic_s
-            + monotonic_duration * right_ratio,
+            source_end_monotonic_s=self.source_start_monotonic_s + monotonic_duration * right_ratio,
             discontinuity_before=(
                 self.discontinuity_before if start_sample == normalized_start else None
             ),

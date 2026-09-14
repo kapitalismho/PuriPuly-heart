@@ -33,6 +33,10 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigurationOwner,
 )
+from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_EXECUTION_CONTRACT,
+    OVERLAY_NATIVE_RETRY_CONTRACT,
+)
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
@@ -52,7 +56,10 @@ class RecordingBridge:
     def __init__(self) -> None:
         self.snapshots: list[object] = []
 
-    async def replace_snapshot(self, snapshot: object) -> None:
+    async def replace_snapshot(
+        self, snapshot: object, *, block_expirations: object | None = None
+    ) -> None:
+        _ = block_expirations
         self.snapshots.append(snapshot)
 
     async def broadcast_shutdown(self) -> None:
@@ -149,8 +156,6 @@ def attach_live_presenter(
         calibration=OverlayCalibration(),
         clock=FakeClock(_now=10.0),
         translation_enabled=config_owner.snapshot().value.translation_enabled,
-        peer_presentation_refresh_burst=False,
-        self_presentation_refresh_burst=False,
     )
     runtime = owner.new_runtime()
     runtime.set_overlay_instance_id("overlay-test")
@@ -247,6 +252,7 @@ async def _drain() -> None:
 @dataclass(slots=True)
 class _TestManagedProcess:
     ready: bool = True
+    overlay_instance_id: str = "overlay-test"
     failure_reason: str | None = None
     _events: asyncio.Queue[dict[str, object]] = dataclass_field(default_factory=asyncio.Queue)
     _exit_future: asyncio.Future[int | None] | None = dataclass_field(default=None, init=False)
@@ -260,14 +266,27 @@ class _TestManagedProcess:
                 {"type": "startup_error", "failure_reason": self.failure_reason}
             )
         elif self.ready:
-            self._events.put_nowait({"type": "overlay_ready"})
+            self._events.put_nowait(
+                {
+                    "type": "overlay_ready",
+                    "overlay_instance_id": self.overlay_instance_id,
+                    "runtime_generation": 1,
+                    "capabilities": {
+                        "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                        "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+                    },
+                }
+            )
 
     async def next_event(self) -> dict[str, object]:
         return await self._events.get()
 
-    async def wait(self) -> int | None:
+    async def wait_for_exit(self) -> int | None:
         assert self._exit_future is not None
         return await asyncio.shield(self._exit_future)
+
+    async def finish_readers(self) -> None:
+        return None
 
     async def terminate(self) -> None:
         self.terminated = True
@@ -288,15 +307,21 @@ class _TestProcessRunner:
     failure_reason: str | None = None
     ready: bool = True
     last_process: _TestManagedProcess | None = dataclass_field(default=None, init=False)
+    overlay_instance_id: str = "overlay-test"
+
+    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+        _ = (quiet_tail_profile, handoff_experiment)
 
     def prepare(self, manifest: object) -> Path:
-        _ = manifest
+        self.overlay_instance_id = str(getattr(manifest, "overlay_instance_id"))
         return Path("C:/fake/PuriPulyHeartOverlay.exe")
 
     async def spawn(self, executable_path: object, manifest_path: object) -> _TestManagedProcess:
         _ = (executable_path, manifest_path)
         self.last_process = _TestManagedProcess(
-            ready=self.ready, failure_reason=self.failure_reason
+            ready=self.ready,
+            failure_reason=self.failure_reason,
+            overlay_instance_id=self.overlay_instance_id,
         )
         return self.last_process
 
@@ -306,16 +331,23 @@ class _GatedProcessRunner:
     entered: asyncio.Event = dataclass_field(default_factory=asyncio.Event)
     gate: asyncio.Event = dataclass_field(default_factory=asyncio.Event)
     last_process: _TestManagedProcess | None = dataclass_field(default=None, init=False)
+    overlay_instance_id: str = "overlay-test"
+
+    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+        _ = (quiet_tail_profile, handoff_experiment)
 
     def prepare(self, manifest: object) -> Path:
-        _ = manifest
+        self.overlay_instance_id = str(getattr(manifest, "overlay_instance_id"))
         return Path("C:/fake/PuriPulyHeartOverlay.exe")
 
     async def spawn(self, executable_path: object, manifest_path: object) -> _TestManagedProcess:
         _ = (executable_path, manifest_path)
         self.entered.set()
         await self.gate.wait()
-        self.last_process = _TestManagedProcess(ready=True)
+        self.last_process = _TestManagedProcess(
+            ready=True,
+            overlay_instance_id=self.overlay_instance_id,
+        )
         return self.last_process
 
 
@@ -348,11 +380,12 @@ async def _restart_via_transition(
         staticmethod(lambda _target, _task_factory: runner),
     )
     owner.on_runtime_crashed()
+    await _drain()
     await owner.begin_start()
     runtime = owner._runtime
     assert runtime is not None
-    assert runtime.start_task is not None
-    await runtime.start_task
+    if runtime.start_task is not None:
+        await runtime.start_task
     return runtime
 
 
@@ -455,7 +488,7 @@ async def test_restart_reuse_rebuilds_visible_row_as_source_primary(
         assert before.primary_text == "peer translation toggle"
         replace_translation_runtime_enabled(config_owner, False)
         second_runtime = await _restart_via_transition(owner, _TestProcessRunner(), monkeypatch)
-        assert owner.state == "connected"
+        assert owner.state == "connected", owner.failure_reason
         reused = cast(OverlayPresenter, second_runtime.presenter)
         assert reused is first_presenter
         assert reused.translation_enabled is False
@@ -778,8 +811,6 @@ async def test_stale_and_closed_updates_are_ignored() -> None:
         calibration=OverlayCalibration(),
         clock=FakeClock(_now=10.0),
         translation_enabled=True,
-        peer_presentation_refresh_burst=False,
-        self_presentation_refresh_burst=False,
     )
     runtime.adopt_presenter(cast(Any, new_presenter))
     runtime.set_overlay_instance_id("overlay-next")

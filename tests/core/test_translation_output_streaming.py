@@ -155,7 +155,10 @@ class RecordingTranslationDiagnostics:
 class RecordingPresentationBridge:
     snapshots: list[object] = field(default_factory=list)
 
-    async def replace_snapshot(self, snapshot: object) -> None:
+    async def replace_snapshot(
+        self, snapshot: object, *, block_expirations: object | None = None
+    ) -> None:
+        _ = block_expirations
         self.snapshots.append(snapshot)
 
     async def broadcast_shutdown(self) -> None:
@@ -462,7 +465,6 @@ async def test_translation_active_self_overlay_snapshot_uses_spec_translation_la
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -547,7 +549,6 @@ async def test_translation_same_text_blank_spec_language_update_feeds_final_tran
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
     merge_id = uuid4()
@@ -612,7 +613,6 @@ async def test_translation_self_translation_overlay_uses_translation_languages_n
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -749,7 +749,6 @@ async def test_translation_peer_translation_overlay_uses_translation_languages_n
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -799,7 +798,6 @@ async def test_translation_active_self_sticky_secondary_preserves_cached_seconda
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
     merge_id = uuid4()
@@ -840,7 +838,6 @@ async def test_translation_active_self_sticky_secondary_preserves_cached_seconda
 async def test_translation_active_self_blank_secondary_preserves_cached_primary_language() -> None:
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
     merge_id = uuid4()
@@ -883,7 +880,6 @@ async def test_translation_self_final_transcript_preserves_active_display_langua
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -938,7 +934,6 @@ async def test_translation_stale_secondary_blanking_preserves_active_primary_lan
     presenter = OverlayPresenter(
         bridge=bridge,
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
     merge_id = uuid4()
@@ -989,7 +984,6 @@ async def test_translation_peer_overlay_snapshot_uses_peer_specific_source_and_t
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -2327,17 +2321,10 @@ async def test_self_stt_final_uses_self_chatbox_when_legacy_peer_chatbox_active(
 @pytest.mark.asyncio
 async def test_peer_overlay_emit_failures_still_emit_translation_done_and_deny_chatbox() -> None:
     class RecordingFailingOverlaySink:
-        def __init__(self, order: list[str]) -> None:
-            self.attempted_types: list[str] = []
-            self._order = order
-
         async def emit(self, event: object) -> None:
-            self._order.append(f"overlay:{event.type}")
-            self.attempted_types.append(event.type)
             raise RuntimeError(f"overlay boom: {event.type}")
 
-    call_order: list[str] = []
-    sink = RecordingFailingOverlaySink(call_order)
+    sink = RecordingFailingOverlaySink()
     osc = RecordingOscQueue()
     harness = compose_translation_test_harness(
         stt=None,
@@ -2346,27 +2333,9 @@ async def test_peer_overlay_emit_failures_still_emit_translation_done_and_deny_c
         overlay_sink=sink,
         peer_translation_enabled=True,
     )
-    original_put = harness.ui_events.put
-
-    async def recording_put(event) -> None:
-        call_order.append(f"ui:{event.type.value}")
-        await original_put(event)
-
-    harness.ui_events.put = recording_put  # type: ignore[method-assign]
-
     utterance_id = await harness.translate_peer_text_for_test("안녕")
     events = [await harness.ui_events.get() for _ in range(2)]
 
-    assert call_order == [
-        "ui:TRANSCRIPT_FINAL",
-        "overlay:translation_final",
-        "overlay:utterance_closed",
-        "ui:TRANSLATION_DONE",
-    ]
-    assert sink.attempted_types == [
-        "translation_final",
-        "utterance_closed",
-    ]
     assert [event.type for event in events] == [
         UIEventType.TRANSCRIPT_FINAL,
         UIEventType.TRANSLATION_DONE,

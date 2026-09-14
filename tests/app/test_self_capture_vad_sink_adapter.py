@@ -63,9 +63,7 @@ async def test_adapter_forwards_required_recognition_terminal_operations() -> No
     )
     await adapter.fail_owned_segment(failed, reason="buffer_exhausted")
 
-    assert runtime.rejections == [
-        (rejected, "recognition_admission_timeout", "expired")
-    ]
+    assert runtime.rejections == [(rejected, "recognition_admission_timeout", "expired")]
     assert runtime.failures == [(failed, "buffer_exhausted")]
 
 
