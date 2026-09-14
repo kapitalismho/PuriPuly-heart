@@ -883,7 +883,6 @@ class OverlayBridge:
         self._ensure_writer()
         self._writer_wakeup.set()
 
-
     def _connection_id(self, connection: ServerConnection) -> str:
         return f"conn-{id(connection):x}"
 

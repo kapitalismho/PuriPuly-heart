@@ -342,8 +342,6 @@ async def test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_contr
     assert queue.get_nowait() == {"type": "shutdown_complete"}
 
 
-
-
 @pytest.mark.asyncio
 async def test_desktop_first_visible_flows_from_real_process_reader_to_manager_callback(
     tmp_path: Path,
@@ -393,6 +391,8 @@ async def test_desktop_first_visible_flows_from_real_process_reader_to_manager_c
     assert manager.desktop_first_visible is True
     assert fired == ["visible"]
     assert manager.diagnostics.evidence_summary()["input_rejected"] == {}
+
+
 @pytest.mark.asyncio
 async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> None:
     class ControlledProcess:

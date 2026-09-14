@@ -273,13 +273,9 @@ def test_child_logging_mode_confirmation_is_revision_monotonic() -> None:
     )
     recorder.set_logging_mode("detailed")
 
-    assert recorder.confirm_child_logging_mode(
-        "detailed", mode_revision=1, source="owner_status"
-    )
+    assert recorder.confirm_child_logging_mode("detailed", mode_revision=1, source="owner_status")
     assert recorder.logging_mode_update_status == "applied"
-    assert not recorder.confirm_child_logging_mode(
-        "basic", mode_revision=1, source="owner_status"
-    )
+    assert not recorder.confirm_child_logging_mode("basic", mode_revision=1, source="owner_status")
     assert not recorder.confirm_child_logging_mode(
         "unknown", mode_revision=2, source="owner_status"
     )
@@ -564,8 +560,7 @@ async def test_dump_prunes_old_artifacts_to_retention_limit(
     )
 
     receipts = [
-        await recorder.dump_evidence(outcome="failure", attempt=index)
-        for index in range(3)
+        await recorder.dump_evidence(outcome="failure", attempt=index) for index in range(3)
     ]
 
     artifacts = list(tmp_path.glob("overlay-diagnostics-*.jsonl"))
@@ -631,9 +626,7 @@ def test_retention_maintenance_failure_is_not_capture_loss(tmp_path: Path) -> No
     recorder._prune_artifacts(keep=tmp_path / "missing.jsonl")
 
     summary = recorder.evidence_summary()
-    assert summary["maintenance_failures"] == {
-        "artifact_retention_cleanup_failed": 1
-    }
+    assert summary["maintenance_failures"] == {"artifact_retention_cleanup_failed": 1}
     assert summary["input_rejected"] == {}
 
 

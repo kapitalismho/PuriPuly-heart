@@ -301,7 +301,6 @@ class OverlayProcessManager:
             if callable(set_logging_mode):
                 set_logging_mode(requested)
 
-
     def _set_shutdown_failure(self, cause: str) -> None:
         if self._shutdown_terminal_cause is None:
             self._shutdown_terminal_cause = cause

@@ -120,5 +120,3 @@ def test_durable_callbacks_dispatch_peer_work_through_public_owner_contract() ->
     assert "self._require_peer().on_child_terminal(child, outcome)" in source
     assert "self._require_peer().submit_translation_output(submission)" in source
     assert "ClientHub" not in source
-
-

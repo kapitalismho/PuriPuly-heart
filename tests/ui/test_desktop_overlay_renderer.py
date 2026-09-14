@@ -3460,8 +3460,7 @@ async def test_desktop_overlay_detail_logs_startup_render_and_snapshot_updates(
 
         update_output = capsys.readouterr().out
         assert (
-            "[overlay][DIAG] [DesktopOverlay] snapshot_update revision=2 blocks=1"
-            in update_output
+            "[overlay][DIAG] [DesktopOverlay] snapshot_update revision=2 blocks=1" in update_output
         )
         assert "[overlay][DIAG] [DesktopOverlay] render" in update_output
         assert "revision=2" in update_output
@@ -5157,9 +5156,7 @@ async def test_desktop_overlay_renderer_default_diagnostic_port_routes_safe_reco
         await renderer.enqueue_snapshot(_scheduled_snapshot(2, "caption must not appear"))
         await asyncio.wait_for(window.rendered_snapshot.wait(), timeout=1.0)
         diagnostic_events = [
-            event
-            for event in sink.events
-            if event["type"] == "desktop_renderer_diagnostic"
+            event for event in sink.events if event["type"] == "desktop_renderer_diagnostic"
         ]
         assert any(
             event["record"]["record_type"] == "renderer_event"
@@ -6187,22 +6184,14 @@ async def test_desktop_renderer_logging_mode_switches_live_and_rejects_stale_rev
     )
 
     await port.emit(envelope)
-    await renderer._apply_runtime_control(
-        {"logging_mode": "detailed", "logging_mode_revision": 1}
-    )
+    await renderer._apply_runtime_control({"logging_mode": "detailed", "logging_mode_revision": 1})
     await port.emit(envelope)
-    await renderer._apply_runtime_control(
-        {"logging_mode": "basic", "logging_mode_revision": 2}
-    )
+    await renderer._apply_runtime_control({"logging_mode": "basic", "logging_mode_revision": 2})
     await port.emit(envelope)
-    await renderer._apply_runtime_control(
-        {"logging_mode": "detailed", "logging_mode_revision": 1}
-    )
+    await renderer._apply_runtime_control({"logging_mode": "detailed", "logging_mode_revision": 1})
     await port.emit(envelope)
 
-    diagnostics = [
-        event for event in sink.events if event["type"] == "desktop_renderer_diagnostic"
-    ]
+    diagnostics = [event for event in sink.events if event["type"] == "desktop_renderer_diagnostic"]
     statuses = [event for event in sink.events if event["type"] == "logging_mode_status"]
     assert len(diagnostics) == 1
     assert [(event["logging_mode"], event["logging_mode_revision"]) for event in statuses] == [

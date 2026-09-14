@@ -807,7 +807,6 @@ async def test_overlay_bridge_keeps_desktop_connection_after_first_visible() -> 
     assert ready == {"type": "overlay_ready"}
 
 
-
 @pytest.mark.asyncio
 async def test_overlay_bridge_desktop_runtime_control_is_target_gated_from_steamvr_path() -> None:
     bridge = OverlayBridge(
@@ -985,7 +984,6 @@ async def test_overlay_bridge_records_send_failures_and_prunes_stale_connections
     assert events[1]["exception_type"]
     assert events[3]["stale_connections"] == 1
     assert bridge._authenticated_connections == set()
-
 
 
 @pytest.mark.asyncio

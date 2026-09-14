@@ -309,9 +309,7 @@ _SECRET_ASSIGNMENT_TEXT_RE: Final = re.compile(
 )
 _BEARER_SECRET_TEXT_RE: Final = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+\-/]{8,}")
 _OPENAI_STYLE_SECRET_TEXT_RE: Final = re.compile(r"\bsk-[A-Za-z0-9][A-Za-z0-9._-]{8,}\b")
-_URL_USERINFO_RE: Final = re.compile(
-    r"(?i)\b([a-z][a-z0-9+.-]*://)([^/\s:@]+):([^/\s@]+)@"
-)
+_URL_USERINFO_RE: Final = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)([^/\s:@]+):([^/\s@]+)@")
 CONVERSATION_TEXT_MAX_LENGTH: Final = 4096
 
 

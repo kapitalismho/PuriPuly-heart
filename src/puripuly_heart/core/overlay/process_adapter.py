@@ -29,9 +29,7 @@ _REVERSE_LIFECYCLE_CONTROL_TYPES = frozenset(
     }
 )
 _REVERSE_TERMINAL_CONTROL_TYPES = frozenset({"startup_error", "runtime_error"})
-_REVERSE_DIAGNOSTIC_CONTROL_TYPES = frozenset(
-    {"overlay_trace", "desktop_renderer_diagnostic"}
-)
+_REVERSE_DIAGNOSTIC_CONTROL_TYPES = frozenset({"overlay_trace", "desktop_renderer_diagnostic"})
 _DECLARED_LOG_LEVELS = {
     "[overlay][ERROR]": logging.ERROR,
     "[overlay][WARN]": logging.WARNING,

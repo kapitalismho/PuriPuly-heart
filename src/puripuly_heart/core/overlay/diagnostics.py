@@ -270,9 +270,7 @@ class OverlayDiagnosticsRecorder:
             self.recording_windows[-1]["ended_sequence"] = self._sequence
         self.logging_mode = normalized
         self.logging_mode_update_status = (
-            "applied"
-            if self.effective_child_logging_mode == normalized
-            else "pending"
+            "applied" if self.effective_child_logging_mode == normalized else "pending"
         )
         self.recording_windows.append(
             {
@@ -303,9 +301,7 @@ class OverlayDiagnosticsRecorder:
         except (TypeError, ValueError):
             self.note_input_rejected("invalid_logging_mode")
             return False
-        if mode_revision is not None and (
-            type(mode_revision) is not int or mode_revision < 0
-        ):
+        if mode_revision is not None and (type(mode_revision) is not int or mode_revision < 0):
             self.note_input_rejected("invalid_logging_mode_revision")
             return False
         effective_revision = self.effective_child_logging_mode_revision
@@ -326,10 +322,7 @@ class OverlayDiagnosticsRecorder:
         self.logging_mode_update_status = (
             "applied"
             if normalized == self.requested_logging_mode
-            and (
-                mode_revision is None
-                or mode_revision == self.logging_mode_revision
-            )
+            and (mode_revision is None or mode_revision == self.logging_mode_revision)
             else "failed"
         )
         if previous != normalized or self.logging_mode_update_status != "applied":
@@ -608,9 +601,7 @@ class OverlayDiagnosticsRecorder:
             "logging_mode": self.logging_mode,
             "requested_logging_mode": self.requested_logging_mode,
             "effective_child_logging_mode": self.effective_child_logging_mode,
-            "effective_child_logging_mode_revision": (
-                self.effective_child_logging_mode_revision
-            ),
+            "effective_child_logging_mode_revision": (self.effective_child_logging_mode_revision),
             "logging_mode_update_status": self.logging_mode_update_status,
             "logging_mode_revision": self.logging_mode_revision,
             "recording_windows": [dict(window) for window in self.recording_windows],
@@ -758,9 +749,7 @@ class OverlayDiagnosticsRecorder:
             encoded_events.append(encoded)
 
         completeness_scope = (
-            "desktop"
-            if summary_fields.get("selected_target") == "desktop"
-            else "native"
+            "desktop" if summary_fields.get("selected_target") == "desktop" else "native"
         )
         base_summary = {
             "category": "summary",
@@ -794,11 +783,7 @@ class OverlayDiagnosticsRecorder:
             and not self._input_rejected
             and self._dump_abandoned == 0
         )
-        completeness = (
-            retained_capture_complete
-            if completeness_scope == "desktop"
-            else False
-        )
+        completeness = retained_capture_complete if completeness_scope == "desktop" else False
         summary_line = self._encode_line(
             {
                 **base_summary,
@@ -860,12 +845,9 @@ class OverlayDiagnosticsRecorder:
             retained_files = 0
             for path in candidates:
                 size = path.stat().st_size
-                retain = (
-                    path == keep
-                    or (
-                        retained_files < _DIAGNOSTIC_ARTIFACT_FILE_LIMIT
-                        and retained_bytes + size <= _DIAGNOSTIC_ARTIFACT_TOTAL_BYTES
-                    )
+                retain = path == keep or (
+                    retained_files < _DIAGNOSTIC_ARTIFACT_FILE_LIMIT
+                    and retained_bytes + size <= _DIAGNOSTIC_ARTIFACT_TOTAL_BYTES
                 )
                 if retain:
                     retained_files += 1
@@ -906,6 +888,7 @@ class OverlayDiagnosticsRecorder:
         with temporary.open("wb") as handle:
             handle.write(content)
         temporary.replace(path)
+
     @staticmethod
     def _encode_line(payload: dict[str, Any]) -> bytes:
         raw = json.dumps(payload, ensure_ascii=True, default=str, sort_keys=True)
@@ -913,7 +896,6 @@ class OverlayDiagnosticsRecorder:
 
     def _stage_recording_enabled(self) -> bool:
         return self.logging_mode == SessionLoggingMode.DETAILED.value
-
 
     def _append_stage(
         self,
