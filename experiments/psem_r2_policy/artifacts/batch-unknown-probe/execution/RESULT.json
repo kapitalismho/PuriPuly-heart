@@ -1,0 +1,588 @@
+{
+  "schema": "BATCH-UNKNOWN-PROBE-RESULT-1",
+  "status": "complete",
+  "decision": {
+    "answer": "UNKNOWN-only cut removal still has incremental meaning value after both arms receive the complete parent context, but the observed value is narrower and mixed.",
+    "primary_changed_parents": {
+      "clear_B_improved": 3,
+      "equal": 13,
+      "clear_B_worse": 1,
+      "unjudgeable": 1,
+      "total": 18
+    },
+    "primary_readability_B_relative_to_A": {
+      "improved": 4,
+      "equal": 9,
+      "worse": 4,
+      "unjudgeable": 1
+    },
+    "clear_win_signal": {
+      "met": true,
+      "rule": "At least three clear primary B wins across at least two source clusters.",
+      "clear_B_wins": 3,
+      "groups": [
+        "EN2009",
+        "ES2009"
+      ],
+      "interpretation": "Descriptive exploratory signal only. It is not an automatic adoption gate or production veto."
+    },
+    "risk": {
+      "primary_new_B_severe_errors": [
+        {
+          "parent_id": "4a8dca47-d874-420b-a30d-60dd9184cfde",
+          "kind": "content_duplication",
+          "summary": "B rendered task breakdown three times although the source mentions it twice."
+        }
+      ],
+      "interpretation": "The severe-error list is reported separately and is not hidden by the clear-win signal."
+    },
+    "adoption": "The prior narrow UNKNOWN policy adoption decision remains recorded and is not automatically reset. This run adds a newly observed task-breakdown duplication risk for the user to assess; it does not claim that the user has already accepted this new risk. This experiment does not implement issue #160, select LOCALCUT, or make a production, native, Soniox, HOLDOUT, or pacing-adoption decision.",
+    "comparison_limit": "The preceding fragment probe and this matched batch probe used different prompts and context exposure. The earlier six-win description versus the current three clear wins is descriptive, not a fresh factorial causal comparison. Old fragment outputs are not a comparison arm here."
+  },
+  "design": {
+    "arm_A": "Existing PSEM partitions; one complete-parent batch translation call per parent replicate.",
+    "arm_B": "The same complete-parent batch translation call after the adopted UNKNOWN-only cut suppression.",
+    "parents": 20,
+    "primary_changed_distinct_parents": 18,
+    "primary_cluster_distribution": {
+      "EN2009": 11,
+      "ES2009": 6,
+      "ES2002": 1
+    },
+    "no_op_guards": 2,
+    "repeat_pairs_not_independent": 8,
+    "total_blind_pairs": 28,
+    "logical_arm_bindings": 56,
+    "unique_http_attempts": 54,
+    "source_units": {
+      "A": 112,
+      "B": 75,
+      "reduction": 37,
+      "reduction_percent": 33.0
+    },
+    "selection_disclosure": "These exact DEV cases and repeats were already used in an independent fragment experiment and those results were known before this batch experiment. New batch outputs were not used for selection."
+  },
+  "execution": {
+    "generation_candidate": "f5524234",
+    "generation_and_locked_ratings_commit_before_decode": "3eacbba6c9c929371c2765c76b4cf1fd62c556f7",
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "model": "google/gemma-4-26b-a4b-it",
+    "provider": "Cloudflare",
+    "http_statuses": [
+      200
+    ],
+    "finish_reasons": [
+      "stop"
+    ],
+    "attempts_started": 54,
+    "attempts_terminal": 54,
+    "usable_outputs": 52,
+    "invalid_translation_outputs": 2,
+    "indeterminate": 0,
+    "automatic_retries": 0,
+    "usage": {
+      "prompt_tokens": 20388,
+      "completion_tokens": 4288,
+      "total_tokens": 24676,
+      "reported_cost_usd": 0.0033252
+    },
+    "operational_failures": [
+      {
+        "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+        "replicate": 0,
+        "arm": "A",
+        "outcome": "invalid_translation_output",
+        "objective_wire_fact": "The HTTP 200 stop response body and model content were valid JSON, but translation s3 for source segment 'was ' contained only one space and therefore failed the nonempty-text contract."
+      },
+      {
+        "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+        "replicate": 2,
+        "arm": "A",
+        "outcome": "invalid_translation_output",
+        "objective_wire_fact": "The HTTP 200 stop response body and model content were valid JSON, but translation s3 for source segment 'was ' contained only one space and therefore failed the nonempty-text contract."
+      }
+    ],
+    "failure_interpretation": "These are not malformed-JSON responses. The affected matched pairs remain unjudgeable even though B was usable; they are not promoted to B meaning wins. No repair or retry call was made."
+  },
+  "ratings": {
+    "rater": "batch-translation-rater; fresh independent read-only agent given only the neutral partial-blind packet",
+    "rater_source": "history://batch-translation-rater:97-478",
+    "schema_valid_pairs": 28,
+    "shape_visible_partial_blind": true,
+    "no_op_guards": "Both no-op pairs had identical candidates and were rated equal without clear wins.",
+    "repeat_stability_not_independent": {
+      "9a75496a-26b7-42f8-a41b-f6ed81d41dcc": "B clear meaning win in 3/3 replicates.",
+      "5c333233-1622-4850-a60e-ca8811613108": "Meaning equal in 3/3; B readability preferred in 3/3.",
+      "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4": "B clear meaning win in 3/3 replicates.",
+      "8766ce13-7ef6-4f8b-a09a-86cd0883a603": "Unjudgeable, tentative B worse, unjudgeable across replicates 0/1/2; both unjudgeable results were caused by the A whitespace-only output."
+    },
+    "judgment_boundary": "Preference, severity, and meaning conclusions are the blind rater's judgments. HTTP status, finish reason, raw JSON validity, output-contract validation, hashes, model/provider metadata, and usage are objective recorded execution facts."
+  },
+  "current_run_examples": {
+    "thirty_five": {
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "source_text": "Nineteen fifty by two. That's thirty five. Right. So",
+      "source_segments": {
+        "A": [
+          "Nineteen fifty by two. That's thirty ",
+          "five. ",
+          "Right. ",
+          "So"
+        ],
+        "B": [
+          "Nineteen fifty by two. That's thirty five. ",
+          "Right. ",
+          "So"
+        ]
+      },
+      "ordered_translations_by_replicate": [
+        {
+          "replicate": 0,
+          "A": [
+            "1950에 2를 곱하면. 그건 30 ",
+            "5네요. ",
+            "맞아요. ",
+            "그러니까"
+          ],
+          "B": [
+            "1950 곱하기 2. 그럼 35네요.",
+            "맞아요.",
+            "그러니까"
+          ]
+        },
+        {
+          "replicate": 1,
+          "A": [
+            "1950에 2를 곱하면. 그건 30 ",
+            "5네요. ",
+            "맞아요. ",
+            "그러니까"
+          ],
+          "B": [
+            "1950 곱하기 2. 그러면 35네요.",
+            "맞아요.",
+            "그러니까"
+          ]
+        },
+        {
+          "replicate": 2,
+          "A": [
+            "1950에 2를 곱하면. 그건 30",
+            "5네요. ",
+            "맞아요. ",
+            "그러니까"
+          ],
+          "B": [
+            "1950 곱하기 2. 그건 35네요.",
+            "맞아요.",
+            "그러니까"
+          ]
+        }
+      ],
+      "rater_judgment": "B was a clear meaning win in all three replicates because B preserved 35, while A's separate outputs rendered 30 and 5."
+    },
+    "function": {
+      "parent_id": "5c333233-1622-4850-a60e-ca8811613108",
+      "source_text": "To a function. But Uh-huh. At the end of the day, we don't look at the technology, but we look at the function.First. Okay.",
+      "source_segments": {
+        "A": [
+          "To a function. ",
+          "But ",
+          "Uh-huh. At ",
+          "the end of the day, we don't look at the technology, ",
+          "but we look ",
+          "at the function.",
+          "First. ",
+          "Okay."
+        ],
+        "B": [
+          "To a function. But ",
+          "Uh-huh. At ",
+          "the end of the day, we don't look at the technology, but we look at the function.",
+          "First. ",
+          "Okay."
+        ]
+      },
+      "ordered_translations_by_replicate": [
+        {
+          "replicate": 0,
+          "A": [
+            "기능에 대해서 말이죠.",
+            "하지만 ",
+            "네. 결국 ",
+            "우리는 기술을 보는 것이 아니라, ",
+            "우리는 ",
+            "기능을 봅니다.",
+            "먼저요. ",
+            "알겠습니다."
+          ],
+          "B": [
+            "기능에 대해서요. 하지만 ",
+            "네. 결국 ",
+            "우리는 기술을 보는 게 아니라, 기능을 봅니다.",
+            "우선요. ",
+            "알겠습니다."
+          ]
+        },
+        {
+          "replicate": 1,
+          "A": [
+            "기능에 대해서요.",
+            "하지만 ",
+            "네. 결국 ",
+            "우리는 기술을 보는 것이 아니라, ",
+            "우리는 ",
+            "기능을 봅니다.",
+            "먼저요. ",
+            "알겠습니다."
+          ],
+          "B": [
+            "기능에 대해서요. 하지만 ",
+            "네. 결국 ",
+            "우리는 기술을 보는 것이 아니라, 기능을 봅니다.",
+            "먼저요. ",
+            "알겠습니다."
+          ]
+        },
+        {
+          "replicate": 2,
+          "A": [
+            "기능에 대해서요.",
+            "하지만 ",
+            "네. 결국 ",
+            "우리는 기술을 보는 것이 아니라, ",
+            "우리는 ",
+            "기능을 봅니다.",
+            "먼저요. ",
+            "알겠습니다."
+          ],
+          "B": [
+            "기능에 대해서요. 하지만 ",
+            "네. 결국 ",
+            "우리는 기술을 보는 것이 아니라 기능을 봅니다.",
+            "우선요. ",
+            "알겠습니다."
+          ]
+        }
+      ],
+      "rater_judgment": "Meaning was equal in all three replicates and B was more readable in all three. Both arms translated function as 기능; the earlier fragment probe's 행사 error did not recur, so no incremental meaning benefit remained for this parent under shared context."
+    },
+    "replace_relation": {
+      "parent_id": "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4",
+      "source_text": "To make all the triangles, red, and squares in. There at the moment.Okay. Okay. So you can't tell what is meant to replace that",
+      "source_segments": {
+        "A": [
+          "To make all ",
+          "the triangles, red, and squares ",
+          "in. ",
+          "There ",
+          "at ",
+          "the moment.",
+          "Okay. ",
+          "Okay. ",
+          "So you ",
+          "can't tell what is meant ",
+          "to ",
+          "replace that"
+        ],
+        "B": [
+          "To make all the triangles, red, and squares ",
+          "in. ",
+          "There at the moment.",
+          "Okay. ",
+          "Okay. ",
+          "So you can't tell what is meant to replace that"
+        ]
+      },
+      "ordered_translations_by_replicate": [
+        {
+          "replicate": 0,
+          "A": [
+            "모든 ",
+            "삼각형, 빨간색, 그리고 사각형들을 ",
+            "안에 만들려고요. ",
+            "지금 ",
+            "현재 ",
+            "거기에 있어요.",
+            "알겠습니다. ",
+            "알겠습니다. ",
+            "그러니까 당신은 ",
+            "무엇을 의미하는지 알 수 없군요 ",
+            "그것을 ",
+            "대체하려는 것이"
+          ],
+          "B": [
+            "모든 삼각형, 빨간색, 그리고 사각형을 만들려면 ",
+            "안에.",
+            "지금 거기에 있습니다.",
+            "알겠습니다.",
+            "알겠습니다.",
+            "그러니까 무엇이 그것을 대체해야 하는지 알 수 없다는 거군요"
+          ]
+        },
+        {
+          "replicate": 1,
+          "A": [
+            "모든",
+            "삼각형, 빨간색, 그리고 사각형을 ",
+            "안에 만들려고요. ",
+            "거기 ",
+            "지금 ",
+            "있잖아요.",
+            "알겠어요. ",
+            "알겠어요. ",
+            "그래서 당신은 ",
+            "무엇을 의미하는지 알 수 없겠네요 ",
+            "그것을 ",
+            "대체하려는 것이"
+          ],
+          "B": [
+            "모든 삼각형, 빨간색, 그리고 사각형들을 만들기 위해서 ",
+            "안에. ",
+            "지금 거기에 있습니다.",
+            "알겠습니다. ",
+            "알겠습니다. ",
+            "그러니까 무엇이 그것을 대체하려는 것인지 알 수 없다는 말씀이시죠"
+          ]
+        },
+        {
+          "replicate": 2,
+          "A": [
+            "모든 ",
+            "삼각형, 빨간색, 그리고 사각형을 ",
+            "안에 만들다. ",
+            "거기에 ",
+            "지금 ",
+            "있어요.",
+            "알겠습니다. ",
+            "알겠습니다. ",
+            "그래서 당신은 ",
+            "무엇을 의미하는지 알 수 없군요 ",
+            "그것을 ",
+            "대체하려는 것이"
+          ],
+          "B": [
+            "모든 삼각형, 빨간색, 그리고 사각형을 만들기 위해서 ",
+            "안에. ",
+            "지금 거기에 있습니다.",
+            "알겠습니다. ",
+            "알겠습니다. ",
+            "그래서 무엇이 그것을 대체하려는 것인지 알 수 없다는 말씀이시군요"
+          ]
+        }
+      ],
+      "rater_judgment": "B was a clear meaning win in all three replicates. Full parent context alone did not repair A's split 관계: the final replacement complement remained orphaned, while B retained the complete relation."
+    },
+    "task_breakdown": {
+      "parent_id": "4a8dca47-d874-420b-a30d-60dd9184cfde",
+      "source_text": "Well, I mean, what It's a task breakdown. It's just a second ish. It is a taskbreakdown. But for the verbal",
+      "source_segments": {
+        "A": [
+          "Well, I ",
+          "mean, ",
+          "what ",
+          "It's a ",
+          "task ",
+          "breakdown. It's just ",
+          "a second ish. ",
+          "It ",
+          "is a taskbreakdown. But for the verbal"
+        ],
+        "B": [
+          "Well, I ",
+          "mean, ",
+          "what It's a ",
+          "task ",
+          "breakdown. It's just a second ish. ",
+          "It ",
+          "is a taskbreakdown. But for the verbal"
+        ]
+      },
+      "ordered_translations": {
+        "A": [
+          "음, 그러니까 ",
+          "제 말은, ",
+          "그게 ",
+          "그건 ",
+          "업무 ",
+          "분할이에요. 그냥 ",
+          "잠시만요. ",
+          "그건 ",
+          "업무 분할입니다. 하지만 구두로 하는 건"
+        ],
+        "B": [
+          "음, 그러니까 ",
+          "제 말은, ",
+          "그게 작업 분할이에요. ",
+          "작업 ",
+          "분할요. 잠시만요. ",
+          "그건 ",
+          "작업 분할이 맞아요. 하지만 구두로 설명할 때는"
+        ]
+      },
+      "rater_judgment": "A rendered the two source mentions twice. B anticipated task breakdown in one segment and rendered it again in the following task/breakdown segments, producing three mentions; B was a clear meaning and readability loss with a NEW content_duplication error."
+    },
+    "slides": {
+      "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "source_text": "But this slide was That slide was like that? Mhmm.I didn't change this one at all.",
+      "source_segments": {
+        "A": [
+          "But ",
+          "this slide ",
+          "was That slide ",
+          "was ",
+          "like ",
+          "that? ",
+          "Mhmm.",
+          "I ",
+          "didn't change this one at all."
+        ],
+        "B": [
+          "But this slide was That slide ",
+          "was ",
+          "like that? ",
+          "Mhmm.",
+          "I didn't change this one at all."
+        ]
+      },
+      "ordered_translations_by_replicate": [
+        {
+          "replicate": 0,
+          "A": null,
+          "A_raw_valid_json_translations": [
+            "하지만 ",
+            "이 슬라이드가 ",
+            "그 슬라이드가 ",
+            " ",
+            "그랬던 ",
+            "건가요? ",
+            "음. ",
+            "저는 ",
+            "이건 전혀 바꾸지 않았어요."
+          ],
+          "B": [
+            "하지만 이 슬라이드가 그 슬라이드가 ",
+            "그랬던 ",
+            "건가요? ",
+            "음흠.",
+            "저는 이걸 전혀 바꾸지 않았어요."
+          ],
+          "rating": "unjudgeable"
+        },
+        {
+          "replicate": 1,
+          "A": [
+            "하지만 ",
+            "이 슬라이드가 ",
+            "그 슬라이드가 ",
+            "그랬던 ",
+            "건가요 ",
+            "요? ",
+            "음.",
+            "저는 ",
+            "이건 전혀 바꾸지 않았어요."
+          ],
+          "B": [
+            "하지만 이 슬라이드가 그 슬라이드가 ",
+            "그랬나요? ",
+            "그랬냐고요? ",
+            "음흠.",
+            "전 이걸 전혀 바꾸지 않았어요."
+          ],
+          "rating": "B worse, tentative; not clear"
+        },
+        {
+          "replicate": 2,
+          "A": null,
+          "A_raw_valid_json_translations": [
+            "하지만 ",
+            "이 슬라이드가 ",
+            "그 슬라이드가 ",
+            " ",
+            "그렇게 ",
+            "되어 있었다고요? ",
+            "음흠.",
+            "저는 ",
+            "이건 전혀 바꾸지 않았어요."
+          ],
+          "B": [
+            "하지만 이 슬라이드가 그 슬라이드가 ",
+            "그랬나요? ",
+            "그랬던 건가요? ",
+            "음흠.",
+            "저는 이걸 전혀 바꾸지 않았어요."
+          ],
+          "rating": "unjudgeable"
+        }
+      ],
+      "rater_judgment": "The only fully usable pair tentatively favored A for meaning because B doubled the question, while readability favored B. The two unavailable pairs remain unjudgeable."
+    },
+    "incomplete_but_i_think": {
+      "parent_id": "eb86a37a-23b6-4054-a9aa-3d5b38e962a3",
+      "source_text": "The solar power definitely would be, but I think",
+      "source_segments": {
+        "A": [
+          "The ",
+          "solar power definitely would be, ",
+          "but I ",
+          "think"
+        ],
+        "B": [
+          "The ",
+          "solar power definitely would be, but I think"
+        ]
+      },
+      "ordered_translations": {
+        "A": [
+          "그 ",
+          "태양광 발전은 확실히 그럴 것이지만, ",
+          "제 생각에는 ",
+          "그렇다고 생각해요"
+        ],
+        "B": [
+          "그 ",
+          "태양광 발전은 분명히 그렇겠지만, 제 생각에는"
+        ]
+      },
+      "rater_judgment": "B was a clear meaning win because it preserved the incomplete ending; A invented a missing complement. B readability was worse, illustrating that the main judgment was independent of readability."
+    }
+  },
+  "idealized_issue_160_r7_usage": {
+    "assumptions": "All results are ready, two caption slots are initially free, and there are no external occupants, expiry, protection, or pressure effects.",
+    "formula_per_parent": "max(0, segment_count - 2) one-second replacement admissions",
+    "total_tail_admissions": {
+      "A": 72,
+      "B": 35,
+      "reduction": 37
+    },
+    "claim_limit": "This is calculated source-shape usage only. It is not observed wall time, UI behavior, pacing latency, caption-render verification, or physical HMD exposure. Both arms used one logical parent API call per binding."
+  },
+  "evidence_identity": {
+    "baseline": "49bab295f9801455d2f1925ff73a9ca6aaaba376",
+    "plan_sha256": "4f9821bf26c8ad65862358e85fea03949f3ecc991e14be2f9be91c6cd8227550",
+    "cases_sha256": "ee237cc05944c22fbe3b1e39e94656295d23b20342dfb7894afc1c7764a1d507",
+    "prepare_sha256": "8bcee206b519058277eaca8976d0e0166aa5c982fd721344106b4eb490d53ad6",
+    "runner_sha256": "84a4b8209fa43925458dcb5f24639f282c3eee9957a536bd0ee0fd4f20180a3a",
+    "prompt_sha256": "cdacb7ff12a4200ce599a00690703e8d6fe97c40e799930cc80f65bb52c114e0",
+    "execution_identity_sha256": "785ba3ef467ff1fd6c71f867674a77f8d44a71a09b49ba28862be28acc3b62f3",
+    "catalog_order_sha256": "0ac664b17e6fcf923f34da998bd063f80be53872cc45f46ca4394032b2aefc6b",
+    "private_key_sha256": "e385bd9ee6a2f6a1e37c35a4c09e2311d0ef36098915c424220541c805942435",
+    "journal_sha256": "4d4fcb64432332dd5fe0af4ac10d2779b207461409866770d668a966dfb24667",
+    "blind_packet_sha256": "bb712dc1efa856dac11624c2c968d4ce90f1ff95cf5f73716a449a9055eb3f18",
+    "unlocked_ratings_sha256_before_cleanup": "a777724294131e129e6adbca69de2e8b5d532389ad44d5eda4b8480fa421e9ca",
+    "locked_ratings_sha256": "932a9069cfea4f9b61f094feaf2dfc60c9039aee43fdd71904cb2c9c9fe21cfe",
+    "decoded_ratings_sha256": "18e18b1dd66c2fc52e5a09518db63c29168cec340241b2244afb4fa5e7837110"
+  },
+  "reproduction_and_safety": {
+    "read_only_integrity_check": "python -B experiments/psem_r2_policy/artifacts/batch-unknown-probe/run.py check",
+    "one_time_lock_command_already_completed": "python -B experiments/psem_r2_policy/artifacts/batch-unknown-probe/run.py lock-ratings experiments/psem_r2_policy/artifacts/batch-unknown-probe/execution/ratings.json",
+    "decode_command_idempotent_with_existing_result": "python -B experiments/psem_r2_policy/artifacts/batch-unknown-probe/run.py decode",
+    "constraint": "DO NOT execute the API command again and do not retry either invalid output. All 54 authorized attempts are already spent. The unlocked ratings.json named by the historical one-time lock command is intentionally removed after its exact locked copy is retained."
+  },
+  "generalization_and_scope_limits": [
+    "Only 18 distinct changed parents from three exposed DEV clusters were efficacy-rated; repeats are stability observations, not independent cases.",
+    "One independent agent rated a visibly shape-partial-blind packet; the meaning benefit was not human-validated.",
+    "This is a #160-adapted PSEM text probe, not actual Soniox R4 segmentation, native/UI verification, raw slot pacing, LOCALCUT selection, a HOLDOUT result, or a production implementation.",
+    "No architecture or runtime drift was introduced; all work is experiment-only."
+  ]
+}
