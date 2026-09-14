@@ -9,6 +9,7 @@ import importlib.abc
 import importlib.util
 import json
 import math
+import re
 import os
 import shutil
 import socket
@@ -27,7 +28,8 @@ from uuid import UUID
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 CONFIG_PATH = HERE / "baseline_config.json"
-RUNS = HERE / "runs"
+OUTPUT_ROOT = HERE
+RUNS = OUTPUT_ROOT / "runs"
 RETAINED = ROOT / "experiments/psem_r2_policy/artifacts/retained/historical_policy_inputs.jsonl.gz"
 ANNOTATIONS = Path(r"C:/Users/salee/AppData/Local/Temp/opencode/stb_phase2_corpora/ami/annotations/words")
 PROFILE_KEYS = {
@@ -50,6 +52,58 @@ def digest(path: Path) -> str:
 
 def emit(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+def configure_paths(config_path: Path, config: dict[str, Any]) -> None:
+    global CONFIG_PATH, OUTPUT_ROOT, RUNS
+    CONFIG_PATH = config_path.resolve()
+    configured = config.get("output_root")
+    OUTPUT_ROOT = (ROOT / configured).resolve() if configured else HERE
+    if OUTPUT_ROOT != HERE and HERE not in OUTPUT_ROOT.parents:
+        raise RuntimeError("output_root must remain inside the experiment directory")
+    RUNS = OUTPUT_ROOT / "runs"
+
+
+def current_source_revision() -> str:
+    completed = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, capture_output=True, text=True)
+    return completed.stdout.strip()
+
+
+def execution_identities(config: dict[str, Any], source_revision: str | None) -> dict[str, Any]:
+    return {
+        "source_revision": source_revision or "pending Director commit; execution prohibited",
+        "committed_runner_config_analysis_verified": source_revision is not None,
+        "config_sha256": digest(CONFIG_PATH),
+        "runner_sha256": digest(Path(__file__)),
+        "analysis_sha256": digest(HERE / "analyze_baseline.py"),
+        "executable_sha256": digest(Path(config["native"]["executable"])),
+        "model_sha256": digest(Path(config["native"]["model"])),
+        "runtime_archive_sha256": digest(ROOT / config["receiver"]["runtime_archive"]),
+        "ownership_override_sha256": digest(ROOT / config["receiver"]["ownership_override"]),
+        "decoder_sha256": digest(ROOT / config["receiver"]["decoder"]),
+    }
+
+def matches_committed_blob(revision: str, path: Path) -> bool:
+    relative = path.resolve().relative_to(ROOT).as_posix()
+    committed = subprocess.run(["git", "rev-parse", f"{revision}:{relative}"], cwd=ROOT, check=True, capture_output=True, text=True).stdout.strip()
+    current = subprocess.run(["git", "hash-object", relative], cwd=ROOT, check=True, capture_output=True, text=True).stdout.strip()
+    return current == committed
+
+
+def validate_source_revision(source_revision: str | None) -> str:
+    if source_revision is None or re.fullmatch(r"[0-9a-f]{40}", source_revision) is None:
+        raise RuntimeError("execute requires --source-revision with the exact committed 40-character revision")
+    current = current_source_revision()
+    if current != source_revision:
+        raise RuntimeError(f"source revision mismatch: requested {source_revision}, current {current}")
+    for path in (Path(__file__), HERE / "analyze_baseline.py", CONFIG_PATH):
+        if not matches_committed_blob(current, path):
+            raise RuntimeError(f"execution input is not the committed revision: {path}")
+    return current
+
+
+def timing_summary(values: list[int]) -> dict[str, Any]:
+    ordered = sorted(values)
+    return {"samples": len(ordered), "sum_us": sum(ordered), "min_us": ordered[0], "median_us": ordered[len(ordered) // 2], "max_us": ordered[-1]}
 
 
 class ArchiveFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
@@ -295,7 +349,7 @@ def parse_gpu(path: Path, pid: int) -> dict[str, Any]:
     return {"status": "observed_process_counter", "counter": "GPU Process Memory(pid_NATIVE_*) Dedicated Usage", "samples": len(samples), "peak_bytes": int(max(samples)), "global_gpu_usage_used": False, "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included."}
 
 
-def run_source(source: dict[str, Any], config: dict[str, Any], policy: Any, native: Any, absolute_deadline: float) -> dict[str, Any]:
+def run_source(source: dict[str, Any], config: dict[str, Any], policy: Any, native: Any, absolute_deadline: float, source_revision: str) -> dict[str, Any]:
     meeting = source["meeting"]
     run_dir = RUNS / meeting
     if run_dir.exists():
@@ -308,7 +362,7 @@ def run_source(source: dict[str, Any], config: dict[str, Any], policy: Any, nati
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(("127.0.0.1", 0))
     server.listen(1)
-    server.settimeout(60)
+    server.settimeout(0.01)
     port = server.getsockname()[1]
     dump_dir = run_dir / "dump"
     dump_dir.mkdir()
@@ -318,7 +372,7 @@ def run_source(source: dict[str, Any], config: dict[str, Any], policy: Any, nati
     env.update({"TRANSCRIBE_PSEM_PACE_16KHZ": "1", "TRANSCRIBE_PSEM_EVENTS_TCP": f"127.0.0.1:{port}", "TRANSCRIBE_PSEM_CAUSAL_FRONTEND": "1", "TRANSCRIBE_PSEM_PACE_FROM_SAMPLE": "0", "TRANSCRIBE_PSEM_PACE_UNTIL_SAMPLE": str(source["execution_samples"]), "TRANSCRIBE_DUMP_DIR": str(dump_dir)})
     for name, key in PROFILE_KEYS.items():
         env[key] = str(config["native"]["profile"][name])
-    command = [config["native"]["executable"], "-m", config["native"]["model"], "--backend", "vulkan", str(projection)]
+    command = [config["native"]["executable"], "-m", config["native"]["model"], "--backend", config["native"]["backend"], str(projection)]
     stdout_path, stderr_path = run_dir / "native.stdout.log", run_dir / "native.stderr.log"
     query, counter, local_qpf = qpc_api()
     wrapper_handle = open_process_handle(os.getpid())
@@ -329,8 +383,25 @@ def run_source(source: dict[str, Any], config: dict[str, Any], policy: Any, nati
         gpu_path = run_dir / "gpu-process-memory.csv"
         gpu = subprocess.Popen(["typeperf", f"\\GPU Process Memory(pid_{process.pid}_*)\\Dedicated Usage", "-si", "1", "-sc", "1800", "-f", "CSV", "-o", str(gpu_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         conn = None
+        child_handle = int(process._handle)
+        memory_samples = []
+
+        def sample_memory() -> None:
+            native_working, _native_peak = process_memory(child_handle)
+            wrapper_working, _wrapper_peak = process_memory(wrapper_handle)
+            memory_samples.append({"qpc": qpc_now(query, counter), "native_working_set_bytes": native_working, "wrapper_working_set_bytes": wrapper_working, "aggregate_working_set_bytes": native_working + wrapper_working})
+
         try:
-            conn, peer = server.accept()
+            accept_deadline = time.perf_counter() + 60
+            while conn is None:
+                if process.poll() is not None:
+                    raise RuntimeError("native process exited before receiver connection")
+                if time.perf_counter() >= accept_deadline:
+                    raise TimeoutError("native receiver connection timeout")
+                try:
+                    conn, peer = server.accept()
+                except socket.timeout:
+                    sample_memory()
             conn.settimeout(0.005)
             receiver = policy.PretranslationOwnershipOwner(enabled=True, tombstone_capacity=int(config["receiver"]["evidence_capacity"]))
             decoder = native.LiveTransitionDecoder()
@@ -344,10 +415,7 @@ def run_source(source: dict[str, Any], config: dict[str, Any], policy: Any, nati
             ready = None
             done = None
             next_parent = 0
-            rss_native = []
-            rss_wrapper = []
-            aggregate_rss = []
-            child_handle = int(process._handle)
+            sample_memory()
 
             def admit_due(now_qpc: int, force: bool = False) -> None:
                 nonlocal next_parent
@@ -418,11 +486,7 @@ def run_source(source: dict[str, Any], config: dict[str, Any], policy: Any, nati
                             done = message
                 elif chunk == b"" and process.poll() is not None:
                     break
-                native_working, _native_peak = process_memory(child_handle)
-                wrapper_working, _wrapper_peak = process_memory(wrapper_handle)
-                rss_native.append(native_working)
-                rss_wrapper.append(wrapper_working)
-                aggregate_rss.append(native_working + wrapper_working)
+                sample_memory()
             exit_code = process.wait(timeout=30)
             admit_due(qpc_now(query, counter), force=True)
             finished_qpc = qpc_now(query, counter)
@@ -451,6 +515,11 @@ def run_source(source: dict[str, Any], config: dict[str, Any], policy: Any, nati
     with gzip.open(assignments_path, "wt", encoding="utf-8") as target:
         for assignment in assignments:
             target.write(json.dumps(assignment, ensure_ascii=False, separators=(",", ":")) + "\n")
+    memory_path = run_dir / "process-memory-samples.csv"
+    with memory_path.open("w", encoding="utf-8", newline="") as target:
+        writer = csv.DictWriter(target, fieldnames=("qpc", "native_working_set_bytes", "wrapper_working_set_bytes", "aggregate_working_set_bytes"))
+        writer.writeheader()
+        writer.writerows(memory_samples)
     trace_path = dump_dir / "diar.trace.json"
     trace = json.loads(trace_path.read_text(encoding="utf-8"))
     effective = {name: trace[name] for name in PROFILE_KEYS}
@@ -459,41 +528,117 @@ def run_source(source: dict[str, Any], config: dict[str, Any], policy: Any, nati
     support_lag = [receipt - int(row["raw_support_end_sample"]) / 16000 for receipt, row in zip(receipts, chunks)]
     removed = sum(len(row["selected_unknown_only"]["removed_boundary_token_indexes"]) for row in assignments)
     changed = sum(row["selected_unknown_only"]["units"] != row["receiver"]["pre_selected_policy_units"] for row in assignments)
-    result = {"schema": "PSEM-STREAMING-STUDENT-TEACHER-SOURCE-RUN-1", "meeting": meeting, "evidence_labels": {"native": "actual local Vulkan native pass", "receiver": "actual prospective receiver invocation on frozen accepted-text replay", "translation_admission": "actual experiment cutoff invocation in the shared QPC clock", "api": "not run", "display": "not run"}, "source": {**source, "wav_sha256": digest(Path(source["wav"])), "projection_sha256": digest(projection), "projection_bytes": projection.stat().st_size, "parents_admitted": len(assignments), "annotation_coverage": annotations}, "identity": {"command": command, "effective_profile": effective, "generation": generation, "capture_epoch": 1, "reset_contract": "one native process and one receiver generation from source zero through the complete approved source; logical parent admissions do not reset model/reference", "genuine_discontinuity": "source end only; no reconnect or synthetic seal reset occurred"}, "clock": {"kind": "Windows QueryPerformanceCounter", "qpf": int(ready["qpf"]), "native_source_zero_qpc": int(ready["qpc"]), "native_done_qpc": int(done["qpc"]), "process_start_qpc": started_qpc, "process_finish_qpc": finished_qpc, "all_native_availability_receiver_receipt_and_admission_values_share_qpc": True, "receiver_transport_delay_observed_not_rewritten": True}, "native": {"exit_code": exit_code, "messages": len(messages), "chunks": len(chunks), "output_frames": sum(int(row["emit_count"]) for row in chunks), "soft_output_values": sum(len(row["probs"]) * len(row["probs"][0]) for row in chunks if row.get("probs")), "maximum_visible_sample": max(int(row["n_visible"]) for row in chunks), "maximum_consumed_support_sample": max(int(row["raw_support_end_sample"]) for row in chunks), "transition_events": len(transitions), "transitions": transitions, "receiver_support_lag_s": {"min": min(support_lag), "median": sorted(support_lag)[len(support_lag) // 2], "max": max(support_lag)}}, "receiver": {"assignments": len(assignments), "source_only_or_empty": sum(not row["accepted_text"] for row in assignments), "text_conservation_failures": sum(not row["selected_unknown_only"]["text_conserved"] for row in assignments), "selected_suppressed_boundaries": removed, "selected_changed_parents": changed, "late_event_references": sum(len(row["receiver"]["late_ignored"]) for row in assignments), "admission_scheduling_lateness_s": {"max": max(row["clock"]["scheduling_lateness_s"] for row in assignments), "median": sorted(row["clock"]["scheduling_lateness_s"] for row in assignments)[len(assignments) // 2]}}, "cost": {"complete_path_wall_s": (finished_qpc - started_qpc) / local_qpf, "native_process_cpu_s": native_cpu, "receiver_wrapper_cpu_s": wrapper_cpu, "native_peak_working_set_bytes_observed": max(rss_native), "receiver_wrapper_peak_working_set_bytes_observed": max(rss_wrapper), "complete_path_peak_sum_working_set_bytes_sampled": max(aggregate_rss), "rss_sampling": "working sets sampled together in the receiver loop; peak sum is the maximum simultaneous sample", "gpu_memory": parse_gpu(gpu_path, process.pid)}, "artifacts": {"raw_frame_soft_outputs": {"path": str(raw_path.relative_to(ROOT)), "sha256": digest(raw_path)}, "receiver_assignments": {"path": str(assignments_path.relative_to(ROOT)), "sha256": digest(assignments_path)}, "native_trace": {"path": str(trace_path.relative_to(ROOT)), "sha256": digest(trace_path)}}}
+    trace_chunks = trace["chunks"]
+    trace_timing = {name: timing_summary([int(row[name]) for row in trace_chunks]) for name in ("service_us", "frontend_us", "graph_a_us", "graph_b_us", "host_us")}
+    result = {
+        "schema": "PSEM-STREAMING-STUDENT-TEACHER-SOURCE-RUN-1",
+        "meeting": meeting,
+        "evidence_labels": {"native": "actual local Vulkan native pass", "receiver": "actual prospective receiver invocation on frozen accepted-text replay", "translation_admission": "actual experiment cutoff invocation in the shared QPC clock", "api": "not run", "display": "not run"},
+        "source": {**source, "wav_sha256": digest(Path(source["wav"])), "projection_sha256": digest(projection), "projection_bytes": projection.stat().st_size, "parents_admitted": len(assignments), "annotation_coverage": annotations},
+        "identity": {**execution_identities(config, source_revision), "command": command, "effective_profile": effective, "generation": generation, "capture_epoch": 1, "reset_contract": "one native process and one receiver generation from source zero through the complete approved source; logical parent admissions do not reset model/reference", "genuine_discontinuity": "source end only; no reconnect or synthetic seal reset occurred"},
+        "clock": {"kind": "Windows QueryPerformanceCounter", "qpf": int(ready["qpf"]), "native_source_zero_qpc": int(ready["qpc"]), "native_done_qpc": int(done["qpc"]), "process_start_qpc": started_qpc, "process_finish_qpc": finished_qpc, "all_native_availability_receiver_receipt_and_admission_values_share_qpc": True, "receiver_transport_delay_observed_not_rewritten": True},
+        "native": {"exit_code": exit_code, "messages": len(messages), "chunks": len(chunks), "output_frames": sum(int(row["emit_count"]) for row in chunks), "soft_output_values": sum(len(row["probs"]) * len(row["probs"][0]) for row in chunks if row.get("probs")), "maximum_visible_sample": max(int(row["n_visible"]) for row in chunks), "maximum_consumed_support_sample": max(int(row["raw_support_end_sample"]) for row in chunks), "transition_events": len(transitions), "transitions": transitions, "receiver_support_lag_s": {"min": min(support_lag), "median": sorted(support_lag)[len(support_lag) // 2], "max": max(support_lag)}},
+        "receiver": {"assignments": len(assignments), "source_only_or_empty": sum(not row["accepted_text"] for row in assignments), "text_conservation_failures": sum(not row["selected_unknown_only"]["text_conserved"] for row in assignments), "selected_suppressed_boundaries": removed, "selected_changed_parents": changed, "late_event_references": sum(len(row["receiver"]["late_ignored"]) for row in assignments), "admission_scheduling_lateness_s": {"max": max(row["clock"]["scheduling_lateness_s"] for row in assignments), "median": sorted(row["clock"]["scheduling_lateness_s"] for row in assignments)[len(assignments) // 2]}},
+        "cost": {
+            "complete_path_wall_s": (finished_qpc - started_qpc) / local_qpf,
+            "wall_interpretation": "Paced end-to-end process/receiver wall time; not compute time or compute RTF.",
+            "native_process_cpu_s": native_cpu,
+            "receiver_wrapper_cpu_s": wrapper_cpu,
+            "native_peak_working_set_bytes_observed": max(row["native_working_set_bytes"] for row in memory_samples),
+            "receiver_wrapper_peak_working_set_bytes_observed": max(row["wrapper_working_set_bytes"] for row in memory_samples),
+            "complete_path_peak_sum_working_set_bytes_sampled": max(row["aggregate_working_set_bytes"] for row in memory_samples),
+            "rss_sampling": "Native and wrapper working sets are paired in each QPC-stamped sample; the aggregate peak is the maximum paired sample, not a sum of independent peaks.",
+            "memory_samples": len(memory_samples),
+            "native_trace_timing_us": {**trace_timing, "initialization_us": int(trace["initialization_us"]), "load_us": int(trace["load_us"]), "interpretation": "Native-reported trace timers. service_us includes paced service elapsed; component timers are retained by name and are not labeled GPU-kernel compute or compute RTF."},
+            "gpu_memory": parse_gpu(gpu_path, process.pid),
+        },
+        "artifacts": {
+            "raw_frame_soft_outputs": {"path": str(raw_path.relative_to(ROOT)), "sha256": digest(raw_path)},
+            "receiver_assignments": {"path": str(assignments_path.relative_to(ROOT)), "sha256": digest(assignments_path)},
+            "native_trace": {"path": str(trace_path.relative_to(ROOT)), "sha256": digest(trace_path)},
+            "soft_target_tensor": {"path": str((dump_dir / "diar.probs.f32").relative_to(ROOT)), "sha256": digest(dump_dir / "diar.probs.f32")},
+            "soft_target_metadata": {"path": str((dump_dir / "diar.probs.json").relative_to(ROOT)), "sha256": digest(dump_dir / "diar.probs.json")},
+            "process_memory_samples": {"path": str(memory_path.relative_to(ROOT)), "sha256": digest(memory_path)},
+        },
+    }
     emit(run_dir / "RESULT.json", result)
     return result
 
 
-def prepare(config: dict[str, Any]) -> dict[str, Any]:
+def prepare(config: dict[str, Any], source_revision: str | None = None) -> dict[str, Any]:
     executable = Path(config["native"]["executable"])
     model = Path(config["native"]["model"])
     if digest(executable) != config["native"]["executable_sha256"] or digest(model) != config["native"]["model_sha256"]:
         raise RuntimeError("native executable or model identity mismatch")
-    if int(config["authority"]["combined_model_wall_cap_seconds"]) != 1800 or config["authority"]["training_updates"] != 0 or config["authority"]["paid_api_calls"] != 0 or config["authority"]["holdout_eval_access"]:
+    authority = config["authority"]
+    if int(authority["combined_model_wall_cap_seconds"]) != 1800 or authority["training_updates"] != 0 or authority["paid_api_calls"] != 0 or authority["holdout_eval_access"]:
         raise RuntimeError("execution envelope mismatch")
+    if authority.get("run_id") == "#164-BASELINE-RERUN-1" and (authority.get("additional_native_passes_per_source") != 1 or OUTPUT_ROOT == HERE):
+        raise RuntimeError("rerun output/envelope mismatch")
     checks = []
     for source in config["sources"]:
         path = Path(source["wav"])
         checks.append({"meeting": source["meeting"], "wav_exists": path.is_file(), "approved_geometry": int(source["execution_samples"]) == int(source["evaluation_samples"]) + int(source["real_context_tail_samples"])})
-    result = {"status": "ready", "config_sha256": digest(CONFIG_PATH), "checks": checks, "model_execution_cap_s": 1800, "training": "not authorized and not run", "network_api": "not authorized and not run"}
     if not all(row["wav_exists"] and row["approved_geometry"] for row in checks):
         raise RuntimeError("source readiness failed")
-    emit(HERE / "READINESS.json", result)
+    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+    result = {
+        "status": "ready_to_execute" if source_revision else "ready_for_director_commit",
+        "execution_permitted": source_revision is not None,
+        "identities": execution_identities(config, source_revision),
+        "checks": checks,
+        "output_root": str(OUTPUT_ROOT.relative_to(ROOT)),
+        "runs_path": str(RUNS.relative_to(ROOT)),
+        "model_execution_cap_s": 1800,
+        "additional_native_passes_per_source": authority.get("additional_native_passes_per_source", 0),
+        "training": "not authorized and not run",
+        "network_api": "not authorized and not run",
+    }
+    emit(OUTPUT_ROOT / "READINESS.json", result)
     return result
 
 
-def execute(config: dict[str, Any]) -> dict[str, Any]:
-    prepare(config)
+def smoke(config: dict[str, Any]) -> dict[str, Any]:
+    wrapper_handle = open_process_handle(os.getpid())
+    child = subprocess.Popen([sys.executable, "-B", "-c", "sum(i*i for i in range(2000000)); import time; time.sleep(0.1)"])
+    try:
+        child_handle = int(child._handle)
+        native_working, _ = process_memory(child_handle)
+        wrapper_working, _ = process_memory(wrapper_handle)
+        sample = {"native_working_set_bytes": native_working, "wrapper_working_set_bytes": wrapper_working, "aggregate_working_set_bytes": native_working + wrapper_working}
+        child.wait(timeout=5)
+        child_cpu = cpu_seconds(child_handle)
+        wrapper_cpu = cpu_seconds(wrapper_handle)
+    finally:
+        if child.poll() is None:
+            child.terminate()
+            child.wait(timeout=5)
+        ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(wrapper_handle))
     policy, native = load_runtime(config)
+    decoder = native.LiveTransitionDecoder()
+    decoder.ingest_chunk(0, [[0.9, 0.1, 0.1, 0.1], [0.1, 0.9, 0.1, 0.1], [0.1, 0.9, 0.1, 0.1]], available_at_monotonic_s=0.0, receipt_kind="no-model-smoke")
+    receiver = policy.PretranslationOwnershipOwner(enabled=True, tombstone_capacity=int(config["receiver"]["evidence_capacity"]))
+    if min(sample.values()) <= 0 or child_cpu <= 0 or wrapper_cpu < 0 or len(decoder.events) != 1 or receiver is None:
+        raise RuntimeError("no-model instrumentation/orchestrator smoke failed")
+    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+    result = {"status": "passed", "model_execution": False, "training_or_backward": False, "process_measurement": sample, "child_cpu_s": child_cpu, "wrapper_cpu_total_s": wrapper_cpu, "synthetic_decoder_events": len(decoder.events), "runtime_identities": execution_identities(config, None)}
+    emit(OUTPUT_ROOT / "PREEXECUTION_SMOKE.json", result)
+    return result
+
+
+def execute(config: dict[str, Any], source_revision: str | None) -> dict[str, Any]:
+    revision = validate_source_revision(source_revision)
+    prepare(config, revision)
     if RUNS.exists():
-        raise RuntimeError("bounded one-pass run directory already exists")
+        raise RuntimeError("bounded one-pass rerun directory already exists")
+    policy, native = load_runtime(config)
     model_start = time.perf_counter()
     deadline = model_start + int(config["authority"]["combined_model_wall_cap_seconds"])
-    results = [run_source(source, config, policy, native, deadline) for source in config["sources"]]
+    results = [run_source(source, config, policy, native, deadline, revision) for source in config["sources"]]
     model_wall = time.perf_counter() - model_start
     total_audio = sum(int(row["source"]["execution_samples"]) for row in results) / 16000
-    summary = {"schema": "PSEM-STREAMING-STUDENT-TEACHER-BASELINE-RESULT-1", "status": "completed", "scope": "#164 authorized non-training Vulkan teacher/receiver baseline only", "authorization": config["authority"], "identities": {"config_sha256": digest(CONFIG_PATH), "executable_sha256": digest(Path(config["native"]["executable"])), "model_sha256": digest(Path(config["native"]["model"])), "runtime_archive_sha256": digest(ROOT / config["receiver"]["runtime_archive"]), "ownership_override_sha256": digest(ROOT / config["receiver"]["ownership_override"]), "decoder_sha256": digest(ROOT / config["receiver"]["decoder"])}, "execution": {"sources": [row["meeting"] for row in results], "native_passes_per_source": 1, "approved_audio_s": total_audio, "combined_model_execution_wall_s": model_wall, "cap_s": config["authority"]["combined_model_wall_cap_seconds"], "cap_held": model_wall <= config["authority"]["combined_model_wall_cap_seconds"], "training_backward_updates": 0, "paid_or_cloud_calls": 0, "holdout_eval_opened": False}, "measurements": {"native_transition_events": {row["meeting"]: row["native"]["transition_events"] for row in results}, "annotation_conditions": {row["meeting"]: row["source"]["annotation_coverage"] for row in results}, "selected_changed_parents": {row["meeting"]: row["receiver"]["selected_changed_parents"] for row in results}, "selected_suppressed_boundaries": {row["meeting"]: row["receiver"]["selected_suppressed_boundaries"] for row in results}, "text_conservation_failures": {row["meeting"]: row["receiver"]["text_conservation_failures"] for row in results}, "cost": {row["meeting"]: row["cost"] for row in results}}, "decision": {"baseline_target_usable": all(row["native"]["output_frames"] > 0 and row["receiver"]["assignments"] > 0 and row["receiver"]["text_conservation_failures"] == 0 for row in results), "compression_training": "not run; awaiting later discussion", "quality_scope": "Engineering target only. Transition and guard conditions are those actually found in the approved prefixes; no universal teacher-quality or translation-effect claim.", "remaining_obligation": "Student learning interface and GT/KD training comparison remain outside this authorized baseline."}, "architecture": {"product_source_changed": False, "production_160_duplicated": False, "runtime_boundary": "Experiment-local pinned archive plus ownership override; no product mutation.", "api_or_display_evidence": "none"}, "source_results": [str((RUNS / row["meeting"] / "RESULT.json").relative_to(ROOT)) for row in results]}
-    emit(HERE / "RESULT.json", summary)
+    summary = {"schema": "PSEM-STREAMING-STUDENT-TEACHER-BASELINE-RESULT-1", "status": "completed_pending_analysis", "scope": config["authority"].get("run_id", "#164 baseline"), "authorization": config["authority"], "identities": execution_identities(config, revision), "execution": {"sources": [row["meeting"] for row in results], "native_passes_per_source": 1, "approved_audio_s": total_audio, "combined_paced_orchestration_wall_s": model_wall, "cap_s": config["authority"]["combined_model_wall_cap_seconds"], "cap_held": model_wall <= config["authority"]["combined_model_wall_cap_seconds"], "training_backward_updates": 0, "paid_or_cloud_calls": 0, "holdout_eval_opened": False}, "measurements": {"native_transition_events": {row["meeting"]: row["native"]["transition_events"] for row in results}, "annotation_conditions": {row["meeting"]: row["source"]["annotation_coverage"] for row in results}, "selected_changed_parents": {row["meeting"]: row["receiver"]["selected_changed_parents"] for row in results}, "selected_suppressed_boundaries": {row["meeting"]: row["receiver"]["selected_suppressed_boundaries"] for row in results}, "text_conservation_failures": {row["meeting"]: row["receiver"]["text_conservation_failures"] for row in results}, "cost": {row["meeting"]: row["cost"] for row in results}}, "decision": {"baseline_target_usable": all(row["native"]["output_frames"] > 0 and row["receiver"]["assignments"] > 0 and row["receiver"]["text_conservation_failures"] == 0 for row in results), "compression_training": "not run; GPU training method discussion selected first", "quality_scope": "Additional cost measurement only; no universal teacher-quality or translation-effect claim."}, "architecture": {"product_source_changed": False, "production_160_duplicated": False, "runtime_boundary": "Experiment-local pinned archive plus ownership override; no product mutation.", "api_or_display_evidence": "none"}, "source_results": [str((RUNS / row["meeting"] / "RESULT.json").relative_to(ROOT)) for row in results]}
+    emit(OUTPUT_ROOT / "RESULT.json", summary)
     return summary
 
 
@@ -595,13 +740,18 @@ def verify_recorded_source(run_dir: Path, row: dict[str, Any], config: dict[str,
 
 
 def verify(config: dict[str, Any]) -> dict[str, Any]:
-    summary = json.loads((HERE / "RESULT.json").read_text(encoding="utf-8"))
+    summary = json.loads((OUTPUT_ROOT / "RESULT.json").read_text(encoding="utf-8"))
     failures = []
     raw_facts = {}
     if not summary["execution"]["cap_held"] or summary["execution"]["native_passes_per_source"] != 1:
         failures.append("execution envelope")
     if summary.get("decision", {}).get("disposition") != "CUTOFF_CONDITIONAL_PARTIAL_BASELINE" or not summary.get("decision", {}).get("baseline_target_usable"):
         failures.append("partial baseline disposition")
+    recorded_identities = summary.get("identities", {})
+    if "runner_sha256" in recorded_identities:
+        current_identities = execution_identities(config, recorded_identities.get("source_revision"))
+        if any(current_identities[name] != recorded_identities.get(name) for name in current_identities):
+            failures.append("execution identities")
     for meeting in summary["execution"]["sources"]:
         run_dir = RUNS / meeting
         row = json.loads((run_dir / "RESULT.json").read_text(encoding="utf-8"))
@@ -614,15 +764,23 @@ def verify(config: dict[str, Any]) -> dict[str, Any]:
         for artifact in row["artifacts"].values():
             if digest(ROOT / artifact["path"]) != artifact["sha256"]:
                 failures.append(f"{meeting} artifact identity")
-    if sum(value.get("parents", 0) for value in raw_facts.values()) != 38 or sum(value.get("timely_transition_parents", 0) for value in raw_facts.values()) != 6 or sum(value.get("parents_missing_end_frame_at_cutoff", 0) for value in raw_facts.values()) != 38:
+        memory_artifact = row["artifacts"].get("process_memory_samples")
+        if memory_artifact:
+            with (ROOT / memory_artifact["path"]).open("r", encoding="utf-8", newline="") as source:
+                memory_rows = [{key: int(value) for key, value in item.items()} for item in csv.DictReader(source)]
+            if not memory_rows or any(item["aggregate_working_set_bytes"] != item["native_working_set_bytes"] + item["wrapper_working_set_bytes"] for item in memory_rows):
+                failures.append(f"{meeting} paired memory samples")
+            elif max(item["aggregate_working_set_bytes"] for item in memory_rows) != row["cost"].get("complete_path_peak_sum_working_set_bytes_sampled", row["cost"].get("complete_path_peak_sum_working_set_bytes_observed")):
+                failures.append(f"{meeting} aggregate memory peak")
+    if sum(value.get("parents", 0) for value in raw_facts.values()) != 38 or sum(value.get("parents_missing_end_frame_at_cutoff", 0) for value in raw_facts.values()) != 38:
         failures.append("aggregate raw causal facts")
     result = {
         "status": "passed" if not failures else "failed",
         "failures": failures,
-        "checks": ["finite authorized envelope", "one native pass per source", "effective profile", "selected-policy text conservation", "raw QPC cutoff and transition reconstruction", "four-slot soft tensor/raw correspondence", "artifact manifest identities"],
+        "checks": ["finite authorized envelope", "one native pass per source", "pinned execution identities", "effective profile", "selected-policy text conservation", "raw QPC cutoff and transition reconstruction", "four-slot soft tensor/raw correspondence", "paired simultaneous memory aggregate", "artifact manifest identities"],
         "raw_recomputed": raw_facts,
     }
-    emit(HERE / "VERIFICATION.json", result)
+    emit(OUTPUT_ROOT / "VERIFICATION.json", result)
     if failures:
         raise RuntimeError(str(failures))
     return result
@@ -630,10 +788,21 @@ def verify(config: dict[str, Any]) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("prepare", "execute", "verify"))
+    parser.add_argument("command", choices=("prepare", "smoke", "execute", "verify"))
+    parser.add_argument("--config", type=Path, default=HERE / "baseline_config.json")
+    parser.add_argument("--source-revision")
     args = parser.parse_args()
-    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-    value = prepare(config) if args.command == "prepare" else execute(config) if args.command == "execute" else verify(config)
+    config_path = args.config.resolve()
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    configure_paths(config_path, config)
+    if args.command == "prepare":
+        value = prepare(config)
+    elif args.command == "smoke":
+        value = smoke(config)
+    elif args.command == "execute":
+        value = execute(config, args.source_revision)
+    else:
+        value = verify(config)
     print(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
 
 

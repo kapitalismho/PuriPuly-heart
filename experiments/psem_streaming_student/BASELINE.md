@@ -74,3 +74,21 @@ python -B experiments/psem_streaming_student/run_baseline.py verify
 ```
 
 The earlier `prepare` and `execute` commands in `FINDINGS.json` are historical execution provenance, not permission to repeat a native run. Architecture remained experiment-local; product source and production behavior did not change.
+
+## Authorized cost rerun: prepared, not executed
+
+`#164-BASELINE-RERUN-1` authorizes exactly one additional Vulkan native pass for each unchanged source/profile under the same 1,800 s combined cap. It does not authorize training/backward, installs, cloud/API work, policy changes, added wait, HOLDOUT/EVAL access, or debugging passes.
+
+The dedicated configuration is `cost_rerun_config.json`; all mutable outputs are isolated under `cost_rerun/` (`runs/<source>/`, `RESULT.json`, `FINDINGS.json`, and `VERIFICATION.json`). Original `runs/` and top-level records remain the original evidence. `cost_rerun/PREEXECUTION_SMOKE.json` and `cost_rerun/READINESS.json` are no-model preparation records.
+
+Execution is deliberately locked until the Director commits this preparation. The runner requires the supplied 40-character revision to equal `HEAD` and verifies that the committed blobs for the runner, analyzer, and rerun config match their working files before either native process starts. It then records that revision plus SHA-256 identities for those inputs, executable, model, runtime archive, ownership override, and decoder.
+
+After the Director supplies the commit:
+
+```text
+python -B experiments/psem_streaming_student/run_baseline.py execute --config experiments/psem_streaming_student/cost_rerun_config.json --source-revision <DIRECTOR_COMMIT>
+python -B experiments/psem_streaming_student/analyze_baseline.py --config experiments/psem_streaming_student/cost_rerun_config.json
+python -B experiments/psem_streaming_student/run_baseline.py verify --config experiments/psem_streaming_student/cost_rerun_config.json
+```
+
+The rerun records QPC-paired native/wrapper working-set samples and takes the aggregate peak from one paired sample, never from independently observed peaks. It records native and wrapper CPU separately. Paced wall remains labeled wall time, not compute RTF; native `service_us`, `frontend_us`, `graph_a_us`, `graph_b_us`, and `host_us` trace fields are retained by name without relabeling them GPU-kernel compute.

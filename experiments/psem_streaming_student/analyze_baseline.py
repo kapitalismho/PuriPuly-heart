@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import gzip
 import hashlib
 import json
@@ -10,6 +11,9 @@ from typing import Any
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
+CONFIG_PATH = HERE / "baseline_config.json"
+OUTPUT_ROOT = HERE
+RUNS = OUTPUT_ROOT / "runs"
 ANNOTATIONS = Path(r"C:/Users/salee/AppData/Local/Temp/opencode/stb_phase2_corpora/ami/annotations/words")
 
 
@@ -78,7 +82,7 @@ def overlap_witnesses(words: list[tuple[int, int, str, str]]) -> list[dict[str, 
 
 
 def analyze_source(meeting: str, guards: dict[tuple[str, str], dict[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
-    run_dir = HERE / "runs" / meeting
+    run_dir = RUNS / meeting
     result = read_json(run_dir / "RESULT.json")
     assignments = read_jsonl(run_dir / "receiver-assignments.jsonl.gz")
     messages = read_jsonl(run_dir / "native-events.jsonl.gz")
@@ -174,35 +178,52 @@ def analyze_source(meeting: str, guards: dict[tuple[str, str], dict[str, Any]]) 
 
 
 def main() -> None:
-    summary = read_json(HERE / "RESULT.json")
+    global CONFIG_PATH, OUTPUT_ROOT, RUNS
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=Path, default=HERE / "baseline_config.json")
+    args = parser.parse_args()
+    CONFIG_PATH = args.config.resolve()
+    config = read_json(CONFIG_PATH)
+    OUTPUT_ROOT = (ROOT / config["output_root"]).resolve() if config.get("output_root") else HERE
+    if OUTPUT_ROOT != HERE and HERE not in OUTPUT_ROOT.parents:
+        raise RuntimeError("output_root must remain inside the experiment directory")
+    RUNS = OUTPUT_ROOT / "runs"
+    summary = read_json(OUTPUT_ROOT / "RESULT.json")
     analyses = {}
     costs = {}
     guards = retained_guards()
     for meeting in summary["execution"]["sources"]:
         analyses[meeting], costs[meeting] = analyze_source(meeting, guards)
     summary["status"] = "completed_cutoff_conditional_partial_baseline"
-    summary["identities"]["executed_runner_revision_provenance"] = "unavailable; the executed runner revision was not pinned during the two native passes"
-    summary["identities"]["runner_sha256_after_analysis_fix"] = digest(HERE / "run_baseline.py")
-    summary["identities"]["analysis_sha256"] = digest(Path(__file__))
+    if "runner_sha256" in summary["identities"]:
+        if summary["identities"]["runner_sha256"] != digest(HERE / "run_baseline.py") or summary["identities"]["analysis_sha256"] != digest(Path(__file__)) or summary["identities"]["config_sha256"] != digest(CONFIG_PATH):
+            raise RuntimeError("executed script/config identity mismatch")
+        summary["identities"]["executed_runner_revision_provenance"] = f"pinned before execution: {summary['identities']['source_revision']}"
+    else:
+        summary["identities"]["executed_runner_revision_provenance"] = "unavailable; the executed runner revision was not pinned during the two native passes"
+        summary["identities"]["runner_sha256_after_analysis_fix"] = digest(HERE / "run_baseline.py")
+        summary["identities"]["analysis_sha256"] = digest(Path(__file__))
     summary["measurements"]["causal_receiver"] = analyses
     for meeting in summary["execution"]["sources"]:
         summary["measurements"]["annotation_conditions"][meeting]["interpretation"] = "Transition and overlap conditions come from accessible AMI word intervals. The raw retained_parent_guards map is empty; post-hoc guard counts characterize recorded inputs and are not runtime guard proof."
     summary["measurements"]["cost"] = costs
+    complete_cost = all(value.get("receiver_wrapper_cpu_measurement", {}).get("status") == "observed" and value.get("receiver_wrapper_working_set_measurement", {}).get("status") == "observed" and value.get("complete_path_peak_sum_working_set_bytes_observed") for value in costs.values())
     summary["decision"] = {
         "baseline_target_usable": True,
         "disposition": "CUTOFF_CONDITIONAL_PARTIAL_BASELINE",
-        "finding": "All 38 admitted parents lacked end-of-span native frame coverage at the artificial zero-wait frozen accepted-text cutoff. Six parents contained timely confirmed transitions (2 ES, 4 EN), so this is partial coverage rather than a proven receiver defect or actual ASR admission blocker.",
+        "finding": "All 38 admitted parents lacked end-of-span native frame coverage at the artificial zero-wait frozen accepted-text cutoff. Timely confirmed-transition coverage remains partial, so this is not a proven receiver defect or actual ASR admission blocker.",
         "soft_target_status": "usable raw four-slot independent probabilities with support/validity metadata",
-        "complete_path_cost_status": "incomplete because original receiver CPU and RSS measurements are unavailable",
+        "complete_path_cost_status": "observed in authorized cost rerun" if complete_cost else "incomplete because receiver CPU or RSS measurements are unavailable",
         "not_a_teacher_finetuning_finding": True,
-        "compression_training": "not run; may proceed only after maintainer approval and is not contingent on changing wait or fixed policy",
+        "compression_training": "not run; GPU training-method discussion selected first and no training/backward is authorized",
         "quality_scope": "The approved prefixes contain actual non-overlap transitions, overlap intervals, and post-hoc retained-parent annotations, but this baseline establishes no general early-stop, downstream benefit, or negative teacher result.",
-        "requested_next_decision": "Discuss R4 training under its own authority. Preserve zero added wait and the fixed policy; the cutoff-conditional mapping gap may be retained or separately scoped without making policy repair mandatory.",
+        "requested_next_decision": "Discuss GPU training method separately. Preserve zero added wait and the fixed policy.",
     }
-    write_json(HERE / "RESULT.json", summary)
-    findings = {"schema": "PSEM-STREAMING-STUDENT-BASELINE-FINDINGS-1", "result_status": summary["status"], "execution": summary["execution"], "causal_receiver": analyses, "cost": costs, "decision": summary["decision"], "provenance": {"executed_runner_revision": summary["identities"]["executed_runner_revision_provenance"], "posthoc_runner_sha256": summary["identities"]["runner_sha256_after_analysis_fix"]}, "evidence_boundaries": summary["architecture"], "commands": ["python -B experiments/psem_streaming_student/run_baseline.py prepare", "python -B experiments/psem_streaming_student/run_baseline.py execute", "python -B experiments/psem_streaming_student/analyze_baseline.py", "python -B experiments/psem_streaming_student/run_baseline.py verify"]}
-    write_json(HERE / "FINDINGS.json", findings)
-    print(json.dumps({"status": findings["result_status"], "decision": findings["decision"]["disposition"], "findings_sha256": digest(HERE / "FINDINGS.json")}, separators=(",", ":")))
+    write_json(OUTPUT_ROOT / "RESULT.json", summary)
+    command_suffix = f" --config {CONFIG_PATH.relative_to(ROOT)}" if config.get("output_root") else ""
+    findings = {"schema": "PSEM-STREAMING-STUDENT-BASELINE-FINDINGS-1", "result_status": summary["status"], "execution": summary["execution"], "causal_receiver": analyses, "cost": costs, "decision": summary["decision"], "provenance": summary["identities"], "evidence_boundaries": summary["architecture"], "commands": [f"python -B experiments/psem_streaming_student/analyze_baseline.py{command_suffix}", f"python -B experiments/psem_streaming_student/run_baseline.py verify{command_suffix}"]}
+    write_json(OUTPUT_ROOT / "FINDINGS.json", findings)
+    print(json.dumps({"status": findings["result_status"], "decision": findings["decision"]["disposition"], "findings_sha256": digest(OUTPUT_ROOT / "FINDINGS.json")}, separators=(",", ":")))
 
 
 if __name__ == "__main__":
