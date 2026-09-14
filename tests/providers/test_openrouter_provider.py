@@ -448,8 +448,7 @@ async def test_httpx_openrouter_client_deepseek_40_uses_requested_provider_pool(
     assert fake_client.last_request["json"]["provider"] == {
         "only": [
             "makora",
-            "baseten/fp8",
-            "coreweave/fp8",
+            "together",
             "wafer/fast",
             "baidu/fp8",
         ],
@@ -532,8 +531,7 @@ async def test_resolved_deepseek_fallback_preserves_primary_provider_pool(
         else {
             "only": [
                 "makora",
-                "baseten/fp8",
-                "coreweave/fp8",
+                "together",
                 "wafer/fast",
                 "baidu/fp8",
             ],

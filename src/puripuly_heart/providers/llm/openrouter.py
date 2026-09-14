@@ -163,8 +163,7 @@ def _build_provider_preferences(
         return {
             "only": [
                 "makora",
-                "baseten/fp8",
-                "coreweave/fp8",
+                "together",
                 "wafer/fast",
                 "baidu/fp8",
             ],
@@ -207,8 +206,7 @@ def _build_provider_preferences(
         return {
             "only": [
                 "makora",
-                "baseten/fp8",
-                "coreweave/fp8",
+                "together",
                 "wafer/fast",
                 "baidu/fp8",
             ],
