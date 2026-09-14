@@ -95,6 +95,9 @@ class VadGating:
     _rollover_pending: bool
     _rollover_silence_run: int
     _pending_segment_settings: tuple[float, float, int, int] | None
+    _hard_rollover_pre_roll_samples: int
+    _hard_rollover_pre_roll: np.ndarray | None
+    _hard_rollover_pre_roll_capture: tuple[AudioCaptureSpan, ...]
 
     def __init__(
         self,
@@ -113,6 +116,7 @@ class VadGating:
         diagnostics_enabled: Callable[[], bool] | None = None,
         diagnostic_label: str = "self",
         external_delivery_boundaries: bool = False,
+        hard_rollover_pre_roll_ms: int = 0,
     ) -> None:
         if sample_rate_hz <= 0:
             raise ValueError("sample_rate_hz must be > 0")
@@ -126,6 +130,8 @@ class VadGating:
             raise ValueError("start_commit_chunks must be > 0")
         if start_commit_chunks < start_debounce_chunks:
             raise ValueError("start_commit_chunks must be >= start_debounce_chunks")
+        if hard_rollover_pre_roll_ms < 0:
+            raise ValueError("hard_rollover_pre_roll_ms must be >= 0")
 
         self.engine = engine
         self.sample_rate_hz = sample_rate_hz
@@ -147,6 +153,9 @@ class VadGating:
 
         capacity_samples = int(self.sample_rate_hz * (ring_buffer_ms / 1000.0))
         self._ring = RingBufferF32(capacity_samples=capacity_samples)
+        self._hard_rollover_pre_roll_samples = int(
+            self.sample_rate_hz * hard_rollover_pre_roll_ms / 1000.0
+        )
 
         self._in_speech = False
         self._utterance_id = None
@@ -166,6 +175,8 @@ class VadGating:
         self._last_observation_was_speech = False
         self._non_speech_sample_count = 0
         self._pending_segment_settings = None
+        self._hard_rollover_pre_roll = None
+        self._hard_rollover_pre_roll_capture = ()
 
     @property
     def in_speech(self) -> bool:
@@ -192,6 +203,7 @@ class VadGating:
         self._silence_run = 0
         self._rollover_pending = False
         self._rollover_silence_run = 0
+        self._clear_hard_rollover_pre_roll()
         self._reset_pending_start()
         self._last_observation_was_speech = False
         self._non_speech_sample_count = 0
@@ -277,6 +289,7 @@ class VadGating:
             if self._rollover_silence_run >= max(1, self.hangover_chunks):
                 self._rollover_pending = False
                 self._rollover_silence_run = 0
+                self._clear_hard_rollover_pre_roll()
                 self.engine.reset()
             self._append_ring(chunk, capture)
             return events
@@ -461,13 +474,18 @@ class VadGating:
         self._rollover_silence_run = 0
         self._speech_chunk_count = 1
         self._speech_sample_count = int(chunk.size)
+        pre_roll = self._hard_rollover_pre_roll
+        if pre_roll is None:
+            pre_roll = np.empty((0,), dtype=np.float32)
+        pre_roll_capture = self._hard_rollover_pre_roll_capture
+        self._clear_hard_rollover_pre_roll()
         logger.info("[VAD] Speech rollover: id=%s, prob=%.2f", str(utterance_id)[:8], prob)
         return [
             SpeechStart(
                 utterance_id,
-                pre_roll=np.empty((0,), dtype=np.float32),
+                pre_roll=pre_roll,
                 chunk=chunk.copy(),
-                pre_roll_capture=(),
+                pre_roll_capture=pre_roll_capture,
                 chunk_capture=capture,
                 genuine_onset=False,
             )
@@ -497,6 +515,17 @@ class VadGating:
             reason=reason,
         )
         self._log_speech_end(reason)
+        sample_count = (
+            min(
+                self._hard_rollover_pre_roll_samples,
+                self._speech_sample_count,
+                self._ring.capacity_samples,
+            )
+            if reason == "delivery_deadline"
+            else 0
+        )
+        self._hard_rollover_pre_roll = self._ring.get_last_samples(sample_count)
+        self._hard_rollover_pre_roll_capture = self._capture_suffix(sample_count)
         self._reset_active_segment()
         self._rollover_pending = True
         self._rollover_silence_run = 0
@@ -533,6 +562,10 @@ class VadGating:
                 break
         selected.reverse()
         return tuple(selected)
+
+    def _clear_hard_rollover_pre_roll(self) -> None:
+        self._hard_rollover_pre_roll = None
+        self._hard_rollover_pre_roll_capture = ()
 
     def _log_candidate(
         self,
@@ -621,6 +654,7 @@ PEER_VAD_SPEECH_THRESHOLD = 0.5
 PEER_VAD_START_DEBOUNCE_CHUNKS = 3
 PEER_VAD_START_COMMIT_CHUNKS = 3
 PEER_VAD_DELIVERY_BOUNDARIES_EXTERNAL = True
+PEER_HARD_ROLLOVER_PRE_ROLL_MS = 300
 
 
 def create_peer_vad_gating(
@@ -644,6 +678,7 @@ def create_peer_vad_gating(
         start_debounce_chunks=PEER_VAD_START_DEBOUNCE_CHUNKS,
         start_commit_chunks=PEER_VAD_START_COMMIT_CHUNKS,
         external_delivery_boundaries=PEER_VAD_DELIVERY_BOUNDARIES_EXTERNAL,
+        hard_rollover_pre_roll_ms=PEER_HARD_ROLLOVER_PRE_ROLL_MS,
         candidate_log_label="Peer",
         diagnostic_event_callback=diagnostic_event_callback,
         diagnostics_enabled=diagnostics_enabled,

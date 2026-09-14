@@ -474,8 +474,18 @@ def test_self_retention_profile_uses_exact_selected_sample_ceiling() -> None:
     assert profile.max_retained_bytes == 11_520_000
 
 
-def test_listen_retention_profile_uses_seven_seconds_plus_prefix_per_slot() -> None:
-    settings = _retention_settings("local_qwen_gpu")
+@pytest.mark.parametrize(
+    ("vad_pre_roll_ms", "expected_samples"),
+    [(500, 1_040_000), (100, 1_008_000)],
+)
+def test_listen_retention_profile_covers_six_seconds_and_largest_prefix(
+    vad_pre_roll_ms: int,
+    expected_samples: int,
+) -> None:
+    settings = replace(
+        _retention_settings("local_qwen_gpu"),
+        vad_pre_roll_ms=vad_pre_roll_ms,
+    )
     profile = _recognition_retention_profile(
         SimpleNamespace(
             channel="peer",
@@ -486,15 +496,15 @@ def test_listen_retention_profile_uses_seven_seconds_plus_prefix_per_slot() -> N
         settings,
     )
 
-    assert profile.max_retained_samples == 1_200_000
-    assert profile.max_retained_bytes == 4_800_000
+    assert profile.max_retained_samples == expected_samples
+    assert profile.max_retained_bytes == expected_samples * 4
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("channel", "content_samples"),
     [
-        ("peer", int(7.144 * 16000)),
+        ("peer", 6 * 16000),
         ("self", 7 * 16000),
     ],
 )
@@ -523,12 +533,12 @@ async def test_production_retention_profiles_accept_listen_boundary_and_long_sel
     start, end = _retention_owned_events(
         settings,
         content_samples=content_samples,
-        prefix_samples=8000 if channel == "peer" else 0,
+        prefix_samples=4800 if channel == "peer" else 0,
     )
 
     await engine.handle_owned_vad_event(start)
     assert engine.retention_snapshot.retained_samples == content_samples + (
-        8000 if channel == "peer" else 0
+        4800 if channel == "peer" else 0
     )
     await engine.handle_owned_vad_event(end)
 

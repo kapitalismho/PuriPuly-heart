@@ -175,7 +175,7 @@ async def test_peer_audio_ownership_preserves_resampled_ranges_for_continuous_sp
     assert ledger.snapshots == ()
 
 
-async def test_listen_continuous_audio_rolls_at_seven_seconds_without_reused_content():
+async def test_listen_continuous_audio_rolls_at_six_seconds_with_context_only_tail():
     frame_count = 440
     frames = [
         AudioFrameF32(
@@ -238,7 +238,9 @@ async def test_listen_continuous_audio_rolls_at_seven_seconds_without_reused_con
         "source_eof",
     ]
     assert [snapshot.genuine_onset for snapshot in snapshots] == [True, False, False]
-    assert [snapshot.prefix_context_sample_count for snapshot in snapshots] == [0, 0, 0]
+    assert [snapshot.prefix_context_sample_count for snapshot in snapshots] == [0, 4800, 4800]
+    starts = [owned.event for owned in owned_events if isinstance(owned.event, SpeechStart)]
+    assert [start.pre_roll.size for start in starts] == [0, 4800, 4800]
     assert sum(snapshot.content_sample_count for snapshot in snapshots) == frame_count * 512
     content_ranges = [
         capture_range for snapshot in snapshots for capture_range in snapshot.content_ranges
@@ -250,6 +252,19 @@ async def test_listen_continuous_audio_rolls_at_seven_seconds_without_reused_con
         == content_ranges[index].normalized_start_sample
         for index in range(1, len(content_ranges))
     )
+    assert [
+        (
+            snapshot.context_ranges[0].normalized_start_sample,
+            snapshot.context_ranges[-1].normalized_end_sample,
+        )
+        for snapshot in snapshots[1:]
+    ] == [
+        (
+            snapshots[index - 1].content_ranges[-1].normalized_end_sample - 4800,
+            snapshots[index - 1].content_ranges[-1].normalized_end_sample,
+        )
+        for index in (1, 2)
+    ]
 
 
 async def test_peer_audio_unknown_gap_fails_open_segment_without_turning_loss_into_silence():
@@ -336,6 +351,7 @@ async def test_peer_audio_unknown_gap_fails_open_segment_without_turning_loss_in
         "source_discontinuity",
         "source_eof",
     ]
+    assert [snapshot.prefix_context_sample_count for snapshot in snapshots] == [0, 0]
     assert ledger.terminal_receipts[0].outcome == "failed"
     assert [event.event.reason for event in owned_events if hasattr(event.event, "reason")] == [
         "source_discontinuity",

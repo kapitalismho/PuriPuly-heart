@@ -427,14 +427,29 @@ async def test_resumption_creates_new_pause_and_busy_worker_does_not_queue_or_re
 
 
 @pytest.mark.asyncio
-async def test_age_step_preserves_existing_pause_and_revokes_model_authority() -> None:
+async def test_four_second_step_uses_accumulated_192ms_pause_at_exact_age() -> None:
+    harness = Harness(profile="off", threshold=None, hangover_ms=800)
+    await harness.open()
+    await harness.feed_chunks([3776], speech=True, value=1.0)
+    await harness.feed_chunks([191], speech=False)
+    assert harness.clock.value == pytest.approx(3.999)
+    assert harness.vad.ends == []
+
+    await harness.feed_chunks([1], speech=False)
+
+    assert harness.clock.value == pytest.approx(4.0)
+    assert harness.vad.ends[0].reason == "delivery_pause"
+    assert harness.ledger.snapshots[0].content_sample_count == 4000 * 16
+
+
+@pytest.mark.asyncio
+async def test_four_second_step_preserves_pause_and_rejects_stale_model_result() -> None:
     harness = Harness()
     await harness.open()
-    await harness.feed(3648, speech=True, value=1.0)
+    await harness.feed_chunks([3648], speech=True, value=1.0)
     await harness.feed(224, speech=False)
     assert len(harness.inference.requests) == 1
     await harness.feed(96, speech=False)
-    assert len(harness.inference.requests) == 1
     assert len(harness.vad.ends) == 1
     request = harness.inference.requests[0]
     await harness.complete(0, score=0.99, at=request.complete_deadline_monotonic_s - 0.1)
@@ -442,33 +457,41 @@ async def test_age_step_preserves_existing_pause_and_revokes_model_authority() -
 
 
 @pytest.mark.asyncio
-async def test_six_second_step_preserves_pause_support_without_forcing_speech_cut() -> None:
-    continuous = Harness(profile="off", threshold=None)
-    await continuous.open()
-    await continuous.feed(5984, speech=True, value=1.0)
-    assert continuous.clock.value > 6.0
-    assert continuous.vad.ends == []
+async def test_five_second_step_uses_accumulated_128ms_pause_at_exact_age() -> None:
+    harness = Harness(profile="off", threshold=None, hangover_ms=800)
+    await harness.open()
+    await harness.feed_chunks([4839], speech=True, value=1.0)
+    await harness.feed_chunks([128], speech=False)
+    assert harness.clock.value == pytest.approx(4.999)
+    assert harness.vad.ends == []
 
-    await continuous.feed(96, speech=False)
-    assert continuous.vad.ends == []
-    await continuous.feed(32, speech=False)
-    assert len(continuous.vad.ends) == 1
-    assert continuous.vad.ends[0].reason == "delivery_pause"
+    await harness.feed_chunks([1], speech=False)
 
-    accumulated = Harness(profile="off", threshold=None)
-    await accumulated.open()
-    await accumulated.feed(5824, speech=True, value=1.0)
-    await accumulated.feed(160, speech=False)
-    assert accumulated.clock.value > 6.0
-    assert len(accumulated.vad.ends) == 1
-    assert accumulated.ledger.snapshots[0].seal_reason == "delivery_pause"
+    assert harness.clock.value == pytest.approx(5.0)
+    assert harness.vad.ends[0].reason == "delivery_pause"
+    assert harness.ledger.snapshots[0].content_sample_count == 5000 * 16
+
+
+@pytest.mark.asyncio
+async def test_six_second_hard_limit_seals_continuous_speech_at_exact_age() -> None:
+    harness = Harness(profile="off", threshold=None)
+    await harness.open()
+    await harness.feed_chunks([5967], speech=True, value=1.0)
+    assert harness.clock.value == pytest.approx(5.999)
+    assert harness.vad.ends == []
+
+    await harness.feed_chunks([1], speech=True, value=1.0)
+
+    assert harness.clock.value == pytest.approx(6.0)
+    assert harness.vad.ends[0].reason == "delivery_deadline"
+    assert harness.ledger.snapshots[0].content_sample_count == 6000 * 16
 
 
 @pytest.mark.asyncio
 async def test_no_callback_steps_add_no_silence_and_hard_timer_seals_actual_frontier() -> None:
     harness = Harness(profile="off", threshold=None)
     harness.controller.FOUR_SECOND_AGE_S = 0.05
-    harness.controller.SIX_SECOND_AGE_S = 0.15
+    harness.controller.FIVE_SECOND_AGE_S = 0.15
     harness.controller.HARD_LIMIT_S = 0.3
     await harness.open()
     await harness.feed(96, speech=False)
@@ -487,10 +510,10 @@ async def test_no_callback_steps_add_no_silence_and_hard_timer_seals_actual_fron
 
 
 @pytest.mark.asyncio
-async def test_six_second_timer_reevaluates_existing_160ms_pause_without_callback() -> None:
+async def test_five_second_timer_reevaluates_existing_160ms_pause_without_callback() -> None:
     harness = Harness(profile="off", threshold=None)
     harness.controller.FOUR_SECOND_AGE_S = 0.05
-    harness.controller.SIX_SECOND_AGE_S = 0.25
+    harness.controller.FIVE_SECOND_AGE_S = 0.25
     harness.controller.HARD_LIMIT_S = 0.5
     await harness.open()
     await harness.feed(160, speech=False)
@@ -507,7 +530,7 @@ async def test_six_second_timer_reevaluates_existing_160ms_pause_without_callbac
 async def test_hard_boundary_wins_simultaneous_pause_decision_once() -> None:
     harness = Harness(profile="off", threshold=None)
     harness.controller.HARD_LIMIT_S = 0.16
-    harness.controller.SIX_SECOND_AGE_S = 0.1
+    harness.controller.FIVE_SECOND_AGE_S = 0.1
     await harness.open()
     await harness.feed(128, speech=False)
 

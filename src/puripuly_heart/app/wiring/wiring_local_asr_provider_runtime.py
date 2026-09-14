@@ -226,12 +226,13 @@ def _recognition_retention_profile(
     if channel == "self":
         max_samples = 2_880_000
     else:
-        # LISTEN already owns its seven-second segmentation boundary. Recognition
-        # accounts against that binding's complete retained-segment envelope
-        # rather than imposing a second, chunk-order-sensitive endpoint.
+        max_context_ms = max(
+            settings.vad_pre_roll_ms,
+            ListenDeliveryController.HARD_CUT_OVERLAP_MS,
+        )
         max_samples = int(
             sample_rate_hz
-            * (ListenDeliveryController.HARD_LIMIT_S + settings.vad_pre_roll_ms / 1000.0)
+            * (ListenDeliveryController.HARD_LIMIT_S + max_context_ms / 1000.0)
             * LISTEN_RETAINED_SEGMENT_SLOTS
         )
     provider_options = getattr(config, "provider_options", {})
