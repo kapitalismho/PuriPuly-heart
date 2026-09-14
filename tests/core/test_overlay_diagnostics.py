@@ -4,6 +4,7 @@ import asyncio
 import json
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -570,6 +571,69 @@ async def test_dump_prunes_old_artifacts_to_retention_limit(
     assert len(artifacts) == 2
     assert receipts[-1]["file_name"] in {path.name for path in artifacts}
     assert not list(tmp_path.glob(".overlay-diagnostics-*.tmp"))
+
+
+@pytest.mark.asyncio
+async def test_concurrent_dump_retention_does_not_delete_other_instance_temp(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    first = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-concurrent-first",
+        diagnostics_dir=tmp_path,
+    )
+    second = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-concurrent-second",
+        diagnostics_dir=tmp_path,
+    )
+    first_started = threading.Event()
+    release_first = threading.Event()
+    original = diagnostics_module.OverlayDiagnosticsRecorder._write_dump_file
+
+    def interleaved_write(temporary: Path, path: Path, content: bytes) -> None:
+        if temporary == first._temporary_path():
+            temporary.parent.mkdir(parents=True, exist_ok=True)
+            temporary.write_bytes(content)
+            first_started.set()
+            assert release_first.wait(timeout=0.8)
+            temporary.replace(path)
+            return
+        original(temporary, path, content)
+
+    monkeypatch.setattr(
+        diagnostics_module.OverlayDiagnosticsRecorder,
+        "_write_dump_file",
+        staticmethod(interleaved_write),
+    )
+    first_task = asyncio.create_task(first.dump_evidence(outcome="failure"))
+    while not first_started.is_set():
+        await asyncio.sleep(0)
+
+    second_receipt = await second.dump_evidence(outcome="failure")
+    assert second_receipt["outcome"] == "written"
+    assert first._temporary_path().is_file()
+
+    release_first.set()
+    first_receipt = await first_task
+    assert first_receipt["outcome"] == "written"
+    assert first.last_dump_path is not None and first.last_dump_path.is_file()
+    assert second.last_dump_path is not None and second.last_dump_path.is_file()
+
+
+def test_retention_maintenance_failure_is_not_capture_loss(tmp_path: Path) -> None:
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-maintenance",
+        diagnostics_dir=tmp_path,
+    )
+    recorder._temporary_path().mkdir(parents=True)
+
+    recorder._prune_artifacts(keep=tmp_path / "missing.jsonl")
+
+    summary = recorder.evidence_summary()
+    assert summary["maintenance_failures"] == {
+        "artifact_retention_cleanup_failed": 1
+    }
+    assert summary["input_rejected"] == {}
 
 
 @pytest.mark.asyncio

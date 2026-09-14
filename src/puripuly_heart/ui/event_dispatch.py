@@ -35,7 +35,6 @@ from puripuly_heart.ui.i18n import localize_user_message_ref, t
 
 logger = logging.getLogger(__name__)
 
-_FINAL_TRANSCRIPT_CACHE_LIMIT = 500
 _RAW_STRING_ERROR_DEPRECATION_DIAGNOSTIC = (
     "[UIEventBridge] Deprecated raw string error payload sanitized for user-visible sinks"
 )
@@ -84,18 +83,6 @@ class HistoryEventDestination(Protocol):
         *,
         translated: bool = False,
         language_code: str | None = None,
-    ) -> None: ...
-
-
-class ConversationEventDestination(Protocol):
-    def append_record(
-        self,
-        *,
-        source: str,
-        channel: str,
-        source_text: str,
-        translated_text: str,
-        origin_wall_clock_ms: int | None = None,
     ) -> None: ...
 
 
@@ -207,29 +194,6 @@ class AppHistoryEventDestination:
         if callable(self._append_history_entry):
             self._append_history_entry(
                 source, text, translated=translated, language_code=language_code
-            )
-
-
-class AppConversationEventDestination:
-    def __init__(self, append_conversation_record: object | None) -> None:
-        self._append_conversation_record = append_conversation_record
-
-    def append_record(
-        self,
-        *,
-        source: str,
-        channel: str,
-        source_text: str,
-        translated_text: str,
-        origin_wall_clock_ms: int | None = None,
-    ) -> None:
-        if callable(self._append_conversation_record):
-            self._append_conversation_record(
-                source=source,
-                channel=channel,
-                source_text=source_text,
-                translated_text=translated_text,
-                origin_wall_clock_ms=origin_wall_clock_ms,
             )
 
 
@@ -369,7 +333,6 @@ class UIEventBridge:
         runtime_logging: RuntimeLoggingPort | None = None,
         dashboard_destination: DashboardEventDestination,
         history_destination: HistoryEventDestination,
-        conversation_destination: ConversationEventDestination,
         error_destination: ErrorEventDestination | None = None,
         get_language_codes: object | None = None,
         is_translation_enabled: object | None = None,
@@ -388,16 +351,13 @@ class UIEventBridge:
         self._overlay_state_changed_callback = on_overlay_state_changed
         self.dashboard_destination = dashboard_destination
         self.history_destination = history_destination
-        self.conversation_destination = conversation_destination
         self.error_destination = error_destination or AppErrorEventDestination(
             runtime_logging=runtime_logging,
             clear_managed_auth_pending=clear_managed_auth_pending,
             show_snackbar=show_snackbar,
             get_stt_state=self._get_stt_state_callback,
         )
-        self.projection_service = EventProjectionService(
-            final_transcript_cache_limit=_FINAL_TRANSCRIPT_CACHE_LIMIT
-        )
+        self.projection_service = EventProjectionService()
         self._running = False
         self._closed = False
         self._started = asyncio.Event()
@@ -413,10 +373,6 @@ class UIEventBridge:
             return bool(self._is_translation_enabled_callback())
         return False
 
-    @property
-    def _final_self_transcripts(self) -> object:
-        return self.projection_service.final_self_transcripts
-
     def _projection_context(self) -> EventProjectionContext:
         source_lang, target_lang = self._get_language_codes()
         stt_state = (
@@ -429,20 +385,6 @@ class UIEventBridge:
             runtime_logging_mode=getattr(self.runtime_logging, "mode", None),
             stt_state=stt_state,
         )
-
-    def _append_conversation_record_projection(self, projection: object | None) -> None:
-        if self._closed or projection is None:
-            return
-        try:
-            self.conversation_destination.append_record(
-                source=projection.source,
-                channel=projection.channel,
-                source_text=projection.source_text,
-                translated_text=projection.translated_text,
-                origin_wall_clock_ms=projection.origin_wall_clock_ms,
-            )
-        except Exception:
-            logger.error("Failed to append conversation record")
 
     def _emit_dashboard_translation_applied_detailed(
         self,
@@ -568,7 +510,6 @@ class UIEventBridge:
                 self._emit_dashboard_translation_applied_detailed(
                     diagnostic=projection.translation_diagnostic,
                 )
-            self._append_conversation_record_projection(projection.conversation)
             for history in projection.history:
                 self.history_destination.append_entry(
                     history.source,

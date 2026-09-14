@@ -468,6 +468,11 @@ def test_text_redactor_removes_raw_transcript_translation_source_assignments() -
             "provider-secret-token",
             "DIAGNOSTIC_REDACTION_MARKER",
         ),
+        (
+            "WebSocket reconnect failed: wss://alice:super-secret@example.test/socket",
+            "alice:super-secret",
+            "DIAGNOSTIC_REDACTION_MARKER",
+        ),
     ],
 )
 def test_text_redactor_removes_provider_broker_exception_and_secret_log_payloads(

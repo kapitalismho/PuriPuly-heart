@@ -342,6 +342,57 @@ async def test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_contr
     assert queue.get_nowait() == {"type": "shutdown_complete"}
 
 
+
+
+@pytest.mark.asyncio
+async def test_desktop_first_visible_flows_from_real_process_reader_to_manager_callback(
+    tmp_path: Path,
+) -> None:
+    class PipeProcess:
+        def __init__(self) -> None:
+            self.stdout = asyncio.StreamReader()
+            self.stderr = None
+            self.pid = 72
+            self.returncode = 0
+
+    fired: list[str] = []
+    manager = OverlayProcessManager(
+        overlay_instance_id="overlay-reader-visible",
+        selected_target="desktop",
+        diagnostics_dir=tmp_path,
+        first_visible_callback=lambda: fired.append("visible"),
+    )
+    manager.state = "starting"
+    manager._current_phase = "startup"
+    process = PipeProcess()
+    managed = _AsyncioOverlayProcess(process=process)
+    assert manager.diagnostics is not None
+    managed.attach_diagnostics(
+        manager.diagnostics,
+        overlay_instance_id=manager.overlay_instance_id,
+    )
+    process.stdout.feed_data(
+        (
+            json.dumps(
+                {
+                    "type": "desktop_first_visible",
+                    "overlay_instance_id": manager.overlay_instance_id,
+                    "generation": 1,
+                }
+            )
+            + "\n"
+        ).encode()
+    )
+    process.stdout.feed_eof()
+
+    event = await asyncio.wait_for(managed.next_event(), timeout=0.5)
+    await manager._handle_lifecycle_event(event, allow_ready=False)
+    await managed.finish_readers()
+
+    assert event.payload["type"] == "desktop_first_visible"
+    assert manager.desktop_first_visible is True
+    assert fired == ["visible"]
+    assert manager.diagnostics.evidence_summary()["input_rejected"] == {}
 @pytest.mark.asyncio
 async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> None:
     class ControlledProcess:

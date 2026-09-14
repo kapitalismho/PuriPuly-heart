@@ -13,6 +13,7 @@ from puripuly_heart.core.orchestrator.channel_runtime import (
     _MergeBuffer,
     _SpeculativeAttemptStatus,
 )
+from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
 from tests.helpers.translation_owners import (
     compose_translation_test_harness,
@@ -115,11 +116,13 @@ async def test_peer_transcript_stays_in_peer_runtime() -> None:
     harness = compose_translation_test_harness(stt=None, llm=None, osc=FakeOscQueue())
     transcript = Transcript(utterance_id=uuid4(), text="peer text", is_final=True, channel="peer")
 
-    await harness.dispatch_transcript(transcript, is_final=True, source="Peer")
-
+    await harness.dispatch_stt_event(STTFinalEvent(transcript.utterance_id, transcript))
     assert transcript.utterance_id not in harness.self_runtime.utterances
-    assert transcript.utterance_id in harness.peer_runtime.utterances
-    assert harness.peer_runtime.get_source(transcript.utterance_id) == "Peer"
+    assert len(harness.peer_runtime.utterances) == 1
+    peer_bundle = next(iter(harness.peer_runtime.utterances.values()))
+    assert peer_bundle.final is not None
+    assert peer_bundle.final.text == transcript.text
+    assert harness.peer_runtime.get_source(peer_bundle.utterance_id) == "Peer"
 
 
 @pytest.mark.asyncio

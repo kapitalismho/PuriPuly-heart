@@ -747,7 +747,8 @@ class SelfTranslationChannelOwner:
             raise ValueError("Self translation owner received a non-Self child")
         self._admitted_requests.pop(child.utterance_id, None)
         self.runtime.translation_tasks.pop(child.utterance_id, None)
-        self.output_projection.record_child_terminal_conversation(child, outcome)
+        if not self.translation_turns.child_output_was_submitted(child.utterance_id):
+            self.output_projection.record_child_terminal_conversation(child, outcome)
         await self.output_projection.complete_self_target(child, outcome)
         dual_target = len(child.config_snapshot.value.self_target_languages) == 2
         await self.output_projection.complete_translation_parent_output(

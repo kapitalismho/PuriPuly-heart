@@ -301,21 +301,6 @@ class OverlayProcessManager:
             if callable(set_logging_mode):
                 set_logging_mode(requested)
 
-    def logging_mode_state(self) -> dict[str, object]:
-        diagnostics = self.diagnostics
-        return {
-            "requested": self.logging_mode,
-            "effective": (
-                diagnostics.effective_child_logging_mode
-                if diagnostics is not None
-                else None
-            ),
-            "status": (
-                diagnostics.logging_mode_update_status
-                if diagnostics is not None
-                else "not_connected"
-            ),
-        }
 
     def _set_shutdown_failure(self, cause: str) -> None:
         if self._shutdown_terminal_cause is None:

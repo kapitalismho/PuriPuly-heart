@@ -2,7 +2,6 @@
 
 import asyncio
 import inspect
-import logging
 import subprocess
 import sys
 import time
@@ -42,28 +41,6 @@ def _get_log_dir() -> Path:
 def _format_conversation_timestamp(origin_wall_clock_ms: int | None) -> str:
     timestamp_s = origin_wall_clock_ms / 1000.0 if origin_wall_clock_ms is not None else time.time()
     return datetime.fromtimestamp(timestamp_s).strftime("%H:%M:%S")
-
-
-class FletLogHandler(logging.Handler):
-    """Custom log handler that forwards logs to a LogsView."""
-
-    def __init__(self, logs_view: "LogsView"):
-        super().__init__()
-        self.logs_view = logs_view
-        self.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
-        )
-
-    def emit(self, record: logging.LogRecord) -> None:
-        try:
-            msg = self.format(record)
-            append_log_threadsafe = getattr(self.logs_view, "append_log_threadsafe", None)
-            if callable(append_log_threadsafe):
-                append_log_threadsafe(msg)
-            else:
-                self.logs_view.append_log(msg)
-        except Exception:
-            pass
 
 
 class LiveLogViewModel:
@@ -193,7 +170,6 @@ class LogsView(ft.Column):
 
         self.on_mode_change: Callable[[str], None] | None = None
 
-        self._handler: FletLogHandler | None = None
         self._title_text: ft.Text | None = None
         self._mode_button: ft.TextButton | None = None
         self._log_text: ft.Text | None = None
@@ -294,9 +270,6 @@ class LogsView(ft.Column):
 
     def bind_logs_intents(self, intents: LogsIntents) -> None:
         self.on_mode_change = intents.runtime_logging_mode_change
-
-    def attach_log_handler(self) -> None:
-        return
 
     def append_log(self, record: str):
         """Append a log entry with throttled updates."""

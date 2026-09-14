@@ -309,7 +309,9 @@ _SECRET_ASSIGNMENT_TEXT_RE: Final = re.compile(
 )
 _BEARER_SECRET_TEXT_RE: Final = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+\-/]{8,}")
 _OPENAI_STYLE_SECRET_TEXT_RE: Final = re.compile(r"\bsk-[A-Za-z0-9][A-Za-z0-9._-]{8,}\b")
-_URL_USERINFO_RE: Final = re.compile(r"(?i)\b(https?://)([^/\s:@]+):([^/\s@]+)@")
+_URL_USERINFO_RE: Final = re.compile(
+    r"(?i)\b([a-z][a-z0-9+.-]*://)([^/\s:@]+):([^/\s@]+)@"
+)
 CONVERSATION_TEXT_MAX_LENGTH: Final = 4096
 
 
@@ -896,6 +898,10 @@ def _redact_text_payload(text: str) -> tuple[str, bool]:
     redacted = _SECRET_ASSIGNMENT_TEXT_RE.sub(_redact_secret_assignment, redacted)
     redacted = _BEARER_SECRET_TEXT_RE.sub(f"Bearer {DIAGNOSTIC_REDACTION_MARKER}", redacted)
     redacted = _OPENAI_STYLE_SECRET_TEXT_RE.sub(DIAGNOSTIC_REDACTION_MARKER, redacted)
+    redacted = _URL_USERINFO_RE.sub(
+        lambda match: f"{match.group(1)}[redacted]@",
+        redacted,
+    )
     changed = redacted != text
     if changed:
         redacted = re.sub(r"\s+", " ", redacted).strip()
@@ -927,6 +933,7 @@ def _text_content_reasons(text: str) -> tuple[DiagnosticValidationReason, ...]:
         reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSAFE_TEXT_PAYLOAD)
     if not _is_safe_redaction_marker(text) and (
         _SENSITIVE_TOKEN_ASSIGNMENT_TEXT_RE.search(text)
+        or _URL_USERINFO_RE.search(text)
         or any(pattern.search(text) for pattern in _SECRET_VALUE_PATTERNS)
     ):
         reasons.append(DIAGNOSTIC_VALIDATION_REASON_SECRET_PATTERN)

@@ -236,6 +236,7 @@ from puripuly_heart.core.local_asr_provisioning import (
     LocalASRProvisioningSnapshot,
 )
 from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
+from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
 )
@@ -382,6 +383,40 @@ def _copy_provider_prompt_apply_fields(
             ),
         ),
         state=replace(target.state, managed_connection=next_managed),
+    )
+
+
+def _managed_gemma_lifecycle_label(event: DiagnosticEvent, key: str) -> str:
+    value = event.fields.get(key)
+    if not isinstance(value, str):
+        return "none"
+    normalized = "".join(
+        character if character.isalnum() or character in "._:-" else "_"
+        for character in value.strip()
+    )
+    return normalized[:128] or "none"
+
+
+def _emit_managed_gemma_lifecycle_diagnostic(
+    event: DiagnosticEvent,
+    *,
+    log_basic: Callable[..., object],
+    log_detailed: Callable[..., object],
+) -> None:
+    phase = _managed_gemma_lifecycle_label(event, "phase")
+    scope = _managed_gemma_lifecycle_label(event, "scope_name")
+    task = _managed_gemma_lifecycle_label(event, "task_name")
+    callback = _managed_gemma_lifecycle_label(event, "callback_name")
+    exception_class = _managed_gemma_lifecycle_label(event, "exception_class")
+    log_basic(
+        f"[ManagedGemma] lifecycle outcome=failed phase={phase} cause={exception_class}",
+        level=logging.ERROR,
+    )
+    log_detailed(
+        "[Detailed][ManagedGemma] lifecycle outcome=failed "
+        f"phase={phase} scope={scope} task={task} callback={callback} "
+        f"exception_class={exception_class}",
+        level=logging.ERROR,
     )
 
 
@@ -548,9 +583,10 @@ def compose_application_runtime(
             log_sink=lambda message, level: log_detailed(message, level=level),
         ),
         status_sink=managed_gemma_status,
-        lifecycle_diagnostic_sink=lambda _event: log_basic(
-            "[ManagedGemma] lifecycle outcome=failed cause=unclassified",
-            level=logging.ERROR,
+        lifecycle_diagnostic_sink=lambda event: _emit_managed_gemma_lifecycle_diagnostic(
+            event,
+            log_basic=log_basic,
+            log_detailed=log_detailed,
         ),
     )
 
@@ -1885,7 +1921,7 @@ def compose_application_runtime(
         previous_self_capture=lambda: pipeline.self_capture,
         component_sink=install_pipeline,
         peer_application=lambda: require_peer().owner,
-        configure_vrc_mic=lambda *, enabled: (require_vrc_mic_sync().configure(enabled=enabled)),
+        configure_vrc_mic=lambda *, enabled: require_vrc_mic_sync().configure(enabled=enabled),
         stt_failure_sink=log_error,
         cleanup_failure_sink=lambda message, exc: log_error(f"{message}: {exc}"),
         managed_gemma=managed_gemma,

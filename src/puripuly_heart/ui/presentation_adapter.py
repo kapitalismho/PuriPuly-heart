@@ -20,7 +20,6 @@ from puripuly_heart.app.ports.ui_models import (
 )
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.ui.event_bridge import (
-    AppConversationEventDestination,
     AppDashboardEventDestination,
     AppHistoryEventDestination,
     UIEventBridge,
@@ -103,7 +102,6 @@ class FletUiPresentationAdapter:
         event_queue: object,
         runtime_logging: object,
     ) -> UIEventBridgePort:
-        logs_view = getattr(self._app, "view_logs", None)
         return UIEventBridge(
             event_queue=event_queue,
             runtime_logging=runtime_logging,
@@ -112,9 +110,6 @@ class FletUiPresentationAdapter:
             ),
             history_destination=AppHistoryEventDestination(
                 getattr(self._app, "add_history_entry", None)
-            ),
-            conversation_destination=AppConversationEventDestination(
-                getattr(logs_view, "append_conversation_record", None)
             ),
             get_language_codes=getattr(self._app, "get_event_language_codes", None),
             is_translation_enabled=getattr(self._app, "is_event_translation_enabled", None),

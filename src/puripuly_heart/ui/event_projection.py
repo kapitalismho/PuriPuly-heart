@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Literal
 
 from puripuly_heart.domain.events import STTSessionState
 from puripuly_heart.domain.models import Transcript, Translation
 from puripuly_heart.ui.event_mapping import MappedEvent
-
-_FINAL_TRANSCRIPT_CACHE_LIMIT = 500
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,21 +53,6 @@ class HistoryProjection:
 
 
 @dataclass(frozen=True, slots=True)
-class ConversationProjection:
-    source: str
-    channel: str
-    source_text: str
-    translated_text: str
-    origin_wall_clock_ms: int | None = None
-    utterance_id: object | None = None
-    source_language: str | None = None
-    target_language: str | None = None
-    target_index: int | None = None
-    disposition: str = "translated"
-    turn_kind: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class TranslationAppliedDiagnostic:
     utterance_id: object | None
     channel: str | None
@@ -86,26 +68,18 @@ class EventProjectionBatch:
     transcript: DashboardTranscriptProjection | None = None
     translation: DashboardTranslationProjection | None = None
     history: tuple[HistoryProjection, ...] = ()
-    conversation: ConversationProjection | None = None
     translation_diagnostic: TranslationAppliedDiagnostic | None = None
     osc_history_language_code: str | None = None
 
 
 @dataclass(slots=True)
 class EventProjectionService:
-    final_transcript_cache_limit: int = _FINAL_TRANSCRIPT_CACHE_LIMIT
     _primary_first_partial_emitted: set[str] = field(default_factory=set)
-    _final_self_transcripts: OrderedDict[str, Transcript] = field(default_factory=OrderedDict)
     _closed: bool = False
-
-    @property
-    def final_self_transcripts(self) -> OrderedDict[str, Transcript]:
-        return self._final_self_transcripts
 
     def close(self) -> None:
         self._closed = True
         self._primary_first_partial_emitted.clear()
-        self._final_self_transcripts.clear()
 
     def project(
         self,
@@ -136,9 +110,8 @@ class EventProjectionService:
         is_final = mapped.transcript_kind == "final"
         utterance_key = str(transcript.utterance_id)
         if is_final:
-            self._primary_first_partial_emitted.discard(utterance_key)
             should_log = True
-            self._remember_final_self_transcript(transcript)
+            self._primary_first_partial_emitted.discard(utterance_key)
         else:
             should_log = utterance_key not in self._primary_first_partial_emitted
             if should_log:
@@ -177,11 +150,6 @@ class EventProjectionService:
         context: EventProjectionContext,
     ) -> EventProjectionBatch:
         source = mapped.source or "Mic"
-        conversation = (
-            None
-            if mapped.runtime_log_handled
-            else self._conversation_record_projection(translation, source=source)
-        )
         return EventProjectionBatch(
             translation=DashboardTranslationProjection(
                 text=translation.text,
@@ -209,7 +177,6 @@ class EventProjectionService:
                     language_code=context.target_language,
                 ),
             ),
-            conversation=conversation,
             translation_diagnostic=TranslationAppliedDiagnostic(
                 utterance_id=translation.utterance_id,
                 channel=translation.channel,
@@ -218,49 +185,6 @@ class EventProjectionService:
                 translation_target_language=translation.target_language,
                 text_len=len(translation.text),
             ),
-        )
-
-    def _remember_final_self_transcript(self, transcript: Transcript) -> None:
-        if transcript.channel != "self" or not transcript.is_final:
-            return
-        key = str(transcript.utterance_id)
-        self._final_self_transcripts[key] = transcript
-        self._final_self_transcripts.move_to_end(key)
-        while len(self._final_self_transcripts) > self.final_transcript_cache_limit:
-            self._final_self_transcripts.popitem(last=False)
-
-    def _source_text_for_translation(self, translation: Translation) -> str:
-        source_text = translation.source_text.strip()
-        if source_text:
-            return source_text
-        transcript = self._final_self_transcripts.get(str(translation.utterance_id))
-        if transcript is None:
-            return ""
-        return transcript.text.strip()
-
-    def _conversation_record_projection(
-        self,
-        translation: Translation,
-        *,
-        source: str,
-    ) -> ConversationProjection | None:
-        translated_text = translation.text.strip()
-        if not translated_text:
-            return None
-        source_text = self._source_text_for_translation(translation)
-        if not source_text:
-            return None
-        return ConversationProjection(
-            source=source,
-            channel=translation.channel,
-            source_text=source_text,
-            translated_text=translated_text,
-            origin_wall_clock_ms=translation.origin_wall_clock_ms,
-            utterance_id=translation.utterance_id,
-            source_language=translation.source_language,
-            target_language=translation.target_language,
-            disposition="translated",
-            turn_kind=translation.channel,
         )
 
 
@@ -288,7 +212,6 @@ def _short_visual_debug_token(value: object | None) -> str:
 
 
 __all__ = [
-    "ConversationProjection",
     "DashboardTranscriptProjection",
     "DashboardTranslationProjection",
     "EventProjectionBatch",

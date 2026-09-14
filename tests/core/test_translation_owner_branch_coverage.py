@@ -328,9 +328,9 @@ async def test_translation_drops_stale_partial_and_keeps_final_order() -> None:
         utterance_id=utterance_id, text="hello world!!!", is_final=True, created_at=2.0
     )
 
-    await harness.dispatch_transcript(partial, is_final=False, source="Mic")
-    await harness.dispatch_transcript(final, is_final=True, source="Mic")
-    await harness.dispatch_transcript(partial, is_final=False, source="Mic")
+    await harness.dispatch_self_transcript(partial, is_final=False, source="Mic")
+    await harness.dispatch_self_transcript(final, is_final=True, source="Mic")
+    await harness.dispatch_self_transcript(partial, is_final=False, source="Mic")
 
     bundle = harness.bundle_for(utterance_id)
     assert buffer.parts == ["hello world!!!"]
@@ -595,16 +595,14 @@ def test_prepare_llm_request_routes_context_logs_by_runtime_visibility() -> None
             f"context_chars={expected_context_chars}"
         )
 
-        assert basic_messages.count(
-            "[Translation] Context mode: channel=self mode=integrated"
-        ) == 1
+        assert basic_messages.count("[Translation] Context mode: channel=self mode=integrated") == 1
         assert not any("context_apply" in message for message in basic_messages)
         assert not any("입력" in message for message in basic_messages)
         assert not any("안녕" in message for message in basic_messages)
 
-        assert detailed_messages.count(
-            "[Translation] Context mode: channel=self mode=integrated"
-        ) == 1
+        assert (
+            detailed_messages.count("[Translation] Context mode: channel=self mode=integrated") == 1
+        )
         context_apply_messages = [
             message for message in detailed_messages if "context_apply_target" in message
         ]

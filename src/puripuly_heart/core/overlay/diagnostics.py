@@ -225,6 +225,7 @@ class OverlayDiagnosticsRecorder:
     _sequence: int = field(init=False, default=0)
     _started_at: float = field(init=False, default_factory=time.monotonic)
     _memory_dropped: Counter[str] = field(init=False, default_factory=Counter)
+    _maintenance_failures: Counter[str] = field(init=False, default_factory=Counter)
     _input_rejected: Counter[str] = field(init=False, default_factory=Counter)
     _dump_abandoned: int = field(init=False, default=0)
     _phase_native_cursor: int = field(init=False, default=0)
@@ -642,6 +643,7 @@ class OverlayDiagnosticsRecorder:
             ),
             "memory_dropped": dict(sorted(self._memory_dropped.items())),
             "input_rejected": dict(sorted(self._input_rejected.items())),
+            "maintenance_failures": dict(sorted(self._maintenance_failures.items())),
             "dump_abandoned": self._dump_abandoned,
         }
 
@@ -736,10 +738,7 @@ class OverlayDiagnosticsRecorder:
             self.diagnostics_dir
             / f"overlay-diagnostics-{outcome}-{timestamp}-{self.overlay_instance_id}.jsonl"
         )
-        writer_identity = hashlib.sha256(
-            self.overlay_instance_id.encode("utf-8", errors="replace")
-        ).hexdigest()[:16]
-        temporary = self.diagnostics_dir / f".overlay-diagnostics-{writer_identity}.tmp"
+        temporary = self._temporary_path()
         encoded_events: list[bytes] = []
         truncated_records = 0
         for event in events:
@@ -872,10 +871,15 @@ class OverlayDiagnosticsRecorder:
                     retained_bytes += size
                 else:
                     path.unlink(missing_ok=True)
-            for temporary in self.diagnostics_dir.glob(".overlay-diagnostics-*.tmp"):
-                temporary.unlink(missing_ok=True)
+            self._temporary_path().unlink(missing_ok=True)
         except OSError:
-            self.note_input_rejected("artifact_retention_cleanup_failed")
+            self._maintenance_failures["artifact_retention_cleanup_failed"] += 1
+
+    def _temporary_path(self) -> Path:
+        writer_identity = hashlib.sha256(
+            self.overlay_instance_id.encode("utf-8", errors="replace")
+        ).hexdigest()[:16]
+        return self.diagnostics_dir / f".overlay-diagnostics-{writer_identity}.tmp"
 
     @staticmethod
     def _write_dump_file(temporary: Path, path: Path, content: bytes) -> None:

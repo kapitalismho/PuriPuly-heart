@@ -42,6 +42,7 @@ _DELIVERY_RECEIPT_LIMIT = 128
 _REVERSE_CONTROL_TYPES = {
     "runtime_error",
     "overlay_ready",
+    "desktop_first_visible",
     "shutdown_ack",
     "window_bounds_changed",
     "interaction_mode_changed",

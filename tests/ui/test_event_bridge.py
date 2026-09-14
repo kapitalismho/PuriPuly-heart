@@ -6,7 +6,6 @@ import io
 import json
 import logging
 from types import SimpleNamespace
-from unittest.mock import PropertyMock, patch
 from uuid import uuid4
 
 import flet as ft
@@ -20,12 +19,15 @@ from puripuly_heart.core.managed_openrouter_release import (
 )
 
 from puripuly_heart.core import messages
-from puripuly_heart.core.runtime_logging import SessionLoggingMode, SessionRuntimeLoggingService
+from puripuly_heart.core.runtime_logging import (
+    RealtimeLogHandler,
+    SessionLoggingMode,
+    SessionRuntimeLoggingService,
+)
 from puripuly_heart.domain.events import STTSessionState, UIEvent, UIEventType
 from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 from puripuly_heart.ui import event_dispatch as event_dispatch_module
 from puripuly_heart.ui.event_bridge import (
-    AppConversationEventDestination,
     AppDashboardEventDestination,
     AppHistoryEventDestination,
     UIEventBridge,
@@ -33,11 +35,7 @@ from puripuly_heart.ui.event_bridge import (
 from puripuly_heart.ui.event_mapping import map_ui_event
 from puripuly_heart.ui.event_projection import EventProjectionContext, EventProjectionService
 from puripuly_heart.ui.i18n import get_locale, set_locale, t
-from puripuly_heart.ui.views import logs as logs_view_module
-from puripuly_heart.ui.views.logs import FletLogHandler, LogsView
 from tests.helpers.ui_application import compose_test_ui_application_boundary
-
-assert logs_view_module.LogsView is LogsView
 
 
 class DummyDashboard:
@@ -139,43 +137,9 @@ class FailingTranslationDashboard(DummyDashboard):
 class DummyLogs:
     def __init__(self) -> None:
         self.lines: list[str] = []
-        self.conversation_records: list[dict[str, object]] = []
 
     def append_log(self, line: str) -> None:
         self.lines.append(line)
-
-    def append_conversation_record(
-        self,
-        *,
-        source: str,
-        channel: str,
-        source_text: str,
-        translated_text: str,
-        origin_wall_clock_ms: int | None = None,
-    ) -> None:
-        self.conversation_records.append(
-            {
-                "source": source,
-                "channel": channel,
-                "source_text": source_text,
-                "translated_text": translated_text,
-                "origin_wall_clock_ms": origin_wall_clock_ms,
-            }
-        )
-
-
-class FailingConversationLogs(DummyLogs):
-    def append_conversation_record(
-        self,
-        *,
-        source: str,
-        channel: str,
-        source_text: str,
-        translated_text: str,
-        origin_wall_clock_ms: int | None = None,
-    ) -> None:
-        _ = (source, channel, source_text, translated_text, origin_wall_clock_ms)
-        raise RuntimeError("conversation append failed")
 
 
 class DummyApp:
@@ -290,12 +254,6 @@ def make_bridge(app: object, **kwargs: object) -> UIEventBridge:
             "history_destination",
             AppHistoryEventDestination(getattr(app, "add_history_entry", None)),
         ),
-        conversation_destination=kwargs.pop(
-            "conversation_destination",
-            AppConversationEventDestination(
-                getattr(getattr(app, "view_logs", None), "append_conversation_record", None)
-            ),
-        ),
         error_destination=kwargs.pop("error_destination", None),
         runtime_logging=kwargs.pop("runtime_logging", None),
         get_language_codes=kwargs.pop(
@@ -337,11 +295,7 @@ def test_event_bridge_constructor_requires_explicit_dispatch_ports() -> None:
     signature = inspect.signature(UIEventBridge)
 
     assert "app" not in signature.parameters
-    for name in (
-        "dashboard_destination",
-        "history_destination",
-        "conversation_destination",
-    ):
+    for name in ("dashboard_destination", "history_destination"):
         assert signature.parameters[name].default is inspect.Parameter.empty
 
 
@@ -412,7 +366,7 @@ def test_event_mapping_is_testable_without_view_mutation() -> None:
 
 
 def test_event_projection_builds_dtos_without_runtime_subscription() -> None:
-    service = EventProjectionService(final_transcript_cache_limit=2)
+    service = EventProjectionService()
     utterance_id = uuid4()
     context = EventProjectionContext(
         source_language="ko",
@@ -455,8 +409,6 @@ def test_event_projection_builds_dtos_without_runtime_subscription() -> None:
     assert transcript_projection.history[0].language_code == "ko"
     assert translation_projection.translation is not None
     assert translation_projection.translation.channel == "self"
-    assert translation_projection.conversation is not None
-    assert translation_projection.conversation.source_text == "source"
     assert translation_projection.translation_diagnostic is not None
     assert translation_projection.translation_diagnostic.text_len == len("translated")
 
@@ -499,30 +451,6 @@ class RecordingHistoryDestination:
                 "text": text,
                 "translated": translated,
                 "language_code": language_code,
-            }
-        )
-
-
-class RecordingConversationDestination:
-    def __init__(self) -> None:
-        self.records: list[dict[str, object]] = []
-
-    def append_record(
-        self,
-        *,
-        source: str,
-        channel: str,
-        source_text: str,
-        translated_text: str,
-        origin_wall_clock_ms: int | None = None,
-    ) -> None:
-        self.records.append(
-            {
-                "source": source,
-                "channel": channel,
-                "source_text": source_text,
-                "translated_text": translated_text,
-                "origin_wall_clock_ms": origin_wall_clock_ms,
             }
         )
 
@@ -649,337 +577,6 @@ async def test_event_bridge_routes_translation_and_osc_history_by_language_mode(
 
 
 @pytest.mark.asyncio
-async def test_event_bridge_appends_self_conversation_record_from_translation_source_text() -> None:
-    app = DummyApp()
-    bridge = make_bridge(app, event_queue=asyncio.Queue())
-    utterance_id = uuid4()
-
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=utterance_id,
-                text="고마워",
-                source_text="ありがとう",
-                channel="self",
-                origin_wall_clock_ms=1712345678901,
-            ),
-            source="Mic",
-        )
-    )
-
-    assert app.view_logs.conversation_records == [
-        {
-            "source": "Mic",
-            "channel": "self",
-            "source_text": "ありがとう",
-            "translated_text": "고마워",
-            "origin_wall_clock_ms": 1712345678901,
-        }
-    ]
-
-
-@pytest.mark.asyncio
-async def test_event_bridge_uses_cached_final_self_transcript_as_source_fallback() -> None:
-    app = DummyApp()
-    bridge = make_bridge(app, event_queue=asyncio.Queue())
-    utterance_id = uuid4()
-
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSCRIPT_FINAL,
-            payload=Transcript(utterance_id=utterance_id, text="あああ", is_final=True),
-            source="Mic",
-        )
-    )
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(utterance_id=utterance_id, text="아아아", channel="self"),
-            source="Mic",
-        )
-    )
-
-    assert app.view_logs.conversation_records[-1]["source_text"] == "あああ"
-    assert app.view_logs.conversation_records[-1]["translated_text"] == "아아아"
-
-
-@pytest.mark.asyncio
-async def test_event_bridge_translation_source_text_takes_precedence_over_cached_transcript() -> (
-    None
-):
-    app = DummyApp()
-    bridge = make_bridge(app, event_queue=asyncio.Queue())
-    utterance_id = uuid4()
-
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSCRIPT_FINAL,
-            payload=Transcript(utterance_id=utterance_id, text="cached source", is_final=True),
-            source="Mic",
-        )
-    )
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=utterance_id,
-                text="translated",
-                source_text="explicit source",
-                channel="self",
-            ),
-            source="Mic",
-        )
-    )
-
-    assert app.view_logs.conversation_records[-1]["source_text"] == "explicit source"
-
-
-@pytest.mark.asyncio
-async def test_event_bridge_conversation_append_failure_does_not_skip_translation_history() -> None:
-    app = DummyApp()
-    app.view_logs = FailingConversationLogs()
-    bridge = make_bridge(app, event_queue=asyncio.Queue())
-    utterance_id = uuid4()
-
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=utterance_id,
-                text="translated",
-                source_text="source",
-                channel="self",
-            ),
-            source="Mic",
-        )
-    )
-
-    assert app.view_dashboard.translation_calls == [("translated", "en")]
-    assert app.history == [("Mic", "translated", True, "en")]
-
-
-@pytest.mark.asyncio
-async def test_event_bridge_missing_logs_sink_does_not_skip_translation_history() -> None:
-    app_without_logs = DummyApp()
-    delattr(app_without_logs, "view_logs")
-    bridge_without_logs = make_bridge(app_without_logs, event_queue=asyncio.Queue())
-
-    await bridge_without_logs._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=uuid4(),
-                text="translated without logs view",
-                source_text="source",
-                channel="self",
-            ),
-            source="Mic",
-        )
-    )
-
-    app_without_append = DummyApp()
-    app_without_append.view_logs = SimpleNamespace(lines=[])
-    bridge_without_append = make_bridge(app_without_append, event_queue=asyncio.Queue())
-
-    await bridge_without_append._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=uuid4(),
-                text="translated without append method",
-                source_text="source",
-                channel="self",
-            ),
-            source="Mic",
-        )
-    )
-
-    assert app_without_logs.history == [("Mic", "translated without logs view", True, "en")]
-    assert app_without_append.history == [("Mic", "translated without append method", True, "en")]
-
-
-@pytest.mark.asyncio
-async def test_event_bridge_skips_invalid_incomplete_and_partial_conversation_records() -> None:
-    app = DummyApp()
-    bridge = make_bridge(app, event_queue=asyncio.Queue())
-    partial_id = uuid4()
-    peer_id = uuid4()
-
-    await bridge._handle_event(UIEvent(type=UIEventType.TRANSLATION_DONE, payload="bad"))
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSCRIPT_PARTIAL,
-            payload=Transcript(utterance_id=partial_id, text="partial", is_final=False),
-            source="Mic",
-        )
-    )
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=partial_id, text="partial translation", channel="self"
-            ),
-            source="Mic",
-        )
-    )
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=uuid4(),
-                text="translated without source",
-                channel="self",
-            ),
-            source="Mic",
-        )
-    )
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=uuid4(),
-                text="   ",
-                source_text="has source",
-                channel="self",
-            ),
-            source="Mic",
-        )
-    )
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSCRIPT_FINAL,
-            payload=Transcript(
-                utterance_id=peer_id,
-                text="peer final",
-                is_final=True,
-                channel="peer",
-            ),
-            source="Peer Mic",
-        )
-    )
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=peer_id,
-                text="peer translation",
-                channel="self",
-            ),
-            source="Mic",
-        )
-    )
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=uuid4(),
-                text="peer translation",
-                source_text="peer source",
-                channel="peer",
-            ),
-            source="Peer Mic",
-        )
-    )
-
-    assert len(app.view_logs.conversation_records) == 1
-    record = app.view_logs.conversation_records[0]
-    assert record["source"] == "Peer Mic"
-    assert record["channel"] == "peer"
-    assert record["source_text"] == "peer source"
-    assert record["translated_text"] == "peer translation"
-
-
-@pytest.mark.asyncio
-async def test_event_bridge_final_self_transcript_cache_is_bounded(monkeypatch) -> None:
-    app = DummyApp()
-    bridge = make_bridge(app, event_queue=asyncio.Queue())
-    bridge.projection_service.final_transcript_cache_limit = 2
-    first_id = uuid4()
-    second_id = uuid4()
-    third_id = uuid4()
-
-    for utterance_id, text in ((first_id, "first"), (second_id, "second"), (third_id, "third")):
-        await bridge._handle_event(
-            UIEvent(
-                type=UIEventType.TRANSCRIPT_FINAL,
-                payload=Transcript(utterance_id=utterance_id, text=text, is_final=True),
-                source="Mic",
-            )
-        )
-
-    assert list(bridge._final_self_transcripts) == [str(second_id), str(third_id)]
-
-
-@pytest.mark.asyncio
-async def test_event_bridge_close_clears_conversation_cache_and_rejects_late_records() -> None:
-    app = DummyApp()
-    bridge = make_bridge(app, event_queue=asyncio.Queue())
-    utterance_id = uuid4()
-
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSCRIPT_FINAL,
-            payload=Transcript(utterance_id=utterance_id, text="cached secret", is_final=True),
-            source="Mic",
-        )
-    )
-    assert list(bridge._final_self_transcripts) == [str(utterance_id)]
-
-    bridge.close()
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=utterance_id,
-                text="late translation",
-                source_text="late secret source",
-                channel="self",
-            ),
-            source="Mic",
-        )
-    )
-
-    assert bridge._final_self_transcripts == {}
-    assert app.view_logs.conversation_records == []
-
-
-@pytest.mark.asyncio
-async def test_event_bridge_appends_to_real_logs_view_conversation_text() -> None:
-    app = DummyApp()
-    app.view_logs = LogsView()
-    bridge = make_bridge(app, event_queue=asyncio.Queue())
-    utterance_id = uuid4()
-
-    with (
-        patch.object(type(app.view_logs), "page", new_callable=PropertyMock, return_value=None),
-        patch.object(
-            logs_view_module,
-            "_format_conversation_timestamp",
-            return_value="18:06:12",
-        ),
-    ):
-        await bridge._handle_event(
-            UIEvent(
-                type=UIEventType.TRANSLATION_DONE,
-                payload=Translation(
-                    utterance_id=utterance_id,
-                    text="고마워",
-                    source_text="ありがとう",
-                    channel="self",
-                    origin_wall_clock_ms=1712345678901,
-                ),
-                source="Mic",
-            )
-        )
-        app.view_logs._on_conversation_button_click(SimpleNamespace())
-
-    assert app.view_logs._log_text.value == (
-        "[18:06:12] " f"{logs_view_module.source_label('Mic')}\n" "ありがとう\n" "고마워"
-    )
-
-
-@pytest.mark.asyncio
 async def test_event_bridge_logs_self_dashboard_translation_applied_detail_only() -> None:
     app = DummyApp()
     runtime_logging = RuntimeLoggingCapture()
@@ -1018,17 +615,15 @@ async def test_event_bridge_logs_self_dashboard_translation_applied_detail_only(
 
 
 @pytest.mark.asyncio
-async def test_event_bridge_accepts_separable_dashboard_history_conversation_destinations() -> None:
+async def test_event_bridge_accepts_separable_dashboard_and_history_destinations() -> None:
     app = DummyApp()
     dashboard = RecordingDashboardDestination()
     history = RecordingHistoryDestination()
-    conversation = RecordingConversationDestination()
     bridge = make_bridge(
         app,
         event_queue=asyncio.Queue(),
         dashboard_destination=dashboard,
         history_destination=history,
-        conversation_destination=conversation,
     )
     utterance_id = uuid4()
 
@@ -1073,18 +668,8 @@ async def test_event_bridge_accepts_separable_dashboard_history_conversation_des
             "language_code": "en",
         },
     ]
-    assert conversation.records == [
-        {
-            "source": "Mic",
-            "channel": "self",
-            "source_text": "source text",
-            "translated_text": "translated text",
-            "origin_wall_clock_ms": 1712345678901,
-        }
-    ]
     assert app.view_dashboard.display_calls == []
     assert app.history == []
-    assert app.view_logs.conversation_records == []
 
 
 @pytest.mark.asyncio
@@ -1680,7 +1265,7 @@ async def test_event_bridge_handles_error_and_soniox_shutdown_suppression(tmp_pa
             file_handler=file_handler,
             log_file=log_file,
         ),
-        ui_handler_factory=FletLogHandler,
+        ui_handler_factory=RealtimeLogHandler,
     )
     runtime_logging.attach_realtime_sink(app.view_logs)
     bridge = make_bridge(
@@ -1734,7 +1319,7 @@ async def test_event_bridge_skips_duplicate_runtime_log_for_already_logged_error
             file_handler=file_handler,
             log_file=log_file,
         ),
-        ui_handler_factory=FletLogHandler,
+        ui_handler_factory=RealtimeLogHandler,
     )
     runtime_logging.attach_realtime_sink(app.view_logs)
     bridge = make_bridge(

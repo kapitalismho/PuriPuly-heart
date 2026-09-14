@@ -24,6 +24,7 @@ _REVERSE_LIFECYCLE_CONTROL_TYPES = frozenset(
         "runtime_error",
         "shutdown_complete",
         "owner_status",
+        "desktop_first_visible",
         "logging_mode_status",
     }
 )

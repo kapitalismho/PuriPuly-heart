@@ -472,6 +472,13 @@ class PeerTranslationChannelOwner:
         if isinstance(event, STTFinalEvent):
             if event.channel != "peer":
                 raise ValueError("Peer translation owner received a non-Peer final event")
+            configuration = self.translation_runtime_config_snapshot().value
+            self._emit_basic(
+                "[Pipeline] turn_result channel=peer utterance_id=%s "
+                "origin=peer recognition=completed source_language=%s",
+                event.transcript.utterance_id,
+                self._source_language_for(self.runtime, configuration),
+            )
             await self._ensure_translation(
                 event.transcript,
                 turn_kind="peer",
@@ -488,75 +495,6 @@ class PeerTranslationChannelOwner:
     def _require_ingress(self) -> None:
         if not self._accepting_events:
             raise RuntimeError("Peer translation ingress is closed")
-
-    async def _handle_transcript(
-        self, transcript: Transcript, *, is_final: bool, source: str | None
-    ) -> None:
-        if transcript.channel != "peer":
-            raise ValueError("Peer translation owner received a non-Peer transcript")
-        bundle = self.runtime.get_or_create_bundle(transcript.utterance_id)
-        bundle.with_transcript(transcript)
-        self._remember_source(transcript.utterance_id, source, channel="peer")
-        await self.output_projection.publish_ui(
-            TranslationUiMessage(
-                event_type=(
-                    UIEventType.TRANSCRIPT_FINAL if is_final else UIEventType.TRANSCRIPT_PARTIAL
-                ),
-                utterance_id=transcript.utterance_id,
-                payload=transcript,
-                source=source,
-            )
-        )
-        if not is_final:
-            return
-        configuration = self.translation_runtime_config_snapshot().value
-        self._emit_basic(
-            "[Pipeline] turn_result channel=peer utterance_id=%s "
-            "origin=peer recognition=completed source_language=%s",
-            transcript.utterance_id,
-            self._source_language_for(self.runtime, configuration),
-        )
-        deny_peer_chatbox_attempt = self.output_projection.chatbox_is_denied("peer")
-        peer_terminal_work_will_follow = self._peer_terminal_work_will_follow(self.runtime)
-        if self._overlay_translation_will_follow(self.runtime):
-            await self._ensure_translation(transcript, turn_kind="peer")
-        elif self.output_projection.has_overlay_destination:
-            configuration = self.translation_runtime_config_snapshot().value
-            finalized = await self.output_projection.project_peer_source_only(
-                transcript=transcript,
-                source_language=self._source_language_for(
-                    self.runtime,
-                    configuration,
-                ),
-                target_language=self._target_language_for(
-                    self.runtime,
-                    configuration,
-                ),
-                close_is_final=True,
-                finalize_latency=not peer_terminal_work_will_follow,
-            )
-            if finalized:
-                self._clear_runtime_latency_bookkeeping(
-                    channel="peer",
-                    utterance_id=transcript.utterance_id,
-                )
-            if deny_peer_chatbox_attempt:
-                await self.output_projection.publish_peer_chatbox_denial(transcript.utterance_id)
-                self._clear_runtime_latency_bookkeeping(
-                    channel="peer",
-                    utterance_id=transcript.utterance_id,
-                )
-        elif deny_peer_chatbox_attempt:
-            await self.output_projection.publish_peer_chatbox_denial(transcript.utterance_id)
-            self._clear_runtime_latency_bookkeeping(
-                channel="peer",
-                utterance_id=transcript.utterance_id,
-            )
-        elif not peer_terminal_work_will_follow:
-            self._finalize_latency_timeline(
-                channel="peer",
-                utterance_id=transcript.utterance_id,
-            )
 
     async def _handle_peer_final_transcript(
         self,
@@ -699,12 +637,18 @@ class PeerTranslationChannelOwner:
             raise ValueError("Peer translation owner received a non-Peer child")
         runtime = self.runtime
         runtime.translation_tasks.pop(child.utterance_id, None)
-        self.output_projection.record_child_terminal_conversation(child, outcome)
-        if outcome in {
-            "source_only",
-            "failed",
-            "cancelled",
-        } and not self.translation_turns.child_output_was_submitted(child.utterance_id):
+        output_submitted = self.translation_turns.child_output_was_submitted(child.utterance_id)
+        if not output_submitted:
+            self.output_projection.record_child_terminal_conversation(child, outcome)
+        if (
+            outcome
+            in {
+                "source_only",
+                "failed",
+                "cancelled",
+            }
+            and not output_submitted
+        ):
             configuration = child.config_snapshot.value
             await self.output_projection.project_peer_source_only(
                 transcript=child.transcript,

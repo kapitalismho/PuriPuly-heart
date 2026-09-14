@@ -358,22 +358,8 @@ class TranslationOwnersTestHarness:
             return
         await self._peer_owner.handle_stt_event_loop_exception(exc, channel="peer")
 
-    async def dispatch_transcript(self, *args: object, **kwargs: object) -> None:
-        transcript = args[0] if args else kwargs.get("transcript")
-        if (
-            isinstance(transcript, Transcript)
-            and transcript.channel == "peer"
-            and transcript.is_final
-        ):
-            transcript = self.admit_peer_transcript_for_test(transcript)
-            if args:
-                args = (transcript, *args[1:])
-            else:
-                kwargs["transcript"] = transcript
-        if getattr(transcript, "channel", "self") == "self":
-            await self._self_owner._handle_transcript(*args, **kwargs)
-            return
-        await self._peer_owner._handle_transcript(*args, **kwargs)
+    async def dispatch_self_transcript(self, *args: object, **kwargs: object) -> None:
+        await self._self_owner._handle_transcript(*args, **kwargs)
 
     async def ensure_translation(self, *args: object, **kwargs: object) -> None:
         transcript = args[0] if args else kwargs.get("transcript")

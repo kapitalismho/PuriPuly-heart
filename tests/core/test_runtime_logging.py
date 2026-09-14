@@ -680,6 +680,42 @@ def test_emit_persisted_preserves_queued_record_order_before_direct_write(tmp_pa
         sinks.close()
 
 
+def test_technical_redactor_removes_url_userinfo_from_arbitrary_logger_names() -> None:
+    stream = io.StringIO()
+    stream_handler = logging.StreamHandler(stream)
+    stream_handler.setFormatter(logging.Formatter("%(message)s"))
+    root_logger = logging.getLogger(f"test.runtime_logging.url-userinfo.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    root_logger.setLevel(logging.INFO)
+    session_logger = logging.getLogger(f"{root_logger.name}.session")
+    session_logger.handlers.clear()
+    session_logger.propagate = False
+    runtime_logging = SessionRuntimeLoggingService(
+        root_logger=root_logger,
+        session_logger=session_logger,
+        sinks=_SharedSinkBundle(
+            stream_handler=stream_handler,
+            file_handler=logging.NullHandler(),
+            log_file="runtime.log",
+        ),
+    )
+    third_party_logger = logging.getLogger(f"{root_logger.name}.websocket-client")
+    third_party_logger.handlers.clear()
+    third_party_logger.propagate = True
+    third_party_logger.setLevel(logging.INFO)
+
+    try:
+        third_party_logger.error("connection failed wss://alice:super-secret@example.test/socket")
+
+        rendered = stream.getvalue()
+        assert "connection failed" in rendered
+        assert "alice:super-secret" not in rendered
+        assert "wss://[redacted]@example.test/socket" in rendered
+    finally:
+        runtime_logging.close()
+
+
 def test_session_runtime_logging_redacts_unsafe_legacy_text_before_live_and_persisted_sinks(
     tmp_path,
 ) -> None:

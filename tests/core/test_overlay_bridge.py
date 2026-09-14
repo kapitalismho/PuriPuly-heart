@@ -747,6 +747,35 @@ async def test_overlay_bridge_desktop_initial_control_replay_after_snapshot_and_
 
 
 @pytest.mark.asyncio
+async def test_overlay_bridge_keeps_desktop_connection_after_first_visible() -> None:
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        desktop_runtime_controls_enabled=True,
+        initial_snapshot=OverlayPresentationSnapshot(
+            revision=0,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[],
+        ),
+    )
+    await bridge.start()
+
+    try:
+        async with connect(bridge.url) as ws:
+            await ws.send(json.dumps({"type": "auth", "session_token": "expected-token"}))
+            await asyncio.wait_for(ws.recv(), timeout=0.5)
+            await ws.send(json.dumps({"type": "desktop_first_visible"}))
+            first_visible = await asyncio.wait_for(bridge.messages.get(), timeout=0.5)
+            await ws.send(json.dumps({"type": "overlay_ready"}))
+            ready = await asyncio.wait_for(bridge.messages.get(), timeout=0.5)
+    finally:
+        await bridge.stop()
+
+    assert first_visible == {"type": "desktop_first_visible"}
+    assert ready == {"type": "overlay_ready"}
+
+
+
+@pytest.mark.asyncio
 async def test_overlay_bridge_desktop_runtime_control_is_target_gated_from_steamvr_path() -> None:
     bridge = OverlayBridge(
         session_token="expected-token",

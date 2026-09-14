@@ -2308,7 +2308,7 @@ class TranslationOutputProjectionOwner:
         child: TranslationTurnChild,
         outcome: TranslationTurnOutcome,
     ) -> None:
-        if outcome != "cancelled":
+        if outcome not in {"source_only", "failed", "cancelled"}:
             return
         self._record_conversation(
             utterance_id=child.parent_utterance_id,
@@ -2320,7 +2320,7 @@ class TranslationOutputProjectionOwner:
             source=child.source,
             turn_kind=child.turn_kind,
             target_index=None,
-            disposition="cancelled",
+            disposition=outcome,
             turn_generation=child.turn_generation,
             turn_order=child.turn_order,
             publication_generation=child.transcript.publication_generation,

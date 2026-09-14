@@ -31,12 +31,13 @@ use crate::presentation::{
     PresentationCauseKind, PresentationCauses, PresentationCorrelation, PresentationDiagnostics,
     ReadinessCancellation, ReadinessOutcome,
 };
+#[cfg(test)]
+use crate::renderer::StyleBucketSourceCount;
 use crate::renderer::{
     CaptionBlock, CaptionBlockVariant, CaptionChannel, CaptionDebugOverlay, CaptionLayoutResult,
-    CaptionPresentation, CaptionRenderer, RenderedFrame,
+    CaptionPresentation, CaptionRenderer, FontLanguageBucket, FontSource, RenderDiagnostics,
+    RenderedFrame,
 };
-#[cfg(test)]
-use crate::renderer::{RenderDiagnostics, StyleBucketSourceCount};
 use crate::retry_episode::{
     FreshRetryChannel, FreshRetryPolicy as NativeFreshRetryPolicy,
     FreshSchedule as NativeFreshSchedule, RetryEpisodes, RetryIntent,
@@ -201,6 +202,45 @@ impl ReadinessStatusContext {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RendererDegradationSummary {
+    font_warmup_failures: u32,
+    bundled_font_fallback_lines: u32,
+    style_resolution_fallback_lines: u32,
+    heuristic_layout_fallbacks: u32,
+}
+
+impl RendererDegradationSummary {
+    fn from_diagnostics(diagnostics: &RenderDiagnostics) -> Option<Self> {
+        let bundled_font_fallback_lines = diagnostics
+            .style_bucket_source_counts
+            .iter()
+            .filter(|count| {
+                count.bucket != FontLanguageBucket::General
+                    && count.source == FontSource::SystemFont
+            })
+            .map(|count| count.count)
+            .sum();
+        let style_resolution_fallback_lines = diagnostics
+            .style_bucket_source_counts
+            .iter()
+            .filter(|count| count.source == FontSource::SystemFallbackSentinel)
+            .map(|count| count.count)
+            .sum();
+        let summary = Self {
+            font_warmup_failures: diagnostics.font_warmup_failures,
+            bundled_font_fallback_lines,
+            style_resolution_fallback_lines,
+            heuristic_layout_fallbacks: diagnostics.heuristic_layout_fallback_count,
+        };
+        (summary.font_warmup_failures > 0
+            || summary.bundled_font_fallback_lines > 0
+            || summary.style_resolution_fallback_lines > 0
+            || summary.heuristic_layout_fallbacks > 0)
+            .then_some(summary)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct PresentationRuntime {
     ready: bool,
@@ -236,6 +276,7 @@ pub struct PresentationRuntime {
     readiness_status_context: ReadinessStatusContext,
     logging_mode: OverlayLoggingMode,
     logging_mode_revision: u64,
+    last_renderer_degradation: Option<RendererDegradationSummary>,
 }
 
 #[derive(Debug, Clone)]
@@ -416,6 +457,7 @@ impl PresentationRuntime {
             handoff_experiment: HandoffExperiment::Off,
             retained_frame: None,
             readiness_status_context: ReadinessStatusContext::default(),
+            last_renderer_degradation: None,
             logging_mode: OverlayLoggingMode::Basic,
             logging_mode_revision: 0,
         };
@@ -681,6 +723,31 @@ impl PresentationRuntime {
             });
         }
         changed
+    }
+
+    async fn emit_renderer_degradation_if_changed(
+        &mut self,
+        logger: &OverlayLogger,
+        diagnostics: &RenderDiagnostics,
+    ) -> Result<(), RuntimeFailure> {
+        let current = RendererDegradationSummary::from_diagnostics(diagnostics);
+        if current == self.last_renderer_degradation {
+            return Ok(());
+        }
+        self.last_renderer_degradation = current;
+        let Some(summary) = current else {
+            return Ok(());
+        };
+        logger
+            .warn(format!(
+                "renderer_degradation font_warmup_failures={} bundled_font_fallback_lines={} style_resolution_fallback_lines={} heuristic_layout_fallbacks={} scope=changed physical_hmd_visibility=not_observable",
+                summary.font_warmup_failures,
+                summary.bundled_font_fallback_lines,
+                summary.style_resolution_fallback_lines,
+                summary.heuristic_layout_fallbacks,
+            ))
+            .await
+            .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
     }
 
     fn runtime_logging_mode_would_change(
@@ -1135,6 +1202,10 @@ impl PresentationRuntime {
                 }
             }
         };
+        if fresh_render {
+            self.emit_renderer_degradation_if_changed(logger, frame.diagnostics())
+                .await?;
+        }
         let cpu_render_us = duration_us(render_started.elapsed());
         let render_duration_us =
             (detailed_logging && fresh_render).then_some(u128::from(cpu_render_us));
@@ -4711,6 +4782,20 @@ mod tests {
             .await
             .unwrap();
         }
+
+        async fn wait_for_text_occurrences(&self, needle: &str, minimum: usize) {
+            tokio::time::timeout(Duration::from_millis(100), async {
+                while String::from_utf8_lossy(&self.contents())
+                    .matches(needle)
+                    .count()
+                    < minimum
+                {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+        }
     }
 
     impl Write for ControlledSink {
@@ -5672,6 +5757,66 @@ mod tests {
         assert!(!runtime.redraw_requested());
         assert!(!runtime.apply_runtime_logging_mode(&logger, OverlayLoggingMode::Detailed, 1));
         assert!(!logger.is_detailed());
+    }
+
+    #[tokio::test]
+    async fn renderer_degradation_warning_is_bounded_to_changed_failure_episode() {
+        let stdout = ControlledSink::new(ControlledSinkMode::Success);
+        let logger = OverlayLogger::from_streams(
+            Box::new(stdout.clone()),
+            Box::new(ControlledSink::new(ControlledSinkMode::Success)),
+            OverlayLoggingMode::Basic,
+        );
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
+        let degraded = RenderDiagnostics {
+            font_warmup_failures: 1,
+            heuristic_layout_fallback_count: 1,
+            style_bucket_source_counts: vec![
+                StyleBucketSourceCount {
+                    bucket: FontLanguageBucket::CjkKo,
+                    source: FontSource::SystemFont,
+                    count: 2,
+                },
+                StyleBucketSourceCount {
+                    bucket: FontLanguageBucket::General,
+                    source: FontSource::SystemFallbackSentinel,
+                    count: 1,
+                },
+            ],
+            ..RenderDiagnostics::default()
+        };
+
+        runtime
+            .emit_renderer_degradation_if_changed(&logger, &degraded)
+            .await
+            .unwrap();
+        stdout.wait_for_text("renderer_degradation").await;
+        let first = String::from_utf8(stdout.contents()).unwrap();
+        assert!(first.contains("[overlay][WARN] renderer_degradation"));
+        assert!(first.contains("font_warmup_failures=1"));
+        assert!(first.contains("bundled_font_fallback_lines=2"));
+        assert!(first.contains("style_resolution_fallback_lines=1"));
+        assert!(first.contains("heuristic_layout_fallbacks=1"));
+
+        runtime
+            .emit_renderer_degradation_if_changed(&logger, &degraded)
+            .await
+            .unwrap();
+        assert_eq!(stdout.contents().len(), first.len());
+
+        runtime
+            .emit_renderer_degradation_if_changed(&logger, &RenderDiagnostics::default())
+            .await
+            .unwrap();
+        runtime
+            .emit_renderer_degradation_if_changed(&logger, &degraded)
+            .await
+            .unwrap();
+        stdout
+            .wait_for_text_occurrences("renderer_degradation", 2)
+            .await;
+        let repeated = String::from_utf8(stdout.contents()).unwrap();
+        assert_eq!(repeated.matches("renderer_degradation").count(), 2);
     }
 
     #[tokio::test]

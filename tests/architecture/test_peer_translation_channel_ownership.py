@@ -122,10 +122,3 @@ def test_durable_callbacks_dispatch_peer_work_through_public_owner_contract() ->
     assert "ClientHub" not in source
 
 
-def test_peer_owner_preserves_explicit_chatbox_denial_attempts() -> None:
-    source = OWNER_PATH.read_text(encoding="utf-8")
-
-    assert 'self.output_projection.chatbox_is_denied("peer")' in source
-    assert "self.output_projection.publish_peer_chatbox_denial(" in source
-    assert 'channel="peer"' in source
-    assert 'channel="self"' not in source
