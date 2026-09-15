@@ -295,6 +295,17 @@ Execution options:
 
 Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
+Healthy cloud reuse follows [STT-REUSE-1 (#169)](https://github.com/kapitalismho/PuriPuly-heart/issues/169):
+
+- One submitted turn remains unresolved per connection. Successor input waits for the predecessor's authoritative terminal and completed seal/write cleanup; the healthy connection keeps its epoch while each admitted segment gets a new turn identity.
+- Soniox requires its pending manual `<fin>`, Deepgram requires a `from_finalize` ACK before close/drain wins, Gemini requires authoritative input transcription plus ActivityEnd, and Scribe requires the canonical committed transcript after a successful manual commit. Normal final/explicit-empty completion retains connection resources; timeout, ambiguity, error, EOF and abort retire authority irreversibly.
+- Unkeyed protocols rely on ordered provider completion, not fabricated native IDs or text equality. Captured stale identities and detectable idle contradictions are rejected; arbitrary old unkeyed text arriving after a new turn begins cannot be independently authenticated.
+- `ScopedRecognitionEngine` alone owns the 180-second soft connection age, 10-second recent-speech protection and independent idle timer. Capture/VAD owners report real speech and pending owned input; provider terminals and PEER delivery cuts are not acoustic silence. Age does not reset per turn.
+- Shared wiring enables deferred idle rotation for Soniox, Deepgram, Gemini, Scribe and Rolling Free. Due sessions close only after genuine quiet and drained owned work; no empty replacement is opened. Later speech uses bounded demand-driven recovery after cleanup quarantine, without mid-utterance replay.
+- Rolling retains its selected healthy member. Qwen task reuse, Custom keyed realtime/offline reuse and local CPU/GPU session/model release policies remain separate and unchanged. `intent.stt.drain_timeout_s` still bounds actual drain/cleanup; healthy reuse adds no fixed drain sleep.
+
+Controlled adapter/source tests do not certify live service conformance or latency improvement. Live acceptance requires credentials, model access and explicit paid-call permission. Retained Soniox stream duration, including post-speech protection, remains billable.
+
 GPU worker split:
 
 - Python adapter: process launch, authentication, requests, heartbeat, cancellation, shutdown.

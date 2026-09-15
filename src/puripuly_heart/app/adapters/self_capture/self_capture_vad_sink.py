@@ -16,6 +16,24 @@ class SelfCaptureVadSinkAdapter:
         runtime = self._require_runtime()
         await runtime.handle_vad_event(event)
 
+    async def observe_source_activity(
+        self,
+        *,
+        speech_observed: bool,
+        observed_at_monotonic_s: float,
+    ) -> None:
+        runtime = self._require_runtime()
+        await runtime.observe_source_activity(
+            speech_observed=speech_observed,
+            observed_at_monotonic_s=observed_at_monotonic_s,
+        )
+
+    async def observe_pending_source_work(self, *, pending: bool) -> None:
+        runtime = self._require_runtime()
+        observe = getattr(runtime, "observe_pending_source_work", None)
+        if callable(observe):
+            await observe(pending=pending)
+
     async def reject_owned_segment(
         self,
         event: object,

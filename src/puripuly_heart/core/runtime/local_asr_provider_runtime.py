@@ -715,6 +715,54 @@ class LocalASRProviderRuntimeOwner:
             ):
                 return
 
+    async def observe_source_activity(
+        self,
+        channel: ProviderRuntimeChannel,
+        *,
+        speech_observed: bool,
+        observed_at_monotonic_s: float,
+    ) -> None:
+        self._require_open("dispatch provider source activity")
+        self._validate_channel(channel)
+        async with self._operation():
+            provider, generation = self._handles[channel].current_provider_generation()
+            if provider is None:
+                return
+            observe = getattr(provider, "observe_source_activity", None)
+            if not callable(observe):
+                return
+            await observe(
+                speech_observed=speech_observed,
+                observed_at_monotonic_s=observed_at_monotonic_s,
+            )
+            if not self._handles[channel].is_current_provider_generation(
+                provider=provider,
+                generation=generation,
+            ):
+                return
+
+    async def observe_pending_source_work(
+        self,
+        channel: ProviderRuntimeChannel,
+        *,
+        pending: bool,
+    ) -> None:
+        self._require_open("dispatch pending provider source work")
+        self._validate_channel(channel)
+        async with self._operation():
+            provider, generation = self._handles[channel].current_provider_generation()
+            if provider is None:
+                return
+            observe = getattr(provider, "observe_pending_source_work", None)
+            if not callable(observe):
+                return
+            await observe(pending=pending)
+            if not self._handles[channel].is_current_provider_generation(
+                provider=provider,
+                generation=generation,
+            ):
+                return
+
     async def handle_owned_vad_event(
         self,
         channel: ProviderRuntimeChannel,

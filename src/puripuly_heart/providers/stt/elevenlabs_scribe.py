@@ -275,6 +275,11 @@ class _ElevenLabsScribeSession(STTBackendSession):
     _scoped_provenance: list[STTNativeProvenance] = field(
         init=False, default_factory=list, repr=False
     )
+    _commit_identity: STTProviderTurnIdentity | None = field(init=False, default=None, repr=False)
+    _commit_write_in_flight: bool = field(init=False, default=False, repr=False)
+    _pending_committed: tuple[STTProviderTurnIdentity, str, STTNativeProvenance] | None = field(
+        init=False, default=None, repr=False
+    )
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
@@ -373,27 +378,87 @@ class _ElevenLabsScribeSession(STTBackendSession):
         )
 
     def _on_committed(self, data: Any) -> None:
-        text = self._event_text(data)
+        try:
+            text = self._committed_text(data)
+        except (TypeError, ValueError):
+            self._protocol_failure("scribe_committed_transcript_missing_text")
+            return
         logger.info("[STT] Transcript final text_len=%s", len(text))
         if self._event_projection.is_legacy:
             self._enqueue_connection_event(STTBackendTranscriptEvent(text=text, is_final=True))
             return
         identity = self._event_projection.active_identity
-        if identity is None or not self._event_projection.sealed:
+        if identity is None:
+            self._protocol_failure("scribe_unsolicited_committed_transcript")
+            return
+        if self._commit_identity != identity or not self._event_projection.sealed:
             return
         provenance = self._event_provenance(data, barrier="committed_transcript")
+        if self._commit_write_in_flight:
+            if self._pending_committed is not None:
+                self._protocol_failure("scribe_duplicate_committed_transcript")
+                return
+            self._pending_committed = (identity, text, provenance)
+            return
+        self._finish_committed(identity, text, provenance)
+
+    @staticmethod
+    def _committed_text(data: Any) -> str:
+        if isinstance(data, dict):
+            if "text" not in data:
+                raise ValueError("committed transcript is missing text")
+            text = data["text"]
+        else:
+            if not hasattr(data, "text"):
+                raise ValueError("committed transcript is missing text")
+            text = data.text
+        if not isinstance(text, str):
+            raise TypeError("committed transcript text must be a string")
+        return text
+
+    def _finish_committed(
+        self,
+        identity: STTProviderTurnIdentity,
+        text: str,
+        provenance: STTNativeProvenance,
+    ) -> None:
+        if (
+            self._stopped
+            or self._commit_write_in_flight
+            or self._commit_identity != identity
+            or not self._event_projection.is_current(identity)
+            or not self._event_projection.sealed
+        ):
+            return
         self._scoped_provenance.append(provenance)
-        self._event_projection.terminal(
+        accepted = self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
                 outcome="final" if text else "empty",
                 text=text,
                 text_authority="authoritative",
-                epoch_disposition="retire",
+                epoch_disposition="reuse",
                 provenance=tuple(self._scoped_provenance),
             )
         )
         self._clear_scoped_turn()
+        if not accepted:
+            self._event_projection.end_epoch(
+                orderly=False,
+                reason="scribe_connection_event_overflow",
+                provider_turn_id=identity.provider_turn_id,
+            )
+            self._end_connection_stream()
+
+    def _protocol_failure(self, reason: str) -> None:
+        if self._event_projection.is_scoped:
+            self._scoped_transport_failure(reason, orderly=False)
+            self._end_connection_stream()
+            return
+        if self._stopped:
+            return
+        self._stopped = True
+        self._enqueue_connection_event(RuntimeError(reason))
 
     def _on_error_event(self, data: Any) -> None:
         if self._stopped:
@@ -444,6 +509,9 @@ class _ElevenLabsScribeSession(STTBackendSession):
 
     def _clear_scoped_turn(self) -> None:
         self._scoped_provenance.clear()
+        self._commit_identity = None
+        self._commit_write_in_flight = False
+        self._pending_committed = None
 
     def _scoped_transport_failure(self, reason: str, *, orderly: bool) -> None:
         identity = self._event_projection.active_identity
@@ -525,7 +593,14 @@ class _ElevenLabsScribeSession(STTBackendSession):
             await connection.send({"audio_base_64": base64.b64encode(pcm16le).decode("ascii")})
         except Exception:
             self._scoped_transport_failure("scribe_write_failed", orderly=False)
+            self._end_connection_stream()
             raise
+        if (
+            self._stopped
+            or self._connection is not connection
+            or not self._event_projection.is_current(identity)
+        ):
+            raise RuntimeError("Scribe turn lost authority during audio write")
         self._last_send_at = time.monotonic()
         self._event_projection.payload_written(identity, payload_sequence)
 
@@ -543,11 +618,28 @@ class _ElevenLabsScribeSession(STTBackendSession):
         if self._stopped or connection is None:
             raise RuntimeError("Scribe session is closed")
         self._event_projection.seal(identity)
+        self._commit_identity = identity
+        self._commit_write_in_flight = True
         try:
             await connection.commit()
         except Exception:
             self._scoped_transport_failure("scribe_commit_failed", orderly=False)
+            self._end_connection_stream()
             raise
+        if (
+            self._stopped
+            or self._connection is not connection
+            or not self._event_projection.is_current(identity)
+            or self._commit_identity != identity
+        ):
+            return
+        self._commit_write_in_flight = False
+        pending = self._pending_committed
+        self._pending_committed = None
+        if pending is not None:
+            pending_identity, text, provenance = pending
+            if pending_identity == identity:
+                self._finish_committed(identity, text, provenance)
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         self._event_projection.require_open(identity)

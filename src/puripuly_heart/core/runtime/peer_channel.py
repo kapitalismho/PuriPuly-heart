@@ -152,6 +152,14 @@ class SpeechChannelRuntime(Protocol):
 
 class _VadSink(Protocol):
     async def handle_owned_vad_event(self, event: object) -> None: ...
+    async def observe_source_activity(
+        self,
+        *,
+        speech_observed: bool,
+        observed_at_monotonic_s: float,
+    ) -> None: ...
+
+    async def observe_pending_source_work(self, *, pending: bool) -> None: ...
 
 
 @dataclass(slots=True)
@@ -204,6 +212,28 @@ class _GenerationGuardedVadSink:
     async def handle_owned_vad_event(self, event: object) -> None:
         await self._submit(event)
 
+    async def observe_source_activity(
+        self,
+        *,
+        speech_observed: bool,
+        observed_at_monotonic_s: float,
+    ) -> None:
+        if not self.runtime.is_current_generation(self.capture_generation.value):
+            return
+        observe = getattr(self.sink, "observe_source_activity", None)
+        if callable(observe):
+            await observe(
+                speech_observed=speech_observed,
+                observed_at_monotonic_s=observed_at_monotonic_s,
+            )
+
+    async def _observe_pending_source_work(self, pending: bool) -> None:
+        if not self.runtime.is_current_generation(self.capture_generation.value):
+            return
+        observe = getattr(self.sink, "observe_pending_source_work", None)
+        if callable(observe):
+            await observe(pending=pending)
+
     async def finish(self) -> None:
         worker = self._worker
         if worker is None:
@@ -247,6 +277,7 @@ class _GenerationGuardedVadSink:
         if self._queued_control_events > self._MAX_RESERVED_CONTROL_EVENTS:
             raise RuntimeError("peer VAD dispatch exceeded the control event budget")
         self._arm_expiry_timer()
+        await self._observe_pending_source_work(bool(self._queue))
         self._wake.set()
         await asyncio.sleep(0)
 
@@ -272,6 +303,7 @@ class _GenerationGuardedVadSink:
                 self._release_event_accounting(queued)
                 if queued.closes_segment and queued.segment_id is not None:
                     self._started_segment_ids.discard(queued.segment_id)
+                await self._observe_pending_source_work(bool(self._queue))
 
     def _enforce_segment_budget(self) -> None:
         candidates = self._whole_unsent_sealed_segments()

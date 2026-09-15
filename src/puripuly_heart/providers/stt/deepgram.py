@@ -212,9 +212,9 @@ class _DeepgramSDKSession(STTBackendSession):
         provenance: STTNativeProvenance,
     ) -> None:
         loop = self._loop
-        identity = self._event_projection.active_identity
-        if loop is None or identity is None:
+        if loop is None:
             return
+        identity = self._event_projection.active_identity
         loop.call_soon_threadsafe(
             self._handle_scoped_result,
             identity,
@@ -226,12 +226,19 @@ class _DeepgramSDKSession(STTBackendSession):
 
     def _handle_scoped_result(
         self,
-        identity: STTProviderTurnIdentity,
+        identity: STTProviderTurnIdentity | None,
         text: str,
         is_final: bool,
         from_finalize: bool,
         provenance: STTNativeProvenance,
     ) -> None:
+        if identity is None:
+            if is_final or from_finalize:
+                self._event_projection.end_epoch(
+                    orderly=False,
+                    reason="deepgram_idle_result",
+                )
+            return
         if not self._event_projection.is_current(identity):
             return
         if is_final and text:
@@ -249,8 +256,19 @@ class _DeepgramSDKSession(STTBackendSession):
                         provenance=provenance,
                     )
                 )
-        if from_finalize and self._event_projection.sealed:
-            self._terminalize_scoped(provenance=provenance, epoch_disposition="retire")
+        if from_finalize:
+            if not self._event_projection.sealed:
+                self._terminalize_scoped(
+                    provenance=provenance,
+                    epoch_disposition="retire",
+                    degraded_reason="deepgram_finalize_ack_before_seal",
+                    empty_is_success=False,
+                )
+                return
+            self._terminalize_scoped(
+                provenance=provenance,
+                epoch_disposition="retire" if self._scoped_close_sent else "reuse",
+            )
 
     def _terminalize_scoped(
         self,
@@ -555,12 +573,11 @@ class _DeepgramSDKSession(STTBackendSession):
         await completion
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
-        if self._stopped:
+        if self._stopped or self._scoped_close_sent:
             raise RuntimeError("Deepgram session is closed")
         self._event_projection.begin(request)
         self._scoped_fragments.clear()
         self._scoped_provenance.clear()
-        self._scoped_close_sent = False
 
     async def send_turn_audio(
         self,

@@ -66,6 +66,14 @@ def _request(provider: str, order: int = 1) -> STTProviderTurnRequest:
     )
 
 
+def _request_for_epoch(provider: str, order: int, epoch: str = "epoch-1") -> STTProviderTurnRequest:
+    request = _request(provider, order)
+    return replace(
+        request,
+        identity=replace(request.identity, provider_epoch_id=epoch),
+    )
+
+
 def _span() -> tuple[AudioCaptureSpan, ...]:
     return (
         AudioCaptureSpan(
@@ -127,6 +135,7 @@ def _deepgram_session(
     drain_timeout_s: float = 10.0,
     *,
     order: int = 1,
+    epoch: str | None = None,
 ) -> _DeepgramSDKSession:
     session = _DeepgramSDKSession(
         api_key="k",
@@ -138,7 +147,7 @@ def _deepgram_session(
         drain_timeout_s=drain_timeout_s,
         projection=STTSessionProjection(
             mode="scoped",
-            provider_epoch_id=f"epoch-{order}",
+            provider_epoch_id=epoch or f"epoch-{order}",
         ),
     )
     session._loop = asyncio.get_running_loop()
@@ -169,7 +178,7 @@ async def test_non_soniox_provider_does_not_add_audio_at_listen_hard_boundary(mo
 
 
 @pytest.mark.asyncio
-async def test_deepgram_actual_result_shape_retires_unkeyed_epoch_and_isolates_next(
+async def test_deepgram_actual_result_shape_reuses_acknowledged_epoch_and_detects_idle_result(
     monkeypatch,
 ) -> None:
     writes: list[tuple[_DeepgramSDKSession, object]] = []
@@ -181,67 +190,77 @@ async def test_deepgram_actual_result_shape_retires_unkeyed_epoch_and_isolates_n
         await gate.wait()
 
     monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
-    session_a = _deepgram_session()
-    assert session_a._audio_q.maxsize == 258
-    session_a._build_transcript_event(_deepgram_result("unsolicited", from_finalize=True))
-    assert session_a._event_projection.scoped_event_depth == 0
+    session = _deepgram_session()
+    assert session._audio_q.maxsize == 258
     request_a = _request("deepgram")
-    await session_a.begin_turn(request_a)
+    await session.begin_turn(request_a)
     gate.clear()
     send = asyncio.create_task(
-        session_a.send_turn_audio(
+        session.send_turn_audio(
             request_a.identity,
-            b"pcm",
+            b"pcm-a",
             payload_sequence=1,
             source_ranges=_span(),
             context_only=False,
         )
     )
-    await _wait(lambda: any(payload == b"pcm" for _, payload in writes))
+    await _wait(lambda: any(payload == b"pcm-a" for _, payload in writes))
     assert not send.done()
     gate.set()
     await send
-    await session_a.seal_turn(
+    await session.seal_turn(
         request_a.identity,
         sealed_content_ranges=_span(),
         seal_reason="silence",
         observed_trailing_silence_ms=224,
     )
-    session_a._build_transcript_event(_deepgram_result("same "))
-    session_a._build_transcript_event(_deepgram_result("text"))
-    session_a._build_transcript_event(_deepgram_result("", from_finalize=True))
+    session._build_transcript_event(_deepgram_result("same "))
+    session._build_transcript_event(_deepgram_result("text"))
+    session._build_transcript_event(_deepgram_result("", from_finalize=True))
     await asyncio.sleep(0)
-    assert (await _next(session_a)).text == "same "
-    assert (await _next(session_a)).text == "text"
-    terminal_a = await _next(session_a)
+    assert (await _next(session)).text == "same "
+    assert (await _next(session)).text == "text"
+    terminal_a = await _next(session)
     assert (terminal_a.outcome, terminal_a.text, terminal_a.epoch_disposition) == (
         "final",
         "same text",
-        "retire",
+        "reuse",
     )
-    session_a._build_transcript_event(_deepgram_result("late-a"))
-    session_a._build_transcript_event(_deepgram_result("late-a", from_finalize=True))
-    await asyncio.sleep(0)
-    assert session_a._event_projection.scoped_event_depth == 0
-    with pytest.raises(RuntimeError, match="epoch is retired"):
-        await session_a.begin_turn(_request("deepgram", 2))
 
-    session_b = _deepgram_session(order=2)
-    request_b = _request("deepgram", 2)
-    await session_b.begin_turn(request_b)
-    await session_b.seal_turn(
+    request_b = _request_for_epoch("deepgram", 2)
+    await session.begin_turn(request_b)
+    await session.send_turn_audio(
+        request_b.identity,
+        b"pcm-b",
+        payload_sequence=1,
+        source_ranges=_span(),
+        context_only=False,
+    )
+    await session.seal_turn(
         request_b.identity,
         sealed_content_ranges=_span(),
         seal_reason="silence",
         observed_trailing_silence_ms=0,
     )
-    session_b._build_transcript_event(_deepgram_result("same text", from_finalize=True))
+    session._build_transcript_event(_deepgram_result("same text", from_finalize=True))
     await asyncio.sleep(0)
-    assert (await _next(session_b)).text == "same text"
-    terminal_b = await _next(session_b)
-    assert (terminal_b.text, terminal_b.epoch_disposition) == ("same text", "retire")
-    await session_a.close()
-    await session_b.close()
+    assert (await _next(session)).text == "same text"
+    terminal_b = await _next(session)
+    assert (terminal_b.text, terminal_b.epoch_disposition) == ("same text", "reuse")
+    assert terminal_a.identity != terminal_b.identity
+    assert all(item[0] is session for item in writes)
+    assert [payload for _, payload in writes].count(_FINALIZE) == 2
+    assert _CLOSE_STREAM not in [payload for _, payload in writes]
+    await session.close()
+
+    ambiguous = _deepgram_session()
+    ambiguous._build_transcript_event(_deepgram_result("unsolicited", from_finalize=True))
+    ended = await _next(ambiguous)
+    assert isinstance(ended, STTProviderEpochEnded)
+    assert ended.reason == "deepgram_idle_result"
+    with pytest.raises(RuntimeError, match="epoch is retired"):
+        await ambiguous.begin_turn(_request("deepgram"))
+    await ambiguous.close()
 
 
 @pytest.mark.asyncio
@@ -267,7 +286,7 @@ async def test_deepgram_empty_error_abort_and_two_drain_path(monkeypatch) -> Non
     assert (terminal.outcome, terminal.text_authority, terminal.epoch_disposition) == (
         "empty",
         "authoritative",
-        "retire",
+        "reuse",
     )
     await empty.close()
 
@@ -308,7 +327,7 @@ async def test_deepgram_empty_error_abort_and_two_drain_path(monkeypatch) -> Non
         "cancelled",
     )
     assert isinstance(await _next(aborted), STTProviderEpochEnded)
-    with pytest.raises(RuntimeError, match="epoch is retired"):
+    with pytest.raises(RuntimeError, match="epoch is retired|session is closed"):
         await aborted.begin_turn(_request("deepgram", 2))
     await aborted.close()
     assert writes.count(_FINALIZE) == 2
@@ -362,7 +381,7 @@ def _gemini_message(*, final: object = _MISSING, interim: object = _MISSING, ack
     return types.LiveServerMessage(server_content=content, voice_activity=activity)
 
 
-async def _gemini_session(timeout: float = 0.05, *, order: int = 1):
+async def _gemini_session(timeout: float = 0.05, *, order: int = 1, epoch: str | None = None):
     live = _FakeGeminiLive()
     session = _GeminiTranscribeLiveSession(
         api_key="k",
@@ -374,7 +393,7 @@ async def _gemini_session(timeout: float = 0.05, *, order: int = 1):
         finalize_timeout_s=timeout,
         projection=STTSessionProjection(
             mode="scoped",
-            provider_epoch_id=f"epoch-{order}",
+            provider_epoch_id=epoch or f"epoch-{order}",
         ),
     )
     session._live_session = live
@@ -384,68 +403,83 @@ async def _gemini_session(timeout: float = 0.05, *, order: int = 1):
 
 
 @pytest.mark.asyncio
-async def test_gemini_actual_message_shape_retires_unkeyed_epoch_and_isolates_next() -> None:
+async def test_gemini_actual_message_shape_reuses_two_part_barrier_and_detects_idle_output() -> (
+    None
+):
     from google.genai import types
 
     assert "id" not in types.LiveServerMessage.model_fields
     assert "event_id" not in types.LiveServerMessage.model_fields
-    session_a, live_a = await _gemini_session()
-    assert session_a._send_queue.maxsize == 258
-    live_a.push(_gemini_message(final="unsolicited"))
-    await asyncio.sleep(0)
-    assert session_a._event_projection.scoped_event_depth == 0
+    session, live = await _gemini_session()
+    assert session._send_queue.maxsize == 258
     request_a = _request("gemini_transcribe")
-    await session_a.begin_turn(request_a)
-    live_a.send_gate.clear()
+    await session.begin_turn(request_a)
+    live.send_gate.clear()
     send = asyncio.create_task(
-        session_a.send_turn_audio(
+        session.send_turn_audio(
             request_a.identity,
-            b"pcm",
+            b"pcm-a",
             payload_sequence=1,
             source_ranges=_span(),
             context_only=False,
         )
     )
-    await _wait(lambda: any("audio" in item for item in live_a.sent))
+    await _wait(lambda: any(item.get("audio", {}).get("data") == b"pcm-a" for item in live.sent))
     assert not send.done()
-    live_a.send_gate.set()
+    live.send_gate.set()
     await send
-    await session_a.seal_turn(
+    await session.seal_turn(
         request_a.identity,
         sealed_content_ranges=_span(),
         seal_reason="silence",
         observed_trailing_silence_ms=224,
     )
-    live_a.push(_gemini_message(ack=True))
-    live_a.push(_gemini_message(final="same"))
-    update_a = await _next(session_a)
-    terminal_a = await _next(session_a)
-    assert update_a.text == "same"
-    assert (terminal_a.text, terminal_a.epoch_disposition) == ("same", "retire")
-    live_a.push(_gemini_message(final="late-a"))
-    live_a.push(_gemini_message(ack=True))
+    live.push(_gemini_message(ack=True))
     await asyncio.sleep(0)
-    assert session_a._event_projection.scoped_event_depth == 0
-    with pytest.raises(RuntimeError, match="epoch is retired"):
-        await session_a.begin_turn(_request("gemini_transcribe", 2))
+    assert session._event_projection.scoped_event_depth == 0
+    live.push(_gemini_message(final="same"))
+    update_a = await _next(session)
+    terminal_a = await _next(session)
+    assert update_a.text == "same"
+    assert (terminal_a.text, terminal_a.epoch_disposition) == ("same", "reuse")
 
-    session_b, live_b = await _gemini_session(order=2)
-    request_b = _request("gemini_transcribe", 2)
-    await session_b.begin_turn(request_b)
-    await session_b.seal_turn(
+    request_b = _request_for_epoch("gemini_transcribe", 2)
+    await session.begin_turn(request_b)
+    await session.send_turn_audio(
+        request_b.identity,
+        b"pcm-b",
+        payload_sequence=1,
+        source_ranges=_span(),
+        context_only=False,
+    )
+    await session.seal_turn(
         request_b.identity,
         sealed_content_ranges=_span(),
         seal_reason="silence",
         observed_trailing_silence_ms=0,
     )
-    live_b.push(_gemini_message(final="same"))
-    live_b.push(_gemini_message(final="duplicate"))
-    live_b.push(_gemini_message(ack=True))
-    assert (await _next(session_b)).text == "same"
-    terminal_b = await _next(session_b)
-    assert (terminal_b.text, terminal_b.epoch_disposition) == ("same", "retire")
-    await session_a.close()
-    await session_b.close()
+    live.push(_gemini_message(final="same"))
+    await asyncio.sleep(0)
+    assert (await _next(session)).text == "same"
+    assert session._event_projection.scoped_event_depth == 0
+    live.push(_gemini_message(ack=True))
+    terminal_b = await _next(session)
+    assert (terminal_b.text, terminal_b.epoch_disposition) == ("same", "reuse")
+    assert terminal_a.identity != terminal_b.identity
+    assert live.closed is False
+    assert sum(item.get("activity_start") is not None for item in live.sent) == 2
+    assert sum(item.get("activity_end") is not None for item in live.sent) == 2
+    await session.close()
+    assert live.closed is True
+
+    ambiguous, ambiguous_live = await _gemini_session()
+    ambiguous_live.push(_gemini_message(final="unsolicited"))
+    ended = await _next(ambiguous)
+    assert isinstance(ended, STTProviderEpochEnded)
+    assert ended.reason == "gemini_unsolicited_authoritative"
+    with pytest.raises(RuntimeError, match="session is closed"):
+        await ambiguous.begin_turn(_request("gemini_transcribe"))
+    await ambiguous.close()
 
 
 @pytest.mark.asyncio
@@ -466,7 +500,7 @@ async def test_gemini_empty_timeout_error_and_abort_receipts() -> None:
     assert (terminal.outcome, terminal.text_authority, terminal.epoch_disposition) == (
         "empty",
         "authoritative",
-        "retire",
+        "reuse",
     )
     await empty.close()
 
@@ -536,7 +570,7 @@ class _FakeSonioxWebSocket:
         self.queue.put_nowait(payload)
 
 
-def _soniox_session(*, order: int = 1):
+def _soniox_session(*, order: int = 1, epoch: str | None = None):
     ws = _FakeSonioxWebSocket()
     session = _SonioxSession(
         api_key="k",
@@ -551,7 +585,7 @@ def _soniox_session(*, order: int = 1):
         enable_language_identification=True,
         projection=STTSessionProjection(
             mode="scoped",
-            provider_epoch_id=f"epoch-{order}",
+            provider_epoch_id=epoch or f"epoch-{order}",
         ),
     )
     session._ws = ws
@@ -561,35 +595,32 @@ def _soniox_session(*, order: int = 1):
 
 
 @pytest.mark.asyncio
-async def test_soniox_documented_unkeyed_tokens_retire_epoch_and_isolate_next() -> None:
-    session_a, ws_a = _soniox_session()
-    assert session_a._audio_q.maxsize == 258
-    ws_a.push(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
-    await asyncio.sleep(0)
-    assert session_a._event_projection.scoped_event_depth == 0
+async def test_soniox_documented_unkeyed_tokens_reuse_epoch_and_detect_idle_ambiguity() -> None:
+    session, ws = _soniox_session()
+    assert session._audio_q.maxsize == 258
     request_a = _request("soniox")
-    await session_a.begin_turn(request_a)
-    ws_a.send_gate.clear()
+    await session.begin_turn(request_a)
+    ws.send_gate.clear()
     send = asyncio.create_task(
-        session_a.send_turn_audio(
+        session.send_turn_audio(
             request_a.identity,
-            b"pcm",
+            b"pcm-a",
             payload_sequence=1,
             source_ranges=_span(),
             context_only=False,
         )
     )
-    await _wait(lambda: ws_a.sent == [b"pcm"])
+    await _wait(lambda: ws.sent == [b"pcm-a"])
     assert not send.done()
-    ws_a.send_gate.set()
+    ws.send_gate.set()
     await send
-    await session_a.seal_turn(
+    await session.seal_turn(
         request_a.identity,
         sealed_content_ranges=_span(),
         seal_reason="silence",
         observed_trailing_silence_ms=224,
     )
-    ws_a.push(
+    ws.push(
         json.dumps(
             {
                 "tokens": [
@@ -600,27 +631,27 @@ async def test_soniox_documented_unkeyed_tokens_retire_epoch_and_isolate_next() 
             }
         )
     )
-    assert (await _next(session_a)).text == "same "
-    assert (await _next(session_a)).text == "text"
-    terminal_a = await _next(session_a)
-    assert (terminal_a.text, terminal_a.epoch_disposition) == ("same text", "retire")
-    ws_a.push(json.dumps({"tokens": [{"text": "late-a", "is_final": True}]}))
-    ws_a.push(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
-    await asyncio.sleep(0)
-    assert session_a._event_projection.scoped_event_depth == 0
-    with pytest.raises(RuntimeError, match="epoch is retired"):
-        await session_a.begin_turn(_request("soniox", 2))
+    assert (await _next(session)).text == "same "
+    assert (await _next(session)).text == "text"
+    terminal_a = await _next(session)
+    assert (terminal_a.text, terminal_a.epoch_disposition) == ("same text", "reuse")
 
-    session_b, ws_b = _soniox_session(order=2)
-    request_b = _request("soniox", 2)
-    await session_b.begin_turn(request_b)
-    await session_b.seal_turn(
+    request_b = _request_for_epoch("soniox", 2)
+    await session.begin_turn(request_b)
+    await session.send_turn_audio(
+        request_b.identity,
+        b"pcm-b",
+        payload_sequence=1,
+        source_ranges=_span(),
+        context_only=False,
+    )
+    await session.seal_turn(
         request_b.identity,
         sealed_content_ranges=_span(),
         seal_reason="silence",
         observed_trailing_silence_ms=0,
     )
-    ws_b.push(
+    ws.push(
         json.dumps(
             {
                 "tokens": [
@@ -630,11 +661,23 @@ async def test_soniox_documented_unkeyed_tokens_retire_epoch_and_isolate_next() 
             }
         )
     )
-    assert (await _next(session_b)).text == "same text"
-    terminal_b = await _next(session_b)
-    assert (terminal_b.text, terminal_b.epoch_disposition) == ("same text", "retire")
-    await session_a.close()
-    await session_b.close()
+    assert (await _next(session)).text == "same text"
+    terminal_b = await _next(session)
+    assert (terminal_b.text, terminal_b.epoch_disposition) == ("same text", "reuse")
+    assert terminal_a.identity != terminal_b.identity
+    assert ws.closed is False
+    assert b"pcm-a" in ws.sent and b"pcm-b" in ws.sent
+    await session.close()
+    assert ws.closed is True
+
+    ambiguous, ambiguous_ws = _soniox_session()
+    ambiguous_ws.push(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    ended = await _next(ambiguous)
+    assert isinstance(ended, STTProviderEpochEnded)
+    assert ended.reason == "soniox_protocol_ambiguity"
+    with pytest.raises(RuntimeError, match="epoch is retired"):
+        await ambiguous.begin_turn(_request("soniox"))
+    await ambiguous.close()
 
 
 @pytest.mark.asyncio
@@ -653,7 +696,7 @@ async def test_soniox_empty_error_and_abort_receipts() -> None:
     assert (terminal.outcome, terminal.text_authority, terminal.epoch_disposition) == (
         "empty",
         "authoritative",
-        "retire",
+        "reuse",
     )
     await empty.close()
 
@@ -704,7 +747,7 @@ class _FakeScribeConnection:
         self.closed = True
 
 
-def _scribe_session(*, order: int = 1):
+def _scribe_session(*, order: int = 1, epoch: str | None = None):
     connection = _FakeScribeConnection()
     session = _ElevenLabsScribeSession(
         api_key="k",
@@ -715,7 +758,7 @@ def _scribe_session(*, order: int = 1):
         connect_timeout_s=10.0,
         projection=STTSessionProjection(
             mode="scoped",
-            provider_epoch_id=f"epoch-{order}",
+            provider_epoch_id=epoch or f"epoch-{order}",
         ),
     )
     session._connection = connection
@@ -723,75 +766,85 @@ def _scribe_session(*, order: int = 1):
 
 
 @pytest.mark.asyncio
-async def test_scribe_actual_payload_shape_retires_unkeyed_epoch_and_isolates_next() -> None:
+async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_ambiguity() -> None:
     from elevenlabs.types import CommittedTranscriptPayload, PartialTranscriptPayload
 
     assert "id" not in CommittedTranscriptPayload.model_fields
     assert "transcript_id" not in CommittedTranscriptPayload.model_fields
     assert "commit_id" not in CommittedTranscriptPayload.model_fields
-    session_a, connection_a = _scribe_session()
-    assert session_a._connection_events.maxsize == 258
-    session_a._on_committed(CommittedTranscriptPayload(text="unsolicited"))
-    assert session_a._event_projection.scoped_event_depth == 0
+    session, connection = _scribe_session()
+    assert session._connection_events.maxsize == 258
     request_a = _request("elevenlabs_scribe")
-    await session_a.begin_turn(request_a)
-    for index in range(2_000):
-        session_a._on_partial(PartialTranscriptPayload(text=f"partial-{index}"))
-        session_a._on_committed(CommittedTranscriptPayload(text=f"early-{index}"))
-    assert session_a._connection_events.empty()
-    assert session_a._event_projection.scoped_event_depth == 1
-    connection_a.send_gate.clear()
+    await session.begin_turn(request_a)
+    session._on_committed(CommittedTranscriptPayload(text="before-commit"))
+    assert session._event_projection.scoped_event_depth == 0
+    connection.send_gate.clear()
     send = asyncio.create_task(
-        session_a.send_turn_audio(
+        session.send_turn_audio(
             request_a.identity,
-            b"pcm",
+            b"pcm-a",
             payload_sequence=1,
             source_ranges=_span(),
             context_only=False,
         )
     )
-    await _wait(lambda: bool(connection_a.sent))
+    await _wait(lambda: bool(connection.sent))
     assert not send.done()
-    connection_a.send_gate.set()
+    connection.send_gate.set()
     await send
-    session_a._on_partial(PartialTranscriptPayload(text="same"))
-    assert (await _next(session_a)).text == "same"
-    connection_a.commit_gate.clear()
+    session._on_partial(PartialTranscriptPayload(text="same"))
+    assert (await _next(session)).text == "same"
+    connection.commit_gate.clear()
     seal = asyncio.create_task(
-        session_a.seal_turn(
+        session.seal_turn(
             request_a.identity,
             sealed_content_ranges=_span(),
             seal_reason="silence",
             observed_trailing_silence_ms=224,
         )
     )
-    await _wait(lambda: connection_a.commits == 1)
+    await _wait(lambda: connection.commits == 1)
     assert not seal.done()
-    session_a._on_committed(CommittedTranscriptPayload(text="same"))
-    terminal_a = await _next(session_a)
-    assert (terminal_a.text, terminal_a.epoch_disposition) == ("same", "retire")
-    connection_a.commit_gate.set()
+    session._on_committed(CommittedTranscriptPayload(text="same"))
+    assert session._event_projection.scoped_event_depth == 0
+    connection.commit_gate.set()
     await seal
-    session_a._on_committed(CommittedTranscriptPayload(text="late-a"))
-    session_a._on_committed(CommittedTranscriptPayload(text="late-a"))
-    assert session_a._event_projection.scoped_event_depth == 0
-    with pytest.raises(RuntimeError, match="epoch is retired"):
-        await session_a.begin_turn(_request("elevenlabs_scribe", 2))
+    terminal_a = await _next(session)
+    assert (terminal_a.text, terminal_a.epoch_disposition) == ("same", "reuse")
 
-    session_b, _ = _scribe_session(order=2)
-    request_b = _request("elevenlabs_scribe", 2)
-    await session_b.begin_turn(request_b)
-    await session_b.seal_turn(
+    request_b = _request_for_epoch("elevenlabs_scribe", 2)
+    await session.begin_turn(request_b)
+    await session.send_turn_audio(
+        request_b.identity,
+        b"pcm-b",
+        payload_sequence=1,
+        source_ranges=_span(),
+        context_only=False,
+    )
+    await session.seal_turn(
         request_b.identity,
         sealed_content_ranges=_span(),
         seal_reason="silence",
         observed_trailing_silence_ms=0,
     )
-    session_b._on_committed(CommittedTranscriptPayload(text="same"))
-    terminal_b = await _next(session_b)
-    assert (terminal_b.text, terminal_b.epoch_disposition) == ("same", "retire")
-    await session_a.close()
-    await session_b.close()
+    session._on_committed(CommittedTranscriptPayload(text="same"))
+    terminal_b = await _next(session)
+    assert (terminal_b.text, terminal_b.epoch_disposition) == ("same", "reuse")
+    assert terminal_a.identity != terminal_b.identity
+    assert connection.commits == 2
+    assert connection.closed is False
+    await session.close()
+    assert connection.closed is True
+
+    ambiguous, ambiguous_connection = _scribe_session()
+    ambiguous._on_committed(CommittedTranscriptPayload(text="unsolicited"))
+    ended = await _next(ambiguous)
+    assert isinstance(ended, STTProviderEpochEnded)
+    assert ended.reason == "scribe_unsolicited_committed_transcript"
+    with pytest.raises(RuntimeError, match="session is closed"):
+        await ambiguous.begin_turn(_request("elevenlabs_scribe"))
+    await ambiguous.close()
+    assert ambiguous_connection.closed is True
 
 
 @pytest.mark.asyncio
@@ -812,7 +865,7 @@ async def test_scribe_empty_error_and_abort_receipts() -> None:
     assert (terminal.outcome, terminal.text_authority, terminal.epoch_disposition) == (
         "empty",
         "authoritative",
-        "retire",
+        "reuse",
     )
     await empty.close()
 
