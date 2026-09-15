@@ -1,0 +1,81 @@
+{
+  "schema": "PSEM-ISSUE-164-GT-PROBE-1",
+  "implementation_base_commit": "efd6ec87652ff228af03e50dabeb1eba99b9c985",
+  "implementation_sha256": {
+    "gt_probe.py": "74e390c5aebf1a1574c862116aaa658fce97a02560688bd56b59e862cb76f06b",
+    "student.py": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d",
+    "run_gt_probe.sh": "c7be4e3f4c1d505bdfed738d86cafbb791790f9b4e4be172f78e7e038dd0fda6"
+  },
+  "authority": {
+    "issue": 164,
+    "scope": "one bounded GT-only training-path smoke",
+    "actual_launch_requires_director_release": true,
+    "paid_or_cloud_calls": 0,
+    "teacher_passes": 0,
+    "dev_eval_holdout_access": false,
+    "production_mutation": false
+  },
+  "seed": 20260915,
+  "source": {
+    "source_id": "ami_ES2005a",
+    "meeting": "ES2005a",
+    "role": "PSEM-STRATEGY-TRAIN",
+    "component_id": "component-9bde89b69d0e4b542ec46d0132128e14ec230a5f90ae0965fce7ab19567b707c",
+    "waveform": "C:/Users/salee/AppData/Local/Temp/opencode/stb_phase2_corpora/ami/audio/ES2005a/ES2005a.Mix-Headset.wav",
+    "waveform_sha256": "ac33e7b18ae72931e65dc279af4b129370ad62ca6ed64299b9e35f356e3f8ed8",
+    "expected_channels": 1,
+    "corpus_root": "C:/Users/salee/AppData/Local/Temp/opencode/stb_phase2_corpora",
+    "reference_root": "C:/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/.cache/issue-121-local-data/reference",
+    "reference_commit": "9527b7c64846fb38316a610f32e9d3466bd6d8b7",
+    "reference_rttm_sha256": "821f901941b449977ac9130b3ce0fbccb44da7b097d2ee73795cac65ae16c24a",
+    "label_result_sha256": "c073bfbb2570581a6ec55c9eee44c3a50851512574e59624318fa1305941f029",
+    "manifest_sha256": {
+      "source_manifest": "76d5a6640ffabbc3cf91c25f5a94284f9869ad266e621ee06f48a987d5d7c6de",
+      "split_manifest": "dce084ca8394f70e4f7fe4c72687bbfd95998d26e9ce43e600ef2eb8a65490b4",
+      "topology_manifest": "728c33d17d239dedf08eed9e014cd7e42f4b980c9bcb5b7826c67449f897d7cd",
+      "identity_components": "09aa1c50b7978cc780c8314cdf43af765de9e1cd74622fa4099aace52437e29f"
+    }
+  },
+  "architecture": {
+    "input": "16 kHz mono waveform to fixed causal 64-bin log-Mel",
+    "encoder": "three causal Conv1d SiLU blocks, channels 64/512/512/512, kernel 5, stride 2 each",
+    "temporal": "two-layer unidirectional stateful GRU, hidden size 512",
+    "output": "four independent activity-occupancy logits with sigmoid inference",
+    "expected_parameter_count": 5940740,
+    "minimum_parameters": 5000000,
+    "maximum_parameters": 10000000,
+    "output_hop_samples": 1280,
+    "lookahead_samples": 0
+  },
+  "training": {
+    "chunk_samples": 243200,
+    "chunk_seconds": 15.2,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "maximum_grad_norm": 5.0,
+    "state": "carry chronologically from source zero; detach but never reset between updates",
+    "frames_per_update": 190
+  },
+  "budget": {
+    "backend_fixture_optimizer_steps": 1,
+    "gt_optimizer_steps": 19,
+    "total_optimizer_steps": 20,
+    "maximum_unique_fit_audio_samples": 4800000,
+    "prepared_and_consumed_fit_samples": 4620800,
+    "prepared_and_consumed_fit_seconds": 288.8,
+    "automatic_retry_after_unknown_partial_update": false
+  },
+  "verification": {
+    "partition_witness_samples": 4620800,
+    "partition_tolerance": 0.0001,
+    "inference_samples": 243200,
+    "partition_witness_output_frames": 3610,
+    "reload_tolerance": 0.00001,
+    "inference_source_sample_bounds": [0, 243200]
+  },
+  "resource_guard": {
+    "minimum_free_gpu_bytes": 4294967296,
+    "maximum_expected_peak_bytes": 4294967296,
+    "combined_stage_deadline_seconds": 7200
+  }
+}
