@@ -42,11 +42,7 @@ from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_WHITE,
     _DESKTOP_PREVIEW_BACKGROUND_ALPHA_PRESETS,
 )
-from puripuly_heart.ui.fonts import (
-    FONT_FAMILY_NOTO_SANS,
-    FONT_FAMILY_NOTO_SANS_CJK_JP,
-    assets_dir,
-)
+from puripuly_heart.ui.fonts import assets_dir
 from puripuly_heart.ui.theme import COLOR_BACKGROUND
 
 
@@ -483,12 +479,10 @@ def test_desktop_overlay_caption_rendering_no_caption_states_use_empty_moving_ca
     edit_plan = desktop_overlay.build_desktop_caption_plan(
         empty_snapshot,
         interaction_mode="edit",
-        locale="ja",
     )
     locked_plan = desktop_overlay.build_desktop_caption_plan(
         empty_snapshot,
         interaction_mode="pass_through",
-        locale="ja",
     )
 
     assert edit_plan.lines == ()
@@ -524,7 +518,6 @@ def test_desktop_overlay_visual_config_uses_preset_tokens_and_no_outline_text() 
             background_alpha=0.38,
             outline_width=None,
         ),
-        locale="ko",
     )
 
     assert plan.primary_font_size == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].primary_font_size
@@ -1120,7 +1113,6 @@ def test_desktop_overlay_caption_rendering_preserves_cjk_emoji_and_minimum_secon
         snapshot,
         window_width=1152,
         window_height=288,
-        locale="zh-CN",
     )
 
     assert [line.text for line in plan.lines] == [
@@ -1129,7 +1121,7 @@ def test_desktop_overlay_caption_rendering_preserves_cjk_emoji_and_minimum_secon
     ]
     assert plan.primary_font_size == _DESKTOP_CAPTION_SIZE_PRESETS["small"].primary_font_size
     assert plan.secondary_font_size == _DESKTOP_CAPTION_SIZE_PRESETS["small"].secondary_font_size
-    assert {line.font_family for line in plan.lines} == {"Noto Sans CJK SC"}
+    assert {line.font_family for line in plan.lines} == {"Noto Sans CJK JP"}
 
 
 @pytest.mark.parametrize(
@@ -1180,7 +1172,7 @@ def test_desktop_overlay_caption_rendering_preserves_cjk_emoji_and_minimum_secon
                 primary_language="en-US",
             ),
             "Live captions stay readable tonight",
-            "Noto Sans",
+            "Noto Sans CJK JP",
             "semibold",
             ft.FontWeight.W_600,
             id="general-english-text",
@@ -1205,7 +1197,7 @@ def test_desktop_overlay_caption_rendering_preserves_cjk_emoji_and_minimum_secon
         ),
     ],
 )
-def test_desktop_overlay_caption_font_policy_uses_language_metadata_for_jp_unified_cjk(
+def test_desktop_overlay_caption_font_policy_preserves_language_specific_weights(
     block: OverlayPresentationBlock,
     line_text: str,
     expected_family: str,
@@ -1214,7 +1206,6 @@ def test_desktop_overlay_caption_font_policy_uses_language_metadata_for_jp_unifi
 ) -> None:
     plan = desktop_overlay.build_desktop_caption_plan(
         OverlayPresentationSnapshot(blocks=[block]),
-        locale="en",
     )
 
     line_by_text = {line.text: line for line in plan.lines}
@@ -1228,58 +1219,6 @@ def test_desktop_overlay_caption_font_policy_uses_language_metadata_for_jp_unifi
     assert text_control.style.font_family == expected_family
     assert text_control.weight == expected_flet_weight
     assert text_control.style.weight == expected_flet_weight
-
-
-def test_desktop_overlay_caption_font_policy_uses_latin_and_jp_unified_cjk_faces_without_packaged_fonts() -> (
-    None
-):
-    snapshot = OverlayPresentationSnapshot(
-        blocks=[
-            _block(
-                "latin-only",
-                channel="self",
-                block_variant="finalized",
-                appearance_seq=1,
-                primary_text="Live captions stay readable tonight",
-            ),
-            _block(
-                "mixed-cjk",
-                channel="peer",
-                block_variant="finalized",
-                appearance_seq=2,
-                primary_text="오늘도 captions are readable",
-            ),
-        ]
-    )
-
-    plan = desktop_overlay.build_desktop_caption_plan(snapshot, locale="en")
-
-    assert [(line.text, line.font_family) for line in plan.lines] == [
-        ("Live captions stay readable tonight", "Noto Sans"),
-        ("오늘도 captions are readable", "Noto Sans CJK JP"),
-    ]
-
-
-def test_desktop_overlay_caption_cjk_font_follows_ui_locale() -> None:
-    snapshot = OverlayPresentationSnapshot(
-        blocks=[
-            _block(
-                "cjk-line",
-                channel="self",
-                block_variant="finalized",
-                appearance_seq=1,
-                primary_text="오늘도 captions are readable",
-            )
-        ]
-    )
-
-    ko_plan = desktop_overlay.build_desktop_caption_plan(snapshot, locale="ko")
-    ja_plan = desktop_overlay.build_desktop_caption_plan(snapshot, locale="ja")
-    zh_plan = desktop_overlay.build_desktop_caption_plan(snapshot, locale="zh-CN")
-
-    assert ko_plan.lines[0].font_family == "Noto Sans CJK KR"
-    assert ja_plan.lines[0].font_family == "Noto Sans CJK JP"
-    assert zh_plan.lines[0].font_family == "Noto Sans CJK SC"
 
 
 def test_desktop_overlay_caption_weight_uses_semibold_for_general_text() -> None:
@@ -1880,12 +1819,10 @@ def test_desktop_overlay_preview_no_caption_fixture_supports_manual_qa_states() 
     edit_plan = desktop_overlay.build_desktop_caption_plan(
         fixture.snapshot,
         interaction_mode="edit",
-        locale="en",
     )
     locked_plan = desktop_overlay.build_desktop_caption_plan(
         fixture.snapshot,
         interaction_mode="pass_through",
-        locale="en",
     )
     assert edit_plan.lines == ()
     assert edit_plan.surface_visible is True
@@ -2423,28 +2360,6 @@ def test_desktop_overlay_preview_fixtures_run_local_app_without_renderer_or_pers
         in visible_text
     )
     assert any("긴 문장" in text for text in visible_text)
-
-
-@pytest.mark.asyncio
-async def test_desktop_overlay_registers_bundled_noto_cjk_on_the_flet_page() -> None:
-    app = FakeFletApp()
-    window = desktop_overlay.FletDesktopRendererWindow(
-        app_runner=app.run,
-        event_sink=RecordingLifecycleSink().emit,
-        locale="en",
-        window_z_order_port=RecordingWindowZOrderPort(),
-        window_process_info_provider=lambda: (4321, None),
-    )
-
-    try:
-        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
-    finally:
-        await window.close()
-
-    assert app.page.fonts[FONT_FAMILY_NOTO_SANS] == "/fonts/NotoSansCJK-Medium.ttc"
-    assert app.page.fonts[FONT_FAMILY_NOTO_SANS_CJK_JP] == "/fonts/NotoSansCJK-Medium.ttc"
-    assert app.page.fonts["Noto Sans CJK KR"] == "/fonts/NotoSansCJK-Medium.ttc"
-    assert app.page.fonts["Noto Sans CJK SC"] == "/fonts/NotoSansCJK-Medium.ttc"
 
 
 @pytest.mark.asyncio

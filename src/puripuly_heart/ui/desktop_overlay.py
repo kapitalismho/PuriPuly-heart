@@ -76,9 +76,6 @@ from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_BACKGROUND_RGB as _DESKTOP_CAPTION_BACKGROUND_RGB,
 )
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
-    _DESKTOP_CAPTION_CJK_FONT_FAMILY as _DESKTOP_CAPTION_CJK_FONT_FAMILY,
-)
-from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_CJK_LANGUAGE_PRIMARY_SUBTAGS as _DESKTOP_CAPTION_CJK_LANGUAGE_PRIMARY_SUBTAGS,
 )
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
@@ -92,9 +89,6 @@ from puripuly_heart.ui.desktop_overlay_surface.contract import (
 )
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_GOLD as _DESKTOP_CAPTION_GOLD,
-)
-from puripuly_heart.ui.desktop_overlay_surface.contract import (
-    _DESKTOP_CAPTION_LATIN_FONT_FAMILY as _DESKTOP_CAPTION_LATIN_FONT_FAMILY,
 )
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_LATIN_NARROW_WIDTH_EM as _DESKTOP_CAPTION_LATIN_NARROW_WIDTH_EM,
@@ -296,9 +290,6 @@ from puripuly_heart.ui.desktop_overlay_surface.renderer import (
 )
 from puripuly_heart.ui.desktop_overlay_surface.renderer import (
     _desktop_caption_char_is_cjk as _desktop_caption_char_is_cjk,
-)
-from puripuly_heart.ui.desktop_overlay_surface.renderer import (
-    _desktop_caption_font_family_for_text as _desktop_caption_font_family_for_text,
 )
 from puripuly_heart.ui.desktop_overlay_surface.renderer import (
     _desktop_caption_language_is_cjk as _desktop_caption_language_is_cjk,
@@ -1107,7 +1098,6 @@ class FletDesktopRendererWindow:
             window_height=_page_window_number(page, "height", DESKTOP_FLET_DEFAULT_HEIGHT),
             visual_state=self._visual_state,
             interaction_mode=self._interaction_mode,
-            locale=self._locale,
         )
         self._plan_with_grow_only_caption_card_widths(plan)
 
@@ -1146,7 +1136,6 @@ class FletDesktopRendererWindow:
             window_height=_page_window_number(page, "height", DESKTOP_FLET_DEFAULT_HEIGHT),
             visual_state=self._visual_state,
             interaction_mode=self._interaction_mode,
-            locale=self._locale,
         )
         return {
             "slot_count": len(plan.slots),
@@ -1485,7 +1474,6 @@ class FletDesktopRendererWindow:
             window_height=_page_window_number(page, "height", DESKTOP_FLET_DEFAULT_HEIGHT),
             visual_state=self._visual_state,
             interaction_mode=self._interaction_mode,
-            locale=self._locale,
         )
         previous_width_floors = dict(self._caption_card_width_floor_by_block)
         plan = self._plan_with_grow_only_caption_card_widths(raw_plan)
@@ -2151,7 +2139,6 @@ class FletDesktopRendererWindow:
             window_height=preset.window_height,
             visual_state=self._preview_visual_state(),
             interaction_mode=self._interaction_mode,
-            locale=self._locale,
         )
         return self._plan_with_grow_only_caption_card_widths(plan)
 

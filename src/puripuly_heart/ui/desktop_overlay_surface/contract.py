@@ -9,16 +9,14 @@ from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_DEFAULT_TEXT_SCALE,
 )
 from puripuly_heart.core.overlay.protocol import OverlayPresentationSnapshot
-from puripuly_heart.ui.fonts import FONT_FAMILY_NOTO_SANS, FONT_FAMILY_NOTO_SANS_CJK_JP
+from puripuly_heart.ui.fonts import FONT_FAMILY_NOTO_SANS_CJK_JP
 from puripuly_heart.ui.theme import COLOR_BACKGROUND
 
 _DESKTOP_CAPTION_WHITE = "#FFFFFF"
 
 _DESKTOP_CAPTION_GOLD = "#FFD700"
 
-_DESKTOP_CAPTION_LATIN_FONT_FAMILY = FONT_FAMILY_NOTO_SANS
-
-_DESKTOP_CAPTION_CJK_FONT_FAMILY = FONT_FAMILY_NOTO_SANS_CJK_JP
+_DESKTOP_CAPTION_FONT_FAMILY = FONT_FAMILY_NOTO_SANS_CJK_JP
 
 _DESKTOP_CAPTION_CJK_LANGUAGE_PRIMARY_SUBTAGS = frozenset(
     {"ko", "kor", "ja", "jpn", "zh", "zho", "chi", "cmn", "yue"}
@@ -333,7 +331,6 @@ class DesktopCaptionPlan:
     background_color: str
     surface_visible: bool
     full_window_background_visible: bool
-    cjk_font_family: str = _DESKTOP_CAPTION_CJK_FONT_FAMILY
     no_scrollbars: bool = True
     max_visible_lines: int = _DESKTOP_CAPTION_MAX_VISIBLE_LINES
     max_visible_slots: int = _DESKTOP_CAPTION_MAX_VISIBLE_SLOTS
