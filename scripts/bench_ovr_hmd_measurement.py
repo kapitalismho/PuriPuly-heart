@@ -323,8 +323,6 @@ def prepare_session(executable: Path) -> Path:
                 "text_scale": 1.0,
                 "background_alpha": 0.24,
             },
-            "logging_mode": "detailed",
-            "logging_comparison": "both_arms_use_detailed_instead_of_earlier_basic_measurement",
             "handoff_experiment_default": HANDOFF_EXPERIMENT_OFF,
         },
         "preregistration": {
