@@ -154,7 +154,7 @@ If initialization was interrupted after writing only a valid frozen plan and loc
 
 The harmless two-subprocess controller smoke and focused boundary/locking/failure/plan-identity checks are recorded in `STAGED_CONTROL_VERIFICATION.json`. Runtime state under `.stage-control/` is intentionally ignored; its state, frozen plan, logs, and receipts must remain together for resume.
 
-## Bounded WSL GT probe: checkpoint proof blocked
+## Bounded WSL GT probe: original failed attempts
 
 The maintainer authorized four stages: GPU backward/update verification, a minimal aligned FIT input and independent student, a few GT-only updates with checkpoint reload/inference, and a measured report. The Director fixed one seed and architecture, at most 300 unique FIT audio seconds, and 20 total optimizer updates: one backend fixture plus nineteen GT updates. The approximately two-hour target was not an authorization for extra runs, KD, new teacher passes, evaluation audio, paid calls, or production changes.
 
@@ -186,6 +186,41 @@ Retained host command walls were 16.969345 seconds for the backend command, 13.0
 
 Both failed controller states remain unchanged and refuse automatic continuation. No failed state was relabeled as successful. Runtime artifact directories are local and ignored; retain each complete directory with its configuration and logs. No audio or model artifact was published.
 
-The next decision is authorization for a minimal **two additional GT updates**, using the same architecture, seed, and the first 30.4 seconds of the already authorized source, to finish checkpoint and reload proof. That would bring the cumulative budget to 22; it has not been approved or executed. This runner failure is not evidence against acoustic PSEM or against the student architecture. The complete GT/KD comparison in issue #164 remains open.
+At this initial blocked point, the next decision was authorization for two additional GT updates using the same architecture, seed, and the first 30.4 seconds of the already authorized source. The maintainer subsequently approved exactly those two updates, bringing the cumulative cap to 22; the successful completion is recorded below. The earlier runner failure is not evidence against acoustic PSEM or against the student architecture. The complete GT/KD comparison in issue #164 remains open.
 
 Independent review was unavailable: its transport failed before reading the candidate, and fresh reviewer allocation could not resolve a configured model. No independent-review pass is claimed. Direct checks and actual runtime evidence are distinguished above. Product code and the selected downstream policy were unchanged; no system architecture change is proposed by this experiment.
+
+## Two-update checkpoint completion: passed
+
+After explicit approval of two additional GT updates, the frozen implementation `a58a48edc894f655aaa0f3bc13f9d925369b7d01` ran `gt_probe_checkpoint_plan.json` in actual WSL. The backend was not repeated. The separate run `.stage-control/issue-164-gt-checkpoint/` completed preparation, two updates with fresh-process checkpoint reload/inference, and report generation, all with exit code zero. A fresh controller process independently read its persisted `COMPLETED` state.
+
+This completes the requested four-stage **training-path smoke**, not issue #164's full quality-cost comparison. The saved checkpoint contains exactly **two new GT updates from the original initialization**; it does not recover or continue the lost nineteen-update weights. `GT_CHECKPOINT_RESULT.json` is a byte-identical tracked copy of the successful runtime result, SHA-256 `3a172eeb237c8b23fe91b343b0167dcaa11f642c4ee61a2f2d3fdecf12f4bfd8`. `GT_PROBE_RESULT.json` remains the historical failure record.
+
+### Actual observations
+
+| Check | Result |
+| --- | --- |
+| Training device | RX 7900 XTX, WSL Ubuntu, PyTorch 2.9.1 / ROCm 7.2.1 |
+| Student | 5,940,740 parameters; unchanged architecture and seed 20260915 |
+| Current learned input | Source-zero `ami_ES2005a`, 486,400 samples / 30.4 seconds |
+| GT update 1 | Loss 0.6919456124; finite gradients; first-parameter delta norm 0.0402700007 |
+| GT update 2 | Loss 0.6822207570; finite gradients; delta norm 0.0322614498; numeric state carried from update 1 |
+| Synchronized training loop | 2.178627211 seconds; first update 2.124919743 seconds includes first-use overhead; second update 0.052244433 seconds |
+| Frozen-weight chunk partition | Maximum logit delta 1.6391e-7; tolerance 1e-4 |
+| Midstream numeric-state handoff | Maximum logit delta 1.7881e-7; maximum state delta 4.7684e-7 |
+| Fresh-process reload | Optimizer counters equal 2, zero further updates, finite four-output inference, prediction delta exactly 0 |
+| Full student inference block | 15.2 seconds of audio processed in 0.025567173 seconds, including H2D, log-Mel, convolutions, GRU, logits, sigmoid, and D2H |
+| Inference exclusions | Checkpoint load 0.340519757 seconds, CPU optimizer validation 0.562113972 seconds, and warmup 0.858929030 seconds are separate |
+| PyTorch GPU allocation peaks | Training plus frozen-weight diagnostics: 275.90 MiB allocated / 294 MiB reserved; measured inference after warmup: 153.23 MiB allocated / 176 MiB reserved |
+
+These losses come from different chronological chunks and are not evidence of convergence or generalization. The inference number is a single warmed, 15.2-second block replay, not measured 80-ms admission cadence, live latency, or a throughput guarantee. PyTorch allocation counters are not complete process or device memory measurements and are not directly comparable to the native teacher's sampled counters. No teacher/student cost-reduction claim follows from this smoke.
+
+### Checkpoint and budget
+
+The checkpoint is `.stage-control/issue-164-gt-checkpoint/student_gt_checkpoint.pt`: **71,402,202 bytes**, SHA-256 `1928a9ae14d257282a9eefbc8e819876de1f8db325e0565831875dded8a434ac`. It includes model parameters, optimizer state, configuration, global step, RNG, consumed-source identity/frontier, and the actual detached streaming state. Its file size includes training state; it is not an inference-only model size. The saved state follows the declared TBPTT trajectory and is not claimed to equal replaying the entire prefix with the final weights.
+
+Retain this complete run directory, including `state.json`, frozen plan/configuration, continuation lineage, prior failure evidence, `prepared_fit.pt`, checkpoint, `train_receipt.json`, `reload_receipt.json`, `result.json`, and logs. The final model and its inputs remain local and ignored; no upload occurred. An already completed `resume` has no next stage and performs no additional training.
+
+Final optimizer accounting is **1 prior backend fixture + 19 conservatively charged failed-attempt updates + 2 newly checkpointed updates = 22**, with zero reload updates. Current input is 30.4 seconds; cumulative unique FIT audio remains 288.8 seconds, while cumulative training exposure including the approved repetition is 319.2 seconds. Both earlier failed controller states and their evidence remain unchanged.
+
+**Decision:** the isolated WSL GPU training, state-carry, persistence, and standalone inference path is executable. A later bounded GT/KD comparison can now be designed around measured execution rather than an assumed backward backend. Acoustic usefulness, calibration, source-disjoint quality, downstream effects, and complete teacher/student cost remain unmeasured. No additional updates, teacher passes, KD, evaluation audio, API/cloud work, production integration, or issue closure are authorized by this completion. The independent-review limitation above still applies.

@@ -1,0 +1,201 @@
+{
+  "audio_exposure_accounting": {
+    "cumulative_training_exposure_seconds": 319.2,
+    "cumulative_unique_fit_seconds": 288.8,
+    "current_input_seconds": 30.4,
+    "gt_training_consumed_seconds": 30.4,
+    "inference_replay_sample_bounds": [
+      0,
+      243200
+    ],
+    "partition_and_inference_replays_add_unique_audio_seconds": 0,
+    "prepared_unique_fit_seconds": 30.4,
+    "prior_failed_gt_checkpoint_recovered": false,
+    "prior_failed_gt_exposure_seconds": 288.8
+  },
+  "checkpoint_sha256": "1928a9ae14d257282a9eefbc8e819876de1f8db325e0565831875dded8a434ac",
+  "execution_lineage": {
+    "continuation_implementation_commit": "a58a48edc894f655aaa0f3bc13f9d925369b7d01",
+    "continuation_receipt_sha256": "0c143e34906962d84c8217c84f00f5c5e5f2193f2e5ff8416989bee3a7c17345",
+    "mode": "two_update_checkpoint_continuation_after_failed_gt_diagnostic",
+    "prior_backend_failed_run_id": "5f7943647cc44204a787afd7a2d588c1",
+    "prior_failed_gt_checkpoint_recovered": false,
+    "prior_failed_gt_controller_status": "FAILED at a post-loop scalar-counter diagnostic",
+    "prior_failed_gt_frozen_config_sha256": "a8b27c3a3d51bfaf5c46033eee0ddb97db1dc59deedffbc38d37cf1ee8c5c915",
+    "prior_failed_gt_run_id": "d55445b124c945da958cd081d159344b",
+    "prior_failed_gt_state_sha256": "e491b6fefa9cb5aaeb62737c93e29374a27e5702bc8fe0a67c0f469ac4d536d4",
+    "prior_failed_gt_stderr_sha256": "af573e55f62268e88ea23551e33042650109d95a517b1e24628323b91dae63d0",
+    "prior_failed_gt_training_observations_recovered": false,
+    "prior_failed_gt_update_inference_basis": "the bound 19-iteration loop precedes the trace-pinned failing post-loop counter audit",
+    "prior_failed_gt_updates_conservatively_inferred": 19
+  },
+  "optimizer_step_accounting": {
+    "cumulative_total": 22,
+    "new_gt_updates_observed_and_checkpointed": 2,
+    "prior_backend_fixture": 1,
+    "prior_failed_gt_updates_conservatively_spent": 19,
+    "reload": 0
+  },
+  "parameter_count": 5940740,
+  "reload": {
+    "checkpoint_load_seconds_excluded": 0.34051975699999915,
+    "checkpoint_sha256": "1928a9ae14d257282a9eefbc8e819876de1f8db325e0565831875dded8a434ac",
+    "finite_four_independent_probabilities": true,
+    "fresh_python_process": true,
+    "full_path_inference": {
+      "audio_seconds": 15.2,
+      "definition": "decoder-free student-only 15.2-second block replay: host-to-device mono waveform transfer, GPU fixed log-Mel, causal convolutions, stateful GRU, linear logits, sigmoid, and device-to-host probabilities",
+      "device": {
+        "backend": "PyTorch ROCm through torch.cuda API",
+        "device": "cuda:0",
+        "name": "AMD Radeon RX 7900 XTX",
+        "total_memory_bytes": 25725276160
+      },
+      "input_samples": 243200,
+      "measured_seconds": 0.02556717300000244,
+      "not_real_time_admission_cadence": true,
+      "output_frames": 190,
+      "peak_allocated_bytes": 160670720,
+      "peak_reserved_bytes": 184549376,
+      "peak_scope": "reset after warmup; includes resident model and measured inference only",
+      "synchronized": true,
+      "warmup_seconds_separate": 0.8589290299999988
+    },
+    "optimizer_cpu_validation_seconds_excluded": 0.5621139719999988,
+    "optimizer_step_counters": [
+      2
+    ],
+    "optimizer_steps": 0,
+    "prediction_max_abs_delta": 0.0,
+    "prediction_tolerance": 1e-05,
+    "representative_valid_frontier_sample": 5120,
+    "representative_valid_probabilities": [
+      0.500070333480835,
+      0.49523597955703735,
+      0.47286394238471985,
+      0.49662211537361145
+    ],
+    "runtime": {
+      "config_sha256": "17cc3784f8e090e08b3c003a15b98e4abd43e86e425b8d8f780a17daa4a311c8",
+      "implementation_base_commit": "c4d1abc33f1c57e0cdd14f5f41c765226cf5ab30",
+      "implementation_sha256": {
+        "gt_probe.py": "c40d791c8739192a129d00498d4b19b93b6ec827427acdddfb7bab23a277f133",
+        "run_gt_probe.sh": "9702c0b8199a018755c256edfe00bdd44c5d585598f6ae32a5573ccb59038563",
+        "stages.py": "c5ceb3934428b4ecae24e2c2905281ff7483ec3ccc09d2a816b3b0e2e9be077b",
+        "student.py": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d"
+      },
+      "python": "3.12.3",
+      "torch": "2.9.1+rocm7.2.1.gitff65f5bc",
+      "torch_hip": "7.2.53211-e1a6bc5663"
+    },
+    "stage": "reload"
+  },
+  "runtime": {
+    "config_sha256": "17cc3784f8e090e08b3c003a15b98e4abd43e86e425b8d8f780a17daa4a311c8",
+    "implementation_base_commit": "c4d1abc33f1c57e0cdd14f5f41c765226cf5ab30",
+    "implementation_sha256": {
+      "gt_probe.py": "c40d791c8739192a129d00498d4b19b93b6ec827427acdddfb7bab23a277f133",
+      "run_gt_probe.sh": "9702c0b8199a018755c256edfe00bdd44c5d585598f6ae32a5573ccb59038563",
+      "stages.py": "c5ceb3934428b4ecae24e2c2905281ff7483ec3ccc09d2a816b3b0e2e9be077b",
+      "student.py": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d"
+    },
+    "python": "3.12.3",
+    "torch": "2.9.1+rocm7.2.1.gitff65f5bc",
+    "torch_hip": "7.2.53211-e1a6bc5663"
+  },
+  "schema": "PSEM-ISSUE-164-GT-PROBE-RESULT-1",
+  "scope": "bounded GT-only smoke; not quality, generalization, KD, receiver, or production evidence",
+  "source": {
+    "annotation_sha256": {
+      "reference_rttm": "821f901941b449977ac9130b3ce0fbccb44da7b097d2ee73795cac65ae16c24a",
+      "source_annotation": "446d74caae4300cc95765fd7403ce4b29e186d60c5865ede24681bb8f22e2b15",
+      "speaker_mapping": "ca5102b6238a165eabfd55aed24f16146274c3b1e67c4c1417e7dde04b54a37b"
+    },
+    "channel_projection": "arithmetic mean of all channels in each source sample frame",
+    "component_id": "component-9bde89b69d0e4b542ec46d0132128e14ec230a5f90ae0965fce7ab19567b707c",
+    "meeting": "ES2005a",
+    "prepared_sample_bounds": [
+      0,
+      486400
+    ],
+    "role": "PSEM-STRATEGY-TRAIN",
+    "sample_rate": 16000,
+    "sample_width_bytes": 2,
+    "source_channels": 1,
+    "source_id": "ami_ES2005a",
+    "source_total_samples": 7646038,
+    "training_sample_bounds": [
+      0,
+      486400
+    ],
+    "waveform_sha256": "ac33e7b18ae72931e65dc279af4b129370ad62ca6ed64299b9e35f356e3f8ed8"
+  },
+  "status": "completed",
+  "streaming_partition_witness": {
+    "midstream_handoff_max_abs_logit_delta": 1.7881393432617188e-07,
+    "midstream_handoff_max_abs_state_delta": 4.76837158203125e-07,
+    "prefix_extension_compares_same_frozen_weights": true,
+    "prefix_extension_max_abs_logit_delta": 1.7881393432617188e-07,
+    "sample_bounds": [
+      0,
+      486400
+    ],
+    "tolerance": 0.0001,
+    "weights_frozen_during_witness": true,
+    "whole_vs_chunked_max_abs_logit_delta": 1.6391277313232422e-07,
+    "whole_vs_chunked_max_abs_state_delta": 2.9802322387695312e-08
+  },
+  "training": {
+    "gpu": {
+      "backend": "PyTorch ROCm through torch.cuda API",
+      "device": "cuda:0",
+      "name": "AMD Radeon RX 7900 XTX",
+      "peak_allocated_bytes": 289305088,
+      "peak_reserved_bytes": 308281344,
+      "total_memory_bytes": 25725276160
+    },
+    "loop_seconds_synchronized": 2.1786272110000002,
+    "timing_scope": "each step and loop include host-to-device input/target transfer, frontend, student forward, BCE, backward, gradient checks/clipping, optimizer step, and synchronization; step 1 includes first-use overhead",
+    "updates": [
+      {
+        "elapsed_seconds_synchronized": 2.1249197430000013,
+        "first_parameter_delta_norm": 0.04027000069618225,
+        "gradient_norm_before_clip": 0.2697448432445526,
+        "gradients_finite": true,
+        "input_samples": [
+          0,
+          243200
+        ],
+        "loss": 0.6919456124305725,
+        "output_frames": 190,
+        "output_frontier_samples": [
+          1280,
+          243200
+        ],
+        "state_carried_from_previous_step": false,
+        "state_detached_not_reset": true,
+        "step": 1
+      },
+      {
+        "elapsed_seconds_synchronized": 0.05224443299999848,
+        "first_parameter_delta_norm": 0.032261449843645096,
+        "gradient_norm_before_clip": 0.2516380548477173,
+        "gradients_finite": true,
+        "input_samples": [
+          243200,
+          486400
+        ],
+        "loss": 0.6822207570075989,
+        "output_frames": 190,
+        "output_frontier_samples": [
+          244480,
+          486400
+        ],
+        "state_carried_from_previous_step": true,
+        "state_detached_not_reset": true,
+        "step": 2
+      }
+    ]
+  },
+  "training_observation_boundary": "few-step training loss is a backend/path diagnostic, not a quality or generalization metric"
+}
