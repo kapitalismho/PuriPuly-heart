@@ -1489,7 +1489,7 @@ def build_peer_capture_session_config_from_vnext(
         ),
         endpoint_language=PeerCaptureLanguageFacts(
             source_mode=settings.intent.languages.peer_source_mode,
-            source_language=settings.intent.languages.peer_source_language,
+            source_language=settings.intent.languages.effective_peer_source,
             expected_languages=tuple(settings.intent.languages.peer_expected_languages),
         ),
         target_sample_rate_hz=backend.sample_rate_hz,

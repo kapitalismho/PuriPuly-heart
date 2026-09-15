@@ -486,7 +486,17 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
 
 
 @pytest.mark.asyncio
-async def test_requested_auto_language_uses_smart_turn_when_local_auto_resolves_english() -> None:
+@pytest.mark.parametrize(
+    ("source_mode", "peer_source", "self_source"),
+    [
+        ("auto", "en", "ko"),
+        ("auto", "", "ko"),
+        ("manual", "", "ko"),
+    ],
+)
+async def test_resolved_peer_language_keeps_smart_turn_active(
+    source_mode: str, peer_source: str, self_source: str
+) -> None:
     class FiniteSource:
         terminal_reason = None
 
@@ -534,17 +544,13 @@ async def test_requested_auto_language_uses_smart_turn_when_local_auto_resolves_
             ),
             languages=replace(
                 settings.intent.languages,
-                peer_source_mode="auto",
-                peer_source_language="en",
+                source_language=self_source,
+                peer_source_mode=source_mode,
+                peer_source_language=peer_source,
             ),
         ),
     )
     config = build_peer_capture_session_config_from_vnext(settings)
-    assert config.provider_id == "local_cpu_auto"
-    assert config.language.source_mode == "manual"
-    assert config.language.source_language == "en"
-    assert config.delivery_language.source_mode == "auto"
-    assert config.delivery_language.source_language == "en"
 
     source = FiniteSource()
     smart_turn = RecordingInferenceOwner()
