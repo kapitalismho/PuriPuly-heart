@@ -22,6 +22,10 @@ from torch import Tensor, nn
 PRIOR_FAILED_RUN_ID = "5f7943647cc44204a787afd7a2d588c1"
 PRIOR_BACKEND_RECEIPT_SHA256 = "3fdaef8c79e150bb76769ca4f6cdf1c8e5d07d1477286162aaa660ea924f6d66"
 PRIOR_BACKEND_CONFIG_SHA256 = "d6db6bda38c0935c9b808cf4dd469d17aca6a94f1c8c6ecec0392d570382e9aa"
+PRIOR_GT_RUN_ID = "d55445b124c945da958cd081d159344b"
+PRIOR_GT_STATE_SHA256 = "e491b6fefa9cb5aaeb62737c93e29374a27e5702bc8fe0a67c0f469ac4d536d4"
+PRIOR_GT_STDERR_SHA256 = "af573e55f62268e88ea23551e33042650109d95a517b1e24628323b91dae63d0"
+PRIOR_GT_CONFIG_SHA256 = "a8b27c3a3d51bfaf5c46033eee0ddb97db1dc59deedffbc38d37cf1ee8c5c915"
 
 
 def sha256_file(path: Path) -> str:
@@ -74,12 +78,36 @@ def load_config(path: Path) -> dict[str, Any]:
         actual = sha256_file(root / relative)
         if actual != expected:
             raise RuntimeError(f"implementation identity mismatch for {relative}: {actual}")
-    if value["budget"]["backend_fixture_optimizer_steps"] != 1:
-        raise RuntimeError("backend fixture must use exactly one optimizer step")
-    if not 1 <= value["budget"]["gt_optimizer_steps"] <= 19:
-        raise RuntimeError("GT optimizer steps must be between one and nineteen")
-    if value["budget"]["total_optimizer_steps"] != 1 + value["budget"]["gt_optimizer_steps"]:
-        raise RuntimeError("total optimizer-step budget is inconsistent")
+    budget = value["budget"]
+    if "prior_failed_gt_optimizer_steps" in budget:
+        expected = {
+            "prior_backend_optimizer_steps": 1,
+            "prior_failed_gt_optimizer_steps": 19,
+            "gt_optimizer_steps": 2,
+            "total_optimizer_steps": 22,
+            "maximum_unique_fit_audio_samples": 486400,
+            "prepared_and_consumed_fit_samples": 486400,
+            "prepared_and_consumed_fit_seconds": 30.4,
+            "cumulative_unique_fit_audio_samples": 4620800,
+            "cumulative_unique_fit_audio_seconds": 288.8,
+            "cumulative_training_exposure_samples": 5107200,
+            "cumulative_training_exposure_seconds": 319.2,
+        }
+        if (
+            value["authority"].get("user_authorized_additional_gt_updates") != 2
+            or budget.get("automatic_retry_after_unknown_partial_update") is not False
+        ):
+            raise RuntimeError("checkpoint continuation requires explicit two-update authority")
+        for key, expected_value in expected.items():
+            if budget.get(key) != expected_value:
+                raise RuntimeError(f"checkpoint-continuation budget {key} must be {expected_value}")
+    else:
+        if budget["backend_fixture_optimizer_steps"] != 1:
+            raise RuntimeError("backend fixture must use exactly one optimizer step")
+        if not 1 <= budget["gt_optimizer_steps"] <= 19:
+            raise RuntimeError("GT optimizer steps must be between one and nineteen")
+        if budget["total_optimizer_steps"] != 1 + budget["gt_optimizer_steps"]:
+            raise RuntimeError("total optimizer-step budget is inconsistent")
     return value
 
 
@@ -141,6 +169,10 @@ def parameter_count(model: nn.Module) -> int:
 def backend_stage(config_path: Path, run_root: Path) -> None:
     config_path = bind_config(config_path, run_root, initialize=True)
     config = load_config(config_path)
+    if "prior_failed_gt_optimizer_steps" in config["budget"]:
+        raise RuntimeError(
+            "checkpoint-continuation authority forbids another backend fixture update"
+        )
     device = require_gpu(config)
     seed_everything(config["seed"])
     conv = nn.Conv1d(64, 128, 5, stride=2).to(device)
@@ -922,16 +954,113 @@ def report_stage(config_path: Path, run_root: Path) -> None:
         backend = json.loads(prior_backend_path.read_text())
         continuation = json.loads(continuation_path.read_text())
         prior_config = json.loads(prior_config_path.read_text())
-        expected_continuation = {
-            "schema": "PSEM-ISSUE-164-GT-CONTINUATION-1",
-            "prior_failed_run_id": PRIOR_FAILED_RUN_ID,
-            "prior_backend_receipt_sha256": PRIOR_BACKEND_RECEIPT_SHA256,
-            "prior_backend_frozen_config_sha256": PRIOR_BACKEND_CONFIG_SHA256,
-            "continuation_frozen_config_sha256": config_sha256,
-        }
+        schema = continuation.get("schema")
+        if schema == "PSEM-ISSUE-164-GT-CONTINUATION-1":
+            expected_continuation = {
+                "schema": schema,
+                "prior_failed_run_id": PRIOR_FAILED_RUN_ID,
+                "prior_backend_receipt_sha256": PRIOR_BACKEND_RECEIPT_SHA256,
+                "prior_backend_frozen_config_sha256": PRIOR_BACKEND_CONFIG_SHA256,
+                "continuation_frozen_config_sha256": config_sha256,
+            }
+            comparable_prior = {
+                key: value for key, value in prior_config.items() if key != "implementation_sha256"
+            }
+            comparable_current = {
+                key: value for key, value in config.items() if key != "implementation_sha256"
+            }
+            if comparable_prior != comparable_current:
+                raise RuntimeError(
+                    "continuation config changed fields beyond implementation identities"
+                )
+            optimizer_accounting = {
+                "prior_backend_fixture": backend["optimizer_steps"],
+                "optimizer_steps_this_continuation": trained["optimizer_steps"],
+                "reload": reloaded["optimizer_steps"],
+                "cumulative_total": backend["optimizer_steps"] + trained["optimizer_steps"],
+            }
+            execution_lineage = {
+                "mode": "continuation_after_backend_receipt_recovery",
+                "failed_run_id": PRIOR_FAILED_RUN_ID,
+                "controller_stage_status": "FAILED after child exit 0 because required outputs were misplaced",
+                "receipt_sha256": PRIOR_BACKEND_RECEIPT_SHA256,
+                "frozen_config_sha256": PRIOR_BACKEND_CONFIG_SHA256,
+                "runtime": backend["runtime"],
+                "continuation_receipt_sha256": sha256_file(continuation_path),
+            }
+        elif schema == "PSEM-ISSUE-164-GT-CHECKPOINT-CONTINUATION-1":
+            prior_gt_state_path = run_root / "prior_failed_gt_state.json"
+            prior_gt_stderr_path = run_root / "prior_failed_gt_stderr.log"
+            prior_gt_config_path = run_root / "prior_failed_gt_frozen_config.json"
+            expected_continuation = {
+                "schema": schema,
+                "prior_failed_run_id": PRIOR_FAILED_RUN_ID,
+                "prior_backend_receipt_sha256": PRIOR_BACKEND_RECEIPT_SHA256,
+                "prior_backend_frozen_config_sha256": PRIOR_BACKEND_CONFIG_SHA256,
+                "prior_failed_gt_run_id": PRIOR_GT_RUN_ID,
+                "prior_failed_gt_state_sha256": PRIOR_GT_STATE_SHA256,
+                "prior_failed_gt_stderr_sha256": PRIOR_GT_STDERR_SHA256,
+                "prior_failed_gt_frozen_config_sha256": PRIOR_GT_CONFIG_SHA256,
+                "continuation_frozen_config_sha256": config_sha256,
+            }
+            prior_gt_config = json.loads(prior_gt_config_path.read_text())
+            prior_gt_state = json.loads(prior_gt_state_path.read_text())
+            train_outcomes = [
+                outcome
+                for outcome in prior_gt_state["stage_outcomes"]
+                if outcome["stage_id"] == "train"
+            ]
+            if (
+                sha256_file(prior_gt_state_path) != PRIOR_GT_STATE_SHA256
+                or sha256_file(prior_gt_stderr_path) != PRIOR_GT_STDERR_SHA256
+                or sha256_file(prior_gt_config_path) != PRIOR_GT_CONFIG_SHA256
+                or prior_gt_state["run_id"] != PRIOR_GT_RUN_ID
+                or prior_gt_state["status"] != "FAILED"
+                or len(train_outcomes) != 1
+                or train_outcomes[0]["status"] != "FAILED"
+                or train_outcomes[0]["return_code"] != 1
+                or train_outcomes[0]["stderr"]["sha256"] != PRIOR_GT_STDERR_SHA256
+            ):
+                raise RuntimeError("prior failed-GT evidence identity or outcome differs")
+            for identity_key in ("source", "architecture", "seed", "training"):
+                if prior_gt_config[identity_key] != config[identity_key]:
+                    raise RuntimeError(f"checkpoint continuation changed frozen {identity_key}")
+            if (
+                prior_gt_config["implementation_sha256"]["student.py"]
+                != config["implementation_sha256"]["student.py"]
+                or prior_gt_config["budget"]["gt_optimizer_steps"] != 19
+                or prior_gt_config["budget"]["total_optimizer_steps"] != 20
+                or trained["optimizer_steps"] != 2
+            ):
+                raise RuntimeError(
+                    "checkpoint continuation changed student identity or step accounting"
+                )
+            optimizer_accounting = {
+                "prior_backend_fixture": 1,
+                "prior_failed_gt_updates_conservatively_spent": 19,
+                "new_gt_updates_observed_and_checkpointed": trained["optimizer_steps"],
+                "reload": reloaded["optimizer_steps"],
+                "cumulative_total": 1 + 19 + trained["optimizer_steps"],
+            }
+            execution_lineage = {
+                "mode": "two_update_checkpoint_continuation_after_failed_gt_diagnostic",
+                "prior_backend_failed_run_id": PRIOR_FAILED_RUN_ID,
+                "prior_failed_gt_run_id": PRIOR_GT_RUN_ID,
+                "prior_failed_gt_controller_status": "FAILED at a post-loop scalar-counter diagnostic",
+                "prior_failed_gt_updates_conservatively_inferred": 19,
+                "prior_failed_gt_update_inference_basis": "the bound 19-iteration loop precedes the trace-pinned failing post-loop counter audit",
+                "prior_failed_gt_checkpoint_recovered": False,
+                "prior_failed_gt_training_observations_recovered": False,
+                "prior_failed_gt_state_sha256": PRIOR_GT_STATE_SHA256,
+                "prior_failed_gt_stderr_sha256": PRIOR_GT_STDERR_SHA256,
+                "prior_failed_gt_frozen_config_sha256": PRIOR_GT_CONFIG_SHA256,
+                "continuation_receipt_sha256": sha256_file(continuation_path),
+            }
+        else:
+            raise RuntimeError("unexpected continuation receipt schema")
         if any(continuation.get(key) != value for key, value in expected_continuation.items()):
             raise RuntimeError(
-                "continuation receipt does not bind the prior backend and current config"
+                "continuation receipt does not bind prior evidence and current config"
             )
         commit = continuation.get("implementation_commit")
         if (
@@ -940,16 +1069,7 @@ def report_stage(config_path: Path, run_root: Path) -> None:
             or any(character not in "0123456789abcdef" for character in commit)
         ):
             raise RuntimeError("continuation receipt has no valid implementation commit")
-        comparable_prior = {
-            key: value for key, value in prior_config.items() if key != "implementation_sha256"
-        }
-        comparable_current = {
-            key: value for key, value in config.items() if key != "implementation_sha256"
-        }
-        if comparable_prior != comparable_current:
-            raise RuntimeError(
-                "continuation config changed fields beyond implementation identities"
-            )
+        execution_lineage["continuation_implementation_commit"] = commit
         if (
             sha256_file(prior_backend_path) != PRIOR_BACKEND_RECEIPT_SHA256
             or sha256_file(prior_config_path) != PRIOR_BACKEND_CONFIG_SHA256
@@ -957,22 +1077,6 @@ def report_stage(config_path: Path, run_root: Path) -> None:
             or backend["optimizer_steps"] != 1
         ):
             raise RuntimeError("prior backend evidence identity or step count differs")
-        optimizer_accounting = {
-            "prior_backend_fixture": backend["optimizer_steps"],
-            "optimizer_steps_this_continuation": trained["optimizer_steps"],
-            "reload": reloaded["optimizer_steps"],
-            "cumulative_total": backend["optimizer_steps"] + trained["optimizer_steps"],
-        }
-        execution_lineage = {
-            "mode": "continuation_after_backend_receipt_recovery",
-            "failed_run_id": PRIOR_FAILED_RUN_ID,
-            "controller_stage_status": "FAILED after child exit 0 because required outputs were misplaced",
-            "receipt_sha256": PRIOR_BACKEND_RECEIPT_SHA256,
-            "frozen_config_sha256": PRIOR_BACKEND_CONFIG_SHA256,
-            "runtime": backend["runtime"],
-            "continuation_receipt_sha256": sha256_file(continuation_path),
-            "continuation_implementation_commit": commit,
-        }
     else:
         if prior_backend_path.exists() or prior_config_path.exists():
             raise RuntimeError("prior backend evidence requires an explicit continuation receipt")
@@ -1002,6 +1106,23 @@ def report_stage(config_path: Path, run_root: Path) -> None:
         or sha256_file(checkpoint_path) != trained["checkpoint_sha256"]
     ):
         raise RuntimeError("report checkpoint identities differ")
+    audio_exposure_accounting = {
+        "prepared_unique_fit_seconds": config["budget"]["prepared_and_consumed_fit_seconds"],
+        "gt_training_consumed_seconds": config["budget"]["prepared_and_consumed_fit_seconds"],
+        "partition_and_inference_replays_add_unique_audio_seconds": 0,
+        "inference_replay_sample_bounds": config["verification"]["inference_source_sample_bounds"],
+    }
+    if "prior_failed_gt_optimizer_steps" in config["budget"]:
+        audio_exposure_accounting.update(
+            {
+                "current_input_seconds": 30.4,
+                "cumulative_unique_fit_seconds": 288.8,
+                "cumulative_training_exposure_seconds": 319.2,
+                "prior_failed_gt_exposure_seconds": 288.8,
+                "prior_failed_gt_checkpoint_recovered": False,
+            }
+        )
+
     result = {
         "schema": "PSEM-ISSUE-164-GT-PROBE-RESULT-1",
         "status": "completed",
@@ -1009,14 +1130,7 @@ def report_stage(config_path: Path, run_root: Path) -> None:
         "optimizer_step_accounting": optimizer_accounting,
         "execution_lineage": execution_lineage,
         "source": prepared["source"],
-        "audio_exposure_accounting": {
-            "prepared_unique_fit_seconds": config["budget"]["prepared_and_consumed_fit_seconds"],
-            "gt_training_consumed_seconds": config["budget"]["prepared_and_consumed_fit_seconds"],
-            "partition_and_inference_replays_add_unique_audio_seconds": 0,
-            "inference_replay_sample_bounds": config["verification"][
-                "inference_source_sample_bounds"
-            ],
-        },
+        "audio_exposure_accounting": audio_exposure_accounting,
         "parameter_count": trained["parameter_count"],
         "checkpoint_sha256": trained["checkpoint_sha256"],
         "training": {
