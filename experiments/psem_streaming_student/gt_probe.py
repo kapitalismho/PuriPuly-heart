@@ -19,6 +19,10 @@ import torch
 from student import StreamingState, StreamingStudent
 from torch import Tensor, nn
 
+PRIOR_FAILED_RUN_ID = "5f7943647cc44204a787afd7a2d588c1"
+PRIOR_BACKEND_RECEIPT_SHA256 = "3fdaef8c79e150bb76769ca4f6cdf1c8e5d07d1477286162aaa660ea924f6d66"
+PRIOR_BACKEND_CONFIG_SHA256 = "d6db6bda38c0935c9b808cf4dd469d17aca6a94f1c8c6ecec0392d570382e9aa"
+
 
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
@@ -87,12 +91,12 @@ def local_path(value: str) -> Path:
 
 def runtime_identity(config_path: Path) -> dict[str, object]:
     root = Path(__file__).resolve().parent
+    config = load_config(config_path)
     return {
-        "implementation_base_commit": load_config(config_path)["implementation_base_commit"],
+        "implementation_base_commit": config["implementation_base_commit"],
         "config_sha256": sha256_file(config_path),
         "implementation_sha256": {
-            name: sha256_file(root / name)
-            for name in ("gt_probe.py", "student.py", "run_gt_probe.sh")
+            name: sha256_file(root / name) for name in config["implementation_sha256"]
         },
         "python": platform.python_version(),
         "torch": torch.__version__,
@@ -907,16 +911,91 @@ def reload_stage(config_path: Path, run_root: Path) -> None:
 def report_stage(config_path: Path, run_root: Path) -> None:
     config_path = bind_config(config_path, run_root, initialize=False)
     config = load_config(config_path)
-    backend = json.loads((run_root / "backend_receipt.json").read_text())
+    prior_backend_path = run_root / "prior_backend_receipt.json"
+    prior_config_path = run_root / "prior_backend_frozen_config.json"
+    continuation_path = run_root / "continuation_receipt.json"
     prepared = json.loads((run_root / "prepare_receipt.json").read_text())
     trained = json.loads((run_root / "train_receipt.json").read_text())
     reloaded = json.loads((run_root / "reload_receipt.json").read_text())
     config_sha256 = sha256_file(config_path)
+    if continuation_path.exists():
+        backend = json.loads(prior_backend_path.read_text())
+        continuation = json.loads(continuation_path.read_text())
+        prior_config = json.loads(prior_config_path.read_text())
+        expected_continuation = {
+            "schema": "PSEM-ISSUE-164-GT-CONTINUATION-1",
+            "prior_failed_run_id": PRIOR_FAILED_RUN_ID,
+            "prior_backend_receipt_sha256": PRIOR_BACKEND_RECEIPT_SHA256,
+            "prior_backend_frozen_config_sha256": PRIOR_BACKEND_CONFIG_SHA256,
+            "continuation_frozen_config_sha256": config_sha256,
+        }
+        if any(continuation.get(key) != value for key, value in expected_continuation.items()):
+            raise RuntimeError(
+                "continuation receipt does not bind the prior backend and current config"
+            )
+        commit = continuation.get("implementation_commit")
+        if (
+            not isinstance(commit, str)
+            or len(commit) != 40
+            or any(character not in "0123456789abcdef" for character in commit)
+        ):
+            raise RuntimeError("continuation receipt has no valid implementation commit")
+        comparable_prior = {
+            key: value for key, value in prior_config.items() if key != "implementation_sha256"
+        }
+        comparable_current = {
+            key: value for key, value in config.items() if key != "implementation_sha256"
+        }
+        if comparable_prior != comparable_current:
+            raise RuntimeError(
+                "continuation config changed fields beyond implementation identities"
+            )
+        if (
+            sha256_file(prior_backend_path) != PRIOR_BACKEND_RECEIPT_SHA256
+            or sha256_file(prior_config_path) != PRIOR_BACKEND_CONFIG_SHA256
+            or backend["runtime"]["config_sha256"] != PRIOR_BACKEND_CONFIG_SHA256
+            or backend["optimizer_steps"] != 1
+        ):
+            raise RuntimeError("prior backend evidence identity or step count differs")
+        optimizer_accounting = {
+            "prior_backend_fixture": backend["optimizer_steps"],
+            "optimizer_steps_this_continuation": trained["optimizer_steps"],
+            "reload": reloaded["optimizer_steps"],
+            "cumulative_total": backend["optimizer_steps"] + trained["optimizer_steps"],
+        }
+        execution_lineage = {
+            "mode": "continuation_after_backend_receipt_recovery",
+            "failed_run_id": PRIOR_FAILED_RUN_ID,
+            "controller_stage_status": "FAILED after child exit 0 because required outputs were misplaced",
+            "receipt_sha256": PRIOR_BACKEND_RECEIPT_SHA256,
+            "frozen_config_sha256": PRIOR_BACKEND_CONFIG_SHA256,
+            "runtime": backend["runtime"],
+            "continuation_receipt_sha256": sha256_file(continuation_path),
+            "continuation_implementation_commit": commit,
+        }
+    else:
+        if prior_backend_path.exists() or prior_config_path.exists():
+            raise RuntimeError("prior backend evidence requires an explicit continuation receipt")
+        backend_path = run_root / "backend_receipt.json"
+        backend = json.loads(backend_path.read_text())
+        if backend["runtime"]["config_sha256"] != config_sha256 or backend["optimizer_steps"] != 1:
+            raise RuntimeError("normal-run backend config identity or step count differs")
+        optimizer_accounting = {
+            "backend_fixture_this_run": backend["optimizer_steps"],
+            "gt_student_this_run": trained["optimizer_steps"],
+            "reload": reloaded["optimizer_steps"],
+            "total_this_run": backend["optimizer_steps"] + trained["optimizer_steps"],
+        }
+        execution_lineage = {
+            "mode": "normal_four_stage_run",
+            "backend_receipt_sha256": sha256_file(backend_path),
+            "runtime": backend["runtime"],
+        }
     if any(
         receipt["runtime"]["config_sha256"] != config_sha256
-        for receipt in (backend, prepared, trained, reloaded)
+        for receipt in (prepared, trained, reloaded)
     ):
-        raise RuntimeError("stage receipts do not share the frozen config identity")
+        raise RuntimeError("learning stage receipts do not share the frozen config identity")
     checkpoint_path = run_root / "student_gt_checkpoint.pt"
     if (
         trained["checkpoint_sha256"] != reloaded["checkpoint_sha256"]
@@ -927,12 +1006,8 @@ def report_stage(config_path: Path, run_root: Path) -> None:
         "schema": "PSEM-ISSUE-164-GT-PROBE-RESULT-1",
         "status": "completed",
         "scope": "bounded GT-only smoke; not quality, generalization, KD, receiver, or production evidence",
-        "optimizer_step_accounting": {
-            "backend_fixture": backend["optimizer_steps"],
-            "gt_student": trained["optimizer_steps"],
-            "reload": reloaded["optimizer_steps"],
-            "total": backend["optimizer_steps"] + trained["optimizer_steps"],
-        },
+        "optimizer_step_accounting": optimizer_accounting,
+        "execution_lineage": execution_lineage,
         "source": prepared["source"],
         "audio_exposure_accounting": {
             "prepared_unique_fit_seconds": config["budget"]["prepared_and_consumed_fit_seconds"],

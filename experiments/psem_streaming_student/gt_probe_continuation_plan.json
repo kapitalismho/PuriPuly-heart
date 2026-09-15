@@ -2,25 +2,6 @@
   "schema_version": 1,
   "stages": [
     {
-      "id": "backend",
-      "argv": [
-        "wsl.exe",
-        "-d",
-        "Ubuntu",
-        "--exec",
-        "bash",
-        "{workflow_root_wsl}/run_gt_probe.sh",
-        "backend",
-        "{workflow_root_wsl}/gt_probe_config.json",
-        "{run_root_wsl}"
-      ],
-      "timeout_seconds": 600,
-      "required_outputs": [
-        "backend_receipt.json",
-        "frozen_config.json"
-      ]
-    },
-    {
       "id": "prepare",
       "argv": [
         "wsl.exe",

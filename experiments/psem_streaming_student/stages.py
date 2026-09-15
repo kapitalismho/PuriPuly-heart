@@ -205,6 +205,7 @@ def substitutions(run_root: Path) -> dict[str, str]:
         "{workflow_root}": str(root),
         "{workflow_root_wsl}": windows_path_to_wsl(root),
         "{run_root}": str(run_root.resolve()),
+        "{run_root_wsl}": windows_path_to_wsl(run_root),
         "{python}": sys.executable,
     }
 
