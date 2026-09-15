@@ -261,7 +261,6 @@ def _owner(
     *,
     process_child=None,
     output=None,
-    on_parent_ready=None,
     trace=None,
     predecessor_wait_observer=None,
     turn_generation_observer=None,
@@ -293,7 +292,6 @@ def _owner(
         on_child_started=started,
         process_child=process,
         on_child_terminal=terminal,
-        on_parent_ready=on_parent_ready,
         on_parent_closed=closed,
         on_parent_rejected=rejected,
         predecessor_wait_observer=predecessor_wait_observer,
@@ -923,6 +921,48 @@ async def test_channel_cancellation_drains_inflight_admission_before_reset_retur
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("cancelled", [False, True])
+async def test_interrupted_parent_admission_closes_parent_and_allows_next_turn(
+    cancelled: bool,
+) -> None:
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def admitted(_children: tuple[TranslationTurnChild, ...]) -> None:
+        entered.set()
+        await release.wait()
+        raise RuntimeError("output admission failed")
+
+    owner = _owner()
+    owner.on_parent_admitted = admitted
+    parent_id = uuid4()
+    submit_task = asyncio.create_task(owner.submit(_request(parent_id=parent_id, turn_kind="peer")))
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1.0)
+        if cancelled:
+            submit_task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await submit_task
+        else:
+            release.set()
+            await submit_task
+
+        assert owner.is_parent_closed(parent_id)
+        assert not owner.has_resources
+        await asyncio.wait_for(owner.wait_for_idle(), timeout=1.0)
+        owner.on_parent_admitted = None
+        following_id = uuid4()
+        await owner.submit(_request(parent_id=following_id, turn_kind="peer"))
+        await asyncio.wait_for(owner.wait_for_idle(), timeout=1.0)
+        assert owner.is_parent_closed(following_id)
+        assert not owner.has_resources
+    finally:
+        release.set()
+        await asyncio.gather(submit_task, return_exceptions=True)
+        await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_dual_target_precomputed_translation_is_normalized_to_primary_child() -> None:
     parent_id = uuid4()
     observed: list[TranslationTurnChild] = []
@@ -1276,7 +1316,7 @@ async def test_blocked_peer_parent_does_not_serialize_self_parent() -> None:
 
 
 @pytest.mark.asyncio
-async def test_parents_run_in_submission_order_within_one_channel() -> None:
+async def test_self_parents_run_in_submission_order() -> None:
     first_entered = asyncio.Event()
     release_first = asyncio.Event()
     started_texts: list[str] = []
@@ -1293,14 +1333,14 @@ async def test_parents_run_in_submission_order_within_one_channel() -> None:
         await owner.submit(
             _request(
                 parent_id=uuid4(),
-                turn_kind="peer",
+                turn_kind="self",
                 runs=(FinalLanguageRun("first", "en"),),
             )
         )
         await owner.submit(
             _request(
                 parent_id=uuid4(),
-                turn_kind="peer",
+                turn_kind="self",
                 runs=(FinalLanguageRun("second", "en"),),
             )
         )
@@ -1417,10 +1457,7 @@ async def test_terminal_adapter_failure_does_not_strand_parent() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("turn_kind", ["self", "peer"])
-async def test_single_target_predecessor_wait_is_observed_without_source_text(
-    turn_kind: str,
-) -> None:
+async def test_single_target_self_predecessor_wait_is_observed_without_source_text() -> None:
     release_first = asyncio.Event()
     waits: list[tuple[str, dict[str, object]]] = []
 
@@ -1436,8 +1473,8 @@ async def test_single_target_predecessor_wait_is_observed_without_source_text(
     second_id = uuid4()
     owner = _owner(process_child=process, predecessor_wait_observer=observe)
     try:
-        await owner.submit(_request(parent_id=first_id, turn_kind=turn_kind))
-        await owner.submit(_request(parent_id=second_id, turn_kind=turn_kind))
+        await owner.submit(_request(parent_id=first_id, turn_kind="self"))
+        await owner.submit(_request(parent_id=second_id, turn_kind="self"))
         await asyncio.sleep(0)
         assert [event for event, _fields in waits] == ["predecessor_wait_start"]
         assert waits[0][1]["parent_utterance_id"] == str(second_id)
@@ -1509,6 +1546,75 @@ async def test_blocked_overlay_does_not_delay_next_single_target_self_llm() -> N
         "overlay-start:second",
         "overlay-end:second",
     ]
+
+
+@pytest.mark.asyncio
+async def test_peer_parents_share_execution_limit_after_ordered_source_admission() -> None:
+    texts = ("first", "second", "third", "fourth", "fifth")
+    release = {text: asyncio.Event() for text in texts[:3]}
+    started = {text: asyncio.Event() for text in texts}
+    source_admissions: list[str] = []
+    active_count = 0
+    maximum_active_count = 0
+
+    async def admitted(children: tuple[TranslationTurnChild, ...]) -> None:
+        source_admissions.append(children[0].transcript.text)
+
+    async def process(child: TranslationTurnChild, _cancellation_requested):
+        nonlocal active_count, maximum_active_count
+        text = child.transcript.text
+        active_count += 1
+        maximum_active_count = max(maximum_active_count, active_count)
+        started[text].set()
+        try:
+            gate = release.get(text)
+            if gate is not None:
+                await gate.wait()
+            return _translated_result(child)
+        finally:
+            active_count -= 1
+
+    output = RecordingOutput()
+    owner = _owner(process_child=process, output=output)
+    owner.on_parent_admitted = admitted
+
+    def request(text: str) -> TranslationTurnRequest:
+        return replace(
+            _request(
+                parent_id=uuid4(),
+                turn_kind="peer",
+                runs=(FinalLanguageRun(text, "en"),),
+            ),
+            config_snapshot=TranslationRuntimeConfigSnapshot(
+                revision=0,
+                value=TranslationRuntimeConfig(concurrency_limit=3),
+            ),
+        )
+
+    try:
+        for text in texts[:3]:
+            await owner.submit(request(text))
+        await asyncio.gather(*(started[text].wait() for text in texts[:3]))
+        for text in texts[3:]:
+            await owner.submit(request(text))
+        await asyncio.sleep(0)
+
+        assert not started["fourth"].is_set()
+        assert not started["fifth"].is_set()
+        assert source_admissions == list(texts)
+        release["second"].set()
+        release["third"].set()
+        await asyncio.gather(started["fourth"].wait(), started["fifth"].wait())
+
+        assert maximum_active_count == 3
+        assert output.submissions == []
+
+        release["first"].set()
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+
+    assert [submission.source_text for submission in output.submissions] == list(texts)
 
 
 @pytest.mark.asyncio
@@ -1616,18 +1722,30 @@ async def test_peer_cancellation_releases_frontier_for_new_generation() -> None:
     owner = _owner(process_child=process, output=output)
     try:
         await owner.submit(
-            _request(
-                parent_id=uuid4(),
-                turn_kind="peer",
-                runs=(FinalLanguageRun("cancelled", "en"),),
+            replace(
+                _request(
+                    parent_id=uuid4(),
+                    turn_kind="peer",
+                    runs=(FinalLanguageRun("cancelled", "en"),),
+                ),
+                config_snapshot=TranslationRuntimeConfigSnapshot(
+                    revision=0,
+                    value=TranslationRuntimeConfig(concurrency_limit=1),
+                ),
             )
         )
         await asyncio.wait_for(first_started.wait(), timeout=1)
         await owner.submit(
-            _request(
-                parent_id=uuid4(),
-                turn_kind="peer",
-                runs=(FinalLanguageRun("waiting", "en"),),
+            replace(
+                _request(
+                    parent_id=uuid4(),
+                    turn_kind="peer",
+                    runs=(FinalLanguageRun("waiting", "en"),),
+                ),
+                config_snapshot=TranslationRuntimeConfigSnapshot(
+                    revision=0,
+                    value=TranslationRuntimeConfig(concurrency_limit=1),
+                ),
             )
         )
         await owner.cancel_pending(channel="peer")
@@ -1687,6 +1805,7 @@ async def test_same_channel_output_order_follows_submission_order() -> None:
 @pytest.mark.asyncio
 async def test_unexecuted_child_does_not_hold_semantic_gate_on_overlay() -> None:
     overlay_released = asyncio.Event()
+    overlay_started = asyncio.Event()
     events: list[str] = []
 
     async def created(child: TranslationTurnChild) -> None:
@@ -1704,6 +1823,7 @@ async def test_unexecuted_child_does_not_hold_semantic_gate_on_overlay() -> None
             submission: TranslationOutputSubmission,
         ) -> None:
             events.append(f"overlay-start:{submission.source_text}")
+            overlay_started.set()
             if submission.source_text == "a2":
                 await overlay_released.wait()
             events.append(f"overlay-end:{submission.source_text}")
@@ -1729,6 +1849,7 @@ async def test_unexecuted_child_does_not_hold_semantic_gate_on_overlay() -> None
             if "llm:b" in events:
                 break
             await asyncio.sleep(0)
+        await overlay_started.wait()
         assert "llm:a2" in events
         assert "llm:b" in events
         assert "overlay-start:a2" in events
@@ -1758,7 +1879,15 @@ async def test_peer_waiting_queue_retires_oldest_above_exact_capacity() -> None:
     parent_ids = [uuid4() for _ in range(10)]
     try:
         for parent_id in parent_ids:
-            await owner.submit(_request(parent_id=parent_id, turn_kind="peer"))
+            await owner.submit(
+                replace(
+                    _request(parent_id=parent_id, turn_kind="peer"),
+                    config_snapshot=TranslationRuntimeConfigSnapshot(
+                        revision=0,
+                        value=TranslationRuntimeConfig(concurrency_limit=1),
+                    ),
+                )
+            )
         await asyncio.sleep(0)
         retired = [event for event in trace if event[0] == "terminal" and event[2] == "source_only"]
         assert len(retired) == 1
@@ -1768,7 +1897,8 @@ async def test_peer_waiting_queue_retires_oldest_above_exact_capacity() -> None:
     finally:
         await owner.close()
 
-    assert processed == [parent_ids[0], *parent_ids[2:]]
+    assert set(processed) == set([parent_ids[0], *parent_ids[2:]])
+    assert len(processed) == len(parent_ids) - 1
 
 
 @pytest.mark.asyncio
@@ -1902,9 +2032,23 @@ async def test_peer_waiting_parent_expires_twelve_second_policy_clock() -> None:
     owner.peer_waiting_ttl_s = 0.01
     first_id = uuid4()
     waiting_id = uuid4()
+    constrained_snapshot = TranslationRuntimeConfigSnapshot(
+        revision=0,
+        value=TranslationRuntimeConfig(concurrency_limit=1),
+    )
     try:
-        await owner.submit(_request(parent_id=first_id, turn_kind="peer"))
-        await owner.submit(_request(parent_id=waiting_id, turn_kind="peer"))
+        await owner.submit(
+            replace(
+                _request(parent_id=first_id, turn_kind="peer"),
+                config_snapshot=constrained_snapshot,
+            )
+        )
+        await owner.submit(
+            replace(
+                _request(parent_id=waiting_id, turn_kind="peer"),
+                config_snapshot=constrained_snapshot,
+            )
+        )
         await asyncio.wait_for(owner.wait_for_parent(waiting_id), timeout=0.5)
         assert processed == [first_id]
         assert any(event[0] == "terminal" and event[2] == "source_only" for event in trace)

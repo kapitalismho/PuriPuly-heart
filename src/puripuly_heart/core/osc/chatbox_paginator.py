@@ -198,6 +198,18 @@ class ChatboxPaginator:
         assert self._pending_messages is not None
         dropped_pages = len(self._pending_pages)
         dropped_messages = len(self._pending_messages)
+        if self._active_message is not None:
+            self._record_stage(
+                "message_terminal",
+                utterance_id=str(self._active_message.utterance_id),
+                status="output_runtime_closing",
+            )
+        for message in self._pending_messages:
+            self._record_stage(
+                "message_terminal",
+                utterance_id=str(message.utterance_id),
+                status="output_runtime_closing",
+            )
         self._pending_pages.clear()
         self._pending_messages.clear()
         self._next_page_at = 0.0
@@ -273,6 +285,11 @@ class ChatboxPaginator:
         elif active_key is not None and active_key < incoming_key:
             dropped_pages = self._clear_active_message()
             active_pruned = True
+            self._record_stage(
+                "message_terminal",
+                utterance_id=str(active.utterance_id),
+                status="output_superseded",
+            )
 
         replaced_pending_revision: int | None = None
         replacement_index: int | None = None
@@ -287,6 +304,11 @@ class ChatboxPaginator:
                 if replacement_index is None:
                     replacement_index = len(next_pending)
                 pruned_messages += 1
+                self._record_stage(
+                    "message_terminal",
+                    utterance_id=str(candidate.utterance_id),
+                    status="output_superseded",
+                )
                 continue
             if candidate_key == incoming_key:
                 if replacement_index is None:
@@ -414,6 +436,13 @@ class ChatboxPaginator:
             self.sender.send_chatbox(text)
         except OSError as exc:
             self._emit_send_failure(mode=mode, exc=exc)
+            if mode == "queued" and remaining_parts == 0:
+                active = self._active_message
+                self._record_stage(
+                    "message_terminal",
+                    utterance_id=None if active is None else str(active.utterance_id),
+                    status="output_send_failed",
+                )
             return False
         self._emit_send_delivered(mode=mode, text=text, remaining_parts=remaining_parts)
         if mode == "queued":

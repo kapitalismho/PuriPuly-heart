@@ -107,10 +107,15 @@ class LatencyTracePointContract:
 
 
 LATENCY_TRACE_POINT_CONTRACTS: dict[str, LatencyTracePointContract] = {
+    "last_speech": LatencyTracePointContract(
+        name="last_speech",
+        timing_semantics="Last observed source speech content boundary supplied by the channel owner.",
+        acceptance_expectation="Use the owned source content frontier and observed trailing silence; leave unavailable origins unmeasured.",
+    ),
     "speech_end": LatencyTracePointContract(
         name="speech_end",
-        timing_semantics="Shared latency zero boundary recorded when the channel owner accepts SpeechEnd for the utterance.",
-        acceptance_expectation="Record the post-VAD SpeechEnd boundary; published e2e_ms adds the channel-specific VAD hangover for user-facing latency.",
+        timing_semantics="Actual source utterance seal accepted by the channel owner.",
+        acceptance_expectation="Retain this post-VAD boundary for the stage breakdown without using it as the end-to-end origin.",
     ),
     "stt_final": LatencyTracePointContract(
         name="stt_final",
@@ -132,34 +137,27 @@ LATENCY_TRACE_POINT_CONTRACTS: dict[str, LatencyTracePointContract] = {
         timing_semantics="Recorded when the translation request owner has completed text ready for publication.",
         acceptance_expectation="Use the completed translation that is about to be published, whether it came from a streaming or non-streaming provider.",
     ),
-    "self_chatbox_enqueue": LatencyTracePointContract(
-        name="self_chatbox_enqueue",
-        timing_semantics="Recorded when the output projection enqueues the final self output into ChatboxPaginator.",
-        acceptance_expectation="This is the official self Basic latency end boundary because it is the final self output handoff point owned by the output projection.",
+    "self_chatbox_send": LatencyTracePointContract(
+        name="self_chatbox_send",
+        timing_semantics="Recorded after the first self chatbox page is successfully handed to the OSC UDP sender.",
+        acceptance_expectation="This is a software send observation, not a VRChat or physical display acknowledgement.",
     ),
-    "peer_overlay_first_emit": LatencyTracePointContract(
-        name="peer_overlay_first_emit",
-        timing_semantics="Recorded when the output projection publishes the first peer overlay output into the output path, before any logical pacing wait: paired source+translation when translation succeeds, or source-only fallback when translation is unavailable, fails, or is cancelled.",
-        acceptance_expectation="Use the first pre-pacing projection publication that carries peer-visible text for that peer logical turn; this point does not claim logical admission, renderer delivery, or physical display.",
+    "peer_overlay_applied": LatencyTracePointContract(
+        name="peer_overlay_applied",
+        timing_semantics="Recorded when the peer presenter returns an applied application receipt after logical pacing.",
+        acceptance_expectation="This is presenter application receipt, not native renderer or physical HMD acknowledgement.",
+    ),
+    "dashboard_translation_applied": LatencyTracePointContract(
+        name="dashboard_translation_applied",
+        timing_semantics="Recorded after the dashboard translation destination accepts the update.",
+        acceptance_expectation="This is dashboard application receipt, not a physical display acknowledgement.",
     ),
     "peer_overlay_first_render": LatencyTracePointContract(
         name="peer_overlay_first_render",
-        timing_semantics="Recorded by the local overlay when the first local visible peer source or translation overlay output for the logical turn appears on this client.",
-        acceptance_expectation="Emit once per peer logical turn after peer_overlay_first_emit at the first local visible peer source or translation overlay output for that turn; do not wait for lifecycle completion, cleanup, or any channel-owner terminal summary stage.",
+        timing_semantics="Reported by the native overlay's existing correlated first-render diagnostic.",
+        acceptance_expectation="This is a local renderer observation, not compositor, physical HMD, or VRChat display acknowledgement.",
     ),
 }
-
-
-def format_basic_latency_summary(
-    *,
-    channel: str,
-    e2e_ms: int,
-) -> str:
-    parts = [
-        f"channel={channel}",
-        f"e2e_ms={e2e_ms}",
-    ]
-    return f"[Basic][Latency] {' '.join(parts)}"
 
 
 def format_detailed_latency_trace(
@@ -191,24 +189,6 @@ def format_detailed_latency_trace(
             )
         )
     return " ".join(parts)
-
-
-def format_detailed_latency_breakdown(
-    *,
-    channel: str,
-    e2e_ms: int,
-    speech_end_to_stt_final_ms: int | None = None,
-    stt_final_to_final_output_ms: int | None = None,
-) -> str:
-    parts = [
-        f"channel={channel}",
-        f"e2e_ms={e2e_ms}",
-    ]
-    if speech_end_to_stt_final_ms is not None:
-        parts.append(f"speech_end_to_stt_final_ms={speech_end_to_stt_final_ms}")
-    if stt_final_to_final_output_ms is not None:
-        parts.append(f"stt_final_to_final_output_ms={stt_final_to_final_output_ms}")
-    return f"[Detailed][LatencyBreakdown] {' '.join(parts)}"
 
 
 def format_translation_ready_for_output(

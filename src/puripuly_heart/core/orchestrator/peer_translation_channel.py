@@ -358,6 +358,18 @@ class PeerTranslationChannelOwner:
         speech_end_at = owned.segment.sealed_at_monotonic_s
         if speech_end_at is None:
             raise ValueError("peer owned SpeechEnd must carry a sealed segment")
+        source_end_at = (
+            owned.segment.content_ranges[-1].source_end_monotonic_s
+            if owned.segment.content_ranges
+            else speech_end_at
+        )
+        self._record_latency_stage(
+            channel="peer",
+            utterance_id=event.utterance_id,
+            stage="last_speech",
+            timestamp=source_end_at - event.trailing_silence_ms / 1000.0,
+            publish_now=False,
+        )
         self.runtime.utterance_start_times[event.utterance_id] = speech_end_at
         self.runtime.speech_ended_ids.add(event.utterance_id)
         self._peer_parent_speech_end_times[event.utterance_id] = speech_end_at
@@ -614,22 +626,6 @@ class PeerTranslationChannelOwner:
             raise asyncio.CancelledError
         return result
 
-    async def on_parent_ready(self, children: tuple[TranslationTurnChild, ...]) -> None:
-        if any(child.channel != "peer" for child in children):
-            raise ValueError("Peer translation owner received a non-Peer parent")
-        requests = tuple(
-            self._translation_process_request(
-                child,
-                (
-                    self._target_language_for(self.runtime, child.config_snapshot.value)
-                    if child.target_language == "und"
-                    else child.target_language
-                ),
-            )
-            for child in children
-        )
-        self._prepared_requests.update(self.translation_requests.admit_peer(requests))
-
     @staticmethod
     def _translation_process_request(
         child: TranslationTurnChild,
@@ -705,6 +701,18 @@ class PeerTranslationChannelOwner:
                 detailed=True,
             )
         )
+        requests = tuple(
+            self._translation_process_request(
+                child,
+                (
+                    self._target_language_for(self.runtime, child.config_snapshot.value)
+                    if child.target_language == "und"
+                    else child.target_language
+                ),
+            )
+            for child in children
+        )
+        self._prepared_requests.update(self.translation_requests.admit_peer(requests))
         if not await self.output_projection.admit_translation_parent(children):
             raise RuntimeError("Peer translation output admission rejected parent")
 

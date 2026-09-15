@@ -1390,6 +1390,8 @@ class OutputRuntime:
             reason="application_applied",
             metadata={
                 "channel": "peer",
+                "utterance_id": str(event.utterance_id),
+                "event_type": event.EVENT_TYPE,
                 "publication_generation": peer_batch.publication_generation,
                 "source_order": peer_batch.source_order,
                 "accepted_handoff": True,
@@ -1486,6 +1488,8 @@ class OutputRuntime:
         self._batch_admission.release(destination_batch, reason)
         metadata: dict[str, str | int | float | bool | None] = {
             "channel": "peer",
+            "utterance_id": str(event.utterance_id),
+            "event_type": event.EVENT_TYPE,
             "accepted_handoff": True,
             "physical_ack": False,
             "stage": "application_accepted",

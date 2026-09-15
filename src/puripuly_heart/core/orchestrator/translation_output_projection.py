@@ -635,6 +635,32 @@ class TranslationOutputProjectionOwner:
             self.diagnostics.record_overlay_sink_failure(
                 decision.metadata.get("error_type", "Exception")
             )
+        if decision.metadata.get("event_type") not in {
+            "peer_transcript_final",
+            "translation_final",
+        }:
+            return
+        raw_utterance_id = decision.metadata.get("utterance_id")
+        if not isinstance(raw_utterance_id, str):
+            return
+        try:
+            utterance_id = UUID(raw_utterance_id)
+        except ValueError:
+            return
+        if (
+            decision.decision == OUTPUT_ROUTING_DECISION_PUBLISHED
+            and decision.reason == "application_applied"
+        ):
+            self.diagnostics.record_output_latency_stage(
+                LatencyStageDiagnostic(
+                    channel="peer",
+                    utterance_id=utterance_id,
+                    stage="peer_overlay_applied",
+                    overwrite=False,
+                )
+            )
+            return
+        self.diagnostics.abandon_pending_latency_output("peer", utterance_id)
 
     @property
     def self_turn_aggregate_count(self) -> int:
@@ -1131,14 +1157,7 @@ class TranslationOutputProjectionOwner:
         output_scope: OverlayPublicationScope | None = None,
     ) -> bool:
         if self.has_overlay_destination:
-            self.diagnostics.record_latency_stage(
-                LatencyStageDiagnostic(
-                    channel="peer",
-                    utterance_id=transcript.utterance_id,
-                    stage="peer_overlay_first_emit",
-                    overwrite=False,
-                )
-            )
+            self.diagnostics.retain_latency_until_output("peer", transcript.utterance_id)
             await self.emit_final_transcript(
                 TranscriptOverlayProjection(
                     transcript=transcript,
@@ -1172,13 +1191,9 @@ class TranslationOutputProjectionOwner:
             secondary_len=len(translation.text.strip()),
         )
         if projection.record_peer_first_emit:
-            self.diagnostics.record_latency_stage(
-                LatencyStageDiagnostic(
-                    channel=translation.channel,
-                    utterance_id=translation.utterance_id,
-                    stage="peer_overlay_first_emit",
-                    overwrite=False,
-                )
+            self.diagnostics.retain_latency_until_output(
+                "peer",
+                translation.utterance_id,
             )
         await self.publish_overlay_event(
             self.overlay_event_adapter.translation_final(
@@ -1242,6 +1257,13 @@ class TranslationOutputProjectionOwner:
             publication_generation=publication_generation,
             source_order=source_order,
         )
+        if (
+            event.channel == "peer"
+            and event.EVENT_TYPE in {"peer_transcript_final", "translation_final"}
+            and result.decision.decision != OUTPUT_ROUTING_DECISION_PUBLISHED
+            and event.utterance_id is not None
+        ):
+            self.diagnostics.abandon_pending_latency_output("peer", event.utterance_id)
         if result.decision.reason == "destination_publish_failed":
             self.diagnostics.record_overlay_sink_failure(
                 result.decision.metadata.get("error_type", "Exception")
@@ -2466,6 +2488,11 @@ class TranslationOutputProjectionOwner:
         self,
         projection: ChatboxProjection,
     ) -> OutputPublicationResult:
+        if projection.channel == "self":
+            self.diagnostics.retain_latency_until_output(
+                "self",
+                projection.utterance_id,
+            )
         result = await self.output_runtime.publish_chatbox(
             publication_id=projection.utterance_id,
             channel=projection.channel,
@@ -2492,6 +2519,10 @@ class TranslationOutputProjectionOwner:
                     detailed=True,
                 )
             )
+            self.diagnostics.abandon_pending_latency_output(
+                projection.channel,
+                projection.utterance_id,
+            )
             self.diagnostics.clear_latency_timeline(
                 projection.channel,
                 projection.utterance_id,
@@ -2515,14 +2546,6 @@ class TranslationOutputProjectionOwner:
                 detailed=True,
             )
         )
-        if projection.channel == "self":
-            self.diagnostics.record_latency_stage(
-                LatencyStageDiagnostic(
-                    channel="self",
-                    utterance_id=projection.utterance_id,
-                    stage="self_chatbox_enqueue",
-                )
-            )
         await self.publish_ui(
             TranslationUiMessage(
                 event_type=UIEventType.OSC_SENT,

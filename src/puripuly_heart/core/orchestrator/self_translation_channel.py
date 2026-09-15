@@ -208,21 +208,37 @@ class SelfTranslationChannelOwner:
             resume_overlay_resync_buffer = self._maybe_confirm_resume(vad_event)
         if isinstance(vad_event, SpeechEnd):
             speech_end_at = self.clock.now()
+            sealed_at = (
+                owned.segment.sealed_at_monotonic_s
+                if owned is not None and owned.segment.sealed_at_monotonic_s is not None
+                else speech_end_at
+            )
+            source_end_at = (
+                owned.segment.content_ranges[-1].source_end_monotonic_s
+                if owned is not None and owned.segment.content_ranges
+                else sealed_at
+            )
+            self._record_latency_stage(
+                utterance_id=vad_event.utterance_id,
+                stage="last_speech",
+                timestamp=source_end_at - vad_event.trailing_silence_ms / 1000.0,
+                publish_now=False,
+            )
             self.output_projection.set_self_chatbox_typing_reason(
                 SELF_SPEECH_TYPING_REASON,
                 True,
             )
             self.runtime.utterance_start_times[vad_event.utterance_id] = speech_end_at
             self.runtime.speech_ended_ids.add(vad_event.utterance_id)
-            self._inherit_scoped_publication_end(
-                vad_event.utterance_id,
-                speech_end_at,
-            )
             self._record_latency_stage(
                 utterance_id=vad_event.utterance_id,
                 stage="speech_end",
-                timestamp=speech_end_at,
+                timestamp=sealed_at,
                 publish_now=not low_latency_mode,
+            )
+            self._inherit_scoped_publication_end(
+                vad_event.utterance_id,
+                speech_end_at,
             )
             if low_latency_mode:
                 self._maybe_update_buffer_end_time(vad_event.utterance_id)
@@ -485,6 +501,10 @@ class SelfTranslationChannelOwner:
         self._scoped_endpoint_publication_ids[acoustic_id] = publication_id
         cumulative = self._scoped_publication_text.get(identity, "") + text
         self._scoped_publication_text[identity] = cumulative
+        self._inherit_latency_for_output(
+            output_utterance_id=publication_id,
+            source_utterance_ids=(acoustic_id,),
+        )
         if acoustic_id in self.runtime.speech_ended_ids:
             self.runtime.speech_ended_ids.add(publication_id)
             end_time = self.runtime.utterance_start_times.get(acoustic_id)
@@ -551,6 +571,10 @@ class SelfTranslationChannelOwner:
             return
         self.runtime.speech_ended_ids.add(publication_id)
         self.runtime.utterance_start_times[publication_id] = end_time
+        self._inherit_latency_for_output(
+            output_utterance_id=publication_id,
+            source_utterance_ids=(acoustic_id,),
+        )
         self._maybe_update_buffer_end_time(publication_id)
         self._maybe_start_finalize_wait(publication_id)
 
@@ -1641,7 +1665,6 @@ class SelfTranslationChannelOwner:
                 transcript,
                 turn_kind="self",
                 prestarted_secondary_translation=prestarted_secondary_translation,
-                wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
                 config_snapshot=config_snapshot,
             )
             return
@@ -1675,7 +1698,6 @@ class SelfTranslationChannelOwner:
                     turn_kind="self",
                     precomputed_translation=translation,
                     prestarted_secondary_translation=prestarted_secondary_translation,
-                    wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
                     config_snapshot=config_snapshot,
                 )
                 return
@@ -1691,7 +1713,6 @@ class SelfTranslationChannelOwner:
             transcript,
             turn_kind="self",
             prestarted_secondary_translation=prestarted_secondary_translation,
-            wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
             config_snapshot=config_snapshot,
         )
 

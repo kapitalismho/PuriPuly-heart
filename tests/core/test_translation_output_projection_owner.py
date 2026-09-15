@@ -12,6 +12,7 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
 )
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
+    LatencyStageDiagnostic,
     TranslationLatencyDiagnosticsOwner,
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import (
@@ -26,6 +27,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnChild,
     TranslationTurnOutcome,
 )
+from puripuly_heart.core.overlay.sink import OverlayApplicationReceipt, OverlayEventUnion
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime.output import OutputRuntime
 from puripuly_heart.core.runtime_logging import SessionLoggingMode
@@ -93,6 +95,27 @@ class RecordingOverlay:
 
     def active_self_overlay_metadata(self) -> ActiveSelfOverlayMetadata | None:
         return self.metadata
+
+
+class BlockingPeerOverlay(RecordingOverlay):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def emit_peer_when_admissible(
+        self,
+        event: OverlayEventUnion,
+    ) -> OverlayApplicationReceipt:
+        self.started.set()
+        await self.release.wait()
+        self.events.append(event)
+        return OverlayApplicationReceipt(
+            stage="application_accepted",
+            outcome="applied",
+            publication_id=event.event_id,
+            scene_revision=1,
+        )
 
 
 def make_owner(
@@ -309,6 +332,54 @@ async def wait_for_overlay_event_count(
             await asyncio.sleep(0)
 
     await asyncio.wait_for(wait_until_emitted(), timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_peer_latency_waits_for_paced_presenter_application_receipt() -> None:
+    overlay = BlockingPeerOverlay()
+    owner, _chatbox, _ui, config_owner = make_owner(overlay=overlay)
+    runtime_logging, stream = _make_runtime_logging_capture()
+    owner.diagnostics.runtime_logging = runtime_logging
+    translation = Translation(
+        utterance_id=uuid4(),
+        text="translated",
+        source_text="source",
+        source_language="ja",
+        target_language="en",
+        channel="peer",
+    )
+    output = submission(
+        config_owner,
+        channel="peer",
+        outcome="translated",
+        translation=translation,
+    )
+    owner.diagnostics.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="peer",
+            utterance_id=translation.utterance_id,
+            stage="last_speech",
+            timestamp=8.0,
+        )
+    )
+
+    try:
+        await admit_and_project_single_translation(owner, output)
+        await overlay.started.wait()
+        assert not any("[Basic][Latency]" in message for message in _runtime_log_messages(stream))
+
+        owner.clock.advance(4.0)
+        overlay.release.set()
+        await owner.output_runtime.wait_for_peer_output_idle()
+
+        summary = next(
+            message for message in _runtime_log_messages(stream) if "[Basic][Latency]" in message
+        )
+        assert "endpoint=overlay_applied" in summary
+        assert "last_speech_to_overlay_applied_ms=6000" in summary
+    finally:
+        runtime_logging.close()
+        await owner.output_runtime.close()
 
 
 async def complete_cancelled_translation_target(

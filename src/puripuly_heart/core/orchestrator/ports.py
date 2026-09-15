@@ -43,11 +43,14 @@ def runtime_logging_mode_is_detailed(mode: object) -> bool:
 def format_basic_latency_summary(
     *,
     channel: str,
-    e2e_ms: int,
+    endpoint: str,
+    elapsed_ms: int,
 ) -> str:
+    metric_name = f"last_speech_to_{endpoint}_ms"
     parts = [
         f"channel={channel}",
-        f"e2e_ms={e2e_ms}",
+        f"endpoint={endpoint}",
+        f"{metric_name}={elapsed_ms}",
     ]
     return f"[Basic][Latency] {' '.join(parts)}"
 
@@ -86,18 +89,23 @@ def format_detailed_latency_trace(
 def format_detailed_latency_breakdown(
     *,
     channel: str,
-    e2e_ms: int,
+    endpoint: str,
+    elapsed_ms: int,
+    last_speech_to_speech_end_ms: int | None = None,
     speech_end_to_stt_final_ms: int | None = None,
     stt_final_to_final_output_ms: int | None = None,
 ) -> str:
     parts = [
         f"channel={channel}",
-        f"e2e_ms={e2e_ms}",
+        f"endpoint={endpoint}",
+        f"last_speech_to_{endpoint}_ms={elapsed_ms}",
     ]
+    if last_speech_to_speech_end_ms is not None:
+        parts.append(f"last_speech_to_speech_end_ms={last_speech_to_speech_end_ms}")
     if speech_end_to_stt_final_ms is not None:
         parts.append(f"speech_end_to_stt_final_ms={speech_end_to_stt_final_ms}")
     if stt_final_to_final_output_ms is not None:
-        parts.append(f"stt_final_to_final_output_ms={stt_final_to_final_output_ms}")
+        parts.append(f"stt_final_to_{endpoint}_ms={stt_final_to_final_output_ms}")
     return f"[Detailed][LatencyBreakdown] {' '.join(parts)}"
 
 

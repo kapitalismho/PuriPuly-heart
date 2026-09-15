@@ -325,11 +325,15 @@ Translation owners retain:
 
 `TranslationTurnLifecycleOwner` admits peer turns in source order. Self and peer speech have separate bounded queues with expiry; child translations share their parent slot.
 
-The turn owner segments LISTEN transcripts by language and speaker. `TranslationRequestOwner.admit_peer` prepares each segment before recording the parent's source history once. Multi-segment LLM requests share a current-turn reference with parent-local speaker aliases and return plain translated text for one segment; custom HTTP payloads remain unchanged.
+The turn owner segments LISTEN transcripts by language and speaker. In the serialized parent-admission boundary, `TranslationRequestOwner.admit_peer` prepares each segment before recording the parent's source history once. Preparation precedes suspendable output admission, so provider replacement cannot reorder source context. Multi-segment LLM requests share a current-turn reference with parent-local speaker aliases and return plain translated text for one segment; custom HTTP payloads remain unchanged.
 
-Peer segments execute concurrently up to the captured translation concurrency limit, with provider-wide admission still shared with Self. Waiting for a parent-local execution slot does not consume the child watchdog. The turn owner publishes completed segments incrementally in source order; a failed segment retires only its own output slot. The next Peer parent still waits for its predecessor's semantic completion. Prepared requests retain provider generation authority, and cancellation drains queued and active child work before retiring the parent.
+Peer parents and segments execute concurrently under a Peer-wide captured translation concurrency limit, with provider-wide admission still shared with Self. Waiting for an execution slot does not consume the child watchdog or exempt a parent from waiting-queue expiry. Completed segments publish incrementally in parent and child source order; a failed segment retires only its own output slot. A separate bounded active-parent count limits retained results during output stalls without holding execution capacity. Prepared requests retain provider generation authority, and cancellation drains queued and active child work before retiring the parent.
+
+Interrupted parent admission retires the unstarted parent. Waiting-parent retirement closes its lifecycle even if its source-only output has already been evicted or output submission fails.
 
 Manual self turns share the ordered lifecycle but are not subject to speech eviction, expiry, or TALK OFF cancellation.
+
+Self merge commit returns after parent admission for both single- and dual-target output. The turn lifecycle owns subsequent translation and publication; speculative selection and finalize-grace policy remain in the Self owner.
 
 ## Output
 

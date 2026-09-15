@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 from uuid import uuid4
 
+import pytest
+
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
@@ -97,44 +99,247 @@ def make_owner(
     )
 
 
-def test_owner_emits_latency_contract_once_with_channel_hangover_and_cause() -> None:
+def test_owner_summarizes_actual_delayed_chatbox_send_from_last_speech() -> None:
+    clock = FakeClock(_now=10.0)
     logging = RuntimeLogging()
-    owner = make_owner(runtime_logging=logging)
-    utterance_id = uuid4()
-    stages = (
-        ("speech_end", 10.0),
-        ("stt_final", 10.1),
-        ("llm_request_start", 10.2),
-        ("llm_first_chunk", 10.4),
-        ("llm_done", 10.5),
-        ("self_chatbox_enqueue", 10.6),
+    configuration = TranslationRuntimeConfig(hangover_s=0.4)
+    owner = TranslationLatencyDiagnosticsOwner(
+        clock=clock,
+        config_snapshot=lambda: TranslationRuntimeConfigurationOwner(configuration).snapshot(),
+        runtime_logging=logging,
     )
-
-    for stage, timestamp in stages:
-        owner.record_latency_stage(
-            LatencyStageDiagnostic(
-                channel="self",
-                utterance_id=utterance_id,
-                stage=stage,
-                timestamp=timestamp,
-            )
-        )
+    paginator = ChatboxPaginator(
+        sender=FakeSender(),
+        clock=clock,
+        max_chars=4,
+        page_interval_s=3.0,
+        stage_recorder=owner.record_chatbox_stage,
+    )
+    paginator.enqueue(OSCMessage(utterance_id=uuid4(), text="abcdefgh", created_at=clock.now()))
+    utterance_id = uuid4()
     owner.record_latency_stage(
         LatencyStageDiagnostic(
             channel="self",
             utterance_id=utterance_id,
-            stage="self_chatbox_enqueue",
-            timestamp=10.7,
-            overwrite=False,
+            stage="last_speech",
+            timestamp=8.0,
+        )
+    )
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self",
+            utterance_id=utterance_id,
+            stage="speech_end",
+            timestamp=9.0,
+        )
+    )
+    paginator.enqueue(OSCMessage(utterance_id=utterance_id, text="done", created_at=clock.now()))
+    owner.retain_latency_until_output("self", utterance_id)
+    owner.clear_latency_timeline("self", utterance_id)
+
+    assert logging.basic == []
+
+    configuration = replace(configuration, hangover_s=9.0)
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert logging.basic == [
+        "[Basic][Latency] channel=self endpoint=chatbox_send " "last_speech_to_chatbox_send_ms=5000"
+    ]
+    breakdown = next(
+        message for message in logging.detailed if "[Detailed][LatencyBreakdown]" in message
+    )
+    assert "last_speech_to_speech_end_ms=1000" in breakdown
+    assert "last_speech_to_chatbox_send_ms=5000" in breakdown
+    assert owner.snapshot().timeline_keys == frozenset()
+
+
+def test_first_successful_page_keeps_latency_after_earlier_page_failures() -> None:
+    class SelectiveSender(FakeSender):
+        def send_chatbox(self, text: str) -> None:
+            if text != "ijkl":
+                raise OSError("send failed")
+            super().send_chatbox(text)
+
+    clock = FakeClock(_now=10.0)
+    logging = RuntimeLogging()
+    owner = make_owner(clock=clock, runtime_logging=logging)
+    sender = SelectiveSender()
+    paginator = ChatboxPaginator(
+        sender=sender, clock=clock, max_chars=4, stage_recorder=owner.record_chatbox_stage
+    )
+    utterance_id = uuid4()
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self", utterance_id=utterance_id, stage="last_speech", timestamp=9.0
+        )
+    )
+    owner.retain_latency_until_output("self", utterance_id)
+    paginator.enqueue(OSCMessage(utterance_id=utterance_id, text="abcdefghijkl", created_at=10.0))
+    owner.clear_latency_timeline("self", utterance_id)
+    clock.advance(3.0)
+    paginator.process_due()
+    assert logging.basic == []
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["ijkl"]
+    assert len(logging.basic) == 1
+    assert "last_speech_to_chatbox_send_ms=7000" in logging.basic[0]
+    assert owner.snapshot().timeline_keys == frozenset()
+
+    failed_id = uuid4()
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self", utterance_id=failed_id, stage="last_speech", timestamp=16.0
+        )
+    )
+    owner.retain_latency_until_output("self", failed_id)
+    paginator.enqueue(OSCMessage(utterance_id=failed_id, text="abcdefgh", created_at=16.0))
+    clock.advance(3.0)
+    paginator.process_due()
+    assert len(logging.basic) == 1
+    assert owner.snapshot().timeline_keys == frozenset()
+
+
+@pytest.mark.parametrize("same_parent", [False, True])
+def test_pending_self_replacement_retires_only_superseded_timing(same_parent: bool) -> None:
+    clock = FakeClock(_now=10.0)
+    logging = RuntimeLogging()
+    owner = make_owner(clock=clock, runtime_logging=logging)
+    sender = FakeSender()
+    paginator = ChatboxPaginator(
+        sender=sender, clock=clock, max_chars=4, stage_recorder=owner.record_chatbox_stage
+    )
+    paginator.enqueue(OSCMessage(utterance_id=uuid4(), text="abcdefgh", created_at=10.0))
+    old_id = uuid4()
+    new_id = old_id if same_parent else uuid4()
+    for revision, utterance_id, text in ((1, old_id, "old"), (2, new_id, "new")):
+        owner.record_latency_stage(
+            LatencyStageDiagnostic(
+                channel="self", utterance_id=utterance_id, stage="last_speech", timestamp=9.0
+            )
+        )
+        owner.retain_latency_until_output("self", utterance_id)
+        paginator.enqueue(
+            OSCMessage(
+                utterance_id=utterance_id,
+                text=text,
+                created_at=10.0,
+                self_speech=True,
+                turn_generation=1,
+                turn_order=1 if same_parent else revision,
+                presentation_revision=revision,
+            )
+        )
+        owner.clear_latency_timeline("self", utterance_id)
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["abcd", "efgh", "new"]
+    assert len(logging.basic) == 1
+    assert "last_speech_to_chatbox_send_ms=4000" in logging.basic[0]
+    assert owner.snapshot().timeline_keys == frozenset()
+
+
+def test_late_source_end_reaches_committed_outputs_after_source_cleanup() -> None:
+    clock = FakeClock(_now=13.0)
+    logging = RuntimeLogging()
+    owner = make_owner(clock=clock, runtime_logging=logging)
+    source_id, publication_id, first_id, second_id = (uuid4() for _ in range(4))
+    owner.record_latency_stage(
+        LatencyStageDiagnostic("self", source_id, "stt_final", timestamp=9.0)
+    )
+    owner.inherit_latency(LatencyInheritanceDiagnostic("self", publication_id, (source_id,)))
+    for output_id in (first_id, second_id):
+        owner.inherit_latency(LatencyInheritanceDiagnostic("self", output_id, (publication_id,)))
+        owner.retain_latency_until_output("self", output_id)
+        owner.clear_latency_timeline("self", output_id)
+    owner.clear_latency_timeline("self", publication_id)
+    owner.clear_latency_timeline("self", source_id)
+    owner.record_output_latency_stage(
+        LatencyStageDiagnostic("self", first_id, "self_chatbox_send", timestamp=13.0)
+    )
+    assert logging.basic == []
+    owner.record_latency_stage(
+        LatencyStageDiagnostic("self", source_id, "last_speech", timestamp=9.5, publish_now=False)
+    )
+    owner.record_latency_stage(
+        LatencyStageDiagnostic("self", source_id, "speech_end", timestamp=10.1)
+    )
+    owner.record_output_latency_stage(
+        LatencyStageDiagnostic("self", second_id, "self_chatbox_send", timestamp=15.0)
+    )
+
+    assert len(logging.basic) == 2
+    assert "last_speech_to_chatbox_send_ms=3500" in logging.basic[0]
+    assert "last_speech_to_chatbox_send_ms=5500" in logging.basic[1]
+    assert owner.snapshot().timeline_keys == frozenset()
+
+
+@pytest.mark.parametrize("late_last_speech,expected_ms", [(9.5, 500), (11.0, None)])
+def test_merged_output_waits_for_latest_source_without_fabricating_zero_latency(
+    late_last_speech: float, expected_ms: int | None
+) -> None:
+    logging = RuntimeLogging()
+    owner = make_owner(runtime_logging=logging)
+    first_id, late_id, output_id = (uuid4() for _ in range(3))
+    owner.record_latency_stage(LatencyStageDiagnostic("self", late_id, "stt_final", timestamp=9.0))
+    owner.record_latency_stage(
+        LatencyStageDiagnostic("self", first_id, "last_speech", timestamp=8.0)
+    )
+    owner.record_latency_stage(
+        LatencyStageDiagnostic("self", first_id, "speech_end", timestamp=8.5)
+    )
+    owner.inherit_latency(LatencyInheritanceDiagnostic("self", output_id, (first_id, late_id)))
+    owner.retain_latency_until_output("self", output_id)
+    owner.clear_latency_timeline("self", first_id)
+    owner.clear_latency_timeline("self", late_id)
+    owner.clear_latency_timeline("self", output_id)
+    owner.record_output_latency_stage(
+        LatencyStageDiagnostic("self", output_id, "self_chatbox_send", timestamp=10.0)
+    )
+    assert logging.basic == []
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            "self", late_id, "last_speech", timestamp=late_last_speech, publish_now=False
+        )
+    )
+    owner.record_latency_stage(
+        LatencyStageDiagnostic("self", late_id, "speech_end", timestamp=late_last_speech + 0.5)
+    )
+
+    if expected_ms is None:
+        assert logging.basic == []
+    else:
+        assert len(logging.basic) == 1
+        assert f"last_speech_to_chatbox_send_ms={expected_ms}" in logging.basic[0]
+    assert owner.snapshot().timeline_keys == frozenset()
+
+
+def test_owner_does_not_measure_output_without_last_speech_origin() -> None:
+    logging = RuntimeLogging()
+    owner = make_owner(runtime_logging=logging)
+    utterance_id = uuid4()
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self",
+            utterance_id=utterance_id,
+            stage="speech_end",
+            timestamp=10.0,
+        )
+    )
+    owner.record_output_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self",
+            utterance_id=utterance_id,
+            stage="self_chatbox_send",
+            timestamp=10.5,
         )
     )
 
-    assert logging.basic == ["[Basic][Latency] channel=self e2e_ms=1000"]
-    assert sum("[Detailed][Latency]" in message for message in logging.detailed) == 6
-    cause = next(message for message in logging.detailed if "latency_cause" in message)
-    assert "provider=llm" in cause
-    assert "dominant_stage=llm_request_to_llm_done" in cause
-    assert "llm_request_to_llm_done_ms=300" in cause
+    assert logging.basic == []
+    assert not any("[Detailed][LatencyBreakdown]" in message for message in logging.detailed)
 
 
 def test_chatbox_replacement_and_prune_reach_runtime_logging_without_overlay_diagnostics() -> None:

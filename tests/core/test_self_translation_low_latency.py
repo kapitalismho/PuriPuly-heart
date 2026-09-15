@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import UUID, uuid4
 
 import numpy as np
 import pytest
 
+from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.orchestrator.channel_runtime import (
     _MergeBuffer,
     _SpeculativeAttemptStatus,
@@ -20,6 +21,8 @@ from puripuly_heart.core.orchestrator.ports import compute_latency_dominant_stag
 from puripuly_heart.core.orchestrator.self_translation_channel import (
     SelfTranslationChannelOwner,
 )
+from puripuly_heart.core.orchestrator.translation_diagnostics import LatencyStageDiagnostic
+from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime_logging import SessionLoggingMode
 from puripuly_heart.core.translation_backend import LlmTranslationBackend
@@ -35,9 +38,11 @@ from tests.core.test_translation_owner_branch_coverage import (
     _make_runtime_logging_capture,
     _runtime_log_messages,
 )
+from tests.helpers.fakes import FakeSender
 from tests.helpers.translation_owners import (
     compose_translation_test_harness,
     make_speculative_attempt,
+    owned_peer_speech_end,
 )
 
 # ── Mock classes ──────────────────────────────────────────────────────────────
@@ -920,49 +925,73 @@ class TestRuntimeLatencyLogging:
             await harness.stop()
 
     @pytest.mark.asyncio
-    async def test_basic_latency_summary_includes_self_hangover_without_stage(self):
+    @pytest.mark.parametrize("trailing_silence_ms,reason", [(600, "silence"), (0, "max_duration")])
+    async def test_last_speech_latency_uses_capture_tail_not_handler_time_or_settings(
+        self, trailing_silence_ms, reason, monkeypatch
+    ):
         runtime_logging, log_stream = _make_runtime_logging_capture()
-        clock = FakeClock(initial_time=10.0)
+        clock = FakeClock(initial_time=12.0)
+        sender = FakeSender()
+        osc = ChatboxPaginator(sender=sender, clock=clock)
         harness = compose_translation_test_harness(
             stt=None,
             llm=None,
-            osc=FakeOscQueue(),
+            osc=osc,
             clock=clock,
             low_latency_mode=True,
             low_latency_finalize_wait_ms=0,
             hangover_s=9.9,
             runtime_logging=runtime_logging,
         )
+        osc.stage_recorder = harness.translation_diagnostics.record_chatbox_stage
+
+        async def accept_owned_audio(*args):
+            return None
+
+        monkeypatch.setattr(
+            type(harness.local_asr_runtime), "handle_owned_vad_event", accept_owned_audio
+        )
         utterance_id = uuid4()
-
+        owned = owned_peer_speech_end(
+            utterance_id,
+            speech_end_at=11.0,
+            trailing_silence_ms=trailing_silence_ms,
+            reason=reason,
+        )
+        capture = AudioCaptureSpan(0, 0, 16000, 0, 16000, 9.0, 10.0)
+        owned = replace(
+            owned,
+            segment=replace(owned.segment, content_ranges=(capture,), content_sample_count=16000),
+        )
         try:
-            await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
+            await harness.self_owner.handle_vad_event(owned)
+            harness.replace_configuration(hangover_s=0.1)
             clock.advance(0.25)
-
             await harness.dispatch_stt_event(
                 STTFinalEvent(
                     utterance_id=utterance_id,
                     transcript=Transcript(
                         utterance_id=utterance_id,
-                        text="official latency",
+                        text="captured speech",
                         is_final=True,
                         created_at=clock.now(),
                     ),
-                ),
+                )
             )
+            await harness.translation_turns.wait_for_idle()
 
-            messages = _runtime_log_messages(log_stream)
-            latency_message = next(message for message in messages if "[Basic][Latency]" in message)
-
-            assert "channel=self" in latency_message
-            assert "e2e_ms=10150" in latency_message
-            assert "final_output_stage=" not in latency_message
-            assert "speech_end_to_stt_final_ms=" not in latency_message
-            assert "stt_final_to_final_output_ms=" not in latency_message
-            assert "hangover" not in latency_message
+            assert sender.sent == ["captured speech"]
+            elapsed_ms = 2250 + trailing_silence_ms
+            summaries = [
+                message
+                for message in _runtime_log_messages(log_stream)
+                if "[Basic][Latency]" in message
+            ]
+            assert len(summaries) == 1
+            assert f"last_speech_to_chatbox_send_ms={elapsed_ms}" in summaries[0]
         finally:
-            runtime_logging.close()
             await harness.stop()
+            runtime_logging.close()
 
     @pytest.mark.asyncio
     async def test_detailed_latency_traces_emit_only_in_detailed_mode(self):
@@ -972,10 +1001,12 @@ class TestRuntimeLatencyLogging:
 
         basic_clock = FakeClock(initial_time=10.0)
         detailed_clock = FakeClock(initial_time=20.0)
+        basic_osc = ChatboxPaginator(sender=FakeSender(), clock=basic_clock)
+        detailed_osc = ChatboxPaginator(sender=FakeSender(), clock=detailed_clock)
         basic_harness = compose_translation_test_harness(
             stt=None,
             llm=None,
-            osc=FakeOscQueue(),
+            osc=basic_osc,
             clock=basic_clock,
             low_latency_mode=True,
             low_latency_finalize_wait_ms=0,
@@ -984,16 +1015,27 @@ class TestRuntimeLatencyLogging:
         detailed_harness = compose_translation_test_harness(
             stt=None,
             llm=None,
-            osc=FakeOscQueue(),
+            osc=detailed_osc,
             clock=detailed_clock,
             low_latency_mode=True,
             low_latency_finalize_wait_ms=0,
             runtime_logging=detailed_runtime_logging,
         )
+        basic_osc.stage_recorder = basic_harness.translation_diagnostics.record_chatbox_stage
+        detailed_osc.stage_recorder = detailed_harness.translation_diagnostics.record_chatbox_stage
 
         try:
             basic_utterance_id = uuid4()
             await basic_harness.self_owner.handle_vad_event(SpeechEnd(basic_utterance_id))
+            basic_harness.translation_diagnostics.record_latency_stage(
+                LatencyStageDiagnostic(
+                    channel="self",
+                    utterance_id=basic_utterance_id,
+                    stage="last_speech",
+                    timestamp=basic_clock.now(),
+                    publish_now=False,
+                )
+            )
             basic_clock.advance(0.05)
             await basic_harness.dispatch_stt_event(
                 STTFinalEvent(
@@ -1009,6 +1051,15 @@ class TestRuntimeLatencyLogging:
 
             detailed_utterance_id = uuid4()
             await detailed_harness.self_owner.handle_vad_event(SpeechEnd(detailed_utterance_id))
+            detailed_harness.translation_diagnostics.record_latency_stage(
+                LatencyStageDiagnostic(
+                    channel="self",
+                    utterance_id=detailed_utterance_id,
+                    stage="last_speech",
+                    timestamp=detailed_clock.now(),
+                    publish_now=False,
+                )
+            )
             detailed_clock.advance(0.05)
             await detailed_harness.dispatch_stt_event(
                 STTFinalEvent(
@@ -1021,6 +1072,8 @@ class TestRuntimeLatencyLogging:
                     ),
                 ),
             )
+            await basic_harness.translation_turns.wait_for_idle()
+            await detailed_harness.translation_turns.wait_for_idle()
 
             basic_messages = _runtime_log_messages(basic_stream)
             detailed_messages = _runtime_log_messages(detailed_stream)
@@ -1036,16 +1089,15 @@ class TestRuntimeLatencyLogging:
                 for message in detailed_messages
             )
             assert any(
-                "[Detailed][Latency]" in message and "stage=self_chatbox_enqueue" in message
+                "[Detailed][Latency]" in message and "stage=self_chatbox_send" in message
                 for message in detailed_messages
             )
             assert any(
                 "[Detailed][LatencyBreakdown]" in message
                 and "channel=self" in message
-                and "e2e_ms=1050" in message
+                and "last_speech_to_chatbox_send_ms=50" in message
                 and "speech_end_to_stt_final_ms=50" in message
-                and "stt_final_to_final_output_ms=0" in message
-                and "final_output_stage=" not in message
+                and "stt_final_to_chatbox_send_ms=0" in message
                 for message in detailed_messages
             )
         finally:
@@ -1062,10 +1114,12 @@ class TestRuntimeLatencyLogging:
 
         basic_clock = FakeClock(initial_time=10.0)
         detailed_clock = FakeClock(initial_time=20.0)
+        basic_osc = ChatboxPaginator(sender=FakeSender(), clock=basic_clock)
+        detailed_osc = ChatboxPaginator(sender=FakeSender(), clock=detailed_clock)
         basic_harness = compose_translation_test_harness(
             stt=None,
             llm=None,
-            osc=FakeOscQueue(),
+            osc=basic_osc,
             clock=basic_clock,
             low_latency_mode=True,
             low_latency_finalize_wait_ms=0,
@@ -1074,16 +1128,27 @@ class TestRuntimeLatencyLogging:
         detailed_harness = compose_translation_test_harness(
             stt=None,
             llm=None,
-            osc=FakeOscQueue(),
+            osc=detailed_osc,
             clock=detailed_clock,
             low_latency_mode=True,
             low_latency_finalize_wait_ms=0,
             runtime_logging=detailed_runtime_logging,
         )
+        basic_osc.stage_recorder = basic_harness.translation_diagnostics.record_chatbox_stage
+        detailed_osc.stage_recorder = detailed_harness.translation_diagnostics.record_chatbox_stage
 
         try:
             basic_utterance_id = uuid4()
             await basic_harness.self_owner.handle_vad_event(SpeechEnd(basic_utterance_id))
+            basic_harness.translation_diagnostics.record_latency_stage(
+                LatencyStageDiagnostic(
+                    channel="self",
+                    utterance_id=basic_utterance_id,
+                    stage="last_speech",
+                    timestamp=basic_clock.now(),
+                    publish_now=False,
+                )
+            )
             basic_clock.advance(0.25)
             await basic_harness.dispatch_stt_event(
                 STTFinalEvent(
@@ -1099,6 +1164,15 @@ class TestRuntimeLatencyLogging:
 
             detailed_utterance_id = uuid4()
             await detailed_harness.self_owner.handle_vad_event(SpeechEnd(detailed_utterance_id))
+            detailed_harness.translation_diagnostics.record_latency_stage(
+                LatencyStageDiagnostic(
+                    channel="self",
+                    utterance_id=detailed_utterance_id,
+                    stage="last_speech",
+                    timestamp=detailed_clock.now(),
+                    publish_now=False,
+                )
+            )
             detailed_clock.advance(0.25)
             await detailed_harness.dispatch_stt_event(
                 STTFinalEvent(
@@ -1111,6 +1185,8 @@ class TestRuntimeLatencyLogging:
                     ),
                 ),
             )
+            await basic_harness.translation_turns.wait_for_idle()
+            await detailed_harness.translation_turns.wait_for_idle()
 
             basic_messages = _runtime_log_messages(basic_stream)
             detailed_messages = _runtime_log_messages(detailed_stream)
@@ -1136,22 +1212,34 @@ class TestRuntimeLatencyLogging:
         runtime_logging, log_stream = _make_runtime_logging_capture()
         runtime_logging.set_mode(SessionLoggingMode.DETAILED)
         clock = FakeClock(initial_time=10.0)
+        sender = FakeSender()
+        osc = ChatboxPaginator(sender=sender, clock=clock)
         harness = compose_translation_test_harness(
             stt=None,
             llm=ClockedTranslateLLMProvider(
                 clock=clock,
                 responses=[(0.30, "translated secret-token")],
             ),
-            osc=FakeOscQueue(),
+            osc=osc,
             clock=clock,
             low_latency_mode=True,
             low_latency_finalize_wait_ms=0,
             runtime_logging=runtime_logging,
         )
+        osc.stage_recorder = harness.translation_diagnostics.record_chatbox_stage
         utterance_id = uuid4()
 
         try:
             await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
+            harness.translation_diagnostics.record_latency_stage(
+                LatencyStageDiagnostic(
+                    channel="self",
+                    utterance_id=utterance_id,
+                    stage="last_speech",
+                    timestamp=clock.now(),
+                    publish_now=False,
+                )
+            )
             clock.advance(0.05)
             await harness.dispatch_stt_event(
                 STTFinalEvent(
@@ -1172,6 +1260,7 @@ class TestRuntimeLatencyLogging:
             )
             assert spec_task is not None
             await asyncio.gather(spec_task, return_exceptions=True)
+            await harness.translation_turns.wait_for_idle()
 
             messages = _runtime_log_messages(log_stream)
             latency_cause = next(
@@ -1205,6 +1294,15 @@ class TestRuntimeLatencyLogging:
 
         try:
             await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
+            harness.translation_diagnostics.record_latency_stage(
+                LatencyStageDiagnostic(
+                    channel="self",
+                    utterance_id=utterance_id,
+                    stage="last_speech",
+                    timestamp=clock.now(),
+                    publish_now=False,
+                )
+            )
             runtime_logging.set_mode(SessionLoggingMode.DETAILED)
             clock.advance(0.05)
 
@@ -1327,6 +1425,15 @@ class TestRuntimeLatencyLogging:
 
         try:
             await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
+            harness.translation_diagnostics.record_latency_stage(
+                LatencyStageDiagnostic(
+                    channel="self",
+                    utterance_id=utterance_id,
+                    stage="last_speech",
+                    timestamp=clock.now(),
+                    publish_now=False,
+                )
+            )
             clock.advance(0.05)
             await harness.dispatch_stt_event(
                 STTFinalEvent(
@@ -1373,7 +1480,8 @@ class TestRuntimeLatencyLogging:
         runtime_logging, log_stream = _make_runtime_logging_capture()
         runtime_logging.set_mode(SessionLoggingMode.DETAILED)
         clock = FakeClock(initial_time=10.0)
-        osc = FakeOscQueue()
+        sender = FakeSender()
+        osc = ChatboxPaginator(sender=sender, clock=clock)
         overlay_sink = RecordingOverlaySink()
         harness = compose_translation_test_harness(
             stt=None,
@@ -1385,10 +1493,20 @@ class TestRuntimeLatencyLogging:
             low_latency_finalize_wait_ms=0,
             runtime_logging=runtime_logging,
         )
+        osc.stage_recorder = harness.translation_diagnostics.record_chatbox_stage
         source_utterance_id = uuid4()
 
         try:
             await harness.self_owner.handle_vad_event(SpeechEnd(source_utterance_id))
+            harness.translation_diagnostics.record_latency_stage(
+                LatencyStageDiagnostic(
+                    channel="self",
+                    utterance_id=source_utterance_id,
+                    stage="last_speech",
+                    timestamp=clock.now(),
+                    publish_now=False,
+                )
+            )
             clock.advance(0.05)
             await harness.dispatch_stt_event(
                 STTFinalEvent(
@@ -1402,10 +1520,10 @@ class TestRuntimeLatencyLogging:
                 ),
             )
 
-            output_utterance_id = osc.messages[0].utterance_id
             active_events = [
                 event for event in overlay_sink.events if event.type == "self_active_update"
             ]
+            output_utterance_id = active_events[0].utterance_id
             messages = _runtime_log_messages(log_stream)
             output_messages = [
                 message
@@ -1424,7 +1542,7 @@ class TestRuntimeLatencyLogging:
             assert active_events[0].utterance_id == output_utterance_id
             assert any("stage=speech_end" in message for message in output_messages)
             assert any("stage=stt_final" in message for message in output_messages)
-            assert any("stage=self_chatbox_enqueue" in message for message in output_messages)
+            assert any("stage=self_chatbox_send" in message for message in output_messages)
             assert source_messages == []
         finally:
             runtime_logging.close()
@@ -1468,6 +1586,13 @@ class TestRuntimeLatencyLogging:
             harness.peer_owner._record_latency_stage(
                 channel="self",
                 utterance_id=source_utterance_id,
+                stage="last_speech",
+                timestamp=10.0,
+                publish_now=False,
+            )
+            harness.peer_owner._record_latency_stage(
+                channel="self",
+                utterance_id=source_utterance_id,
                 stage="speech_end",
                 timestamp=10.0,
                 publish_now=False,
@@ -1482,6 +1607,7 @@ class TestRuntimeLatencyLogging:
 
             await harness.self_owner._run_spec_translation(merge_id, "spec output", 1)
             await harness.self_owner._commit_merge(buffer, reason="spec_done")
+            await harness.translation_turns.wait_for_idle()
 
             output_messages = [
                 message
@@ -1552,6 +1678,13 @@ class TestRuntimeLatencyLogging:
             harness.peer_owner._record_latency_stage(
                 channel="self",
                 utterance_id=source_utterance_id,
+                stage="last_speech",
+                timestamp=10.0,
+                publish_now=False,
+            )
+            harness.peer_owner._record_latency_stage(
+                channel="self",
+                utterance_id=source_utterance_id,
                 stage="speech_end",
                 timestamp=10.0,
                 publish_now=False,
@@ -1571,6 +1704,7 @@ class TestRuntimeLatencyLogging:
             harness.replace_configuration(translation_enabled=False)
 
             await harness.self_owner._commit_merge(buffer, reason="final_no_llm")
+            await harness.translation_turns.wait_for_idle()
 
             output_messages = [
                 message
@@ -1581,7 +1715,7 @@ class TestRuntimeLatencyLogging:
 
             assert any("stage=speech_end" in message for message in output_messages)
             assert any("stage=stt_final" in message for message in output_messages)
-            assert any("stage=self_chatbox_enqueue" in message for message in output_messages)
+            assert any("stage=last_speech" in message for message in output_messages)
             assert not any("stage=llm_request_start" in message for message in output_messages)
             assert not any("stage=llm_done" in message for message in output_messages)
         finally:
@@ -2768,6 +2902,47 @@ class TestSpecCommitPaths:
             await harness.stop()
 
     @pytest.mark.asyncio
+    async def test_single_target_commit_returns_while_translation_is_pending(self):
+        clock = FakeClock(initial_time=10.0)
+        llm = BlockingLLMProvider()
+        osc = FakeOscQueue()
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=llm,
+            osc=osc,
+            clock=clock,
+            low_latency_mode=True,
+        )
+        source_id = uuid4()
+        buffer = _MergeBuffer(
+            merge_id=uuid4(),
+            parts=["hello"],
+            utterance_ids=[source_id],
+            start_time=clock.now(),
+            last_end_time=clock.now(),
+        )
+        harness.self_owner.merge_buffer = buffer
+        harness.self_runtime.utterance_start_times[source_id] = clock.now()
+
+        try:
+            await asyncio.wait_for(
+                harness.self_owner._commit_merge(buffer, reason="final"),
+                timeout=1.0,
+            )
+            await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+            next_source_id = uuid4()
+            await harness.self_owner.handle_vad_event(SpeechEnd(next_source_id))
+
+            assert next_source_id in harness.self_runtime.speech_ended_ids
+            assert osc.messages == []
+            llm.release.set()
+            await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+            assert [message.text for message in osc.messages] == ["hello (translated)"]
+        finally:
+            llm.release.set()
+            await harness.stop()
+
+    @pytest.mark.asyncio
     async def test_commit_merge_reuses_spec_translation_when_text_matches(self):
         clock = FakeClock(initial_time=10.0)
         osc = FakeOscQueue()
@@ -2797,6 +2972,7 @@ class TestSpecCommitPaths:
         harness.self_runtime.utterance_start_times[uid] = clock.now()
 
         await harness.self_owner._commit_merge(buffer, reason="spec_done")
+        await harness.translation_turns.wait_for_idle()
 
         assert harness.self_owner.merge_buffer is None
         assert len(osc.messages) == 1
@@ -2931,6 +3107,7 @@ class TestSpecCommitPaths:
         buffer.speculative_attempt.source_text = "goodbye live"
 
         await harness.self_owner._commit_merge(buffer, reason="spec_done")
+        await harness.translation_turns.wait_for_idle()
 
         assert [event.type for event in overlay_sink.events] == [
             "self_active_update",
@@ -2984,6 +3161,7 @@ class TestSpecCommitPaths:
         assert buffer.speculative_attempt is not None
         buffer.speculative_attempt.source_text = "goodbye live"
         await harness.self_owner._commit_merge(buffer, reason="spec_done")
+        await harness.translation_turns.wait_for_idle()
 
         preview_event = next(
             event
@@ -3172,6 +3350,7 @@ class TestSpecCommitPaths:
         assert buffer.speculative_attempt is not None
         buffer.speculative_attempt.source_text = "goodbye live"
         await harness.self_owner._commit_merge(buffer, reason="spec_done")
+        await harness.translation_turns.wait_for_idle()
 
         active_self_emits = [
             event
@@ -3217,6 +3396,7 @@ class TestSpecCommitPaths:
         harness.self_runtime.utterance_start_times[uid] = clock.now()
 
         await harness.self_owner._commit_merge(buffer, reason="spec_done")
+        await harness.translation_turns.wait_for_idle()
 
         assert harness.self_owner.merge_buffer is None
         assert llm.calls == []
@@ -3252,6 +3432,7 @@ class TestSpecCommitPaths:
         harness.self_runtime.utterance_start_times[uid] = clock.now()
 
         await harness.self_owner._commit_merge(buffer, reason="spec_done")
+        await harness.translation_turns.wait_for_idle()
 
         assert harness.self_owner.merge_buffer is None
         assert llm.calls == []
@@ -3380,6 +3561,7 @@ class TestSpecCommitPaths:
         harness.self_runtime.utterance_start_times[uid] = clock.now()
 
         await harness.self_owner._commit_merge(buffer, reason="spec_done")
+        await harness.translation_turns.wait_for_idle()
 
         assert harness.self_owner.merge_buffer is None
         assert len(llm.calls) == 1

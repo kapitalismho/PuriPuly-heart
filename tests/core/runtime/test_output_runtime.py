@@ -1671,6 +1671,8 @@ async def test_peer_writer_awaits_presenter_pacing_before_application_receipt() 
     decision = owner.routing_decisions[-1]
     assert decision.reason == "application_applied"
     assert decision.metadata["physical_ack"] is False
+    assert decision.metadata["utterance_id"] == str(event.utterance_id)
+    assert decision.metadata["event_type"] == event.EVENT_TYPE
     await owner.close()
 
 

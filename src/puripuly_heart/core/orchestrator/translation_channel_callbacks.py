@@ -157,10 +157,6 @@ class TranslationChannelOwnerCallbacks:
             cancellation_requested,
         )
 
-    async def parent_ready(self, children: tuple[TranslationTurnChild, ...]) -> None:
-        if children:
-            await self._require_peer().on_parent_ready(children)
-
     async def child_terminal(
         self,
         child: TranslationTurnChild,

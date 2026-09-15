@@ -1113,7 +1113,7 @@ async def test_back_to_back_peer_parents_publish_in_submission_order() -> None:
     sink = RecordingOverlaySink()
     llm = GatedRecordingTranslateLLMProvider(
         responses=["first translation", "second translation"],
-        start_target=1,
+        start_target=2,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -1162,8 +1162,13 @@ async def test_back_to_back_peer_parents_publish_in_submission_order() -> None:
         )
 
         await asyncio.wait_for(llm.all_started.wait(), timeout=0.5)
-        assert [text for _utterance_id, text, _context in llm.calls] == ["first forced segment"]
-        assert len(harness.peer_runtime.translation_tasks) == 1
+        assert [text for _utterance_id, text, _context in llm.calls] == [
+            "first forced segment",
+            "second forced segment",
+        ]
+        assert "first forced segment" not in llm.calls[0][2]
+        assert "first forced segment" in llm.calls[1][2]
+        assert len(harness.peer_runtime.translation_tasks) == 2
 
         assert llm.release is not None
         llm.release.set_result(None)
@@ -1210,6 +1215,108 @@ async def test_back_to_back_peer_parents_publish_in_submission_order() -> None:
         assert harness.peer_runtime.speech_ended_ids == set()
         assert not harness.translation_diagnostics.snapshot().timeline_keys
     finally:
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_peer_context_order_survives_provider_replacement_during_output_admission() -> None:
+    old = GatedRecordingTranslateLLMProvider(responses=["prior"], start_target=1)
+    new = GatedRecordingTranslateLLMProvider(responses=["bravo"], start_target=1)
+    new.release = asyncio.get_running_loop().create_future()
+    new.release.set_result(None)
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=old,
+        osc=RecordingOscQueue(),
+        overlay_sink=RecordingOverlaySink(),
+        peer_translation_enabled=True,
+        peer_source_language="en",
+        peer_target_language="ja",
+        concurrency_limit=1,
+    )
+
+    async def submit(text: str) -> None:
+        utterance_id = uuid4()
+        transcript = harness.admit_peer_transcript_for_test(
+            Transcript(utterance_id=utterance_id, text=text, is_final=True, channel="peer")
+        )
+        await harness.peer_owner.handle_stt_event(
+            STTFinalEvent(utterance_id=utterance_id, transcript=transcript)
+        )
+
+    pending = None
+    try:
+        await submit("prior")
+        await asyncio.wait_for(old.all_started.wait(), timeout=1.0)
+        async with harness.output_runtime._batch_admission.lock:
+            pending = asyncio.create_task(submit("alpha"))
+            await asyncio.sleep(0)
+            assert not pending.done()
+            await harness.replace_llm_provider(None)
+        await asyncio.wait_for(pending, timeout=1.0)
+        await harness.replace_llm_provider(new)
+        await submit("bravo")
+        assert old.release is not None
+        old.release.set_result(None)
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+
+        assert [text for _, text, _ in new.calls] == ["bravo"]
+        assert "alpha" in new.calls[0][2]
+        assert "bravo" not in new.calls[0][2]
+    finally:
+        if old.release is not None and not old.release.done():
+            old.release.set_result(None)
+        if pending is not None and not pending.done():
+            pending.cancel()
+            await asyncio.gather(pending, return_exceptions=True)
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_peer_overflow_with_evicted_output_drains_and_accepts_following_turn() -> None:
+    provider = GatedRecordingTranslateLLMProvider(responses=["translated"] * 11, start_target=1)
+    sink = RecordingOverlaySink()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=RecordingOscQueue(),
+        overlay_sink=sink,
+        peer_translation_enabled=True,
+        concurrency_limit=1,
+    )
+    try:
+        for index in range(10):
+            source_id = uuid4()
+            transcript = harness.admit_peer_transcript_for_test(
+                Transcript(source_id, f"parent{index}", is_final=True, channel="peer")
+            )
+            await asyncio.wait_for(
+                harness.peer_owner.handle_stt_event(STTFinalEvent(source_id, transcript)),
+                timeout=1.0,
+            )
+        assert provider.release is not None
+        provider.release.set_result(None)
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+        await harness.output_runtime.wait_for_peer_output_idle()
+        assert not harness.translation_turns.has_resources
+        assert any(
+            event.type == "translation_final" and event.source_text == "parent9"
+            for event in sink.events
+        )
+
+        following_id = await harness.handle_peer_transcript_final_for_test("following")
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+        await harness.output_runtime.wait_for_peer_output_idle()
+        assert any(
+            event.type == "translation_final"
+            and event.utterance_id == following_id
+            and event.source_text == "following"
+            for event in sink.events
+        )
+        assert not harness.translation_turns.has_resources
+    finally:
+        if provider.release is not None and not provider.release.done():
+            provider.release.set_result(None)
         await harness.stop()
 
 
@@ -1296,7 +1403,7 @@ async def test_identical_inflight_peer_finals_reject_the_second_final() -> None:
 
 
 @pytest.mark.asyncio
-async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> None:
+async def test_peer_overlay_applied_latency_summary_and_detailed_trace() -> None:
     basic_runtime_logging, basic_stream = _make_runtime_logging_capture()
     detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
     detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
@@ -1374,8 +1481,8 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
         )
 
         assert "channel=peer" in basic_latency_message
-        assert "e2e_ms=1130" in basic_latency_message
-        assert "final_output_stage=" not in basic_latency_message
+        assert "endpoint=overlay_applied" in basic_latency_message
+        assert "last_speech_to_overlay_applied_ms=180" in basic_latency_message
         assert not any("[Detailed][Latency]" in message for message in basic_messages)
         assert not any("[Detailed][LatencyBreakdown]" in message for message in basic_messages)
 
@@ -1393,19 +1500,21 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
         ]
 
         assert detailed_trace_stages == [
+            "last_speech",
             "speech_end",
             "stt_final",
             "llm_request_start",
             "llm_done",
-            "peer_overlay_first_emit",
+            "peer_overlay_applied",
         ]
         assert any(
             "[Detailed][LatencyBreakdown]" in message
             and "channel=peer" in message
-            and "e2e_ms=1130" in message
+            and "endpoint=overlay_applied" in message
+            and "last_speech_to_overlay_applied_ms=180" in message
+            and "last_speech_to_speech_end_ms=0" in message
             and "speech_end_to_stt_final_ms=30" in message
-            and "stt_final_to_final_output_ms=150" in message
-            and "final_output_stage=" not in message
+            and "stt_final_to_overlay_applied_ms=150" in message
             for message in detailed_messages
         )
         assert not any(
@@ -1424,7 +1533,7 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
 
 
 @pytest.mark.asyncio
-async def test_peer_overlay_first_emit_waits_for_llm_done() -> None:
+async def test_peer_overlay_applied_waits_for_llm_done_and_application_receipt() -> None:
     runtime_logging, stream = _make_runtime_logging_capture()
     clock = FakeClock(_now=100.0)
     llm = ReleasableTranslateLLMProvider(response_text="hello")

@@ -6,11 +6,13 @@ from uuid import uuid4
 import pytest
 
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
+from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.messages import UserErrorReport
 from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry, _MergeBuffer
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
+from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnTerminal,
@@ -19,8 +21,13 @@ from puripuly_heart.core.stt.backend import (
 )
 from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import STTFinalEvent, STTSessionState, UIEventType
-from puripuly_heart.domain.models import Transcript
-from tests.helpers.fakes import RecordingOscQueue
+from puripuly_heart.domain.models import OSCMessage, Transcript
+from tests.core.test_self_translation_low_latency import FakeLLMProvider
+from tests.core.test_translation_owner_branch_coverage import (
+    _make_runtime_logging_capture,
+    _runtime_log_messages,
+)
+from tests.helpers.fakes import FakeSender, RecordingOscQueue
 from tests.helpers.translation_owners import (
     compose_translation_test_harness,
     make_speculative_attempt,
@@ -134,6 +141,88 @@ async def test_scoped_request_keeps_suffix_after_early_publication() -> None:
 
     assert successor.parts == ["B"]
     assert identity not in harness.self_owner._scoped_publication_ids
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scoped", [False, True])
+async def test_late_speech_end_measures_already_committed_translation(scoped: bool) -> None:
+    clock = FakeClock(_now=10.0)
+    logging, stream = _make_runtime_logging_capture()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(sender=sender, clock=clock, max_chars=24)
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=FakeLLMProvider(delay_s=0),
+        osc=paginator,
+        clock=clock,
+        runtime_logging=logging,
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+        low_latency_awaiting_vad_timeout_s=0.01,
+    )
+    paginator.stage_recorder = harness.translation_diagnostics.record_chatbox_stage
+    source_id = uuid4()
+    try:
+        paginator.enqueue(OSCMessage(uuid4(), "x" * 48, created_at=clock.now()))
+        if scoped:
+            identity = STTProviderTurnIdentity(
+                segment=AudioSegmentIdentity(1, 1, source_id, 1),
+                provider_epoch_id="epoch",
+                provider_turn_id="turn",
+            )
+            event = STTProviderTurnUpdate(
+                identity,
+                1,
+                "stable",
+                "append",
+                "hello",
+                contribution=STTTextContribution("hello", 0, 5),
+            )
+        else:
+            event = STTFinalEvent(source_id, Transcript(source_id, "hello", is_final=True))
+        await harness.self_owner.handle_stt_event(event)
+        buffer = harness.self_owner.merge_buffer
+        assert buffer is not None
+        assert buffer.awaiting_vad_timeout_task is not None
+        await asyncio.wait_for(buffer.awaiting_vad_timeout_task, timeout=1.0)
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+        assert harness.self_owner.merge_buffer is None
+        assert sender.sent == ["x" * 24]
+        if scoped:
+            await harness.self_owner.handle_stt_event(
+                STTProviderTurnUpdate(
+                    identity,
+                    2,
+                    "stable",
+                    "append",
+                    "hello world",
+                    contribution=STTTextContribution("world", 5, 11),
+                )
+            )
+            successor = harness.self_owner.merge_buffer
+            assert successor is not None
+            assert successor.awaiting_vad_timeout_task is not None
+            await asyncio.wait_for(successor.awaiting_vad_timeout_task, timeout=1.0)
+            await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+
+        clock.advance(0.1)
+        await harness.self_owner.handle_vad_event(SpeechEnd(source_id, trailing_silence_ms=600))
+        clock.advance(2.9)
+        paginator.process_due()
+
+        expected_text = "world (translated)" if scoped else "hello (translated)"
+        assert sender.sent[-1] == expected_text
+        summaries = [
+            message
+            for message in _runtime_log_messages(stream)
+            if message.startswith("[Basic][Latency]")
+        ]
+        assert len(summaries) == 1
+        assert "last_speech_to_chatbox_send_ms=3500" in summaries[0]
+        assert not harness.translation_diagnostics.snapshot().timeline_keys
+    finally:
+        await harness.stop()
+        logging.close()
 
 
 @pytest.mark.asyncio

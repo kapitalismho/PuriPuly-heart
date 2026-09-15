@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import cast
@@ -31,16 +32,21 @@ from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.domain.models import ChannelId
 
 _LATENCY_TRACE_ORDER = (
+    "last_speech",
     "speech_end",
     "stt_final",
     "llm_request_start",
     "llm_first_chunk",
     "llm_done",
-    "self_chatbox_enqueue",
-    "peer_overlay_first_emit",
+    "self_chatbox_send",
+    "peer_overlay_applied",
+    "dashboard_translation_applied",
     "peer_overlay_first_render",
 )
-_LATENCY_SUMMARY_OUTPUT_STAGES = {"self_chatbox_enqueue", "peer_overlay_first_emit"}
+_LATENCY_SUMMARY_OUTPUT_STAGES = (
+    ("self", "self_chatbox_send", "chatbox_send"),
+    ("peer", "peer_overlay_applied", "overlay_applied"),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -242,6 +248,9 @@ class _LatencyTimeline:
     target_language: str | None = None
     turn_generation: int | None = None
     turn_order: int | None = None
+    pending_sources: set[UUID] = field(default_factory=set)
+    clear_requested: bool = False
+    awaiting_speech_end: bool = False
 
 
 @dataclass(slots=True)
@@ -274,7 +283,17 @@ class TranslationLatencyDiagnosticsOwner:
         default=None,
         repr=False,
     )
-    _timelines: dict[tuple[ChannelId, UUID], _LatencyTimeline] = field(
+    _timelines: OrderedDict[tuple[ChannelId, UUID], _LatencyTimeline] = field(
+        init=False,
+        default_factory=OrderedDict,
+        repr=False,
+    )
+    _awaiting_output: set[tuple[ChannelId, UUID]] = field(
+        init=False,
+        default_factory=set,
+        repr=False,
+    )
+    _source_outputs: dict[tuple[ChannelId, UUID], set[UUID]] = field(
         init=False,
         default_factory=dict,
         repr=False,
@@ -583,6 +602,24 @@ class TranslationLatencyDiagnosticsOwner:
                     detailed=True,
                 )
             )
+        raw_utterance_id = fields.get("utterance_id")
+        if event in {"page_send", "message_terminal"} and isinstance(raw_utterance_id, str):
+            try:
+                utterance_id = UUID(raw_utterance_id)
+            except ValueError:
+                pass
+            else:
+                if event == "page_send":
+                    self.record_output_latency_stage(
+                        LatencyStageDiagnostic(
+                            channel="self",
+                            utterance_id=utterance_id,
+                            stage="self_chatbox_send",
+                            overwrite=False,
+                        )
+                    )
+                else:
+                    self.abandon_pending_latency_output("self", utterance_id)
         recorder = self.overlay_diagnostics
         if recorder is None:
             return
@@ -622,49 +659,157 @@ class TranslationLatencyDiagnosticsOwner:
         timeline.stage_times[diagnostic.stage] = (
             self.clock.now() if diagnostic.timestamp is None else diagnostic.timestamp
         )
+        if diagnostic.stage == "speech_end":
+            timeline.awaiting_speech_end = False
         if diagnostic.publish_now:
             self._emit_latency_contract(
                 diagnostic.channel,
                 diagnostic.utterance_id,
             )
+        if diagnostic.stage == "speech_end":
+            for output_id in tuple(
+                self._source_outputs.get((diagnostic.channel, diagnostic.utterance_id), ())
+            ):
+                self._emit_latency_contract(diagnostic.channel, output_id)
+            if timeline.clear_requested:
+                self.clear_latency_timeline(diagnostic.channel, diagnostic.utterance_id)
+
+    def record_output_latency_stage(self, diagnostic: LatencyStageDiagnostic) -> bool:
+        timeline = self._get_timeline(diagnostic.channel, diagnostic.utterance_id)
+        if timeline is None:
+            return False
+        self.record_latency_stage(diagnostic)
+        if "last_speech" not in timeline.stage_times and not timeline.pending_sources:
+            self.abandon_pending_latency_output(diagnostic.channel, diagnostic.utterance_id)
+        return True
 
     def inherit_latency(self, diagnostic: LatencyInheritanceDiagnostic) -> None:
-        output_timeline = self._get_timeline(
-            diagnostic.channel,
-            diagnostic.output_utterance_id,
-            create=True,
-        )
-        assert output_timeline is not None
-        for source_utterance_id in diagnostic.source_utterance_ids:
-            source_timeline = self._get_timeline(
-                diagnostic.channel,
-                source_utterance_id,
-            )
+        channel = diagnostic.channel
+        output_id = diagnostic.output_utterance_id
+        output_key = (channel, output_id)
+        output_timeline = self._get_timeline(channel, output_id)
+        for source_id in diagnostic.source_utterance_ids:
+            if source_id == output_id:
+                continue
+            self._resolve_latency_sources(channel, source_id)
+            source_timeline = self._get_timeline(channel, source_id)
             if source_timeline is None:
                 continue
-            for stage in ("speech_end", "stt_final"):
-                source_time = source_timeline.stage_times.get(stage)
-                if source_time is None:
+            if output_timeline is None:
+                output_timeline = self._get_timeline(channel, output_id, create=True)
+                assert output_timeline is not None
+                if self._timelines.get((channel, source_id)) is not source_timeline:
+                    self._discard_latency_timeline(channel, output_id)
+                    return
+            if self._timelines.get(output_key) is not output_timeline:
+                return
+            self._inherit_stage_times(output_timeline, source_timeline)
+            pending_sources = source_timeline.pending_sources
+            if not pending_sources and "speech_end" not in source_timeline.stage_times:
+                pending_sources = {source_id}
+            for pending_id in pending_sources:
+                if pending_id == output_id:
                     continue
-                existing_time = output_timeline.stage_times.get(stage)
-                output_timeline.stage_times[stage] = (
-                    source_time if existing_time is None else max(existing_time, source_time)
-                )
-        self._emit_latency_contract(
-            diagnostic.channel,
-            diagnostic.output_utterance_id,
-        )
+                source = self._timelines[(channel, pending_id)]
+                source.awaiting_speech_end = True
+                output_timeline.pending_sources.add(pending_id)
+                self._source_outputs.setdefault((channel, pending_id), set()).add(output_id)
+        self._emit_latency_contract(channel, output_id)
+
+    @staticmethod
+    def _inherit_stage_times(output: _LatencyTimeline, source: _LatencyTimeline) -> None:
+        for stage in ("last_speech", "speech_end", "stt_final"):
+            source_time = source.stage_times.get(stage)
+            if source_time is None:
+                continue
+            existing_time = output.stage_times.get(stage)
+            output.stage_times[stage] = (
+                source_time if existing_time is None else max(existing_time, source_time)
+            )
+
+    def _resolve_latency_sources(self, channel: ChannelId, utterance_id: UUID) -> None:
+        timeline = self._timelines.get((channel, utterance_id))
+        if timeline is None:
+            return
+        for source_id in tuple(timeline.pending_sources):
+            source = self._timelines.get((channel, source_id))
+            if source is None:
+                self._discard_latency_timeline(channel, utterance_id)
+                return
+            self._inherit_stage_times(timeline, source)
+            if "speech_end" in source.stage_times:
+                timeline.pending_sources.remove(source_id)
+                self._release_latency_source(channel, source_id, utterance_id)
+
+    def _release_latency_source(self, channel: ChannelId, source_id: UUID, output_id: UUID) -> None:
+        key = (channel, source_id)
+        outputs = self._source_outputs.get(key)
+        if outputs is None:
+            return
+        outputs.discard(output_id)
+        if outputs:
+            return
+        self._source_outputs.pop(key, None)
+        source = self._timelines.get(key)
+        if (
+            source is not None
+            and source.clear_requested
+            and not source.awaiting_speech_end
+            and key not in self._awaiting_output
+        ):
+            self._discard_latency_timeline(channel, source_id)
+
+    def _discard_latency_timeline(self, channel: ChannelId, utterance_id: UUID) -> None:
+        key = (channel, utterance_id)
+        timeline = self._timelines.pop(key, None)
+        self._awaiting_output.discard(key)
+        if timeline is None:
+            return
+        for source_id in timeline.pending_sources:
+            self._release_latency_source(channel, source_id, utterance_id)
+        for output_id in self._source_outputs.pop(key, ()):
+            self._discard_latency_timeline(channel, output_id)
+
+    def retain_latency_until_output(self, channel: ChannelId, utterance_id: UUID) -> None:
+        key = (channel, utterance_id)
+        timeline = self._timelines.get(key)
+        if timeline is not None:
+            self._awaiting_output.add(key)
+
+    def abandon_pending_latency_output(
+        self,
+        channel: ChannelId,
+        utterance_id: UUID,
+    ) -> None:
+        key = (channel, utterance_id)
+        if key not in self._awaiting_output:
+            return
+        self._awaiting_output.discard(key)
+        self.clear_latency_timeline(channel, utterance_id)
 
     def clear_latency_timeline(self, channel: ChannelId, utterance_id: UUID) -> None:
-        self._timelines.pop((channel, utterance_id), None)
+        key = (channel, utterance_id)
+        timeline = self._timelines.get(key)
+        if timeline is None:
+            return
+        timeline.clear_requested = True
+        if (
+            key in self._awaiting_output
+            or self._source_outputs.get(key)
+            or timeline.awaiting_speech_end
+        ):
+            return
+        self._discard_latency_timeline(channel, utterance_id)
 
     def clear_latency_state(self, channel: ChannelId | None = None) -> None:
         if channel is None:
             self._timelines.clear()
+            self._awaiting_output.clear()
+            self._source_outputs.clear()
             return
         keys = [key for key in self._timelines if key[0] == channel]
-        for key in keys:
-            self._timelines.pop(key, None)
+        for _, utterance_id in keys:
+            self._discard_latency_timeline(channel, utterance_id)
 
     def publish_latency(self, diagnostic: LatencyTimelineDiagnostic) -> None:
         self._emit_latency_contract(diagnostic.channel, diagnostic.utterance_id)
@@ -677,7 +822,7 @@ class TranslationLatencyDiagnosticsOwner:
         elapsed_ms = None
         if timeline is not None:
             elapsed_ms = self._elapsed_ms(
-                timeline.stage_times.get("speech_end"),
+                timeline.stage_times.get("last_speech"),
                 timeline.stage_times.get("llm_done"),
             )
         return logging_port.emit_detailed_lazy(
@@ -863,9 +1008,14 @@ class TranslationLatencyDiagnosticsOwner:
     ) -> _LatencyTimeline | None:
         key = (channel, utterance_id)
         timeline = self._timelines.get(key)
+        if timeline is not None:
+            self._timelines.move_to_end(key)
         if timeline is None and create:
             timeline = _LatencyTimeline(channel=channel)
             self._timelines[key] = timeline
+            while len(self._timelines) > 4096:
+                evicted_channel, evicted_id = next(iter(self._timelines))
+                self._discard_latency_timeline(evicted_channel, evicted_id)
         return timeline
 
     @staticmethod
@@ -874,13 +1024,6 @@ class TranslationLatencyDiagnosticsOwner:
             return None
         return max(0, int(round((end_at - start_at) * 1000)))
 
-    def _hangover_ms(self, channel: ChannelId) -> int:
-        configuration = self.config_snapshot().value
-        hangover_s = (
-            configuration.peer_hangover_s if channel == "peer" else configuration.hangover_s
-        )
-        return max(0, int(round(hangover_s * 1000)))
-
     def _emit_latency_trace(
         self,
         channel: ChannelId,
@@ -888,10 +1031,10 @@ class TranslationLatencyDiagnosticsOwner:
         stage: str,
     ) -> None:
         timeline = self._get_timeline(channel, utterance_id)
-        if timeline is None or stage in timeline.emitted_trace_points:
+        if timeline is None or timeline.pending_sources or stage in timeline.emitted_trace_points:
             return
         elapsed_ms = self._elapsed_ms(
-            timeline.stage_times.get("speech_end"),
+            timeline.stage_times.get("last_speech"),
             timeline.stage_times.get(stage),
         )
         if elapsed_ms is None:
@@ -924,28 +1067,45 @@ class TranslationLatencyDiagnosticsOwner:
         channel: ChannelId,
         utterance_id: UUID,
         final_output_stage: str,
+        endpoint: str,
     ) -> None:
         timeline = self._get_timeline(channel, utterance_id)
-        if timeline is None or timeline.basic_summary_emitted:
+        if timeline is None or timeline.basic_summary_emitted or timeline.pending_sources:
+            return
+        last_speech_at = timeline.stage_times.get("last_speech")
+        final_output_at = timeline.stage_times.get(final_output_stage)
+        elapsed_ms = self._elapsed_ms(last_speech_at, final_output_at)
+        if elapsed_ms is None:
+            return
+        if final_output_at < last_speech_at:
+            timeline.basic_summary_emitted = True
+            self._awaiting_output.discard((channel, utterance_id))
+            self.clear_latency_timeline(channel, utterance_id)
             return
         speech_end_at = timeline.stage_times.get("speech_end")
-        final_output_at = timeline.stage_times.get(final_output_stage)
-        measured_ms = self._elapsed_ms(speech_end_at, final_output_at)
-        if measured_ms is None:
-            return
-        e2e_ms = measured_ms + self._hangover_ms(channel)
         stt_final_at = timeline.stage_times.get("stt_final")
         stt_reference_at = None
         if speech_end_at is not None and stt_final_at is not None:
             stt_reference_at = max(speech_end_at, stt_final_at)
         self.emit(
-            RuntimeDiagnostic(message=format_basic_latency_summary(channel=channel, e2e_ms=e2e_ms))
+            RuntimeDiagnostic(
+                message=format_basic_latency_summary(
+                    channel=channel,
+                    endpoint=endpoint,
+                    elapsed_ms=elapsed_ms,
+                )
+            )
         )
         self.emit(
             RuntimeDiagnostic(
                 message=format_detailed_latency_breakdown(
                     channel=channel,
-                    e2e_ms=e2e_ms,
+                    endpoint=endpoint,
+                    elapsed_ms=elapsed_ms,
+                    last_speech_to_speech_end_ms=self._elapsed_ms(
+                        last_speech_at,
+                        speech_end_at,
+                    ),
                     speech_end_to_stt_final_ms=self._elapsed_ms(
                         speech_end_at,
                         stt_final_at,
@@ -958,19 +1118,24 @@ class TranslationLatencyDiagnosticsOwner:
                 detailed=True,
             )
         )
-        self._emit_latency_cause(channel, utterance_id, final_output_stage)
+        self._emit_latency_cause(channel, utterance_id, final_output_stage, endpoint)
         timeline.basic_summary_emitted = True
+        key = (channel, utterance_id)
+        self._awaiting_output.discard(key)
+        self.clear_latency_timeline(channel, utterance_id)
 
     def _emit_latency_cause(
         self,
         channel: ChannelId,
         utterance_id: UUID,
         final_output_stage: str,
+        endpoint: str,
     ) -> None:
         timeline = self._get_timeline(channel, utterance_id)
         if timeline is None or timeline.latency_cause_emitted:
             return
         stages = timeline.stage_times
+        last_speech_at = stages.get("last_speech")
         speech_end_at = stages.get("speech_end")
         stt_final_at = stages.get("stt_final")
         llm_request_start_at = stages.get("llm_request_start")
@@ -991,6 +1156,10 @@ class TranslationLatencyDiagnosticsOwner:
             turn_generation=timeline.turn_generation,
             turn_order=timeline.turn_order,
             stage_durations_ms={
+                "last_speech_to_speech_end": self._elapsed_ms(
+                    last_speech_at,
+                    speech_end_at,
+                ),
                 "speech_end_to_stt_final": self._elapsed_ms(
                     speech_end_at,
                     stt_final_at,
@@ -1007,9 +1176,14 @@ class TranslationLatencyDiagnosticsOwner:
                     llm_request_start_at,
                     llm_done_at,
                 ),
-                "stt_final_to_final_output": (
+                f"stt_final_to_{endpoint}": (
                     self._elapsed_ms(stt_final_at, final_output_at)
                     if llm_request_start_at is None
+                    else None
+                ),
+                f"llm_done_to_{endpoint}": (
+                    self._elapsed_ms(llm_done_at, final_output_at)
+                    if llm_request_start_at is not None
                     else None
                 ),
             },
@@ -1026,10 +1200,12 @@ class TranslationLatencyDiagnosticsOwner:
             timeline.latency_cause_emitted = True
 
     def _emit_latency_contract(self, channel: ChannelId, utterance_id: UUID) -> None:
+        self._resolve_latency_sources(channel, utterance_id)
         for stage in _LATENCY_TRACE_ORDER:
             self._emit_latency_trace(channel, utterance_id, stage)
-        for stage in _LATENCY_SUMMARY_OUTPUT_STAGES:
-            self._emit_latency_summary(channel, utterance_id, stage)
+        for summary_channel, stage, endpoint in _LATENCY_SUMMARY_OUTPUT_STAGES:
+            if channel == summary_channel:
+                self._emit_latency_summary(channel, utterance_id, stage, endpoint)
 
     @staticmethod
     def _format_log_message(message: str, *args: object) -> str:
