@@ -153,3 +153,39 @@ The frozen plan hash and per-command hashes bind completed state to that run. On
 If initialization was interrupted after writing only a valid frozen plan and lock files, the next matching `run` completes initialization once. Any mismatched plan or other content in that partial state root fails closed without deleting or overwriting it.
 
 The harmless two-subprocess controller smoke and focused boundary/locking/failure/plan-identity checks are recorded in `STAGED_CONTROL_VERIFICATION.json`. Runtime state under `.stage-control/` is intentionally ignored; its state, frozen plan, logs, and receipts must remain together for resume.
+
+## Bounded WSL GT probe: checkpoint proof blocked
+
+The maintainer authorized four stages: GPU backward/update verification, a minimal aligned FIT input and independent student, a few GT-only updates with checkpoint reload/inference, and a measured report. The Director fixed one seed and architecture, at most 300 unique FIT audio seconds, and 20 total optimizer updates: one backend fixture plus nineteen GT updates. The approximately two-hour target was not an authorization for extra runs, KD, new teacher passes, evaluation audio, paid calls, or production changes.
+
+The actual runs used WSL Ubuntu, ROCm 7.2.1, PyTorch `2.9.1+rocm7.2.1.gitff65f5bc`, and the RX 7900 XTX. `GT_PROBE_RESULT.json` records the observed boundaries and missing evidence.
+
+| Stage | Actual result |
+| --- | --- |
+| GPU backend | One Conv1d/GRU/linear fixture update completed with finite gradients, loss 0.6978195906, and nonzero convolution-weight delta 0.2022929192. |
+| FIT and student preparation | Passed. One permitted TRAIN source, `ami_ES2005a`, from sample 0 through 4,620,800: 288.8 seconds at 16 kHz. The independent student has 5,940,740 trainable parameters. |
+| GT updates and checkpoint | The configured nineteen-update loop reached its post-loop optimizer-state audit, which raised before checkpoint persistence. No reloadable checkpoint remains. |
+| Report | Failure and resource accounting are retained here; learned inference, quality, and cost conclusions remain unavailable. |
+
+The student is fixed causal 64-bin log-Mel, three stride-two causal convolution blocks, two unidirectional GRU layers of width 512, and four independent activity outputs. It does not need Sortformer at inference. Raw, unsnapped source intervals produce fractional per-speaker occupancy in half-open 1,280-sample bins; overlap remains multi-active. The 397 raw intervals and 23 relation-only nonlexical masks are retained in the prepared input. Relation-only masks do not remove otherwise valid activity supervision. The first three outputs lack the full 4,880-sample causal receptive field and are excluded. Output frontiers match their target-bin ends without future audio.
+
+### Two distinct implementation failures
+
+1. At `400caac18ee6e5105789b6a1b886aa9a5ad1e39b`, Windows backslashes were consumed by the WSL command boundary. `readonly RUN_ROOT="$(wslpath ...)"` also hid the conversion failure. The backend completed, but wrote its receipt and frozen configuration to the workflow directory; the controller correctly failed on missing required outputs. Those files were recovered unchanged, and the backend was not rerun. The path repair adds `{run_root_wsl}`, uses direct WSL execution, and rejects an invalid launcher root before Python starts.
+2. At `b9711f1b9a5bc595204b1f43571bce6b0976c644`, preparation succeeded in the correct directory. Training then failed at the post-loop counter audit: `value` was already a scalar optimizer-step tensor, but code indexed `value["step"]`. The same error was present in reload diagnostics. Both reads have been repaired to extract the scalar directly, and checkpoint persistence now precedes post-training diagnostics. The scalar-counter repair was checked without model execution or another optimizer update; the repaired learned save/reload path has not yet been exercised.
+
+The nineteen GT updates are charged from the pinned code and the post-loop traceback, not from persisted per-step receipts. The loop's finite/change checks precede that traceback, but its loss values, step timings, final numeric state, and memory statistics were only in memory and were lost. They are not reconstructed or presented as measured results. The conservative cumulative budget is therefore **20 spent, zero additional updates authorized**.
+
+Retained host command walls were 16.969345 seconds for the backend command, 13.054090 seconds for preparation, and 8.570759 seconds for the failed training command. These include process/WSL overhead and are not isolated GPU compute, training-loop timing, mean step latency, or inference RTF.
+
+### Retained artifacts and next decision
+
+- `.stage-control/issue-164-gt-probe/`: original failed state and logs, recovered backend receipt/configuration, and host launch provenance.
+- `.stage-control/issue-164-gt-continuation/`: separate failed state, explicit continuation lineage, the prepared input, preparation receipt, and exact training traceback.
+- `prepared_fit.pt`: 18,608,719 bytes, SHA-256 `b367960d2dae9ea8b7b9571af23015f723ac5d72f24125d3c8a5a9ac7576b682`. It contains the authorized waveform prefix, raw GT provenance and projected targets; inspect with the pinned environment's `torch.load(..., map_location="cpu", weights_only=False)`. This is an input artifact, not a learned checkpoint.
+
+Both failed controller states remain unchanged and refuse automatic continuation. No failed state was relabeled as successful. Runtime artifact directories are local and ignored; retain each complete directory with its configuration and logs. No audio or model artifact was published.
+
+The next decision is authorization for a minimal **two additional GT updates**, using the same architecture, seed, and the first 30.4 seconds of the already authorized source, to finish checkpoint and reload proof. That would bring the cumulative budget to 22; it has not been approved or executed. This runner failure is not evidence against acoustic PSEM or against the student architecture. The complete GT/KD comparison in issue #164 remains open.
+
+Independent review was unavailable: its transport failed before reading the candidate, and fresh reviewer allocation could not resolve a configured model. No independent-review pass is claimed. Direct checks and actual runtime evidence are distinguished above. Product code and the selected downstream policy were unchanged; no system architecture change is proposed by this experiment.

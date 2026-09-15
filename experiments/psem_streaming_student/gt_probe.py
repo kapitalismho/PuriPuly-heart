@@ -656,22 +656,7 @@ def train_stage(config_path: Path, run_root: Path) -> None:
         )
     torch.cuda.synchronize(device)
     training_loop_seconds = time.perf_counter() - training_started
-    optimizer_steps = {
-        int(value["step"].item())
-        for state_value in optimizer.state.values()
-        for key, value in state_value.items()
-        if key == "step"
-    }
-    if optimizer_steps != {steps}:
-        raise RuntimeError(f"optimizer step counters do not equal {steps}: {optimizer_steps}")
     training_end = steps * chunk_samples
-    if (
-        state.total_samples != training_end
-        or state.emitted_outputs != config["verification"]["partition_witness_output_frames"]
-    ):
-        raise RuntimeError(
-            "streaming state frontier/frame count differs from chronological training exposure"
-        )
     checkpoint = {
         "schema": "PSEM-ISSUE-164-GT-CHECKPOINT-1",
         "model": model.state_dict(),
@@ -689,6 +674,21 @@ def train_stage(config_path: Path, run_root: Path) -> None:
     }
     checkpoint_path = run_root / "student_gt_checkpoint.pt"
     torch.save(checkpoint, checkpoint_path)
+    optimizer_steps = {
+        int(value.item())
+        for state_value in optimizer.state.values()
+        for key, value in state_value.items()
+        if key == "step"
+    }
+    if optimizer_steps != {steps}:
+        raise RuntimeError(f"optimizer step counters do not equal {steps}: {optimizer_steps}")
+    if (
+        state.total_samples != training_end
+        or state.emitted_outputs != config["verification"]["partition_witness_output_frames"]
+    ):
+        raise RuntimeError(
+            "streaming state frontier/frame count differs from chronological training exposure"
+        )
     tolerance = float(config["verification"]["partition_tolerance"])
     witness_samples = min(training_end, int(config["verification"]["partition_witness_samples"]))
     witness = waveform[:witness_samples]
@@ -825,7 +825,7 @@ def reload_stage(config_path: Path, run_root: Path) -> None:
     )
     optimizer.load_state_dict(checkpoint["optimizer"])
     loaded_steps = {
-        int(value["step"].item())
+        int(value.item())
         for state_value in optimizer.state.values()
         for key, value in state_value.items()
         if key == "step"
