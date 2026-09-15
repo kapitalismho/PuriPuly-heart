@@ -5965,10 +5965,8 @@ async def test_protected_rows_are_not_evicted_by_elapsed_pacing_interval() -> No
 @pytest.mark.asyncio
 async def test_peer_admission_paces_only_new_replacements_after_free_slots_fill() -> None:
     clock = FakeClock(_now=10.0)
-    sleep_calls: list[float] = []
 
     async def fake_sleep(delay: float) -> None:
-        sleep_calls.append(delay)
         if delay > PEER_REPLACEMENT_INTERVAL_SECONDS:
             await asyncio.Event().wait()
         clock.advance(delay)
@@ -5999,8 +5997,8 @@ async def test_peer_admission_paces_only_new_replacements_after_free_slots_fill(
             )
         )
         assert receipt.outcome == "applied"
+        assert clock.now() == 10.0 + max(0, index - 1) * PEER_REPLACEMENT_INTERVAL_SECONDS
 
-    assert [delay for delay in sleep_calls if delay <= 1.0] == [PEER_REPLACEMENT_INTERVAL_SECONDS]
     assert [block.id for block in presenter.snapshot().blocks] == [
         f"peer:{turn_ids[1]}",
         f"peer:{turn_ids[2]}",
@@ -6019,17 +6017,15 @@ async def test_peer_admission_paces_only_new_replacements_after_free_slots_fill(
             target_language="ja",
         )
     )
-    assert [delay for delay in sleep_calls if delay <= 1.0] == [PEER_REPLACEMENT_INTERVAL_SECONDS]
+    assert clock.now() == 10.0 + PEER_REPLACEMENT_INTERVAL_SECONDS
     await presenter.close()
 
 
 @pytest.mark.asyncio
 async def test_peer_replacement_uses_self_new_occupant_as_shared_anchor() -> None:
     clock = FakeClock(_now=20.0)
-    sleep_calls: list[float] = []
 
     async def fake_sleep(delay: float) -> None:
-        sleep_calls.append(delay)
         if delay > PEER_REPLACEMENT_INTERVAL_SECONDS:
             await asyncio.Event().wait()
         clock.advance(delay)
@@ -6074,6 +6070,6 @@ async def test_peer_replacement_uses_self_new_occupant_as_shared_anchor() -> Non
     )
 
     assert receipt.outcome == "applied"
-    assert [delay for delay in sleep_calls if delay <= 1.0] == [PEER_REPLACEMENT_INTERVAL_SECONDS]
+    assert clock.now() == 20.0 + PEER_REPLACEMENT_INTERVAL_SECONDS
     assert presenter.snapshot().blocks[0].id == f"peer:{peer_turn_id}"
     await presenter.close()

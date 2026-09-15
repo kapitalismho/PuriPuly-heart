@@ -349,6 +349,7 @@ Self merge commit returns after parent admission for both single- and dual-targe
 Delivery boundaries:
 
 - Peer UI and overlay destinations have independent bounded queues and writers.
+- When the visible window is full, a new Peer subtitle waits until at least 1.5 seconds after the most recent new occupant before replacing a row. Filling a free slot or updating an already visible subtitle does not incur this pacing delay.
 - Self chatbox speech has bounded pending delivery and expiry. Manual messages are exempt from speech eviction and expiry.
 - Output handoff releases translation ordering without waiting for display. Sink failure does not replay recognition or translation.
 - Peer publications retain activation generation and source order through output. Retiring an activation cancels its deliveries and rejects late work.

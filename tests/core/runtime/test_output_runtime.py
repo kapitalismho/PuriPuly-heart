@@ -1735,11 +1735,9 @@ async def test_peer_overlay_pressure_retains_eight_and_evicts_oldest_wholly_unse
 async def test_output_presenter_five_ready_peers_follow_two_slot_pacing_schedule() -> None:
     OutputRuntime = _output_runtime_class()
     clock = FakeClock(_now=10.0)
-    sleep_calls: list[float] = []
 
     async def controlled_sleep(delay: float) -> None:
-        sleep_calls.append(delay)
-        if delay > 1.0:
+        if delay > PEER_REPLACEMENT_INTERVAL_SECONDS:
             await asyncio.Event().wait()
         clock.advance(delay)
         await asyncio.sleep(0)
@@ -1775,8 +1773,7 @@ async def test_output_presenter_five_ready_peers_follow_two_slot_pacing_schedule
         assert result.decision.reason == "accepted_handoff"
     await owner.wait_for_peer_output_idle()
 
-    assert [delay for delay in sleep_calls if delay <= 1.0] == [1.0, 1.0, 1.0]
-    assert clock.now() == 13.0
+    assert clock.now() == 10.0 + 3 * PEER_REPLACEMENT_INTERVAL_SECONDS
     assert [block.id for block in presenter.snapshot().blocks] == [
         f"peer:{turn_ids[3]}",
         f"peer:{turn_ids[4]}",
@@ -1807,7 +1804,7 @@ async def test_output_presenter_five_ready_peers_follow_two_slot_pacing_schedule
         decision.metadata["stage"] == "application_accepted"
         and decision.metadata["outcome"] == "applied"
         and decision.metadata["physical_ack"] is False
-        and decision.metadata["handoff_wait_ms"] == 1000
+        and decision.metadata["handoff_wait_ms"] == PEER_REPLACEMENT_INTERVAL_SECONDS * 1000
         and decision.metadata["wait_reason"] == "replacement_gate"
         for decision in paced_outcomes
     )
