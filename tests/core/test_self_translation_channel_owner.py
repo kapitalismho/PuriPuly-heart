@@ -219,6 +219,7 @@ async def test_late_speech_end_measures_already_committed_translation(scoped: bo
         ]
         assert len(summaries) == 1
         assert "last_speech_to_chatbox_send_ms=3500" in summaries[0]
+        assert not any("[Metric]" in message for message in _runtime_log_messages(stream))
         assert not harness.translation_diagnostics.snapshot().timeline_keys
     finally:
         await harness.stop()

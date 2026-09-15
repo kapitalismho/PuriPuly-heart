@@ -1068,7 +1068,7 @@ class SelfTranslationChannelOwner:
         )
 
     def _emit_metric(self, message: str, *args: object) -> None:
-        self.diagnostics.emit_metric(message, *args)
+        return
 
     def _record_latency_stage(
         self,
