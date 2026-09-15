@@ -224,3 +224,33 @@ Retain this complete run directory, including `state.json`, frozen plan/configur
 Final optimizer accounting is **1 prior backend fixture + 19 conservatively charged failed-attempt updates + 2 newly checkpointed updates = 22**, with zero reload updates. Current input is 30.4 seconds; cumulative unique FIT audio remains 288.8 seconds, while cumulative training exposure including the approved repetition is 319.2 seconds. Both earlier failed controller states and their evidence remain unchanged.
 
 **Decision:** the isolated WSL GPU training, state-carry, persistence, and standalone inference path is executable. A later bounded GT/KD comparison can now be designed around measured execution rather than an assumed backward backend. Acoustic usefulness, calibration, source-disjoint quality, downstream effects, and complete teacher/student cost remain unmeasured. No additional updates, teacher passes, KD, evaluation audio, API/cloud work, production integration, or issue closure are authorized by this completion. The independent-review limitation above still applies.
+
+## Clean ROCm 10 environment reset
+
+After the maintainer updated the Windows display driver and explicitly requested a clean Linux ROCm setup, the RX 7900 XTX driver was observed as DriverStore `32.0.31041.1004`, matching Adrenalin 26.8.1. The scoped removal transaction removed the 23 inventoried ROCm 7.2.1/ROCDXG packages without an upgrade or `autoremove`, followed by the old dedicated PyTorch environment and obsolete installer directories. The WSL distribution, unrelated development tools, code, datasets, labels, checkpoints, and historical results were retained.
+
+The current runtime is `/opt/psem-streaming-student/rocm-10.0.0-pytorch-2.13.0`: Python 3.12.3, PyTorch `2.13.0+rocm10.0.0`, ROCm SDK packages 10.0.0, and ROCDXG 1.2.2. AMD's released Linux pip packages were installed in the dedicated environment and exercised under WSL; this is not described as the exact package-manager recipe shown by AMD's WSL selector. No Linux `amdgpu-dkms` driver was installed, and this setup did not modify the Windows driver.
+
+`torch.version.hip` reports **7.15.26333**, and both HIP runtime/driver version APIs return `71526333`. These observed identities are retained rather than relabeled as HIP 10. Loaded HIP and HSA libraries come from the new environment's `_rocm_sdk_core` directory; the bridge is `/opt/rocm/lib/librocdxg.so.1.2.2`. The former ROCm 7.2.1 runtime and active launcher references were removed.
+
+Current package pins, archive URLs/hashes, loaded-library paths, removal scope, and preservation checks are in `environment/ENVIRONMENT.json` and `environment/requirements.lock`. The previous receipt and lock remain explicitly historical as `environment/ENVIRONMENT_ROCM_7_2_1_HISTORICAL.json` and `environment/requirements-rocm-7.2.1-historical.lock`. Existing frozen run receipts/configurations remain unchanged. The default environment stage plan and both active launchers now select the new environment.
+
+### Existing checkpoint inference
+
+`environment/ROCM10_INFERENCE_RESULT.json` retains 30 raw timings from a fresh-process, no-grad replay of the same checkpoint and first 243,200 prepared samples (15.2 seconds). Each repetition starts from reset streaming state and measures synchronized H2D waveform transfer, log-Mel, convolution, GRU, logits, sigmoid, and D2H probabilities. Three warmup repetitions are excluded; the model is FP32/eval with one CPU thread.
+
+| Check | Observed result |
+| --- | --- |
+| Warmed block latency, median | 20.064929 ms |
+| Warmed block latency, p90 | 21.265417 ms |
+| Output | Finite probabilities, shape `[1, 190, 4]` |
+| Source frontiers | Exact agreement with the historical reference |
+| Maximum probability delta from historical reference | 5.9604645e-8 |
+| PyTorch peak allocated / reserved | 127,120,896 / 150,994,944 bytes |
+| Additional optimizer updates or backward calls | Zero |
+
+Checkpoint, prepared input, student source, and successful historical GT result hashes match the pre-removal inventory. The cumulative optimizer count remains **22**. The previous 25.567173-ms observation was a single run under the older driver/framework and a different measurement protocol; it is not a matched baseline for a controlled speedup percentage. These measurements are block inference, not live 80-ms admission latency, training speed, or evidence of acoustic quality. Earlier backward/training proof remains evidence for the historical ROCm 7.2.1 environment, not fresh backward verification on ROCm 10.
+
+This reset changes the isolated experiment environment, not the product architecture or student model. Issue #164 remains open/In progress; full GT/KD training, teacher passes, and quality-cost acceptance remain outside this reset.
+
+The Director exercised the updated default stage plan after WSL restarted: `.stage-control/rocm10-clean-env-smoke/`, run `59ead2543e854300bf36764e34380d68`, completed `dependency-check` and `default-gpu-environment-check`, both with exit code zero. The focused `experiments/psem_streaming_student/tests/test_stages.py` run also passed (nine tests). No new permanent test or benchmark script was added; the temporary inference script was removed after retaining its result.

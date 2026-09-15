@@ -1,0 +1,92 @@
+{
+  "schema": "PSEM-ISSUE-164-ROCM10-RUNTIME-COMPARISON-1",
+  "scope": "fresh-process no-grad checkpoint inference; no optimizer, backward, or training",
+  "checkpoint": {
+    "sha256": "1928a9ae14d257282a9eefbc8e819876de1f8db325e0565831875dded8a434ac",
+    "prepared_fit_sha256": "d90904cd97c589a5bdab357368d583f80d56a925b88d20ec3c01dd15af959715",
+    "parameter_count": 5940740,
+    "input_samples": 243200,
+    "input_seconds": 15.2
+  },
+  "runtime": {
+    "torch_module_version": "2.13.0+rocm10.0.0",
+    "torch_hip_compile_identity": "7.15.26333",
+    "hip_runtime_get_version": 71526333,
+    "hip_driver_get_version": 71526333,
+    "device_name": "AMD Radeon RX 7900 XTX",
+    "device_capability": [11, 0],
+    "device_total_memory_bytes": 25725263872,
+    "loaded_gpu_libraries": [
+      "/opt/psem-streaming-student/rocm-10.0.0-pytorch-2.13.0/lib/python3.12/site-packages/_rocm_sdk_core/lib/libamdhip64.so.7",
+      "/opt/psem-streaming-student/rocm-10.0.0-pytorch-2.13.0/lib/python3.12/site-packages/_rocm_sdk_core/lib/libhsa-runtime64.so.1",
+      "/opt/rocm/lib/librocdxg.so.1.2.2"
+    ]
+  },
+  "execution": {
+    "cpu_threads": 1,
+    "dtype": "float32",
+    "mode": "eval",
+    "grad_enabled_inside_measurement": false,
+    "state_reset_before_each_repetition": true,
+    "timing_scope": "synchronized H2D waveform transfer through log-Mel, convolution, GRU, linear logits, sigmoid, and D2H probabilities",
+    "warmup_repetitions": 3,
+    "measured_repetitions": 30,
+    "raw_seconds": [
+      0.020076262999999983,
+      0.020023764000001165,
+      0.01984232899999938,
+      0.019759813000000293,
+      0.01993446699999879,
+      0.020255069000000958,
+      0.020123111000003746,
+      0.020217578000000458,
+      0.020252808999998706,
+      0.020024810000002446,
+      0.020053595000000257,
+      0.020035407000001726,
+      0.020175428999998246,
+      0.020540142999998068,
+      0.019901425000000472,
+      0.01980502400000006,
+      0.02001409599999704,
+      0.019890021000001923,
+      0.01968908700000327,
+      0.020220363999996493,
+      0.020094445999994548,
+      0.019806997999999965,
+      0.019737132000003044,
+      0.02018318100000016,
+      0.019883968000002028,
+      0.020188478999997983,
+      0.021226439000002983,
+      0.02221948300000065,
+      0.021616213999998024,
+      0.022197655999995902
+    ],
+    "median_seconds": 0.02006492900000012,
+    "p90_seconds": 0.02126541650000249,
+    "p90_definition": "linear interpolation at zero-based rank (n - 1) * 0.9",
+    "minimum_seconds": 0.01968908700000327,
+    "maximum_seconds": 0.02221948300000065,
+    "peak_allocated_bytes": 127120896,
+    "peak_reserved_bytes": 150994944
+  },
+  "prediction_witness": {
+    "finite": true,
+    "shape": [1, 190, 4],
+    "frontier_count": 190,
+    "frontiers_equal_historical_reference": true,
+    "maximum_absolute_probability_delta_from_historical_rocm7_reference": 5.960464477539063e-08,
+    "representative_frontier": 5120,
+    "representative_probabilities": [
+      0.500070333480835,
+      0.49523597955703735,
+      0.47286394238471985,
+      0.49662211537361145
+    ]
+  },
+  "comparison_limit": "The historical ROCm 7 observation was a single run under a different protocol, so this receipt makes no controlled ROCm-only or training-speed claim.",
+  "optimizer_created": false,
+  "backward_called": false,
+  "training_run": false
+}

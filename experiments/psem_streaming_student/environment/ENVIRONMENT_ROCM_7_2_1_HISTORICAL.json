@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "artifact_role": "issue_164_historical_wsl_gpu_environment",
+  "status": "historical_removed_not_current",
+  "current": false,
+  "verified_at": "2026-09-14T19:57:22+09:00",
+  "scope": {
+    "performed": [
+      "isolated WSL ROCm and PyTorch runtime setup",
+      "GPU agent discovery",
+      "library import",
+      "bounded no-autograd GPU tensor allocation, addition, checksum transfer, and synchronization"
+    ],
+    "not_performed": [
+      "model forward",
+      "backward",
+      "optimizer creation or update",
+      "student implementation",
+      "dataset access",
+      "training",
+      "HOLDOUT or EVAL access"
+    ]
+  },
+  "host": {
+    "os": "Windows 11 build 22631",
+    "gpu": "AMD Radeon RX 7900 XTX 24GB",
+    "driver_registry_version_before_setup": "26.3.1",
+    "driver_store_version_before_setup": "32.0.23033.1002",
+    "driver_action": "none"
+  },
+  "wsl": {
+    "distribution": "Ubuntu",
+    "distribution_version": "24.04.4 LTS",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "device_route": "/dev/dxg",
+    "device_route_type": "character special file",
+    "required_environment": {
+      "HSA_ENABLE_DXG_DETECTION": "1",
+      "ROCM_PATH": "/opt/rocm-7.2.1"
+    }
+  },
+  "runtime": {
+    "venv": "/opt/psem-streaming-student/rocm-7.2.1-pytorch-2.9.1",
+    "wheelhouse": "/opt/psem-streaming-student/wheels",
+    "rocm": "7.2.1",
+    "rocm_path": "/opt/rocm-7.2.1",
+    "rocdxg": "1.2.0",
+    "python": "3.12.3",
+    "torch_module_version": "2.9.1+rocm7.2.1.gitff65f5bc",
+    "torch_distribution_version": "2.9.1+rocm7.2.1.lw.gitff65f5bc",
+    "torch_hip": "7.2.53211-e1a6bc5663",
+    "triton": "3.5.1+rocm7.2.1.gita272dfa8",
+    "numpy": "1.26.4",
+    "torchvision": "not installed",
+    "torchaudio": "not installed"
+  },
+  "gpu_verification": {
+    "rocminfo_agent_name": "gfx1100",
+    "rocminfo_marketing_name": "AMD Radeon RX 7900 XTX",
+    "torch_cuda_api_available": true,
+    "torch_device_count": 1,
+    "torch_device_capability": [11, 0],
+    "default_probe_mode": "default_no_autograd",
+    "tensor_elements": 4096,
+    "tensor_checksum": 8390656.0,
+    "synchronized": true,
+    "probe_elapsed_seconds": 0.23692236999997363,
+    "backward_called": false,
+    "model_created": false,
+    "optimizer_created": false
+  },
+  "launch": {
+    "ready_command": "wsl.exe -d Ubuntu -- bash /mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/environment/run_backend_probe.sh",
+    "future_backward_opt_in_suffix": " --backward",
+    "future_backward_opt_in_executed": false,
+    "student_training_command": null,
+    "student_training_command_limitation": "No student or trainer was implemented in this environment-only workstream, so a training command would be a fake placeholder."
+  },
+  "reproduction": {
+    "python_lock": "requirements.lock",
+    "offline_python_install": "/opt/psem-streaming-student/rocm-7.2.1-pytorch-2.9.1/bin/pip install --no-index --find-links /opt/psem-streaming-student/wheels -r requirements.lock",
+    "system_dependency_retrieval": {
+      "repository_installer_url": "https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/noble/amdgpu-install_7.2.1.70201-1_all.deb",
+      "repository_installer_download_bytes": 16908,
+      "rocm_apt_repository": "https://repo.radeon.com/rocm/apt/7.2.1 noble main",
+      "graphics_apt_repository_registered_temporarily": "https://repo.radeon.com/graphics/7.2.1/ubuntu noble main",
+      "amdgpu_apt_repository_registered_temporarily": "https://repo.radeon.com/amdgpu/30.30.1/ubuntu noble main",
+      "repository_signing_key_primary_fingerprint": "CA8BB4727A47B4D09B4EE8969386B48A1A693C5C",
+      "repository_signing_key_subkey_fingerprint": "2B2AFE47A094DC2D1013777C30C07AF01A6D36BA",
+      "rocdxg_url": "https://github.com/ROCm/librocdxg/releases/download/v1.2.0/rocdxg-roct_1.2.0_amd64.deb",
+      "rocdxg_download_bytes": 166894,
+      "rocdxg_retained_path": "/opt/psem-streaming-student/packages/rocdxg-roct_1.2.0_amd64.deb",
+      "rocdxg_sha256": "3ed9526719290cd8f590150dad8ea0f234fa779bea6a4c9a8449d7ae6b8cfb6e"
+    },
+    "system_packages": {
+      "rocm-core": "7.2.1.70201-81~24.04",
+      "hsa-rocr": "1.18.0.70201-81~24.04",
+      "rocminfo": "1.0.0.70201-81~24.04",
+      "hip-runtime-amd": "7.2.53211.70201-81~24.04",
+      "comgr": "3.0.0.70201-81~24.04",
+      "rocprofiler-register": "0.6.0.70201-81~24.04",
+      "rocdxg-roct": "1.2.0",
+      "roctracer": "4.1.70201.70201-81~24.04",
+      "hipblaslt": "1.2.2.70201-81~24.04",
+      "rocblas": "5.2.0.70201-81~24.04",
+      "rocsolver": "3.32.0.70201-81~24.04",
+      "hipblas": "3.2.0.70201-81~24.04",
+      "rocfft": "1.0.36.70201-81~24.04",
+      "hipfft": "1.0.22.70201-81~24.04",
+      "hiprand": "3.1.0.70201-81~24.04",
+      "hipsolver": "3.2.0.70201-81~24.04",
+      "rocsparse": "4.2.0.70201-81~24.04",
+      "hipsparse": "4.2.0.70201-81~24.04",
+      "hipsparselt": "0.2.6.70201-81~24.04",
+      "rocrand": "4.2.0.70201-81~24.04",
+      "miopen-hip": "3.5.1.70201-81~24.04",
+      "rocm-smi-lib": "7.8.0.70201-81~24.04",
+      "rccl": "2.27.7.70201-81~24.04",
+      "python3.12-venv": "3.12.3-1ubuntu0.17",
+      "python3-pip-whl": "24.0+dfsg-1ubuntu1.3",
+      "python3-setuptools-whl": "68.1.2-2ubuntu1.2",
+      "libncurses6": "6.4+20240113-1ubuntu2.2",
+      "libncurses-dev": "6.4+20240113-1ubuntu2.2",
+      "libpci3": "1:3.10.0-2build1",
+      "pciutils": "1:3.10.0-2build1"
+    }
+  },
+  "artifact_hashes_sha256": {
+    "amdgpu-install_7.2.1.70201-1_all.deb": "4c0338a241c15b12c14eb3aeb4012ea0d55dba681737ea8482248041a16c2afa",
+    "rocdxg-roct_1.2.0_amd64.deb": "3ed9526719290cd8f590150dad8ea0f234fa779bea6a4c9a8449d7ae6b8cfb6e",
+    "filelock-3.32.6-py3-none-any.whl": "3f16ecd0117feae0dfc147e8c62eb5daeccd8bd800378c3ddf416de9b4feb6b1",
+    "fsspec-2026.7.0-py3-none-any.whl": "b57ddbafedfaef7018c1ecab32aa200a9d7ca26b77965f64e48b70061249d279",
+    "jinja2-3.1.6-py3-none-any.whl": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+    "markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl": "d6dd0be5b5b189d31db7cda48b91d7e0a9795f31430b7f271219ab30f1d3ac9d",
+    "mpmath-1.3.0-py3-none-any.whl": "a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+    "networkx-3.6.1-py3-none-any.whl": "d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762",
+    "numpy-1.26.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl": "675d61ffbfa78604709862923189bad94014bef562cc35cf61d3a07bba02a7ed",
+    "setuptools-84.0.0-py3-none-any.whl": "51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670",
+    "sympy-1.14.0-py3-none-any.whl": "e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5",
+    "torch-2.9.1+rocm7.2.1.lw.gitff65f5bc-cp312-cp312-linux_x86_64.whl": "fb45ace0a27e9f0d0e3c4c6efd8932162743f8376f2aa4752a4d31ef5a1bd3d7",
+    "triton-3.5.1+rocm7.2.1.gita272dfa8-cp312-cp312-linux_x86_64.whl": "07787af1d28c273852f897bfeaa7bca29f2fa4a13ca0f28f535832b240ce7016",
+    "typing_extensions-4.16.0-py3-none-any.whl": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+  },
+  "resource_accounting": {
+    "download_cap_bytes": 20000000000,
+    "retained_wheelhouse_bytes": 1966390555,
+    "accounting_kind": "conservative estimate charging the full retained wheelhouse even where pip cache was observed",
+    "conservative_charged_download_bytes": 1975640251,
+    "small_setup_downloads_bytes": {
+      "repository_installer_original": 16908,
+      "rocdxg_original_install": 166894,
+      "rocdxg_retained_copy": 166894
+    },
+    "large_rocm_library_archives_downloaded_this_workstream_bytes": 0,
+    "large_rocm_library_archives_source": "pre-existing apt cache",
+    "installed_venv_and_wheelhouse_bytes": 6358877199,
+    "installed_rocm_tree_bytes": 12399262683,
+    "root_filesystem_used_kib_after_setup": 193577384,
+    "root_filesystem_available_kib_after_setup": 808482012
+  },
+  "global_changes": {
+    "windows_driver_or_os": "unchanged",
+    "existing_product_python_environment": "unchanged",
+    "existing_research_python_environment": "unchanged",
+    "linux_kernel_or_display_driver_installed": false,
+    "temporary_wsl_apt_repositories_after_setup": "purged; no temporary source list, keyring, preference, or installer config remains",
+    "cleanup_provenance": {
+      "installer_dpkg_state_before_purge": "deinstall ok config-files",
+      "setup_conffile_creation_time": "2026-09-14T19:36:23+09:00",
+      "removed_setup_owned_paths": [
+        "/etc/apt/sources.list.d/rocm.list",
+        "/etc/apt/sources.list.d/amdgpu.list",
+        "/etc/apt/keyrings/rocm.gpg",
+        "/etc/apt/preferences.d/repo-radeon-pin-600",
+        "/etc/amdgpu-install/amdgpu-setup.conf"
+      ],
+      "amdgpu_install_package_after_cleanup": "absent",
+      "amdgpu_dkms_package": "absent"
+    },
+    "wsl_packages": "only the pinned ROCm user-space runtime/library packages and Python venv prerequisites listed in this receipt"
+  }
+}

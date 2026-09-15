@@ -8,7 +8,7 @@
         "-d",
         "Ubuntu",
         "--",
-        "/opt/psem-streaming-student/rocm-7.2.1-pytorch-2.9.1/bin/python",
+        "/opt/psem-streaming-student/rocm-10.0.0-pytorch-2.13.0/bin/python",
         "-m",
         "pip",
         "check"
