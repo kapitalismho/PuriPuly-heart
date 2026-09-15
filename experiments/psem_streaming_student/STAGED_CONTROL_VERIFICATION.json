@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "artifact_role": "issue_164_staged_pause_resume_control_verification",
-  "status": "passed",
+  "status": "passed_after_full_review_repairs",
   "scope": {
     "performed": [
       "Python standard-library controller and harmless throwaway subprocess stages",
       "durable pause after the active stage",
-      "fresh-process status and resume",
+      "fresh-process status and resume from the frozen plan",
       "focused controller regression tests"
     ],
     "not_performed": [
@@ -18,9 +18,15 @@
     ]
   },
   "actual_subprocess_smoke": {
-    "run_id": "e326b2c35d1f460ca6cb57fd86e641bc",
-    "plan_sha256": "2b391add199b7a7c01020fca4edd58e8a42f8f6a6fd9b36d190409c11a4782cd",
+    "run_id": "a78474c126594e8cb28bd66b1efe3c45",
+    "plan_sha256": "8acce370a83ae5d30ef1549c44845d21e73a93f054fb1f07c32ebdfdd6475d13",
+    "command_identities": {
+      "stage1": "d3c5dded50242a39e0439a23da015f1af2e4c78299ea1824cd93524283fa001c",
+      "stage2": "ca9c3a9bfaef188a5aac5764aec3256980059ac7ae8a50a78ec1494d37196a23"
+    },
     "pause_acknowledged_while": "stage1",
+    "external_plan_changed_before_pause": true,
+    "external_plan_removed_before_fresh_status": true,
     "boundary_state": {
       "status": "PAUSED",
       "pause_requested": true,
@@ -30,7 +36,9 @@
       "next_stage": "stage2",
       "stage2_output_present": false
     },
-    "fresh_process_status_matched_boundary": true,
+    "fresh_process_status_without_external_plan_succeeded": true,
+    "resume_without_requested_plan_refused": true,
+    "resume_with_state_frozen_plan_succeeded": true,
     "final_state": {
       "status": "COMPLETED",
       "completed_stages": [
@@ -45,6 +53,13 @@
       "stage1.output": "d81c55f49c5bb0d36bc11e3966ec4efab66f8dfefbbc1761161ca9d230e5466a",
       "stage2.output": "d81c55f49c5bb0d36bc11e3966ec4efab66f8dfefbbc1761161ca9d230e5466a"
     },
+    "logs": {
+      "stage1.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage2.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "attempt_log_files": 4,
     "throwaway_directory_removed_after_receipt": true
   },
   "retained_failed_smoke_receipt": {
@@ -61,18 +76,36 @@
   },
   "focused_regressions": {
     "command": ".venv/Scripts/python.exe -m pytest experiments/psem_streaming_student/tests/test_stages.py -q",
-    "result": "5 passed",
-    "invariants": [
+    "result": "9 passed",
+    "coverage": {
+      "F1": "pause and status use frozen state despite changed or missing external plan; resume still refuses changed or missing requested plan",
+      "F2": "orphaned harmless child PID, stage, warning, and untrusted output state persist without a false completion receipt; owned child is cleaned up",
+      "F3": "an existing-file state root returns structured error code 2 without clobbering content",
+      "F4": "unknown top-level and stage keys plus non-finite timeout are rejected",
+      "F5": "a pause before launch creates no attempt logs",
+      "F6": "matching frozen-only initialization completes once; mismatch is refused"
+    },
+    "unchanged_invariants": [
       "pause persists at the completed-stage boundary and resume skips it",
-      "pause accepted before launch prevents that stage from starting",
       "a duplicate driver cannot acquire the run lock",
-      "a failed stage retains logs and cannot advance",
-      "a changed plan is refused"
+      "a failed stage retains logs and cannot advance"
     ]
+  },
+  "review_stress_evidence_reported_by_director": {
+    "concurrent_pause_requests": 25,
+    "pause_boundary_serialization": "passed",
+    "duplicate_driver_lock": "passed",
+    "windows_wsl_attached_timeout_cleanup": "passed"
+  },
+  "cleanup": {
+    "lost_separator_artifact": "UserssaleeAppDataLocalTemppsem-stage-smoke-38uv2p9cstate/control.lock",
+    "ownership_confirmation": "created by the recorded failed manual smoke command; contained one lock byte and no other content",
+    "removed": true
   },
   "limits": [
     "Pause is graceful only after the current stage; it is not an intra-stage checkpoint.",
-    "An interrupted driver with an unknown in-flight child outcome is fail-closed and cannot be implicitly resumed or retried.",
+    "INTERRUPTED does not mean the recorded child stopped; outputs remain uncommitted and untrusted pending manual reconciliation.",
+    "The controller does not blindly kill a stale recorded PID or provide full crash recovery.",
     "The shipped plan contains environment checks only; future real training stages require separate implementation and authorization."
   ]
 }

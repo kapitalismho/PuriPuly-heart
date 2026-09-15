@@ -59,8 +59,11 @@ def atomic_json(path: Path, value: object) -> None:
 
 @contextmanager
 def file_lock(path: Path, *, blocking: bool) -> Iterator[None]:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    handle = path.open("a+b")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handle = path.open("a+b")
+    except OSError as exc:
+        raise ControlError(f"cannot open lock {path}: {exc}") from exc
     if handle.tell() == 0:
         handle.write(b"0")
         handle.flush()
@@ -115,9 +118,16 @@ def validate_relative_path(value: object, label: str) -> str:
     return value
 
 
+def reject_unknown_keys(value: dict[str, Any], allowed: set[str], label: str) -> None:
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise ControlError(f"{label} has unknown keys: {', '.join(unknown)}")
+
+
 def validate_plan(value: dict[str, Any]) -> dict[str, Any]:
-    if value.get("schema_version") != SCHEMA_VERSION:
-        raise ControlError(f"plan schema_version must be {SCHEMA_VERSION}")
+    reject_unknown_keys(value, {"schema_version", "stages"}, "plan")
+    if type(value.get("schema_version")) is not int or value["schema_version"] != SCHEMA_VERSION:
+        raise ControlError(f"plan schema_version must be integer {SCHEMA_VERSION}")
     stages = value.get("stages")
     if not isinstance(stages, list) or not stages:
         raise ControlError("plan stages must be a non-empty list")
@@ -126,6 +136,11 @@ def validate_plan(value: dict[str, Any]) -> dict[str, Any]:
     for index, raw in enumerate(stages):
         if not isinstance(raw, dict):
             raise ControlError(f"stage {index} must be an object")
+        reject_unknown_keys(
+            raw,
+            {"id", "argv", "timeout_seconds", "required_outputs"},
+            f"stage {index}",
+        )
         stage_id = raw.get("id")
         if not isinstance(stage_id, str) or not stage_id or stage_id in seen:
             raise ControlError(f"stage {index} id must be non-empty and unique")
@@ -229,18 +244,23 @@ def public_state(state: dict[str, Any], plan: dict[str, Any]) -> dict[str, Any]:
         "pause_requested": state["pause_requested"],
         "plan_sha256": state["plan_sha256"],
         "last_error": state["last_error"],
+        "last_recorded_child": state.get("last_recorded_child"),
+        "interruption_warning": state.get("interruption_warning"),
     }
 
 
 def load_bound(
-    paths_by_name: dict[str, Path], requested_plan: Path
+    paths_by_name: dict[str, Path], requested_plan: Path | None = None
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     state = load_object(paths_by_name["state"])
     frozen = validate_plan(load_object(paths_by_name["plan"]))
-    supplied = validate_plan(load_object(requested_plan))
-    supplied_digest = digest(supplied)
-    if digest(frozen) != state.get("plan_sha256") or supplied_digest != state.get("plan_sha256"):
-        raise ControlError("plan identity differs from the frozen plan for this run")
+    frozen_digest = digest(frozen)
+    if frozen_digest != state.get("plan_sha256"):
+        raise ControlError("frozen plan identity differs from stored run state")
+    if requested_plan is not None:
+        supplied = validate_plan(load_object(requested_plan))
+        if digest(supplied) != frozen_digest:
+            raise ControlError("requested plan identity differs from the frozen plan for this run")
     expected_commands = {
         stage["id"]: digest(
             {
@@ -256,41 +276,81 @@ def load_bound(
     return state, frozen
 
 
+def command_identities(plan: dict[str, Any]) -> dict[str, str]:
+    return {
+        stage["id"]: digest(
+            {
+                "argv": stage["argv"],
+                "timeout_seconds": stage["timeout_seconds"],
+                "required_outputs": stage["required_outputs"],
+            }
+        )
+        for stage in plan["stages"]
+    }
+
+
+def initial_state(plan: dict[str, Any]) -> dict[str, Any]:
+    now = utc_now()
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "run_id": uuid.uuid4().hex,
+        "created_at": now,
+        "updated_at": now,
+        "status": "READY",
+        "pause_requested": False,
+        "current_stage": None,
+        "completed_stages": [],
+        "plan_sha256": digest(plan),
+        "command_identities": command_identities(plan),
+        "stage_outcomes": [],
+        "last_error": None,
+        "last_recorded_child": None,
+        "interruption_warning": None,
+    }
+
+
 def initialize(state_root: Path, plan_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     locations = paths(state_root)
-    state_root.mkdir(parents=True, exist_ok=True)
-    with file_lock(locations["control_lock"], blocking=True):
-        if locations["state"].exists() or locations["plan"].exists():
-            raise ControlError(f"run state already exists: {state_root}")
-        plan = validate_plan(load_object(plan_path))
-        plan_digest = digest(plan)
-        commands = {
-            stage["id"]: digest(
-                {
-                    "argv": stage["argv"],
-                    "timeout_seconds": stage["timeout_seconds"],
-                    "required_outputs": stage["required_outputs"],
-                }
-            )
-            for stage in plan["stages"]
-        }
-        state = {
-            "schema_version": SCHEMA_VERSION,
-            "run_id": uuid.uuid4().hex,
-            "created_at": utc_now(),
-            "updated_at": utc_now(),
-            "status": "READY",
-            "pause_requested": False,
-            "current_stage": None,
-            "completed_stages": [],
-            "plan_sha256": plan_digest,
-            "command_identities": commands,
-            "stage_outcomes": [],
-            "last_error": None,
-        }
-        atomic_json(locations["plan"], plan)
-        atomic_json(locations["state"], state)
-    return state, plan
+    try:
+        state_root.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ControlError(f"cannot create state root {state_root}: {exc}") from exc
+    try:
+        with file_lock(locations["control_lock"], blocking=True):
+            requested = validate_plan(load_object(plan_path))
+            state_exists = locations["state"].exists()
+            frozen_exists = locations["plan"].exists()
+            names = {item.name for item in state_root.iterdir()}
+            if not state_exists and not frozen_exists:
+                unexpected = sorted(names - {"control.lock", "driver.lock"})
+                if unexpected:
+                    raise ControlError(
+                        "uninitialized state root has unexpected content: " + ", ".join(unexpected)
+                    )
+                state = initial_state(requested)
+                atomic_json(locations["plan"], requested)
+                atomic_json(locations["state"], state)
+                return state, requested
+            if not state_exists and frozen_exists:
+                allowed = {"control.lock", "driver.lock", "frozen_plan.json"}
+                unexpected = sorted(names - allowed)
+                if unexpected:
+                    raise ControlError(
+                        "partial initialization has unexpected content: " + ", ".join(unexpected)
+                    )
+                frozen = validate_plan(load_object(locations["plan"]))
+                if digest(requested) != digest(frozen):
+                    raise ControlError(
+                        "requested plan identity differs from recoverable frozen initialization"
+                    )
+                state = initial_state(frozen)
+                atomic_json(locations["state"], state)
+                return state, frozen
+            raise ControlError(f"run state already exists or is inconsistent: {state_root}")
+    except ControlError:
+        raise
+    except OSError as exc:
+        raise ControlError(f"cannot initialize state root {state_root}: {exc}") from exc
 
 
 def save_state(path: Path, state: dict[str, Any]) -> None:
@@ -334,57 +394,62 @@ def execute_stage(
     state_root: Path,
     locations: dict[str, Path],
     state: dict[str, Any],
-    plan: dict[str, Any],
 ) -> None:
     stage_id = stage["id"]
     values = substitutions(state_root)
     argv = [expand(item, values) for item in stage["argv"]]
-    locations["logs"].mkdir(parents=True, exist_ok=True)
     attempt_number = 1 + sum(1 for item in state["stage_outcomes"] if item["stage_id"] == stage_id)
     stdout_path = locations["logs"] / f"{stage_id}.attempt-{attempt_number}.stdout.log"
     stderr_path = locations["logs"] / f"{stage_id}.attempt-{attempt_number}.stderr.log"
     started_at = utc_now()
     timed_out = False
     launch_error: str | None = None
-    with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
-        with file_lock(locations["control_lock"], blocking=True):
-            current, _ = load_bound(locations, locations["plan"])
-            if current["pause_requested"]:
-                current["status"] = "PAUSED"
-                current["current_stage"] = None
-                save_state(locations["state"], current)
-                state.clear()
-                state.update(current)
-                return
-            current["status"] = "LAUNCHING"
-            current["current_stage"] = stage_id
-            current["last_error"] = None
+    with file_lock(locations["control_lock"], blocking=True):
+        current, _ = load_bound(locations)
+        if current["pause_requested"]:
+            current["status"] = "PAUSED"
+            current["current_stage"] = None
             save_state(locations["state"], current)
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
-            try:
-                child = subprocess.Popen(
-                    argv,
-                    cwd=workflow_root(),
-                    stdin=subprocess.DEVNULL,
-                    stdout=stdout,
-                    stderr=stderr,
-                    shell=False,
-                    start_new_session=os.name != "nt",
-                    creationflags=creationflags,
-                )
-            except OSError as exc:
-                child = None
-                launch_error = f"stage could not start: {exc}"
-            if child is not None:
-                current["status"] = "RUNNING"
-                current["child"] = {
-                    "pid": child.pid,
-                    "stage_id": stage_id,
-                    "started_at": started_at,
-                }
-                save_state(locations["state"], current)
-                state.clear()
-                state.update(current)
+            state.clear()
+            state.update(current)
+            return
+        current["status"] = "LAUNCHING"
+        current["current_stage"] = stage_id
+        current["last_error"] = None
+        save_state(locations["state"], current)
+        locations["logs"].mkdir(parents=True, exist_ok=True)
+        stdout = stdout_path.open("wb")
+        try:
+            stderr = stderr_path.open("wb")
+        except BaseException:
+            stdout.close()
+            raise
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+        try:
+            child = subprocess.Popen(
+                argv,
+                cwd=workflow_root(),
+                stdin=subprocess.DEVNULL,
+                stdout=stdout,
+                stderr=stderr,
+                shell=False,
+                start_new_session=os.name != "nt",
+                creationflags=creationflags,
+            )
+        except OSError as exc:
+            child = None
+            launch_error = f"stage could not start: {exc}"
+        if child is not None:
+            current["status"] = "RUNNING"
+            current["child"] = {
+                "pid": child.pid,
+                "stage_id": stage_id,
+                "started_at": started_at,
+            }
+            save_state(locations["state"], current)
+            state.clear()
+            state.update(current)
+    try:
         if child is None:
             return_code = None
         else:
@@ -394,6 +459,9 @@ def execute_stage(
                 timed_out = True
                 stop_timed_out_child(child)
                 return_code = child.returncode
+    finally:
+        stdout.close()
+        stderr.close()
     finished_at = utc_now()
     outputs: list[dict[str, Any]] = []
     output_error: str | None = None
@@ -431,7 +499,7 @@ def execute_stage(
         "error": error,
     }
     with file_lock(locations["control_lock"], blocking=True):
-        current, _ = load_bound(locations, locations["plan"])
+        current, _ = load_bound(locations)
         current.pop("child", None)
         current["stage_outcomes"].append(outcome)
         current["current_stage"] = None
@@ -452,12 +520,25 @@ def drive(state_root: Path, plan_path: Path, *, resume: bool) -> dict[str, Any]:
         with file_lock(locations["control_lock"], blocking=True):
             state, plan = load_bound(locations, plan_path)
             if state["status"] in {"RUNNING", "LAUNCHING"}:
+                recorded_child = state.pop("child", None)
+                if recorded_child is None:
+                    recorded_child = {
+                        "pid": None,
+                        "stage_id": state["current_stage"],
+                        "started_at": None,
+                    }
                 state["status"] = "INTERRUPTED"
+                state["current_stage"] = None
+                state["last_recorded_child"] = recorded_child
+                state["interruption_warning"] = (
+                    "the recorded child may still be running; its outputs are uncommitted and must not "
+                    "be trusted until manually reconciled"
+                )
                 state["last_error"] = (
                     "prior driver ended with an unknown in-flight child outcome; implicit retry is refused"
                 )
                 save_state(locations["state"], state)
-                raise ControlError(state["last_error"])
+                raise ControlError(f"{state['last_error']}; {state['interruption_warning']}")
             if state["status"] == "FAILED":
                 raise ControlError(
                     "failed stage blocks continuation; inspect retained logs and state"
@@ -473,7 +554,7 @@ def drive(state_root: Path, plan_path: Path, *, resume: bool) -> dict[str, Any]:
         by_id = {stage["id"]: stage for stage in plan["stages"]}
         while True:
             with file_lock(locations["control_lock"], blocking=True):
-                state, plan = load_bound(locations, locations["plan"])
+                state, plan = load_bound(locations)
                 next_id = next_stage_id(state, plan)
                 if next_id is None:
                     state["status"] = "COMPLETED"
@@ -486,15 +567,15 @@ def drive(state_root: Path, plan_path: Path, *, resume: bool) -> dict[str, Any]:
                     state["current_stage"] = None
                     save_state(locations["state"], state)
                     return public_state(state, plan)
-            execute_stage(by_id[next_id], state_root, locations, state, plan)
+            execute_stage(by_id[next_id], state_root, locations, state)
             if state["status"] in {"PAUSED", "FAILED"}:
                 return public_state(state, plan)
 
 
-def pause(state_root: Path, plan_path: Path) -> dict[str, Any]:
+def pause(state_root: Path, plan_path: Path | None = None) -> dict[str, Any]:
     locations = paths(state_root)
     with file_lock(locations["control_lock"], blocking=True):
-        state, plan = load_bound(locations, plan_path)
+        state, plan = load_bound(locations)
         if state["status"] == "COMPLETED":
             return public_state(state, plan)
         if state["status"] in {"FAILED", "INTERRUPTED"}:
@@ -506,10 +587,10 @@ def pause(state_root: Path, plan_path: Path) -> dict[str, Any]:
         return public_state(state, plan)
 
 
-def status(state_root: Path, plan_path: Path) -> dict[str, Any]:
+def status(state_root: Path, plan_path: Path | None = None) -> dict[str, Any]:
     locations = paths(state_root)
     with file_lock(locations["control_lock"], blocking=True):
-        state, plan = load_bound(locations, plan_path)
+        state, plan = load_bound(locations)
         return public_state(state, plan)
 
 

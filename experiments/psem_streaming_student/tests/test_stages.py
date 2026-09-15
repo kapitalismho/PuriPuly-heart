@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -113,11 +115,13 @@ def test_pause_wins_before_next_stage_launch(tmp_path: Path) -> None:
             )
         ],
     )
-    stages.initialize(state_root, plan_path)
+    state, frozen = stages.initialize(state_root, plan_path)
     result = stages.pause(state_root, plan_path)
     assert result["status"] == "PAUSED"
     assert stages.status(state_root, plan_path)["next_stage"] == "only"
+    stages.execute_stage(frozen["stages"][0], state_root, stages.paths(state_root), state)
     assert not (state_root / "ran").exists()
+    assert not (state_root / "logs").exists()
 
 
 def test_duplicate_driver_is_rejected(tmp_path: Path) -> None:
@@ -178,7 +182,9 @@ def test_failure_is_retained_and_does_not_advance(tmp_path: Path) -> None:
     assert len(state["stage_outcomes"]) == 1
 
 
-def test_plan_change_refuses_resume(tmp_path: Path) -> None:
+def test_control_uses_frozen_plan_but_resume_rejects_external_plan_change(
+    tmp_path: Path,
+) -> None:
     plan = tmp_path / "plan.json"
     state_root = tmp_path / "state"
     write_plan(
@@ -202,7 +208,139 @@ def test_plan_change_refuses_resume(tmp_path: Path) -> None:
             )
         ],
     )
-    result = invoke("resume", state_root, plan)
-    assert result.returncode == 2
-    assert "plan identity differs" in result.stderr
+    paused = invoke("pause", state_root, plan)
+    assert paused.returncode == 0
+    assert json.loads(paused.stdout)["status"] == "PAUSED"
+    assert invoke("status", state_root, plan).returncode == 0
+    changed = invoke("resume", state_root, plan)
+    assert changed.returncode == 2
+    assert "requested plan identity differs" in changed.stderr
+    plan.unlink()
+    assert invoke("status", state_root, plan).returncode == 0
+    missing = invoke("resume", state_root, plan)
+    assert missing.returncode == 2
+    assert "file does not exist" in missing.stderr
     assert not (state_root / "changed").exists()
+
+
+def test_state_root_file_returns_structured_error_without_clobbering(tmp_path: Path) -> None:
+    plan = tmp_path / "plan.json"
+    state_root = tmp_path / "occupied"
+    state_root.write_text("owned", encoding="utf-8")
+    write_plan(plan, [stage("one", "raise SystemExit(0)")])
+    result = invoke("run", state_root, plan)
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["error"].startswith("cannot create state root")
+    assert state_root.read_text(encoding="utf-8") == "owned"
+
+
+def test_manifest_rejects_unknown_keys_and_invalid_timeout(tmp_path: Path) -> None:
+    plan = tmp_path / "plan.json"
+    state_root = tmp_path / "state"
+    value = stage("one", "raise SystemExit(0)")
+    value["timeouts_seconds"] = 5
+    write_plan(plan, [value])
+    typo = invoke("run", state_root, plan)
+    assert typo.returncode == 2
+    assert "unknown keys: timeouts_seconds" in typo.stderr
+    assert not (state_root / "state.json").exists()
+    plan.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "stages": [stage("one", "raise SystemExit(0)")],
+                "unexpected": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    unknown = invoke("run", state_root, plan)
+    assert unknown.returncode == 2
+    assert "plan has unknown keys: unexpected" in unknown.stderr
+    value = stage("one", "raise SystemExit(0)")
+    value["timeout_seconds"] = float("inf")
+    write_plan(plan, [value])
+    nonfinite = invoke("run", state_root, plan)
+    assert nonfinite.returncode == 2
+    assert "timeout_seconds must be an integer" in nonfinite.stderr
+
+
+def test_frozen_only_initialization_recovers_once_and_mismatch_refuses(
+    tmp_path: Path,
+) -> None:
+    plan = tmp_path / "plan.json"
+    state_root = tmp_path / "recoverable"
+    state_root.mkdir()
+    one = stage(
+        "one",
+        "import pathlib,sys; p=pathlib.Path(sys.argv[1])/'count'; p.write_text('1')",
+        "count",
+    )
+    write_plan(plan, [one])
+    frozen = stages.validate_plan(json.loads(plan.read_text(encoding="utf-8")))
+    stages.atomic_json(state_root / "frozen_plan.json", frozen)
+    recovered = invoke("run", state_root, plan)
+    assert recovered.returncode == 0, recovered.stderr
+    assert (state_root / "count").read_text(encoding="utf-8") == "1"
+    second = invoke("run", state_root, plan)
+    assert second.returncode == 2
+    assert (state_root / "count").read_text(encoding="utf-8") == "1"
+
+    mismatch_root = tmp_path / "mismatch"
+    mismatch_root.mkdir()
+    stages.atomic_json(mismatch_root / "frozen_plan.json", frozen)
+    write_plan(plan, [stage("changed", "raise SystemExit(0)")])
+    mismatch = invoke("run", mismatch_root, plan)
+    assert mismatch.returncode == 2
+    assert "recoverable frozen initialization" in mismatch.stderr
+    assert not (mismatch_root / "state.json").exists()
+
+
+def test_interrupted_driver_exposes_untrusted_live_child_metadata(tmp_path: Path) -> None:
+    plan = tmp_path / "plan.json"
+    state_root = tmp_path / "state"
+    blocking = "import pathlib,sys,time; r=pathlib.Path(sys.argv[1]); (r/'started').write_text('1');\nwhile not (r/'release').exists(): time.sleep(.01)\n(r/'uncommitted').write_text('done'); (r/'cleanup-ready').write_text('1'); deadline=time.monotonic()+10\nwhile time.monotonic()<deadline: time.sleep(.1)"
+    write_plan(plan, [stage("orphan", blocking, "uncommitted")])
+    driver = subprocess.Popen(
+        [
+            sys.executable,
+            str(MODULE_PATH),
+            "run",
+            "--state-root",
+            str(state_root),
+            "--plan",
+            str(plan),
+        ],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    wait_for(state_root / "started", driver)
+    driver.terminate()
+    driver.communicate(timeout=10)
+    interrupted = invoke("resume", state_root, plan)
+    assert interrupted.returncode == 2
+    current = json.loads(invoke("status", state_root, plan).stdout)
+    child = current["last_recorded_child"]
+    assert current["status"] == "INTERRUPTED"
+    assert child["stage_id"] == "orphan"
+    assert isinstance(child["pid"], int)
+    assert "may still be running" in current["interruption_warning"]
+    assert current["completed_stages"] == []
+    (state_root / "release").write_text("go", encoding="utf-8")
+    wait_for(state_root / "uncommitted")
+    state = json.loads((state_root / "state.json").read_text(encoding="utf-8"))
+    wait_for(state_root / "cleanup-ready")
+    assert state["stage_outcomes"] == []
+    assert state["completed_stages"] == []
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(child["pid"]), "/T", "/F"],
+            check=False,
+            capture_output=True,
+        )
+    else:
+        try:
+            os.kill(child["pid"], signal.SIGTERM)
+        except ProcessLookupError:
+            pass
