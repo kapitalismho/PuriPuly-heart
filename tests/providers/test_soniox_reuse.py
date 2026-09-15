@@ -22,11 +22,13 @@ class _RecordingWebSocket:
     def __init__(self) -> None:
         self.sent: list[object] = []
         self.closed = False
+        self.close_calls = 0
 
     async def send(self, payload: object) -> None:
         self.sent.append(payload)
 
     async def close(self) -> None:
+        self.close_calls += 1
         self.closed = True
 
 
@@ -229,6 +231,81 @@ async def test_soniox_detectable_idle_output_retires_reused_epoch_without_seedin
     with pytest.raises(RuntimeError, match="epoch is retired"):
         await session.begin_turn(_request(2))
     await session.close()
+
+
+@pytest.mark.asyncio
+async def test_soniox_finished_response_retires_idle_reused_epoch_before_next_begin() -> None:
+    session, websocket = _session()
+    request = _request(1)
+    await session.begin_turn(request)
+    await _seal(session, request)
+    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    terminal = await _next(session)
+    assert isinstance(terminal, STTProviderTurnTerminal)
+    assert terminal.epoch_disposition == "reuse"
+
+    session._handle_message(json.dumps({"tokens": [], "finished": True}))
+    ended = await _next(session)
+    assert isinstance(ended, STTProviderEpochEnded)
+    assert (ended.reason, ended.orderly) == ("soniox_stream_finished", True)
+    assert session._event_projection.retired is True
+    with pytest.raises(RuntimeError, match="session is closed"):
+        await session.begin_turn(_request(2))
+
+    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    await asyncio.sleep(0)
+    assert session._event_projection.scoped_event_depth == 0
+    await session.close()
+    await session.close()
+    assert websocket.close_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_soniox_finished_response_retires_active_turn_with_preserved_text() -> None:
+    session, websocket = _session()
+    request = _request(1)
+    await session.begin_turn(request)
+    await _seal(session, request)
+
+    session._handle_message(
+        json.dumps(
+            {
+                "tokens": [
+                    {
+                        "text": "kept",
+                        "is_final": True,
+                        "end_ms": 100,
+                        "language": "en",
+                        "speaker": "4",
+                    }
+                ],
+                "finished": True,
+            }
+        )
+    )
+    update = await _next(session)
+    terminal = await _next(session)
+    ended = await _next(session)
+    assert isinstance(update, STTProviderTurnUpdate)
+    assert update.text == "kept"
+    assert isinstance(terminal, STTProviderTurnTerminal)
+    assert (
+        terminal.outcome,
+        terminal.text,
+        terminal.text_authority,
+        terminal.failure_reason,
+        terminal.epoch_disposition,
+    ) == ("degraded", "kept", "degraded", "soniox_stream_finished", "retire")
+    assert terminal.final_language_runs[0].text == "kept"
+    assert terminal.final_speaker_runs[0].text == "kept"
+    assert isinstance(ended, STTProviderEpochEnded)
+    assert (ended.reason, ended.orderly) == ("soniox_stream_finished", True)
+
+    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    await asyncio.sleep(0)
+    assert session._event_projection.scoped_event_depth == 0
+    await session.close()
+    assert websocket.close_calls == 1
 
 
 @pytest.mark.asyncio

@@ -154,20 +154,22 @@ class _DeepgramSDKSession(STTBackendSession):
         return self.model.strip().lower() == _DEEPGRAM_KEYTERM_MODEL
 
     def _build_transcript_event(self, result: Any) -> STTBackendTranscriptEvent | None:
-        if not hasattr(result, "channel") or not hasattr(result.channel, "alternatives"):
-            return None
-        if not result.channel.alternatives:
-            return None
-
-        alternative = result.channel.alternatives[0]
-        raw_transcript = str(getattr(alternative, "transcript", "") or "")
-        transcript = raw_transcript.strip()
         speech_final = getattr(result, "speech_final", False)
         is_final = getattr(result, "is_final", False)
         metadata = getattr(result, "metadata", None)
         from_finalize = bool(
             getattr(result, "from_finalize", False) or getattr(metadata, "from_finalize", False)
         )
+        channel = getattr(result, "channel", None)
+        alternatives = getattr(channel, "alternatives", None)
+        if alternatives:
+            alternative = alternatives[0]
+            raw_transcript = str(getattr(alternative, "transcript", "") or "")
+        elif from_finalize:
+            raw_transcript = ""
+        else:
+            return None
+        transcript = raw_transcript.strip()
         request_id = getattr(metadata, "request_id", None)
         provenance = STTNativeProvenance(
             native_request_id=str(request_id) if request_id is not None else None,
@@ -187,7 +189,7 @@ class _DeepgramSDKSession(STTBackendSession):
             is_final,
             speech_final,
         )
-        if self._event_projection.is_scoped or not (is_final or speech_final):
+        if self._event_projection.is_scoped or not (is_final or speech_final or from_finalize):
             return None
         if not transcript:
             if self.stream_label == "peer":
@@ -695,10 +697,19 @@ class _DeepgramSDKSession(STTBackendSession):
         if self._stopped:
             return
         self._stopped = True
+        self._scoped_close_sent = True
         self._audio_q.put_nowait(_STOP)
 
     async def close(self) -> None:
         self._log_summary_once()
+        task = self._scoped_drain_task
+        self._scoped_drain_task = None
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         await self.stop()
         if self._thread is not None:
             self._thread.join(timeout=5.0)

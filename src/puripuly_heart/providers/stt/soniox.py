@@ -424,6 +424,10 @@ class _SonioxSession(STTBackendSession):
             self._pending_tokens.append(final_token)
             self._emit_scoped_token(final_token, token, data)
 
+        if data.get("finished") is True and self._event_projection.is_scoped:
+            self._scoped_transport_failure("soniox_stream_finished", orderly=True)
+            self._stopped = True
+
     def _emit_scoped_token(
         self,
         final_token: _FinalToken,

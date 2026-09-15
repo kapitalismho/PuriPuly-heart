@@ -29,6 +29,7 @@ from puripuly_heart.core.audio.ownership import (
     AudioSegmentSettingsSnapshot,
     AudioSegmentSnapshot,
     OwnedVadEvent,
+    PeerAudioSegmentLedger,
 )
 from puripuly_heart.core.gpu_worker import (
     GpuWorkerActivation,
@@ -41,6 +42,20 @@ from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+from puripuly_heart.core.runtime.peer_channel import (
+    _CaptureGeneration,
+    _GenerationGuardedVadSink,
+)
+from puripuly_heart.core.stt.backend import (
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+)
+from puripuly_heart.core.stt.scoped_engine import (
+    ScopedRecognitionEngine,
+    STTRecognitionWatchdogs,
+)
+from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from tests.helpers.lifecycle import assert_lifecycle_structure
 
 GPU_DEVICE = GpuWorkerDevice(
@@ -1420,6 +1435,145 @@ async def test_owned_vad_routing_preserves_old_configuration_until_ordered_hando
     assert new.events == [first_new]
     assert old.rejections == [(queued_old, "recognition_admission_timeout", "expired")]
     assert new.failures == [(first_new, "buffer_exhausted")]
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_retained_scoped_engine_receives_pending_fact_from_blocked_peer_guard() -> None:
+    class Session:
+        allows_interim_timeout_fallback = False
+
+        def __init__(self) -> None:
+            self.events = STTProviderEventBuffer()
+            self.requests: list[STTProviderTurnRequest] = []
+            self.close_calls = 0
+
+        async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+            self.requests.append(request)
+
+        async def send_turn_audio(self, _identity, _pcm16le, **_kwargs) -> None:
+            return None
+
+        async def seal_turn(self, identity, **_kwargs) -> None:
+            self.events.put(
+                STTProviderTurnTerminal(
+                    identity=identity,
+                    outcome="empty",
+                    text_authority="authoritative",
+                    epoch_disposition="reuse",
+                )
+            )
+
+        async def abort_turn(self, _identity, **_kwargs) -> None:
+            return None
+
+        async def turn_events(self):
+            async for event in self.events.events():
+                yield event
+
+        async def stop(self) -> None:
+            return None
+
+        async def close(self) -> None:
+            self.close_calls += 1
+            self.events.close()
+
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner()
+    old_settings = AudioSegmentSettingsSnapshot(
+        provider_id="deepgram",
+        provider_signature=("old",),
+        runtime_signature=("old-runtime",),
+        source_mode="fixed",
+        source_language="en",
+        expected_languages=("en",),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.5,
+        vad_hangover_ms=800,
+        vad_pre_roll_ms=320,
+    )
+    new_scope = ("deepgram", ("new",), ("new-runtime",))
+    now = [0.0]
+    sessions: list[Session] = []
+
+    async def open_session(_settings, _epoch):
+        session = Session()
+        sessions.append(session)
+        return session
+
+    old = ScopedRecognitionEngine(
+        session_factory=open_session,
+        event_sink=lambda _event: None,
+        accepted_settings_scope=(
+            old_settings.provider_id,
+            old_settings.provider_signature,
+            old_settings.runtime_signature,
+        ),
+        monotonic_clock=lambda: now[0],
+        watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(
+            healthy_reset_age_s=0.02,
+            recent_speech_window_s=0.01,
+        ),
+    )
+    new = FakeScopedProvider(new_scope)
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=old_settings)
+    first_id = uuid4()
+    first_start = ledger.observe_vad_event(
+        SpeechStart(
+            first_id,
+            pre_roll=np.empty((0,), dtype=np.float32),
+            chunk=np.ones((8,), dtype=np.float32),
+        ),
+        now_monotonic_s=0.0,
+    )
+    first_end = ledger.observe_vad_event(
+        SpeechEnd(first_id),
+        now_monotonic_s=0.01,
+    )
+
+    await owner.start()
+    await owner.handoff_prebuilt_provider("peer", old, start=True)
+    await owner.handle_owned_vad_event("peer", first_start)
+    await owner.handle_owned_vad_event("peer", first_end)
+    await owner.handoff_prebuilt_provider("peer", new, start=True)
+
+    ready = asyncio.Event()
+
+    class CaptureRuntime:
+        def is_current_generation(self, generation: int) -> bool:
+            return generation == 1
+
+    class Sink:
+        async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None:
+            await owner.handle_owned_vad_event("peer", event)
+
+        async def observe_pending_source_work(self, *, pending: bool) -> None:
+            await owner.observe_pending_source_work("peer", pending=pending)
+
+    guard = _GenerationGuardedVadSink(
+        sink=Sink(),
+        runtime=CaptureRuntime(),
+        capture_generation=_CaptureGeneration(1),
+        provider_ingress_ready=ready,
+    )
+    queued_ledger = PeerAudioSegmentLedger(activation_generation=1, settings=old_settings)
+    queued_id = uuid4()
+    queued_start = queued_ledger.observe_vad_event(
+        SpeechStart(
+            queued_id,
+            pre_roll=np.empty((0,), dtype=np.float32),
+            chunk=np.ones((8,), dtype=np.float32),
+        ),
+        now_monotonic_s=0.02,
+    )
+    await guard.handle_owned_vad_event(queued_start)
+    now[0] = 180.0
+    await asyncio.sleep(0.03)
+
+    assert sessions[0].close_calls == 0
+    ready.set()
+    await guard.finish()
+    assert len(sessions) == 1
+    assert len(sessions[0].requests) == 2
     await owner.close()
 
 

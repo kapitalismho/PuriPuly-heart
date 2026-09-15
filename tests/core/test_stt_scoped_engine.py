@@ -1656,6 +1656,35 @@ async def test_abort_immediately_invalidates_authority_while_native_phase_is_blo
 
 
 @pytest.mark.asyncio
+async def test_abort_during_first_start_payload_prevents_second_payload_write() -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
+    start, _chunk, _end = segment_events(ledger, start_sample=2050, now=20.5)
+    session = ControlledScopedSession()
+    session.send_gate.clear()
+    emitted: list[object] = []
+    engine = ScopedRecognitionEngine(
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        event_sink=emitted.append,
+        watchdog_resolver=lambda _settings: watchdogs(write_timeout_s=1.0),
+    )
+
+    start_task = asyncio.create_task(engine.handle_owned_vad_event(start))
+    await wait_until(lambda: sum(call[0] == "send" for call in session.calls) == 1)
+    await engine.abort_for_toggle_off()
+    session.send_gate.set()
+    await start_task
+    await wait_until(lambda: any(call[0] == "stop" for call in session.calls))
+
+    assert sum(call[0] == "send" for call in session.calls) == 1
+    assert sum(call[0] == "send_done" for call in session.calls) == 1
+    assert sum(call[0] == "abort" for call in session.calls) == 1
+    terminals = [item for item in emitted if isinstance(item, STTProviderTurnTerminal)]
+    assert len(terminals) == 1
+    assert terminals[0].outcome == "cancelled"
+    await engine.close()
+
+
+@pytest.mark.asyncio
 async def test_bound_event_sink_does_not_block_speech_end_on_downstream_delivery() -> None:
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
     start, _chunk, end = segment_events(ledger, start_sample=1200, now=12.0)

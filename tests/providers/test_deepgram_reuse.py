@@ -86,6 +86,33 @@ def _result(
     )
 
 
+def _installed_empty_alternatives_result(*, metadata_ack: bool):
+    from deepgram.extensions.types.sockets import ListenV1ResultsEvent
+    from deepgram.extensions.types.sockets.listen_v1_results_event import (
+        ListenV1Channel,
+        ListenV1ModelInfo,
+        ListenV1ResultsMetadata,
+    )
+
+    metadata = ListenV1ResultsMetadata(
+        request_id="connection-request",
+        model_info=ListenV1ModelInfo(name="nova-3", version="1", arch="nova"),
+        model_uuid="model",
+        from_finalize=metadata_ack,
+    )
+    return ListenV1ResultsEvent(
+        type="Results",
+        channel_index=[0, 1],
+        duration=0.1,
+        start=0.0,
+        is_final=True,
+        speech_final=False,
+        channel=ListenV1Channel(alternatives=[]),
+        metadata=metadata,
+        from_finalize=not metadata_ack,
+    )
+
+
 async def _next(session: _DeepgramSDKSession):
     return await asyncio.wait_for(anext(session.turn_events()), timeout=1)
 
@@ -166,6 +193,59 @@ async def test_acknowledged_turns_reuse_one_session_for_identical_and_empty_resu
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("metadata_ack", [False, True])
+async def test_installed_empty_alternatives_finalize_ack_is_authoritative_empty_reuse(
+    monkeypatch: pytest.MonkeyPatch,
+    metadata_ack: bool,
+) -> None:
+    writes: list[object] = []
+
+    async def write(_session: _DeepgramSDKSession, payload: object) -> None:
+        writes.append(payload)
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    session = _session(drain_timeout_s=0.001)
+    request = _request(1)
+    await session.begin_turn(request)
+    await _seal(session, request)
+    session._build_transcript_event(_installed_empty_alternatives_result(metadata_ack=metadata_ack))
+    await asyncio.sleep(0)
+
+    terminal = await _next(session)
+    assert isinstance(terminal, STTProviderTurnTerminal)
+    assert (terminal.outcome, terminal.text_authority, terminal.epoch_disposition) == (
+        "empty",
+        "authoritative",
+        "reuse",
+    )
+    await asyncio.sleep(0.01)
+    assert writes == [_FINALIZE]
+    assert session._scoped_drain_task is None
+
+
+@pytest.mark.asyncio
+async def test_empty_alternatives_without_finalize_ack_remains_incomplete() -> None:
+    session = _session()
+    request = _request(1)
+    await session.begin_turn(request)
+    result = types.SimpleNamespace(
+        channel=types.SimpleNamespace(alternatives=[]),
+        is_final=True,
+        speech_final=False,
+        from_finalize=False,
+        metadata=types.SimpleNamespace(
+            request_id="connection-request",
+            from_finalize=False,
+        ),
+    )
+
+    assert session._build_transcript_event(result) is None
+    await asyncio.sleep(0)
+    assert session._event_projection.active_identity == request.identity
+    assert session._event_projection.scoped_event_depth == 0
+
+
+@pytest.mark.asyncio
 async def test_final_fragment_waits_for_ack_and_close_fallback_is_irreversible(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -205,6 +285,42 @@ async def test_final_fragment_waits_for_ack_and_close_fallback_is_irreversible(
         "retire",
     )
     assert writes.count(_CLOSE_STREAM) == 1
+    with pytest.raises(RuntimeError, match="closed"):
+        await session.begin_turn(_request(2))
+
+
+@pytest.mark.asyncio
+async def test_close_cancels_blocked_close_stream_drain_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    writes: list[object] = []
+    close_stream_started = asyncio.Event()
+    blocked = asyncio.Event()
+
+    async def write(_session: _DeepgramSDKSession, payload: object) -> None:
+        writes.append(payload)
+        if payload is _CLOSE_STREAM:
+            close_stream_started.set()
+            await blocked.wait()
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    session = _session(drain_timeout_s=0.001)
+    request = _request(1)
+    await session.begin_turn(request)
+    await _seal(session, request)
+    await asyncio.wait_for(close_stream_started.wait(), timeout=1)
+    drain_task = session._scoped_drain_task
+
+    assert drain_task is not None
+    assert not drain_task.done()
+    await asyncio.wait_for(session.close(), timeout=1)
+
+    assert session._scoped_drain_task is None
+    assert drain_task.done()
+    assert writes.count(_CLOSE_STREAM) == 1
+    session._build_transcript_event(_result("late", top_level_ack=True))
+    await asyncio.sleep(0)
+    assert session._stopped is True
     with pytest.raises(RuntimeError, match="closed"):
         await session.begin_turn(_request(2))
 

@@ -102,6 +102,7 @@ class _ActiveTurn:
     settings: AudioSegmentSettingsSnapshot
     normalizer: STTScopedTurnNormalizer
     watchdogs: STTRecognitionWatchdogs
+    authority_generation: int
     terminal_ready: asyncio.Future[STTProviderTurnTerminal]
     retention_profile: STTRetentionProfile | None
     payload_sequence: int = 0
@@ -474,6 +475,7 @@ class ScopedRecognitionEngine:
             ),
             watchdogs=watchdogs,
             terminal_ready=loop.create_future(),
+            authority_generation=authority_generation,
             retention_budget=(owned.retention.budget if owned.retention is not None else None),
         )
         self._turn = turn
@@ -508,7 +510,7 @@ class ScopedRecognitionEngine:
                 event.pre_roll_capture,
                 context_only=True,
             )
-        if not turn.write_failed and event.chunk.size:
+        if self._has_write_authority(session, turn) and event.chunk.size:
             await self._send_payload(
                 turn,
                 session,
@@ -522,10 +524,7 @@ class ScopedRecognitionEngine:
         if turn is None or turn.write_failed:
             return
         session = self._session
-        if session is None:
-            self._set_turn_failure(turn, "provider_session_unavailable")
-            turn.write_failed = True
-            await self._finish_failed_turn_immediately(turn)
+        if session is None or not self._has_write_authority(session, turn):
             return
         await self._send_payload(
             turn,
@@ -543,7 +542,11 @@ class ScopedRecognitionEngine:
             raise RuntimeError("recognition terminality requires a locally sealed segment")
         turn.local_sealed = True
         session = self._session
-        if not turn.write_failed and session is not None:
+        if (
+            not turn.write_failed
+            and session is not None
+            and self._has_write_authority(session, turn)
+        ):
             sent = await self._run_write(
                 session,
                 turn,
@@ -555,7 +558,7 @@ class ScopedRecognitionEngine:
                     observed_trailing_silence_ms=event.trailing_silence_ms,
                 ),
             )
-            if sent:
+            if sent and self._has_write_authority(session, turn):
                 await self._await_terminal(turn)
         if not turn.terminal_ready.done():
             self._set_turn_failure(turn, "provider_turn_failed_before_terminal")
@@ -571,6 +574,8 @@ class ScopedRecognitionEngine:
         *,
         context_only: bool,
     ) -> None:
+        if not self._has_write_authority(session, turn):
+            return
         sample_count = int(getattr(samples, "size", 0))
         if sample_count <= 0:
             return
@@ -826,9 +831,10 @@ class ScopedRecognitionEngine:
         operations.add(task)
         done, _pending = await asyncio.wait({task}, timeout=turn.watchdogs.write_timeout_s)
         if task not in done:
-            self._set_turn_failure(turn, f"provider_{operation}_timeout")
-            turn.write_failed = True
-            self._retire_current_session(turn.watchdogs)
+            if self._has_write_authority(session, turn):
+                self._set_turn_failure(turn, f"provider_{operation}_timeout")
+                turn.write_failed = True
+                self._retire_current_session(turn.watchdogs)
             return False
         operations.discard(task)
         if not operations:
@@ -836,11 +842,26 @@ class ScopedRecognitionEngine:
         try:
             task.result()
         except BaseException as exc:
-            self._set_turn_failure(turn, f"provider_{operation}_failed:{type(exc).__name__}")
-            turn.write_failed = True
-            self._retire_current_session(turn.watchdogs)
+            if self._has_write_authority(session, turn):
+                self._set_turn_failure(turn, f"provider_{operation}_failed:{type(exc).__name__}")
+                turn.write_failed = True
+                self._retire_current_session(turn.watchdogs)
             return False
-        return True
+        return self._has_write_authority(session, turn)
+
+    def _has_write_authority(
+        self,
+        session: STTScopedTurnSession,
+        turn: _ActiveTurn,
+    ) -> bool:
+        return (
+            not self._closed
+            and not turn.terminal_emitted
+            and turn.authority_generation == self._authority_generation
+            and turn is self._turn
+            and session is self._session
+            and turn.identity.provider_epoch_id == self._provider_epoch_id
+        )
 
     def _set_turn_failure(
         self,
