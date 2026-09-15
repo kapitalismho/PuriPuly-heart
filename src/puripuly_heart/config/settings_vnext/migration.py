@@ -77,6 +77,16 @@ def _requires_translation_fallback_retirement_migration(settings_version: object
     return True
 
 
+def _requires_translation_concurrency_migration(settings_version: object) -> bool:
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        return settings_version < 46
+    if isinstance(settings_version, str) and settings_version.strip().isdigit():
+        return int(settings_version.strip()) < 46
+    return True
+
+
 def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     migrate_telemetry = _requires_telemetry_boolean_migration(data)
     migrate_local_qwen = _requires_local_qwen_cpu_auto_migration(data.get("settings_version"))
@@ -96,6 +106,9 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     migrate_translation_fallback_retirement = _requires_translation_fallback_retirement_migration(
         data.get("settings_version")
     )
+    migrate_translation_concurrency = _requires_translation_concurrency_migration(
+        data.get("settings_version")
+    )
     prepared = dict(copy.deepcopy(data))
     prepared["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
     if migrate_prompt_reset:
@@ -103,6 +116,8 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     intent = prepared.get("intent") if isinstance(prepared.get("intent"), dict) else {}
     translation = intent.get("translation") if isinstance(intent.get("translation"), dict) else {}
     if isinstance(intent, dict) and isinstance(translation, dict):
+        if migrate_translation_concurrency and translation.get("concurrency_limit") == 5:
+            translation["concurrency_limit"] = 10
         if migrate_multi_model_gemma:
             _migrate_multi_model_gemma_translation(translation)
         if migrate_cerebras_retirement:

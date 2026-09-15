@@ -108,7 +108,7 @@ An extension without credentials declares an empty array (or omits the field):
 
 ## Behavior and limits
 
-- Every request is a POST with a 10 second timeout and at most 5 concurrent in-flight requests.
+- Every request is a POST with a 10 second timeout. Concurrent in-flight requests follow the translation concurrency setting, which defaults to 10.
 - VRChat scene participant count is not sent to HTTP extensions. The extension manifest supports only `{{text}}`, `{{source_language}}`, `{{target_language}}`, and `{{secret:<id>}}` placeholders, with no context or system prompt channel, so there is no place to carry ambient scene metadata.
 - Non-2xx responses, transport errors, malformed response bodies, pointer misses, and empty results surface as translation errors instead of silent fallbacks.
 - Test your extension against a local mock server or a free API; PuriPuly never sends sample requests to validate an extension.

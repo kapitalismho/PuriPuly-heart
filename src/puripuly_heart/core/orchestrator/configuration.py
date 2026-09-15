@@ -59,7 +59,7 @@ class TranslationRuntimeConfig:
     fallback_transcript_only: bool = False
     translation_enabled: bool = True
     peer_translation_enabled: bool = False
-    concurrency_limit: int = 5
+    concurrency_limit: int = 10
     integrated_context_enabled: bool = False
     hangover_s: float = DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
     peer_hangover_s: float = 0.6

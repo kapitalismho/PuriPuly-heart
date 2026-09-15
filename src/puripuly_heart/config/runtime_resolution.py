@@ -616,12 +616,12 @@ def _translation_connection_from_openrouter_source(
 class TranslationRuntimeIntent:
     model: TranslationModelName = TRANSLATION_MODEL_GEMMA4_26B_31B
     connection: TranslationConnectionName = TRANSLATION_CONNECTION_MANAGED
-    concurrency_limit: int = 5
+    concurrency_limit: int = 10
 
     def __post_init__(self) -> None:
         model = _normalize_translation_model(self.model)
         connection = _normalize_translation_connection(self.connection, model=model)
-        concurrency_limit = _normalize_positive_int(self.concurrency_limit, default=5)
+        concurrency_limit = _normalize_positive_int(self.concurrency_limit, default=10)
         object.__setattr__(self, "model", model)
         object.__setattr__(self, "connection", connection)
         object.__setattr__(self, "concurrency_limit", concurrency_limit)
@@ -973,7 +973,7 @@ def normalize_translation_runtime_intent(
     return TranslationRuntimeIntent(
         model=normalized_model,
         connection=_normalize_translation_connection(connection, model=normalized_model),
-        concurrency_limit=_normalize_positive_int(concurrency_limit, default=5),
+        concurrency_limit=_normalize_positive_int(concurrency_limit, default=10),
     )
 
 
@@ -1062,7 +1062,7 @@ def derive_translation_runtime_intent_from_compatibility(
         allowed=_OPENROUTER_PROVIDER_ROUTINGS,
         default="default",
     )
-    concurrency = _normalize_positive_int(concurrency_limit, default=5)
+    concurrency = _normalize_positive_int(concurrency_limit, default=10)
 
     if provider == PROVIDER_OPENROUTER:
         if provider_routing == "gemma4_26b_31b_latency":

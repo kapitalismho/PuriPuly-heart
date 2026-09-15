@@ -28,7 +28,7 @@ def create_translation_backend(
     runtime_input: RuntimeResolutionInput | None = None,
     extras: LlmFactoryResolvedExtras | None = None,
     http_extension_id: str | None = None,
-    concurrency_limit: int = 5,
+    concurrency_limit: int = 10,
     managed_release_service: object | None = None,
     managed_delegate_ready: Callable[[], object] | None = None,
     runtime_logging: ProviderObservationPort | None = None,

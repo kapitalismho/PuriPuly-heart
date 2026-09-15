@@ -72,7 +72,7 @@ class HttpExtensionTranslationBackend(TranslationBackend):
     extension: HttpExtension
     secret_store: TranslationSecretResolver
     timeout: float = 10.0
-    concurrency_limit: int = 5
+    concurrency_limit: int = 10
     client_factory: Callable[..., httpx.AsyncClient] = httpx.AsyncClient
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _semaphore: asyncio.Semaphore = field(init=False, repr=False)

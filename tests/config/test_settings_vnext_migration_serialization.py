@@ -60,6 +60,35 @@ def _write_json_bytes(path: Path, data: dict[str, Any]) -> bytes:
     return raw_bytes
 
 
+@pytest.mark.parametrize(
+    ("version", "saved_limit", "expected"),
+    [(45, 5, 10), (44, 5, 10), (45, 3, 3), (45, 20, 20), (46, 5, 5)],
+)
+def test_concurrency_upgrade_preserves_custom_values_and_runs_once(
+    tmp_path: Path, version: int, saved_limit: int, expected: int
+) -> None:
+    raw = _serialization().to_dict(AppSettingsVNext())
+    raw["settings_version"] = version
+    raw["intent"]["translation"]["concurrency_limit"] = saved_limit
+    path = tmp_path / "settings.json"
+    original = _write_json_bytes(path, raw)
+    result = _compat().load_vnext_settings(path)
+    assert result.ok
+    assert result.settings.intent.translation.concurrency_limit == expected
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
+    assert saved["intent"]["translation"]["concurrency_limit"] == expected
+    backups = tuple(tmp_path.glob("settings.json.pre-v*.bak"))
+    if version < 46:
+        assert len(backups) == 1
+        assert backups[0].read_bytes() == original
+    assert (
+        _compat().load_vnext_settings(path).settings.intent.translation.concurrency_limit
+        == expected
+    )
+    assert tuple(tmp_path.glob("settings.json.pre-v*.bak")) == backups
+
+
 def _final_dev_v30_fixture() -> dict[str, Any]:
     fixture_path = Path(__file__).parent / "fixtures" / "final_dev_v30_settings.json"
     return json.loads(fixture_path.read_text(encoding="utf-8"))

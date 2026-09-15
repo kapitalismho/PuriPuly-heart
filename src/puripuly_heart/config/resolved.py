@@ -225,7 +225,7 @@ class ResolvedLLMConfig:
     fallback: ResolvedLLMFallbackPlan | None = None
     attempts: tuple[ResolvedLLMAttemptPlan, ...] = ()
     loser_grace_ms: int = 50
-    concurrency_limit: int = 5
+    concurrency_limit: int = 10
 
     def __post_init__(self) -> None:
         if self.loser_grace_ms < 0:

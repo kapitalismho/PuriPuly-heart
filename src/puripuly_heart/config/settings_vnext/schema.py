@@ -19,7 +19,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 45
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 46
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -303,7 +303,7 @@ class TranslationIntent:
     connection_history: dict[str, str] = field(
         default_factory=_default_translation_connection_history
     )
-    concurrency_limit: int = 5
+    concurrency_limit: int = 10
     openrouter_broker_base_url: str = DEFAULT_OPENROUTER_BROKER_BASE_URL
     openrouter_routing_mode: str = "latency"
     openrouter_model: str = "google/gemma-4-26b-a4b-it"
