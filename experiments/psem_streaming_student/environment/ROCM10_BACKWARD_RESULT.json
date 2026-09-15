@@ -1,0 +1,213 @@
+{
+  "checkpoint": {
+    "expected_sha256": "1928a9ae14d257282a9eefbc8e819876de1f8db325e0565831875dded8a434ac",
+    "new_checkpoint_written": false,
+    "path": "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-gt-checkpoint/student_gt_checkpoint.pt",
+    "sha256_after": "1928a9ae14d257282a9eefbc8e819876de1f8db325e0565831875dded8a434ac",
+    "sha256_before": "1928a9ae14d257282a9eefbc8e819876de1f8db325e0565831875dded8a434ac",
+    "unchanged": true
+  },
+  "completion_receipt": "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/rocm10-backward-check/step_completion.json",
+  "evaluation_audio_access": false,
+  "model": {
+    "checkpoint_loaded": false,
+    "class": "StreamingStudent",
+    "expected_parameter_count": 5940740,
+    "fresh_instance": true,
+    "parameter_count": 5940740,
+    "parameter_devices": [
+      "cuda:0"
+    ],
+    "parameter_dtypes": [
+      "torch.float32"
+    ],
+    "parameters_on_gpu": true
+  },
+  "optimizer": {
+    "all_step_counters_equal_one": true,
+    "class": "AdamW",
+    "learning_rate": 0.0001,
+    "maximum_grad_norm": 5.0,
+    "state_entry_count": 16,
+    "step_call_count": 1,
+    "step_counters": [
+      1
+    ],
+    "step_returned": true,
+    "weight_decay": 0.0001
+  },
+  "optimizer_step_accounting": {
+    "automatic_retry_after_ambiguous_post_step_failure": false,
+    "cap": 23,
+    "cap_respected": true,
+    "cumulative_total": 23,
+    "new_optimizer_steps": 1,
+    "prior_cumulative_total": 22
+  },
+  "post_update_inference": {
+    "expected_shape": [
+      1,
+      190,
+      4
+    ],
+    "finite": true,
+    "frontier_count": 190,
+    "frontier_first": 1280,
+    "frontier_last": 243200,
+    "frontiers_exact": true,
+    "full_student_path": "frontend log-Mel -> three causal Conv1d SiLU blocks -> two-layer GRU -> linear head",
+    "mode": "eval_no_grad",
+    "memory_scope": "retained-allocation peak, not standalone inference footprint: optimizer state, gradients, parameter snapshots, and training buffers remained live after the update; torch.cuda.reset_peak_memory_stats reset counters only",
+    "peak_memory": {
+      "allocated_bytes": 307136000,
+      "reserved_bytes": 341835776
+    },
+    "shape": [
+      1,
+      190,
+      4
+    ],
+    "state_emitted_outputs": 190,
+    "state_reset_before_inference": true,
+    "state_total_samples": 243200,
+    "wall_seconds_synchronized": 0.033332270000002495
+  },
+  "real_dataset_access": false,
+  "recorded_at": "2026-09-15T09:21:33.593197+00:00",
+  "runtime": {
+    "cuda_api_available": true,
+    "device": "cuda:0",
+    "device_capability": [
+      11,
+      0
+    ],
+    "device_count": 1,
+    "device_name": "AMD Radeon RX 7900 XTX",
+    "device_total_memory_bytes": 25725263872,
+    "cpu_threads": 1,
+    "interop_threads": 1,
+    "hip_compiled_get_version": 100000,
+    "hip_runtime_get_version": null,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.13.0+rocm10.0.0",
+    "torch_hip_compile_identity": "7.15.26333"
+  },
+  "schema": "PSEM-ISSUE-164-ROCM10-BACKWARD-RESULT-1",
+  "scope": "one fresh StreamingStudent synthetic FP32 forward/backward/AdamW update and reset-state inference; not quality or training-speed evidence",
+  "source": {
+    "environment_sha256": "d1b901759487e340ed412d4d2eb3cf0d823cb416043d864a51d38f1d59be59e9",
+    "gt_probe_sha256": "c40d791c8739192a129d00498d4b19b93b6ec827427acdddfb7bab23a277f133",
+    "probe_sha256": "b28edd334cea42ae99f0c61093c1053e85b38cd432967459f6ec7701691ca750",
+    "student_sha256": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d"
+  },
+  "status": "completed",
+  "synthetic": {
+    "amplitude_max_abs": 0.006012741010636091,
+    "dtype": "torch.float32",
+    "formula": "0.0030*sin(2*pi*220*t)+0.0015*sin(2*pi*440*t+0.37)+0.0005*normal(seed)",
+    "kind": "synthetic_low_amplitude_waveform",
+    "sample_rate": 16000,
+    "samples": 243200,
+    "seconds": 15.2,
+    "seed": 20260915,
+    "shape": [
+      1,
+      243200
+    ],
+    "target_positive_counts_by_slot": [
+      108,
+      80,
+      96,
+      96
+    ],
+    "target_seed": 20260916,
+    "targets_dtype": "torch.float32",
+    "targets_encoding": "independent Bernoulli(0.5) per frame and slot; BCEWithLogits reduction=mean",
+    "targets_sha256": "26692c307415264ca985274d4d1d50897a667c3cfa79e4f4335bb428d831b47a",
+    "targets_shape": [
+      1,
+      190,
+      4
+    ],
+    "waveform_sha256": "cd5e5921e77b312a69dbfb55551489dd673a0c4790f5d183f7438f1a50601cf1"
+  },
+  "teacher_access": false,
+  "training_update": {
+    "all_expected_gradients_present_finite": true,
+    "changed_parameter_count": 16,
+    "changed_parameter_names": [
+      "conv_blocks.0.conv.weight",
+      "conv_blocks.0.conv.bias",
+      "conv_blocks.1.conv.weight",
+      "conv_blocks.1.conv.bias",
+      "conv_blocks.2.conv.weight",
+      "conv_blocks.2.conv.bias",
+      "gru.weight_ih_l0",
+      "gru.weight_hh_l0",
+      "gru.bias_ih_l0",
+      "gru.bias_hh_l0",
+      "gru.weight_ih_l1",
+      "gru.weight_hh_l1",
+      "gru.bias_ih_l1",
+      "gru.bias_hh_l1",
+      "output.weight",
+      "output.bias"
+    ],
+    "expected_trainable_gradient_count": 16,
+    "gradient_norm_before_clip": 0.04166794195771217,
+    "gradient_norm_finite_and_nonzero": true,
+    "gradients_finite_after_clip": true,
+    "group_deltas": {
+      "conv_blocks.0": {
+        "changed_parameter_count": 2,
+        "max_l2_delta": 0.03927360102534294,
+        "parameter_count": 2,
+        "sum_l2_delta": 0.04152205539867282
+      },
+      "conv_blocks.1": {
+        "changed_parameter_count": 2,
+        "max_l2_delta": 0.11210190504789352,
+        "parameter_count": 2,
+        "sum_l2_delta": 0.11436138534918427
+      },
+      "conv_blocks.2": {
+        "changed_parameter_count": 2,
+        "max_l2_delta": 0.11214540898799896,
+        "parameter_count": 2,
+        "sum_l2_delta": 0.11440649395808578
+      },
+      "gru": {
+        "changed_parameter_count": 8,
+        "max_l2_delta": 0.06579562276601791,
+        "parameter_count": 8,
+        "sum_l2_delta": 0.26676503848284483
+      },
+      "output": {
+        "changed_parameter_count": 2,
+        "max_l2_delta": 0.004523705691099167,
+        "parameter_count": 2,
+        "sum_l2_delta": 0.004723704420030117
+      }
+    },
+    "loss": 0.6928367614746094,
+    "loss_finite": true,
+    "missing_gradient_names": [],
+    "nonfinite_gradient_names": [],
+    "peak_memory": {
+      "allocated_bytes": 309878784,
+      "reserved_bytes": 337641472
+    },
+    "present_trainable_gradient_count": 16,
+    "state_after_forward": {
+      "emitted_outputs": 190,
+      "total_samples": 243200
+    },
+    "timing": {
+      "cold_process": true,
+      "step_wall_seconds_synchronized": 6.729957990000003,
+      "timing_scope": "single cold H2D synthetic waveform/targets transfer, full student frontend/Conv/GRU/head forward, BCEWithLogits, backward, gradient checks/clipping, one AdamW step, and final synchronization"
+    },
+    "trainable_parameter_count": 16
+  }
+}
