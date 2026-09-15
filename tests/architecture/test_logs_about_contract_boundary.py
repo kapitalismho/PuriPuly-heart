@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import pathlib
 
 from puripuly_heart.ui.about import contract as about_contract
@@ -20,25 +19,6 @@ FORBIDDEN_IMPORT_PREFIXES = (
 
 CONTRACT_MODULES = (logs_contract, logs_renderer, about_contract, about_renderer)
 
-LOGS_INTENT_FIELDS = ("runtime_logging_mode_change",)
-LOGS_OWNED_VIEW_CALLBACKS = ("on_mode_change",)
-
-
-def _view_attribute_assignments(attribute_owner: str) -> list[str]:
-    tree = ast.parse((SOURCE_ROOT / "ui" / "app.py").read_text(encoding="utf-8"))
-    assigned: list[str] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign):
-            continue
-        for target in node.targets:
-            if (
-                isinstance(target, ast.Attribute)
-                and isinstance(target.value, ast.Attribute)
-                and target.value.attr == attribute_owner
-            ):
-                assigned.append(target.attr)
-    return assigned
-
 
 def test_logs_and_about_contracts_stay_above_backend_owners() -> None:
     for module in CONTRACT_MODULES:
@@ -55,20 +35,6 @@ def test_logs_and_about_contracts_do_not_reach_into_the_view() -> None:
         assert not any(name.startswith("puripuly_heart.ui.views") for name in imported)
 
 
-def test_logs_intents_expose_the_accepted_field_set() -> None:
-    assert tuple(logs_contract.LogsIntents.__dataclass_fields__) == LOGS_INTENT_FIELDS
-
-
-def test_logs_view_implements_the_explicit_contract() -> None:
-    from puripuly_heart.ui.views.logs import LogsView
-
-    assert callable(getattr(LogsView, "bind_logs_intents", None))
-    for name in vars(logs_contract.LogsStateSink):
-        if name.startswith("_"):
-            continue
-        assert getattr(LogsView, name, None) is not None, name
-
-
 def test_about_view_implements_the_explicit_state_sink() -> None:
     from puripuly_heart.ui.views.about import AboutView
 
@@ -76,16 +42,6 @@ def test_about_view_implements_the_explicit_state_sink() -> None:
         if name.startswith("_"):
             continue
         assert callable(getattr(AboutView, name, None)), name
-
-
-def test_translator_app_wires_logs_intents_through_one_path() -> None:
-    assigned = set(_view_attribute_assignments("view_logs"))
-    for owned in LOGS_OWNED_VIEW_CALLBACKS:
-        assert owned not in assigned, f"{owned} must be bound through bind_logs_intents"
-    assert not any(name.startswith("on_") for name in assigned)
-
-    app_source = (SOURCE_ROOT / "ui" / "app.py").read_text(encoding="utf-8")
-    assert app_source.count("bind_logs_intents(") == 1
 
 
 def test_production_logs_and_about_surfaces_use_the_renderers() -> None:

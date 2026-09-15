@@ -115,7 +115,7 @@ def _owner(
         qq_dialog_sink=lambda: qq_values.append("show"),
         result_sink=lambda _result: None,
         log_basic=lambda message: log_values.append(("basic", message)),
-        log_detailed=lambda message: log_values.append(("detailed", message)),
+        log_diagnostic=lambda message: log_values.append(("detailed", message)),
         log_error=lambda message: log_values.append(("error", message)),
         founder_letter_sink=lambda: founder_values.append("show"),
         teardown=teardown,

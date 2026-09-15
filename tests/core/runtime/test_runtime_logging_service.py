@@ -10,7 +10,6 @@ import pytest
 
 from puripuly_heart.core.runtime import RuntimeLoggingCloseError, RuntimeLoggingService
 from puripuly_heart.core.runtime_logging import (
-    SessionLoggingMode,
     SessionRuntimeLoggingService,
     configure_main_logging,
 )
@@ -24,7 +23,6 @@ class FakeSessionRuntimeLogging:
         persisted_error: BaseException | None = None,
         close_error: BaseException | None = None,
     ) -> None:
-        self.mode = SessionLoggingMode.BASIC
         self.log_file = Path("runtime.log")
         self.persisted_error = persisted_error
         self.close_error = close_error
@@ -35,9 +33,6 @@ class FakeSessionRuntimeLogging:
         self.attached_sinks: list[object] = []
         self.close_calls = 0
 
-    def set_mode(self, mode: SessionLoggingMode | str) -> None:
-        self.mode = SessionLoggingMode(mode)
-
     def attach_realtime_sink(self, sink: object) -> None:
         self.attached_sinks.append(sink)
 
@@ -47,20 +42,16 @@ class FakeSessionRuntimeLogging:
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
         self.basic_messages.append((level, message))
 
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
-        if self.mode is not SessionLoggingMode.DETAILED:
-            return False
+    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool:
         self.detailed_messages.append((level, message))
         return True
 
-    def emit_detailed_lazy(
+    def emit_diagnostic_lazy(
         self,
         build_message,
         *,
         level: int = logging.INFO,
     ) -> bool:
-        if self.mode is not SessionLoggingMode.DETAILED:
-            return False
         self.detailed_messages.append((level, build_message()))
         return True
 
@@ -84,8 +75,10 @@ class _FallbackCapture(logging.Handler):
     def __init__(self) -> None:
         super().__init__()
         self.messages: list[tuple[int, str]] = []
+        self.records: list[logging.LogRecord] = []
 
     def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
         self.messages.append((record.levelno, record.getMessage()))
 
 
@@ -199,7 +192,7 @@ def test_runtime_logging_owner_requires_exactly_one_adapter_boundary() -> None:
         session_factory=lambda: factory_calls.append(session) or session
     )
 
-    assert service.mode is SessionLoggingMode.BASIC
+    assert service.log_file == Path("runtime.log")
     assert factory_calls == [session]
 
 
@@ -287,6 +280,72 @@ def test_terminal_close_force_closes_preconfigured_main_queue_and_persists_summa
         main_sinks.close(force=True)
 
 
+def test_runtime_owner_safely_falls_back_when_session_delivery_fails() -> None:
+    class FailingSession(FakeSessionRuntimeLogging):
+        def emit_basic(self, *_args: object, **_kwargs: object) -> None:
+            raise RuntimeError("unavailable")
+
+        def emit_diagnostic(self, *_args: object, **_kwargs: object) -> bool:
+            raise RuntimeError("unavailable")
+
+        def emit_diagnostic_lazy(self, build_message, **_kwargs: object) -> bool:
+            build_message()
+            raise RuntimeError("unavailable")
+
+    fallback_logger, fallback = _fallback_logger()
+    service = RuntimeLoggingService(
+        session_service=FailingSession(),
+        fallback_logger=fallback_logger,
+    )
+    lazy_calls = 0
+
+    def lazy_message() -> str:
+        nonlocal lazy_calls
+        lazy_calls += 1
+        return "provider_response_body=private-lazy-body"
+
+    service.emit_basic("The translation service failed.", level=logging.ERROR)
+    assert (
+        service.emit_diagnostic(
+            "provider_response_body=private-direct-body",
+            level=logging.ERROR,
+        )
+        is True
+    )
+    assert service.emit_diagnostic_lazy(lazy_message, level=logging.WARNING) is True
+
+    rendered = "\n".join(message for _level, message in fallback.messages)
+    assert "The translation service failed." in rendered
+    assert "private-direct-body" not in rendered
+    assert "private-lazy-body" not in rendered
+    assert "diagnostic_delivery_failed" in rendered
+    assert lazy_calls == 1
+    assert (
+        getattr(
+            fallback.records[0],
+            "_puripuly_heart_live_audience",
+            None,
+        )
+        == "basic"
+    )
+
+
+def test_runtime_owner_reports_failed_diagnostic_fallback_delivery() -> None:
+    class FailingSession(FakeSessionRuntimeLogging):
+        def emit_diagnostic(self, *_args: object, **_kwargs: object) -> bool:
+            raise RuntimeError("unavailable")
+
+    fallback_logger = logging.getLogger(f"test.runtime_logging.no-handler.{uuid4()}")
+    fallback_logger.handlers.clear()
+    fallback_logger.propagate = False
+    service = RuntimeLoggingService(
+        session_service=FailingSession(),
+        fallback_logger=fallback_logger,
+    )
+
+    assert service.emit_diagnostic("private payload", level=logging.ERROR) is False
+
+
 def test_late_logs_after_terminal_close_do_not_propagate_to_preconfigured_file_queue(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -333,13 +392,12 @@ def test_late_logs_after_close_use_fallback_without_session_writes() -> None:
     session = FakeSessionRuntimeLogging()
     fallback_logger, fallback = _fallback_logger()
     service = RuntimeLoggingService(session_service=session, fallback_logger=fallback_logger)
-    service.set_mode(SessionLoggingMode.DETAILED)
     service.close_after_producers_stop()
     session.basic_messages.clear()
     session.detailed_messages.clear()
 
     service.emit_basic("late basic", level=logging.WARNING)
-    detailed_result = service.emit_detailed("late detail", level=logging.ERROR)
+    detailed_result = service.emit_diagnostic("late detail", level=logging.ERROR)
 
     assert detailed_result is True
     assert session.basic_messages == []

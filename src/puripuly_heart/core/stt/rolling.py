@@ -27,6 +27,7 @@ from typing import AsyncIterator
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.clock import Clock, SystemClock
+from puripuly_heart.core.runtime_logging import emit_basic_log
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
@@ -302,9 +303,10 @@ class RollingSTTBackend(STTBackend):
         if last_error is not None:
             raise last_error
         if any(definition.is_configured() for definition in self.providers):
-            logger.warning(
-                "[STT][Rolling] all configured providers excluded; statuses=%s",
-                [(status.name.value, status.state.value) for status in self.statuses()],
+            emit_basic_log(
+                logger,
+                "[Recognition] All configured speech recognition services are unavailable.",
+                level=logging.WARNING,
             )
             raise RuntimeError(
                 "All rolling ASR providers are excluded (quota/auth); "
@@ -323,19 +325,18 @@ class RollingSTTBackend(STTBackend):
     ) -> None:
         if kind == _ERROR_KIND_AUTH:
             self._mark(definition.name, RollingProviderState.AUTH_FAILED)
-            logger.warning(
-                "[STT][Rolling] provider=%s open failed kind=%s -> excluded until "
-                "credential change",
-                definition.name.value,
-                kind,
+            emit_basic_log(
+                logger,
+                "[Recognition] A speech recognition service rejected its credentials.",
+                level=logging.WARNING,
             )
             return
         if kind in _PERSISTENT_EXHAUSTION_STATES:
             self._mark(definition.name, RollingProviderState.FREE_QUOTA_EXHAUSTED)
-            logger.warning(
-                "[STT][Rolling] provider=%s open failed kind=%s -> excluded until quota reset",
-                definition.name.value,
-                kind,
+            emit_basic_log(
+                logger,
+                "[Recognition] A speech recognition service has no free quota remaining.",
+                level=logging.WARNING,
             )
             return
         logger.info(

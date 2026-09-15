@@ -137,11 +137,11 @@ def test_run_gui_logs_actionable_flet_runtime_startup_failure(
                 runtime_logging_sinks=object(),
             )
 
-    assert any(
-        "Flet GUI runtime failed: exception_type=FileNotFoundError "
-        "exception_message=bundled Flet archive missing" in record.getMessage()
-        for record in caplog.records
+    message = next(record.getMessage() for record in caplog.records)
+    assert message == (
+        "The application window stopped after a runtime failure · Cause FileNotFoundError"
     )
+    assert "bundled Flet archive missing" not in message
 
 
 def test_run_gui_logs_actionable_ui_startup_failure(monkeypatch, tmp_path, caplog) -> None:
@@ -174,16 +174,11 @@ def test_run_gui_logs_actionable_ui_startup_failure(monkeypatch, tmp_path, caplo
             )
 
     messages = [record.getMessage() for record in caplog.records]
-    assert any(
-        "GUI startup failed: exception_type=RuntimeError "
-        "exception_message=application boundary construction failed" in message
-        for message in messages
-    )
-    assert any(
-        "Flet GUI runtime failed: exception_type=RuntimeError "
-        "exception_message=application boundary construction failed" in message
-        for message in messages
-    )
+    assert messages == [
+        "The application window failed to start · Cause RuntimeError",
+        "The application window stopped after a runtime failure · Cause RuntimeError",
+    ]
+    assert all("application boundary construction failed" not in message for message in messages)
 
 
 def test_run_gui_forwards_main_logging_sinks_when_supported(monkeypatch, tmp_path) -> None:

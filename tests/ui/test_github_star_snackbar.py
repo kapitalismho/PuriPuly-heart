@@ -634,7 +634,7 @@ async def test_main_gui_runs_github_star_prompt_after_update_check(
         async def shutdown(self) -> None:
             await self.application.stop()
 
-        def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
+        def _log_diagnostic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
             _ = (message, level)
 
         def _mark_launch_high_priority_feedback_shown(self, reason: str, snackbar=None) -> None:
@@ -683,7 +683,7 @@ async def test_after_launch_update_failure_still_runs_github_star_prompt(
     app = TranslatorApp.__new__(TranslatorApp)
     app._ui_application = compose_test_ui_application_boundary(None)
     app.page = DummyPage()
-    app._log_detailed = lambda message, **_kwargs: logged.append(message)
+    app._log_diagnostic = lambda message, **_kwargs: logged.append(message)
 
     async def fail_update(_page, **_kwargs) -> None:
         events.append("update")
@@ -717,7 +717,7 @@ async def test_after_launch_usage_and_update_run_in_parallel_before_github_star(
     app._launch_high_priority_feedback_reason = None
     app._launch_high_priority_snackbar = None
     app._github_star_prompt_launch_pending = True
-    app._log_detailed = lambda *_args, **_kwargs: None
+    app._log_diagnostic = lambda *_args, **_kwargs: None
 
     class Controller:
         async def refresh_openrouter_usage_after_launch(self) -> bool:
@@ -775,7 +775,7 @@ async def test_after_launch_high_priority_feedback_suppresses_github_star(
     app._launch_high_priority_feedback_reason = None
     app._launch_high_priority_snackbar = None
     app._github_star_prompt_launch_pending = True
-    app._log_detailed = lambda *_args, **_kwargs: None
+    app._log_diagnostic = lambda *_args, **_kwargs: None
 
     class Controller:
         async def refresh_openrouter_usage_after_launch(self) -> bool:

@@ -55,7 +55,7 @@ class _RuntimeLogging:
     def emit_basic(self, message: str, *, level: int = 20) -> None:
         self.basic.append((message, level))
 
-    def emit_detailed(self, message: str, **_kwargs: object) -> bool:
+    def emit_diagnostic(self, message: str, **_kwargs: object) -> bool:
         self.detailed.append(message)
         return True
 
@@ -193,9 +193,12 @@ async def test_managed_provider_factory_uses_scoped_projection_for_both_channels
     assert "private-epoch-id" not in rendered_diagnostics
     assert "private-normal-turn-id" not in rendered_diagnostics
     assert [call[0] for call in calls] == [config, self_config, self_config]
+    basic_log_sink = calls[0][1].pop("basic_log_sink")
+    assert callable(basic_log_sink)
+    basic_log_sink("measured CPU attempt", 20)
+    assert runtime_logging.basic[-1] == ("measured CPU attempt", 20)
     assert calls[0][1] == {
         "secrets": factory.secrets,
-        "diagnostics_enabled": None,
         "gpu_runtime": gpu_runtime,
         "gpu_model_path": Path("gpu.gguf"),
         "gpu_device_id": "vk:2",

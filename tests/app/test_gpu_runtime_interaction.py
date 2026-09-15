@@ -141,7 +141,7 @@ def _owner(
             device_id="auto",
         ),
         presentation_sink=presentations.append,
-        detailed_log_sink=lambda _message: None,
+        diagnostic_log_sink=lambda _message: None,
         retry_activation=retry_activation,
     )
     return owner, presentations

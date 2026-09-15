@@ -244,10 +244,10 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
         founder_dialog=lambda: False,
         failure_route=lambda _source: None,
         log_basic=lambda _message: None,
-        log_detailed=lambda _message: None,
+        log_diagnostic=lambda _message: None,
         log_error=lambda _message: None,
         basic_warning_sink=lambda _message: None,
-        detailed_warning_sink=lambda _message, _exception: None,
+        diagnostic_warning_sink=lambda _message, _exception: None,
         runtime_state_changed=lambda: runtime_state_changes.append("changed"),
     )
 
@@ -333,10 +333,10 @@ async def test_managed_account_warmup_and_teardown_own_gemma_lifecycle(
         founder_dialog=lambda: False,
         failure_route=lambda _source: None,
         log_basic=lambda _message: None,
-        log_detailed=lambda _message: None,
+        log_diagnostic=lambda _message: None,
         log_error=lambda _message: None,
         basic_warning_sink=lambda _message: None,
-        detailed_warning_sink=lambda _message, _exception: None,
+        diagnostic_warning_sink=lambda _message, _exception: None,
         managed_gemma=ManagedGemma(),
     )
 

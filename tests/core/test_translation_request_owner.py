@@ -571,29 +571,6 @@ def test_prepare_uses_integrated_context_without_eligible_peer_entry() -> None:
 def test_parent_admission_freezes_target_specific_context_before_registering_current_turn() -> None:
     fixture = build_owner(RecordingProvider())
 
-    class DetailedRuntimeLogging:
-        mode = "detailed"
-
-        def __init__(self) -> None:
-            self.basic: list[str] = []
-            self.detailed: list[str] = []
-
-        def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
-            _ = level
-            self.basic.append(message)
-
-        def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
-            _ = level
-            self.detailed.append(message)
-            return True
-
-        def emit_detailed_lazy(self, build_message, *, level: int = logging.INFO) -> bool:
-            _ = level
-            self.detailed.append(build_message())
-            return True
-
-    runtime_logging = DetailedRuntimeLogging()
-    fixture.owner.diagnostics.runtime_logging = runtime_logging
     fixture.self_runtime.remember_context(
         "previous English target",
         timestamp=fixture.clock.now(),
@@ -649,10 +626,6 @@ def test_parent_admission_freezes_target_specific_context_before_registering_cur
         "en",
         "ja",
     ]
-    context_logs = "\n".join(runtime_logging.detailed)
-    assert f"parent_utterance_id={parent_id}" in context_logs
-    assert "target_index=0 target_language=en" in context_logs
-    assert "target_index=1 target_language=ja" in context_logs
 
 
 @pytest.mark.asyncio

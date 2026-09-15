@@ -19,6 +19,7 @@ from puripuly_heart.core.audio.process_identity import (
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.owned_thread import run_owned_thread_call
+from puripuly_heart.core.runtime_logging import emit_basic_log
 from puripuly_heart.core.vrchat_scene import SceneSnapshotProvider, VrchatSceneSnapshot
 from puripuly_heart.core.vrchat_scene_events import UNAVAILABLE_SNAPSHOT
 from puripuly_heart.core.vrchat_scene_parser import parse_vrchat_scene_line
@@ -426,14 +427,11 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._snapshot = self._tracker.snapshot()
         if self._snapshot.status == previous:
             return
-        candidate = self._log_candidate
-        name = candidate.path.name if candidate is not None else "-"
-        logger.warning(
-            "[VrchatScene] file failure name=%s reason=%s status=%s -> %s",
-            name,
-            reason,
-            previous,
-            self._snapshot.status,
+        emit_basic_log(
+            logger,
+            "[VRChat Scene] Scene context became unavailable · Cause %s",
+            reason if reason.isidentifier() else "unclassified",
+            level=logging.WARNING,
         )
 
     def _feed_lines(self, lines: list[str]) -> int:

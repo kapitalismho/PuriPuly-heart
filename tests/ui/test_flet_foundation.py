@@ -68,7 +68,6 @@ class RecordingApplication:
         self.state_calls += 1
         return UiApplicationState(
             config_path=Path("settings.json"),
-            runtime_logging_mode="detailed",
             translation_enabled=True,
             stt_state=None,
             peer_translation_eula_accepted=False,
@@ -175,7 +174,6 @@ def test_foundation_adapter_consumes_only_application_and_presentation_ports() -
     adapter.apply_locale()
 
     assert snapshot.config_path == Path("settings.json")
-    assert snapshot.runtime_logging_mode == "detailed"
     assert snapshot.translation_enabled is True
     assert snapshot.debug_preview_enabled is True
     assert application.state_calls == 1

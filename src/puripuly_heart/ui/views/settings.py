@@ -449,7 +449,7 @@ class SettingsView(ft.Column):
         self.on_open_api_keys_guide: Callable[[], None] | None = None
         self.show_snackbar: Callable[[str, str], None] | None = None
         self.runtime_log_basic: Callable[..., None] | None = None
-        self.runtime_log_detailed: Callable[..., None] | None = None
+        self.runtime_log_diagnostic: Callable[..., None] | None = None
         self._settings_secrets: SettingsSecretsPort | None = None
 
         self._http_extensions = (
@@ -564,8 +564,8 @@ class SettingsView(ft.Column):
         self.show_snackbar = surface.show_snackbar
         if surface.runtime_log_basic is not None:
             self.runtime_log_basic = surface.runtime_log_basic
-        if surface.runtime_log_detailed is not None:
-            self.runtime_log_detailed = surface.runtime_log_detailed
+        if surface.runtime_log_diagnostic is not None:
+            self.runtime_log_diagnostic = surface.runtime_log_diagnostic
         if surface.open_api_keys_guide is not None:
             self.on_open_api_keys_guide = surface.open_api_keys_guide
         self.on_providers_changed = provider.providers_changed
@@ -956,13 +956,6 @@ class SettingsView(ft.Column):
         runtime_log_basic = getattr(self, "runtime_log_basic", None)
         if runtime_log_basic is not None:
             runtime_log_basic(message, level=level)
-            return
-        logger.log(level, message)
-
-    def _emit_runtime_detailed(self, message: str, *, level: int = logging.INFO) -> None:
-        runtime_log_detailed = getattr(self, "runtime_log_detailed", None)
-        if runtime_log_detailed is not None:
-            runtime_log_detailed(message, level=level)
             return
         logger.log(level, message)
 
@@ -4884,19 +4877,9 @@ class SettingsView(ft.Column):
         self._record_provider_edit(self._translation_selection_edit(selection))
         new_provider = self._provider_draft.llm_provider
 
-        changes: list[str] = []
-        if old_model != model:
-            changes.append(f"model={old_model.value}->{model.value}")
-        if old_connection != connection:
-            changes.append(f"connection={old_connection.value}->{connection.value}")
         if old_provider != new_provider:
-            changes.append(f"provider={old_provider.value}->{new_provider.value}")
             self._emit_runtime_basic(
                 f"[Settings] LLM provider changed: {old_provider.value} -> {new_provider.value}"
-            )
-        if changes:
-            self._emit_runtime_detailed(
-                f"[Settings] Translation selection changed: {', '.join(changes)}"
             )
 
         self.has_provider_changes = True
@@ -5082,7 +5065,6 @@ class SettingsView(ft.Column):
         old_region = current_settings.qwen_region.value
         if old_region == value:
             return
-        self._emit_runtime_detailed(f"[Settings] Qwen region changed: {old_region} -> {value}")
         draft = self._ensure_provider_settings_draft()
         self._provider_draft = replace(draft, qwen_region=QwenRegion(value))
         self._record_provider_edit(QwenRegionEdit(self._provider_draft.qwen_region))
@@ -6201,12 +6183,6 @@ class SettingsView(ft.Column):
             return
 
         new_vad = float(e.control.value)
-        old_vad = self._general_snapshot.self_vad_speech_threshold
-
-        if abs(old_vad - new_vad) > 0.001:
-            self._emit_runtime_detailed(
-                f"[Settings] VAD sensitivity changed: {old_vad:.2f} -> {new_vad:.2f}"
-            )
 
         self._general_snapshot = replace(
             self._general_snapshot,
@@ -6223,12 +6199,6 @@ class SettingsView(ft.Column):
             return
 
         new_vad = float(e.control.value)
-        old_vad = self._general_snapshot.peer_vad_speech_threshold
-
-        if abs(old_vad - new_vad) > 0.001:
-            self._emit_runtime_detailed(
-                f"[Settings] Peer VAD threshold changed: {old_vad:.2f} -> {new_vad:.2f}"
-            )
 
         self._general_snapshot = replace(
             self._general_snapshot,
@@ -6251,10 +6221,6 @@ class SettingsView(ft.Column):
             minimum=VAD_ONSET_MIN,
             maximum=VAD_ONSET_MAX,
         )
-        if abs(old_value - new_value) > 0.001:
-            self._emit_runtime_detailed(
-                f"[Settings] Peer VAD threshold changed: {old_value:.2f} -> {new_value:.2f}"
-            )
 
         self._general_snapshot = replace(
             self._general_snapshot,
@@ -6274,10 +6240,6 @@ class SettingsView(ft.Column):
             fallback=old_value,
             minimum=0,
         )
-        if old_value != new_value:
-            self._emit_runtime_detailed(
-                f"[Settings] Peer hangover changed: {old_value} -> {new_value}"
-            )
 
         self._general_snapshot = replace(
             self._general_snapshot,
@@ -6297,10 +6259,6 @@ class SettingsView(ft.Column):
             fallback=old_value,
             minimum=0,
         )
-        if old_value != new_value:
-            self._emit_runtime_detailed(
-                f"[Settings] Peer pre-roll changed: {old_value} -> {new_value}"
-            )
 
         self._general_snapshot = replace(
             self._general_snapshot,
@@ -6519,9 +6477,6 @@ class SettingsView(ft.Column):
             custom_vocabulary_terms=tuple(applied_terms),
         )
         self._custom_vocab_tag_editor.set_terms(applied_terms)
-        self._emit_runtime_detailed(
-            f"[Settings] Custom vocabulary applied: language={source_language}, terms={len(applied_terms)}"
-        )
         self._emit_settings_changed(
             CustomVocabularySettingsIntent(
                 source_language=source_language,
@@ -6540,37 +6495,21 @@ class SettingsView(ft.Column):
         if not submitted_terms:
             return
 
-        source_language = self._current_source_language()
         current_terms = list(self._prompt_snapshot.custom_vocabulary_terms)
         next_terms = list(current_terms)
         seen_terms = set(current_terms)
-        unique_requested_count = len(current_terms)
         cap_exceeded = False
 
         for term in submitted_terms:
             if term in seen_terms:
                 continue
             seen_terms.add(term)
-            unique_requested_count += 1
             if len(next_terms) >= MAX_CUSTOM_VOCAB_TERMS:
                 cap_exceeded = True
                 continue
             next_terms.append(term)
 
-        next_enabled = bool(next_terms) or (
-            self._prompt_snapshot.custom_vocabulary_other_languages_have_terms
-        )
-        will_change = (
-            current_terms != next_terms
-            or self._prompt_snapshot.custom_vocabulary_enabled != next_enabled
-        )
         if cap_exceeded:
-            if will_change:
-                self._emit_runtime_detailed(
-                    "[Settings] Custom vocabulary capped: "
-                    f"language={source_language}, requested={unique_requested_count}, "
-                    f"applied={MAX_CUSTOM_VOCAB_TERMS}"
-                )
             self._show_custom_vocabulary_limit_snackbar()
 
         self._set_custom_vocabulary_terms_for_current_language(next_terms)

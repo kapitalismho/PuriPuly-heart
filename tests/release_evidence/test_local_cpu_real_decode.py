@@ -1,13 +1,6 @@
 from __future__ import annotations
 
-from puripuly_heart.release_evidence.local_cpu_real_decode import (
-    _attempt_payload,
-    _evidence_diagnostics_enabled,
-)
-
-
-def test_real_decode_enables_content_safe_attempt_diagnostics() -> None:
-    assert _evidence_diagnostics_enabled() is True
+from puripuly_heart.release_evidence.local_cpu_real_decode import _attempt_payload
 
 
 def test_attempt_payload_preserves_cpu_timing_without_transcript_content() -> None:

@@ -21,8 +21,6 @@ from puripuly_heart.core.diagnostic_validation import (
     PROVIDER_RESPONSE_BODY_REDACTION_MARKER,
     redact_text_for_sink,
 )
-from puripuly_heart.core.overlay.manifest import normalize_overlay_logging_mode
-from puripuly_heart.core.runtime_logging import SessionLoggingMode
 
 _PROCESS_EVENT_LIMIT = 256
 _CHILD_LINE_LIMIT = 100
@@ -179,7 +177,7 @@ def _redact_failure_jsonl_text(text: str) -> str:
 class OverlayDiagnosticsRecorder:
     overlay_instance_id: str
     diagnostics_dir: Path = field(default_factory=default_overlay_diagnostics_dir)
-    logging_mode: str = SessionLoggingMode.BASIC.value
+    capture_measurements: bool = False
 
     process_events: deque[dict[str, Any]] = field(
         default_factory=lambda: deque(maxlen=_PROCESS_EVENT_LIMIT)
@@ -216,12 +214,6 @@ class OverlayDiagnosticsRecorder:
     )
     last_dump_path: Path | None = None
     last_dump_receipt: dict[str, Any] | None = None
-    requested_logging_mode: str = field(init=False, default=SessionLoggingMode.BASIC.value)
-    effective_child_logging_mode: str | None = field(init=False, default=None)
-    effective_child_logging_mode_revision: int | None = field(init=False, default=None)
-    logging_mode_update_status: str = field(init=False, default="not_connected")
-    logging_mode_revision: int = field(init=False, default=0)
-    recording_windows: list[dict[str, Any]] = field(init=False, default_factory=list)
 
     _sequence: int = field(init=False, default=0)
     _started_at: float = field(init=False, default_factory=time.monotonic)
@@ -246,95 +238,6 @@ class OverlayDiagnosticsRecorder:
     _writer_active: bool = field(init=False, default=False)
     _writer_disabled: bool = field(init=False, default=False)
     _dump_attempt: int = field(init=False, default=0)
-
-    def __post_init__(self) -> None:
-        normalized = normalize_overlay_logging_mode(self.logging_mode)
-        self.logging_mode = normalized
-        self.requested_logging_mode = normalized
-        self.recording_windows.append(
-            {
-                "mode": normalized,
-                "started_sequence": 1,
-                "ended_sequence": None,
-            }
-        )
-
-    def set_logging_mode(self, mode: SessionLoggingMode | str | bool | object) -> None:
-        normalized = normalize_overlay_logging_mode(mode)
-        previous = self.logging_mode
-        self.requested_logging_mode = normalized
-        if normalized == previous:
-            return
-        self.logging_mode_revision += 1
-        if self.recording_windows:
-            self.recording_windows[-1]["ended_sequence"] = self._sequence
-        self.logging_mode = normalized
-        self.logging_mode_update_status = (
-            "applied" if self.effective_child_logging_mode == normalized else "pending"
-        )
-        self.recording_windows.append(
-            {
-                "mode": normalized,
-                "started_sequence": self._sequence + 1,
-                "ended_sequence": None,
-            }
-        )
-        self.record_process(
-            "logging_mode_changed",
-            requested_mode=normalized,
-            previous_mode=previous,
-            effective_child_mode=self.effective_child_logging_mode,
-            update_status=self.logging_mode_update_status,
-            mode_revision=self.logging_mode_revision,
-            verbose_history_retained=True,
-        )
-
-    def confirm_child_logging_mode(
-        self,
-        mode: SessionLoggingMode | str | bool | object,
-        *,
-        mode_revision: int | None = None,
-        source: str,
-    ) -> bool:
-        try:
-            normalized = normalize_overlay_logging_mode(mode)
-        except (TypeError, ValueError):
-            self.note_input_rejected("invalid_logging_mode")
-            return False
-        if mode_revision is not None and (type(mode_revision) is not int or mode_revision < 0):
-            self.note_input_rejected("invalid_logging_mode_revision")
-            return False
-        effective_revision = self.effective_child_logging_mode_revision
-        if effective_revision is not None:
-            if mode_revision is None or mode_revision < effective_revision:
-                self.note_input_rejected("stale_logging_mode_revision")
-                return False
-            if (
-                mode_revision == effective_revision
-                and self.effective_child_logging_mode != normalized
-            ):
-                self.note_input_rejected("conflicting_logging_mode_revision")
-                return False
-        previous = self.effective_child_logging_mode
-        self.effective_child_logging_mode = normalized
-        if mode_revision is not None:
-            self.effective_child_logging_mode_revision = mode_revision
-        self.logging_mode_update_status = (
-            "applied"
-            if normalized == self.requested_logging_mode
-            and (mode_revision is None or mode_revision == self.logging_mode_revision)
-            else "failed"
-        )
-        if previous != normalized or self.logging_mode_update_status != "applied":
-            self.record_process(
-                "child_logging_mode_observed",
-                requested_mode=self.requested_logging_mode,
-                effective_child_mode=normalized,
-                update_status=self.logging_mode_update_status,
-                mode_revision=mode_revision,
-                source=source,
-            )
-        return True
 
     def record_process(self, event: str, **fields: Any) -> dict[str, Any]:
         return self._append(self.process_events, category="process", event=event, **fields)
@@ -364,7 +267,16 @@ class OverlayDiagnosticsRecorder:
         )
 
     def record_bridge(self, event: str, **fields: Any) -> dict[str, Any]:
-        return self._append_stage(self.bridge_events, category="bridge", event=event, **fields)
+        if event in {"send_failure", "connection_retired"} or (
+            event == "connection_closed" and fields.get("code") not in {1000, 1001}
+        ):
+            return self._append(self.bridge_events, category="bridge", event=event, **fields)
+        return self._append_stage(
+            self.bridge_events,
+            category="bridge",
+            event=event,
+            **fields,
+        )
 
     def record_translation(self, event: str, **fields: Any) -> dict[str, Any]:
         return self._append_stage(
@@ -598,13 +510,6 @@ class OverlayDiagnosticsRecorder:
             str(event["outcome"]) for event in events if event.get("outcome") is not None
         )
         return {
-            "logging_mode": self.logging_mode,
-            "requested_logging_mode": self.requested_logging_mode,
-            "effective_child_logging_mode": self.effective_child_logging_mode,
-            "effective_child_logging_mode_revision": (self.effective_child_logging_mode_revision),
-            "logging_mode_update_status": self.logging_mode_update_status,
-            "logging_mode_revision": self.logging_mode_revision,
-            "recording_windows": [dict(window) for window in self.recording_windows],
             "native_handoff_modes": dict(sorted(handoff_modes.items())),
             "native_stage_counts": dict(sorted(stages.items())),
             "native_outcome_counts": dict(sorted(outcomes.items())),
@@ -895,7 +800,7 @@ class OverlayDiagnosticsRecorder:
         return raw.encode("utf-8", errors="replace") + b"\n"
 
     def _stage_recording_enabled(self) -> bool:
-        return self.logging_mode == SessionLoggingMode.DETAILED.value
+        return self.capture_measurements
 
     def _append_stage(
         self,

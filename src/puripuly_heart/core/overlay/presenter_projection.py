@@ -23,7 +23,7 @@ from .sink import (
 )
 from .state import OverlayLogicalTurnEntry
 
-RuntimeDetailedLogger = Callable[[str], bool]
+RuntimeDiagnosticLogger = Callable[[str], bool]
 EntryKey = tuple[str, UUID]
 
 
@@ -148,7 +148,7 @@ class NativeRetryIntentProjection:
 @dataclass(slots=True)
 class PresenterDiagnosticProjection:
     diagnostics: OverlayDiagnosticsRecorder | None = None
-    runtime_log_detailed: Callable[..., bool] | None = None
+    runtime_log_diagnostic: Callable[..., bool] | None = None
     _visible_window_signature: tuple[object, ...] | None = None
 
     def reset(self) -> None:
@@ -158,22 +158,22 @@ class PresenterDiagnosticProjection:
         self,
         *,
         diagnostics: OverlayDiagnosticsRecorder | None,
-        runtime_log_detailed: Callable[..., bool] | None,
+        runtime_log_diagnostic: Callable[..., bool] | None,
     ) -> None:
         self.diagnostics = diagnostics
-        self.runtime_log_detailed = runtime_log_detailed
+        self.runtime_log_diagnostic = runtime_log_diagnostic
 
     def emit_lazy(self, build_message: Callable[[], str], *, level: int = logging.INFO) -> bool:
-        logger = self.runtime_log_detailed
+        logger = self.runtime_log_diagnostic
         if logger is None:
             return False
         owner = getattr(logger, "__self__", None)
         try:
             if owner is not None:
-                emit = getattr(owner, "emit_detailed_lazy", None)
+                emit = getattr(owner, "emit_diagnostic_lazy", None)
                 if callable(emit):
                     return emit(build_message, level=level)
-                emit = getattr(owner, "log_detailed_lazy", None)
+                emit = getattr(owner, "log_diagnostic_lazy", None)
                 if callable(emit):
                     return emit(build_message, level=level)
             return logger(build_message(), level=level)

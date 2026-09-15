@@ -345,7 +345,7 @@ class SettingsRuntimeEffectsAdapter:
                 f"source={previous_source_language}->{next_settings.intent.languages.source_language} "
                 f"target={previous_target_language}->{next_settings.intent.languages.target_language}"
             )
-            self._runtime_logging.emit_detailed(
+            self._runtime_logging.emit_diagnostic(
                 "[Settings] Language apply detail: "
                 f"overlay_state={self._overlay.snapshot.state} "
                 f"presenter_attached={presenter is not None} "
@@ -556,7 +556,7 @@ class SettingsRuntimeEffectsAdapter:
             )
 
         if self._vrc_mic_sync.last_enabled != settings.intent.osc.vrc_mic_intercept:
-            self._runtime_logging.emit_detailed(
+            self._runtime_logging.emit_diagnostic(
                 f"[Settings] VRC mic sync enabled: {settings.intent.osc.vrc_mic_intercept}"
             )
             await self._vrc_mic_sync.configure(enabled=settings.intent.osc.vrc_mic_intercept)
@@ -589,7 +589,7 @@ class SettingsRuntimeEffectsAdapter:
         )
 
         if transition.source_language_changed or transition.target_language_changed:
-            self._runtime_logging.emit_detailed(
+            self._runtime_logging.emit_diagnostic(
                 "[Settings] Language runtime impact: "
                 f"should_restart_stt={should_restart_stt} "
                 f"should_refresh_peer={should_refresh_peer} "

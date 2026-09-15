@@ -16,13 +16,13 @@ from typing import Any
 from uuid import uuid4
 
 from puripuly_heart import __version__
+from puripuly_heart.core.runtime_logging import emit_basic_log
 
 from .diagnostics import OverlayDiagnosticsRecorder, default_overlay_diagnostics_dir
 from .manifest import (
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
     OverlayLaunchManifest,
-    normalize_overlay_logging_mode,
 )
 from .process_adapter import (
     OverlayManagedProcess as OverlayManagedProcess,
@@ -122,7 +122,6 @@ class OverlayProcessManager:
     locale: str = "en"
     log_dir: str = "logs"
     log_level: str = "INFO"
-    logging_mode: str = "basic"
     quiet_tail_profile: str = "p05"
     handoff_experiment: str = HANDOFF_EXPERIMENT_OFF
     renderer_events: asyncio.Queue[dict[str, object]] | None = None
@@ -281,27 +280,12 @@ class OverlayProcessManager:
         return width > 0 and height > 0
 
     def __post_init__(self) -> None:
-        self.logging_mode = normalize_overlay_logging_mode(self.logging_mode)
         self.handoff_experiment = normalize_handoff_experiment(self.handoff_experiment)
         if self.diagnostics is None:
             self.diagnostics = OverlayDiagnosticsRecorder(
                 overlay_instance_id=self.overlay_instance_id,
                 diagnostics_dir=self.diagnostics_dir,
-                logging_mode=self.logging_mode,
             )
-        else:
-            self.diagnostics.set_logging_mode(self.logging_mode)
-
-    def set_logging_mode(self, mode: str) -> None:
-        requested = normalize_overlay_logging_mode(mode)
-        self.logging_mode = requested
-        if self.diagnostics is not None:
-            self.diagnostics.set_logging_mode(requested)
-        process = self._process
-        if process is not None:
-            set_logging_mode = getattr(process, "set_logging_mode", None)
-            if callable(set_logging_mode):
-                set_logging_mode(requested)
 
     def _set_shutdown_failure(self, cause: str) -> None:
         if self._shutdown_terminal_cause is None:
@@ -388,12 +372,6 @@ class OverlayProcessManager:
         self._trace_generation += 1
         self._last_trace_phase = None
         self._last_owner_status_projection = None
-        logger.info(
-            "[OverlayProcess] Start: target=%s overlay_instance_id=%s runtime_generation=1 logging_mode=%s",
-            self.selected_target or "unknown",
-            self.overlay_instance_id,
-            self.logging_mode,
-        )
 
         manifest = self._build_manifest()
         loop = asyncio.get_running_loop()
@@ -454,7 +432,6 @@ class OverlayProcessManager:
             "spawn_requested",
             executable_path=executable_path,
             executable_mtime=self._executable_mtime,
-            logging_mode=self.logging_mode,
         )
         self.process_runner.configure_runtime(
             quiet_tail_profile=self.quiet_tail_profile,
@@ -693,7 +670,6 @@ class OverlayProcessManager:
             log_dir=self.log_dir,
             log_level=self.log_level,
             locale=self.locale,
-            logging_mode=self.logging_mode,
         )
 
     def _write_manifest(self, manifest: OverlayLaunchManifest) -> Path:
@@ -979,24 +955,6 @@ class OverlayProcessManager:
             failure_reason=event.get("failure_reason"),
             startup_phase=event.get("startup_phase"),
         )
-        if event_type == "logging_mode_status":
-            if (
-                trusted_process_event
-                and event.get("overlay_instance_id") == self.overlay_instance_id
-                and event.get("runtime_generation") == 1
-                and isinstance(event.get("logging_mode"), str)
-                and self.diagnostics is not None
-            ):
-                self.diagnostics.confirm_child_logging_mode(
-                    event["logging_mode"],
-                    mode_revision=(
-                        event.get("logging_mode_revision")
-                        if type(event.get("logging_mode_revision")) is int
-                        else None
-                    ),
-                    source="desktop_runtime_control",
-                )
-            return "ignored"
         if event_type == "overlay_trace":
             component = event.get("component")
             trace_event = event.get("event")
@@ -1109,23 +1067,10 @@ class OverlayProcessManager:
             self.state = "connected"
             self.failure_reason = None
             self.startup_failure_evidence = None
-            effective_mode = event.get("logging_mode")
-            mode_revision = event.get("logging_mode_revision")
-            if isinstance(effective_mode, str) and self.diagnostics is not None:
-                self.diagnostics.confirm_child_logging_mode(
-                    effective_mode,
-                    mode_revision=mode_revision if type(mode_revision) is int else None,
-                    source="overlay_ready",
-                )
             logger.info(
-                "[OverlayProcess] Ready: target=%s overlay_instance_id=%s "
-                "runtime_generation=1 generation=%s protocol=8 execution_contract=r2 "
-                "requested_logging_mode=%s effective_logging_mode=%s",
+                "[Overlay] Ready target=%s generation=%s",
                 self.selected_target or "unknown",
-                self.overlay_instance_id,
                 ready_generation,
-                self.logging_mode,
-                effective_mode if isinstance(effective_mode, str) else "unknown",
             )
             return "ready"
         if event_type == "owner_status":
@@ -1147,14 +1092,6 @@ class OverlayProcessManager:
             ):
                 return "ignored"
             self._last_qualified_health_challenge_id = challenge_id
-            effective_mode = event.get("logging_mode")
-            mode_revision = event.get("logging_mode_revision")
-            if isinstance(effective_mode, str) and self.diagnostics is not None:
-                self.diagnostics.confirm_child_logging_mode(
-                    effective_mode,
-                    mode_revision=mode_revision if type(mode_revision) is int else None,
-                    source="owner_status",
-                )
             status_projection = (
                 event.get("classification"),
                 event.get("latest_handoff_revision"),
@@ -1781,19 +1718,16 @@ class OverlayProcessManager:
             stdout_count=stdout_count,
             stderr_count=stderr_count,
         )
-        logger.error(
-            "[OverlayProcess] Failure: overlay_instance_id=%s phase=%s failure_reason=%s exit_code=%s last_transition=%s stdout_lines=%s stderr_lines=%s",
-            self.overlay_instance_id,
+        emit_basic_log(
+            logger,
+            "[Overlay] The overlay process failed · Phase %s · Cause %s",
             (
                 "connected"
                 if self._last_transition in {"overlay_ready", "bridge_ready"}
                 else "startup"
             ),
             failure_reason,
-            self._last_exit_code,
-            self._last_transition,
-            stdout_count,
-            stderr_count,
+            level=logging.ERROR,
         )
 
         if self.diagnostics is not None and not self._failure_dumped:
@@ -1922,9 +1856,6 @@ class OverlayProcessManager:
         attach_lifecycle_sink = getattr(process, "attach_lifecycle_sink", None)
         if callable(attach_lifecycle_sink):
             attach_lifecycle_sink(self._record_managed_process_lifecycle)
-        set_logging_mode = getattr(process, "set_logging_mode", None)
-        if callable(set_logging_mode):
-            set_logging_mode(self.logging_mode)
 
     def _record_managed_process_lifecycle(
         self,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
 
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.services.application_runtime_logging import (
@@ -19,8 +18,6 @@ def compose_application_runtime_logging(
     *,
     presentation: UiPresentationPort,
     sinks: RuntimeLoggingSinks | None,
-    overlay_logging_mode_update: Callable[[], Awaitable[None]],
-    overlay_logging_mode_update_available: Callable[[], bool],
 ) -> ApplicationRuntimeLoggingOwner:
     fallback_logger = logging.getLogger("puripuly_heart.runtime")
     return ApplicationRuntimeLoggingOwner(
@@ -33,6 +30,4 @@ def compose_application_runtime_logging(
             fallback_logger=fallback_logger,
         ),
         fallback_logger=fallback_logger,
-        overlay_logging_mode_update=overlay_logging_mode_update,
-        overlay_logging_mode_update_available=overlay_logging_mode_update_available,
     )

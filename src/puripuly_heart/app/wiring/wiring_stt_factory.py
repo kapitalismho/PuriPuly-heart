@@ -1054,10 +1054,10 @@ def create_stt_backend_from_resolved_config(
     config: ResolvedSTTConfig,
     *,
     secrets: SecretStore,
-    diagnostics_enabled: Callable[[], bool] | None = None,
     gpu_runtime: SharedGpuASRRuntime | None = None,
     gpu_model_path: Path | None = None,
     gpu_device_id: str = "auto",
+    basic_log_sink: Callable[[str, int], None] | None = None,
 ) -> STTBackend:
     stream_label = config.channel
     keyterms = _resolved_stt_keyterms(config)
@@ -1075,7 +1075,7 @@ def create_stt_backend_from_resolved_config(
             sample_rate_hz=config.sample_rate_hz,
             stream_label=stream_label,
             hotwords=keyterms,
-            diagnostics_enabled=diagnostics_enabled,
+            attempt_log_sink=basic_log_sink,
         )
     if config.provider in local_cpu_model_by_provider:
         from puripuly_heart.providers.stt.local_cpu import create_local_cpu_backend
@@ -1086,7 +1086,7 @@ def create_stt_backend_from_resolved_config(
             sample_rate_hz=config.sample_rate_hz,
             stream_label=stream_label,
             hotwords=() if config.provider == STT_PROVIDER_LOCAL_QWEN else keyterms,
-            diagnostics_enabled=diagnostics_enabled,
+            attempt_log_sink=basic_log_sink,
         )
     if config.provider == STT_PROVIDER_LOCAL_QWEN_GPU:
         if gpu_runtime is None:
@@ -1553,7 +1553,6 @@ def create_peer_stt_backend_from_resolved_config(
     config: ResolvedSTTConfig,
     *,
     secrets: SecretStore,
-    diagnostics_enabled: Callable[[], bool] | None = None,
     gpu_runtime: SharedGpuASRRuntime | None = None,
     gpu_model_path: Path | None = None,
     gpu_device_id: str = "auto",
@@ -1561,7 +1560,6 @@ def create_peer_stt_backend_from_resolved_config(
     return create_stt_backend_from_resolved_config(
         config,
         secrets=secrets,
-        diagnostics_enabled=diagnostics_enabled,
         gpu_runtime=gpu_runtime,
         gpu_model_path=gpu_model_path,
         gpu_device_id=gpu_device_id,

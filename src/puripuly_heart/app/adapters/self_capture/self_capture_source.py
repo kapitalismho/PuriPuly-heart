@@ -12,7 +12,7 @@ SelfCaptureHostApiNormalizer = Callable[[str | None], InputHostApiProfile]
 SelfCaptureDeviceResolver = Callable[..., int | None]
 SelfCaptureChannelDecision = Callable[..., SelfMicCaptureChannelDecision]
 SelfCaptureAudioSourceFactory = Callable[..., object]
-SelfCaptureDetailedLog = Callable[..., object]
+SelfCaptureDiagnosticLog = Callable[..., object]
 SelfCaptureSourceWrapper = Callable[[object], object]
 
 
@@ -22,7 +22,7 @@ class SelfCaptureSourceAdapter:
     resolve_device: SelfCaptureDeviceResolver
     channel_decision: SelfCaptureChannelDecision
     source_factory: SelfCaptureAudioSourceFactory
-    log_detailed: SelfCaptureDetailedLog
+    log_diagnostic: SelfCaptureDiagnosticLog
     wrap_source: SelfCaptureSourceWrapper
 
     def __call__(self, config: SelfCaptureSessionConfig) -> object:
@@ -43,7 +43,7 @@ class SelfCaptureSourceAdapter:
                 wasapi_auto_convert=host_api_profile.wasapi_auto_convert,
                 wasapi_exclusive=host_api_profile.wasapi_exclusive,
             )
-            self.log_detailed(
+            self.log_diagnostic(
                 "[STT] Microphone opened: "
                 f"saved_host_api={config.input_host_api!r} "
                 f"actual_host_api={host_api!r} "
@@ -53,7 +53,7 @@ class SelfCaptureSourceAdapter:
                 f"wasapi_exclusive={host_api_profile.wasapi_exclusive}"
             )
         except Exception as exc:
-            self.log_detailed(
+            self.log_diagnostic(
                 "[STT] Microphone open detail: "
                 f"host_api={host_api!r} device={config.input_device!r} error={exc}",
                 level=logging.ERROR,
@@ -69,11 +69,11 @@ class SelfCaptureSourceAdapter:
                         host_api_for_log="",
                         device_for_log=config.input_device,
                     )
-                    self.log_detailed(
+                    self.log_diagnostic(
                         f"[STT] Microphone opened with fallback: device_idx={fallback_idx}"
                     )
                 except Exception as exc:
-                    self.log_detailed(
+                    self.log_diagnostic(
                         f"[STT] Fallback microphone detail: error={exc}",
                         level=logging.ERROR,
                     )
@@ -86,9 +86,9 @@ class SelfCaptureSourceAdapter:
                     host_api_for_log="",
                     device_for_log="",
                 )
-                self.log_detailed("[STT] Microphone opened with system default")
+                self.log_diagnostic("[STT] Microphone opened with system default")
             except Exception as exc:
-                self.log_detailed(
+                self.log_diagnostic(
                     f"[STT] System default microphone detail: error={exc}",
                     level=logging.ERROR,
                 )
@@ -100,7 +100,7 @@ class SelfCaptureSourceAdapter:
         try:
             return self.resolve_device(host_api=host_api, device=device)
         except Exception as exc:
-            self.log_detailed(
+            self.log_diagnostic(
                 "[STT] Device resolution detail: "
                 f"host_api={host_api!r} device={device!r} error={exc}",
                 level=logging.WARNING,
@@ -137,7 +137,7 @@ class SelfCaptureSourceAdapter:
         except Exception as exc:
             if decision.preferred_capture_channels <= config.internal_channels:
                 raise
-            self.log_detailed(
+            self.log_diagnostic(
                 "[STT] Microphone open detail: "
                 f"attempt={attempt!r} "
                 f"host_api={host_api_for_log!r} "
@@ -188,7 +188,7 @@ class SelfCaptureSourceAdapter:
         opened_channels = self._source_int(source, "opened_channels", requested_channels)
         frame_channels = self._source_int(source, "frame_channels", opened_channels)
         actual_sample_rate_hz = self._source_int(source, "actual_sample_rate_hz", 0)
-        self.log_detailed(
+        self.log_diagnostic(
             "[STT] Microphone capture format: "
             f"attempt={attempt!r} "
             f"internal_channels={decision.internal_channels} "
@@ -224,7 +224,7 @@ class SelfCaptureSourceAdapter:
 __all__ = [
     "SelfCaptureAudioSourceFactory",
     "SelfCaptureChannelDecision",
-    "SelfCaptureDetailedLog",
+    "SelfCaptureDiagnosticLog",
     "SelfCaptureDeviceResolver",
     "SelfCaptureHostApiNormalizer",
     "SelfCaptureSourceAdapter",

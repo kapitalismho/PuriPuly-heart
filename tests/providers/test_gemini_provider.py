@@ -50,7 +50,7 @@ class SpyRuntimeLogging:
         self.detailed_messages: list[tuple[str, int]] = []
         self.basic_messages: list[tuple[str, int]] = []
 
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
+    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool:
         self.detailed_messages.append((message, level))
         return self.detailed_return
 

@@ -14,7 +14,7 @@ MANUAL_INPUT_TYPING_REASON = "manual_input"
 class ManualTypingOwner:
     output_provider: Callable[[], SelfChatboxTypingPort | None]
     completion_provider: Callable[[object], object | None]
-    log_detailed: Callable[[str], object]
+    log_diagnostic: Callable[[str], object]
     log_error: Callable[[str], object]
     idle_timeout_seconds: float
     submit_timeout_seconds: float
@@ -56,7 +56,7 @@ class ManualTypingOwner:
         output = self.output_provider()
         if output is not None:
             output.clear_self_chatbox_typing_reasons()
-        self.log_detailed("[ManualTyping] release status=cleared")
+        self.log_diagnostic("[ManualTyping] release status=cleared")
 
     def begin_submit(self) -> str:
         self._submit_generation += 1
@@ -87,7 +87,7 @@ class ManualTypingOwner:
                 timeout=self.submit_timeout_seconds,
             )
         except asyncio.TimeoutError:
-            self.log_detailed("[ManualTyping] submit output wait timed out")
+            self.log_diagnostic("[ManualTyping] submit output wait timed out")
         except Exception as exc:
             self.log_error(_format_manual_typing_error("wait_for_completion", exc))
 

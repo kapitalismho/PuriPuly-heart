@@ -18,7 +18,6 @@ from puripuly_heart.core.messages import (
     DIAGNOSTIC_FIELD_MAX_ITEMS,
     DIAGNOSTIC_FIELD_VALUE_MAX_LENGTH,
     DIAGNOSTIC_VISIBILITY_BASIC,
-    DIAGNOSTIC_VISIBILITY_DETAILED,
     DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
     DIAGNOSTIC_VISIBILITY_PERSISTED_FAILURE_ONLY,
     ContentPolicy,
@@ -33,7 +32,6 @@ DiagnosticSink: TypeAlias = Literal[
     "snackbar",
     "chatbox_disclosure",
     "basic_logs",
-    "detailed_logs",
     "persisted_logs",
     "failure_jsonl",
 ]
@@ -41,7 +39,6 @@ DIAGNOSTIC_SINK_DASHBOARD: Final[DiagnosticSink] = "dashboard"
 DIAGNOSTIC_SINK_SNACKBAR: Final[DiagnosticSink] = "snackbar"
 DIAGNOSTIC_SINK_CHATBOX_DISCLOSURE: Final[DiagnosticSink] = "chatbox_disclosure"
 DIAGNOSTIC_SINK_BASIC_LOGS: Final[DiagnosticSink] = "basic_logs"
-DIAGNOSTIC_SINK_DETAILED_LOGS: Final[DiagnosticSink] = "detailed_logs"
 DIAGNOSTIC_SINK_PERSISTED_LOGS: Final[DiagnosticSink] = "persisted_logs"
 DIAGNOSTIC_SINK_FAILURE_JSONL: Final[DiagnosticSink] = "failure_jsonl"
 DIAGNOSTIC_SINKS: Final[tuple[DiagnosticSink, ...]] = (
@@ -49,7 +46,6 @@ DIAGNOSTIC_SINKS: Final[tuple[DiagnosticSink, ...]] = (
     DIAGNOSTIC_SINK_SNACKBAR,
     DIAGNOSTIC_SINK_CHATBOX_DISCLOSURE,
     DIAGNOSTIC_SINK_BASIC_LOGS,
-    DIAGNOSTIC_SINK_DETAILED_LOGS,
     DIAGNOSTIC_SINK_PERSISTED_LOGS,
     DIAGNOSTIC_SINK_FAILURE_JSONL,
 )
@@ -62,17 +58,9 @@ DIAGNOSTIC_SINK_VISIBILITY_RULES: Final[
         DIAGNOSTIC_SINK_SNACKBAR: frozenset({DIAGNOSTIC_VISIBILITY_BASIC}),
         DIAGNOSTIC_SINK_CHATBOX_DISCLOSURE: frozenset({DIAGNOSTIC_VISIBILITY_BASIC}),
         DIAGNOSTIC_SINK_BASIC_LOGS: frozenset({DIAGNOSTIC_VISIBILITY_BASIC}),
-        DIAGNOSTIC_SINK_DETAILED_LOGS: frozenset(
-            {
-                DIAGNOSTIC_VISIBILITY_BASIC,
-                DIAGNOSTIC_VISIBILITY_DETAILED,
-                DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
-            }
-        ),
         DIAGNOSTIC_SINK_PERSISTED_LOGS: frozenset(
             {
                 DIAGNOSTIC_VISIBILITY_BASIC,
-                DIAGNOSTIC_VISIBILITY_DETAILED,
                 DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
             }
         ),
@@ -310,6 +298,10 @@ _SECRET_ASSIGNMENT_TEXT_RE: Final = re.compile(
 _BEARER_SECRET_TEXT_RE: Final = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+\-/]{8,}")
 _OPENAI_STYLE_SECRET_TEXT_RE: Final = re.compile(r"\bsk-[A-Za-z0-9][A-Za-z0-9._-]{8,}\b")
 _URL_USERINFO_RE: Final = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)([^/\s:@]+):([^/\s@]+)@")
+_PERSONAL_ABSOLUTE_PATH_RE: Final = re.compile(
+    r"(?i)(?:[A-Z]:[\\/](?:Users|Documents and Settings)[\\/][^\s\"'<>|]+|"
+    r"/(?:home|Users)/[^\s\"'<>]+)"
+)
 CONVERSATION_TEXT_MAX_LENGTH: Final = 4096
 
 
@@ -735,7 +727,7 @@ def _compatible_visibility_for_sink(sink: DiagnosticSink) -> DiagnosticVisibilit
     allowed = DIAGNOSTIC_SINK_VISIBILITY_RULES.get(sink, frozenset())
     for visibility in (
         DIAGNOSTIC_VISIBILITY_BASIC,
-        DIAGNOSTIC_VISIBILITY_DETAILED,
+        DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
         DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
         DIAGNOSTIC_VISIBILITY_PERSISTED_FAILURE_ONLY,
     ):
@@ -900,6 +892,7 @@ def _redact_text_payload(text: str) -> tuple[str, bool]:
         lambda match: f"{match.group(1)}[redacted]@",
         redacted,
     )
+    redacted = _PERSONAL_ABSOLUTE_PATH_RE.sub(DIAGNOSTIC_REDACTION_MARKER, redacted)
     changed = redacted != text
     if changed:
         redacted = re.sub(r"\s+", " ", redacted).strip()
@@ -1191,7 +1184,6 @@ __all__ = [
     "DIAGNOSTIC_SINK_BASIC_LOGS",
     "DIAGNOSTIC_SINK_CHATBOX_DISCLOSURE",
     "DIAGNOSTIC_SINK_DASHBOARD",
-    "DIAGNOSTIC_SINK_DETAILED_LOGS",
     "DIAGNOSTIC_SINK_FAILURE_JSONL",
     "DIAGNOSTIC_SINK_PERSISTED_LOGS",
     "DIAGNOSTIC_SINK_SNACKBAR",

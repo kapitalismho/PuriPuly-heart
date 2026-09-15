@@ -17,7 +17,6 @@ from puripuly_heart.config.paths import user_config_dir
 from puripuly_heart.core.diagnostic_validation import (
     DIAGNOSTIC_REDACTION_MARKER,
     DIAGNOSTIC_SINK_BASIC_LOGS,
-    DIAGNOSTIC_SINK_DETAILED_LOGS,
     DIAGNOSTIC_SINK_PERSISTED_LOGS,
     DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED,
     DiagnosticSink,
@@ -26,12 +25,12 @@ from puripuly_heart.core.diagnostic_validation import (
     redact_text_for_sink,
     validate_diagnostics_for_sink,
 )
+from puripuly_heart.core.language import get_language_info
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     CONTENT_POLICY_RAW_USER_TEXT_ALLOWED,
     DIAGNOSTIC_CATEGORY_UNKNOWN,
     DIAGNOSTIC_VISIBILITY_BASIC,
-    DIAGNOSTIC_VISIBILITY_DETAILED,
     DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
     SEVERITY_ERROR,
     SEVERITY_INFO,
@@ -57,9 +56,12 @@ from puripuly_heart.core.observability import (
     RealtimeLogSink,
     RuntimeLogEvent,
     RuntimeLogSink,
-    SessionLoggingMode,
 )
 from puripuly_heart.core.output.models import OutputRoutingDecision
+from puripuly_heart.core.runtime.logging import (
+    LIVE_AUDIENCE_BASIC,
+    LIVE_AUDIENCE_RECORD_ATTRIBUTE,
+)
 
 MAIN_LOG_FILENAME = "puripuly_heart.log"
 MAIN_LOG_BACKUP_FILENAME = "puripuly_heart.backup.log"
@@ -75,9 +77,15 @@ _QUEUE_HANDLER_REFCOUNT_ATTR = "_puripuly_heart_queue_refcount"
 _QUEUE_HANDLER_QUEUE_ATTR = "_puripuly_heart_queue"
 _CONTENT_CATEGORY_ATTR = "_puripuly_heart_content_category"
 _CONVERSATION_CATEGORY = "accepted_conversation"
+_LIVE_AUDIENCE_ATTR = LIVE_AUDIENCE_RECORD_ATTRIBUTE
+_LIVE_AUDIENCE_BASIC = LIVE_AUDIENCE_BASIC
 _MAIN_FILE_QUEUE_CAPACITY = 2048
 _FILE_DRAIN_TIMEOUT_S = 2.0
 _TERMINAL_ENQUEUE_TIMEOUT_S = 0.25
+_FILE_BATCH_MAX_AGE_S = 1.0
+_FILE_BATCH_MAX_BYTES = 64 * 1024
+_FILE_BATCH_MAX_RECORDS = 128
+_MAIN_LOG_MAX_BYTES = 20 * 1024 * 1024
 
 
 LOG_FORMAT = "%(asctime)s.%(msecs)03d [%(levelname)s] %(name)s: %(message)s"
@@ -160,82 +168,6 @@ LATENCY_TRACE_POINT_CONTRACTS: dict[str, LatencyTracePointContract] = {
 }
 
 
-def format_detailed_latency_trace(
-    *,
-    channel: str,
-    utterance_id: str,
-    stage: str,
-    elapsed_ms: int,
-    parent_utterance_id: str | None = None,
-    target_index: int | None = None,
-    target_language: str | None = None,
-    turn_generation: int | None = None,
-    turn_order: int | None = None,
-) -> str:
-    parts = [
-        f"[Detailed][Latency] channel={channel}",
-        f"utterance_id={utterance_id}",
-        f"stage={stage}",
-        f"elapsed_ms={elapsed_ms}",
-    ]
-    if target_language is not None:
-        parts.extend(
-            (
-                f"parent_utterance_id={parent_utterance_id}",
-                f"target_index={target_index}",
-                f"target_language={target_language}",
-                f"turn_generation={turn_generation}",
-                f"turn_order={turn_order}",
-            )
-        )
-    return " ".join(parts)
-
-
-def format_translation_ready_for_output(
-    *,
-    channel: str,
-    utterance_id: str,
-    update_id: str,
-    origin_wall_clock_ms: int | None,
-    session_scope: str | None,
-    source_text_hash: str | None,
-    source_text_len: int | None,
-    logical_turn_key: str | None,
-    translation_len: int,
-    elapsed_ms: int | None,
-    parent_utterance_id: str | None = None,
-    target_index: int | None = None,
-    target_language: str | None = None,
-    turn_generation: int | None = None,
-    turn_order: int | None = None,
-) -> str:
-    parts = [
-        "[Detailed][Translation] translation_ready_for_output",
-        f"channel={channel}",
-        f"utterance_id={utterance_id}",
-        f"update_id={update_id}",
-        f"origin_wall_clock_ms={origin_wall_clock_ms}",
-        f"session_scope={session_scope}",
-        f"source_text_hash={source_text_hash}",
-        f"source_text_len={source_text_len}",
-        f"logical_turn_key={logical_turn_key}",
-        f"translation_len={translation_len}",
-    ]
-    if target_language is not None:
-        parts.extend(
-            (
-                f"parent_utterance_id={parent_utterance_id}",
-                f"target_index={target_index}",
-                f"target_language={target_language}",
-                f"turn_generation={turn_generation}",
-                f"turn_order={turn_order}",
-            )
-        )
-    if elapsed_ms is not None:
-        parts.append(f"elapsed_ms={elapsed_ms}")
-    return " ".join(parts)
-
-
 class RealtimeLogHandler(logging.Handler):
     def __init__(self, sink: RealtimeLogSink):
         super().__init__()
@@ -285,10 +217,102 @@ class _DiagnosticRedactionFilter(logging.Filter):
         return True
 
 
+class _LiveAudienceFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return (
+            getattr(record, _LIVE_AUDIENCE_ATTR, None) == _LIVE_AUDIENCE_BASIC
+            or getattr(record, _CONTENT_CATEGORY_ATTR, None) == _CONVERSATION_CATEGORY
+        )
+
+
+class _BatchingRotatingFileHandler(RotatingFileHandler):
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.oversized_records = 0
+        self.delivery_failures = 0
+
+    def emit_batch(self, records: list[logging.LogRecord]) -> None:
+        if not records:
+            return
+        try:
+            with self.lock:
+                if self.stream is None:
+                    self.stream = self._open()
+                pending: list[str] = []
+                pending_bytes = 0
+                current_bytes = self._stream_size()
+                for record in records:
+                    if not self.filter(record):
+                        continue
+                    text = f"{self.format(record)}{self.terminator}"
+                    encoded_size = len(text.encode(self.encoding or "utf-8", errors="replace"))
+                    if self.maxBytes > 0 and encoded_size > self.maxBytes:
+                        self.oversized_records += 1
+                        continue
+                    if (
+                        self.maxBytes > 0
+                        and current_bytes + pending_bytes > 0
+                        and current_bytes + pending_bytes + encoded_size > self.maxBytes
+                    ):
+                        self._write_pending(pending)
+                        pending = []
+                        pending_bytes = 0
+                        self.doRollover()
+                        current_bytes = 0
+                    pending.append(text)
+                    pending_bytes += encoded_size
+                self._write_pending(pending)
+                if pending:
+                    self.flush()
+        except Exception:
+            self.delivery_failures += len(records)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.emit_batch([record])
+
+    def _stream_size(self) -> int:
+        if self.stream is None:
+            return 0
+        self.stream.seek(0, 2)
+        return int(self.stream.tell())
+
+    def _write_pending(self, pending: list[str]) -> None:
+        if pending and self.stream is not None:
+            self.stream.write("".join(pending))
+
+
+def _estimated_record_bytes(record: logging.LogRecord) -> int:
+    try:
+        return len(record.getMessage().encode("utf-8", errors="replace")) + 96
+    except Exception:
+        return 96
+
+
+def _message_is_definitely_oversized(message: str) -> bool:
+    return len(message) >= _MAIN_LOG_MAX_BYTES
+
+
+def _record_is_definitely_oversized(record: logging.LogRecord) -> bool:
+    message = record.msg
+    return (
+        isinstance(message, str) and not record.args and _message_is_definitely_oversized(message)
+    )
+
+
 class _BoundedQueueHandler(QueueHandler):
     def __init__(self, file_queue: queue.Queue[logging.LogRecord]) -> None:
         super().__init__(file_queue)
         self.dropped_records = 0
+        self.oversized_records = 0
+
+    def handle(self, record: logging.LogRecord) -> bool:
+        if _record_is_definitely_oversized(record):
+            self.oversized_records += 1
+            return False
+        return super().handle(record)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        super().emit(record)
 
     def enqueue(self, record: logging.LogRecord) -> None:
         try:
@@ -320,6 +344,9 @@ class _SafeQueueListener(QueueListener):
         thread = self._thread
         if thread is None:
             return True
+        if not thread.is_alive():
+            self._thread = None
+            return True
         self.enqueue_sentinel()
         thread.join(max(0.0, timeout_s))
         if thread.is_alive():
@@ -327,15 +354,67 @@ class _SafeQueueListener(QueueListener):
         self._thread = None
         return True
 
-    def handle(self, record: logging.LogRecord) -> None:
-        record = self.prepare(record)
+    def _monitor(self) -> None:
+        batch: list[logging.LogRecord] = []
+        batch_bytes = 0
+        oldest_at = 0.0
+        while True:
+            timeout = None
+            if batch:
+                timeout = max(0.0, _FILE_BATCH_MAX_AGE_S - (time.monotonic() - oldest_at))
+            try:
+                record = (
+                    self.dequeue(block=True) if timeout is None else self.queue.get(True, timeout)
+                )
+            except queue.Empty:
+                self._deliver_batch(batch)
+                for _ in batch:
+                    self.queue.task_done()
+                batch = []
+                batch_bytes = 0
+                continue
+            if record is self._sentinel:
+                self._deliver_batch(batch)
+                for _ in batch:
+                    self.queue.task_done()
+                self.queue.task_done()
+                return
+            prepared = self.prepare(record)
+            if not batch:
+                oldest_at = time.monotonic()
+            batch.append(prepared)
+            batch_bytes += _estimated_record_bytes(prepared)
+            if (
+                len(batch) >= _FILE_BATCH_MAX_RECORDS
+                or batch_bytes >= _FILE_BATCH_MAX_BYTES
+                or prepared.levelno >= logging.WARNING
+            ):
+                self._deliver_batch(batch)
+                for _ in batch:
+                    self.queue.task_done()
+                batch = []
+                batch_bytes = 0
+
+    def _deliver_batch(self, records: list[logging.LogRecord]) -> None:
+        if not records:
+            return
         for handler in self.handlers:
-            if self.respect_handler_level and record.levelno < handler.level:
+            eligible = [
+                record
+                for record in records
+                if not self.respect_handler_level or record.levelno >= handler.level
+            ]
+            if not eligible:
                 continue
             try:
-                handler.handle(record)
+                emit_batch = getattr(handler, "emit_batch", None)
+                if callable(emit_batch):
+                    emit_batch(eligible)
+                else:
+                    for record in eligible:
+                        handler.handle(record)
             except Exception:
-                self.delivery_failures += 1
+                self.delivery_failures += len(eligible)
 
 
 @dataclass(slots=True)
@@ -392,6 +471,7 @@ def configure_main_logging(
         target_logger.addHandler(stream_handler)
     stream_handler.setFormatter(_main_formatter())
     _ensure_redaction_filter(stream_handler, DIAGNOSTIC_SINK_BASIC_LOGS)
+    _ensure_live_audience_filter(stream_handler)
 
     _remove_stale_main_file_queue_handlers(target_logger, log_file=log_file)
     existing_queue = _find_main_file_queue_handler(target_logger, log_file=log_file)
@@ -400,13 +480,14 @@ def configure_main_logging(
         if file_handler is not None:
             with contextlib.suppress(Exception):
                 target_logger.removeHandler(file_handler)
-        else:
-            file_handler = RotatingFileHandler(
-                log_file,
-                maxBytes=10 * 1024 * 1024,
-                backupCount=1,
-                encoding="utf-8",
-            )
+            with contextlib.suppress(Exception):
+                file_handler.close()
+        file_handler = _BatchingRotatingFileHandler(
+            log_file,
+            maxBytes=_MAIN_LOG_MAX_BYTES,
+            backupCount=1,
+            encoding="utf-8",
+        )
         file_handler.namer = _main_log_backup_namer
         file_handler.set_name(_MAIN_FILE_HANDLER_NAME)
         file_handler.setFormatter(_main_formatter())
@@ -481,7 +562,6 @@ class SessionRuntimeLoggingService:
         self._realtime_sink: RealtimeLogSink | None = None
         self._ui_handler: logging.Handler | None = None
         self._session_handlers: list[logging.Handler] = []
-        self._mode = SessionLoggingMode.BASIC
         self._closed = False
         self._conversation_record_keys: set[tuple[str, str, int | None, int | None, str]] = set()
         self._conversation_record_order: deque[tuple[str, str, int | None, int | None, str]] = (
@@ -492,6 +572,7 @@ class SessionRuntimeLoggingService:
             getattr(self._sinks, "file_queue_handler", None) or self._sinks.file_handler
         )
         _ensure_redaction_filter(self._sinks.stream_handler, DIAGNOSTIC_SINK_BASIC_LOGS)
+        _ensure_live_audience_filter(self._sinks.stream_handler)
         _ensure_redaction_filter(file_output_handler, DIAGNOSTIC_SINK_PERSISTED_LOGS)
         if file_output_handler is not self._sinks.file_handler:
             _ensure_redaction_filter(self._sinks.file_handler, DIAGNOSTIC_SINK_PERSISTED_LOGS)
@@ -503,23 +584,8 @@ class SessionRuntimeLoggingService:
             self._session_handlers.append(file_output_handler)
 
     @property
-    def mode(self) -> SessionLoggingMode:
-        return self._mode
-
-    @property
     def log_file(self) -> Path:
         return self._sinks.log_file
-
-    def set_mode(self, mode: SessionLoggingMode | str) -> None:
-        normalized = SessionLoggingMode(mode)
-        if normalized is self._mode:
-            return
-        previous = self._mode
-        self._mode = normalized
-        self.emit_basic(
-            "[Logging] mode_changed "
-            f"requested={normalized.value} effective={normalized.value} previous={previous.value}"
-        )
 
     def configure_structured_observability(
         self,
@@ -557,6 +623,7 @@ class SessionRuntimeLoggingService:
 
         handler = self._ui_handler_factory(sink)
         _ensure_redaction_filter(handler, DIAGNOSTIC_SINK_BASIC_LOGS)
+        _ensure_live_audience_filter(handler)
         self._ui_handler = handler
         _ensure_handler(self._root_logger, handler)
         _ensure_handler(self._session_logger, handler)
@@ -589,29 +656,50 @@ class SessionRuntimeLoggingService:
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
         if self._closed:
             return
+        if _message_is_definitely_oversized(message):
+            _note_oversized_rejection(self._sinks)
+            self._session_logger.warning(
+                "[Logging] oversized_record_rejected audience=basic "
+                f"character_count={len(message)} file_cap_bytes={_MAIN_LOG_MAX_BYTES}",
+                extra={_LIVE_AUDIENCE_ATTR: _LIVE_AUDIENCE_BASIC},
+            )
+            return
         safe_message = _redact_legacy_text_for_sink(message, DIAGNOSTIC_SINK_BASIC_LOGS)
-        self._session_logger.log(level, safe_message)
+        self._session_logger.log(
+            level,
+            safe_message,
+            extra={_LIVE_AUDIENCE_ATTR: _LIVE_AUDIENCE_BASIC},
+        )
         self._emit_structured_runtime_log(
             safe_message,
             level=level,
             visibility=DIAGNOSTIC_VISIBILITY_BASIC,
         )
 
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
+    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool:
         if self._closed:
             return False
-        if self._mode is not SessionLoggingMode.DETAILED:
+        if _message_is_definitely_oversized(message):
+            _note_oversized_rejection(self._sinks)
             return False
-        safe_message = _redact_legacy_text_for_sink(message, DIAGNOSTIC_SINK_DETAILED_LOGS)
-        self._session_logger.log(level, safe_message)
-        self._emit_structured_runtime_log(
-            safe_message,
-            level=level,
-            visibility=DIAGNOSTIC_VISIBILITY_DETAILED,
+        safe_message = _redact_legacy_text_for_sink(message, DIAGNOSTIC_SINK_PERSISTED_LOGS)
+        record = self._session_logger.makeRecord(
+            self._session_logger.name,
+            level,
+            fn="",
+            lno=0,
+            msg=safe_message,
+            args=(),
+            exc_info=None,
         )
+        file_output_handler = (
+            getattr(self._sinks, "file_queue_handler", None) or self._sinks.file_handler
+        )
+        file_output_handler.handle(record)
+        self._persist_structured_diagnostic(safe_message, level=level)
         return True
 
-    def emit_detailed_lazy(
+    def emit_diagnostic_lazy(
         self,
         build_message: Callable[[], str],
         *,
@@ -619,19 +707,7 @@ class SessionRuntimeLoggingService:
     ) -> bool:
         if self._closed:
             return False
-        if self._mode is not SessionLoggingMode.DETAILED:
-            return False
-        message = _redact_legacy_text_for_sink(
-            build_message(),
-            DIAGNOSTIC_SINK_DETAILED_LOGS,
-        )
-        self._session_logger.log(level, message)
-        self._emit_structured_runtime_log(
-            message,
-            level=level,
-            visibility=DIAGNOSTIC_VISIBILITY_DETAILED,
-        )
-        return True
+        return self.emit_diagnostic(build_message(), level=level)
 
     def record_output_routing_decision(self, decision: OutputRoutingDecision) -> None:
         if self._closed:
@@ -643,6 +719,9 @@ class SessionRuntimeLoggingService:
 
     def emit_persisted(self, message: str, *, level: int = logging.INFO) -> None:
         if self._closed:
+            return
+        if _message_is_definitely_oversized(message):
+            _note_oversized_rejection(self._sinks)
             return
         safe_message = _redact_legacy_text_for_sink(message, DIAGNOSTIC_SINK_PERSISTED_LOGS)
         loss_suffix = _file_delivery_loss_suffix(self._sinks)
@@ -677,7 +756,9 @@ class SessionRuntimeLoggingService:
         if self._closed:
             return
         event_visibility = visibility or (
-            diagnostics.visibility if diagnostics is not None else DIAGNOSTIC_VISIBILITY_DETAILED
+            diagnostics.visibility
+            if diagnostics is not None
+            else DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY
         )
         event_content_policy = content_policy or (
             diagnostics.content_policy if diagnostics is not None else CONTENT_POLICY_METADATA_ONLY
@@ -968,6 +1049,12 @@ def _ensure_redaction_filter(handler: logging.Handler, sink: DiagnosticSink) -> 
     handler.addFilter(_DiagnosticRedactionFilter(sink))
 
 
+def _ensure_live_audience_filter(handler: logging.Handler) -> None:
+    if any(isinstance(existing, _LiveAudienceFilter) for existing in handler.filters):
+        return
+    handler.filters.insert(0, _LiveAudienceFilter())
+
+
 def _new_session_logger_name() -> str:
     return f"{_SESSION_LOGGER_NAME}.{uuid4()}"
 
@@ -1006,35 +1093,42 @@ def _format_conversation_record(
     omission: str,
 ) -> str:
     metadata = record.metadata
-    parts = [
-        "[Conversation]",
-        f"channel={record.speaker_channel}",
-        f"turn={json.dumps(record.utterance_id, ensure_ascii=False)}",
-        f"kind={metadata.get('turn_kind') or record.speaker_channel}",
-        f"disposition={disposition}",
-        f"source_language={record.source_language or 'unknown'}",
-    ]
-    segment_index = metadata.get("segment_index")
-    if isinstance(segment_index, int) and not isinstance(segment_index, bool):
-        parts.append(f"segment_index={segment_index}")
-    parent_utterance_id = metadata.get("parent_utterance_id")
-    if parent_utterance_id and parent_utterance_id != record.utterance_id:
-        parts.append(f"parent_turn={json.dumps(parent_utterance_id, ensure_ascii=False)}")
-    target_index = metadata.get("target_index")
+    channel = "Self" if record.speaker_channel == "self" else "Peer"
+    turn_kind = metadata.get("turn_kind")
+    if turn_kind == "manual":
+        origin = "Manual"
+    else:
+        source = metadata.get("source")
+        origin = (
+            str(source)
+            if _safe_routing_token(source)
+            else ("Listen" if channel == "Peer" else "Mic")
+        )
+    source_language = _language_display_name(record.source_language)
+    target_language = _language_display_name(record.target_language)
+    if record.translation_text is not None:
+        header = f"[Conversation] {channel} · {origin} → {target_language}"
+        parts = [header, f"Translation {json.dumps(record.translation_text, ensure_ascii=False)}"]
+    else:
+        header = f"[Conversation] {channel} · {origin} · Original ({source_language})"
+        parts = [header]
+        if record.transcript_text is not None:
+            parts.append(f"Original {json.dumps(record.transcript_text, ensure_ascii=False)}")
+    if disposition not in {"accepted", "translated"}:
+        parts.append(f"Outcome {disposition.replace('_', ' ')}")
     failure_code = metadata.get("failure_code")
     if _safe_routing_token(failure_code):
-        parts.append(f"cause={failure_code}")
-    if target_index is not None:
-        parts.append(f"target_index={target_index}")
-    if record.target_language:
-        parts.append(f"target_language={record.target_language}")
-    if record.transcript_text is not None:
-        parts.append(f"source={json.dumps(record.transcript_text, ensure_ascii=False)}")
-    if record.translation_text is not None:
-        parts.append(f"translation={json.dumps(record.translation_text, ensure_ascii=False)}")
+        parts.append(f"Cause {str(failure_code).replace('_', ' ')}")
     if omission != "none":
-        parts.append(f"content_disposition={omission}")
-    return " ".join(parts)
+        parts.append("Content redacted")
+    return " · ".join(parts)
+
+
+def _language_display_name(code: str | None) -> str:
+    if not code:
+        return "Unknown language"
+    info = get_language_info(code)
+    return info.name if info is not None else code
 
 
 def _redact_legacy_text_for_sink(message: str, sink: DiagnosticSink) -> str:
@@ -1044,10 +1138,24 @@ def _redact_legacy_text_for_sink(message: str, sink: DiagnosticSink) -> str:
     return DIAGNOSTIC_REDACTION_MARKER
 
 
+def emit_basic_log(
+    logger: logging.Logger,
+    message: str,
+    *args: object,
+    level: int = logging.INFO,
+) -> None:
+    logger.log(
+        level,
+        message,
+        *args,
+        extra={_LIVE_AUDIENCE_ATTR: _LIVE_AUDIENCE_BASIC},
+    )
+
+
 def _sink_for_live_visibility(visibility: DiagnosticVisibility) -> DiagnosticSink:
     if visibility == DIAGNOSTIC_VISIBILITY_BASIC:
         return DIAGNOSTIC_SINK_BASIC_LOGS
-    return DIAGNOSTIC_SINK_DETAILED_LOGS
+    return DIAGNOSTIC_SINK_PERSISTED_LOGS
 
 
 def _redact_diagnostics_for_observability_sink(
@@ -1264,18 +1372,37 @@ def _enqueue_terminal_file_record(
 
 def _file_delivery_loss_suffix(sinks: RuntimeLoggingSinks) -> str:
     dropped = int(getattr(sinks, "abandoned_records", 0))
+    rejected = 0
+    failures = 0
     handler = getattr(sinks, "file_queue_handler", None)
     if isinstance(handler, _BoundedQueueHandler):
         dropped += handler.dropped_records
+        rejected += handler.oversized_records
+    file_handler = getattr(sinks, "file_handler", None)
+    if isinstance(file_handler, _BatchingRotatingFileHandler):
+        rejected += file_handler.oversized_records
+        failures += file_handler.delivery_failures
     listener = getattr(sinks, "file_queue_listener", None)
     if isinstance(listener, _SafeQueueListener):
         dropped += listener.shutdown_drops
-        failures = listener.delivery_failures
-    else:
-        failures = 0
-    if not dropped and not failures:
+        failures += listener.delivery_failures
+    if not dropped and not rejected and not failures:
         return ""
-    return f"logging_delivery_dropped={dropped} logging_delivery_failures={failures}"
+    return (
+        f"logging_delivery_dropped={dropped} "
+        f"logging_oversized_rejected={rejected} "
+        f"logging_delivery_failures={failures}"
+    )
+
+
+def _note_oversized_rejection(sinks: RuntimeLoggingSinks) -> None:
+    handler = getattr(sinks, "file_queue_handler", None)
+    if isinstance(handler, _BoundedQueueHandler):
+        handler.oversized_records += 1
+        return
+    file_handler = getattr(sinks, "file_handler", None)
+    if isinstance(file_handler, _BatchingRotatingFileHandler):
+        file_handler.oversized_records += 1
 
 
 def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Handler) -> None:
@@ -1284,7 +1411,6 @@ def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Hand
         logger.removeHandler(handler)
     except Exception as exc:
         failures.append(exc)
-    setattr(handler, _QUEUE_HANDLER_CLOSED_ATTR, True)
     setattr(handler, _QUEUE_HANDLER_REFCOUNT_ATTR, 0)
 
     file_queue = _main_file_queue_for_handler(handler)
@@ -1325,13 +1451,21 @@ def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Hand
 
     file_handler = getattr(handler, _QUEUE_HANDLER_FILE_HANDLER_ATTR, None)
     if isinstance(file_handler, logging.Handler) and listener_stopped:
+        initial_delivery_failures = (
+            file_handler.delivery_failures
+            if isinstance(file_handler, _BatchingRotatingFileHandler)
+            else 0
+        )
         dropped = handler.dropped_records if isinstance(handler, _BoundedQueueHandler) else 0
+        rejected = handler.oversized_records if isinstance(handler, _BoundedQueueHandler) else 0
+        if isinstance(file_handler, _BatchingRotatingFileHandler):
+            rejected += file_handler.oversized_records
         if isinstance(listener, _SafeQueueListener):
             dropped += listener.shutdown_drops
-            delivery_failures = listener.delivery_failures
+            delivery_failures = listener.delivery_failures + initial_delivery_failures
         else:
-            delivery_failures = 0
-        if dropped or delivery_failures:
+            delivery_failures = initial_delivery_failures
+        if dropped or rejected or delivery_failures:
             try:
                 record = logger.makeRecord(
                     _SESSION_LOGGER_NAME,
@@ -1340,7 +1474,8 @@ def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Hand
                     lno=0,
                     msg=(
                         "[Lifecycle][Shutdown] logging_delivery_terminal "
-                        f"dropped={dropped} delivery_failures={delivery_failures}"
+                        f"dropped={dropped} oversized_rejected={rejected} "
+                        f"delivery_failures={delivery_failures}"
                     ),
                     args=(),
                     exc_info=None,
@@ -1352,6 +1487,24 @@ def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Hand
             _close_file_handler(file_handler)
         except Exception as exc:
             failures.append(exc)
+        if (
+            isinstance(file_handler, _BatchingRotatingFileHandler)
+            and file_handler.delivery_failures > initial_delivery_failures
+        ):
+            failures.append(
+                RuntimeError(
+                    "Runtime logging file delivery failed "
+                    f"record_count={file_handler.delivery_failures}"
+                )
+            )
+        elif initial_delivery_failures:
+            failures.append(
+                RuntimeError(
+                    "Runtime logging file delivery failed "
+                    f"record_count={initial_delivery_failures}"
+                )
+            )
+        setattr(handler, _QUEUE_HANDLER_CLOSED_ATTR, True)
     if not listener_stopped:
         failures.append(
             TimeoutError("Runtime logging file listener stop timed out; delivery abandoned")

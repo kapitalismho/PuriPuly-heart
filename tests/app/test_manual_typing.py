@@ -35,7 +35,7 @@ def _owner(
     owner = ManualTypingOwner(
         output_provider=lambda: output,
         completion_provider=completion_provider,
-        log_detailed=lambda message: detailed.append(message),
+        log_diagnostic=lambda message: detailed.append(message),
         log_error=lambda message: errors.append(message),
         idle_timeout_seconds=0.01,
         submit_timeout_seconds=0.1,

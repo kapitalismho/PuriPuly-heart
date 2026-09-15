@@ -11,10 +11,8 @@ mod runtime_diagnostics;
 mod spatial_policy;
 pub mod state;
 
-pub use bridge::{
-    BridgeClient, BridgeError, BridgeIncoming, OverlayBridgeEvent, OverlayRuntimeControl,
-};
-pub use logging::{OverlayLogger, OverlayLoggingMode};
+pub use bridge::{BridgeClient, BridgeError, BridgeIncoming, OverlayBridgeEvent};
+pub use logging::OverlayLogger;
 pub use manifest::{
     load_manifest, resolve_quiet_tail_profile, resolve_quiet_tail_profile_from_env,
     validate_manifest, OverlayManifest, QuietTailProfile, EXPECTED_CONTRACT_VERSION,

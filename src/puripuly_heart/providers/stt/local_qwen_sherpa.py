@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import importlib
 import logging
 import time
@@ -12,10 +11,8 @@ from typing import AsyncIterator, Callable
 
 import numpy as np
 
-from puripuly_heart.core.audio.diagnostics import compute_audio_frame_metrics
 from puripuly_heart.core.audio.format import (
     AudioCaptureSpan,
-    AudioFrameF32,
     pcm16le_bytes_to_float32,
 )
 from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
@@ -60,6 +57,7 @@ LOCAL_QWEN_RECOGNIZER_SAMPLE_RATE_HZ = 16000
 LOCAL_ASR_PENDING_TTL_S = 12.0
 _KNOWN_HALLUCINATION_LOG_REDACTION = "<known-local-qwen-hallucination>"
 logger = logging.getLogger(__name__)
+LocalASRAttemptLogSink = Callable[[str, int], None]
 
 
 class LocalQwenSherpaInferenceError(RuntimeError):
@@ -75,35 +73,6 @@ def _log_prefix(provider_id: str, stream_label: str | None) -> str:
     if stream_label:
         return f"{prefix}[{stream_label}]"
     return prefix
-
-
-def _audio_diag_prefix(provider_id: str, stream_label: str | None) -> str:
-    prefix = f"[AudioDiag][{provider_id}]"
-    if stream_label:
-        return f"{prefix}[{stream_label}]"
-    return prefix
-
-
-def _looks_repetitive(text: str) -> bool:
-    stripped = text.strip()
-    if len(stripped) < 6:
-        return False
-    for unit_len in range(1, (len(stripped) // 2) + 1):
-        if len(stripped) % unit_len == 0 and stripped == stripped[:unit_len] * (
-            len(stripped) // unit_len
-        ):
-            return len(stripped) // unit_len >= 3
-    if len(stripped) < 12:
-        return False
-    return len(set(stripped)) <= max(4, len(stripped) // 8)
-
-
-def _looks_script_mismatched(text: str, language_hint: str | None) -> bool:
-    if not text or language_hint != "Korean":
-        return False
-    cjk = sum("\u4e00" <= ch <= "\u9fff" for ch in text)
-    latin = sum("a" <= ch.lower() <= "z" for ch in text)
-    return cjk >= 3 or latin >= max(5, len(text) // 2)
 
 
 def _pcm16le_duration_ms(pcm16le_size_bytes: int, sample_rate_hz: int) -> float:
@@ -176,13 +145,13 @@ class LocalQwenSherpaSTTBackend(STTBackend):
     stream_label: str | None = None
     language_hint: str | None = None
     hotwords: tuple[str, ...] = ()
-    diagnostics_enabled: Callable[[], bool] | None = None
     model_id: str = field(default=LOCAL_STT_MODEL_ID, init=False)
     active_decode_timeout_s: float = 30.0
     provider_id: str = field(default="local_qwen", init=False)
     pending_ttl_s: float = LOCAL_ASR_PENDING_TTL_S
     decode_clock: Callable[[], float] = field(default_factory=lambda: time.perf_counter)
     queue_clock: Callable[[], float] = field(default_factory=lambda: time.monotonic)
+    attempt_log_sink: LocalASRAttemptLogSink | None = field(default=None, repr=False)
     _recognizer: object | None = field(init=False, default=None, repr=False)
     _load_lock: asyncio.Lock = field(init=False, repr=False)
     _decode_lock: asyncio.Lock = field(init=False, repr=False)
@@ -539,41 +508,19 @@ class _LocalQwenSherpaSession(STTBackendSession):
         self._decode_coordinator.enqueue(samples_f32)
 
     async def _decode_samples(self, samples_f32: np.ndarray) -> str:
-        if self._diagnostics_enabled():
-            self._log_decode_start_diagnostics(samples_f32)
         return await self.backend.decode_f32(samples_f32)
 
     async def _handle_decode_completion(self, completion: LocalDecodeCompletion) -> None:
         text = completion.text
         audio_ms = completion.job.audio_ms
         inference_ms = completion.inference_ms
-        rtf = inference_ms / audio_ms if audio_ms > 0 else 0.0
         if audio_ms > 0:
+            rtf = inference_ms / audio_ms
             self._utterances += 1
             self._total_audio_ms += audio_ms
             self._total_inference_ms += inference_ms
             self._total_rtf += rtf
-
-        if audio_ms > 0 and self._diagnostics_enabled():
-            self._log_decode_done_diagnostics(
-                audio_ms=audio_ms,
-                inference_ms=inference_ms,
-                rtf=rtf,
-                text=text,
-            )
-
-        if text:
-            logger.info(
-                "%s Transcript final text_len=%s known_hallucination=%s audio_ms=%.1f inference_ms=%.1f rtf=%.3f",
-                _log_prefix(self.backend.provider_id, self.backend.stream_label),
-                len(text),
-                self.backend.is_known_hallucination(text),
-                audio_ms,
-                inference_ms,
-                rtf,
-            )
-        if audio_ms > 0 and self._diagnostics_enabled():
-            self._log_attempt_diagnostic(
+            self._log_attempt(
                 audio_ms=audio_ms,
                 inference_ms=inference_ms,
                 queue_wait_ms=completion.queue_wait_ms,
@@ -594,8 +541,8 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 self._terminalize_scoped(identity, outcome="empty")
 
     async def _handle_decode_failure(self, failure: LocalDecodeFailure) -> None:
-        if failure.job.audio_ms > 0 and self._diagnostics_enabled():
-            self._log_attempt_diagnostic(
+        if failure.job.audio_ms > 0:
+            self._log_attempt(
                 audio_ms=failure.job.audio_ms,
                 inference_ms=failure.inference_ms,
                 queue_wait_ms=failure.queue_wait_ms,
@@ -623,15 +570,6 @@ class _LocalQwenSherpaSession(STTBackendSession):
             self._event_projection.put_legacy(failure.error)
 
     async def _handle_decode_expired(self, expired: LocalDecodeExpired) -> None:
-        if self._diagnostics_enabled():
-            logger.info(
-                "[LocalASR][Expiry] channel=%s model=%s intended_provider=%s reason=%s queue_wait_seconds=%.3f",
-                self.backend.stream_label or "unknown",
-                self.backend.model_id,
-                self.backend.provider_id,
-                expired.reason,
-                expired.queue_wait_ms / 1000.0,
-            )
         identity = self._scoped_job_identities.pop(expired.job.sequence, None)
         if identity is None:
             self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
@@ -713,54 +651,6 @@ class _LocalQwenSherpaSession(STTBackendSession):
         else:
             self._handoff_complete.set()
 
-    def _diagnostics_enabled(self) -> bool:
-        diagnostics_enabled = self.backend.diagnostics_enabled
-        if diagnostics_enabled is None:
-            return False
-        with contextlib.suppress(Exception):
-            return bool(diagnostics_enabled())
-        return False
-
-    def _log_decode_start_diagnostics(self, samples_f32: np.ndarray) -> None:
-        with contextlib.suppress(Exception):
-            metrics = compute_audio_frame_metrics(
-                AudioFrameF32(
-                    samples=samples_f32,
-                    sample_rate_hz=self.backend.sample_rate_hz,
-                    channels=1,
-                )
-            )
-            logger.info(
-                "%s decode_start audio_ms=%.1f rms_db=%.1f peak_db=%.1f zero_ratio=%.3f language_hint=%r",
-                _audio_diag_prefix(self.backend.provider_id, self.backend.stream_label),
-                metrics.audio_ms,
-                metrics.rms_db,
-                metrics.peak_db,
-                metrics.zero_ratio,
-                self.backend.language_hint,
-            )
-
-    def _log_decode_done_diagnostics(
-        self,
-        *,
-        audio_ms: float,
-        inference_ms: float,
-        rtf: float,
-        text: str,
-    ) -> None:
-        with contextlib.suppress(Exception):
-            logger.info(
-                "%s decode_done audio_ms=%.1f inference_ms=%.1f rtf=%.3f text_len=%s empty_result=%s suspicious_repetition=%s suspicious_script=%s",
-                _audio_diag_prefix(self.backend.provider_id, self.backend.stream_label),
-                audio_ms,
-                inference_ms,
-                rtf,
-                len(text),
-                not bool(text),
-                _looks_repetitive(text),
-                _looks_script_mismatched(text, self.backend.language_hint),
-            )
-
     def _log_summary_once(self) -> None:
         if self._summary_logged or self._utterances == 0:
             return
@@ -779,7 +669,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
             mean_rtf,
         )
 
-    def _log_attempt_diagnostic(
+    def _log_attempt(
         self,
         *,
         audio_ms: float,
@@ -787,14 +677,17 @@ class _LocalQwenSherpaSession(STTBackendSession):
         queue_wait_ms: float,
         result: str,
     ) -> None:
-        rtf = inference_ms / audio_ms if audio_ms > 0 else 0.0
-        logger.info(
-            "[LocalASR][Attempt] channel=%s model=%s backend=CPU audio_seconds=%.3f decode_seconds=%.3f rtf=%.6f result=%s queue_wait_seconds=%.3f",
-            self.backend.stream_label or "unknown",
-            self.backend.model_id,
-            audio_ms / 1000.0,
-            inference_ms / 1000.0,
-            rtf,
-            result,
-            queue_wait_ms / 1000.0,
+        rtf = inference_ms / audio_ms
+        message = (
+            f"[{'Self' if self.backend.stream_label == 'self' else 'Peer'} · Recognition] · "
+            f"Audio {audio_ms / 1000.0:.2f} s · "
+            f"Decode {inference_ms / 1000.0:.2f} s · "
+            f"RTF {rtf:.3f} · Result {result}"
         )
+        if queue_wait_ms >= 0:
+            message = f"{message} · Queue {queue_wait_ms / 1000.0:.2f} s"
+        sink = self.backend.attempt_log_sink
+        if sink is not None:
+            sink(message, logging.INFO)
+            return
+        logger.info(message)

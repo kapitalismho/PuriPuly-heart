@@ -73,7 +73,7 @@ def test_structured_observability_events_use_safe_message_contracts() -> None:
         operation="apply",
         code="provider_degraded",
         category=messages.DIAGNOSTIC_CATEGORY_LIFECYCLE,
-        visibility=messages.DIAGNOSTIC_VISIBILITY_DETAILED,
+        visibility=messages.DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
         content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
         status_code=None,
         retry_after_ms=None,
@@ -82,7 +82,7 @@ def test_structured_observability_events_use_safe_message_contracts() -> None:
     event = observability.DiagnosticEvent(
         category=messages.DIAGNOSTIC_CATEGORY_LIFECYCLE,
         severity=messages.SEVERITY_WARNING,
-        visibility=messages.DIAGNOSTIC_VISIBILITY_DETAILED,
+        visibility=messages.DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
         content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
         correlation_id="corr-1",
         diagnostics=diagnostic,
@@ -134,7 +134,7 @@ def test_structured_observability_event_fields_are_json_safe_scalars() -> None:
         observability.DiagnosticEvent(
             category=messages.DIAGNOSTIC_CATEGORY_UNKNOWN,
             severity=messages.SEVERITY_WARNING,
-            visibility=messages.DIAGNOSTIC_VISIBILITY_DETAILED,
+            visibility=messages.DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
             content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
             correlation_id="corr-json-safe-type",
             diagnostics=None,

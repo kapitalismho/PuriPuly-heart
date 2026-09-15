@@ -69,7 +69,7 @@ def compose_peer_application(
     localize: Callable[[str], str],
     settings_presentation_sink: Callable[[GeneralSettingsSnapshot], None],
     log_basic: Callable[..., object],
-    log_detailed: Callable[..., object],
+    log_diagnostic: Callable[..., object],
     translation_demand_sink: Callable[[], Awaitable[None]] | None = None,
 ) -> PeerApplicationRuntime:
     state = PeerApplicationStateAdapter(
@@ -112,7 +112,7 @@ def compose_peer_application(
         disclosure_sink=disclosure_sink,
         superseded_sink=superseded_sink,
         log_basic=log_basic,
-        log_detailed=log_detailed,
+        log_diagnostic=log_diagnostic,
         log_failure=lambda message: log_basic(message, level=logging.ERROR),
         lifecycle_trace_sink=lambda event, fields: overlay_provider().record_lifecycle_trace(
             event,

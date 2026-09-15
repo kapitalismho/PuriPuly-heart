@@ -68,7 +68,7 @@ class OverlayPresentationTransport(Protocol):
     async def broadcast_shutdown(self) -> None: ...
 
 
-class RuntimeDetailedLogger(Protocol):
+class RuntimeDiagnosticLogger(Protocol):
     def __call__(self, message: str, *, level: int = logging.INFO) -> bool: ...
 
 
@@ -77,7 +77,7 @@ class OverlayPresenter(OverlaySink):
     calibration: OverlayCalibration
     bridge: OverlayPresentationTransport | None = None
     diagnostics: OverlayDiagnosticsRecorder | None = None
-    runtime_log_detailed: RuntimeDetailedLogger | None = None
+    runtime_log_diagnostic: RuntimeDiagnosticLogger | None = None
     clock: Clock = field(default_factory=SystemClock)
     sleep: SleepFn = asyncio.sleep
     visible_window_target_blocks: int = VISIBLE_WINDOW_TARGET_BLOCKS
@@ -120,7 +120,7 @@ class OverlayPresenter(OverlaySink):
         self._retry_projection.reset(enabled=self.native_retry_enabled)
         self._diagnostic_projection.configure(
             diagnostics=self.diagnostics,
-            runtime_log_detailed=self.runtime_log_detailed,
+            runtime_log_diagnostic=self.runtime_log_diagnostic,
         )
         self._presentation_state.generate_snapshot(
             revision=0,
@@ -158,17 +158,17 @@ class OverlayPresenter(OverlaySink):
     def _sync_diagnostic_projection(self) -> PresenterDiagnosticProjection:
         self._diagnostic_projection.configure(
             diagnostics=self.diagnostics,
-            runtime_log_detailed=self.runtime_log_detailed,
+            runtime_log_diagnostic=self.runtime_log_diagnostic,
         )
         return self._diagnostic_projection
 
-    def _emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
+    def _emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool:
         return self._sync_diagnostic_projection().emit_lazy(
             lambda: message,
             level=level,
         )
 
-    def _emit_detailed_lazy(
+    def _emit_diagnostic_lazy(
         self,
         build_message: Callable[[], str],
         *,

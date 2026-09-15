@@ -14,15 +14,12 @@ from tests.helpers.flet_page import attach_dummy_page
 
 
 class RuntimeLoggingCapture:
-    def __init__(self, *, detailed_enabled: bool = True) -> None:
-        self.detailed_enabled = detailed_enabled
+    def __init__(self) -> None:
         self.detailed_calls: list[tuple[int, str]] = []
         self.detailed_messages: list[tuple[int, str]] = []
 
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
+    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool:
         self.detailed_calls.append((level, message))
-        if not self.detailed_enabled:
-            return False
         self.detailed_messages.append((level, message))
         return True
 
@@ -487,7 +484,7 @@ def test_yielding_notice_defers_to_live_turn_content(monkeypatch: pytest.MonkeyP
 
     card.set_display_translation(
         "translated text",
-        runtime_log_detailed=runtime_logging.emit_detailed,
+        runtime_log_diagnostic=runtime_logging.emit_diagnostic,
         update_id="upd-notice-1",
         origin_wall_clock_ms=1500,
         utterance_id="utt-notice-1",
@@ -534,7 +531,7 @@ def test_non_yielding_notice_suppresses_the_translation_and_its_visual_commit(
 
     card.set_display_translation(
         "translated text",
-        runtime_log_detailed=runtime_logging.emit_detailed,
+        runtime_log_diagnostic=runtime_logging.emit_diagnostic,
         update_id="upd-notice-2",
         origin_wall_clock_ms=1500,
         utterance_id="utt-notice-2",
@@ -750,14 +747,14 @@ def test_translation_visual_commit_log_reports_the_redefined_schema(
     monkeypatch.setattr(type(card._display_text), "update", lambda self: events.append("display"))
     monkeypatch.setattr(display_card_module.time, "time", lambda: 2.0)
 
-    def emit_detailed(message: str, *, level: int = logging.INFO) -> bool:
+    def emit_diagnostic(message: str, *, level: int = logging.INFO) -> bool:
         events.append("log")
-        return runtime_logging.emit_detailed(message, level=level)
+        return runtime_logging.emit_diagnostic(message, level=level)
 
     card.set_display_translation(
         "translated text",
         font_family="font-target",
-        runtime_log_detailed=emit_detailed,
+        runtime_log_diagnostic=emit_diagnostic,
         update_id="upd-1",
         origin_wall_clock_ms=1500,
         utterance_id="utt-1",
@@ -791,33 +788,6 @@ def test_translation_visual_commit_log_reports_the_redefined_schema(
     assert "translated text" not in message
 
 
-def test_translation_visual_commit_log_is_suppressed_in_basic_mode(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture(detailed_enabled=False)
-
-    card.set_display("source text")
-    attach_dummy_page(monkeypatch, card._display_text)
-    _mute_display_updates(monkeypatch, card)
-
-    card.set_display_translation(
-        "translated text",
-        runtime_log_detailed=runtime_logging.emit_detailed,
-        update_id="upd-2",
-        origin_wall_clock_ms=1500,
-        utterance_id="utt-2",
-        channel="self",
-        session_scope="session-2",
-        source_text_hash="src-hash-2",
-        source_text_len=11,
-        logical_turn_key="self:utt-2",
-    )
-
-    assert len(runtime_logging.detailed_calls) == 1
-    assert runtime_logging.detailed_messages == []
-
-
 def test_source_applied_log_reports_the_redefined_schema(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -830,7 +800,7 @@ def test_source_applied_log_reports_the_redefined_schema(
 
     card.set_display(
         "source text",
-        runtime_log_detailed=runtime_logging.emit_detailed,
+        runtime_log_diagnostic=runtime_logging.emit_diagnostic,
         origin_wall_clock_ms=1500,
         utterance_id="utt-3",
         channel="self",
@@ -865,7 +835,7 @@ def test_source_applied_log_is_skipped_when_not_requested(
 
     card.set_display(
         "source text",
-        runtime_log_detailed=runtime_logging.emit_detailed,
+        runtime_log_diagnostic=runtime_logging.emit_diagnostic,
         utterance_id="utt-4",
         channel="self",
         should_log=False,

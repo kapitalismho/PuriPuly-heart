@@ -665,16 +665,14 @@
     ]
   },
   "overlay": {
-    "contract_version": 8,
+    "contract_version": 9,
     "manifest_fields": [
       "app_version",
       "bridge_url",
       "contract_version",
-      "diagnostics_enabled",
       "locale",
       "log_dir",
       "log_level",
-      "logging_mode",
       "overlay_instance_id",
       "parent_pid",
       "session_token",
@@ -919,7 +917,7 @@
       "tests/config/test_public_compatibility_surfaces.py::test_overlay_startup_contract_snapshot_matches_python_runners_and_manifest_handoff",
       "tests/core/test_overlay_manifest.py::test_overlay_manifest_uses_structured_block_contract_version",
       "tests/core/test_overlay_manifest.py::test_overlay_manifest_round_trips_contract_fields",
-      "tests/core/test_overlay_manifest.py::test_overlay_manifest_accepts_legacy_diagnostics_enabled_field",
+      "tests/core/test_overlay_manifest.py::test_overlay_manifest_rejects_obsolete_diagnostics_field",
       "tests/core/test_overlay_protocol.py::test_overlay_presentation_snapshot_round_trips_blocks_and_calibration",
       "tests/core/test_overlay_bridge.py::test_overlay_bridge_sends_authenticated_initial_snapshot",
       "tests/app/test_overlay_process_manager.py::test_overlay_process_manager_waits_for_overlay_ready_before_connected",

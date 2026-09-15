@@ -7,19 +7,84 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
 
-from puripuly_heart.core.messages import DiagnosticFieldValue
-from puripuly_heart.core.observability import (
-    ConversationRecordChannel,
-    RealtimeLogSink,
-    SessionLoggingMode,
+from puripuly_heart.core.diagnostic_validation import (
+    DIAGNOSTIC_REDACTION_MARKER,
+    DIAGNOSTIC_SINK_BASIC_LOGS,
+    DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED,
+    redact_text_for_sink,
 )
+from puripuly_heart.core.messages import DiagnosticFieldValue
+from puripuly_heart.core.observability import ConversationRecordChannel, RealtimeLogSink
+
+LIVE_AUDIENCE_RECORD_ATTRIBUTE = "_puripuly_heart_live_audience"
+LIVE_AUDIENCE_BASIC = "basic"
+
+
+def emit_safe_fallback_log(
+    logger: logging.Logger,
+    message: str,
+    *,
+    level: int,
+    live: bool,
+) -> bool:
+    if logger.disabled or not logger.isEnabledFor(level):
+        return False
+    if live:
+        redaction = redact_text_for_sink(message, DIAGNOSTIC_SINK_BASIC_LOGS)
+        rendered = (
+            redaction.text
+            if redaction.status == DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED
+            and redaction.text is not None
+            else DIAGNOSTIC_REDACTION_MARKER
+        )
+        extra = {LIVE_AUDIENCE_RECORD_ATTRIBUTE: LIVE_AUDIENCE_BASIC}
+    else:
+        level_name = logging.getLevelName(level)
+        rendered = (
+            "[Logging] diagnostic_delivery_failed "
+            f"level={str(level_name).replace(' ', '_')} "
+            f"message_len={len(message)} "
+            f"message_sha256={hashlib.sha256(message.encode('utf-8', errors='replace')).hexdigest()[:16]}"
+        )
+        extra = None
+    try:
+        record = logger.makeRecord(
+            logger.name,
+            level,
+            fn="",
+            lno=0,
+            msg=rendered,
+            args=(),
+            exc_info=None,
+            extra=extra,
+        )
+        if not logger.filter(record):
+            return False
+    except Exception:
+        return False
+    return _deliver_record(logger, record)
+
+
+def _deliver_record(logger: logging.Logger, record: logging.LogRecord) -> bool:
+    delivered = False
+    current: logging.Logger | None = logger
+    while current is not None:
+        for handler in tuple(current.handlers):
+            if record.levelno < handler.level:
+                continue
+            try:
+                result = handler.handle(record)
+                delivered = result is not False or delivered
+            except Exception:
+                pass
+        if not current.propagate:
+            break
+        current = current.parent
+    return delivered
 
 
 class RuntimeLoggingAdapterPort(Protocol):
-    mode: SessionLoggingMode
     log_file: Path
-
-    def set_mode(self, mode: SessionLoggingMode | str) -> None: ...
 
     def attach_realtime_sink(self, sink: RealtimeLogSink) -> None: ...
 
@@ -27,9 +92,9 @@ class RuntimeLoggingAdapterPort(Protocol):
 
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None: ...
 
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool: ...
+    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool: ...
 
-    def emit_detailed_lazy(
+    def emit_diagnostic_lazy(
         self,
         build_message: Callable[[], str],
         *,
@@ -98,7 +163,6 @@ class RuntimeLoggingService:
         self._session = session_service if session_service is not None else session_factory()
         self._fallback_logger = fallback_logger
         self._closed = False
-        self._mode = self._session.mode
 
     @property
     def owner_name(self) -> str:
@@ -107,12 +171,6 @@ class RuntimeLoggingService:
     @property
     def is_closed(self) -> bool:
         return self._closed
-
-    @property
-    def mode(self) -> SessionLoggingMode:
-        if not self._closed:
-            self._mode = self._session.mode
-        return self._mode
 
     @property
     def log_file(self) -> Path:
@@ -126,12 +184,6 @@ class RuntimeLoggingService:
             "shutdown_policy": self.shutdown_policy,
             "late_callback_rule": self.late_callback_rule,
         }
-
-    def set_mode(self, mode: SessionLoggingMode | str) -> None:
-        self._mode = SessionLoggingMode(mode)
-        if self._closed:
-            return
-        self._session.set_mode(self._mode)
 
     def attach_realtime_sink(self, sink: RealtimeLogSink) -> None:
         if self._closed:
@@ -147,28 +199,39 @@ class RuntimeLoggingService:
         if self._closed:
             self._emit_fallback(message, level=level)
             return
-        self._session.emit_basic(message, level=level)
+        try:
+            self._session.emit_basic(message, level=level)
+        except Exception:
+            self._emit_delivery_fallback(message, level=level, live=True)
 
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
-        if self.mode is not SessionLoggingMode.DETAILED:
-            return False
+    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool:
         if self._closed:
-            self._emit_fallback(message, level=level)
-            return True
-        return self._session.emit_detailed(message, level=level)
+            return self._emit_fallback(message, level=level)
+        try:
+            return self._session.emit_diagnostic(message, level=level)
+        except Exception:
+            return self._emit_delivery_fallback(message, level=level, live=False)
 
-    def emit_detailed_lazy(
+    def emit_diagnostic_lazy(
         self,
         build_message: Callable[[], str],
         *,
         level: int = logging.INFO,
     ) -> bool:
-        if self.mode is not SessionLoggingMode.DETAILED:
-            return False
+        rendered: str | None = None
+
+        def render() -> str:
+            nonlocal rendered
+            if rendered is None:
+                rendered = build_message()
+            return rendered
+
         if self._closed:
-            self._emit_fallback(build_message(), level=level)
-            return True
-        return self._session.emit_detailed_lazy(build_message, level=level)
+            return self._emit_fallback(render(), level=level)
+        try:
+            return self._session.emit_diagnostic_lazy(render, level=level)
+        except Exception:
+            return self._emit_delivery_fallback(render(), level=level, live=False)
 
     def emit_persisted(self, message: str, *, level: int = logging.INFO) -> None:
         if self._closed:
@@ -224,7 +287,6 @@ class RuntimeLoggingService:
             close_failures.append(exc)
         finally:
             self._closed = True
-            self._mode = self._session.mode
 
         if close_failures:
             self._emit_close_failure_diagnostic(close_failures)
@@ -245,28 +307,45 @@ class RuntimeLoggingService:
     def _close_session_as_logging_owner(self) -> None:
         self._session.close_terminal_owner()
 
+    def _emit_delivery_fallback(self, message: str, *, level: int, live: bool) -> bool:
+        if self._fallback_logger is None:
+            return False
+        return emit_safe_fallback_log(
+            self._fallback_logger,
+            message,
+            level=level,
+            live=live,
+        )
+
     def _emit_fallback(
         self,
         message: str,
         *,
         level: int,
         message_is_safe: bool = False,
-    ) -> None:
+    ) -> bool:
         fallback_message = (
             message if message_is_safe else _format_late_log_fallback(message, level=level)
         )
-        if self._emit_to_fallback_logger(fallback_message, level=level):
-            return
+        if self._emit_to_fallback_logger(fallback_message, level=level, live=False):
+            return True
         stream = getattr(sys, "stderr", None)
         if stream is None:
-            return
+            return False
         try:
             stream.write(f"{logging.getLevelName(level)}: {fallback_message}\n")
             stream.flush()
         except Exception:
-            pass
+            return False
+        return True
 
-    def _emit_to_fallback_logger(self, message: str, *, level: int) -> bool:
+    def _emit_to_fallback_logger(
+        self,
+        message: str,
+        *,
+        level: int,
+        live: bool,
+    ) -> bool:
         if self._fallback_logger is None:
             return False
         try:
@@ -280,6 +359,7 @@ class RuntimeLoggingService:
                 msg=message,
                 args=(),
                 exc_info=None,
+                extra=({LIVE_AUDIENCE_RECORD_ATTRIBUTE: LIVE_AUDIENCE_BASIC} if live else None),
             )
             if not self._fallback_logger.filter(record):
                 return False
@@ -287,14 +367,19 @@ class RuntimeLoggingService:
             return False
 
         emitted = False
-        for handler in list(self._fallback_logger.handlers):
-            if level < handler.level:
-                continue
-            try:
-                handler.handle(record)
-                emitted = True
-            except Exception:
-                pass
+        current: logging.Logger | None = self._fallback_logger
+        while current is not None:
+            for handler in list(current.handlers):
+                if level < handler.level:
+                    continue
+                try:
+                    result = handler.handle(record)
+                    emitted = result is not False or emitted
+                except Exception:
+                    pass
+            if not current.propagate:
+                break
+            current = current.parent
         return emitted
 
 

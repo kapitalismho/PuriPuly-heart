@@ -388,9 +388,9 @@ Each generation owns its tasks and shutdown. Python owns caption lifetime; nativ
 | --- | --- |
 | `SessionRuntimeLoggingService` | Shared console, local file, and Logs view delivery |
 | Translation owners | Accepted SELF/PEER source and target records |
-| Overlay owners | Child logging modes and bounded failure evidence |
+| Overlay owners | Bounded failure evidence and reliable lifecycle warnings |
 
-Basic records outcomes; Detailed adds context. Conversation text uses a secret-protected path; technical diagnostics remain metadata-only. Delivery and retention are bounded, with explicit loss reporting.
+Basic-audience records are the only records delivered live to the console and Logs view. Accepted SELF/PEER conversation records, concise valid recognition RTF, VAD/SmartTurn activity, and useful latency outcomes are Basic. Selected technical diagnostics are file-only and metadata-only. The UTF-8 runtime file is written by one bounded-queue owner in batches, rotates at a 20 MiB record boundary with one backup, and flushes priority records promptly. A record larger than the file cap is rejected before file formatting when possible and counted in terminal loss evidence; queue pressure, failed or stalled I/O, forced termination, and ordinary buffered writes can also prevent complete persistence. File flush does not imply `fsync`.
 
 ## Lifecycle
 

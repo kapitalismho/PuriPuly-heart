@@ -28,10 +28,7 @@ pub(crate) struct PendingSpatialReanchor {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum SpatialDiagnostic {
-    Info(String),
-    Warning(String),
-}
+pub(crate) struct SpatialDiagnostic(pub(crate) String);
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(crate) struct SpatialReanchorPolicy {
@@ -68,23 +65,16 @@ impl SpatialReanchorPolicy {
             seen_turn_ids,
             pending_reanchor: None,
         };
-        let mut diagnostics = vec![SpatialDiagnostic::Info(format!(
-            "spatial_lock_mode_entered revision={}",
-            snapshot.revision
-        ))];
+        let mut diagnostics = Vec::new();
         if total_turns > state.seen_turn_ids.len() {
-            diagnostics.push(SpatialDiagnostic::Warning(format!(
+            diagnostics.push(SpatialDiagnostic(format!(
                 "spatial_turn_identity_capacity_reached retained={} rejected={}",
                 state.seen_turn_ids.len(),
                 total_turns - state.seen_turn_ids.len()
             )));
         }
         if !state.seen_turn_ids.is_empty() {
-            state.request_reanchor(
-                SpatialReanchorReason::InitialVisible,
-                snapshot.revision,
-                &mut diagnostics,
-            );
+            state.request_reanchor(SpatialReanchorReason::InitialVisible, snapshot.revision);
         }
         (state, SpatialPolicyResult { diagnostics })
     }
@@ -101,26 +91,14 @@ impl SpatialReanchorPolicy {
             (false, true) => {
                 self.active = true;
                 self.seen_turn_ids = drawable_turn_ids(snapshot);
-                diagnostics.push(SpatialDiagnostic::Info(format!(
-                    "spatial_lock_mode_entered revision={}",
-                    snapshot.revision
-                )));
                 if !self.seen_turn_ids.is_empty() {
-                    self.request_reanchor(
-                        SpatialReanchorReason::ModeEntered,
-                        snapshot.revision,
-                        &mut diagnostics,
-                    );
+                    self.request_reanchor(SpatialReanchorReason::ModeEntered, snapshot.revision);
                 }
             }
             (true, false) => {
                 self.active = false;
                 self.seen_turn_ids.clear();
                 self.pending_reanchor = None;
-                diagnostics.push(SpatialDiagnostic::Info(format!(
-                    "spatial_lock_mode_exited revision={}",
-                    snapshot.revision
-                )));
             }
             (true, true) => {
                 let frontiers = snapshot
@@ -153,7 +131,7 @@ impl SpatialReanchorPolicy {
                 self.seen_turn_ids
                     .extend(unseen.iter().take(admitted).cloned());
                 if unseen.len() > admitted {
-                    diagnostics.push(SpatialDiagnostic::Warning(format!(
+                    diagnostics.push(SpatialDiagnostic(format!(
                         "spatial_turn_identity_capacity_reached retained={} rejected={}",
                         self.seen_turn_ids.len(),
                         unseen.len() - admitted
@@ -173,19 +151,14 @@ impl SpatialReanchorPolicy {
                     None
                 };
                 if let Some(reason) = reason {
-                    self.request_reanchor(reason, snapshot.revision, &mut diagnostics);
+                    self.request_reanchor(reason, snapshot.revision);
                 }
             }
         }
         SpatialPolicyResult { diagnostics }
     }
 
-    fn request_reanchor(
-        &mut self,
-        reason: SpatialReanchorReason,
-        revision: u64,
-        diagnostics: &mut Vec<SpatialDiagnostic>,
-    ) {
+    fn request_reanchor(&mut self, reason: SpatialReanchorReason, revision: u64) {
         if self.pending_reanchor.is_some() {
             return;
         }
@@ -193,10 +166,6 @@ impl SpatialReanchorPolicy {
             reason,
             requested_revision: revision,
         });
-        diagnostics.push(SpatialDiagnostic::Info(format!(
-            "spatial_reanchor_requested reason={} revision={revision}",
-            reason.as_str()
-        )));
     }
 
     pub(crate) fn pending(&self) -> Option<PendingSpatialReanchor> {

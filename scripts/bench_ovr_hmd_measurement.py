@@ -614,13 +614,13 @@ async def run_measurement(
     diagnostics = OverlayDiagnosticsRecorder(
         overlay_instance_id=overlay_instance_id,
         diagnostics_dir=diagnostics_dir,
-        logging_mode="detailed",
+        capture_measurements=True,
     )
     runtime.attach_diagnostics(diagnostics)
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
         diagnostics=diagnostics,
-        runtime_log_detailed=None,
+        runtime_log_diagnostic=None,
         show_translation=True,
         show_peer_original=True,
         translation_enabled=True,
@@ -635,7 +635,6 @@ async def run_measurement(
         overlay_instance_id=overlay_instance_id,
         runtime_generation=1,
         diagnostics=diagnostics,
-        runtime_logging_mode="detailed",
         desktop_runtime_controls_enabled=False,
         task_factory=runtime.create_child_task,
     )
@@ -672,7 +671,6 @@ async def run_measurement(
                 log_dir=str(diagnostics_dir),
                 startup_timeout_ms=15000,
                 overlay_instance_id=overlay_instance_id,
-                logging_mode="detailed",
                 quiet_tail_profile="p05",
                 handoff_experiment=arm,
                 diagnostics_dir=diagnostics_dir,

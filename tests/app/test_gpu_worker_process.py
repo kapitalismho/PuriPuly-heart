@@ -145,7 +145,7 @@ async def test_started_decode_failure_has_event_and_finite_exact_timing(
     await client.close()
 
 
-async def test_started_decode_failure_logs_captured_worker_stderr(
+async def test_started_decode_failure_logs_metadata_without_worker_stderr_payload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
@@ -168,8 +168,9 @@ async def test_started_decode_failure_logs_captured_worker_stderr(
 
     failure_log = next(message for message in caplog.messages if "[GPUWorker][Failure]" in message)
     assert "failure_code=decode_failure" in failure_log
-    assert "request_id=stderr-decode-failure" in failure_log
-    assert "native decoder rejected peer frame: invalid token state" in failure_log
+    assert "stderr_line_count=1" in failure_log
+    assert "stderr-decode-failure" not in failure_log
+    assert "invalid token state" not in failure_log
     await client.close()
 
 

@@ -60,7 +60,6 @@ from puripuly_heart.core.overlay.manifest import (
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
     OverlayLaunchManifest,
-    normalize_overlay_logging_mode,
 )
 from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationBlock as OverlayPresentationBlock,
@@ -443,7 +442,6 @@ _REQUIRED_MANIFEST_STRING_FIELDS = {
     "locale",
     "log_dir",
     "log_level",
-    "logging_mode",
     "overlay_instance_id",
     "session_token",
 }
@@ -567,37 +565,12 @@ class RendererDiagnosticPort(Protocol):
 
 
 @dataclass(slots=True)
-class DetailedRendererDiagnosticPort:
-    logging_mode: str
-    event_sink: LifecycleSink | None = None
-    overlay_instance_id: str | None = None
+class DisabledRendererDiagnosticPort:
     closed: bool = False
     requires_commit_acknowledgement: bool = False
 
-    def set_logging_mode(self, mode: object) -> bool:
-        try:
-            self.logging_mode = normalize_overlay_logging_mode(mode)
-        except Exception:
-            return False
-        return True
-
     async def emit(self, envelope: RendererDiagnosticEnvelope) -> None:
-        if self.closed or self.logging_mode != "detailed":
-            return
-        if self.event_sink is None or self.overlay_instance_id is None:
-            print(
-                f"[overlay][DIAG] [DesktopOverlay] {json.dumps(dict(envelope.record), sort_keys=True)}",
-                flush=True,
-            )
-            return
-        await self.event_sink.emit(
-            {
-                "type": "desktop_renderer_diagnostic",
-                "overlay_instance_id": self.overlay_instance_id,
-                "runtime_generation": 1,
-                "record": dict(envelope.record),
-            }
-        )
+        _ = envelope
 
     async def close(self) -> None:
         self.closed = True
@@ -805,7 +778,6 @@ class FletDesktopRendererWindow:
         app_runner: FletAppRunner | None = None,
         event_sink: OverlayEventSink | None = None,
         locale: str | None = None,
-        logging_mode: str = "basic",
         bounds_debounce_s: float = 0.15,
         startup_timeout_s: float = DESKTOP_OVERLAY_RENDERER_STARTUP_TIMEOUT_S,
         wait_until_ready_timeout_s: float = DESKTOP_OVERLAY_WAIT_UNTIL_READY_TIMEOUT_S,
@@ -853,7 +825,6 @@ class FletDesktopRendererWindow:
         self._window_process_info_provider = window_process_info_provider
         self._event_sink = event_sink
         self._locale = locale
-        self._logging_mode = normalize_overlay_logging_mode(logging_mode)
         self._bounds_debounce_s = max(0.0, float(bounds_debounce_s))
         self._startup_timeout_s = max(0.1, float(startup_timeout_s))
         self._wait_until_ready_timeout_s = max(0.1, float(wait_until_ready_timeout_s))
@@ -925,11 +896,6 @@ class FletDesktopRendererWindow:
         residual: list[dict[str, object]] = []
         for payload in payloads:
             command = payload.get("command")
-            if command is None and "logging_mode" in payload:
-                if self._set_logging_mode(payload.get("logging_mode")):
-                    continue
-                residual.append(payload)
-                continue
             if command == "set_interaction_mode":
                 continue
             if command == "apply_visual_config":
@@ -1081,9 +1047,7 @@ class FletDesktopRendererWindow:
     async def dispatch_snapshot(self, snapshot: OverlayPresentationSnapshot) -> None:
         if snapshot.revision <= self._last_snapshot_revision:
             return
-        self._emit_detailed_log(
-            f"snapshot_update revision={snapshot.revision} blocks={len(snapshot.blocks)}"
-        )
+
         self._snapshot = snapshot
         self._last_snapshot_revision = snapshot.revision
         self._render_page()
@@ -1149,9 +1113,6 @@ class FletDesktopRendererWindow:
         }
 
     async def dispatch_runtime_control(self, payload: dict[str, object]) -> None:
-        if "logging_mode" in payload and payload.get("command") is None:
-            self._set_logging_mode(payload.get("logging_mode"))
-            return
         command = payload.get("command")
         if command == "set_interaction_mode":
             mode = payload.get("mode")
@@ -1165,11 +1126,7 @@ class FletDesktopRendererWindow:
             if bounds is None:
                 logger.warning("[DesktopOverlay] Ignoring invalid window bounds control")
                 return
-            self._emit_detailed_log(
-                "runtime_control command=apply_window_bounds "
-                f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-                f"height={bounds['height']}"
-            )
+
             await self._cancel_bounds_sample()
             self._apply_window_bounds(bounds)
             return
@@ -1179,13 +1136,7 @@ class FletDesktopRendererWindow:
                 logger.warning("[DesktopOverlay] Ignoring invalid visual config control")
                 return
             self._visual_state = visual_state
-            self._emit_detailed_log(
-                "runtime_control command=apply_visual_config "
-                f"text_scale={visual_state.text_scale} "
-                f"background_alpha={visual_state.background_alpha} "
-                f"outline_width={visual_state.outline_width} "
-                f"swap_caption_languages={visual_state.swap_caption_languages}"
-            )
+
             self._render_page()
             return
         logger.warning("[DesktopOverlay] Ignoring unsupported desktop runtime control: %r", command)
@@ -1295,8 +1246,6 @@ class FletDesktopRendererWindow:
     def _record_process_lifecycle(self, event: str, fields: dict[str, object]) -> None:
         if self._structured_lifecycle_trace_enabled:
             _emit_desktop_lifecycle_trace("flet_view_process", event, fields)
-        details = " ".join(f"{key}={value}" for key, value in sorted(fields.items()))
-        self._emit_detailed_log(f"flet_process event={event} {details}".rstrip())
 
     def _record_startup_lifecycle(self, event: str, fields: dict[str, object]) -> None:
         if self._structured_lifecycle_trace_enabled:
@@ -1305,8 +1254,6 @@ class FletDesktopRendererWindow:
                 event,
                 {"geometry_authority": "flet", **fields},
             )
-        details = " ".join(f"{key}={value}" for key, value in sorted(fields.items()))
-        self._emit_detailed_log(f"startup event={event} {details}".rstrip())
 
     def _bind_window_z_order_process(self) -> None:
         provider = self._window_process_info_provider
@@ -1337,9 +1284,6 @@ class FletDesktopRendererWindow:
         self._bound_owner_pid = owner_pid
         self._bound_pid_file_pid = pid_file_pid
         self._bound_endpoint_identity = self._owner_endpoint_identity()
-        self._emit_detailed_log(
-            f"window_process_bound source=owner pid={owner_pid} pid_file_pid={pid_file_pid}"
-        )
 
     def _owner_process_pid(self) -> int | None:
         owner = self._view_process_owner
@@ -1475,9 +1419,7 @@ class FletDesktopRendererWindow:
             visual_state=self._visual_state,
             interaction_mode=self._interaction_mode,
         )
-        previous_width_floors = dict(self._caption_card_width_floor_by_block)
         plan = self._plan_with_grow_only_caption_card_widths(raw_plan)
-        self._emit_caption_width_diagnostics(raw_plan, plan, previous_width_floors)
         if self._interaction_mode == _DESKTOP_INTERACTION_MODE_EDIT:
             content_kind = (
                 "drag_area_with_empty_lock_action"
@@ -1486,17 +1428,7 @@ class FletDesktopRendererWindow:
             )
         else:
             content_kind = "caption_surface" if plan.surface_visible else "transparent_host"
-        self._emit_detailed_log(
-            "render "
-            f"revision={self._snapshot.revision} "
-            f"blocks={len(self._snapshot.blocks)} "
-            f"interaction_mode={self._interaction_mode} "
-            f"surface_visible={plan.surface_visible} "
-            f"line_count={len(plan.lines)} "
-            f"content_kind={content_kind} "
-            f"window={plan.window_width}x{plan.window_height} "
-            f"background_alpha={plan.background_alpha}"
-        )
+
         self._emit_render_transition(
             _DesktopRenderTrace(
                 content_kind=content_kind,
@@ -1567,10 +1499,7 @@ class FletDesktopRendererWindow:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._emit_detailed_log(
-                "window_bounds_confirmation "
-                f"reason=port_error exception_type={type(exc).__name__}"
-            )
+
             if self._window_z_order_required:
                 logger.warning(
                     "[DesktopOverlay] Desktop overlay window bounds confirmation failed: "
@@ -1587,13 +1516,7 @@ class FletDesktopRendererWindow:
                     ),
                 ) from exc
             return None
-        self._emit_detailed_log(
-            "window_bounds_confirmation "
-            f"reason={result.reason} confirmed={result.confirmed} "
-            f"title_confirmed={result.title_confirmed} "
-            f"bounds_confirmed={result.bounds_confirmed} "
-            f"win32_error={result.win32_error}"
-        )
+
         if self._window_z_order_required and not result.confirmed:
             reason = self._classify_bounds_confirmation(result)
             raise DesktopOverlayStartupError(
@@ -1632,10 +1555,7 @@ class FletDesktopRendererWindow:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._emit_detailed_log(
-                "window_visibility_confirmation "
-                f"reason=port_error exception_type={type(exc).__name__}"
-            )
+
             if self._window_z_order_required:
                 logger.warning(
                     "[DesktopOverlay] Desktop overlay window visibility confirmation failed: "
@@ -1652,14 +1572,7 @@ class FletDesktopRendererWindow:
                     ),
                 ) from exc
             return None
-        self._emit_detailed_log(
-            "window_visibility_confirmation "
-            f"reason={result.reason} confirmed={result.confirmed} "
-            f"title_confirmed={result.title_confirmed} "
-            f"visible_confirmed={result.visible_confirmed} "
-            f"bounds_confirmed={result.bounds_confirmed} "
-            f"win32_error={result.win32_error}"
-        )
+
         if self._window_z_order_required and not result.confirmed:
             reason, drift = self._classify_visibility_confirmation(result)
             raise DesktopOverlayStartupError(
@@ -1724,7 +1637,7 @@ class FletDesktopRendererWindow:
             "first_visible",
             canonical_bounds=dict(self._startup_window_bounds or {}),
         )
-        self._emit_detailed_log(f"first_visible generation={generation}")
+
         sink = self._event_sink
         if sink is None:
             return
@@ -2176,51 +2089,11 @@ class FletDesktopRendererWindow:
             lines=tuple(line for slot in grown_slots for line in slot.lines),
         )
 
-    def _emit_caption_width_diagnostics(
-        self,
-        raw_plan: DesktopCaptionPlan,
-        applied_plan: DesktopCaptionPlan,
-        previous_width_floors: dict[tuple[str, str, int], float],
-    ) -> None:
-        if self._logging_mode != "detailed":
-            return
-        raw_slots_by_key = {_caption_card_width_memory_key(slot): slot for slot in raw_plan.slots}
-        for slot_index, slot in enumerate(applied_plan.slots):
-            key = _caption_card_width_memory_key(slot)
-            raw_slot = raw_slots_by_key.get(key)
-            if raw_slot is None:
-                continue
-            previous_floor = previous_width_floors.get(key, 0.0)
-            floor_hit = slot.card_width > raw_slot.card_width + 0.01
-            self._emit_detailed_log(
-                "render_width "
-                f"revision={self._snapshot.revision} "
-                f"slot={slot_index} "
-                f"raw_card_width={raw_slot.card_width:.1f} "
-                f"applied_card_width={slot.card_width:.1f} "
-                f"raw_text_width={raw_slot.card_text_width:.1f} "
-                f"applied_text_width={slot.card_text_width:.1f} "
-                f"previous_floor={previous_floor:.1f} "
-                f"floor_hit={floor_hit} "
-                f"line_count={len(slot.lines)}"
-            )
-
     def _emit_render_transition(self, trace: _DesktopRenderTrace) -> None:
         previous = self._last_render_trace
         self._last_render_trace = trace
         if previous is None:
             return
-        self._emit_detailed_log(
-            "render_transition "
-            f"revision={self._snapshot.revision} "
-            f"content_kind {previous.content_kind}->{trace.content_kind} "
-            f"surface_visible {previous.surface_visible}->{trace.surface_visible} "
-            f"slot_count {previous.slot_count}->{trace.slot_count} "
-            f"line_count {previous.line_count}->{trace.line_count} "
-            f"window {previous.window_width}x{previous.window_height}->"
-            f"{trace.window_width}x{trace.window_height} "
-            f"background_alpha {previous.background_alpha:.3f}->{trace.background_alpha:.3f}"
-        )
 
     def _preview_visual_state(self) -> DesktopCaptionVisualState:
         return DesktopCaptionVisualState(
@@ -2244,14 +2117,13 @@ class FletDesktopRendererWindow:
                 return
             if mode == self._interaction_mode:
                 return
-            previous_mode = self._interaction_mode
             self._interaction_mode = mode
             self._interaction_generation += 1
             generation = self._interaction_generation
             await self._cancel_window_z_order_task()
             if self._closed.is_set():
                 return
-            self._emit_detailed_log(f"interaction_mode {previous_mode}->{mode}")
+
             self._apply_interaction_window_chrome()
             self._render_page()
             if mode == _DESKTOP_INTERACTION_MODE_PASS_THROUGH:
@@ -2274,9 +2146,7 @@ class FletDesktopRendererWindow:
         except Exception as exc:
             if not self._window_z_order_result_is_current(generation):
                 return
-            self._emit_detailed_log(
-                f"topmost_reassert reason=port_error exception_type={type(exc).__name__}"
-            )
+
             if self._window_z_order_required:
                 logger.warning(
                     "[DesktopOverlay] Topmost z-order re-assertion failed: "
@@ -2286,13 +2156,7 @@ class FletDesktopRendererWindow:
         else:
             if not self._window_z_order_result_is_current(generation):
                 return
-            self._emit_detailed_log(
-                "topmost_reassert "
-                f"reason={result.reason} applied={result.applied} "
-                f"click_through_confirmed={result.click_through_confirmed} "
-                f"topmost_style_present={result.topmost_style_present} "
-                f"win32_error={result.win32_error}"
-            )
+
             if self._window_z_order_required and not result.applied:
                 logger.warning(
                     "[DesktopOverlay] Topmost z-order re-assertion failed: "
@@ -2327,11 +2191,7 @@ class FletDesktopRendererWindow:
             return
         if _page_window_size_differs_from_bounds(page, bounds):
             self._caption_card_width_floor_by_block.clear()
-        self._emit_detailed_log(
-            "apply_window_bounds "
-            f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-            f"height={bounds['height']}"
-        )
+
         self._apply_window_bounds_without_rerender(bounds)
         self._track_programmatic_bounds(bounds)
         self._render_page()
@@ -2353,18 +2213,12 @@ class FletDesktopRendererWindow:
             return
         coordinator = self._startup_coordinator
         if coordinator is None or not coordinator.ready:
-            self._emit_detailed_log("bounds_sample dropped reason=startup_not_ready")
+
             return
         generation = coordinator.generation
-        self._emit_detailed_log(
-            f"window_event type={getattr(event, 'type', getattr(event, 'data', None))} "
-            f"interaction_mode={self._interaction_mode}"
-        )
+
         if self._interaction_mode != _DESKTOP_INTERACTION_MODE_EDIT:
-            self._emit_detailed_log(
-                "bounds_sample dropped reason=event_interaction_mode "
-                f"interaction_mode={self._interaction_mode}"
-            )
+
             return
 
         async def schedule_bounds_sample() -> None:
@@ -2378,9 +2232,7 @@ class FletDesktopRendererWindow:
         await self._cancel_bounds_sample()
         if not self._startup_generation_is_ready(generation):
             return
-        self._emit_detailed_log(
-            f"bounds_sample scheduled interaction_mode={self._interaction_mode}"
-        )
+
         self._bounds_sample_task = asyncio.create_task(
             self._emit_debounced_bounds_sample(generation)
         )
@@ -2401,37 +2253,20 @@ class FletDesktopRendererWindow:
             return
         bounds = _sample_page_window_bounds(self._page)
         if bounds is None:
-            self._emit_detailed_log("bounds_sample dropped reason=no_bounds")
+
             return
         signature = _bounds_signature(bounds)
         if self._is_programmatic_bounds_echo(signature, generation):
-            self._emit_detailed_log(
-                "bounds_sample dropped reason=programmatic_echo "
-                f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-                f"height={bounds['height']}"
-            )
+
             return
         if self._interaction_mode != _DESKTOP_INTERACTION_MODE_EDIT:
-            self._emit_detailed_log(
-                "bounds_sample dropped reason=interaction_mode "
-                f"interaction_mode={self._interaction_mode} "
-                f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-                f"height={bounds['height']}"
-            )
+
             return
         if signature == self._last_reported_bounds:
-            self._emit_detailed_log(
-                "bounds_sample dropped reason=unchanged "
-                f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-                f"height={bounds['height']}"
-            )
+
             return
         self._last_reported_bounds = signature
-        self._emit_detailed_log(
-            "bounds_sample emitted source=user persist=True "
-            f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-            f"height={bounds['height']}"
-        )
+
         await self._emit_overlay_event(
             {
                 "event": "window_bounds_changed",
@@ -2462,20 +2297,6 @@ class FletDesktopRendererWindow:
         if self._event_sink is None:
             return
         await self._event_sink({"type": "overlay_event", "payload": payload})
-
-    def _set_logging_mode(self, mode: object) -> bool:
-        try:
-            normalized_mode = normalize_overlay_logging_mode(mode)
-        except Exception:
-            return False
-        self._logging_mode = normalized_mode
-        self._emit_detailed_log(f"logging_mode mode={normalized_mode}")
-        return True
-
-    def _emit_detailed_log(self, message: str) -> None:
-        if self._logging_mode != "detailed":
-            return
-        print(f"[overlay][DIAG] [DesktopOverlay] {message}", flush=True)
 
     def _track_programmatic_bounds(self, bounds: Mapping[str, int | float]) -> None:
         coordinator = self._startup_coordinator
@@ -2919,18 +2740,13 @@ class DesktopOverlayRenderer:
         self.window = window or FletDesktopRendererWindow(
             event_sink=self._emit_lifecycle,
             locale=manifest.locale,
-            logging_mode=manifest.logging_mode,
             overlay_instance_id=manifest.overlay_instance_id,
         )
         if isinstance(self.window, FletDesktopRendererWindow):
             if self.window._overlay_instance_id is None:
                 self.window._overlay_instance_id = manifest.overlay_instance_id
         self.parent_monitor = parent_monitor or create_parent_monitor(manifest.parent_pid)
-        self.diagnostic_port = diagnostic_port or DetailedRendererDiagnosticPort(
-            logging_mode=manifest.logging_mode,
-            event_sink=self.lifecycle_sink,
-            overlay_instance_id=manifest.overlay_instance_id,
-        )
+        self.diagnostic_port = diagnostic_port or DisabledRendererDiagnosticPort()
         self._diagnostic_ingress_gate = diagnostic_ingress_gate
         self._shutdown_event = asyncio.Event()
         self._shutdown_lock = asyncio.Lock()
@@ -2939,8 +2755,6 @@ class DesktopOverlayRenderer:
         self._tasks: set[asyncio.Task[_RuntimeOutcome | None]] = set()
         self._ui_queue: asyncio.Queue[tuple[str, object]] = asyncio.Queue()
         self._last_accepted_snapshot_revision = -1
-        self._logging_mode_revision = 0
-        self._logging_mode = normalize_overlay_logging_mode(manifest.logging_mode)
 
     @property
     def is_shutdown(self) -> bool:
@@ -3008,8 +2822,6 @@ class DesktopOverlayRenderer:
             ready_event["capabilities"] = {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
             }
-            ready_event["logging_mode"] = self._logging_mode
-            ready_event["logging_mode_revision"] = self._logging_mode_revision
             startup_generation = getattr(self.window, "startup_generation", 0)
             if isinstance(startup_generation, int) and startup_generation > 0:
                 ready_event["generation"] = startup_generation
@@ -3324,40 +3136,7 @@ class DesktopOverlayRenderer:
                 return _RuntimeOutcome(_RUNTIME_FAILURE_EXIT_CODE)
 
     async def _apply_runtime_control(self, payload: dict[str, object]) -> None:
-        if "logging_mode" not in payload or payload.get("command") is not None:
-            await self.window.dispatch_runtime_control(payload)
-            return
-        try:
-            mode = normalize_overlay_logging_mode(payload.get("logging_mode"))
-        except Exception:
-            await self._emit_runtime_error("runtime_control_invalid")
-            return
-        revision = payload.get("logging_mode_revision", self._logging_mode_revision + 1)
-        if type(revision) is not int or revision < 0:
-            await self._emit_runtime_error("runtime_control_invalid")
-            return
-        if revision <= self._logging_mode_revision:
-            await self._emit_logging_mode_status()
-            return
-        set_mode = getattr(self.diagnostic_port, "set_logging_mode", None)
-        if not callable(set_mode) or not set_mode(mode):
-            await self._emit_runtime_error("runtime_control_invalid")
-            return
         await self.window.dispatch_runtime_control(payload)
-        self._logging_mode = mode
-        self._logging_mode_revision = revision
-        await self._emit_logging_mode_status()
-
-    async def _emit_logging_mode_status(self) -> None:
-        await self.lifecycle_sink.emit(
-            {
-                "type": "logging_mode_status",
-                "overlay_instance_id": self.manifest.overlay_instance_id,
-                "runtime_generation": 1,
-                "logging_mode": self._logging_mode,
-                "logging_mode_revision": self._logging_mode_revision,
-            }
-        )
 
     async def _dispatch_pending_snapshot_batch(
         self,
@@ -3704,21 +3483,6 @@ def _parse_runtime_control_payload(message: dict[str, object]) -> dict[str, obje
     payload = message.get("payload")
     if not isinstance(payload, dict):
         return None
-    if "logging_mode" in payload:
-        allowed = {"logging_mode", "logging_mode_revision"}
-        if (
-            set(payload) - allowed
-            or not isinstance(payload.get("logging_mode"), str)
-            or (
-                "logging_mode_revision" in payload
-                and (
-                    type(payload.get("logging_mode_revision")) is not int
-                    or int(payload["logging_mode_revision"]) < 0
-                )
-            )
-        ):
-            return None
-        return dict(payload)
     command = payload.get("command")
     if not isinstance(command, str) or not command:
         return None

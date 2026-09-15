@@ -4,7 +4,6 @@ import logging
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import Enum
 from types import MappingProxyType
 from typing import Final, Literal, Protocol
 
@@ -13,7 +12,7 @@ from puripuly_heart.core.messages import (
     CONTENT_POLICY_RAW_USER_TEXT_ALLOWED,
     DIAGNOSTIC_CATEGORY_UNKNOWN,
     DIAGNOSTIC_VISIBILITY_BASIC,
-    DIAGNOSTIC_VISIBILITY_DETAILED,
+    DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
     SEVERITY_INFO,
     ContentPolicy,
     DiagnosticCategory,
@@ -37,11 +36,6 @@ PROVIDER_OBSERVATION_OUTCOMES: Final[tuple[ProviderObservationOutcome, ...]] = (
 )
 
 ConversationRecordChannel = Literal["self", "peer"]
-
-
-class SessionLoggingMode(str, Enum):
-    BASIC = "basic"
-    DETAILED = "detailed"
 
 
 class RealtimeLogSink(Protocol):
@@ -106,7 +100,7 @@ class ProviderObservationEvent:
     fields: Mapping[str, DiagnosticFieldValue]
     category: DiagnosticCategory = DIAGNOSTIC_CATEGORY_UNKNOWN
     severity: Severity = SEVERITY_INFO
-    visibility: DiagnosticVisibility = DIAGNOSTIC_VISIBILITY_DETAILED
+    visibility: DiagnosticVisibility = DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY
     content_policy: ContentPolicy = CONTENT_POLICY_METADATA_ONLY
 
     def __post_init__(self) -> None:
@@ -192,5 +186,4 @@ __all__ = [
     "RealtimeLogSink",
     "RuntimeLogEvent",
     "RuntimeLogSink",
-    "SessionLoggingMode",
 ]

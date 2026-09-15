@@ -139,7 +139,7 @@ class DashboardView(ft.Column):
         )
         self.on_language_change: Callable[[LanguageSelectionChange], None] | None = None
         self.on_message_input_activity = None
-        self.runtime_log_detailed: Callable[..., bool | None] | None = None
+        self.runtime_log_diagnostic: Callable[..., bool | None] | None = None
 
         self._build_ui()
 
@@ -746,7 +746,7 @@ class DashboardView(ft.Column):
             text,
             is_error=is_error,
             font_family=font_family,
-            runtime_log_detailed=self.runtime_log_detailed,
+            runtime_log_diagnostic=self.runtime_log_diagnostic,
             update_id=update_id,
             origin_wall_clock_ms=origin_wall_clock_ms,
             utterance_id=utterance_id,
@@ -778,7 +778,7 @@ class DashboardView(ft.Column):
         self.display_card.set_display_translation(
             text,
             font_family=font_family,
-            runtime_log_detailed=self.runtime_log_detailed,
+            runtime_log_diagnostic=self.runtime_log_diagnostic,
             update_id=update_id,
             origin_wall_clock_ms=origin_wall_clock_ms,
             utterance_id=utterance_id,

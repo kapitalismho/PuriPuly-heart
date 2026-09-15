@@ -20,7 +20,7 @@ def _owner_with_logs() -> tuple[
     effects: list[LocalASRDiagnosticsGpuEffect] = []
     owner = LocalASRDiagnosticsOwner(
         basic_log_sink=lambda message, level: basic.append((message, level)),
-        detailed_log_sink=lambda message: detailed.append(message),
+        diagnostic_log_sink=lambda message: detailed.append(message),
         gpu_effect_sink=effects.append,
         gpu_discovery_origin_provider=lambda: "settings",
         gpu_provider_id="local_qwen_gpu",
@@ -59,6 +59,32 @@ def test_local_asr_load_result_is_basic_and_bounded() -> None:
             logging.ERROR,
         ),
     ]
+
+
+def test_local_asr_load_result_omits_unmeasured_timings() -> None:
+    owner, basic, _detailed, _effects = _owner_with_logs()
+
+    owner.provider_runtime_diagnostic(
+        ProviderRuntimeDiagnostic(
+            event="activation_failed",
+            channel="self",
+            model_id="qwen-gpu",
+            outcome="failed",
+            failure_code="activation_failed",
+        )
+    )
+    owner.transition_diagnostic(
+        {
+            "channel": "peer",
+            "actual_provider": "local_qwen",
+            "model_id": "qwen",
+            "outcome": "applied",
+        }
+    )
+
+    assert len(basic) == 2
+    assert all("load_seconds" not in message for message, _level in basic)
+    assert all("warmup_seconds" not in message for message, _level in basic)
 
 
 def test_cpu_transition_promotes_only_terminal_load_results_to_basic() -> None:
@@ -173,9 +199,8 @@ def test_gpu_decode_attempt_logs_rtf_in_basic_mode() -> None:
     assert len(detailed) == 1
     assert basic == [
         (
-            "[LocalASR][Attempt] channel=self model=qwen-gpu backend=Vulkan "
-            "audio_seconds=2.000 decode_seconds=0.250 rtf=0.125000 "
-            "result=success queue_wait_seconds=0.031",
+            "[Self · Recognition] · Audio 2.00 s · Decode 0.25 s · "
+            "RTF 0.125 · Result success · Queue 0.03 s",
             logging.INFO,
         )
     ]

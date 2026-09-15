@@ -714,7 +714,7 @@ class TranslationRequestOwner:
                 self.diagnostics.emit(
                     RuntimeDiagnostic(
                         message=(
-                            "[Detailed][Translation] secondary_prestart_provider_started "
+                            "[Diagnostic][Translation] secondary_prestart_provider_started "
                             "parent_utterance_id=%s target_index=%s target_language=%s "
                             "provider_generation=%s"
                         ),
@@ -724,7 +724,7 @@ class TranslationRequestOwner:
                             request.target_language,
                             generation,
                         ),
-                        detailed=True,
+                        diagnostic_only=True,
                     )
                 )
             try:
@@ -747,7 +747,7 @@ class TranslationRequestOwner:
                         self.diagnostics.emit(
                             RuntimeDiagnostic(
                                 message=(
-                                    "[Detailed][Translation] secondary_prestart_provider_finished "
+                                    "[Diagnostic][Translation] secondary_prestart_provider_finished "
                                     "parent_utterance_id=%s target_index=%s target_language=%s "
                                     "provider_generation=%s elapsed_ms=%s"
                                 ),
@@ -758,7 +758,7 @@ class TranslationRequestOwner:
                                     generation,
                                     int((self.clock.now() - provider_started_at) * 1000),
                                 ),
-                                detailed=True,
+                                diagnostic_only=True,
                             )
                         )
             except Exception:

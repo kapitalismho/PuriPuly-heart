@@ -194,7 +194,7 @@ def _application_owner(
         sync_effective_flags=lambda: None,
         sync_local_notice=lambda: None,
         log_basic=lambda _message: None,
-        log_detailed=lambda _message, _level: None,
+        log_diagnostic=lambda _message, _level: None,
     )
 
 

@@ -206,7 +206,7 @@ def build_gui_process_retry_action(
         disclosure_sink=lambda: None,
         superseded_sink=lambda: None,
         log_basic=lambda _message: None,
-        log_detailed=lambda _message: None,
+        log_diagnostic=lambda _message: None,
         log_failure=lambda _message: None,
     )
     owner.bind_runtime(runtime)

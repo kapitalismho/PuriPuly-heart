@@ -61,23 +61,19 @@ class ApplicationRuntimeLoggingStub:
     def __init__(self, backend: object) -> None:
         self._backend = backend
 
-    @property
-    def mode(self) -> str:
-        return str(getattr(self._backend, "runtime_logging_mode", "basic"))
-
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
         sink = getattr(self._backend, "log_basic", None)
         if callable(sink):
             sink(message, level=level)
 
-    def emit_detailed(
+    def emit_diagnostic(
         self,
         message: str,
         *,
         level: int = logging.INFO,
         exception: BaseException | None = None,
     ) -> bool:
-        sink = getattr(self._backend, "log_detailed", None)
+        sink = getattr(self._backend, "log_diagnostic", None)
         if callable(sink):
             sink(message, level=level)
         return exception is not None
@@ -501,10 +497,7 @@ def compose_test_ui_application_boundary(
         managed=cast(UiManagedRuntimePort, runtime),
         engagement=cast(UiEngagementRuntimePort, runtime),
         diagnostics=cast(UiDiagnosticsRuntimePort, runtime),
-        state=UiApplicationStateOwner(
-            state_runtime,
-            runtime_logging=logging_port,
-        ),
+        state=UiApplicationStateOwner(state_runtime),
         runtime_shutdown=runtime_shutdown or ApplicationRuntimeShutdownStub(backend),
         runtime_logging=logging_port,
         settings_secrets=SettingsSecretsOwner(

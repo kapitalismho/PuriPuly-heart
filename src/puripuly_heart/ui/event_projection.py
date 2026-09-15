@@ -13,7 +13,6 @@ class EventProjectionContext:
     source_language: str | None = None
     target_language: str | None = None
     translation_enabled: bool = False
-    runtime_logging_mode: object | None = None
     stt_state: STTSessionState | None = None
 
 
@@ -134,11 +133,7 @@ class EventProjectionService:
                 source_text_len=len(transcript.text),
                 transcript_kind="final" if is_final else "partial",
                 should_log=should_log,
-                debug_prefix=_visual_debug_prefix(
-                    channel=transcript.channel,
-                    utterance_id=transcript.utterance_id,
-                    runtime_logging_mode=context.runtime_logging_mode,
-                ),
+                debug_prefix=None,
             ),
             history=history,
         )
@@ -162,12 +157,7 @@ class EventProjectionService:
                 source_text_hash=translation.source_text_hash,
                 source_text_len=translation.source_text_len,
                 logical_turn_key=translation.logical_turn_key,
-                debug_prefix=_visual_debug_prefix(
-                    channel=translation.channel,
-                    utterance_id=translation.utterance_id,
-                    update_id=translation.update_id,
-                    runtime_logging_mode=context.runtime_logging_mode,
-                ),
+                debug_prefix=None,
             ),
             history=(
                 HistoryProjection(
@@ -186,29 +176,6 @@ class EventProjectionService:
                 text_len=len(translation.text),
             ),
         )
-
-
-def _visual_debug_prefix(
-    *,
-    channel: str | None,
-    utterance_id: object | None,
-    runtime_logging_mode: object | None,
-    update_id: str | None = None,
-) -> str | None:
-    if channel != "peer" or utterance_id is None:
-        return None
-    mode_value = getattr(runtime_logging_mode, "value", runtime_logging_mode)
-    if mode_value != "detailed":
-        return None
-    turn_token = _short_visual_debug_token(utterance_id)
-    stage_token = _short_visual_debug_token(update_id) if update_id else "src"
-    return f"[P {turn_token}/{stage_token}]"
-
-
-def _short_visual_debug_token(value: object | None) -> str:
-    text = "" if value is None else str(value).strip()
-    normalized = "".join(char for char in text if char.isalnum())
-    return (normalized[:4] or "none").lower()
 
 
 __all__ = [

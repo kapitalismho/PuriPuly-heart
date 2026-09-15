@@ -436,10 +436,6 @@ pub trait OverlayFrameSubmitter {
         Vec::new()
     }
 
-    fn take_visibility_api_call_log(&mut self) -> Option<String> {
-        None
-    }
-
     fn sample_frame_timing(&self) -> Option<FrameTimingSample> {
         None
     }
@@ -501,7 +497,6 @@ pub struct FakeOpenVr {
     visible: Cell<bool>,
     observed_visible: Cell<Option<bool>>,
     pending_events: RefCell<VecDeque<OpenVrRuntimeEvent>>,
-    last_visibility_api_call_log: RefCell<Option<String>>,
 }
 
 impl FakeOpenVr {
@@ -578,10 +573,6 @@ impl OverlayFrameSubmitter for OpenVrOverlay {
 
     fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
         self.backend.poll_runtime_events(max_events)
-    }
-
-    fn take_visibility_api_call_log(&mut self) -> Option<String> {
-        self.backend.take_visibility_api_call_log()
     }
 
     fn sample_frame_timing(&self) -> Option<FrameTimingSample> {
@@ -719,15 +710,6 @@ impl OpenVrBackend {
         }
     }
 
-    fn take_visibility_api_call_log(&mut self) -> Option<String> {
-        match self {
-            #[cfg(windows)]
-            Self::Windows(openvr) => openvr.take_visibility_api_call_log(),
-            #[cfg(not(windows))]
-            Self::Test(openvr) => openvr.take_visibility_api_call_log(),
-        }
-    }
-
     fn display_refresh_rate_hz(&self) -> Option<f32> {
         match self {
             #[cfg(windows)]
@@ -755,7 +737,6 @@ struct WindowsOpenVrOverlay {
     overlay_handle: openvr_sys::VROverlayHandle_t,
     placement_policy: OverlayPlacementPolicy,
     visible: bool,
-    last_visibility_api_call_log: Option<String>,
     output_adapter: OpenVrOutputAdapter,
 }
 
@@ -783,7 +764,6 @@ impl WindowsOpenVrOverlay {
             overlay_handle,
             placement_policy: OverlayPlacementPolicy::default(),
             visible: false,
-            last_visibility_api_call_log: None,
             output_adapter,
         };
         instance.configure_overlay()?;
@@ -901,23 +881,11 @@ impl WindowsOpenVrOverlay {
     }
 
     fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
-        let cached_visible_before = self.visible;
         let actual_visible = self.observed_overlay_visible();
         if actual_visible.unwrap_or(self.visible) == visible {
             self.visible = actual_visible.unwrap_or(visible);
-            self.last_visibility_api_call_log = Some(format_openvr_visibility_api_call_log(
-                visible,
-                cached_visible_before,
-                "SkipCachedMatch",
-                self.visible,
-            ));
             return Ok(());
         }
-        let api = if visible {
-            "ShowOverlay"
-        } else {
-            "HideOverlay"
-        };
         if visible {
             self.show_overlay()?;
         } else {
@@ -927,17 +895,7 @@ impl WindowsOpenVrOverlay {
         if let Some(actual_visible) = self.observed_overlay_visible() {
             self.visible = actual_visible;
         }
-        self.last_visibility_api_call_log = Some(format_openvr_visibility_api_call_log(
-            visible,
-            cached_visible_before,
-            api,
-            self.visible,
-        ));
         Ok(())
-    }
-
-    fn take_visibility_api_call_log(&mut self) -> Option<String> {
-        self.last_visibility_api_call_log.take()
     }
 
     fn display_refresh_rate_hz(&self) -> Option<f32> {
@@ -1174,31 +1132,21 @@ impl OverlayFrameSubmitter for FakeOpenVr {
     }
 
     fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
-        let cached_visible_before = self.visible.get();
         let actual_visible = self
             .observed_overlay_visible()
-            .unwrap_or(cached_visible_before);
-        let api = if actual_visible == visible {
-            "SkipCachedMatch"
-        } else if visible {
-            "ShowOverlay"
-        } else {
-            "HideOverlay"
-        };
+            .unwrap_or_else(|| self.visible.get());
         if actual_visible != visible {
+            let api = if visible {
+                "ShowOverlay"
+            } else {
+                "HideOverlay"
+            };
             self.last_call.replace(Some(api.to_string()));
             self.visible.set(visible);
             self.observed_visible.set(Some(visible));
         } else {
             self.visible.set(visible);
         }
-        self.last_visibility_api_call_log
-            .replace(Some(format_openvr_visibility_api_call_log(
-                visible,
-                cached_visible_before,
-                api,
-                self.visible.get(),
-            )));
         Ok(())
     }
 
@@ -1221,25 +1169,6 @@ impl OverlayFrameSubmitter for FakeOpenVr {
         }
         events
     }
-
-    fn take_visibility_api_call_log(&mut self) -> Option<String> {
-        self.last_visibility_api_call_log.borrow_mut().take()
-    }
-}
-
-pub(crate) fn format_openvr_visibility_api_call_log(
-    desired_visible: bool,
-    cached_visible_before: bool,
-    api: &str,
-    cached_visible_after: bool,
-) -> String {
-    format!(
-        "openvr_overlay_visibility_api_call desired_visible={} cached_visible_before={} api={} cached_visible_after={}",
-        desired_visible,
-        cached_visible_before,
-        api,
-        cached_visible_after,
-    )
 }
 
 #[cfg(windows)]
@@ -1884,49 +1813,6 @@ mod tests {
         );
     }
 
-    fn visibility_fields(log: &str) -> Vec<(&str, &str)> {
-        log.split(' ')
-            .filter_map(|part| part.split_once('='))
-            .collect()
-    }
-
-    #[test]
-    fn fake_openvr_visibility_diagnostic_reports_show_and_skip_cached_match() {
-        let mut openvr = FakeOpenVr::default();
-
-        openvr.set_overlay_visible(true).expect("show overlay");
-        assert_eq!(openvr.last_call().as_deref(), Some("ShowOverlay"));
-        let show_log = openvr
-            .take_visibility_api_call_log()
-            .expect("show visibility log");
-        assert_eq!(
-            visibility_fields(&show_log),
-            [
-                ("desired_visible", "true"),
-                ("cached_visible_before", "false"),
-                ("api", "ShowOverlay"),
-                ("cached_visible_after", "true"),
-            ]
-        );
-
-        openvr
-            .set_overlay_visible(true)
-            .expect("skip cached visibility match");
-        assert_eq!(openvr.last_call().as_deref(), Some("ShowOverlay"));
-        let skip_log = openvr
-            .take_visibility_api_call_log()
-            .expect("skip visibility log");
-        assert_eq!(
-            visibility_fields(&skip_log),
-            [
-                ("desired_visible", "true"),
-                ("cached_visible_before", "true"),
-                ("api", "SkipCachedMatch"),
-                ("cached_visible_after", "true"),
-            ]
-        );
-    }
-
     #[test]
     fn fake_openvr_reasserts_show_when_cached_visible_but_actual_hidden() {
         let mut openvr = FakeOpenVr::default();
@@ -1937,18 +1823,6 @@ mod tests {
             .set_overlay_visible(true)
             .expect("reassert show overlay");
         assert_eq!(openvr.last_call().as_deref(), Some("ShowOverlay"));
-        let log = openvr
-            .take_visibility_api_call_log()
-            .expect("reassert visibility log");
-        assert_eq!(
-            visibility_fields(&log),
-            [
-                ("desired_visible", "true"),
-                ("cached_visible_before", "true"),
-                ("api", "ShowOverlay"),
-                ("cached_visible_after", "true"),
-            ]
-        );
         assert_eq!(openvr.observed_overlay_visible(), Some(true));
     }
 

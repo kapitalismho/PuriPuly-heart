@@ -50,9 +50,6 @@ class _FakeManagedProcess:
     def attach_lifecycle_sink(self, sink: object | None) -> None:
         return None
 
-    def set_logging_mode(self, mode: str) -> None:
-        return None
-
 
 class _FakeRunner:
     def __init__(self, process: _FakeManagedProcess) -> None:

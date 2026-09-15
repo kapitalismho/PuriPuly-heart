@@ -17,7 +17,6 @@ from puripuly_heart.core.messages import (
     DIAGNOSTIC_CATEGORY_NETWORK,
     DIAGNOSTIC_CATEGORY_UNKNOWN,
     DIAGNOSTIC_VISIBILITY_BASIC,
-    DIAGNOSTIC_VISIBILITY_DETAILED,
     DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
     SEVERITY_ERROR,
     SEVERITY_INFO,
@@ -33,7 +32,6 @@ from puripuly_heart.core.observability import (
 )
 from puripuly_heart.core.output.models import OutputRoutingDecision
 from puripuly_heart.core.runtime_logging import (
-    SessionLoggingMode,
     SessionRuntimeLoggingService,
     configure_main_logging,
 )
@@ -243,14 +241,14 @@ def test_configure_main_logging_reused_handlers_get_millisecond_resolution_forma
 
     try:
         assert sinks.stream_handler is existing_stream
-        assert sinks.file_handler is existing_file
+        assert sinks.file_handler is not existing_file
         assert re.fullmatch(
             r"\d{2}:\d{2}:\d{2}\.123 \[INFO\] test\.runtime: hello",
             _format_with_handler(existing_stream),
         )
         assert re.fullmatch(
             r"\d{2}:\d{2}:\d{2}\.123 \[INFO\] test\.runtime: hello",
-            _format_with_handler(existing_file),
+            _format_with_handler(sinks.file_handler),
         )
     finally:
         sinks.close()
@@ -320,10 +318,13 @@ def test_configured_main_logging_drops_exception_and_stack_details_before_live_a
         root_logger.error("stack-only failure breadcrumb", stack_info=True)
         _wait_for_log_text(sinks.log_file, "stack-only failure breadcrumb")
 
-        combined = stream.getvalue() + sinks.log_file.read_text(encoding="utf-8")
-        assert "ordinary safe exception-neighbor message" in combined
-        assert "provider call failed safely" in combined
-        assert "stack-only failure breadcrumb" in combined
+        live = stream.getvalue()
+        persisted = sinks.log_file.read_text(encoding="utf-8")
+        combined = live + persisted
+        assert live == ""
+        assert "ordinary safe exception-neighbor message" in persisted
+        assert "provider call failed safely" in persisted
+        assert "stack-only failure breadcrumb" in persisted
         assert "exception-provider-secret" not in combined
         assert "exception-token-secret" not in combined
         assert "provider_response_body" not in combined
@@ -368,10 +369,13 @@ def test_session_runtime_logging_redacts_direct_records_with_injected_sinks(tmp_
         session_logger.error("session stack breadcrumb", stack_info=True)
         file_handler.flush()
 
-        combined = stream.getvalue() + log_file.read_text(encoding="utf-8")
-        assert "ordinary safe injected direct record" in combined
-        assert "session exception breadcrumb" in combined
-        assert "session stack breadcrumb" in combined
+        live = stream.getvalue()
+        persisted = log_file.read_text(encoding="utf-8")
+        combined = live + persisted
+        assert live == ""
+        assert "ordinary safe injected direct record" in persisted
+        assert "session exception breadcrumb" in persisted
+        assert "session stack breadcrumb" in persisted
         assert "injected-root-secret" not in combined
         assert "injected-exception-secret" not in combined
         assert "provider_response_body" not in combined
@@ -394,7 +398,7 @@ def test_configure_main_logging_uses_bounded_rotation_policy(tmp_path) -> None:
 
     try:
         assert isinstance(sinks.file_handler, RotatingFileHandler)
-        assert sinks.file_handler.maxBytes == 10 * 1024 * 1024
+        assert sinks.file_handler.maxBytes == 20 * 1024 * 1024
         assert sinks.file_handler.backupCount == 1
     finally:
         sinks.close()
@@ -631,6 +635,32 @@ def test_file_listener_survives_handler_exceptions(tmp_path) -> None:
         sinks.close()
 
 
+def test_failed_batched_write_is_accounted_and_close_reports_failure(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.write.failure.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    file_handler = sinks.file_handler
+    original_write = file_handler._write_pending
+
+    def fail_write(_pending: list[str]) -> None:
+        raise OSError("injected stream failure")
+
+    monkeypatch.setattr(file_handler, "_write_pending", fail_write)
+    root_logger.warning("persisted sentinel")
+    _wait_until(lambda: file_handler.delivery_failures == 1)
+    monkeypatch.setattr(file_handler, "_write_pending", original_write)
+
+    with pytest.raises(RuntimeError, match="Runtime logging file delivery failed"):
+        sinks.close(force=True)
+
+    persisted = sinks.log_file.read_text(encoding="utf-8")
+    assert "persisted sentinel" not in persisted
+    assert "delivery_failures=1" in persisted
+
+
 def test_emit_persisted_delivers_through_file_queue(tmp_path) -> None:
     root_logger = logging.getLogger(f"test.runtime_logging.persisted.{uuid4()}")
     root_logger.handlers.clear()
@@ -680,40 +710,54 @@ def test_emit_persisted_preserves_queued_record_order_before_direct_write(tmp_pa
         sinks.close()
 
 
-def test_technical_redactor_removes_url_userinfo_from_arbitrary_logger_names() -> None:
+def test_arbitrary_child_error_is_file_only_while_explicit_basic_is_live(tmp_path) -> None:
     stream = io.StringIO()
-    stream_handler = logging.StreamHandler(stream)
-    stream_handler.setFormatter(logging.Formatter("%(message)s"))
-    root_logger = logging.getLogger(f"test.runtime_logging.url-userinfo.{uuid4()}")
+    root_logger = logging.getLogger(f"test.runtime_logging.audience.{uuid4()}")
     root_logger.handlers.clear()
     root_logger.propagate = False
-    root_logger.setLevel(logging.INFO)
-    session_logger = logging.getLogger(f"{root_logger.name}.session")
-    session_logger.handlers.clear()
-    session_logger.propagate = False
-    runtime_logging = SessionRuntimeLoggingService(
-        root_logger=root_logger,
-        session_logger=session_logger,
-        sinks=_SharedSinkBundle(
-            stream_handler=stream_handler,
-            file_handler=logging.NullHandler(),
-            log_file="runtime.log",
-        ),
-    )
-    third_party_logger = logging.getLogger(f"{root_logger.name}.websocket-client")
-    third_party_logger.handlers.clear()
-    third_party_logger.propagate = True
-    third_party_logger.setLevel(logging.INFO)
+    root_logger.addHandler(logging.StreamHandler(stream))
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    runtime_logging = SessionRuntimeLoggingService(root_logger=root_logger, sinks=sinks)
+    child_logger = logging.getLogger(f"{root_logger.name}.provider")
+    child_logger.handlers.clear()
+    child_logger.propagate = True
+    child_logger.setLevel(logging.INFO)
 
     try:
-        third_party_logger.error("connection failed wss://alice:super-secret@example.test/socket")
+        child_logger.error("provider_response_body=private-child-body")
+        child_logger.error(r"cache_path=C:\Users\Alice\private\model.bin")
+        runtime_logging.emit_basic("[Translation] The service request failed.", level=logging.ERROR)
+        _wait_for_log_text(sinks.log_file, "service request failed")
 
-        rendered = stream.getvalue()
-        assert "connection failed" in rendered
-        assert "alice:super-secret" not in rendered
-        assert "wss://[redacted]@example.test/socket" in rendered
+        live = stream.getvalue()
+        persisted = sinks.log_file.read_text(encoding="utf-8")
+        assert "private-child-body" not in live
+        assert "provider_response_body" not in live
+        assert "service request failed" in live
+        assert "private-child-body" not in persisted
+        assert "Alice" not in persisted
+        assert "private\\model.bin" not in persisted
+        assert "service request failed" in persisted
     finally:
         runtime_logging.close()
+        sinks.close()
+
+
+def test_oversized_record_is_rejected_with_bounded_accounting(tmp_path) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.oversized.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+
+    root_logger.info("x" * (20 * 1024 * 1024 + 1))
+    started = time.monotonic()
+    sinks.close(force=True)
+    elapsed = time.monotonic() - started
+
+    persisted = sinks.log_file.read_text(encoding="utf-8")
+    assert elapsed < 2.0
+    assert "oversized_rejected=1" in persisted
+    assert "xxxxxxxxxxxxxxxx" not in persisted
 
 
 def test_session_runtime_logging_redacts_unsafe_legacy_text_before_live_and_persisted_sinks(
@@ -751,8 +795,7 @@ def test_session_runtime_logging_redacts_unsafe_legacy_text_before_live_and_pers
     try:
         runtime_logging.emit_basic("ordinary safe line")
         runtime_logging.emit_basic(unsafe_text, level=logging.ERROR)
-        runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-        runtime_logging.emit_detailed(unsafe_text, level=logging.WARNING)
+        runtime_logging.emit_diagnostic(unsafe_text, level=logging.WARNING)
         runtime_logging.emit_persisted(unsafe_text, level=logging.ERROR)
         file_handler.flush()
 
@@ -851,8 +894,7 @@ def test_session_runtime_logging_redacts_token_assignment_variants_before_sinks(
 
     try:
         runtime_logging.emit_basic(unsafe_text, level=logging.ERROR)
-        runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-        runtime_logging.emit_detailed(unsafe_text, level=logging.WARNING)
+        runtime_logging.emit_diagnostic(unsafe_text, level=logging.WARNING)
         runtime_logging.emit_persisted(unsafe_text, level=logging.ERROR)
         file_handler.flush()
 
@@ -885,28 +927,19 @@ def test_configure_main_logging_reconfigures_after_close(tmp_path) -> None:
         second.close()
 
 
-def test_emit_detailed_lazy_checks_mode_before_formatting() -> None:
+def test_emit_diagnostic_lazy_formats_for_file_audience_only() -> None:
     runtime_logging, stream = _make_runtime_logging_capture()
     builder_calls = 0
 
     def builder() -> str:
         nonlocal builder_calls
         builder_calls += 1
-        return "lazy detail"
+        return "lazy diagnostic"
 
     try:
-        assert runtime_logging.emit_detailed_lazy(builder) is False
-        assert builder_calls == 0
-        assert stream.getvalue() == ""
-
-        runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-
-        assert runtime_logging.emit_detailed_lazy(builder) is True
+        assert runtime_logging.emit_diagnostic_lazy(builder) is True
         assert builder_calls == 1
-        assert stream.getvalue().splitlines() == [
-            "[Logging] mode_changed requested=detailed effective=detailed previous=basic",
-            "lazy detail",
-        ]
+        assert stream.getvalue() == ""
     finally:
         runtime_logging.close()
 
@@ -933,26 +966,19 @@ async def test_session_runtime_logging_emits_structured_events_without_changing_
 
     try:
         runtime_logging.emit_basic("legacy basic text", level=logging.WARNING)
-        assert runtime_logging.emit_detailed("hidden detailed text") is False
-        runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-        assert runtime_logging.emit_detailed("legacy detailed text", level=logging.ERROR) is True
+        assert runtime_logging.emit_diagnostic("first diagnostic text") is True
+        assert (
+            runtime_logging.emit_diagnostic("second diagnostic text", level=logging.ERROR) is True
+        )
         runtime_logging.emit_persisted("legacy persisted text", level=logging.ERROR)
         await runner.drain()
 
-        assert stream.getvalue().splitlines() == [
-            "legacy basic text",
-            "[Logging] mode_changed requested=detailed effective=detailed previous=basic",
-            "legacy detailed text",
-        ]
+        assert stream.getvalue().splitlines() == ["legacy basic text"]
         assert [event.visibility for event in sink.runtime_events] == [
             DIAGNOSTIC_VISIBILITY_BASIC,
-            DIAGNOSTIC_VISIBILITY_BASIC,
-            DIAGNOSTIC_VISIBILITY_DETAILED,
         ]
         assert [event.severity for event in sink.runtime_events] == [
             SEVERITY_WARNING,
-            SEVERITY_INFO,
-            SEVERITY_ERROR,
         ]
         for event in sink.runtime_events:
             assert event.category == DIAGNOSTIC_CATEGORY_UNKNOWN
@@ -962,13 +988,11 @@ async def test_session_runtime_logging_emits_structured_events_without_changing_
             assert event.diagnostics is None
             assert event.fields["renderer"] == "legacy_text"
             field_text = repr(dict(event.fields))
-            assert "legacy basic text" not in field_text
-            assert "legacy detailed text" not in field_text
+            assert "first diagnostic text" not in field_text
+            assert "second diagnostic text" not in field_text
 
         assert [event.visibility for event in sink.diagnostic_events] == [
             DIAGNOSTIC_VISIBILITY_BASIC,
-            DIAGNOSTIC_VISIBILITY_BASIC,
-            DIAGNOSTIC_VISIBILITY_DETAILED,
         ]
         persisted = sink.persisted_records[-1]
         assert persisted.storage_key == "runtime.log"
@@ -1088,7 +1112,7 @@ async def test_session_runtime_logging_redacts_diagnostics_before_structured_sin
         operation="translate",
         code="provider.invalid_response",
         category=DIAGNOSTIC_CATEGORY_NETWORK,
-        visibility=DIAGNOSTIC_VISIBILITY_DETAILED,
+        visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
         content_policy="redacted",
         status_code=502,
         retry_after_ms=None,

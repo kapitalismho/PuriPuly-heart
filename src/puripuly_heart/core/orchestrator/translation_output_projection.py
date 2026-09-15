@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections import deque
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -16,7 +15,6 @@ from puripuly_heart.core.orchestrator.context import ContextMode
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
     LatencyStageDiagnostic,
     OverlayEmitDiagnostic,
-    OverlaySinkDurationDiagnostic,
     RuntimeDiagnostic,
     SelfOverlayDecisionDiagnostic,
     TranslationLatencyDiagnosticsOwner,
@@ -756,7 +754,7 @@ class TranslationOutputProjectionOwner:
         self.diagnostics.emit(
             RuntimeDiagnostic(
                 message=(
-                    "[Detailed][Translation] translation_turn_admitted "
+                    "[Diagnostic][Translation] translation_turn_admitted "
                     "parent_utterance_id=%s turn_generation=%s turn_order=%s "
                     "target_indexes=%s target_languages=%s target_count=%s "
                     "presentation_revision=0"
@@ -769,7 +767,7 @@ class TranslationOutputProjectionOwner:
                     aggregate.configured_targets,
                     len(aggregate.configured_targets),
                 ),
-                detailed=True,
+                diagnostic_only=True,
             )
         )
         return True
@@ -1049,7 +1047,7 @@ class TranslationOutputProjectionOwner:
                 message="[Translation] OSC disclosure enqueue: channel=peer text_len=%s",
                 args=(len(text),),
                 fallback_level=logging.INFO,
-                detailed=True,
+                diagnostic_only=True,
             )
         )
         return self.output_runtime.publish_system_disclosure_chatbox(text=text)
@@ -1250,8 +1248,6 @@ class TranslationOutputProjectionOwner:
     ) -> None:
         if not self.has_overlay_destination:
             return
-        detailed_mode = self.diagnostics.detailed_enabled
-        start = time.perf_counter() if detailed_mode else 0.0
         result = await self.output_runtime.publish_overlay_event(
             event,
             publication_generation=publication_generation,
@@ -1269,17 +1265,6 @@ class TranslationOutputProjectionOwner:
                 result.decision.metadata.get("error_type", "Exception")
             )
             return
-        if detailed_mode and result.decision.decision == "published":
-            elapsed_ms = max(0, int((time.perf_counter() - start) * 1000))
-            self.diagnostics.record_overlay_sink_duration(
-                OverlaySinkDurationDiagnostic(
-                    event_type=type(event).__name__,
-                    channel=getattr(event, "channel", None),
-                    utterance_id=getattr(event, "utterance_id", None),
-                    update_id=getattr(event, "update_id", None),
-                    elapsed_ms=elapsed_ms,
-                )
-            )
 
     async def sync_active_self(
         self,
@@ -1489,7 +1474,7 @@ class TranslationOutputProjectionOwner:
         self.diagnostics.emit(
             RuntimeDiagnostic(
                 message=(
-                    "[Detailed][Translation] translation_target_completed "
+                    "[Diagnostic][Translation] translation_target_completed "
                     "parent_utterance_id=%s turn_generation=%s turn_order=%s "
                     "target_index=%s target_language=%s outcome=%s "
                     "presentation_revision=%s first_success_elapsed_ms=%s "
@@ -1506,7 +1491,7 @@ class TranslationOutputProjectionOwner:
                     first_success_elapsed_ms,
                     all_targets_terminal_elapsed_ms,
                 ),
-                detailed=True,
+                diagnostic_only=True,
             )
         )
         if terminal and self._self_turns.get(child.parent_utterance_id) is aggregate:
@@ -1665,7 +1650,7 @@ class TranslationOutputProjectionOwner:
                 self.diagnostics.emit(
                     RuntimeDiagnostic(
                         message=(
-                            "[Detailed][Translation] %s parent_utterance_id=%s "
+                            "[Diagnostic][Translation] %s parent_utterance_id=%s "
                             "turn_generation=%s turn_order=%s target_indexes=%s "
                             "target_languages=%s revision=%s terminal=%s reason=%s "
                             "first_success_elapsed_ms=%s "
@@ -1694,7 +1679,7 @@ class TranslationOutputProjectionOwner:
                             ),
                             visible_elapsed_ms,
                         ),
-                        detailed=True,
+                        diagnostic_only=True,
                     )
                 )
                 return result
@@ -1703,7 +1688,7 @@ class TranslationOutputProjectionOwner:
             self.diagnostics.emit(
                 RuntimeDiagnostic(
                     message=(
-                        "[Detailed][Translation] %s parent_utterance_id=%s "
+                        "[Diagnostic][Translation] %s parent_utterance_id=%s "
                         "turn_generation=%s turn_order=%s target_indexes=%s "
                         "target_languages=%s revision=%s terminal=%s "
                         "first_success_elapsed_ms=%s all_targets_terminal_elapsed_ms=%s "
@@ -1734,7 +1719,7 @@ class TranslationOutputProjectionOwner:
                             else None
                         ),
                     ),
-                    detailed=True,
+                    diagnostic_only=True,
                 )
             )
             return result
@@ -1785,7 +1770,7 @@ class TranslationOutputProjectionOwner:
         self.diagnostics.emit(
             RuntimeDiagnostic(
                 message=(
-                    "[Detailed][Translation] translation_result_suppressed_stale_turn "
+                    "[Diagnostic][Translation] translation_result_suppressed_stale_turn "
                     "parent_utterance_id=%s turn_generation=%s turn_order=%s "
                     "target_indexes=%s target_languages=%s revision=%s"
                 ),
@@ -1797,7 +1782,7 @@ class TranslationOutputProjectionOwner:
                     target_languages,
                     snapshot.revision,
                 ),
-                detailed=True,
+                diagnostic_only=True,
             )
         )
 
@@ -1809,7 +1794,7 @@ class TranslationOutputProjectionOwner:
         self.diagnostics.emit(
             RuntimeDiagnostic(
                 message=(
-                    "[Detailed][Translation] translation_result_suppressed_stale_turn "
+                    "[Diagnostic][Translation] translation_result_suppressed_stale_turn "
                     "parent_utterance_id=%s turn_generation=%s turn_order=%s "
                     "target_indexes=%s target_languages=%s revision=%s"
                 ),
@@ -1821,7 +1806,7 @@ class TranslationOutputProjectionOwner:
                     (submission.target_language,),
                     presentation_revision,
                 ),
-                detailed=True,
+                diagnostic_only=True,
             )
         )
 
@@ -2516,7 +2501,7 @@ class TranslationOutputProjectionOwner:
                         result.decision.reason,
                     ),
                     fallback_level=logging.INFO,
-                    detailed=True,
+                    diagnostic_only=True,
                 )
             )
             self.diagnostics.abandon_pending_latency_output(
@@ -2543,7 +2528,7 @@ class TranslationOutputProjectionOwner:
                     projection.include_source,
                 ),
                 fallback_level=logging.INFO,
-                detailed=True,
+                diagnostic_only=True,
             )
         )
         await self.publish_ui(
@@ -2577,7 +2562,7 @@ class TranslationOutputProjectionOwner:
                 message="[Translation] OSC enqueue skipped: channel=%s route=%s reason=%s",
                 args=("peer", result.decision.route, result.decision.reason),
                 fallback_level=logging.INFO,
-                detailed=True,
+                diagnostic_only=True,
             )
         )
         self.diagnostics.clear_latency_timeline("peer", utterance_id)

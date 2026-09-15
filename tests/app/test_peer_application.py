@@ -224,7 +224,7 @@ class Harness:
             disclosure_sink=lambda: self.events.append("disclosure"),
             superseded_sink=lambda: self.events.append("superseded"),
             log_basic=lambda message: self.events.append(("basic", message)),
-            log_detailed=lambda message: self.events.append(("detail", message)),
+            log_diagnostic=lambda message: self.events.append(("detail", message)),
             log_failure=lambda message: self.events.append(("failure", message)),
             lifecycle_trace_sink=lambda event, fields: self.lifecycle_traces.append(
                 (event, fields)

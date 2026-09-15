@@ -6,7 +6,7 @@ import pytest
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.about.contract import AboutSurfaceSlots
 from puripuly_heart.ui.about.renderer import ABOUT_ROW_SPACING, compose_about_surface
-from puripuly_heart.ui.logs.contract import LogsIntents, LogsSurfaceSlots
+from puripuly_heart.ui.logs.contract import LogsSurfaceSlots
 from puripuly_heart.ui.logs.renderer import (
     LOGS_CARD_BORDER_RADIUS,
     LOGS_HEADER_BUTTON_SPACING,
@@ -29,7 +29,6 @@ def _slot_controls() -> LogsSurfaceSlots:
     return LogsSurfaceSlots(
         title=ft.Text("title"),
         folder_button=ft.TextButton(content="folder"),
-        mode_button=ft.TextButton(content="mode"),
         conversation_button=ft.TextButton(content="conversation"),
         log_text=ft.Text("log"),
     )
@@ -42,7 +41,6 @@ def test_compose_logs_surface_keeps_the_accepted_geometry_and_slot_order() -> No
     assert regions.header_button_row.spacing == LOGS_HEADER_BUTTON_SPACING
     assert regions.header_button_row.controls == [
         slots.folder_button,
-        slots.mode_button,
         slots.conversation_button,
     ]
     assert regions.card.border_radius == LOGS_CARD_BORDER_RADIUS
@@ -72,21 +70,9 @@ def test_logs_view_production_composition_comes_from_the_renderer() -> None:
     assert card.border_radius == LOGS_CARD_BORDER_RADIUS
     assert view._header_button_row.controls == [
         view._folder_button,
-        view._mode_button,
         view._conversation_button,
     ]
     assert view._log_scroll.controls[0].content is view._log_text
-
-
-def test_logs_view_binds_the_mode_intent_instead_of_an_adhoc_callback() -> None:
-    view = LogsView()
-    received: list[str] = []
-    view.bind_logs_intents(LogsIntents(runtime_logging_mode_change=received.append))
-
-    view._on_mode_button_click(None)
-
-    assert received == ["detailed"]
-    assert view.runtime_logging_mode == "detailed"
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -95,7 +81,7 @@ def test_logs_and_about_surface_structure_is_locale_stable(locale: str) -> None:
 
     logs_view = LogsView()
     assert len(logs_view.controls) == 1
-    assert len(logs_view._header_button_row.controls) == 3
+    assert len(logs_view._header_button_row.controls) == 2
 
     about_view = AboutView()
     assert len(about_view.controls) == 4

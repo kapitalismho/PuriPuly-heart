@@ -127,105 +127,9 @@ async def test_overlay_process_trace_is_monotonic_sanitized_and_included_in_fail
     assert "private subtitle text" not in raw_dump
 
 
-@pytest.mark.asyncio
-async def test_overlay_presenter_bridge_translation_events_are_recorded_and_dumped(
-    tmp_path,
-) -> None:
+def test_overlay_stage_memory_requires_explicit_measurement_capture(tmp_path) -> None:
     recorder = OverlayDiagnosticsRecorder(
-        overlay_instance_id="overlay-stage-trace-test",
-        diagnostics_dir=tmp_path,
-        logging_mode="detailed",
-    )
-
-    presenter_event = recorder.record_presenter(
-        "snapshot_publish",
-        revision=4,
-        block_count=1,
-        text="private overlay text",
-    )
-    removal_event = recorder.record_presenter_removal(
-        entry_key="self:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-    )
-    bridge_event = recorder.record_bridge(
-        "broadcast_finish",
-        revision=4,
-        elapsed_ms=12,
-        transcript="private transcript text",
-    )
-    translation_event = recorder.record_translation(
-        "overlay_emit",
-        event_kind="translation",
-        utterance_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-        secondary_len=18,
-    )
-
-    assert presenter_event["category"] == "presenter"
-    assert presenter_event["revision"] == 4
-    assert removal_event["category"] == "presenter_removal"
-    assert bridge_event["category"] == "bridge"
-    assert translation_event["category"] == "translation"
-    assert "private overlay text" not in json.dumps(presenter_event)
-    assert "private transcript text" not in json.dumps(bridge_event)
-
-    raw_dump = (await _dump_path(recorder, failure_reason="runtime_crashed")).read_text(
-        encoding="utf-8"
-    )
-    assert '"event": "snapshot_publish"' in raw_dump
-    assert '"event": "entry_removed"' in raw_dump
-    assert '"event": "broadcast_finish"' in raw_dump
-    assert '"event": "overlay_emit"' in raw_dump
-    assert "private overlay text" not in raw_dump
-    assert "private transcript text" not in raw_dump
-
-
-@pytest.mark.asyncio
-async def test_overlay_chatbox_stt_and_native_stages_are_dumped_without_payload_text(
-    tmp_path,
-) -> None:
-    recorder = OverlayDiagnosticsRecorder(
-        overlay_instance_id="overlay-gate0-trace-test",
-        diagnostics_dir=tmp_path,
-        logging_mode="detailed",
-    )
-    recorder.record_chatbox(
-        "page_send",
-        utterance_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-        page_index=1,
-        pending_messages=1,
-        oldest_age_s=6.0,
-        text="secret chatbox page",
-    )
-    recorder.record_stt(
-        "stt_enqueue",
-        channel="self",
-        queue_depth=2,
-        oldest_age_s=1.5,
-        transcript="secret stt text",
-    )
-    ingested = recorder.ingest_native_child_line(
-        'presentation_diagnostics [{"stage":"readiness_observed","logical_revision":9,'
-        '"outcome":"timed_out","readiness_us":51000,"observed_runtime_visible":true,'
-        '"desired_visible":true,"physical_hmd_visibility":"not_observable"}]'
-    )
-
-    assert ingested is True
-    raw_dump = (await _dump_path(recorder, failure_reason="runtime_crashed")).read_text(
-        encoding="utf-8"
-    )
-    assert '"category": "chatbox"' in raw_dump
-    assert '"event": "page_send"' in raw_dump
-    assert '"category": "stt"' in raw_dump
-    assert '"event": "stt_enqueue"' in raw_dump
-    assert '"category": "native"' in raw_dump
-    assert '"event": "readiness_observed"' in raw_dump
-    assert '"actual_visibility": "not_queried"' in raw_dump
-    assert "secret chatbox page" not in raw_dump
-    assert "secret stt text" not in raw_dump
-
-
-def test_overlay_stage_memory_is_recorded_only_in_detailed_mode(tmp_path) -> None:
-    recorder = OverlayDiagnosticsRecorder(
-        overlay_instance_id="overlay-stage-mode-test",
+        overlay_instance_id="overlay-stage-disabled",
         diagnostics_dir=tmp_path,
     )
 
@@ -247,51 +151,21 @@ def test_overlay_stage_memory_is_recorded_only_in_detailed_mode(tmp_path) -> Non
     assert list(recorder.stt_events) == []
     assert list(recorder.native_events) == []
 
-    recorder.set_logging_mode("detailed")
-    recorder.record_presenter("snapshot_publish", revision=2)
-    recorder.record_process("overlay_trace", trace_event="bounds_confirmed")
-    assert [event["event"] for event in recorder.presenter_events] == ["snapshot_publish"]
-    assert [event["event"] for event in recorder.process_events] == [
-        "logging_mode_changed",
-        "overlay_trace",
-    ]
-
-    recorder.set_logging_mode("basic")
-    assert [event["event"] for event in recorder.presenter_events] == ["snapshot_publish"]
-    assert [event["event"] for event in recorder.process_events] == [
-        "logging_mode_changed",
-        "overlay_trace",
-        "logging_mode_changed",
-    ]
-    assert recorder.recording_windows[-1]["mode"] == "basic"
-
-
-def test_child_logging_mode_confirmation_is_revision_monotonic() -> None:
-    recorder = OverlayDiagnosticsRecorder(
-        overlay_instance_id="overlay-mode-confirmation",
-        logging_mode="basic",
+    measurement = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-measurement",
+        diagnostics_dir=tmp_path,
+        capture_measurements=True,
     )
-    recorder.set_logging_mode("detailed")
-
-    assert recorder.confirm_child_logging_mode("detailed", mode_revision=1, source="owner_status")
-    assert recorder.logging_mode_update_status == "applied"
-    assert not recorder.confirm_child_logging_mode("basic", mode_revision=1, source="owner_status")
-    assert not recorder.confirm_child_logging_mode(
-        "unknown", mode_revision=2, source="owner_status"
-    )
-    assert recorder.effective_child_logging_mode == "detailed"
-    assert recorder.effective_child_logging_mode_revision == 1
-    summary = recorder.evidence_summary()
-    assert summary["input_rejected"] == {
-        "conflicting_logging_mode_revision": 1,
-        "invalid_logging_mode": 1,
-    }
+    measurement.record_presenter("snapshot_publish", revision=2)
+    measurement.record_process("overlay_trace", trace_event="bounds_confirmed")
+    assert [event["event"] for event in measurement.presenter_events] == ["snapshot_publish"]
+    assert [event["event"] for event in measurement.process_events] == ["overlay_trace"]
 
 
 def test_native_full_batch_preserves_safe_correlation_fields() -> None:
     recorder = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-native-batch",
-        logging_mode="detailed",
+        capture_measurements=True,
     )
     records = [
         {
@@ -330,7 +204,7 @@ def test_native_full_batch_preserves_safe_correlation_fields() -> None:
 def test_native_evidence_distinguishes_real_render_from_successful_rehandoff() -> None:
     recorder = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-evidence",
-        logging_mode="detailed",
+        capture_measurements=True,
     )
     recorder.ingest_native_child_line(
         "presentation_diagnostics "
@@ -365,7 +239,7 @@ def test_native_evidence_distinguishes_real_render_from_successful_rehandoff() -
 def test_measurement_checkpoint_retains_early_phase_after_native_ring_rollover() -> None:
     recorder = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-phase-retention",
-        logging_mode="detailed",
+        capture_measurements=True,
     )
     for sequence in range(8):
         recorder.ingest_native_child_line(
@@ -411,7 +285,7 @@ async def test_repeated_native_loss_samples_use_high_water_and_preclude_complete
     recorder = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-native-loss",
         diagnostics_dir=tmp_path,
-        logging_mode="detailed",
+        capture_measurements=True,
     )
     for sequence, presenter_loss, logger_loss in (
         (1, 11, 2),
@@ -470,7 +344,7 @@ async def test_absent_native_loss_samples_are_unknown_not_zero(tmp_path) -> None
     recorder = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-native-loss-unknown",
         diagnostics_dir=tmp_path,
-        logging_mode="detailed",
+        capture_measurements=True,
     )
     recorder.ingest_native_child_line(
         'presentation_diagnostics [{"sequence":1,"stage":"submission_returned"}]'
@@ -494,7 +368,7 @@ async def test_absent_native_loss_samples_are_unknown_not_zero(tmp_path) -> None
 def test_phase_checkpoint_reports_partial_when_early_records_precede_last_eight() -> None:
     recorder = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-phase-partial",
-        logging_mode="detailed",
+        capture_measurements=True,
     )
     for sequence in range(12):
         recorder.ingest_native_child_line(
@@ -529,9 +403,7 @@ def test_phase_checkpoint_reports_partial_when_early_records_precede_last_eight(
 @pytest.mark.asyncio
 async def test_dump_enforces_line_and_file_bounds_and_reports_loss(tmp_path) -> None:
     recorder = OverlayDiagnosticsRecorder(
-        overlay_instance_id="overlay-bounds",
-        diagnostics_dir=tmp_path,
-        logging_mode="detailed",
+        overlay_instance_id="overlay-bounds", diagnostics_dir=tmp_path
     )
     for index in range(300):
         recorder.record_process("flood", index=index, safe_metadata="x" * 5000)

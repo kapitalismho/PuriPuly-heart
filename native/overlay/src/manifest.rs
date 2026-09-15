@@ -2,7 +2,6 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::logging::OverlayLoggingMode;
 use crate::runtime::StartupError;
 
 pub const QUIET_TAIL_PROFILE_ENV: &str = "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE";
@@ -78,7 +77,7 @@ impl QuietTailProfile {
     }
 }
 
-pub const EXPECTED_CONTRACT_VERSION: u32 = 8;
+pub const EXPECTED_CONTRACT_VERSION: u32 = 9;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct OverlayManifest {
@@ -92,7 +91,6 @@ pub struct OverlayManifest {
     pub log_dir: String,
     pub log_level: String,
     pub locale: String,
-    pub logging_mode: OverlayLoggingMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -108,27 +106,12 @@ struct OverlayManifestSerde {
     log_dir: String,
     log_level: String,
     locale: String,
-    #[serde(default)]
-    logging_mode: Option<OverlayLoggingMode>,
-    #[serde(default)]
-    diagnostics_enabled: Option<bool>,
 }
 
 impl TryFrom<OverlayManifestSerde> for OverlayManifest {
     type Error = StartupError;
 
     fn try_from(raw: OverlayManifestSerde) -> Result<Self, Self::Error> {
-        let logging_mode = match (raw.logging_mode, raw.diagnostics_enabled) {
-            (Some(mode), _) => mode,
-            (None, Some(true)) => OverlayLoggingMode::Detailed,
-            (None, Some(false)) => OverlayLoggingMode::Basic,
-            (None, None) => {
-                return Err(StartupError::Manifest(
-                    "missing field `logging_mode`".to_string(),
-                ))
-            }
-        };
-
         Ok(Self {
             contract_version: raw.contract_version,
             app_version: raw.app_version,
@@ -140,7 +123,6 @@ impl TryFrom<OverlayManifestSerde> for OverlayManifest {
             log_dir: raw.log_dir,
             log_level: raw.log_level,
             locale: raw.locale,
-            logging_mode,
         })
     }
 }

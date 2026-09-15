@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
 LocalASRBasicLogSink = Callable[[str, int], None]
-LocalASRDetailedLogSink = Callable[[str], object]
+LocalASRDiagnosticLogSink = Callable[[str], object]
 LocalASRGpuDiscoveryOriginProvider = Callable[[], str]
 
 
@@ -24,7 +25,7 @@ LocalASRDiagnosticsGpuEffectSink = Callable[[LocalASRDiagnosticsGpuEffect], None
 @dataclass(slots=True)
 class LocalASRDiagnosticsOwner:
     basic_log_sink: LocalASRBasicLogSink = field(repr=False)
-    detailed_log_sink: LocalASRDetailedLogSink = field(repr=False)
+    diagnostic_log_sink: LocalASRDiagnosticLogSink = field(repr=False)
     gpu_effect_sink: LocalASRDiagnosticsGpuEffectSink = field(repr=False)
     gpu_discovery_origin_provider: LocalASRGpuDiscoveryOriginProvider = field(repr=False)
     gpu_provider_id: str
@@ -51,7 +52,7 @@ class LocalASRDiagnosticsOwner:
             value = getattr(diagnostic, name)
             if value is not None:
                 fields.append(f"{name}={value}")
-        self.detailed_log_sink(f"[LocalASR][ProviderRuntime] {' '.join(fields)}")
+        self.diagnostic_log_sink(f"[LocalASR][ProviderRuntime] {' '.join(fields)}")
         if diagnostic.event == "activation_ready":
             self.log_load_result(
                 channel=diagnostic.channel or "unknown",
@@ -59,8 +60,8 @@ class LocalASRDiagnosticsOwner:
                 backend="Vulkan",
                 device=diagnostic.device_id or "unknown",
                 outcome="ready",
-                load_seconds=diagnostic.model_load_seconds or 0.0,
-                warmup_seconds=diagnostic.warmup_seconds or 0.0,
+                load_seconds=diagnostic.model_load_seconds,
+                warmup_seconds=diagnostic.warmup_seconds,
             )
         elif diagnostic.event == "activation_failed":
             self.log_load_result(
@@ -68,7 +69,7 @@ class LocalASRDiagnosticsOwner:
                 model_id=diagnostic.model_id or "unknown",
                 backend="Vulkan",
                 outcome="failed",
-                load_seconds=diagnostic.model_load_seconds or 0.0,
+                load_seconds=diagnostic.model_load_seconds,
                 failure_code=diagnostic.failure_code or "activation_failed",
             )
         elif diagnostic.event == "worker_failed":
@@ -94,27 +95,26 @@ class LocalASRDiagnosticsOwner:
                 "[LocalASR][Worker] backend=Vulkan outcome=recovered utterance_retry=false",
                 logging.INFO,
             )
-        elif diagnostic.event == "decode_attempt" and all(
-            value is not None
-            for value in (
-                diagnostic.audio_seconds,
-                diagnostic.decode_seconds,
-                diagnostic.rtf,
-                diagnostic.queue_wait_seconds,
-            )
+        elif (
+            diagnostic.event == "decode_attempt"
+            and diagnostic.audio_seconds is not None
+            and diagnostic.audio_seconds > 0
+            and diagnostic.decode_seconds is not None
+            and diagnostic.decode_seconds >= 0
+            and diagnostic.rtf is not None
+            and math.isfinite(diagnostic.rtf)
         ):
-            self.basic_log_sink(
-                "[LocalASR][Attempt] "
-                f"channel={diagnostic.channel or 'unknown'} "
-                f"model={diagnostic.model_id or 'unknown'} "
-                "backend=Vulkan "
-                f"audio_seconds={diagnostic.audio_seconds:.3f} "
-                f"decode_seconds={diagnostic.decode_seconds:.3f} "
-                f"rtf={diagnostic.rtf:.6f} "
-                f"result={diagnostic.outcome or 'unknown'} "
-                f"queue_wait_seconds={diagnostic.queue_wait_seconds:.3f}",
-                logging.INFO,
-            )
+            label = "Self" if diagnostic.channel == "self" else "Peer"
+            parts = [
+                f"[{label} · Recognition]",
+                f"Audio {diagnostic.audio_seconds:.2f} s",
+                f"Decode {diagnostic.decode_seconds:.2f} s",
+                f"RTF {diagnostic.rtf:.3f}",
+                f"Result {diagnostic.outcome or 'unknown'}",
+            ]
+            if diagnostic.queue_wait_seconds is not None and diagnostic.queue_wait_seconds >= 0:
+                parts.append(f"Queue {diagnostic.queue_wait_seconds:.2f} s")
+            self.basic_log_sink(" · ".join(parts), logging.INFO)
         if diagnostic.event == "worker_lifecycle" and diagnostic.phase in {
             "validating",
             "loading",
@@ -152,19 +152,25 @@ class LocalASRDiagnosticsOwner:
 
     def transition_diagnostic(self, fields: dict[str, object]) -> None:
         ordered = " ".join(f"{key}={value}" for key, value in fields.items())
-        self.detailed_log_sink(f"[LocalASR][Transition] {ordered}")
+        self.diagnostic_log_sink(f"[LocalASR][Transition] {ordered}")
         actual_provider = str(fields.get("actual_provider") or "")
         if actual_provider == self.gpu_provider_id:
             return
         outcome = str(fields.get("outcome") or "")
         if outcome not in {"applied", "failed"}:
             return
+        load_ms = fields.get("load_ms")
+        load_seconds = (
+            max(0.0, float(load_ms) / 1000.0)
+            if isinstance(load_ms, int | float) and not isinstance(load_ms, bool)
+            else None
+        )
         self.log_load_result(
             channel=str(fields.get("channel") or "unknown"),
             model_id=str(fields.get("model_id") or "unknown"),
             backend="CPU",
             outcome="ready" if outcome == "applied" else "failed",
-            load_seconds=max(0.0, float(fields.get("load_ms") or 0) / 1000.0),
+            load_seconds=load_seconds,
             failure_type=(
                 str(fields["failure_type"]) if fields.get("failure_type") is not None else None
             ),
@@ -177,7 +183,7 @@ class LocalASRDiagnosticsOwner:
         model_id: str,
         backend: str,
         outcome: str,
-        load_seconds: float,
+        load_seconds: float | None,
         failure_type: str | None = None,
         device: str | None = None,
         warmup_seconds: float | None = None,
@@ -190,7 +196,9 @@ class LocalASRDiagnosticsOwner:
         ]
         if device is not None:
             fields.append(f"device={device}")
-        fields.extend((f"outcome={outcome}", f"load_seconds={max(0.0, load_seconds):.3f}"))
+        fields.append(f"outcome={outcome}")
+        if load_seconds is not None:
+            fields.append(f"load_seconds={max(0.0, load_seconds):.3f}")
         if warmup_seconds is not None:
             fields.append(f"warmup_seconds={max(0.0, warmup_seconds):.3f}")
         if failure_type is not None:
@@ -205,7 +213,7 @@ class LocalASRDiagnosticsOwner:
 
 __all__ = [
     "LocalASRBasicLogSink",
-    "LocalASRDetailedLogSink",
+    "LocalASRDiagnosticLogSink",
     "LocalASRDiagnosticsGpuEffect",
     "LocalASRDiagnosticsGpuEffectSink",
     "LocalASRDiagnosticsOwner",

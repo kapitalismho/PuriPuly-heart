@@ -484,7 +484,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         sync_effective_flags=lambda: None,
         sync_local_notice=lambda: None,
         log_basic=lambda _message: None,
-        log_detailed=lambda _message, _level: None,
+        log_diagnostic=lambda _message, _level: None,
     )
     await capture_owner.apply_intent(config_a, enabled=True, explicit_toggle_off=False)
     source = capture_owner.source

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import math
 from collections.abc import Awaitable, Callable
@@ -54,6 +55,7 @@ class ListenDeliveryController:
         emit: ListenOwnedEventSink,
         monotonic_clock: Callable[[], float],
         smart_turn_owner: SmartTurnInferenceOwner | None = None,
+        activity_log: Callable[[str], object] | None = None,
     ) -> None:
         self._vad = vad
         self._ledger = ledger
@@ -61,6 +63,7 @@ class ListenDeliveryController:
         self._monotonic_clock = monotonic_clock
         self._smart_turn_owner = smart_turn_owner or SmartTurnInferenceOwner(clock=monotonic_clock)
         self._owns_smart_turn_owner = smart_turn_owner is None
+        self._activity_log = activity_log
         self._segment_id: UUID | None = None
         self._opened_at_s: float | None = None
         self._pause_samples = 0
@@ -279,6 +282,9 @@ class ListenDeliveryController:
         )
 
     def _log_completion_decision(self, threshold: float | None) -> None:
+        sink = self._activity_log
+        if sink is None:
+            return
         result = self._completion
         reason = "model"
         if result is None:
@@ -292,19 +298,16 @@ class ListenDeliveryController:
         elif result.completed_at_monotonic_s >= result.identity.complete_deadline_monotonic_s:
             reason = "late"
         incomplete = self._completion_boundary_decision == "incomplete"
-        verdict = ("incomplete" if incomplete else "complete") if reason == "model" else "fallback"
-        logger.info(
-            "[STT][Runtime] smart-turn decision segment=%s pause=%s verdict=%s "
-            "score=%s threshold=%s action=%s target_pause_ms=%s reason=%s",
-            self._segment_id,
-            self._pause_id,
-            verdict,
-            result.score if result is not None else None,
-            threshold,
-            "wait" if incomplete else "seal",
-            self.SMART_INCOMPLETE_MS if incomplete else self.SMART_COMPLETE_MS,
-            reason,
-        )
+        if reason == "model":
+            message = (
+                "[Peer · SmartTurn] Continue speaking."
+                if incomplete
+                else "[Peer · SmartTurn] Turn complete."
+            )
+        else:
+            message = f"[Peer · SmartTurn] Decision unavailable ({reason})."
+        with contextlib.suppress(Exception):
+            sink(message)
 
     def _arm_timers(self, segment_id: UUID, opened_at_s: float) -> None:
         self._cancel_timers()

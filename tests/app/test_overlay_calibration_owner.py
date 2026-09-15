@@ -40,7 +40,7 @@ def _owner(
         emit=emit,
         can_persist=can_persist,
         can_emit=can_emit,
-        log_detailed=lambda message, **kwargs: logs.append((message, kwargs)),
+        log_diagnostic=lambda message, **kwargs: logs.append((message, kwargs)),
     )
     return owner, tasks, persisted, emitted, logs
 

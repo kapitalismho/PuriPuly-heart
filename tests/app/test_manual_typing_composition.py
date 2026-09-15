@@ -35,7 +35,7 @@ async def test_composed_manual_typing_owner_uses_injected_self_output_and_comple
         completion_provider=lambda utterance_id: (
             completion if utterance_id == "utterance" else None
         ),
-        log_detailed=detailed.append,
+        log_diagnostic=detailed.append,
         log_error=errors.append,
         idle_timeout_seconds=0.01,
         submit_timeout_seconds=0.1,

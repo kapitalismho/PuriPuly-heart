@@ -71,7 +71,7 @@ class AdapterHarness:
                 preferred_channels=self.preferred_channels,
             ),
             source_factory=self.source_factory,
-            log_detailed=lambda message, level=logging.INFO: self.logs.append((level, message)),
+            log_diagnostic=lambda message, level=logging.INFO: self.logs.append((level, message)),
             wrap_source=self._wrap_source,
         )
 
@@ -187,7 +187,7 @@ def test_adapter_uses_requested_channels_when_source_metadata_is_invalid() -> No
 
 def test_wiring_factory_composes_internal_self_capture_source_adapter() -> None:
     adapter = create_self_capture_source_adapter(
-        log_detailed=lambda *_args, **_kwargs: None,
+        log_diagnostic=lambda *_args, **_kwargs: None,
         wrap_source=lambda source: source,
     )
 

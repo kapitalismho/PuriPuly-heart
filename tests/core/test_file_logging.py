@@ -8,7 +8,6 @@ from logging.handlers import RotatingFileHandler
 from uuid import uuid4
 
 from puripuly_heart.core.runtime_logging import (
-    SessionLoggingMode,
     SessionRuntimeLoggingService,
     configure_main_logging,
 )
@@ -42,7 +41,7 @@ class _RealtimeHandler(logging.Handler):
 def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared_sinks(tmp_path):
     assert "sinks" in inspect.signature(SessionRuntimeLoggingService).parameters
     assert callable(getattr(SessionRuntimeLoggingService, "emit_basic", None))
-    assert callable(getattr(SessionRuntimeLoggingService, "emit_detailed", None))
+    assert callable(getattr(SessionRuntimeLoggingService, "emit_diagnostic", None))
 
     stream = io.StringIO()
     log_file = tmp_path / "main.log"
@@ -75,26 +74,16 @@ def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared
 
     root_logger.info("root info")
     service.emit_basic("basic line")
-    service.emit_detailed("hidden detail")
-    service.set_mode(SessionLoggingMode.DETAILED)
-    service.emit_detailed("visible detail")
-    service.set_mode(SessionLoggingMode.BASIC)
-    service.emit_detailed("hidden after reset")
+    service.emit_diagnostic("first diagnostic")
+    service.emit_diagnostic("second diagnostic")
     service.close()
 
     content = log_file.read_text(encoding="utf-8")
     assert "root info" in content
     assert "basic line" in content
-    assert "visible detail" in content
-    assert "hidden detail" not in content
-    assert "hidden after reset" not in content
-    assert sink.lines == [
-        "root info",
-        "basic line",
-        "[Logging] mode_changed requested=detailed effective=detailed previous=basic",
-        "visible detail",
-        "[Logging] mode_changed requested=basic effective=basic previous=detailed",
-    ]
+    assert "first diagnostic" in content
+    assert "second diagnostic" in content
+    assert sink.lines == ["basic line"]
 
 
 def test_configure_main_logging_reuses_existing_root_stream_handler(tmp_path):

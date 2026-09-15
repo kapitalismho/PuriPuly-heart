@@ -9,7 +9,7 @@ import pytest
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_LIFECYCLE,
-    DIAGNOSTIC_VISIBILITY_DETAILED,
+    DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
     SEVERITY_ERROR,
 )
 from puripuly_heart.core.observability import DiagnosticEvent
@@ -193,7 +193,7 @@ async def test_shutdown_callback_exceptions_emit_bounded_diagnostics_and_later_p
     event = sink.events[0]
     assert event.category == DIAGNOSTIC_CATEGORY_LIFECYCLE
     assert event.severity == SEVERITY_ERROR
-    assert event.visibility == DIAGNOSTIC_VISIBILITY_DETAILED
+    assert event.visibility == DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY
     assert event.content_policy == CONTENT_POLICY_METADATA_ONLY
     assert event.fields == {
         "phase": phase_order[2],

@@ -85,7 +85,7 @@ class PeerApplicationOwner:
     disclosure_sink: PeerApplicationEffect = field(repr=False)
     superseded_sink: PeerApplicationSupersededSink = field(repr=False)
     log_basic: PeerApplicationLogSink = field(repr=False)
-    log_detailed: PeerApplicationLogSink = field(repr=False)
+    log_diagnostic: PeerApplicationLogSink = field(repr=False)
     log_failure: PeerApplicationLogSink = field(repr=False)
     runtime_replace_timeout_s: float = field(
         default=DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS,
@@ -408,7 +408,7 @@ class PeerApplicationOwner:
         self._activation_generation += 1
         generation = self._activation_generation
         self.log_basic(f"[Peer] Toggle request: enabled={enabled}")
-        self.log_detailed(
+        self.log_diagnostic(
             "[Peer] Toggle detail: "
             f"overlay_enabled={state.overlay_intent_enabled} "
             f"overlay_state={state.overlay_state} "
@@ -699,7 +699,7 @@ class PeerApplicationOwner:
             "detail",
             getattr(diagnostic, "process_unavailable_reason", None),
         )
-        self.log_detailed(
+        self.log_diagnostic(
             "[PeerRuntime] "
             f"reason={diagnostic.reason.value} "
             f"capture_kind={diagnostic.capture_kind} "

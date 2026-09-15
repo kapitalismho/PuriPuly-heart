@@ -58,7 +58,6 @@ def _manifest(**overrides: object) -> OverlayLaunchManifest:
         "log_dir": "logs",
         "log_level": "INFO",
         "locale": "en",
-        "logging_mode": "basic",
     }
     values.update(overrides)
     return OverlayLaunchManifest(**values)  # type: ignore[arg-type]
@@ -3315,169 +3314,6 @@ async def test_desktop_overlay_drops_mode_transition_queued_before_close() -> No
 
 
 @pytest.mark.asyncio
-async def test_desktop_overlay_detail_logs_startup_render_and_snapshot_updates(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    app = FakeFletApp()
-    window = desktop_overlay.FletDesktopRendererWindow(
-        app_runner=app.run,
-        event_sink=RecordingLifecycleSink().emit,
-        locale="en",
-        bounds_debounce_s=0.01,
-    )
-    residual = window.prime_startup_runtime_controls(
-        (
-            {"logging_mode": "detailed"},
-            {"command": "set_interaction_mode", "mode": "pass_through"},
-            {
-                "command": "apply_window_bounds",
-                "x": 320,
-                "y": 720,
-                "width": 1344,
-                "height": 320,
-            },
-        )
-    )
-
-    try:
-        assert residual == ()
-        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
-
-        startup_output = capsys.readouterr().out
-        assert "[overlay][DIAG] [DesktopOverlay] render" in startup_output
-        assert "revision=1" in startup_output
-        assert "interaction_mode=edit" in startup_output
-        assert "surface_visible=True" in startup_output
-        assert "line_count=0" in startup_output
-        assert "content_kind=drag_area_with_empty_lock_action" in startup_output
-        assert "window=1344x320" in startup_output
-        assert "bounds_epoch" not in startup_output
-
-        await window.dispatch_runtime_control(
-            {"command": "set_interaction_mode", "mode": "pass_through"}
-        )
-
-        await window.dispatch_snapshot(
-            OverlayPresentationSnapshot(
-                revision=2,
-                blocks=[
-                    _block(
-                        "peer-translated",
-                        channel="peer",
-                        block_variant="finalized",
-                        appearance_seq=1,
-                        primary_text="좋아요",
-                        secondary_text="Sounds good",
-                        secondary_enabled=True,
-                    )
-                ],
-            )
-        )
-
-        update_output = capsys.readouterr().out
-        assert (
-            "[overlay][DIAG] [DesktopOverlay] snapshot_update revision=2 blocks=1" in update_output
-        )
-        assert "[overlay][DIAG] [DesktopOverlay] render" in update_output
-        assert "revision=2" in update_output
-        assert "surface_visible=True" in update_output
-        assert "line_count=2" in update_output
-        assert "content_kind=caption_surface" in update_output
-        assert "bounds_epoch" not in update_output
-
-        await window.dispatch_runtime_control({"logging_mode": "basic"})
-        capsys.readouterr()
-        await window.dispatch_snapshot(OverlayPresentationSnapshot(revision=3, blocks=[]))
-
-        assert capsys.readouterr().out == ""
-    finally:
-        await window.close()
-
-
-@pytest.mark.asyncio
-async def test_desktop_overlay_detail_logs_layout_diagnostics_only_when_detailed(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    app = FakeFletApp()
-    window = desktop_overlay.FletDesktopRendererWindow(
-        app_runner=app.run,
-        event_sink=RecordingLifecycleSink().emit,
-        locale="en",
-        bounds_debounce_s=0.01,
-    )
-    window.prime_startup_runtime_controls(
-        (
-            {"logging_mode": "detailed"},
-            {
-                "command": "apply_window_bounds",
-                "x": 320,
-                "y": 720,
-                "width": 1344,
-                "height": 336,
-            },
-        )
-    )
-    short_peer = _block(
-        "peer-translated",
-        channel="peer",
-        block_variant="finalized",
-        appearance_seq=1,
-        primary_text="응",
-        secondary_text="Sounds good",
-        secondary_enabled=True,
-    )
-    long_peer = _block(
-        "peer-translated",
-        channel="peer",
-        block_variant="finalized",
-        appearance_seq=1,
-        primary_text="This visible caption is intentionally long enough to widen the card.",
-        secondary_text="Sounds good",
-        secondary_enabled=True,
-    )
-
-    try:
-        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
-        await window.dispatch_runtime_control(
-            {"command": "set_interaction_mode", "mode": "pass_through"}
-        )
-        capsys.readouterr()
-
-        await window.dispatch_snapshot(OverlayPresentationSnapshot(revision=2, blocks=[short_peer]))
-
-        first_output = capsys.readouterr().out
-        assert "snapshot_update revision=2 blocks=1" in first_output
-        assert "peer-translated" not in first_output
-        assert "peer:peer-translated" not in first_output
-        assert "Sounds good" not in first_output
-        assert "render_transition revision=2" in first_output
-        assert "content_kind transparent_host->caption_surface" in first_output
-        assert "surface_visible False->True" in first_output
-        assert "slot_count 0->1" in first_output
-        assert "line_count 0->2" in first_output
-        assert "render_width revision=2 slot=0" in first_output
-        assert "key=" not in first_output
-        assert "previous_floor=0.0" in first_output
-
-        await window.dispatch_snapshot(OverlayPresentationSnapshot(revision=3, blocks=[long_peer]))
-        capsys.readouterr()
-
-        await window.dispatch_snapshot(OverlayPresentationSnapshot(revision=4, blocks=[short_peer]))
-
-        floor_output = capsys.readouterr().out
-        assert "render_width revision=4 slot=0" in floor_output
-        assert "floor_hit=True" in floor_output
-
-        await window.dispatch_runtime_control({"logging_mode": "basic"})
-        capsys.readouterr()
-        await window.dispatch_snapshot(OverlayPresentationSnapshot(revision=5, blocks=[short_peer]))
-
-        assert capsys.readouterr().out == ""
-    finally:
-        await window.close()
-
-
-@pytest.mark.asyncio
 async def test_desktop_overlay_flet_window_starts_frameless_transparent_moving_empty_card() -> None:
     app = FakeFletApp()
     sink = RecordingLifecycleSink()
@@ -5046,48 +4882,6 @@ async def test_desktop_overlay_renderer_cancellation_ends_diagnostic_acknowledge
         await bridge.stop()
 
 
-@pytest.mark.asyncio
-async def test_desktop_overlay_renderer_default_diagnostic_port_routes_safe_records_to_lifecycle() -> (
-    None
-):
-    token = "scheduled-default-port-token"
-    bridge = OverlayBridge(
-        session_token=token,
-        initial_snapshot=OverlayPresentationSnapshot(revision=1),
-        heartbeat_interval_ms=20,
-        desktop_runtime_controls_enabled=True,
-    )
-    await bridge.start()
-    window = BatchingRendererWindow()
-    sink = RecordingLifecycleSink()
-    renderer = desktop_overlay.DesktopOverlayRenderer(
-        _manifest(bridge_url=bridge.url, session_token=token, logging_mode="detailed"),
-        window=window,
-        lifecycle_sink=sink,
-        parent_monitor=FakeParentMonitor(),
-    )
-    try:
-        run_task = asyncio.create_task(renderer.run())
-        await _next_bridge_event(bridge, expected_type="overlay_ready")
-        await renderer.enqueue_snapshot(_scheduled_snapshot(2, "caption must not appear"))
-        await asyncio.wait_for(window.rendered_snapshot.wait(), timeout=1.0)
-        diagnostic_events = [
-            event for event in sink.events if event["type"] == "desktop_renderer_diagnostic"
-        ]
-        assert any(
-            event["record"]["record_type"] == "renderer_event"
-            and event["record"]["renderer_revision"] == 2
-            for event in diagnostic_events
-        )
-        assert "caption must not appear" not in json.dumps(diagnostic_events)
-        assert "scheduled-peer" not in json.dumps(diagnostic_events)
-        await bridge.broadcast_shutdown()
-        assert await asyncio.wait_for(run_task, timeout=1.0) == 0
-    finally:
-        await renderer.shutdown()
-        await bridge.stop()
-
-
 def test_desktop_overlay_renderer_diagnostic_policy_requires_exact_safe_flat_schema() -> None:
     committed = {
         "schema_version": 1,
@@ -5319,8 +5113,6 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "logging_mode": "basic",
-            "logging_mode_revision": 0,
             "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
         assert window.started.is_set()
@@ -5329,8 +5121,6 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "logging_mode": "basic",
-            "logging_mode_revision": 0,
             "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
         assert token not in json.dumps(sink.events)
@@ -5600,8 +5390,6 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "logging_mode": "basic",
-            "logging_mode_revision": 0,
             "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
 
@@ -5928,8 +5716,6 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "logging_mode": "basic",
-            "logging_mode_revision": 0,
             "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
         runtime_error = await asyncio.wait_for(received.get(), timeout=1.0)
@@ -6077,43 +5863,3 @@ def test_desktop_renderer_on_legacy_active_peer_source_stays_promoted_primary() 
     assert line.slot == "primary"
     assert line.promoted is True
     assert line.font_size == plan.primary_font_size
-
-
-@pytest.mark.asyncio
-async def test_desktop_renderer_logging_mode_switches_live_and_rejects_stale_revision() -> None:
-    sink = RecordingLifecycleSink()
-    window = FakeRendererWindow()
-    port = desktop_overlay.DetailedRendererDiagnosticPort(
-        logging_mode="basic",
-        event_sink=sink,
-        overlay_instance_id="desktop-overlay-test",
-    )
-    renderer = desktop_overlay.DesktopOverlayRenderer(
-        _manifest(logging_mode="basic"),
-        window=window,
-        lifecycle_sink=sink,
-        parent_monitor=FakeParentMonitor(),
-        diagnostic_port=port,
-    )
-    envelope = desktop_overlay.RendererDiagnosticEnvelope(
-        record={"record_type": "renderer_event", "renderer_revision": 7}
-    )
-
-    await port.emit(envelope)
-    await renderer._apply_runtime_control({"logging_mode": "detailed", "logging_mode_revision": 1})
-    await port.emit(envelope)
-    await renderer._apply_runtime_control({"logging_mode": "basic", "logging_mode_revision": 2})
-    await port.emit(envelope)
-    await renderer._apply_runtime_control({"logging_mode": "detailed", "logging_mode_revision": 1})
-    await port.emit(envelope)
-
-    diagnostics = [event for event in sink.events if event["type"] == "desktop_renderer_diagnostic"]
-    statuses = [event for event in sink.events if event["type"] == "logging_mode_status"]
-    assert len(diagnostics) == 1
-    assert [(event["logging_mode"], event["logging_mode_revision"]) for event in statuses] == [
-        ("detailed", 1),
-        ("basic", 2),
-        ("basic", 2),
-    ]
-    assert port.logging_mode == "basic"
-    assert len(window.runtime_controls) == 2

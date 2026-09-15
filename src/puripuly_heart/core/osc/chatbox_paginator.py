@@ -488,8 +488,8 @@ class ChatboxPaginator:
         )
 
     def _emit_send_attempt(self, *, mode: str, text: str, remaining_parts: int) -> None:
-        self._emit_detailed(
-            f"[Detailed][OSC] send mode={mode} status=attempt chars={len(text)} "
+        self._emit_diagnostic(
+            f"[Diagnostic][OSC] send mode={mode} status=attempt chars={len(text)} "
             f"remaining_parts={remaining_parts}"
         )
 
@@ -511,9 +511,9 @@ class ChatboxPaginator:
             return
         logger.log(level, message)
 
-    def _emit_detailed(self, message: str, *, level: int = logging.INFO) -> None:
+    def _emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> None:
         if self.runtime_logging is not None:
-            self.runtime_logging.emit_detailed(message, level=level)
+            self.runtime_logging.emit_diagnostic(message, level=level)
             return
         logger.debug(message)
 

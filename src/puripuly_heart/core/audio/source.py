@@ -16,6 +16,7 @@ from puripuly_heart.core.audio.format import (
     AudioCaptureSpan,
     AudioFrameF32,
 )
+from puripuly_heart.core.runtime_logging import emit_basic_log
 
 logger = logging.getLogger(__name__)
 
@@ -711,15 +712,15 @@ class SoundDeviceAudioSource(AudioSource):
         self._last_reported_callback_status_count = callback_status_count
         self._last_reported_queue_drop_count = queue_drop_count
         with contextlib.suppress(Exception):
-            logger.warning(
-                "SoundDevice audio callback status/drop observed: "
-                "callback status count=%s callback status new=%s "
-                "last_status=%s queue drop count=%s queue drop new=%s",
+            emit_basic_log(
+                logger,
+                "[Self · Capture] Audio callback interruption observed · "
+                "Callback events %s (+%s) · Dropped frames %s (+%s)",
                 callback_status_count,
                 max(0, status_new_count),
-                self._last_callback_status,
                 queue_drop_count,
                 max(0, drop_new_count),
+                level=logging.WARNING,
             )
 
     async def close(self) -> None:

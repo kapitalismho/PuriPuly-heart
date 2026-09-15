@@ -52,7 +52,6 @@ from .wiring_stt_factory import create_stt_backend_from_resolved_config
 
 FinalTranscriptSuppressedSink = Callable[[FinalTranscriptSuppressedNotification], object]
 FaultProfileProvider = Callable[[], object]
-DiagnosticsEnabled = Callable[[], bool]
 _ACTUAL_DEGRADATION_REASONS = frozenset(
     {
         "language_run_conservation_fallback",
@@ -71,7 +70,6 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
     clock: Clock
     reset_deadline_s: float
     gpu_model_path: Path
-    diagnostics_enabled: DiagnosticsEnabled | None = None
     on_final_transcript_suppressed: FinalTranscriptSuppressedSink | None = None
     runtime_logging: SessionRuntimeLoggingService | None = None
     fault_profile_provider: FaultProfileProvider | None = None
@@ -99,10 +97,17 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
         backend = create_stt_backend_from_resolved_config(
             config,
             secrets=self.secrets,
-            diagnostics_enabled=self.diagnostics_enabled,
             gpu_runtime=cast(SharedGpuASRRuntime, gpu_runtime),
             gpu_model_path=self.gpu_model_path,
             gpu_device_id=request.gpu_device_id,
+            basic_log_sink=(
+                None
+                if self.runtime_logging is None
+                else lambda message, level: self.runtime_logging.emit_basic(
+                    message,
+                    level=level,
+                )
+            ),
         )
         if request.recognition_projection != "scoped":
             raise ValueError("production recognition requires the scoped projection")
@@ -156,7 +161,7 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                 if degraded:
                     service.emit_basic(message, level=logging.WARNING)
                 else:
-                    service.emit_detailed(message)
+                    service.emit_diagnostic(message)
 
         return ScopedRecognitionEngine(
             channel=config.channel,

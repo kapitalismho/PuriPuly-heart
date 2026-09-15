@@ -11,7 +11,7 @@ LOGS_CARD_BORDER_RADIUS = 16
 
 def compose_logs_surface(slots: LogsSurfaceSlots) -> LogsSurfaceRegions:
     header_button_row = ft.Row(
-        controls=[slots.folder_button, slots.mode_button, slots.conversation_button],
+        controls=[slots.folder_button, slots.conversation_button],
         spacing=LOGS_HEADER_BUTTON_SPACING,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
     )

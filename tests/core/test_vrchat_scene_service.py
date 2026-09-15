@@ -1030,7 +1030,7 @@ async def test_ready_transition_logs_once_across_polls(
     assert ready_logs == ["[VrchatScene] status syncing -> ready people=2"]
 
 
-async def test_deleted_log_warns_with_reason_and_file_name(
+async def test_deleted_log_warns_with_safe_reason_without_file_name(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     create_time = time.time() - 5
@@ -1056,8 +1056,8 @@ async def test_deleted_log_warns_with_reason_and_file_name(
     warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
     assert len(warnings) == 1
     assert warnings[0].getMessage() == (
-        f"[VrchatScene] file failure name={file_name} "
-        "reason=FileNotFoundError status=ready -> degraded"
+        "[VRChat Scene] Scene context became unavailable · Cause FileNotFoundError"
     )
+    assert file_name not in warnings[0].getMessage()
     assert _USER_A not in caplog.text
     assert _USER_B not in caplog.text

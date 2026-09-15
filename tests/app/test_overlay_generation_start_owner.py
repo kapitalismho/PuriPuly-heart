@@ -28,7 +28,7 @@ class FakePresenter:
 
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = dict(kwargs)
-        self.runtime_log_detailed = kwargs["runtime_log_detailed"]
+        self.runtime_log_diagnostic = kwargs["runtime_log_diagnostic"]
         self.diagnostics = kwargs["diagnostics"]
         self.task_factory = kwargs["task_factory"]
         self.translation_enabled = bool(kwargs.get("translation_enabled", True))
@@ -194,7 +194,6 @@ class StartHarness:
             set_diagnostics=self.diagnostics.append,
             set_target=self.targets.append,
             calibration_snapshot=lambda: OverlayCalibration(distance=1.4),
-            logging_mode=lambda: "detailed",
             locale=lambda: "ko",
             log_dir=lambda: "C:\\overlay-log",
             build_desktop_controls=lambda _config: [
@@ -317,7 +316,6 @@ async def test_owner_assembles_connected_generation_and_hands_off_monitor(
     manager = FakeProcessManager.instances[0]
     assert manager.kwargs["startup_timeout_ms"] == 3210
     assert manager.kwargs["locale"] == "ko"
-    assert manager.kwargs["logging_mode"] == "detailed"
     assert manager.kwargs["selected_target"] == ("desktop" if desktop else "steamvr")
     assert manager.kwargs["fallback_reason"] is None
     assert manager.kwargs["geometry_authority"] == ("flet" if desktop else "native")
@@ -479,7 +477,7 @@ async def test_owner_starts_fresh_native_epoch_for_preserved_crash_caption() -> 
     harness = StartHarness()
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     presenter = FakePresenter(
-        runtime_log_detailed=lambda message, *, level=logging.INFO: False,
+        runtime_log_diagnostic=lambda message, *, level=logging.INFO: False,
         diagnostics=None,
         task_factory=runtime.create_child_task,
     )

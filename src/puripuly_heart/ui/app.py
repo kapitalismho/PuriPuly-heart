@@ -68,7 +68,6 @@ from puripuly_heart.ui.i18n import (
     language_name,
     t,
 )
-from puripuly_heart.ui.logs.contract import LogsIntents
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.settings.contract import (
     SettingsGeneralIntents,
@@ -249,7 +248,7 @@ class TranslatorApp:
         )
 
         runtime_log_basic = self.application.log_basic
-        runtime_log_detailed = self.application.log_detailed
+        runtime_log_diagnostic = self.application.log_diagnostic
         calibration_begin = self.application.begin_overlay_calibration
         calibration_change = self.application.set_overlay_calibration_field
         calibration_apply = self.application.apply_overlay_calibration
@@ -259,8 +258,8 @@ class TranslatorApp:
                 settings_changed=self._on_settings_changed,
                 show_snackbar=self._show_snackbar,
                 runtime_log_basic=(runtime_log_basic if callable(runtime_log_basic) else None),
-                runtime_log_detailed=(
-                    runtime_log_detailed if callable(runtime_log_detailed) else None
+                runtime_log_diagnostic=(
+                    runtime_log_diagnostic if callable(runtime_log_diagnostic) else None
                 ),
                 open_api_keys_guide=self._open_api_keys_guide,
             ),
@@ -309,11 +308,7 @@ class TranslatorApp:
                 calibration_cancel=(calibration_cancel if callable(calibration_cancel) else None),
             ),
         )
-        self.view_logs.bind_logs_intents(
-            LogsIntents(runtime_logging_mode_change=self._on_runtime_logging_mode_change)
-        )
-        self.view_logs.set_runtime_logging_mode(self.application.state().runtime_logging_mode)
-        self.view_dashboard.runtime_log_detailed = self._log_detailed
+        self.view_dashboard.runtime_log_diagnostic = self._log_diagnostic
 
         set_overlay_calibration = getattr(self.view_settings, "set_overlay_calibration", None)
         overlay_calibration = self.application.overlay_calibration
@@ -664,7 +659,7 @@ class TranslatorApp:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._log_detailed(
+            self._log_diagnostic(
                 f"[Startup] GitHub star prompt failed: {exc!r}",
                 level=logging.WARNING,
             )
@@ -675,14 +670,14 @@ class TranslatorApp:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._log_detailed(
+            self._log_diagnostic(
                 f"[Startup] OpenRouter usage refresh failed: {exc!r}",
                 level=logging.WARNING,
             )
             return False
 
     async def _check_for_update_after_launch(self) -> None:
-        update_kwargs = {"log_detailed": self._log_detailed}
+        update_kwargs = {"log_diagnostic": self._log_diagnostic}
         try:
             update_parameters = inspect.signature(_check_and_notify_update).parameters
         except (TypeError, ValueError):
@@ -704,7 +699,7 @@ class TranslatorApp:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._log_detailed(
+            self._log_diagnostic(
                 f"[Startup] Update check failed: {exc!r}",
                 level=logging.WARNING,
             )
@@ -715,7 +710,7 @@ class TranslatorApp:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._log_detailed(
+            self._log_diagnostic(
                 f"[Startup] Runtime preparation failed: {exc!r}",
                 level=logging.WARNING,
             )
@@ -1296,8 +1291,8 @@ class TranslatorApp:
     def _log_basic(self, message: str, *, level: int = logging.INFO) -> None:
         self.application.log_basic(message, level=level)
 
-    def _log_detailed(self, message: str, *, level: int = logging.INFO) -> None:
-        self.application.log_detailed(message, level=level)
+    def _log_diagnostic(self, message: str, *, level: int = logging.INFO) -> None:
+        self.application.log_diagnostic(message, level=level)
 
     def _revert_dashboard_translation_toggle(self) -> None:
         self._set_dashboard_translation_visual_state(False)
@@ -1328,7 +1323,7 @@ class TranslatorApp:
 
     def _on_translation_toggle(self, enabled: bool) -> bool:
         self._log_basic(f"[Dashboard] Translation toggle requested: enabled={enabled}")
-        self._log_detailed(
+        self._log_diagnostic(
             "[Dashboard] Translation toggle detail: "
             f"dashboard_state={getattr(getattr(self, 'view_dashboard', None), 'is_translation_on', None)} "
             f"overlay_state={getattr(self, 'overlay_state', 'unknown')}"
@@ -1352,7 +1347,7 @@ class TranslatorApp:
 
     def _on_stt_toggle(self, enabled: bool) -> None:
         self._log_basic(f"[Dashboard] STT toggle requested: enabled={enabled}")
-        self._log_detailed(
+        self._log_diagnostic(
             "[Dashboard] STT toggle detail: "
             f"dashboard_state={getattr(getattr(self, 'view_dashboard', None), 'is_stt_on', None)} "
             f"overlay_state={getattr(self, 'overlay_state', 'unknown')}"
@@ -1365,7 +1360,7 @@ class TranslatorApp:
 
     def _on_overlay_toggle(self, enabled: bool) -> None:
         self._log_basic(f"[Dashboard] Overlay toggle requested: enabled={enabled}")
-        self._log_detailed(
+        self._log_diagnostic(
             "[Dashboard] Overlay toggle detail: "
             f"overlay_state={getattr(self, 'overlay_state', 'unknown')} "
             f"failure_reason={getattr(self, 'overlay_failure_reason', None)}"
@@ -1378,7 +1373,7 @@ class TranslatorApp:
 
     def _on_peer_translation_toggle(self, enabled: bool) -> None:
         self._log_basic(f"[Dashboard] Peer toggle requested: enabled={enabled}")
-        self._log_detailed(
+        self._log_diagnostic(
             "[Dashboard] Peer toggle detail: "
             f"overlay_state={getattr(self, 'overlay_state', 'unknown')} "
             f"failure_reason={getattr(self, 'overlay_failure_reason', None)}"
@@ -1428,7 +1423,7 @@ class TranslatorApp:
             f"peer_source={previous_peer_source_code}->{change.peer_source_code} "
             f"peer_target={previous_peer_target_code}->{change.peer_target_code}"
         )
-        self._log_detailed(
+        self._log_diagnostic(
             f"[Dashboard] Language change detail: overlay_state={getattr(self, 'overlay_state', 'unknown')}"
         )
 
@@ -1514,10 +1509,6 @@ class TranslatorApp:
             await self.application.apply_prompt_intent(intent)
 
         self._queue_settings_mutation_task(_task)
-
-    def _on_runtime_logging_mode_change(self, mode: str) -> None:
-        resolved_mode = self.application.set_runtime_logging_mode(mode)
-        self.view_logs.set_runtime_logging_mode(resolved_mode)
 
     def _on_providers_changed(self) -> None:
         view_settings = getattr(self, "view_settings", None)
@@ -2293,7 +2284,7 @@ class TranslatorApp:
         self._log_basic(f"[Overlay] State changed: {previous_state} -> {state}")
         self.overlay_state = state
         self.overlay_failure_reason = failure_reason
-        self._log_detailed(
+        self._log_diagnostic(
             f"[Overlay] State detail: overlay_state={state} failure_reason={failure_reason}"
         )
         self._sync_settings_overlay_runtime_state()
@@ -2331,7 +2322,7 @@ async def main_gui(
 
 async def _check_and_notify_update(
     page: ft.Page,
-    log_detailed=None,
+    log_diagnostic=None,
     on_launch_snackbar_shown=None,
     load_update_info=None,
 ) -> None:
@@ -2395,7 +2386,7 @@ async def _check_and_notify_update(
 
     except Exception as exc:
         message = f"[Update] Check notification failed: {exc}"
-        if callable(log_detailed):
-            log_detailed(message)
+        if callable(log_diagnostic):
+            log_diagnostic(message)
             return
         logger.debug(message)

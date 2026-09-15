@@ -133,7 +133,6 @@ def make_owner(
         cancel_bounds_persistence=_noop_async,
         clear_bounds_suppressed=lambda: None,
         calibration_provider=lambda: cast(OverlayCalibration, OverlayCalibration()),
-        logging_mode_provider=lambda: "basic",
         log_dir_provider=lambda: "",
         desktop_controls_factory=lambda _config: [],
         interaction_mode_sink=lambda _mode: None,
@@ -142,7 +141,7 @@ def make_owner(
         edit_interaction_mode="edit",
         clock=FakeClock(_now=0.0),
         log_basic=lambda _message, _level: None,
-        log_detailed=lambda _message, _level, _exception: False,
+        log_diagnostic=lambda _message, _level, _exception: False,
         translation_enabled_provider=(lambda: config_owner.snapshot().value.translation_enabled),
     )
 
@@ -224,7 +223,7 @@ def make_enable_owner(
         qq_dialog_sink=lambda: None,
         result_sink=lambda _result: None,
         log_basic=lambda _message: None,
-        log_detailed=lambda _message: None,
+        log_diagnostic=lambda _message: None,
         log_error=lambda _message: None,
         founder_letter_sink=lambda: None,
         teardown=teardown,

@@ -51,7 +51,7 @@
 #define ParakeetJapaneseManifestRelativePath "puripuly_heart\data\models\parakeet-tdt-ctc-0.6b-ja-int8-sherpa.manifest.json"
 
 #define InstallerPrivacyDir "installer\privacy"
-#define CanonicalSettingsVersion 45
+#define CanonicalSettingsVersion 46
 #ifdef InstallerSmokeAppDataRoot
   #if (Len(InstallerSmokeAppDataRoot) < 3) || (Copy(InstallerSmokeAppDataRoot, 2, 2) != ":/")
     #error InstallerSmokeAppDataRoot must be an absolute drive path using forward slashes

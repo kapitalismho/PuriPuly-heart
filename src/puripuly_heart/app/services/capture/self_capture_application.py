@@ -38,7 +38,7 @@ class SelfCaptureApplicationOwner:
     sync_effective_flags: Callable[[], None]
     sync_local_notice: Callable[[], None]
     log_basic: Callable[[str], None]
-    log_detailed: Callable[[str, int], None]
+    log_diagnostic: Callable[[str, int], None]
     restart_requested: bool = False
     force_immediate: bool = False
 
@@ -48,7 +48,7 @@ class SelfCaptureApplicationOwner:
             return
         self.log_basic(f"[STT] Toggle request: enabled={enabled}")
         owner = self.capture_owner_if_created()
-        self.log_detailed(
+        self.log_diagnostic(
             "[STT] Toggle detail: "
             f"desired_before={owner is not None and owner.snapshot.desired_active} "
             f"overlay_state={self.overlay_state_provider()}",
@@ -63,7 +63,7 @@ class SelfCaptureApplicationOwner:
             provider = settings.provider_id
             self.log_basic(f"[STT] Enabled with provider: {provider}")
             if provider == "qwen_audio" and settings.qwen_region is not None:
-                self.log_detailed(
+                self.log_diagnostic(
                     f"[STT] Provider detail: provider={provider} " f"region={settings.qwen_region}",
                     logging.INFO,
                 )
@@ -88,7 +88,7 @@ class SelfCaptureApplicationOwner:
     ) -> SelfCaptureSessionSnapshot | None:
         settings = self.settings_provider()
         if settings is None:
-            self.log_detailed(
+            self.log_diagnostic(
                 "[STT] Enable requested before Self translation owner is ready",
                 logging.WARNING,
             )
@@ -111,7 +111,7 @@ class SelfCaptureApplicationOwner:
 
     async def replace_provider(self, *, smooth_local: bool = False) -> None:
         owner = self.capture_owner_if_created()
-        self.log_detailed(
+        self.log_diagnostic(
             "[STT] Replacing runtime provider detail: "
             f"desired={owner is not None and owner.snapshot.desired_active} "
             f"mic_task_active={owner is not None and owner.loop_task is not None}",
@@ -124,7 +124,7 @@ class SelfCaptureApplicationOwner:
         current_provider = (
             getattr(owner.snapshot, "provider_id", None) if owner is not None else None
         )
-        self.log_detailed(
+        self.log_diagnostic(
             "[STT][Runtime] provider refresh requested: "
             f"current={current_provider or 'none'} requested={requested_provider}",
             logging.INFO,
@@ -146,19 +146,19 @@ class SelfCaptureApplicationOwner:
             and snapshot.runtime_signature == config.runtime_signature
         ):
             if snapshot.desired_active and snapshot.effective_active:
-                self.log_detailed(
+                self.log_diagnostic(
                     "[STT][Runtime] provider handoff committed: "
                     f"provider={getattr(snapshot, 'provider_id', config.provider_id)}",
                     logging.INFO,
                 )
             else:
-                self.log_detailed(
+                self.log_diagnostic(
                     "[STT][Runtime] provider prepared: "
                     f"provider={getattr(snapshot, 'provider_id', config.provider_id)}",
                     logging.INFO,
                 )
         elif snapshot.provider_status is SelfCaptureProviderStatus.PENDING:
-            self.log_detailed(
+            self.log_diagnostic(
                 "[STT][Runtime] provider handoff pending: "
                 f"requested={config.provider_id} reason={snapshot.admission_reason or 'boundary'}",
                 logging.INFO,

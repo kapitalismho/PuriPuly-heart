@@ -12,16 +12,13 @@ from puripuly_heart.core.orchestrator.configuration import (
 )
 from puripuly_heart.core.orchestrator.context import ContextMode
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
-    ContextApplicationDiagnostic,
     ContextModeDiagnostic,
     LatencyInheritanceDiagnostic,
     LatencyStageDiagnostic,
     OverlayEmitDiagnostic,
-    RuntimeDiagnostic,
     SelfOverlayDecisionDiagnostic,
     SttEventLoopFailureDiagnostic,
     TranslationLatencyDiagnosticsOwner,
-    TranslationReadyDiagnostic,
     TranslationSkipDiagnostic,
 )
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
@@ -30,8 +27,7 @@ from tests.helpers.fakes import FakeSender
 
 
 class RuntimeLogging:
-    def __init__(self, *, detailed: bool = True) -> None:
-        self.mode = "detailed" if detailed else "basic"
+    def __init__(self) -> None:
         self.basic: list[str] = []
         self.detailed: list[str] = []
 
@@ -39,17 +35,13 @@ class RuntimeLogging:
         _ = level
         self.basic.append(message)
 
-    def emit_detailed(self, message: str, *, level: int = 20) -> bool:
+    def emit_diagnostic(self, message: str, *, level: int = 20) -> bool:
         _ = level
-        if self.mode != "detailed":
-            return False
         self.detailed.append(message)
         return True
 
-    def emit_detailed_lazy(self, build_message, *, level: int = 20) -> bool:
+    def emit_diagnostic_lazy(self, build_message, *, level: int = 20) -> bool:
         _ = level
-        if self.mode != "detailed":
-            return False
         self.detailed.append(build_message())
         return True
 
@@ -60,11 +52,6 @@ class OverlayDiagnostics:
 
     def record_translation(self, event: str, **fields: object) -> None:
         self.records.append((event, fields))
-
-
-class ExplodingString:
-    def __str__(self) -> str:
-        raise AssertionError("disabled Detailed logging evaluated the message")
 
 
 class SttProvider:
@@ -146,11 +133,6 @@ def test_owner_summarizes_actual_delayed_chatbox_send_from_last_speech() -> None
     assert logging.basic == [
         "[Basic][Latency] channel=self endpoint=chatbox_send " "last_speech_to_chatbox_send_ms=5000"
     ]
-    breakdown = next(
-        message for message in logging.detailed if "[Detailed][LatencyBreakdown]" in message
-    )
-    assert "last_speech_to_speech_end_ms=1000" in breakdown
-    assert "last_speech_to_chatbox_send_ms=5000" in breakdown
     assert owner.snapshot().timeline_keys == frozenset()
 
 
@@ -339,79 +321,6 @@ def test_owner_does_not_measure_output_without_last_speech_origin() -> None:
     )
 
     assert logging.basic == []
-    assert not any("[Detailed][LatencyBreakdown]" in message for message in logging.detailed)
-
-
-def test_chatbox_replacement_and_prune_reach_runtime_logging_without_overlay_diagnostics() -> None:
-    clock = FakeClock(_now=10.0)
-    logging = RuntimeLogging()
-    owner = make_owner(clock=clock, runtime_logging=logging, overlay_diagnostics=None)
-    paginator = ChatboxPaginator(
-        sender=FakeSender(),
-        clock=clock,
-        max_chars=4,
-        runtime_logging=logging,
-        stage_recorder=owner.record_chatbox_stage,
-    )
-    parent_id = uuid4()
-
-    paginator.enqueue(
-        OSCMessage(
-            utterance_id=parent_id,
-            text="PRIVATE_FIRST",
-            created_at=clock.now(),
-            turn_generation=3,
-            turn_order=7,
-            presentation_revision=1,
-            target_indexes=(1,),
-            target_languages=("ja",),
-        )
-    )
-    paginator.enqueue(
-        OSCMessage(
-            utterance_id=parent_id,
-            text="PRIVATE_COMPLETE",
-            created_at=clock.now(),
-            turn_generation=3,
-            turn_order=7,
-            presentation_revision=2,
-            target_indexes=(0, 1),
-            target_languages=("zh-CN", "ja"),
-        )
-    )
-    newer_parent_id = uuid4()
-    paginator.enqueue(
-        OSCMessage(
-            utterance_id=newer_parent_id,
-            text="PRIVATE_NEWER",
-            created_at=clock.now(),
-            turn_generation=3,
-            turn_order=8,
-            presentation_revision=1,
-            target_indexes=(0,),
-            target_languages=("zh-CN",),
-        )
-    )
-
-    replacement = next(
-        message for message in logging.detailed if "chatbox_revision_replaced" in message
-    )
-    prune = next(message for message in logging.detailed if "chatbox_older_turn_pruned" in message)
-    assert f"parent_utterance_id={parent_id}" in replacement
-    assert "turn_generation=3" in replacement
-    assert "turn_order=7" in replacement
-    assert "target_indexes=(0, 1)" in replacement
-    assert "target_languages=('zh-CN', 'ja')" in replacement
-    assert "presentation_revision=2" in replacement
-    assert "previous_revision=1" in replacement
-    assert f"parent_utterance_id={newer_parent_id}" in prune
-    assert "turn_order=8" in prune
-    assert "target_indexes=(0,)" in prune
-    assert "target_languages=('zh-CN',)" in prune
-    combined = "\n".join(logging.detailed)
-    assert "PRIVATE_FIRST" not in combined
-    assert "PRIVATE_COMPLETE" not in combined
-    assert "PRIVATE_NEWER" not in combined
 
 
 def test_owner_inherits_and_clears_only_the_selected_timeline() -> None:
@@ -456,114 +365,20 @@ def test_owner_inherits_and_clears_only_the_selected_timeline() -> None:
     assert owner.snapshot().timeline_keys == frozenset({("peer", peer_id)})
 
 
-def test_owner_suppresses_duplicate_context_mode_and_logs_metadata_only() -> None:
+def test_owner_suppresses_duplicate_context_mode() -> None:
     logging = RuntimeLogging()
     owner = make_owner(runtime_logging=logging)
     mode: ContextMode = "integrated"
+
     owner.record_context_mode(ContextModeDiagnostic(channel="self", applied_mode=mode))
     owner.record_context_mode(ContextModeDiagnostic(channel="self", applied_mode=mode))
-    owner.record_context_application(
-        ContextApplicationDiagnostic(
-            channel="self",
-            request_chars=17,
-            context_lines=("- [self] first", "- [peer] second"),
-            context_chars=35,
-        )
-    )
 
     assert sum("Context mode" in message for message in logging.basic) == 1
-    application = next(message for message in logging.detailed if "context_apply" in message)
-    assert "entries=2" in application
-    assert "self_entries=1" in application
-    assert "peer_entries=1" in application
-    assert "first" not in application
-    assert "second" not in application
 
 
-def test_target_diagnostics_include_parent_index_and_language_metadata() -> None:
-    clock = FakeClock(10.0)
-    logging = RuntimeLogging()
-    owner = make_owner(clock=clock, runtime_logging=logging)
-    parent_id = uuid4()
-    child_id = uuid4()
-
-    owner.record_context_mode(
-        ContextModeDiagnostic(
-            channel="self",
-            applied_mode="local",
-            parent_utterance_id=parent_id,
-            target_index=1,
-            target_language="ja",
-        )
-    )
-    owner.record_context_application(
-        ContextApplicationDiagnostic(
-            channel="self",
-            request_chars=12,
-            context_lines=(),
-            context_chars=0,
-            parent_utterance_id=parent_id,
-            target_index=1,
-            target_language="ja",
-        )
-    )
-    owner.record_latency_stage(
-        LatencyStageDiagnostic(
-            channel="self",
-            utterance_id=child_id,
-            stage="speech_end",
-            publish_now=False,
-        )
-    )
-    clock.advance(0.2)
-    owner.record_latency_stage(
-        LatencyStageDiagnostic(
-            channel="self",
-            utterance_id=child_id,
-            stage="llm_done",
-            parent_utterance_id=parent_id,
-            target_index=1,
-            target_language="ja",
-            turn_generation=3,
-            turn_order=7,
-        )
-    )
-    owner.emit_translation_ready(
-        TranslationReadyDiagnostic(
-            channel="self",
-            utterance_id=child_id,
-            update_id="update",
-            origin_wall_clock_ms=None,
-            session_scope=None,
-            source_text_hash=None,
-            source_text_len=None,
-            logical_turn_key=f"self:{parent_id}",
-            translation_len=3,
-            parent_utterance_id=parent_id,
-            target_index=1,
-            target_language="ja",
-            turn_generation=3,
-            turn_order=7,
-        )
-    )
-
-    combined = "\n".join(logging.basic + logging.detailed)
-    assert f"parent_utterance_id={parent_id}" in combined
-    assert "target_index=1" in combined
-    assert "target_language=ja" in combined
-    assert "turn_generation=3" in combined
-    assert "turn_order=7" in combined
-    context_records = [message for message in logging.detailed if "context_apply" in message]
-    assert len(context_records) == 1
-
-
-def test_owner_suppresses_runtime_and_overlay_decision_duplicates_independently() -> None:
-    logging = RuntimeLogging()
+def test_owner_suppresses_duplicate_overlay_decisions() -> None:
     overlay = OverlayDiagnostics()
-    owner = make_owner(
-        runtime_logging=logging,
-        overlay_diagnostics=overlay,
-    )
+    owner = make_owner(overlay_diagnostics=overlay)
     diagnostic = SelfOverlayDecisionDiagnostic.create(
         merge_id=uuid4(),
         source="spec",
@@ -580,17 +395,12 @@ def test_owner_suppresses_runtime_and_overlay_decision_duplicates_independently(
     owner.record_self_overlay_decision(diagnostic)
     owner.record_self_overlay_decision(diagnostic)
 
-    assert sum("active_self_secondary" in message for message in logging.detailed) == 1
     assert [event for event, _fields in overlay.records] == ["active_self_secondary"]
 
 
-def test_owner_does_not_suppress_same_length_overlay_text_changes() -> None:
-    logging = RuntimeLogging()
+def test_owner_does_not_suppress_changed_overlay_text_with_same_length() -> None:
     overlay = OverlayDiagnostics()
-    owner = make_owner(
-        runtime_logging=logging,
-        overlay_diagnostics=overlay,
-    )
+    owner = make_owner(overlay_diagnostics=overlay)
     merge_id = uuid4()
 
     for active_text, secondary_text in (("alpha", "beta"), ("bravo", "zeta")):
@@ -609,7 +419,6 @@ def test_owner_does_not_suppress_same_length_overlay_text_changes() -> None:
             )
         )
 
-    assert sum("active_self_secondary" in message for message in logging.detailed) == 2
     assert [event for event, _fields in overlay.records] == [
         "active_self_secondary",
         "active_self_secondary",
@@ -658,33 +467,6 @@ def test_owner_preserves_overlay_suppression_across_detach_and_replacement() -> 
 
     assert [event for event, _fields in first.records] == ["active_self_secondary"]
     assert [event for event, _fields in second.records] == ["active_self_secondary"]
-
-
-def test_owner_keeps_detailed_message_building_lazy_in_basic_mode() -> None:
-    logging = RuntimeLogging(detailed=False)
-    owner = make_owner(runtime_logging=logging)
-
-    assert not owner.emit(
-        RuntimeDiagnostic(
-            message="[Translation] detail=%s",
-            args=(ExplodingString(),),
-            detailed=True,
-        )
-    )
-    assert not owner.emit_translation_ready(
-        TranslationReadyDiagnostic(
-            channel="self",
-            utterance_id=uuid4(),
-            update_id=ExplodingString(),
-            origin_wall_clock_ms=None,
-            session_scope=None,
-            source_text_hash=None,
-            source_text_len=None,
-            logical_turn_key=None,
-            translation_len=3,
-        )
-    )
-    assert logging.detailed == []
 
 
 def test_owner_sanitizes_stt_failure_and_tracks_overlay_failure_state() -> None:

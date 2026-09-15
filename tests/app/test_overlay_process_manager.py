@@ -874,9 +874,6 @@ async def test_overlay_process_manager_stop_preserves_process_when_terminate_fai
             if self.terminate_calls == 1:
                 raise RuntimeError("terminate failed")
 
-        def set_logging_mode(self, mode: str) -> None:
-            _ = mode
-
     manager = OverlayProcessManager()
     process = FailingOnceTerminateProcess()
     manager._process = process
@@ -2135,286 +2132,6 @@ def test_default_overlay_process_runner_accepts_packaged_sibling_openvr_runtime_
 
 
 @pytest.mark.asyncio
-async def test_overlay_process_manager_logs_tagged_overlay_child_lines_in_detailed_mode(
-    tmp_path: Path,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    script_path = tmp_path / "overlay_stub_logs.py"
-    script_path.write_text(
-        "\n".join(
-            [
-                "#!/usr/bin/env python3",
-                "import sys",
-                "import time",
-                "assert sys.argv[1] == '--config'",
-                'print("[overlay][INFO] child line", flush=True)',
-                _ready_script_line(),
-                "time.sleep(5)",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    script_path.chmod(0o755)
-
-    manager = OverlayProcessManager(
-        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
-        startup_timeout_ms=500,
-        logging_mode="detailed",
-    )
-
-    try:
-        with caplog.at_level("INFO", logger="puripuly_heart.core.overlay.process"):
-            await manager.start()
-
-        assert manager.state == "connected"
-        assert any("[overlay][INFO] child line" in message for message in caplog.messages)
-    finally:
-        await manager.stop()
-
-
-@pytest.mark.asyncio
-async def test_overlay_process_manager_peer_first_render_trace_passthrough_is_visible_in_detailed_mode(
-    tmp_path: Path,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    script_path = tmp_path / "overlay_stub_peer_first_render_trace_detailed.py"
-    script_path.write_text(
-        "\n".join(
-            [
-                "#!/usr/bin/env python3",
-                "import sys",
-                "import time",
-                "assert sys.argv[1] == '--config'",
-                'print("[overlay][INFO] latency_trace stage=peer_overlay_first_render utterance_id=utterance-1 block_id=peer:utterance-1", flush=True)',
-                _ready_script_line(),
-                "time.sleep(5)",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    script_path.chmod(0o755)
-
-    manager = OverlayProcessManager(
-        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
-        startup_timeout_ms=500,
-        logging_mode="detailed",
-    )
-
-    try:
-        with caplog.at_level("INFO", logger="puripuly_heart.core.overlay.process"):
-            await manager.start()
-
-        assert manager.state == "connected"
-        assert any(
-            "stage=peer_overlay_first_render" in message and "block_id=peer:utterance-1" in message
-            for message in caplog.messages
-        )
-    finally:
-        await manager.stop()
-
-
-@pytest.mark.asyncio
-async def test_overlay_process_manager_basic_mode_rejects_unstamped_stderr_and_keeps_declared_warning(
-    tmp_path: Path,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    script_path = tmp_path / "overlay_stub_basic_logs.py"
-    script_path.write_text(
-        "\n".join(
-            [
-                "#!/usr/bin/env python3",
-                "import sys",
-                "import time",
-                "assert sys.argv[1] == '--config'",
-                'print("[overlay][INFO] hidden info", flush=True)',
-                'print("[overlay][WARN] visible warning", flush=True)',
-                'print("stderr-visible", file=sys.stderr, flush=True)',
-                _ready_script_line(),
-                "time.sleep(5)",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    script_path.chmod(0o755)
-
-    manager = OverlayProcessManager(
-        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
-        startup_timeout_ms=500,
-        logging_mode="basic",
-    )
-
-    try:
-        with caplog.at_level("INFO", logger="puripuly_heart.core.overlay.process"):
-            await manager.start()
-
-        assert manager.state == "connected"
-        assert not any("hidden info" in message for message in caplog.messages)
-        assert any("visible warning" in message for message in caplog.messages)
-        assert not any("stderr-visible" in message for message in caplog.messages)
-    finally:
-        await manager.stop()
-
-
-@pytest.mark.asyncio
-async def test_overlay_process_manager_peer_first_render_trace_passthrough_is_hidden_in_basic_mode(
-    tmp_path: Path,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    script_path = tmp_path / "overlay_stub_peer_first_render_trace_basic.py"
-    script_path.write_text(
-        "\n".join(
-            [
-                "#!/usr/bin/env python3",
-                "import sys",
-                "import time",
-                "assert sys.argv[1] == '--config'",
-                'print("[overlay][INFO] latency_trace stage=peer_overlay_first_render utterance_id=utterance-2 block_id=peer:utterance-2", flush=True)',
-                _ready_script_line(),
-                "time.sleep(5)",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    script_path.chmod(0o755)
-
-    manager = OverlayProcessManager(
-        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
-        startup_timeout_ms=500,
-        logging_mode="basic",
-    )
-
-    try:
-        with caplog.at_level("INFO", logger="puripuly_heart.core.overlay.process"):
-            await manager.start()
-
-        assert manager.state == "connected"
-        assert not any("stage=peer_overlay_first_render" in message for message in caplog.messages)
-    finally:
-        await manager.stop()
-
-
-@pytest.mark.asyncio
-async def test_overlay_process_manager_overlay_visible_update_rendered_passthrough_is_visible_in_detailed_mode(
-    tmp_path: Path,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    script_path = tmp_path / "overlay_stub_visible_update_rendered_detailed.py"
-    script_path.write_text(
-        "\n".join(
-            [
-                "#!/usr/bin/env python3",
-                "import sys",
-                "import time",
-                "assert sys.argv[1] == '--config'",
-                'print("[overlay][INFO] overlay_visible_update_rendered revision=7 block_id=self:1 update_id=upd-self-2 slot_index=0", flush=True)',
-                _ready_script_line(),
-                "time.sleep(5)",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    script_path.chmod(0o755)
-
-    manager = OverlayProcessManager(
-        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
-        startup_timeout_ms=500,
-        logging_mode="detailed",
-    )
-
-    try:
-        with caplog.at_level("INFO", logger="puripuly_heart.core.overlay.process"):
-            await manager.start()
-
-        assert manager.state == "connected"
-        assert any(
-            "overlay_visible_update_rendered" in message and "update_id=upd-self-2" in message
-            for message in caplog.messages
-        )
-    finally:
-        await manager.stop()
-
-
-@pytest.mark.asyncio
-async def test_overlay_process_manager_overlay_visible_update_rendered_passthrough_is_hidden_in_basic_mode(
-    tmp_path: Path,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    script_path = tmp_path / "overlay_stub_visible_update_rendered_basic.py"
-    script_path.write_text(
-        "\n".join(
-            [
-                "#!/usr/bin/env python3",
-                "import sys",
-                "import time",
-                "assert sys.argv[1] == '--config'",
-                'print("[overlay][INFO] overlay_visible_update_rendered revision=8 block_id=self:1 update_id=upd-self-3 slot_index=0", flush=True)',
-                _ready_script_line(),
-                "time.sleep(5)",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    script_path.chmod(0o755)
-
-    manager = OverlayProcessManager(
-        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
-        startup_timeout_ms=500,
-        logging_mode="basic",
-    )
-
-    try:
-        with caplog.at_level("INFO", logger="puripuly_heart.core.overlay.process"):
-            await manager.start()
-
-        assert manager.state == "connected"
-        assert not any("overlay_visible_update_rendered" in message for message in caplog.messages)
-    finally:
-        await manager.stop()
-
-
-@pytest.mark.asyncio
-async def test_overlay_process_manager_peer_first_render_visibility_checkpoint_passthrough_is_visible_in_detailed_mode(
-    tmp_path: Path,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    script_path = tmp_path / "overlay_stub_peer_visibility_checkpoint_detailed.py"
-    script_path.write_text(
-        "\n".join(
-            [
-                "#!/usr/bin/env python3",
-                "import sys",
-                "import time",
-                "assert sys.argv[1] == '--config'",
-                'print("[overlay][INFO] peer_first_render_visibility_checkpoint revision=11 peer_ids=[peer:utterance-3] has_drawable_text=true overlay_visible_before=true should_show_after_submit=false hide_deadline_active=false first_texture_submitted=true redraw_requested=true visible_block_count=1 self_block_count=0 fully_transparent=false", flush=True)',
-                _ready_script_line(),
-                "time.sleep(5)",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    script_path.chmod(0o755)
-
-    manager = OverlayProcessManager(
-        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
-        startup_timeout_ms=500,
-        logging_mode="detailed",
-    )
-
-    try:
-        with caplog.at_level("INFO", logger="puripuly_heart.core.overlay.process"):
-            await manager.start()
-
-        assert manager.state == "connected"
-        assert any(
-            "peer_first_render_visibility_checkpoint" in message
-            and "peer_ids=[peer:utterance-3]" in message
-            for message in caplog.messages
-        )
-    finally:
-        await manager.stop()
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "failure_reason",
     [
@@ -2872,12 +2589,9 @@ async def test_overlay_process_manager_writes_runtime_crash_dump_with_recent_chi
     assert summary["failure_reason"] == "runtime_crashed"
 
     stdout_rows = [row for row in dump_rows if row.get("stream") == "stdout"]
-    stderr_rows = [row for row in dump_rows if row.get("stream") == "stderr"]
-    assert {row["line"] for row in stdout_rows} == {
-        "[overlay][WARN] warning-line-0",
-        "[overlay][WARN] warning-line-1",
-    }
-    assert stderr_rows == []
+    assert {row["line"] for row in stdout_rows} == {"child_reported_warning"}
+    assert "warning-line-0" not in dump_files[0].read_text(encoding="utf-8")
+    assert "warning-line-1" not in dump_files[0].read_text(encoding="utf-8")
     assert summary["input_rejected"]["unstamped_child_line"] >= 3
 
 
@@ -3050,50 +2764,6 @@ async def test_overlay_ready_rejects_non_exact_native_retry_contract(
 
 
 @pytest.mark.asyncio
-async def test_overlay_trace_records_complete_sanitized_generation_context(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    manager = OverlayProcessManager(
-        overlay_instance_id="overlay-trace",
-        logging_mode="detailed",
-        selected_target="desktop",
-        fallback_reason="steamvr_not_running",
-        geometry_authority="flet",
-    )
-
-    with caplog.at_level("INFO", logger="puripuly_heart.core.overlay.process"):
-        outcome = await manager._handle_lifecycle_event(
-            {
-                "type": "overlay_trace",
-                "component": "desktop_window_startup",
-                "event": "bounds_confirmed",
-                "generation": 7,
-                "phase": "bounds_confirmed",
-                "monotonic_ms": 18.25,
-                "accepted": True,
-                "parent_pid": 2468,
-                "canonical_bounds": {"x": 20, "y": 30, "width": 900, "height": 240},
-                "observed_bounds": [20, 30, 900, 240],
-            },
-            allow_ready=False,
-        )
-
-    assert outcome == "ignored"
-    assert manager.diagnostics is not None
-    event = manager.diagnostics.process_events[-1]
-    assert event["trace_component"] == "desktop_window_startup"
-    assert event["trace_event"] == "bounds_confirmed"
-    assert event["generation"] == 7
-    assert event["source_monotonic_ms"] == 18.25
-    assert event["selected_target"] == "desktop"
-    assert event["fallback_reason"] == "steamvr_not_running"
-    assert event["geometry_authority"] == "flet"
-    assert event["parent_pid"] == 2468
-    assert event["canonical_bounds"] == {"x": 20, "y": 30, "width": 900, "height": 240}
-    assert event["observed_bounds"] == [20, 30, 900, 240]
-
-
-@pytest.mark.asyncio
 async def test_overlay_stop_drains_terminal_child_lifecycle_trace() -> None:
     class DrainingProcess:
         pid = 4321
@@ -3110,9 +2780,6 @@ async def test_overlay_stop_drains_terminal_child_lifecycle_trace() -> None:
 
         async def terminate(self) -> None:
             return None
-
-        def set_logging_mode(self, mode: str) -> None:
-            _ = mode
 
         def drain_events(self) -> list[OverlayProcessEvent]:
             return [
@@ -3173,9 +2840,6 @@ async def test_connected_expected_exit_drains_all_terminal_child_traces() -> Non
 
         async def terminate(self) -> None:
             return None
-
-        def set_logging_mode(self, mode: str) -> None:
-            _ = mode
 
         def drain_events(self) -> list[OverlayProcessEvent]:
             events = [_process_event(event) for event in self.events]

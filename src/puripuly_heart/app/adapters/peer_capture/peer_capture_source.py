@@ -12,9 +12,8 @@ PeerCaptureLoopbackSourceFactory = Callable[..., object]
 PeerCaptureProcessSourceFactory = Callable[..., object]
 PeerCaptureProcessWatcherFactory = Callable[[], object]
 PeerCapturePipelineFactory = Callable[..., object]
-PeerCaptureDetailedLog = Callable[[str], object]
+PeerCaptureDiagnosticLog = Callable[[str], object]
 PeerCaptureSourceWrapper = Callable[[object], object]
-PeerCaptureDetailedEnabled = Callable[[], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,9 +22,8 @@ class PeerCaptureSourceAdapter:
     process_source_factory: PeerCaptureProcessSourceFactory
     process_watcher_factory: PeerCaptureProcessWatcherFactory
     pipeline_factory: PeerCapturePipelineFactory
-    log_detailed: PeerCaptureDetailedLog
+    log_diagnostic: PeerCaptureDiagnosticLog
     wrap_source: PeerCaptureSourceWrapper
-    is_detailed_enabled: PeerCaptureDetailedEnabled
 
     def __call__(
         self,
@@ -38,7 +36,7 @@ class PeerCaptureSourceAdapter:
 
         device_name = target.device_name or config.output_device
         raw_source = self.loopback_source_factory(device_name=device_name)
-        self.log_detailed(
+        self.log_diagnostic(
             "[AudioDiag][Loopback][peer] "
             f"requested_device={device_name!r} "
             f"resolved_device_name={getattr(raw_source, 'resolved_device_name', None)!r} "
@@ -62,7 +60,7 @@ class PeerCaptureSourceAdapter:
             identity=identity,
             watcher=self.process_watcher_factory(),
         )
-        self.log_detailed(
+        self.log_diagnostic(
             "[AudioDiag][ProcessCapture][peer] "
             f"target_kind={config.capture_target.process_kind} capture=process"
         )
@@ -76,14 +74,11 @@ class PeerCaptureSourceAdapter:
         return self.pipeline_factory(
             source=self.wrap_source(raw_source),
             target_sample_rate_hz=config.target_sample_rate_hz,
-            is_detailed_enabled=self.is_detailed_enabled,
-            log_detailed=lambda message: self.log_detailed(message),
         )
 
 
 __all__ = [
-    "PeerCaptureDetailedEnabled",
-    "PeerCaptureDetailedLog",
+    "PeerCaptureDiagnosticLog",
     "PeerCaptureLoopbackSourceFactory",
     "PeerCapturePipelineFactory",
     "PeerCaptureProcessSourceFactory",

@@ -37,7 +37,7 @@ DESKTOP_INTERACTION_MODES = frozenset(
 SettingsApplicationProvider = Callable[[], SettingsApplicationOwner]
 OverlayApplicationProvider = Callable[[], OverlayApplicationOwner]
 DesktopPresentationSink = Callable[[str, bool], None]
-DesktopDetailedLogSink = Callable[[str, int, Exception | None], object]
+DesktopDiagnosticLogSink = Callable[[str, int, Exception | None], object]
 
 
 @dataclass(slots=True)
@@ -48,7 +48,7 @@ class DesktopOverlayApplicationOwner:
     work_area: DesktopWorkAreaPort
     policy: DesktopOverlayPolicy
     presentation_sink: DesktopPresentationSink
-    log_detailed: DesktopDetailedLogSink
+    log_diagnostic: DesktopDiagnosticLogSink
     _interaction_mode: str = field(
         init=False,
         default=DESKTOP_INTERACTION_MODE_EDIT,
@@ -585,7 +585,7 @@ class DesktopOverlayApplicationOwner:
         level: int = logging.INFO,
         exception: Exception | None = None,
     ) -> None:
-        self.log_detailed(message, level, exception)
+        self.log_diagnostic(message, level, exception)
 
 
 __all__ = [

@@ -400,7 +400,6 @@ async def test_renderer_envelope_feeds_manager_eligibility() -> None:
         log_dir="logs",
         log_level="INFO",
         locale="en",
-        logging_mode="basic",
     )
     renderer = desktop_overlay.DesktopOverlayRenderer(manifest)
     envelope = renderer._startup_error_event(  # noqa: SLF001

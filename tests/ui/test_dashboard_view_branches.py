@@ -340,11 +340,11 @@ def test_dashboard_translation_visual_commit_forwards_metadata_and_runtime_log(
 ) -> None:
     view = _make_dashboard(monkeypatch)
 
-    def fake_runtime_log_detailed(message: str, *, level: int = logging.INFO) -> bool:
+    def fake_runtime_log_diagnostic(message: str, *, level: int = logging.INFO) -> bool:
         _ = (message, level)
         return True
 
-    view.runtime_log_detailed = fake_runtime_log_detailed
+    view.runtime_log_diagnostic = fake_runtime_log_diagnostic
 
     view.set_display_translation_text(
         "dst",
@@ -361,7 +361,7 @@ def test_dashboard_translation_visual_commit_forwards_metadata_and_runtime_log(
 
     assert view.display_card.translation_calls[-1] == ("dst", "font-en")
     assert view.display_card.translation_metadata_calls[-1] == {
-        "runtime_log_detailed": fake_runtime_log_detailed,
+        "runtime_log_diagnostic": fake_runtime_log_diagnostic,
         "update_id": "upd-1",
         "origin_wall_clock_ms": 1712345678901,
         "utterance_id": "utt-1",

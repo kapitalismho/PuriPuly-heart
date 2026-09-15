@@ -173,7 +173,7 @@ def test_managed_gemma_lifecycle_logs_bounded_failure_identity() -> None:
     _emit_managed_gemma_lifecycle_diagnostic(
         event,
         log_basic=lambda message, *, level: basic.append((message, level)),
-        log_detailed=lambda message, *, level: detailed.append((message, level)),
+        log_diagnostic=lambda message, *, level: detailed.append((message, level)),
     )
 
     assert basic == [
@@ -184,7 +184,7 @@ def test_managed_gemma_lifecycle_logs_bounded_failure_identity() -> None:
     ]
     assert detailed == [
         (
-            "[Detailed][ManagedGemma] lifecycle outcome=failed "
+            "[Diagnostic][ManagedGemma] lifecycle outcome=failed "
             "phase=task_done scope=ManagedGemmaRuntime "
             "task=prepare:model_unsafe_whitespace callback=release "
             "exception_class=RuntimeError",

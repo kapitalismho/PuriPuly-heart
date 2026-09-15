@@ -267,7 +267,7 @@ class RuntimeLoggingController:
         _ = level
         self.basic_messages.append(message)
 
-    def log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
+    def log_diagnostic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
         _ = level
         self.detailed_messages.append(message)
 
@@ -709,7 +709,6 @@ class ConstructionDummyController:
         self.app = app
         self.config_path = config_path
         self.settings = None
-        self.runtime_logging_mode = "detailed"
         self.basic_messages: list[str] = []
         self.detailed_messages: list[str] = []
         self.start_calls = 0
@@ -719,14 +718,11 @@ class ConstructionDummyController:
         self.window_visible_at_start = self.app._app.page.window.visible
         self.start_calls += 1
 
-    def set_runtime_logging_mode(self, mode: str) -> None:
-        self.runtime_logging_mode = mode
-
     def log_basic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
         _ = level
         self.basic_messages.append(message)
 
-    def log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
+    def log_diagnostic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
         _ = level
         self.detailed_messages.append(message)
 
@@ -761,7 +757,7 @@ class ConstructionDummyDashboardView(ft.Container):
         self.on_toggle_peer_translation = None
         self.on_language_change = None
         self.overlay_peer_contract = None
-        self.runtime_log_detailed = None
+        self.runtime_log_diagnostic = None
 
     def bind_dashboard_intents(self, *, translation, capture) -> None:
         self.on_send_message = translation.submit_message
@@ -808,8 +804,8 @@ class ConstructionDummySettingsView(ft.Container):
         self.show_snackbar = surface.show_snackbar
         if surface.runtime_log_basic is not None:
             self.runtime_log_basic = surface.runtime_log_basic
-        if surface.runtime_log_detailed is not None:
-            self.runtime_log_detailed = surface.runtime_log_detailed
+        if surface.runtime_log_diagnostic is not None:
+            self.runtime_log_diagnostic = surface.runtime_log_diagnostic
         self.on_providers_changed = provider.providers_changed
         self.on_request_openrouter_pkce = provider.request_openrouter_pkce
         self.on_verify_api_key = provider.verify_api_key
@@ -855,16 +851,6 @@ class ConstructionDummySettingsView(ft.Container):
 class ConstructionDummyLogsView(ft.Container):
     def __init__(self) -> None:
         super().__init__()
-        self.on_mode_change = None
-        self.bound_logs_intents: list[object] = []
-        self.runtime_logging_mode = "basic"
-
-    def bind_logs_intents(self, intents: object) -> None:
-        self.bound_logs_intents.append(intents)
-        self.on_mode_change = getattr(intents, "runtime_logging_mode_change", None)
-
-    def set_runtime_logging_mode(self, mode: str) -> None:
-        self.runtime_logging_mode = mode
 
     def apply_locale(self) -> None:
         return None
@@ -875,7 +861,7 @@ class ConstructionDummyLogsView(ft.Container):
     def log_basic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
         _ = (message, level)
 
-    def log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
+    def log_diagnostic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
         _ = (message, level)
 
 
@@ -966,9 +952,7 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert not hasattr(app.view_settings, "on_overlay_toggle")
     assert not hasattr(app.view_settings, "on_peer_translation_toggle")
     assert app.view_settings.runtime_log_basic == app.application.log_basic
-    assert app.view_settings.runtime_log_detailed == app.application.log_detailed
-    assert app.view_logs.on_mode_change == app._on_runtime_logging_mode_change
-    assert app.view_logs.runtime_logging_mode == "detailed"
+    assert app.view_settings.runtime_log_diagnostic == app.application.log_diagnostic
     assert isinstance(app.application, UiApplicationBoundary)
     assert app.application is app._ui_application
     assert isinstance(backend.app, FletUiPresentationAdapter)
@@ -1713,7 +1697,7 @@ def test_translator_app_keeps_debug_ui_preview_out_of_controller(
     assert not hasattr(app._presentation_adapter, "app")
 
 
-def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_path(
+def test_translator_app_wires_runtime_log_diagnostic_into_dashboard_visual_commit_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class DummyController:
@@ -1723,15 +1707,11 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
             self.config_path = config_path
             self.debug_ui_preview = debug_ui_preview
             self.settings = None
-            self.runtime_logging_mode = "basic"
-
-        def set_runtime_logging_mode(self, mode: str) -> None:
-            self.runtime_logging_mode = mode
 
         def log_basic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
             _ = (message, level)
 
-        def log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> bool:
+        def log_diagnostic(self, message: str, *, level: int = app_module.logging.INFO) -> bool:
             _ = (message, level)
             return True
 
@@ -1744,7 +1724,7 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
             self.on_toggle_overlay = None
             self.on_toggle_peer_translation = None
             self.on_language_change = None
-            self.runtime_log_detailed = None
+            self.runtime_log_diagnostic = None
 
         def bind_dashboard_intents(self, *, translation, capture) -> None:
             self.on_send_message = translation.submit_message
@@ -1793,13 +1773,6 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
     class DummyLogsView(ft.Container):
         def __init__(self) -> None:
             super().__init__()
-            self.on_mode_change = None
-
-        def bind_logs_intents(self, intents: object) -> None:
-            self.on_mode_change = getattr(intents, "runtime_logging_mode_change", None)
-
-        def set_runtime_logging_mode(self, mode: str) -> None:
-            _ = mode
 
         def apply_locale(self) -> None:
             return None
@@ -1842,7 +1815,7 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
         application_factory=application_factory,
     )
 
-    assert app.view_dashboard.runtime_log_detailed == app._log_detailed
+    assert app.view_dashboard.runtime_log_diagnostic == app._log_diagnostic
 
 
 def test_settings_view_pkce_callback_is_wired(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1915,28 +1888,6 @@ def test_app_tab_key_reverses_message_input_languages_only_on_dashboard() -> Non
     assert calls == ["tab"]
 
 
-def test_on_runtime_logging_mode_change_updates_controller_and_logs_view() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    seen: list[str] = []
-
-    def fake_set_mode(mode: str) -> None:
-        seen.append(mode)
-        controller.runtime_logging_mode = mode
-
-    controller = SimpleNamespace(
-        runtime_logging_mode="basic",
-        set_runtime_logging_mode=fake_set_mode,
-    )
-    app._ui_application = compose_test_ui_application_boundary(controller)
-    app.view_logs = SimpleNamespace(
-        set_runtime_logging_mode=lambda mode: seen.append(f"view:{mode}")
-    )
-
-    app._on_runtime_logging_mode_change("detailed")
-
-    assert seen == ["detailed", "view:detailed"]
-
-
 def _make_fake_main_gui_app(seen: dict[str, object]) -> type:
     class FakeController:
         async def start(self) -> None:
@@ -1970,14 +1921,14 @@ def _make_fake_main_gui_app(seen: dict[str, object]) -> type:
         async def shutdown(self) -> None:
             await self.application.stop()
 
-        def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
+        def _log_diagnostic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
             _ = (message, level)
 
         def schedule_after_launch_tasks(self) -> None:
             async def run() -> None:
                 await app_module._check_and_notify_update(
                     self.page,
-                    log_detailed=self._log_detailed,
+                    log_diagnostic=self._log_diagnostic,
                 )
 
             seen["after_launch_task"] = asyncio.create_task(run())
@@ -1993,8 +1944,8 @@ async def test_main_gui_routes_update_check_through_app_log_helper(
     seen: dict[str, object] = {}
     FakeApp = _make_fake_main_gui_app(seen)
 
-    async def fake_check_and_notify_update(incoming_page, *, log_detailed=None) -> None:
-        seen["check"] = (incoming_page, log_detailed)
+    async def fake_check_and_notify_update(incoming_page, *, log_diagnostic=None) -> None:
+        seen["check"] = (incoming_page, log_diagnostic)
 
     monkeypatch.setattr(app_module, "TranslatorApp", FakeApp)
     monkeypatch.setattr(app_module, "_check_and_notify_update", fake_check_and_notify_update)
@@ -2009,7 +1960,7 @@ async def test_main_gui_routes_update_check_through_app_log_helper(
     assert seen["started"] is True
     assert seen["check"][0] is page
     assert getattr(seen["check"][1], "__self__", None) is seen["app"]
-    assert getattr(seen["check"][1], "__func__", None) is FakeApp._log_detailed
+    assert getattr(seen["check"][1], "__func__", None) is FakeApp._log_diagnostic
     assert seen["init"] == (page, Path("settings.json"), False)
 
 
@@ -2021,8 +1972,8 @@ async def test_main_gui_forwards_debug_ui_preview_flag(
     seen: dict[str, object] = {}
     FakeApp = _make_fake_main_gui_app(seen)
 
-    async def fake_check_and_notify_update(incoming_page, *, log_detailed=None) -> None:
-        seen["check"] = (incoming_page, log_detailed)
+    async def fake_check_and_notify_update(incoming_page, *, log_diagnostic=None) -> None:
+        seen["check"] = (incoming_page, log_diagnostic)
 
     monkeypatch.setattr(app_module, "TranslatorApp", FakeApp)
     monkeypatch.setattr(app_module, "_check_and_notify_update", fake_check_and_notify_update)
@@ -2553,7 +2504,7 @@ def test_managed_china_dashboard_prompt_opens_qq_auth_not_discord() -> None:
     )
     app._ui_application = compose_test_ui_application_boundary(controller)
     app._log_basic = lambda *_args, **_kwargs: None
-    app._log_detailed = lambda *_args, **_kwargs: None
+    app._log_diagnostic = lambda *_args, **_kwargs: None
 
     handled = app._on_translation_toggle(True)
 
@@ -3045,7 +2996,7 @@ def _peer_translation_binding_app(
 ):
     app = TranslatorApp.__new__(TranslatorApp)
     app._log_basic = lambda *_args, **_kwargs: None
-    app._log_detailed = lambda *_args, **_kwargs: None
+    app._log_diagnostic = lambda *_args, **_kwargs: None
     tasks: list[object] = []
     shown: list[object] = []
     enabled: list[bool] = []
@@ -4698,7 +4649,7 @@ async def test_check_and_notify_update_swallows_exceptions(monkeypatch: pytest.M
 
     await _check_and_notify_update(
         page,
-        log_detailed=app._log_detailed,
+        log_diagnostic=app._log_diagnostic,
         load_update_info=raise_error,
     )
     assert page.opened == []

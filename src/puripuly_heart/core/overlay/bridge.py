@@ -23,7 +23,6 @@ from .manifest import (
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_NATIVE_RETRY_CONTRACT,
-    normalize_overlay_logging_mode,
 )
 from .protocol import OverlayPresentationSnapshot
 
@@ -151,8 +150,6 @@ class OverlayBridge:
     overlay_instance_id: str | None = None
     runtime_generation: int = 1
     diagnostics: OverlayDiagnosticsRecorder | None = None
-    runtime_logging_mode: str | None = None
-    runtime_logging_mode_revision: int = 0
     desktop_runtime_controls_enabled: bool = False
     task_factory: Any | None = None
     clock: Clock = field(default_factory=SystemClock)
@@ -380,16 +377,6 @@ class OverlayBridge:
     async def broadcast_shutdown(self) -> None:
         self._enqueue_control("shutdown", {"type": "shutdown"}, terminal=True)
 
-    async def broadcast_runtime_control(self, *, logging_mode: str) -> None:
-        normalized_mode = normalize_overlay_logging_mode(logging_mode)
-        if normalized_mode != self.runtime_logging_mode:
-            self.runtime_logging_mode_revision += 1
-        self._enqueue_control(
-            "runtime_control",
-            self._runtime_control_payload(normalized_mode),
-        )
-        self.runtime_logging_mode = normalized_mode
-
     async def broadcast_desktop_runtime_control(self, payload: Mapping[str, Any]) -> None:
         self._ensure_desktop_runtime_controls_enabled()
         message = self._desktop_runtime_control_message(payload)
@@ -450,8 +437,6 @@ class OverlayBridge:
                 )
             self._ensure_writer()
             self._writer_wakeup.set()
-            if not self.desktop_runtime_controls_enabled and self.runtime_logging_mode is not None:
-                self._enqueue_control("runtime_control", self._runtime_control_payload())
             await asyncio.sleep(0)
             async for raw_message in connection:
                 message = self._load_message(raw_message)
@@ -907,23 +892,10 @@ class OverlayBridge:
             except asyncio.QueueEmpty:
                 return
 
-    def _runtime_control_payload(self, logging_mode: str | None = None) -> dict[str, Any]:
-        return {
-            "type": "runtime_control",
-            "payload": {
-                "logging_mode": normalize_overlay_logging_mode(
-                    logging_mode or self.runtime_logging_mode or "basic"
-                ),
-                "logging_mode_revision": self.runtime_logging_mode_revision,
-            },
-        }
-
     def _startup_runtime_controls(self) -> list[dict[str, Any]] | None:
         if not self.desktop_runtime_controls_enabled:
             return None
         controls: list[dict[str, Any]] = []
-        if self.runtime_logging_mode is not None:
-            controls.append(dict(self._runtime_control_payload()["payload"]))
         controls.extend(dict(control) for control in self._mailbox.initial_desktop_runtime_controls)
         return controls
 

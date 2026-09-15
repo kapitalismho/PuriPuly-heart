@@ -9,7 +9,6 @@ import secrets
 import sys
 import tempfile
 import time
-from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -32,8 +31,6 @@ from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 GPU_WORKER_CONTRACT_VERSION = 2
 GPU_WORKER_EXECUTABLE_NAME = "PuriPulyHeartGpuWorker.exe"
 _MAX_FRAME_BYTES = 4 * 1024 * 1024
-_MAX_STDERR_LINES = 64
-_MAX_STDERR_LINE_CHARS = 2_000
 _STDERR_FAILURE_FLUSH_SECONDS = 0.05
 
 logger = logging.getLogger(__name__)
@@ -264,7 +261,7 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
     _close_complete: asyncio.Event = field(init=False, repr=False)
     _last_heartbeat: float = field(init=False, repr=False)
     _terminal_error: GpuWorkerClosedError | None = field(init=False, default=None, repr=False)
-    _stderr_tail: deque[str] = field(init=False, repr=False)
+    _stderr_line_count: int = field(init=False, default=0, repr=False)
     _stderr_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _closed: bool = field(init=False, default=False, repr=False)
     _closing: bool = field(init=False, default=False, repr=False)
@@ -276,7 +273,7 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
         self._close_lock = asyncio.Lock()
         self._close_complete = asyncio.Event()
         self._last_heartbeat = time.monotonic()
-        self._stderr_tail = deque(maxlen=_MAX_STDERR_LINES)
+        self._stderr_line_count = 0
         start_lifecycle_task(self._scope, self._read_frames(), name="frame-reader")
         start_lifecycle_task(self._scope, self._monitor_process(), name="process-monitor")
         start_lifecycle_task(self._scope, self._monitor_heartbeat(), name="heartbeat-monitor")
@@ -551,7 +548,7 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
         if future is None or future.done():
             return
         if payload.get("status") == "ok":
-            self._stderr_tail.clear()
+            self._stderr_line_count = 0
             response_payload = payload.get("payload")
             if isinstance(response_payload, dict):
                 future.set_result(cast(dict[str, object], response_payload))
@@ -562,13 +559,10 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
         response_payload = payload.get("payload")
         failure_code = code if isinstance(code, str) else "worker_failure"
         if failure_code == "cancelled":
-            self._stderr_tail.clear()
+            self._stderr_line_count = 0
         else:
             await asyncio.sleep(_STDERR_FAILURE_FLUSH_SECONDS)
-            self._log_failure_stderr(
-                failure_code=failure_code,
-                request_id=request_id,
-            )
+            self._log_failure_stderr(failure_code=failure_code)
         future.set_exception(
             GpuWorkerRequestError(
                 failure_code,
@@ -637,30 +631,24 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
 
     async def _capture_stderr(self, stream: asyncio.StreamReader) -> None:
         while raw_line := await stream.readline():
-            line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
-            if not line:
-                continue
-            if len(line) > _MAX_STDERR_LINE_CHARS:
-                line = f"{line[:_MAX_STDERR_LINE_CHARS]}…"
-            self._stderr_tail.append(line)
+            if raw_line.strip():
+                self._stderr_line_count += 1
 
     def _log_failure_stderr(
         self,
         *,
         failure_code: str,
-        request_id: str | None = None,
         exit_code: int | None = None,
     ) -> None:
-        stderr_tail = tuple(self._stderr_tail)
-        self._stderr_tail.clear()
-        if not stderr_tail:
+        stderr_line_count = self._stderr_line_count
+        self._stderr_line_count = 0
+        if not stderr_line_count:
             return
         logger.error(
-            "[GPUWorker][Failure] failure_code=%s request_id=%s exit_code=%s stderr_tail=%s",
+            "[GPUWorker][Failure] failure_code=%s exit_code=%s stderr_line_count=%s",
             failure_code,
-            request_id or "none",
             exit_code if exit_code is not None else "none",
-            json.dumps(stderr_tail, ensure_ascii=False),
+            stderr_line_count,
         )
 
     def _fail_pending(self, error: BaseException) -> None:

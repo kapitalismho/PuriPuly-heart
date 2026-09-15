@@ -147,7 +147,7 @@ OverlayAsyncEffect = Callable[[], Awaitable[None]]
 OverlayPresentationSink = Callable[[OverlayPeerPresentationState | None], None]
 OverlayStateSink = Callable[[str, str | None], None]
 OverlayFallbackNoticeSink = Callable[[bool], None]
-OverlayDetailedLogSink = Callable[[str, int, Exception | None], object]
+OverlayDiagnosticLogSink = Callable[[str, int, Exception | None], object]
 OverlayBasicLogSink = Callable[[str, int], object]
 OverlayCalibrationProvider = Callable[[], OverlayCalibration]
 OverlayValueProvider = Callable[[], str]
@@ -178,7 +178,6 @@ class OverlayApplicationOwner:
     cancel_bounds_persistence: OverlayAsyncEffect = field(repr=False)
     clear_bounds_suppressed: OverlayEffect = field(repr=False)
     calibration_provider: OverlayCalibrationProvider = field(repr=False)
-    logging_mode_provider: OverlayValueProvider = field(repr=False)
     log_dir_provider: OverlayValueProvider = field(repr=False)
     desktop_controls_factory: OverlayDesktopControlsFactory = field(repr=False)
     interaction_mode_sink: OverlayInteractionModeSink = field(repr=False)
@@ -187,7 +186,7 @@ class OverlayApplicationOwner:
     edit_interaction_mode: str
     clock: Clock
     log_basic: OverlayBasicLogSink = field(repr=False)
-    log_detailed: OverlayDetailedLogSink = field(repr=False)
+    log_diagnostic: OverlayDiagnosticLogSink = field(repr=False)
     translation_enabled_provider: OverlayTranslationEnabledProvider = field(repr=False)
     _runtime: OverlayRuntimeHandle | None = field(init=False, default=None, repr=False)
     _state: str = field(init=False, default="off", repr=False)
@@ -570,7 +569,7 @@ class OverlayApplicationOwner:
                 emit_shutdown=False,
             )
         except Exception as exc:
-            self.log_detailed(
+            self.log_diagnostic(
                 "[Overlay] Stale overlay start cleanup reported failure",
                 logging.WARNING,
                 exc,
@@ -585,15 +584,15 @@ class OverlayApplicationOwner:
                 )
             except Exception as exc:
                 message = "[Overlay] Stale output ingress detach reported failure"
-                detailed_emitted = self.log_detailed(message, logging.WARNING, exc)
-                if not detailed_emitted:
+                diagnostic_emitted = self.log_diagnostic(message, logging.WARNING, exc)
+                if not diagnostic_emitted:
                     self.log_basic(message, logging.WARNING)
         try:
             self.detach_translation_diagnostics(diagnostics)
         except Exception as exc:
             message = "[Overlay] Stale diagnostics detach reported failure"
-            detailed_emitted = self.log_detailed(message, logging.WARNING, exc)
-            if not detailed_emitted:
+            diagnostic_emitted = self.log_diagnostic(message, logging.WARNING, exc)
+            if not diagnostic_emitted:
                 self.log_basic(message, logging.WARNING)
 
     async def begin_start(self) -> OverlaySessionStartStatus | None:
@@ -696,7 +695,7 @@ class OverlayApplicationOwner:
                 "[Overlay] Retired VR cleanup failed: "
                 f"overlay_instance_id={runtime.overlay_instance_id}"
             )
-            if not self.log_detailed(message, logging.WARNING, exc):
+            if not self.log_diagnostic(message, logging.WARNING, exc):
                 self.log_basic(message, logging.WARNING)
             return False
         return True
@@ -776,12 +775,12 @@ class OverlayApplicationOwner:
 
     def _generation_effects(self) -> OverlayGenerationStartEffects:
         return OverlayGenerationStartEffects(
-            log_runtime=lambda message, **_kwargs: self.log_detailed(
+            log_runtime=lambda message, **_kwargs: self.log_diagnostic(
                 message,
                 logging.INFO,
                 None,
             ),
-            log_failure=lambda message, level, exception: self.log_detailed(
+            log_failure=lambda message, level, exception: self.log_diagnostic(
                 message,
                 level,
                 exception,
@@ -795,7 +794,6 @@ class OverlayApplicationOwner:
             set_diagnostics=self.attach_translation_diagnostics,
             set_target=self._set_active_target,
             calibration_snapshot=self.calibration_provider,
-            logging_mode=self.logging_mode_provider,
             locale=self._locale,
             log_dir=self.log_dir_provider,
             build_desktop_controls=self.desktop_controls_factory,
@@ -1099,7 +1097,7 @@ class OverlayApplicationOwner:
             "generation": recovery_generation,
             "replacement_started": False,
         }
-        self.log_detailed(
+        self.log_diagnostic(
             "[Overlay] Desktop startup recovery eligible: "
             f"failure_reason={reason} "
             f"failed_overlay_instance_id={failed_instance_id} "
@@ -1120,7 +1118,7 @@ class OverlayApplicationOwner:
             or not previous.transfer_reap_complete()
             or not cleanup_complete
         ):
-            self.log_detailed(
+            self.log_diagnostic(
                 "[Overlay] Desktop startup recovery teardown uncertain; terminal",
                 logging.WARNING,
                 None,
@@ -1248,7 +1246,7 @@ class OverlayApplicationOwner:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self.log_detailed(
+            self.log_diagnostic(
                 "[Overlay] Peer dependency refresh failed after desktop recovery terminal",
                 logging.WARNING,
                 exc,
@@ -1271,7 +1269,7 @@ class OverlayApplicationOwner:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self.log_detailed(
+            self.log_diagnostic(
                 "[Overlay] Peer dependency refresh failed after terminal fallback",
                 logging.WARNING,
                 exc,
@@ -1402,8 +1400,8 @@ class OverlayApplicationOwner:
         except Exception as exc:
             close_succeeded = False
             message = "[Overlay] Overlay runtime close reported cleanup failure"
-            detailed_emitted = self.log_detailed(message, logging.WARNING, exc)
-            if not detailed_emitted:
+            diagnostic_emitted = self.log_diagnostic(message, logging.WARNING, exc)
+            if not diagnostic_emitted:
                 self.log_basic(message, logging.WARNING)
         if close_succeeded and not self.runtime_has_resources(runtime):
             self._runtime = None
@@ -1432,7 +1430,7 @@ class OverlayApplicationOwner:
                     ),
                     "outcome": "connected",
                 }
-                self.log_detailed(
+                self.log_diagnostic(
                     "[Overlay] Desktop startup recovery connected: "
                     f"failure_reason={recovery.get('failure_reason')} "
                     f"failed_overlay_instance_id={failed_id} "
@@ -1499,7 +1497,7 @@ class OverlayApplicationOwner:
         ]
         if diagnostic.failure_type is not None:
             fields.append(f"failure_type={diagnostic.failure_type}")
-        self.log_detailed(
+        self.log_diagnostic(
             f"[Overlay] generation_start {' '.join(fields)}",
             logging.WARNING if diagnostic.outcome == "failed" else logging.INFO,
             None,
@@ -1523,7 +1521,7 @@ class OverlayApplicationOwner:
                 logging.WARNING,
             )
             return
-        self.log_detailed(
+        self.log_diagnostic(
             f"[Overlay] session_transition {' '.join(fields)}",
             (
                 logging.WARNING
@@ -1539,7 +1537,7 @@ class OverlayApplicationOwner:
         _metadata: object,
         exception: Exception | None,
     ) -> None:
-        self.log_detailed(
+        self.log_diagnostic(
             f"[Overlay] Session desktop fallback failed: event={event}",
             logging.WARNING,
             exception,

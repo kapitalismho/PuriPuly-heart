@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from pathlib import Path
 from types import SimpleNamespace
@@ -16,28 +15,24 @@ from puripuly_heart.app.wiring.wiring_application_runtime_logging import (
 )
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_FINAL_DIAGNOSTICS
 from puripuly_heart.core.observability import ProviderObservationPort
-from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks, SessionLoggingMode
+from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
 
 
 class RecordingRuntimeLogging:
     def __init__(self) -> None:
-        self.mode = SessionLoggingMode.BASIC
         self.basic: list[tuple[int, str]] = []
         self.detailed: list[tuple[int, str]] = []
         self.persisted: list[tuple[int, str]] = []
         self.close_failures: tuple[BaseException, ...] | None = None
 
-    def set_mode(self, mode: SessionLoggingMode | str) -> None:
-        self.mode = SessionLoggingMode(mode)
-
     def emit_basic(self, message: str, *, level: int) -> None:
         self.basic.append((level, message))
 
-    def emit_detailed(self, message: str, *, level: int) -> bool:
+    def emit_diagnostic(self, message: str, *, level: int) -> bool:
         self.detailed.append((level, message))
         return True
 
-    def emit_detailed_lazy(self, build_message, *, level: int) -> bool:
+    def emit_diagnostic_lazy(self, build_message, *, level: int) -> bool:
         self.detailed.append((level, build_message()))
         return True
 
@@ -60,36 +55,6 @@ def _owner() -> tuple[ApplicationRuntimeLoggingOwner, list[object]]:
     return owner, attached
 
 
-def test_owner_controls_mode_transition_and_presentation_attachment() -> None:
-    owner, attached = _owner()
-    service = RecordingRuntimeLogging()
-    owner.install_service(service)
-    detailed_enabled: list[str] = []
-    modes: list[str] = []
-
-    owner.set_mode(
-        "detailed",
-        detailed_enabled=lambda: detailed_enabled.append("enabled"),
-        mode_changed=modes.append,
-    )
-
-    assert owner.mode == "detailed"
-    assert detailed_enabled == ["enabled"]
-    assert modes == ["detailed"]
-    assert attached == [service, service]
-
-
-def test_owner_initializes_mode_without_ui_transition_effects() -> None:
-    owner, attached = _owner()
-    service = RecordingRuntimeLogging()
-    owner.install_service(service)
-
-    owner.initialize_mode("detailed")
-
-    assert service.mode is SessionLoggingMode.DETAILED
-    assert attached == [service]
-
-
 def test_owner_exposes_provider_observation_capability() -> None:
     owner, _ = _owner()
     service = RecordingRuntimeLogging()
@@ -109,13 +74,84 @@ def test_owner_formats_exception_detail_and_preserves_lazy_evaluation() -> None:
     try:
         raise RuntimeError("sensitive detail")
     except RuntimeError as error:
-        assert owner.emit_detailed("failed", level=logging.WARNING, exception=error) is True
-    assert owner.emit_detailed_lazy(lambda: "lazy", level=logging.INFO) is True
+        assert owner.emit_diagnostic("failed", level=logging.WARNING, exception=error) is True
+    assert owner.emit_diagnostic_lazy(lambda: "lazy", level=logging.INFO) is True
 
-    assert service.detailed[0][0] == logging.WARNING
-    assert service.detailed[0][1].startswith("failed\nTraceback")
-    assert "RuntimeError: sensitive detail" in service.detailed[0][1]
+    assert service.detailed[0] == (
+        logging.WARNING,
+        "failed exception_type=RuntimeError",
+    )
     assert service.detailed[1] == (logging.INFO, "lazy")
+
+
+def test_owner_fallback_preserves_audience_and_never_forwards_raw_diagnostics() -> None:
+    class FailingRuntimeLogging:
+        def emit_basic(self, *_args: object, **_kwargs: object) -> None:
+            raise RuntimeError("unavailable")
+
+        def emit_diagnostic(self, *_args: object, **_kwargs: object) -> bool:
+            raise RuntimeError("unavailable")
+
+        def emit_diagnostic_lazy(self, build_message, **_kwargs: object) -> bool:
+            build_message()
+            raise RuntimeError("unavailable")
+
+    records: list[logging.LogRecord] = []
+
+    class Capture(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record)
+
+    fallback = logging.getLogger("test.application-runtime-logging.fallback")
+    fallback.handlers.clear()
+    fallback.propagate = False
+    fallback.setLevel(logging.INFO)
+    fallback.addHandler(Capture())
+    owner = ApplicationRuntimeLoggingOwner(
+        presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
+        service_factory=FailingRuntimeLogging,
+        fallback_logger=fallback,
+    )
+    lazy_calls = 0
+
+    def lazy_message() -> str:
+        nonlocal lazy_calls
+        lazy_calls += 1
+        return "provider_response_body=private-lazy-body"
+
+    owner.emit_basic("The translation service failed.", level=logging.ERROR)
+    assert (
+        owner.emit_diagnostic(
+            "provider_response_body=private-direct-body",
+            level=logging.ERROR,
+        )
+        is True
+    )
+    assert owner.emit_diagnostic_lazy(lazy_message, level=logging.WARNING) is True
+
+    rendered = "\n".join(record.getMessage() for record in records)
+    assert "The translation service failed." in rendered
+    assert "private-direct-body" not in rendered
+    assert "private-lazy-body" not in rendered
+    assert "diagnostic_delivery_failed" in rendered
+    assert lazy_calls == 1
+
+
+def test_owner_diagnostic_fallback_reports_failed_delivery_without_handlers() -> None:
+    class FailingRuntimeLogging:
+        def emit_diagnostic(self, *_args: object, **_kwargs: object) -> bool:
+            raise RuntimeError("unavailable")
+
+    fallback = logging.getLogger("test.application-runtime-logging.no-handler")
+    fallback.handlers.clear()
+    fallback.propagate = False
+    owner = ApplicationRuntimeLoggingOwner(
+        presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
+        service_factory=FailingRuntimeLogging,
+        fallback_logger=fallback,
+    )
+
+    assert owner.emit_diagnostic("private payload", level=logging.ERROR) is False
 
 
 def test_owner_keeps_shutdown_diagnostics_and_close_on_the_logging_boundary() -> None:
@@ -157,61 +193,6 @@ def test_owner_keeps_shutdown_diagnostics_and_close_on_the_logging_boundary() ->
     assert service.close_failures == (cleanup_error,)
 
 
-@pytest.mark.asyncio
-async def test_owner_owns_and_cancels_fallback_overlay_update_task() -> None:
-    entered = asyncio.Event()
-    cancelled = asyncio.Event()
-
-    async def update_overlay() -> None:
-        entered.set()
-        try:
-            await asyncio.Event().wait()
-        except asyncio.CancelledError:
-            cancelled.set()
-            raise
-
-    owner = ApplicationRuntimeLoggingOwner(
-        presentation=SimpleNamespace(
-            attach_runtime_log_sink=lambda _service: None,
-            schedule_task=lambda _callback: False,
-        ),
-        service_factory=RecordingRuntimeLogging,
-        fallback_logger=logging.getLogger("test.application-runtime-logging.tasks"),
-        overlay_logging_mode_update=update_overlay,
-        overlay_logging_mode_update_available=lambda: True,
-    )
-
-    owner.schedule_overlay_logging_mode_update()
-    await entered.wait()
-
-    assert owner.active_task_names
-
-    await owner.close_background_tasks()
-
-    assert cancelled.is_set()
-    assert owner.active_task_names == ()
-
-
-def test_owner_stops_new_background_ingress() -> None:
-    scheduled: list[object] = []
-    owner = ApplicationRuntimeLoggingOwner(
-        presentation=SimpleNamespace(
-            attach_runtime_log_sink=lambda _service: None,
-            schedule_task=lambda callback: scheduled.append(callback) or True,
-        ),
-        service_factory=RecordingRuntimeLogging,
-        fallback_logger=logging.getLogger("test.application-runtime-logging.ingress"),
-        overlay_logging_mode_update=lambda: asyncio.sleep(0),
-        overlay_logging_mode_update_available=lambda: True,
-    )
-
-    owner.stop_ingress()
-    owner.schedule_audio_environment_snapshot()
-    owner.schedule_overlay_logging_mode_update()
-
-    assert scheduled == []
-
-
 @pytest.fixture
 def composed_logging(tmp_path: Path, monkeypatch):
     root = logging.getLogger()
@@ -229,8 +210,6 @@ def composed_logging(tmp_path: Path, monkeypatch):
             attach_runtime_log_sink=lambda service: service.attach_realtime_sink(realtime),
         ),
         sinks=RuntimeLoggingSinks(logging.NullHandler(), file_handler, log_file),
-        overlay_logging_mode_update=lambda: asyncio.sleep(0),
-        overlay_logging_mode_update_available=lambda: False,
     )
     try:
         yield owner, log_file, conversation
@@ -257,8 +236,10 @@ def test_composed_logging_persists_source_and_translation(composed_logging, capl
         )
 
     persisted = log_file.read_text(encoding="utf-8")
-    assert 'source="안녕하세요"' in persisted
-    assert 'translation="Hello"' in persisted
+    assert "Original" in persisted and '"안녕하세요"' in persisted
+    assert "→ English" in persisted and '"Hello"' in persisted
+    assert "manual-turn" not in persisted
+    assert "target_index" not in persisted
     assert [(record["source_text"], record["translated_text"]) for record in conversation] == [
         ("안녕하세요", None),
         (None, "Hello"),

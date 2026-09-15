@@ -226,7 +226,7 @@ class DisplayCard(ft.Container):
         is_error: bool = False,
         font_family: str | None = None,
         *,
-        runtime_log_detailed: Callable[..., bool | None] | None = None,
+        runtime_log_diagnostic: Callable[..., bool | None] | None = None,
         update_id: str | None = None,
         origin_wall_clock_ms: int | None = None,
         utterance_id: object | None = None,
@@ -249,13 +249,13 @@ class DisplayCard(ft.Container):
         self._turn_size_cap = _display_layout_for_length(
             _weighted_len(_apply_debug_prefix(text or "", debug_prefix))
         )[0]
-        measure = should_log and runtime_log_detailed is not None
+        measure = should_log and runtime_log_diagnostic is not None
         display_update_issued, flet_update_elapsed_us = self._sync_display(
             measure_flet_update=measure
         )
         if should_log:
             self._emit_dashboard_source_applied(
-                runtime_log_detailed=runtime_log_detailed,
+                runtime_log_diagnostic=runtime_log_diagnostic,
                 update_id=update_id,
                 origin_wall_clock_ms=origin_wall_clock_ms,
                 utterance_id=utterance_id,
@@ -271,7 +271,7 @@ class DisplayCard(ft.Container):
         text: str | None,
         font_family: str | None = None,
         *,
-        runtime_log_detailed: Callable[..., bool | None] | None = None,
+        runtime_log_diagnostic: Callable[..., bool | None] | None = None,
         update_id: str | None = None,
         origin_wall_clock_ms: int | None = None,
         utterance_id: object | None = None,
@@ -288,12 +288,12 @@ class DisplayCard(ft.Container):
         self._translation_value = text or None
         self._translation_font_family = font_family if text else None
         self._debug_prefix = debug_prefix
-        measure = runtime_log_detailed is not None
+        measure = runtime_log_diagnostic is not None
         display_update_issued, flet_update_elapsed_us = self._sync_display(
             measure_flet_update=measure
         )
         self._emit_dashboard_translation_visual_commit(
-            runtime_log_detailed=runtime_log_detailed,
+            runtime_log_diagnostic=runtime_log_diagnostic,
             update_id=update_id,
             origin_wall_clock_ms=origin_wall_clock_ms,
             utterance_id=utterance_id,
@@ -383,7 +383,7 @@ class DisplayCard(ft.Container):
     def _emit_dashboard_translation_visual_commit(
         self,
         *,
-        runtime_log_detailed: Callable[..., bool | None] | None,
+        runtime_log_diagnostic: Callable[..., bool | None] | None,
         update_id: str | None,
         origin_wall_clock_ms: int | None,
         utterance_id: object | None,
@@ -395,7 +395,7 @@ class DisplayCard(ft.Container):
         display_update_issued: bool,
         flet_update_elapsed_us: int | None = None,
     ) -> None:
-        if runtime_log_detailed is None or update_id is None:
+        if runtime_log_diagnostic is None or update_id is None:
             return
         if not display_update_issued:
             return
@@ -407,7 +407,7 @@ class DisplayCard(ft.Container):
             elapsed_ms = max(0, int(time.time() * 1000) - origin_wall_clock_ms)
 
         parts = [
-            "[Detailed][DisplayCard] dashboard_translation_visual_commit",
+            "[Diagnostic][DisplayCard] dashboard_translation_visual_commit",
             f"utterance_id={utterance_id}",
             f"channel={channel}",
             f"update_id={update_id}",
@@ -428,14 +428,14 @@ class DisplayCard(ft.Container):
             parts.append(f"flet_update_elapsed_us={flet_update_elapsed_us}")
 
         try:
-            runtime_log_detailed(" ".join(parts), level=logging.INFO)
+            runtime_log_diagnostic(" ".join(parts), level=logging.INFO)
         except Exception:
             return
 
     def _emit_dashboard_source_applied(
         self,
         *,
-        runtime_log_detailed: Callable[..., bool | None] | None,
+        runtime_log_diagnostic: Callable[..., bool | None] | None,
         update_id: str | None,
         origin_wall_clock_ms: int | None,
         utterance_id: object | None,
@@ -445,7 +445,7 @@ class DisplayCard(ft.Container):
         display_update_issued: bool,
         flet_update_elapsed_us: int | None = None,
     ) -> None:
-        if runtime_log_detailed is None:
+        if runtime_log_diagnostic is None:
             return
         if not display_update_issued:
             return
@@ -455,7 +455,7 @@ class DisplayCard(ft.Container):
             elapsed_ms = max(0, int(time.time() * 1000) - origin_wall_clock_ms)
 
         parts = [
-            "[Detailed][DisplayCard] dashboard_source_applied",
+            "[Diagnostic][DisplayCard] dashboard_source_applied",
             f"utterance_id={utterance_id}",
             f"channel={channel}",
             f"update_id={update_id if update_id is not None else 'none'}",
@@ -473,7 +473,7 @@ class DisplayCard(ft.Container):
             parts.append(f"flet_update_elapsed_us={flet_update_elapsed_us}")
 
         try:
-            runtime_log_detailed(" ".join(parts), level=logging.INFO)
+            runtime_log_diagnostic(" ".join(parts), level=logging.INFO)
         except Exception:
             return
 

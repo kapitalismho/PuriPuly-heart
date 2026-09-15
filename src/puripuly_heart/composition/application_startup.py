@@ -28,7 +28,6 @@ from puripuly_heart.app.wiring_translation_runtime_configuration import (
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
-from puripuly_heart.core.runtime_logging import SessionLoggingMode
 
 
 @dataclass(slots=True)
@@ -109,7 +108,6 @@ class ApplicationStartupAdapter:
         )
         with contextlib.suppress(Exception):
             self.presentation.apply_locale()
-        self.runtime_logging.initialize_mode(SessionLoggingMode.BASIC)
         self.presentation.attach_runtime_log_sink(self.runtime_logging)
 
     async def launch_startup_runtime(self, state: ApplicationStartupState) -> None:

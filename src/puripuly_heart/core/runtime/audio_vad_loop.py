@@ -7,7 +7,6 @@ from collections.abc import AsyncIterator, Callable
 
 import numpy as np
 
-from puripuly_heart.core.audio.diagnostics import compute_audio_frame_metrics
 from puripuly_heart.core.audio.format import (
     AudioCaptureSpan,
     AudioFrameF32,
@@ -19,7 +18,7 @@ from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
 from puripuly_heart.core.audio.smart_turn import SmartTurnInferenceOwner
 from puripuly_heart.core.audio.source import AudioSource
 from puripuly_heart.core.audio.streaming_resampler import CaptureMappedStreamingResampler
-from puripuly_heart.core.vad.gating import VadGating
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart, VadGating
 from puripuly_heart.core.vad.sink import VadEventSink
 
 
@@ -131,8 +130,6 @@ async def run_audio_vad_loop(
     target_sample_rate_hz: int,
     audio_gate: VrcMicAudioGate | None = None,
     channel_label: str = "self",
-    is_detailed_enabled: Callable[[], bool] | None = None,
-    log_detailed: Callable[[str], object] | None = None,
     log_basic: Callable[[str], object] | None = None,
     segment_ledger: PeerAudioSegmentLedger | None = None,
     monotonic_clock: Callable[[], float] = time.monotonic,
@@ -147,10 +144,6 @@ async def run_audio_vad_loop(
     source_format: tuple[int, int] | None = None
     synthetic_source_next_sample = 0
     synthetic_sequence = 0
-    gate_gated_audio_ms = 0.0
-    gate_passed_audio_ms = 0.0
-    gate_log_accumulated_ms = 0.0
-    vad_input_accumulated_audio_ms = 0.0
     delivery_controller: ListenDeliveryController | None = None
     progress_audio_ms = 0.0
     progress_speech_observed = False
@@ -166,25 +159,36 @@ async def run_audio_vad_loop(
             emit=_emit_owned,
             monotonic_clock=monotonic_clock,
             smart_turn_owner=smart_turn_owner,
+            activity_log=log_basic,
         )
         owner_task = asyncio.current_task()
         if owner_task is not None:
             owner_task.add_done_callback(lambda _task: delivery_controller.cancel())
 
-    def _diagnostics_enabled() -> bool:
-        if is_detailed_enabled is None or log_detailed is None:
-            return False
-        with contextlib.suppress(Exception):
-            return bool(is_detailed_enabled())
-        return False
-
-    def _log_detailed_best_effort(message: str) -> None:
-        if log_detailed is None:
+    def _log_vad_activity(event: object) -> None:
+        if log_basic is None:
             return
-        with contextlib.suppress(Exception):
-            log_detailed(message)
+        label = "Peer" if channel_label.lower() == "peer" else "Self"
+        message: str | None = None
+        if isinstance(event, SpeechStart):
+            message = (
+                f"[{label} · VAD] Speech started."
+                if event.genuine_onset
+                else f"[{label} · VAD] Segment continued after rollover."
+            )
+        elif isinstance(event, SpeechEnd):
+            suffix = (
+                f" Trailing silence {event.trailing_silence_ms} ms."
+                if event.trailing_silence_ms > 0
+                else ""
+            )
+            message = f"[{label} · VAD] Speech ended.{suffix}"
+        if message is not None:
+            with contextlib.suppress(Exception):
+                log_basic(message)
 
     async def _dispatch(event: object) -> None:
+        _log_vad_activity(event)
         if segment_ledger is None:
             await sink.handle_vad_event(event)
             return
@@ -198,34 +202,14 @@ async def run_audio_vad_loop(
         await _emit_owned(owned)
 
     async def _process_buffered_chunks() -> None:
-        nonlocal buffer, gate_gated_audio_ms, gate_passed_audio_ms, gate_log_accumulated_ms
+        nonlocal buffer
         nonlocal progress_audio_ms, progress_speech_observed, last_progress_state
         while buffer.size >= chunk_samples:
             chunk = buffer[:chunk_samples]
             buffer = buffer[chunk_samples:]
             chunk_capture = _capture_prefix(capture_buffer, chunk_samples)
-            original_chunk = chunk
             if audio_gate is not None:
                 chunk = audio_gate.process_chunk(chunk)
-                if _diagnostics_enabled():
-                    with contextlib.suppress(Exception):
-                        chunk_ms = chunk.size * 1000.0 / float(target_sample_rate_hz)
-                        gate_log_accumulated_ms += chunk_ms
-                        if np.any(original_chunk) and not np.any(chunk):
-                            gate_gated_audio_ms += chunk_ms
-                        else:
-                            gate_passed_audio_ms += chunk_ms
-                        if gate_log_accumulated_ms >= 1000.0:
-                            _log_detailed_best_effort(
-                                f"[AudioDiag][Gate][{channel_label}] "
-                                f"enabled={audio_gate.enabled} "
-                                f"receiver_active={audio_gate.receiver_active} "
-                                f"gated_audio_ms={gate_gated_audio_ms:.1f} "
-                                f"passed_audio_ms={gate_passed_audio_ms:.1f}"
-                            )
-                            gate_log_accumulated_ms = 0.0
-                            gate_gated_audio_ms = 0.0
-                            gate_passed_audio_ms = 0.0
             process_owned = getattr(vad, "process_owned_chunk", None)
             events = (
                 process_owned(chunk, chunk_capture)
@@ -348,29 +332,6 @@ async def run_audio_vad_loop(
         if normalized.size:
             if normalized_capture is None:
                 raise RuntimeError("normalized audio has no capture mapping")
-            if _diagnostics_enabled():
-                with contextlib.suppress(Exception):
-                    vad_input_frame = AudioFrameF32(
-                        samples=normalized.reshape(-1),
-                        sample_rate_hz=target_sample_rate_hz,
-                        channels=1,
-                        capture=normalized_capture,
-                    )
-                    vad_input_metrics = compute_audio_frame_metrics(vad_input_frame)
-                    vad_input_accumulated_audio_ms += vad_input_metrics.audio_ms
-                    if vad_input_accumulated_audio_ms >= 1000.0:
-                        vad_input_accumulated_audio_ms = 0.0
-                        _log_detailed_best_effort(
-                            f"[AudioDiag][VADInput][{channel_label}] "
-                            f"source_rate={frame.sample_rate_hz} "
-                            f"source_channels={frame.channels} "
-                            f"target_rate={target_sample_rate_hz} "
-                            f"samples={vad_input_metrics.samples} "
-                            f"audio_ms={vad_input_metrics.audio_ms:.1f} "
-                            f"rms_db={vad_input_metrics.rms_db:.1f} "
-                            f"peak_db={vad_input_metrics.peak_db:.1f} "
-                            f"zero_ratio={vad_input_metrics.zero_ratio:.3f}"
-                        )
             buffer = np.concatenate([buffer, normalized.reshape(-1)])
             capture_buffer.append(normalized_capture)
             await _process_buffered_chunks()

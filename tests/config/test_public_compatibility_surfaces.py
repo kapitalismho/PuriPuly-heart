@@ -1430,7 +1430,6 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
         log_dir="logs",
         log_level="INFO",
         locale="en",
-        logging_mode="basic",
     )
     manager = overlay_process_module.OverlayProcessManager()
     written_manifest_path = manager._write_manifest(manifest)

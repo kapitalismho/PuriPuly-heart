@@ -12,17 +12,14 @@ from tests.helpers.fakes import FakeSender
 
 
 class FakeRuntimeLogging:
-    def __init__(self, *, detailed_enabled: bool = False) -> None:
-        self.detailed_enabled = detailed_enabled
+    def __init__(self) -> None:
         self.basic: list[tuple[int, str]] = []
         self.detailed: list[tuple[int, str]] = []
 
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
         self.basic.append((level, message))
 
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
-        if not self.detailed_enabled:
-            return False
+    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool:
         self.detailed.append((level, message))
         return True
 
@@ -90,7 +87,7 @@ def test_short_message_sends_immediately_without_cooldown() -> None:
 def test_detailed_send_attempt_records_length_without_chatbox_payload() -> None:
     clock = FakeClock()
     sender = FakeSender()
-    runtime_logging = FakeRuntimeLogging(detailed_enabled=True)
+    runtime_logging = FakeRuntimeLogging()
     paginator = ChatboxPaginator(
         sender=sender,
         clock=clock,

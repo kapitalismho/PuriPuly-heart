@@ -68,7 +68,7 @@ class TranslationEnableOwner:
     qq_dialog_sink: TranslationEnableQqDialogSink
     result_sink: TranslationEnableResultSink
     log_basic: TranslationEnableLogSink
-    log_detailed: TranslationEnableLogSink
+    log_diagnostic: TranslationEnableLogSink
     log_error: TranslationEnableLogSink
     founder_letter_sink: TranslationEnableFounderLetterSink
     teardown: TranslationEnableTeardown | None = None
@@ -101,7 +101,7 @@ class TranslationEnableOwner:
             self._publish_starting(False)
             return False
         self.log_basic(f"[Translation] Toggle request: enabled={enabled}")
-        self.log_detailed(
+        self.log_diagnostic(
             "[Translation] Toggle detail: "
             f"current_enabled={state.translation_enabled} "
             f"llm_available={state.llm_available}"
@@ -116,7 +116,7 @@ class TranslationEnableOwner:
                 enabled=True,
                 generation=request_generation,
             ):
-                self.log_detailed(
+                self.log_diagnostic(
                     "[Translation] Skipping stale enable request after newer toggle intent"
                 )
                 return False
@@ -129,7 +129,7 @@ class TranslationEnableOwner:
             if enabled and state.settings_available and state.provider_name is not None:
                 self.log_basic(f"[Translation] Enabled with provider: {state.provider_name}")
                 if state.provider_name == "qwen" and state.qwen_region is not None:
-                    self.log_detailed(
+                    self.log_diagnostic(
                         "[Translation] Provider detail: "
                         f"provider={state.provider_name} region={state.qwen_region}"
                     )
@@ -161,7 +161,7 @@ class TranslationEnableOwner:
             raise
         self.pending_sink(False)
         if not self.intent_matches(enabled=True, generation=request_generation):
-            self.log_detailed(
+            self.log_diagnostic(
                 "[Translation] Skipping stale managed enable result after newer toggle intent"
             )
             return False
