@@ -22,10 +22,9 @@ def _log_basic_request_failure(
     runtime_logging: ProviderObservationPort | None,
     operation: str,
     status: int,
-    message: str,
 ) -> None:
     report = provider_failure_report(
-        RuntimeError(f"status={status} message={message}"),
+        RuntimeError(f"status={status}"),
         provider="deepseek",
         operation=operation,
     )
@@ -33,7 +32,6 @@ def _log_basic_request_failure(
         operation,
         format_error_report_for_log(report),
     )
-    rendered = f"{rendered} message={message}"
     if runtime_logging is not None:
         runtime_logging.emit_basic(rendered, level=logging.ERROR)
         return
@@ -287,7 +285,6 @@ class HttpxDeepSeekClient:
                 runtime_logging=self.runtime_logging,
                 operation="translate",
                 status=response.status_code,
-                message=detail,
             )
             raise RuntimeError(
                 f"DeepSeek request failed (status={response.status_code} message={detail})"

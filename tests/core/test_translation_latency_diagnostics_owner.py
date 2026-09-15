@@ -10,9 +10,7 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigurationOwner,
 )
-from puripuly_heart.core.orchestrator.context import ContextMode
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
-    ContextModeDiagnostic,
     LatencyInheritanceDiagnostic,
     LatencyStageDiagnostic,
     OverlayEmitDiagnostic,
@@ -130,7 +128,7 @@ def test_owner_summarizes_actual_delayed_chatbox_send_from_last_speech() -> None
     paginator.process_due()
 
     assert logging.basic == [
-        "[Basic][Latency] channel=self endpoint=chatbox_send " "last_speech_to_chatbox_send_ms=5000"
+        "[Basic][Latency] channel=self endpoint=chatbox_send last_speech_to_chatbox_send_ms=5000"
     ]
     assert owner.snapshot().timeline_keys == frozenset()
 
@@ -364,17 +362,6 @@ def test_owner_inherits_and_clears_only_the_selected_timeline() -> None:
     assert owner.snapshot().timeline_keys == frozenset({("peer", peer_id)})
 
 
-def test_owner_suppresses_duplicate_context_mode() -> None:
-    logging = RuntimeLogging()
-    owner = make_owner(runtime_logging=logging)
-    mode: ContextMode = "integrated"
-
-    owner.record_context_mode(ContextModeDiagnostic(channel="self", applied_mode=mode))
-    owner.record_context_mode(ContextModeDiagnostic(channel="self", applied_mode=mode))
-
-    assert sum("Context mode" in message for message in logging.basic) == 1
-
-
 def test_owner_suppresses_duplicate_overlay_decisions() -> None:
     overlay = OverlayDiagnostics()
     owner = make_owner(overlay_diagnostics=overlay)
@@ -501,8 +488,6 @@ def test_owner_fallback_stt_failure_does_not_read_provider_metadata(caplog) -> N
     assert "private speech" not in caplog.text
     assert any(record.levelname == "ERROR" for record in caplog.records)
     assert "secret-token" not in caplog.text
-
-
 
 
 def test_owner_replaces_overlay_diagnostics_by_expected_identity() -> None:

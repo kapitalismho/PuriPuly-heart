@@ -4,8 +4,14 @@ import logging
 from dataclasses import dataclass
 from uuid import uuid4
 
+import httpx
 import pytest
 
+from puripuly_heart.core.runtime_logging import (
+    RealtimeLogHandler,
+    SessionRuntimeLoggingService,
+    configure_main_logging,
+)
 from puripuly_heart.providers.llm.deepseek import (
     DeepSeekClient,
     DeepSeekLLMProvider,
@@ -203,6 +209,77 @@ async def test_httpx_deepseek_client_translate_raises_on_length_finish_reason(
             source_language="ko",
             target_language="en",
         )
+
+
+@pytest.mark.asyncio
+async def test_httpx_deepseek_failure_excludes_arbitrary_body_from_session_sinks(
+    tmp_path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    sentinel = "UPSTREAM_PRIVATE_BODY"
+    root_logger = logging.getLogger(f"test.deepseek.failure.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    root_logger.addHandler(logging.StreamHandler())
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    runtime_logging = SessionRuntimeLoggingService(
+        root_logger=root_logger,
+        sinks=sinks,
+        ui_handler_factory=RealtimeLogHandler,
+    )
+
+    class RealtimeSink:
+        def __init__(self) -> None:
+            self.lines: list[str] = []
+
+        def append_log(self, line: str) -> None:
+            self.lines.append(line)
+
+    realtime = RealtimeSink()
+    runtime_logging.attach_realtime_sink(realtime)
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            502,
+            json={"error": {"message": sentinel}},
+            request=request,
+        )
+    )
+    client = HttpxDeepSeekClient(
+        api_key="test-key",
+        model="m",
+        base_url="https://example",
+        runtime_logging=runtime_logging,
+    )
+    client._client = httpx.AsyncClient(transport=transport)
+
+    try:
+        with pytest.raises(RuntimeError, match=sentinel):
+            await client.translate(
+                text="hello",
+                system_prompt="SYSTEM",
+                source_language="ko",
+                target_language="en",
+            )
+        await client.close()
+        runtime_logging.close()
+        sinks.close()
+
+        console = capsys.readouterr().err
+        ui = "\n".join(realtime.lines)
+        persisted = sinks.log_file.read_text(encoding="utf-8")
+        for target, rendered in (
+            ("console", console),
+            ("ui", ui),
+            ("file", persisted),
+        ):
+            assert sentinel not in rendered, target
+            assert "DeepSeek request failed" in rendered, target
+            assert "status=502" in rendered, target
+            assert "code=provider.service_unavailable" in rendered, target
+    finally:
+        await client.close()
+        runtime_logging.close()
+        sinks.close()
 
 
 @pytest.mark.asyncio
