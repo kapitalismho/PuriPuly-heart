@@ -70,6 +70,8 @@
     "optimizer_created": false
   },
   "launch": {
+    "recorded_checkout_commit": "39b865d33a108213afdaea8f54a0514bc02cbf57",
+    "execution_notice": "Archived commands refer to the recorded checkout and removed ROCm 7.2.1 installation. The current run_backend_probe.sh selects ROCm 10; it does not reproduce this historical environment. The old runtime, virtual environment, and offline wheelhouse would need restoration before using the historical recipe.",
     "ready_command": "wsl.exe -d Ubuntu -- bash /mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/environment/run_backend_probe.sh",
     "future_backward_opt_in_suffix": " --backward",
     "future_backward_opt_in_executed": false,
@@ -77,8 +79,8 @@
     "student_training_command_limitation": "No student or trainer was implemented in this environment-only workstream, so a training command would be a fake placeholder."
   },
   "reproduction": {
-    "python_lock": "requirements.lock",
-    "offline_python_install": "/opt/psem-streaming-student/rocm-7.2.1-pytorch-2.9.1/bin/pip install --no-index --find-links /opt/psem-streaming-student/wheels -r requirements.lock",
+    "python_lock": "requirements-rocm-7.2.1-historical.lock",
+    "offline_python_install": "/opt/psem-streaming-student/rocm-7.2.1-pytorch-2.9.1/bin/pip install --no-index --find-links /opt/psem-streaming-student/wheels -r requirements-rocm-7.2.1-historical.lock",
     "system_dependency_retrieval": {
       "repository_installer_url": "https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/noble/amdgpu-install_7.2.1.70201-1_all.deb",
       "repository_installer_download_bytes": 16908,

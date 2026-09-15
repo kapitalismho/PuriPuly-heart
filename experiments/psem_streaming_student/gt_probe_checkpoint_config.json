@@ -4,7 +4,7 @@
   "implementation_sha256": {
     "gt_probe.py": "c40d791c8739192a129d00498d4b19b93b6ec827427acdddfb7bab23a277f133",
     "student.py": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d",
-    "run_gt_probe.sh": "9702c0b8199a018755c256edfe00bdd44c5d585598f6ae32a5573ccb59038563",
+    "run_gt_probe.sh": "2be4fa5d7c87db01c645fc42374ec45cf881e0c92047b63f50f90c8993fc7ec4",
     "stages.py": "c5ceb3934428b4ecae24e2c2905281ff7483ec3ccc09d2a816b3b0e2e9be077b"
   },
   "authority": {
