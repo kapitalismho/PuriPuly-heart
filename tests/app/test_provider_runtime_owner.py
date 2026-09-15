@@ -402,7 +402,7 @@ async def test_managed_provider_rebuild_blocks_concurrent_enable_from_closing_by
         qq_dialog_sink=lambda: None,
         result_sink=lambda _result: None,
         log_basic=lambda _message: None,
-        log_detailed=lambda _message: None,
+        log_diagnostic=lambda _message: None,
         log_error=lambda _message: None,
         founder_letter_sink=lambda: None,
     )

@@ -63,9 +63,6 @@ def test_adapter_constructs_desktop_pipeline_with_selected_device_and_diagnostic
         used_default_fallback=True,
     )
 
-    def detailed_enabled() -> bool:
-        return True
-
     wrapped_source = object()
 
     adapter = PeerCaptureSourceAdapter(
@@ -77,9 +74,8 @@ def test_adapter_constructs_desktop_pipeline_with_selected_device_and_diagnostic
         ),
         process_watcher_factory=object,
         pipeline_factory=lambda **kwargs: kwargs,
-        log_detailed=logs.append,
+        log_diagnostic=logs.append,
         wrap_source=lambda source: wrapped_source if source is raw_source else None,
-        is_detailed_enabled=detailed_enabled,
     )
 
     pipeline = adapter(_config(target), PeerCaptureResolvedTarget(intent=target))
@@ -87,8 +83,6 @@ def test_adapter_constructs_desktop_pipeline_with_selected_device_and_diagnostic
     assert loopback_calls == [expected_device]
     assert pipeline["source"] is wrapped_source
     assert pipeline["target_sample_rate_hz"] == 24000
-    assert pipeline["is_detailed_enabled"] is detailed_enabled
-    assert callable(pipeline["log_detailed"])
     assert "requested_device=" in logs[0]
     assert "resolved_device_name='Resolved Speakers [Loopback]'" in logs[0]
     assert "used_default_fallback=True" in logs[0]
@@ -117,9 +111,8 @@ def test_adapter_constructs_strict_process_pipeline_without_device_fallback() ->
         process_source_factory=process_source_factory,
         process_watcher_factory=lambda: watcher,
         pipeline_factory=lambda **kwargs: kwargs,
-        log_detailed=logs.append,
+        log_diagnostic=logs.append,
         wrap_source=lambda source: ("wrapped", source),
-        is_detailed_enabled=lambda: False,
     )
 
     pipeline = adapter(
@@ -151,9 +144,8 @@ def test_adapter_rejects_resolved_process_without_identity() -> None:
         ),
         process_watcher_factory=object,
         pipeline_factory=lambda **kwargs: kwargs,
-        log_detailed=lambda _message: None,
+        log_diagnostic=lambda _message: None,
         wrap_source=lambda source: source,
-        is_detailed_enabled=lambda: False,
     )
 
     with pytest.raises(
@@ -171,9 +163,8 @@ def test_adapter_rejects_resolved_process_without_identity() -> None:
 
 def test_wiring_factory_composes_internal_peer_capture_source_adapter() -> None:
     adapter = create_peer_capture_source_adapter(
-        log_detailed=lambda _message: None,
+        log_diagnostic=lambda _message: None,
         wrap_source=lambda source: source,
-        is_detailed_enabled=lambda: False,
     )
 
     assert isinstance(adapter, PeerCaptureSourceAdapter)

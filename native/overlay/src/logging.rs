@@ -1,5 +1,4 @@
-use parking_lot::{Condvar, Mutex, RwLock};
-use serde::{Deserialize, Serialize};
+use parking_lot::{Condvar, Mutex};
 use serde_json::Value;
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -58,58 +57,20 @@ struct WriterOwner {
     watch: Arc<WriteWatch>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum OverlayLoggingMode {
-    #[default]
-    Basic,
-    Detailed,
-}
-
-impl OverlayLoggingMode {
-    fn allows_info(self) -> bool {
-        matches!(self, Self::Detailed)
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Basic => "basic",
-            Self::Detailed => "detailed",
-        }
-    }
-}
-
 pub struct OverlayLogger {
     diagnostic_sender: Option<std_mpsc::SyncSender<LogRecord>>,
     reliable_sender: Option<std_mpsc::SyncSender<LogRecord>>,
-    mode: RwLock<OverlayLoggingMode>,
     dropped_records: Arc<AtomicU64>,
     shutting_down: Arc<AtomicBool>,
     writer: Mutex<WriterOwner>,
 }
 
 impl OverlayLogger {
-    pub async fn open(
-        _log_dir: impl AsRef<std::path::Path>,
-        mode: OverlayLoggingMode,
-    ) -> io::Result<Self> {
+    pub async fn open(_log_dir: impl AsRef<std::path::Path>) -> io::Result<Self> {
         Ok(Self::from_streams(
             Box::new(std::io::stdout()),
             Box::new(std::io::stderr()),
-            mode,
         ))
-    }
-
-    pub async fn info(&self, message: impl AsRef<str>) -> io::Result<()> {
-        self.log_line("INFO", message.as_ref())
-    }
-
-    pub async fn detailed_info(&self, message: impl AsRef<str>) -> io::Result<bool> {
-        if !self.is_detailed() {
-            return Ok(false);
-        }
-        self.enqueue_diagnostic(true, "INFO", message.as_ref());
-        Ok(true)
     }
 
     pub async fn warn(&self, message: impl AsRef<str>) -> io::Result<()> {
@@ -128,23 +89,11 @@ impl OverlayLogger {
         self.write_reliable(false, format!("EVENT {payload}")).await
     }
 
-    pub fn set_mode(&self, mode: OverlayLoggingMode) {
-        *self.mode.write() = mode;
-    }
-
-    pub fn is_detailed(&self) -> bool {
-        matches!(*self.mode.read(), OverlayLoggingMode::Detailed)
-    }
-
     pub fn dropped_records(&self) -> u64 {
         self.dropped_records.load(Ordering::Relaxed)
     }
 
-    pub(crate) fn from_streams(
-        stdout: LogStream,
-        stderr: LogStream,
-        mode: OverlayLoggingMode,
-    ) -> Self {
+    pub(crate) fn from_streams(stdout: LogStream, stderr: LogStream) -> Self {
         let (diagnostic_sender, diagnostic_receiver) =
             std_mpsc::sync_channel(DIAGNOSTIC_QUEUE_CAPACITY);
         let (reliable_sender, reliable_receiver) = std_mpsc::sync_channel(RELIABLE_QUEUE_CAPACITY);
@@ -181,7 +130,6 @@ impl OverlayLogger {
         Self {
             diagnostic_sender: Some(diagnostic_sender),
             reliable_sender: Some(reliable_sender),
-            mode: RwLock::new(mode),
             dropped_records,
             shutting_down,
             writer: Mutex::new(WriterOwner {
@@ -197,9 +145,6 @@ impl OverlayLogger {
     }
 
     fn log_line(&self, level: &str, message: &str) -> io::Result<()> {
-        if level == "INFO" && !self.mode.read().allows_info() {
-            return Ok(());
-        }
         self.enqueue_diagnostic(level != "ERROR", level, message);
         Ok(())
     }
@@ -585,80 +530,33 @@ mod tests {
         let log_dir = unique_log_dir("no-file");
         let log_path = log_dir.join("puripuly_heart_overlay.log");
 
-        let logger = OverlayLogger::open(&log_dir, OverlayLoggingMode::Detailed)
-            .await
-            .unwrap();
-        logger.info("hello").await.unwrap();
+        let logger = OverlayLogger::open(&log_dir).await.unwrap();
+        logger.warn("hello").await.unwrap();
 
         assert!(!log_path.exists());
     }
 
     #[tokio::test]
-    async fn overlay_logger_routes_info_and_error_lines_to_streams_only() {
+    async fn overlay_logger_suppresses_info_and_routes_warnings_and_errors() {
         let stdout = RecordingSink::new();
         let stderr = RecordingSink::new();
-        let logger = OverlayLogger::from_streams(
-            Box::new(stdout.clone()),
-            Box::new(stderr.clone()),
-            OverlayLoggingMode::Detailed,
-        );
+        let logger =
+            OverlayLogger::from_streams(Box::new(stdout.clone()), Box::new(stderr.clone()));
 
-        logger.info("child line").await.unwrap();
-        logger.error("bad line").await.unwrap();
-        wait_for_bytes(&stdout, "[overlay][INFO] child line\n".len()).await;
-        wait_for_bytes(&stderr, "[overlay][ERROR] bad line\n".len()).await;
+        assert_eq!(logger.dropped_records(), 0);
+        logger.warn("degraded").await.unwrap();
+        logger.error("failed").await.unwrap();
+        wait_for_bytes(&stdout, "[overlay][WARN] degraded\n".len()).await;
+        wait_for_bytes(&stderr, "[overlay][ERROR] failed\n".len()).await;
 
         assert_eq!(
             String::from_utf8(stdout.bytes()).unwrap(),
-            "[overlay][INFO] child line\n"
+            "[overlay][WARN] degraded\n"
         );
         assert_eq!(
             String::from_utf8(stderr.bytes()).unwrap(),
-            "[overlay][ERROR] bad line\n"
+            "[overlay][ERROR] failed\n"
         );
-    }
-
-    #[tokio::test]
-    async fn overlay_logger_suppresses_info_lines_in_basic_mode() {
-        let stdout = RecordingSink::new();
-        let stderr = RecordingSink::new();
-        let logger = OverlayLogger::from_streams(
-            Box::new(stdout.clone()),
-            Box::new(stderr.clone()),
-            OverlayLoggingMode::Basic,
-        );
-
-        logger.info("hidden").await.unwrap();
-        logger.warn("visible").await.unwrap();
-        wait_for_bytes(&stdout, "[overlay][WARN] visible\n".len()).await;
-
-        assert_eq!(
-            String::from_utf8(stdout.bytes()).unwrap(),
-            "[overlay][WARN] visible\n"
-        );
-        assert_eq!(String::from_utf8(stderr.bytes()).unwrap(), "");
-    }
-
-    #[tokio::test]
-    async fn overlay_logger_applies_runtime_mode_updates() {
-        let stdout = RecordingSink::new();
-        let stderr = RecordingSink::new();
-        let logger = OverlayLogger::from_streams(
-            Box::new(stdout.clone()),
-            Box::new(stderr.clone()),
-            OverlayLoggingMode::Basic,
-        );
-
-        logger.info("hidden").await.unwrap();
-        logger.set_mode(OverlayLoggingMode::Detailed);
-        logger.info("visible").await.unwrap();
-        wait_for_bytes(&stdout, "[overlay][INFO] visible\n".len()).await;
-
-        assert_eq!(
-            String::from_utf8(stdout.bytes()).unwrap(),
-            "[overlay][INFO] visible\n"
-        );
-        assert_eq!(String::from_utf8(stderr.bytes()).unwrap(), "");
     }
     struct GatedSink {
         released: Arc<AtomicBool>,
@@ -687,13 +585,12 @@ mod tests {
             Box::new(GatedSink {
                 released: released.clone(),
             }),
-            OverlayLoggingMode::Detailed,
         );
 
         for index in 0..=(DIAGNOSTIC_QUEUE_CAPACITY + 1) {
             tokio::time::timeout(
                 Duration::from_millis(5),
-                logger.info(format!("diagnostic {index}")),
+                logger.warn(format!("diagnostic {index}")),
             )
             .await
             .unwrap()
@@ -717,12 +614,11 @@ mod tests {
                 released: released.clone(),
             }),
             Box::new(RecordingSink::new()),
-            OverlayLoggingMode::Detailed,
         );
         let watch = logger.writer.lock().watch.clone();
-        logger.info("blocked").await.unwrap();
+        logger.warn("blocked").await.unwrap();
         for index in 0..=(DIAGNOSTIC_QUEUE_CAPACITY + 1) {
-            logger.info(format!("queued {index}")).await.unwrap();
+            logger.warn(format!("queued {index}")).await.unwrap();
         }
         tokio::time::timeout(Duration::from_millis(100), async {
             loop {
@@ -807,10 +703,9 @@ mod tests {
         let logger = OverlayLogger::from_streams(
             Box::new(RecordingSink::new()),
             Box::new(RecordingSink::new()),
-            OverlayLoggingMode::Detailed,
         );
         logger.dropped_records.store(u64::MAX, Ordering::Relaxed);
-        logger.info("x".repeat(MAX_LOG_RECORD_BYTES)).await.unwrap();
+        logger.warn("x".repeat(MAX_LOG_RECORD_BYTES)).await.unwrap();
         assert_eq!(logger.dropped_records(), u64::MAX);
         logger.shutdown().unwrap();
     }
@@ -821,14 +716,11 @@ mod tests {
         if let Ok(stream) = std::env::var("PURIPULY_LOG_PIPE_CHILD") {
             let runtime = tokio::runtime::Runtime::new().unwrap();
             runtime.block_on(async {
-                let logger =
-                    OverlayLogger::open(std::env::temp_dir(), OverlayLoggingMode::Detailed)
-                        .await
-                        .unwrap();
+                let logger = OverlayLogger::open(std::env::temp_dir()).await.unwrap();
                 let payload = "x".repeat(MAX_LOG_RECORD_BYTES - 32);
                 for _ in 0..=DIAGNOSTIC_QUEUE_CAPACITY {
                     if stream == "stdout" {
-                        logger.info(&payload).await.unwrap();
+                        logger.warn(&payload).await.unwrap();
                     } else {
                         logger.error(&payload).await.unwrap();
                     }

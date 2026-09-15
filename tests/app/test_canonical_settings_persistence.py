@@ -352,14 +352,10 @@ def test_retired_managed_gemma_sweep_emits_safe_bounded_runtime_receipt(
         def __init__(self) -> None:
             self.messages: list[str] = []
 
-        @property
-        def mode(self) -> str:
-            return "basic"
-
         def emit_basic(self, message: str, **_kwargs: object) -> None:
             self.messages.append(message)
 
-        def emit_detailed(self, _message: str, **_kwargs: object) -> bool:
+        def emit_diagnostic(self, _message: str, **_kwargs: object) -> bool:
             return False
 
     models_dir = tmp_path / "private-models"

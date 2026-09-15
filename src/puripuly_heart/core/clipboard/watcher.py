@@ -8,6 +8,8 @@ import threading
 from collections.abc import Callable
 from ctypes import wintypes
 
+from puripuly_heart.core.runtime_logging import emit_basic_log
+
 logger = logging.getLogger(__name__)
 
 _WM_CLIPBOARDUPDATE = 0x031D
@@ -104,7 +106,11 @@ class WindowsClipboardWatcher:
         if thread.is_alive():
             thread.join(timeout=2.0)
         if thread.is_alive():
-            logger.warning("Clipboard watcher thread did not stop before timeout")
+            emit_basic_log(
+                logger,
+                "[Clipboard] The clipboard watcher did not stop before shutdown.",
+                level=logging.WARNING,
+            )
             return
         self._clear_thread_refs_if_stopped()
 
@@ -125,7 +131,11 @@ class WindowsClipboardWatcher:
             self._configure_win32_api()
             ctypes.windll.user32.PostMessageW(hwnd, _WM_CLIPBOARD_WATCHER_STOP, 0, 0)
         except Exception:
-            logger.exception("Failed to post clipboard watcher stop message")
+            emit_basic_log(
+                logger,
+                "[Clipboard] The clipboard watcher stop request failed.",
+                level=logging.ERROR,
+            )
 
     def _configure_win32_api(self) -> None:
         user32 = ctypes.windll.user32
@@ -215,7 +225,11 @@ class WindowsClipboardWatcher:
                     try:
                         self._on_text(text.strip())
                     except Exception:
-                        logger.exception("Clipboard text callback failed")
+                        emit_basic_log(
+                            logger,
+                            "[Clipboard] Accepted clipboard text could not be submitted.",
+                            level=logging.ERROR,
+                        )
                 return 0
             if msg == _WM_CLIPBOARD_WATCHER_STOP:
                 self._cleanup_window(hwnd)
@@ -271,7 +285,11 @@ class WindowsClipboardWatcher:
                 self._start_error = exc
                 self._ready.set()
             else:
-                logger.exception("Clipboard watcher message loop failed")
+                emit_basic_log(
+                    logger,
+                    "[Clipboard] The clipboard watcher stopped after an internal failure.",
+                    level=logging.ERROR,
+                )
         finally:
             if self._hwnd:
                 self._cleanup_window(self._hwnd)

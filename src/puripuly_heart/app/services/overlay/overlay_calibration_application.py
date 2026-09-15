@@ -18,7 +18,7 @@ class OverlayCalibrationApplicationOwner:
     settings_application_provider: Callable[[], SettingsApplicationOwner]
     overlay_provider: Callable[[], OverlayApplicationOwner]
     schedule_task: Callable[[Callable[[], Awaitable[None]]], bool]
-    log_detailed: Callable[..., object]
+    log_diagnostic: Callable[..., object]
     ingress_available: Callable[[], bool]
     _owner: OverlayCalibrationOwner = field(init=False, repr=False)
 
@@ -31,7 +31,7 @@ class OverlayCalibrationApplicationOwner:
             can_emit=lambda: (
                 self.ingress_available() and self.overlay_provider().current_presenter() is not None
             ),
-            log_detailed=self.log_detailed,
+            log_diagnostic=self.log_diagnostic,
         )
 
     @property

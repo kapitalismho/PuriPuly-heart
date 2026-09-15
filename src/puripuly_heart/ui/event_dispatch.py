@@ -48,11 +48,6 @@ class DashboardEventDestination(Protocol):
         text: str,
         *,
         language_code: str | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        source_text_len: int | None = None,
-        transcript_kind: str | None = None,
-        should_log: bool = False,
         debug_prefix: str | None = None,
     ) -> bool | None: ...
 
@@ -61,14 +56,6 @@ class DashboardEventDestination(Protocol):
         text: str,
         *,
         language_code: str | None = None,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        session_scope: str | None = None,
-        source_text_hash: str | None = None,
-        source_text_len: int | None = None,
-        logical_turn_key: str | None = None,
         debug_prefix: str | None = None,
     ) -> bool | None: ...
 
@@ -97,11 +84,10 @@ class ErrorEventDestination(Protocol):
 
 
 class RuntimeLoggingPort(Protocol):
-    mode: object
 
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None: ...
 
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool: ...
+    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool: ...
 
 
 class AppDashboardEventDestination:
@@ -118,11 +104,6 @@ class AppDashboardEventDestination:
         text: str,
         *,
         language_code: str | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        source_text_len: int | None = None,
-        transcript_kind: str | None = None,
-        should_log: bool = False,
         debug_prefix: str | None = None,
     ) -> bool:
         dashboard = self._dashboard
@@ -131,11 +112,6 @@ class AppDashboardEventDestination:
         dashboard.set_display_text(
             text,
             language_code=language_code,
-            utterance_id=utterance_id,
-            channel=channel,
-            source_text_len=source_text_len,
-            transcript_kind=transcript_kind,
-            should_log=should_log,
             debug_prefix=debug_prefix,
         )
         return True
@@ -145,14 +121,6 @@ class AppDashboardEventDestination:
         text: str,
         *,
         language_code: str | None = None,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        session_scope: str | None = None,
-        source_text_hash: str | None = None,
-        source_text_len: int | None = None,
-        logical_turn_key: str | None = None,
         debug_prefix: str | None = None,
     ) -> bool:
         dashboard = self._dashboard
@@ -161,14 +129,6 @@ class AppDashboardEventDestination:
         dashboard.set_display_translation_text(
             text,
             language_code=language_code,
-            update_id=update_id,
-            origin_wall_clock_ms=origin_wall_clock_ms,
-            utterance_id=utterance_id,
-            channel=channel,
-            session_scope=session_scope,
-            source_text_hash=source_text_hash,
-            source_text_len=source_text_len,
-            logical_turn_key=logical_turn_key,
             debug_prefix=debug_prefix,
         )
         return True
@@ -235,14 +195,14 @@ class AppErrorEventDestination:
             else:
                 logger.error(text)
         except Exception:
-            logger.error(text)
+            logger.error("A user interface operation failed.")
 
     def _emit_legacy_raw_payload_deprecation_diagnostic(self) -> None:
-        emit_detailed = getattr(self._runtime_logging, "emit_detailed", None)
-        if not callable(emit_detailed):
+        emit_diagnostic = getattr(self._runtime_logging, "emit_diagnostic", None)
+        if not callable(emit_diagnostic):
             return
         with contextlib.suppress(Exception):
-            emit_detailed(_RAW_STRING_ERROR_DEPRECATION_DIAGNOSTIC, level=logging.WARNING)
+            emit_diagnostic(_RAW_STRING_ERROR_DEPRECATION_DIAGNOSTIC, level=logging.WARNING)
 
     def _clear_managed_auth_pending_state(self) -> None:
         if callable(self._clear_managed_auth_pending):
@@ -382,11 +342,10 @@ class UIEventBridge:
             source_language=source_lang,
             target_language=target_lang,
             translation_enabled=self._translation_enabled(),
-            runtime_logging_mode=getattr(self.runtime_logging, "mode", None),
             stt_state=stt_state,
         )
 
-    def _emit_dashboard_translation_applied_detailed(
+    def _emit_dashboard_translation_applied_diagnostic(
         self,
         *,
         diagnostic: TranslationAppliedDiagnostic,
@@ -394,7 +353,7 @@ class UIEventBridge:
         if self.runtime_logging is None:
             return
         message = (
-            "[Detailed][UIEventBridge] dashboard_translation_applied "
+            "[Diagnostic][UIEventBridge] dashboard_translation_applied "
             f"utterance_id={diagnostic.utterance_id} "
             f"channel={diagnostic.channel} "
             f"source_label={json.dumps(diagnostic.source_label, ensure_ascii=False)} "
@@ -403,7 +362,7 @@ class UIEventBridge:
             f"text_len={diagnostic.text_len}"
         )
         with contextlib.suppress(Exception):
-            self.runtime_logging.emit_detailed(message)
+            self.runtime_logging.emit_diagnostic(message)
 
     def _schedule_github_star_prompt_translation_success(self, translation: Translation) -> None:
         if not translation.text.strip():
@@ -432,12 +391,14 @@ class UIEventBridge:
                 try:
                     await self._handle_event(event)
                 except Exception as exc:
-                    logger.error(
-                        "Error handling UI event: event_type=%s channel=%s exception_type=%s",
-                        event.type.value,
-                        event.channel,
-                        type(exc).__name__,
+                    message = (
+                        "A user interface event failed · "
+                        f"Event {event.type.value} · Cause {type(exc).__name__}"
                     )
+                    if self.runtime_logging is not None:
+                        self.runtime_logging.emit_basic(message, level=logging.ERROR)
+                    else:
+                        logger.error(message)
                 finally:
                     self.event_queue.task_done()
         except asyncio.CancelledError:
@@ -472,11 +433,6 @@ class UIEventBridge:
             self.dashboard_destination.publish_transcript(
                 transcript_projection.text,
                 language_code=transcript_projection.language_code,
-                utterance_id=transcript_projection.utterance_id,
-                channel=transcript_projection.channel,
-                source_text_len=transcript_projection.source_text_len,
-                transcript_kind=transcript_projection.transcript_kind,
-                should_log=transcript_projection.should_log,
                 debug_prefix=transcript_projection.debug_prefix,
             )
             for history in projection.history:
@@ -496,18 +452,10 @@ class UIEventBridge:
             dashboard_published = self.dashboard_destination.publish_translation(
                 translation_projection.text,
                 language_code=translation_projection.language_code,
-                update_id=translation_projection.update_id,
-                origin_wall_clock_ms=translation_projection.origin_wall_clock_ms,
-                utterance_id=translation_projection.utterance_id,
-                channel=translation_projection.channel,
-                session_scope=translation_projection.session_scope,
-                source_text_hash=translation_projection.source_text_hash,
-                source_text_len=translation_projection.source_text_len,
-                logical_turn_key=translation_projection.logical_turn_key,
                 debug_prefix=translation_projection.debug_prefix,
             )
             if dashboard_published is not False and projection.translation_diagnostic is not None:
-                self._emit_dashboard_translation_applied_detailed(
+                self._emit_dashboard_translation_applied_diagnostic(
                     diagnostic=projection.translation_diagnostic,
                 )
             for history in projection.history:

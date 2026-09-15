@@ -27,7 +27,7 @@ def compose_vrc_mic_sync(
     *,
     state_provider: Callable[[], VrcMicState | None],
     gate_provider: Callable[[], VrcMicAudioGatePort | None],
-    log_detailed: Callable[[str, int], None],
+    log_diagnostic: Callable[[str, int], None],
     error_sink: Callable[[str], None],
     settings_provider: Callable[[], object | None],
     apply_settings: Callable[[object], Awaitable[object]],
@@ -43,7 +43,7 @@ def compose_vrc_mic_sync(
     query_service: OscQueryServicePort | None = None,
 ) -> OscControlIntegrationOwner:
     def diagnostics_sink(event: str, metadata: Mapping[str, object]) -> None:
-        log_detailed(
+        log_diagnostic(
             f"[Lifecycle][VrcMicReceiverRuntime] event={event} metadata={dict(metadata)}",
             logging.WARNING,
         )

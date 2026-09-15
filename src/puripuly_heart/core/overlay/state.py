@@ -109,19 +109,8 @@ class OverlayEntryRemovalRecord:
 
 
 @dataclass(frozen=True, slots=True)
-class OverlayTurnDecisionRecord:
-    decision: str
-    disposition: str | None = None
-    key: OverlayEntryKey | None = None
-    entry: OverlayLogicalTurnEntry | None = None
-    block: OverlayPresentationBlock | None = None
-    extras: dict[str, object] | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class OverlayReductionResult:
     changed: bool
-    decisions: tuple[OverlayTurnDecisionRecord, ...] = ()
 
     def __bool__(self) -> bool:
         return self.changed
@@ -306,19 +295,12 @@ class OverlayPresentationState:
         show_translation: bool,
         terminal_update_reason: OverlayTerminalUpdateReason,
     ) -> OverlayReductionResult:
-        decisions: list[OverlayTurnDecisionRecord] = []
+
         key = self.entry_key(event.channel, event.utterance_id)
         retired_preview_seq = self.retired_preview_self_seqs.get(key)
         if retired_preview_seq is not None and event.seq <= retired_preview_seq:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_superseded",
-                    disposition="superseded",
-                    key=key,
-                    extras={"event_seq": event.seq, "retired_preview_seq": retired_preview_seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
         active_entry = self._active_update_entry_or_none(
             channel=event.channel,
             utterance_id=event.utterance_id,
@@ -326,10 +308,9 @@ class OverlayPresentationState:
             now=now,
             show_translation=show_translation,
             terminal_update_reason=terminal_update_reason,
-            decisions=decisions,
         )
         if active_entry is None:
-            return OverlayReductionResult(False, tuple(decisions))
+            return OverlayReductionResult(False)
         key, entry = active_entry
 
         previous_rendered_translation_text = self._rendered_self_translation_text(entry)
@@ -356,17 +337,9 @@ class OverlayPresentationState:
             )
             entry.live_primary_language = next_primary_language
             entry.live_secondary_language = next_secondary_language
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_coalesced",
-                    disposition="coalesced",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq},
-                )
-            )
+
             entry.last_updated_seq = event.seq
-            return OverlayReductionResult(language_changed, tuple(decisions))
+            return OverlayReductionResult(language_changed)
 
         self._remember_entry_input_seq(entry, event_seq=event.seq)
         if not entry.occupant_key:
@@ -412,7 +385,7 @@ class OverlayPresentationState:
         )
         entry.last_updated_seq = event.seq
         self.set_live_turn_key_for_channel(event.channel, key)
-        return OverlayReductionResult(True, tuple(decisions))
+        return OverlayReductionResult(True)
 
     def apply_self_active_clear(
         self,
@@ -421,35 +394,19 @@ class OverlayPresentationState:
         now: float,
         show_translation: bool,
     ) -> OverlayReductionResult:
-        decisions: list[OverlayTurnDecisionRecord] = []
+
         live_self = self.live_entry_for_channel("self")
         if live_self is None:
             return OverlayReductionResult(False)
         key, entry = live_self
         if event.seq < entry.last_updated_seq:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_superseded",
-                    disposition="superseded",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq, "last_updated_seq": entry.last_updated_seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
         if not entry.live_text:
             self.live_self_turn_key = None
             entry.last_updated_seq = event.seq
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_coalesced",
-                    disposition="coalesced",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
 
         previous_rendered_translation_text = self._rendered_self_translation_text(entry)
         self._clear_self_live_payload(entry)
@@ -470,7 +427,7 @@ class OverlayPresentationState:
                 reason="live_self_cleared",
                 now=now,
             )
-        return OverlayReductionResult(True, tuple(decisions))
+        return OverlayReductionResult(True)
 
     def apply_self_finalized_update(
         self,
@@ -481,44 +438,24 @@ class OverlayPresentationState:
         next_appearance_seq: NextAppearanceSeq,
         terminal_update_reason: OverlayTerminalUpdateReason,
     ) -> OverlayReductionResult:
-        decisions: list[OverlayTurnDecisionRecord] = []
+
         key = self.entry_key(event.channel, event.utterance_id)
-        if self._append_terminal_update_decision(
-            terminal_update_reason(event.channel, event.utterance_id),
-            key=key,
-            decisions=decisions,
-        ):
-            return OverlayReductionResult(False, tuple(decisions))
+        if terminal_update_reason(event.channel, event.utterance_id) is not None:
+            return OverlayReductionResult(False)
         entry = self.entry_for(event.channel, event.utterance_id)
         if entry.retained_hidden:
             return OverlayReductionResult(False)
         if event.seq < entry.last_updated_seq:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_superseded",
-                    disposition="superseded",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq, "last_updated_seq": entry.last_updated_seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
         event_source_language = _content_language_or_none(event.source_language)
         if (
             entry.original_text == event.text
             and entry.original_language == event_source_language
             and entry.last_updated_seq == event.seq
         ):
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_coalesced",
-                    disposition="coalesced",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
 
         previous_rendered_translation_text = self._rendered_self_translation_text(entry)
         self._remember_entry_input_seq(entry, event_seq=event.seq)
@@ -560,9 +497,8 @@ class OverlayPresentationState:
             now=now,
             publishable_seq=event.seq,
             next_appearance_seq=next_appearance_seq,
-            decisions=decisions,
         )
-        return OverlayReductionResult(True, tuple(decisions))
+        return OverlayReductionResult(True)
 
     def apply_self_translation_update(
         self,
@@ -573,26 +509,14 @@ class OverlayPresentationState:
         next_appearance_seq: NextAppearanceSeq,
         terminal_update_reason: OverlayTerminalUpdateReason,
     ) -> OverlayReductionResult:
-        decisions: list[OverlayTurnDecisionRecord] = []
+
         key = self.entry_key(event.channel, event.utterance_id)
-        if self._append_terminal_update_decision(
-            terminal_update_reason(event.channel, event.utterance_id),
-            key=key,
-            decisions=decisions,
-        ):
-            return OverlayReductionResult(False, tuple(decisions))
+        if terminal_update_reason(event.channel, event.utterance_id) is not None:
+            return OverlayReductionResult(False)
         entry = self.entry_for(event.channel, event.utterance_id)
         if event.seq < entry.last_updated_seq:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_superseded",
-                    disposition="superseded",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq, "last_updated_seq": entry.last_updated_seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
         event_source_language = _content_language_or_none(event.source_language)
         event_target_language = _content_language_or_none(event.target_language)
         if (
@@ -601,16 +525,8 @@ class OverlayPresentationState:
             and entry.translation_language == event_target_language
             and entry.last_updated_seq == event.seq
         ):
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_coalesced",
-                    disposition="coalesced",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
         if event_source_language is not None:
             entry.original_language = event_source_language
         previous_rendered_translation_text = self._rendered_self_translation_text(entry)
@@ -654,9 +570,8 @@ class OverlayPresentationState:
             now=now,
             publishable_seq=event.seq,
             next_appearance_seq=next_appearance_seq,
-            decisions=decisions,
         )
-        return OverlayReductionResult(True, tuple(decisions))
+        return OverlayReductionResult(True)
 
     def apply_self_utterance_closed(
         self,
@@ -665,7 +580,7 @@ class OverlayPresentationState:
         now: float,
         is_tombstoned: OverlayTerminalUpdatePredicate,
     ) -> OverlayReductionResult:
-        decisions: list[OverlayTurnDecisionRecord] = []
+
         key = self.entry_key(event.channel, event.utterance_id)
         if is_tombstoned(event.channel, event.utterance_id):
             return OverlayReductionResult(False)
@@ -673,31 +588,15 @@ class OverlayPresentationState:
         if entry is None:
             return OverlayReductionResult(False)
         if event.seq < entry.last_updated_seq:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_superseded",
-                    disposition="superseded",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq, "last_updated_seq": entry.last_updated_seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
         if entry.closed_seq == event.seq:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_coalesced",
-                    disposition="coalesced",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
         entry.closed_seq = event.seq
         entry.closed_at = now
         entry.last_updated_seq = event.seq
-        return OverlayReductionResult(True, tuple(decisions))
+        return OverlayReductionResult(True)
 
     # Product decision: peer overlay text is emitted with translation arrival. Peer source-only/active updates must not become visible normal-flow rows.
     def apply_peer_active_update(
@@ -712,7 +611,6 @@ class OverlayPresentationState:
     ) -> OverlayReductionResult:
         """Apply reserved peer active fallback state without normalizing it as product flow."""
 
-        decisions: list[OverlayTurnDecisionRecord] = []
         active_entry = self._active_update_entry_or_none(
             channel=event.channel,
             utterance_id=event.utterance_id,
@@ -720,10 +618,9 @@ class OverlayPresentationState:
             now=now,
             show_translation=True,
             terminal_update_reason=terminal_update_reason,
-            decisions=decisions,
         )
         if active_entry is None:
-            return OverlayReductionResult(False, tuple(decisions))
+            return OverlayReductionResult(False)
         key, entry = active_entry
         if self._active_update_matches_live_payload(
             channel=event.channel,
@@ -742,17 +639,9 @@ class OverlayPresentationState:
             next_original_language = _line_language(event.source_language, event.text)
             language_changed = entry.original_language != next_original_language
             entry.original_language = next_original_language
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_coalesced",
-                    disposition="coalesced",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq},
-                )
-            )
+
             entry.last_updated_seq = event.seq
-            return OverlayReductionResult(language_changed, tuple(decisions))
+            return OverlayReductionResult(language_changed)
 
         self._remember_entry_input_seq(entry, event_seq=event.seq)
         if not entry.occupant_key:
@@ -771,10 +660,9 @@ class OverlayPresentationState:
             next_appearance_seq=next_appearance_seq,
             show_peer_original=show_peer_original,
             translation_enabled=translation_enabled,
-            decisions=decisions,
         )
         self.set_live_turn_key_for_channel(event.channel, key)
-        return OverlayReductionResult(True, tuple(decisions))
+        return OverlayReductionResult(True)
 
     def apply_peer_finalized_update(
         self,
@@ -786,44 +674,24 @@ class OverlayPresentationState:
         terminal_update_reason: OverlayTerminalUpdateReason,
         translation_enabled: bool = True,
     ) -> OverlayReductionResult:
-        decisions: list[OverlayTurnDecisionRecord] = []
+
         key = self.entry_key(event.channel, event.utterance_id)
-        if self._append_terminal_update_decision(
-            terminal_update_reason(event.channel, event.utterance_id),
-            key=key,
-            decisions=decisions,
-        ):
-            return OverlayReductionResult(False, tuple(decisions))
+        if terminal_update_reason(event.channel, event.utterance_id) is not None:
+            return OverlayReductionResult(False)
         entry = self.entry_for(event.channel, event.utterance_id)
         if entry.retained_hidden:
             return OverlayReductionResult(False)
         if event.seq < entry.last_updated_seq:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_superseded",
-                    disposition="superseded",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq, "last_updated_seq": entry.last_updated_seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
         event_source_language = _content_language_or_none(event.source_language)
         if (
             entry.original_text == event.text
             and entry.original_language == event_source_language
             and entry.last_updated_seq == event.seq
         ):
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_coalesced",
-                    disposition="coalesced",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
 
         self._remember_entry_input_seq(entry, event_seq=event.seq)
         entry.original_text = event.text
@@ -840,9 +708,8 @@ class OverlayPresentationState:
             next_appearance_seq=next_appearance_seq,
             show_peer_original=show_peer_original,
             translation_enabled=translation_enabled,
-            decisions=decisions,
         )
-        return OverlayReductionResult(True, tuple(decisions))
+        return OverlayReductionResult(True)
 
     def apply_peer_translation_update(
         self,
@@ -854,26 +721,14 @@ class OverlayPresentationState:
         terminal_update_reason: OverlayTerminalUpdateReason,
         translation_enabled: bool = True,
     ) -> OverlayReductionResult:
-        decisions: list[OverlayTurnDecisionRecord] = []
+
         key = self.entry_key(event.channel, event.utterance_id)
-        if self._append_terminal_update_decision(
-            terminal_update_reason(event.channel, event.utterance_id),
-            key=key,
-            decisions=decisions,
-        ):
-            return OverlayReductionResult(False, tuple(decisions))
+        if terminal_update_reason(event.channel, event.utterance_id) is not None:
+            return OverlayReductionResult(False)
         entry = self.entry_for(event.channel, event.utterance_id)
         if event.seq < entry.last_updated_seq:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_superseded",
-                    disposition="superseded",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq, "last_updated_seq": entry.last_updated_seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
         event_source_language = _content_language_or_none(event.source_language)
         event_target_language = _content_language_or_none(event.target_language)
         if (
@@ -882,16 +737,8 @@ class OverlayPresentationState:
             and entry.translation_language == event_target_language
             and entry.last_updated_seq == event.seq
         ):
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_coalesced",
-                    disposition="coalesced",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
 
         self._remember_entry_input_seq(entry, event_seq=event.seq)
         if event.source_text.strip():
@@ -940,9 +787,8 @@ class OverlayPresentationState:
             next_appearance_seq=next_appearance_seq,
             show_peer_original=show_peer_original,
             translation_enabled=translation_enabled,
-            decisions=decisions,
         )
-        return OverlayReductionResult(True, tuple(decisions))
+        return OverlayReductionResult(True)
 
     def apply_peer_utterance_closed(
         self,
@@ -951,7 +797,7 @@ class OverlayPresentationState:
         now: float,
         is_tombstoned: OverlayTerminalUpdatePredicate,
     ) -> OverlayReductionResult:
-        decisions: list[OverlayTurnDecisionRecord] = []
+
         key = self.entry_key(event.channel, event.utterance_id)
         if is_tombstoned(event.channel, event.utterance_id):
             return OverlayReductionResult(False)
@@ -959,31 +805,15 @@ class OverlayPresentationState:
         if entry is None:
             return OverlayReductionResult(False)
         if event.seq < entry.last_updated_seq:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_superseded",
-                    disposition="superseded",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq, "last_updated_seq": entry.last_updated_seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
         if entry.closed_seq == event.seq:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_coalesced",
-                    disposition="coalesced",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event.seq},
-                )
-            )
-            return OverlayReductionResult(False, tuple(decisions))
+
+            return OverlayReductionResult(False)
         entry.closed_seq = event.seq
         entry.closed_at = now
         entry.last_updated_seq = event.seq
-        return OverlayReductionResult(True, tuple(decisions))
+        return OverlayReductionResult(True)
 
     def expire_entries(
         self,
@@ -1283,35 +1113,6 @@ class OverlayPresentationState:
                 effective_deadline = min(effective_deadline, hidden_deadline)
         return effective_deadline, visible_deadline, translation_deadline
 
-    def _append_terminal_update_decision(
-        self,
-        terminal_reason: str | None,
-        *,
-        key: OverlayEntryKey,
-        decisions: list[OverlayTurnDecisionRecord],
-    ) -> bool:
-        if terminal_reason is None:
-            return False
-        if terminal_reason == "evicted_by_newer_turn":
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_late_update_ignored_after_eviction",
-                    disposition="evicted",
-                    key=key,
-                    extras={"terminal_reason": terminal_reason},
-                )
-            )
-        elif terminal_reason == "expired":
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_late_update_ignored_after_idle_hide",
-                    disposition="hidden_idle_ttl",
-                    key=key,
-                    extras={"terminal_reason": terminal_reason},
-                )
-            )
-        return True
-
     def _active_update_entry_or_none(
         self,
         *,
@@ -1321,45 +1122,20 @@ class OverlayPresentationState:
         now: float,
         show_translation: bool,
         terminal_update_reason: OverlayTerminalUpdateReason,
-        decisions: list[OverlayTurnDecisionRecord],
     ) -> tuple[OverlayEntryKey, OverlayLogicalTurnEntry] | None:
         key = self.entry_key(channel, utterance_id)
-        if self._append_terminal_update_decision(
-            terminal_update_reason(channel, utterance_id),
-            key=key,
-            decisions=decisions,
-        ):
+        if terminal_update_reason(channel, utterance_id) is not None:
             return None
         live_entry = self.live_entry_for_channel(channel)
         if live_entry is not None:
             live_key, current_live_entry = live_entry
             if live_key != key and event_seq < current_live_entry.last_updated_seq:
-                decisions.append(
-                    OverlayTurnDecisionRecord(
-                        decision="overlay_turn_superseded",
-                        disposition="superseded",
-                        key=key,
-                        entry=current_live_entry,
-                        extras={
-                            "event_seq": event_seq,
-                            "superseded_by_entry": self._format_entry_key(live_key),
-                            "superseded_by_seq": current_live_entry.last_updated_seq,
-                        },
-                    )
-                )
+
                 return None
 
         entry = self.entry_for(channel, utterance_id)
         if event_seq < entry.last_updated_seq:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_superseded",
-                    disposition="superseded",
-                    key=key,
-                    entry=entry,
-                    extras={"event_seq": event_seq, "last_updated_seq": entry.last_updated_seq},
-                )
-            )
+
             return None
         if live_entry is not None and live_entry[0] != key:
             if channel == "self":
@@ -1513,7 +1289,6 @@ class OverlayPresentationState:
         next_appearance_seq: NextAppearanceSeq,
         show_peer_original: bool = True,
         translation_enabled: bool = True,
-        decisions: list[OverlayTurnDecisionRecord],
     ) -> None:
         if self.entry_is_publishable(
             entry,
@@ -1529,14 +1304,6 @@ class OverlayPresentationState:
             entry.ever_publishable = True
             if entry.visible_since is None:
                 entry.visible_since = now
-        else:
-            decisions.append(
-                OverlayTurnDecisionRecord(
-                    decision="overlay_turn_not_yet_publishable",
-                    key=key,
-                    entry=entry,
-                )
-            )
 
     def _should_retire_preview_only_self_entry(
         self,

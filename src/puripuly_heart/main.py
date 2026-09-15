@@ -224,10 +224,13 @@ def _run_gui(
                 vrchat_osc_presence=vrchat_osc_presence,
             )
         except Exception as exc:
-            logger.exception(
-                "GUI startup failed: exception_type=%s exception_message=%s",
+            from puripuly_heart.core.runtime_logging import emit_basic_log
+
+            emit_basic_log(
+                logger,
+                "The application window failed to start · Cause %s",
                 type(exc).__name__,
-                str(exc),
+                level=logging.ERROR,
             )
             raise
 
@@ -238,10 +241,13 @@ def _run_gui(
             view=ft.AppView.FLET_APP_HIDDEN,
         )
     except Exception as exc:
-        logger.exception(
-            "Flet GUI runtime failed: exception_type=%s exception_message=%s",
+        from puripuly_heart.core.runtime_logging import emit_basic_log
+
+        emit_basic_log(
+            logger,
+            "The application window stopped after a runtime failure · Cause %s",
             type(exc).__name__,
-            str(exc),
+            level=logging.ERROR,
         )
         raise
     return 0

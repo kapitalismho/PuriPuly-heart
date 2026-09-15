@@ -881,18 +881,18 @@ async def test_cpu_auto_close_during_delegate_open_retires_late_session_and_dele
 
 
 @pytest.mark.asyncio
-async def test_local_cpu_attempt_diagnostic_separates_queue_wait_and_decode_rtf(
+async def test_local_cpu_attempt_performance_separates_queue_wait_and_decode_rtf(
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     queue_now = 1.0
     decode_times = iter((10.0, 10.5))
+    basic_logs: list[tuple[str, int]] = []
     backend = LocalQwenSherpaSTTBackend(
         model_dir=Path("C:/models/qwen"),
         stream_label="self",
         queue_clock=lambda: queue_now,
         decode_clock=lambda: next(decode_times),
-        diagnostics_enabled=lambda: True,
+        attempt_log_sink=lambda message, level: basic_logs.append((message, level)),
     )
 
     async def ensure_recognizer() -> object:
@@ -906,40 +906,64 @@ async def test_local_cpu_attempt_diagnostic_separates_queue_wait_and_decode_rtf(
 
     session = await backend.open_session()
     await session.send_audio_f32(np.ones(16000, dtype=np.float32))
-    with caplog.at_level(
-        logging.INFO,
-        logger="puripuly_heart.providers.stt.local_qwen_sherpa",
-    ):
-        await session.on_speech_end()
-        queue_now = 1.25
-        event = await anext(session.events())
-
+    await session.on_speech_end()
+    queue_now = 1.25
+    event = await anext(session.events())
     assert event == STTBackendTranscriptEvent(text="private transcript", is_final=True)
-    attempt = next(message for message in caplog.messages if "[LocalASR][Attempt]" in message)
-    assert "channel=self" in attempt
-    assert f"model={LOCAL_STT_MODEL_ID}" in attempt
-    assert "backend=CPU" in attempt
-    assert "audio_seconds=1.000" in attempt
-    assert "decode_seconds=0.500" in attempt
-    assert "rtf=0.500000" in attempt
-    assert "result=success" in attempt
-    assert "queue_wait_seconds=0.250" in attempt
+    assert len(basic_logs) == 1
+    attempt, level = basic_logs[0]
+    assert level == logging.INFO
+    assert "[Self · Recognition]" in attempt
+    assert "Audio 1.00 s" in attempt
+    assert "Decode 0.50 s" in attempt
+    assert "RTF 0.500" in attempt
+    assert "Result success" in attempt
+    assert "Queue 0.25 s" in attempt
     assert "private transcript" not in attempt
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_local_cpu_zero_audio_does_not_publish_fabricated_attempt_metrics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    basic_logs: list[tuple[str, int]] = []
+    backend = LocalQwenSherpaSTTBackend(
+        model_dir=Path("C:/models/qwen"),
+        stream_label="self",
+        attempt_log_sink=lambda message, level: basic_logs.append((message, level)),
+    )
+
+    async def ensure_recognizer() -> object:
+        return object()
+
+    async def decode(_samples: np.ndarray) -> str:
+        return ""
+
+    monkeypatch.setattr(backend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(backend, "decode_f32", decode)
+    session = await backend.open_session()
+
+    await session.on_speech_end()
+    event = await anext(session.events())
+
+    assert event == STTBackendTranscriptEvent(text="", is_final=True)
+    assert basic_logs == []
     await session.close()
 
 
 @pytest.mark.asyncio
 async def test_local_cpu_failed_started_attempt_retains_decode_timing(
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     decode_times = iter((20.0, 20.25))
+    basic_logs: list[tuple[str, int]] = []
     backend = LocalQwenSherpaSTTBackend(
         model_dir=Path("C:/models/qwen"),
         stream_label="peer",
         queue_clock=lambda: 3.0,
         decode_clock=lambda: next(decode_times),
-        diagnostics_enabled=lambda: True,
+        attempt_log_sink=lambda message, level: basic_logs.append((message, level)),
     )
 
     async def ensure_recognizer() -> object:
@@ -954,31 +978,26 @@ async def test_local_cpu_failed_started_attempt_retains_decode_timing(
     await session.send_audio_f32(np.ones(8000, dtype=np.float32))
 
     events = session.events()
-    with caplog.at_level(
-        logging.INFO,
-        logger="puripuly_heart.providers.stt.local_qwen_sherpa",
-    ):
-        await session.on_speech_end()
-        boundary = await anext(events)
-        with pytest.raises(LocalQwenSherpaInferenceError, match="private failure detail"):
-            await anext(events)
+    await session.on_speech_end()
+    boundary = await anext(events)
+    with pytest.raises(LocalQwenSherpaInferenceError, match="private failure detail"):
+        await anext(events)
 
     assert boundary == STTBackendTranscriptEvent(text="", is_final=True)
-    attempt = next(message for message in caplog.messages if "[LocalASR][Attempt]" in message)
-    assert "channel=peer" in attempt
-    assert f"model={LOCAL_STT_MODEL_ID}" in attempt
-    assert "audio_seconds=0.500" in attempt
-    assert "decode_seconds=0.250" in attempt
-    assert "rtf=0.500000" in attempt
-    assert "result=failure" in attempt
-    assert "private failure detail" not in attempt
+    assert len(basic_logs) == 1
+    attempt, level = basic_logs[0]
+    assert level == logging.INFO
+    assert "[Peer · Recognition]" in attempt
+    assert "Audio 0.50 s" in attempt
+    assert "Decode 0.25 s" in attempt
+    assert "RTF 0.500" in attempt
+    assert "Result failure" in attempt
     await session.close()
 
 
 @pytest.mark.asyncio
-async def test_local_cpu_expiry_emits_boundary_and_safe_diagnostic_without_decode(
+async def test_local_cpu_expiry_emits_boundary_without_decode(
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     queue_now = 0.0
     decode_times = iter((1.0, 1.1))
@@ -990,7 +1009,6 @@ async def test_local_cpu_expiry_emits_boundary_and_safe_diagnostic_without_decod
         stream_label="self",
         queue_clock=lambda: queue_now,
         decode_clock=lambda: next(decode_times),
-        diagnostics_enabled=lambda: True,
     )
 
     async def ensure_recognizer() -> object:
@@ -1013,23 +1031,12 @@ async def test_local_cpu_expiry_emits_boundary_and_safe_diagnostic_without_decod
     await session.on_speech_end()
 
     events = session.events()
-    with caplog.at_level(
-        logging.INFO,
-        logger="puripuly_heart.providers.stt.local_qwen_sherpa",
-    ):
-        queue_now = 12.0
-        release_first.set()
-        first = await anext(events)
-        expired = await anext(events)
+    queue_now = 12.0
+    release_first.set()
+    first = await anext(events)
+    expired = await anext(events)
 
     assert decoded == 1
     assert first == STTBackendTranscriptEvent(text="first result", is_final=True)
     assert expired == STTBackendTranscriptEvent(text="", is_final=True)
-    expiry = next(message for message in caplog.messages if "[LocalASR][Expiry]" in message)
-    assert "channel=self" in expiry
-    assert f"model={LOCAL_STT_MODEL_ID}" in expiry
-    assert "intended_provider=local_qwen" in expiry
-    assert "reason=pending_ttl_exceeded" in expiry
-    assert "queue_wait_seconds=12.000" in expiry
-    assert "first result" not in expiry
     await session.close()

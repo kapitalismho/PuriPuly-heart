@@ -27,6 +27,7 @@ from typing import AsyncIterator
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.clock import Clock, SystemClock
+from puripuly_heart.core.runtime_logging import emit_basic_log
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
@@ -222,16 +223,6 @@ class RollingSTTBackend(STTBackend):
     def _mark(self, name: STTProviderName, state: RollingProviderState) -> None:
         if self._states.get(name) == state:
             return
-        previous = self._states.get(name)
-        previous_label = (
-            previous.value if previous is not None else RollingProviderState.AVAILABLE.value
-        )
-        logger.info(
-            "[STT][Rolling] provider=%s state=%s -> %s",
-            name.value,
-            previous_label,
-            state.value,
-        )
         self._states[name] = state
 
     def _provider_state(self, definition: RollingProviderDefinition) -> RollingProviderState:
@@ -264,11 +255,6 @@ class RollingSTTBackend(STTBackend):
             return False
         definition.rebind(api_key)
         self._states[name] = None
-        logger.info(
-            "[STT][Rolling] provider=%s rebound configured=%s",
-            name.value,
-            definition.is_configured(),
-        )
         return True
 
     async def open_session(
@@ -276,7 +262,6 @@ class RollingSTTBackend(STTBackend):
         *,
         projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
     ) -> STTBackendSession:
-        attempt_start = self.clock.now()
         last_error: BaseException | None = None
         for definition in self.providers:
             if not self._is_eligible(definition):
@@ -289,11 +274,6 @@ class RollingSTTBackend(STTBackend):
                 self._handle_open_error(definition, exc, kind)
                 last_error = exc
                 continue
-            logger.info(
-                "[STT][Rolling] session selected provider=%s connect_s=%.3f",
-                definition.name.value,
-                self.clock.now() - attempt_start,
-            )
             return _RollingSession(
                 definition=definition,
                 inner=session,
@@ -302,9 +282,10 @@ class RollingSTTBackend(STTBackend):
         if last_error is not None:
             raise last_error
         if any(definition.is_configured() for definition in self.providers):
-            logger.warning(
-                "[STT][Rolling] all configured providers excluded; statuses=%s",
-                [(status.name.value, status.state.value) for status in self.statuses()],
+            emit_basic_log(
+                logger,
+                "[Recognition] All configured speech recognition services are unavailable.",
+                level=logging.WARNING,
             )
             raise RuntimeError(
                 "All rolling ASR providers are excluded (quota/auth); "
@@ -323,27 +304,20 @@ class RollingSTTBackend(STTBackend):
     ) -> None:
         if kind == _ERROR_KIND_AUTH:
             self._mark(definition.name, RollingProviderState.AUTH_FAILED)
-            logger.warning(
-                "[STT][Rolling] provider=%s open failed kind=%s -> excluded until "
-                "credential change",
-                definition.name.value,
-                kind,
+            emit_basic_log(
+                logger,
+                "[Recognition] A speech recognition service rejected its credentials.",
+                level=logging.WARNING,
             )
             return
         if kind in _PERSISTENT_EXHAUSTION_STATES:
             self._mark(definition.name, RollingProviderState.FREE_QUOTA_EXHAUSTED)
-            logger.warning(
-                "[STT][Rolling] provider=%s open failed kind=%s -> excluded until quota reset",
-                definition.name.value,
-                kind,
+            emit_basic_log(
+                logger,
+                "[Recognition] A speech recognition service has no free quota remaining.",
+                level=logging.WARNING,
             )
             return
-        logger.info(
-            "[STT][Rolling] provider=%s open failed kind=transient (%s); falling through "
-            "for this attempt",
-            definition.name.value,
-            type(exc).__name__,
-        )
 
     def _handle_session_error(
         self,

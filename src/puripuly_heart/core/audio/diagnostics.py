@@ -11,18 +11,6 @@ import numpy as np
 from puripuly_heart.core.audio.format import AudioFrameF32, reshape_audio_samples_f32
 from puripuly_heart.core.audio.source import AudioSource
 
-_VIRTUAL_AUDIO_KEYWORDS = (
-    "steam",
-    "oculus",
-    "meta",
-    "quest",
-    "virtual",
-    "voicemeeter",
-    "vb-cable",
-    "sonar",
-    "nvidia broadcast",
-)
-
 
 class AudioFaultProfile(StrEnum):
     NONE = "none"
@@ -116,100 +104,6 @@ def compute_audio_frame_metrics(frame: AudioFrameF32) -> AudioFrameMetrics:
     )
 
 
-def _virtual_hint(name: str) -> bool:
-    lowered = name.lower()
-    return any(keyword in lowered for keyword in _VIRTUAL_AUDIO_KEYWORDS)
-
-
-def format_sounddevice_snapshot_lines(*, hostapis: list[dict], devices: list[dict]) -> list[str]:
-    lines = ["[AudioDiag][Snapshot][SoundDevice] environment"]
-    for index, hostapi in enumerate(hostapis):
-        lines.append(
-            f"[AudioDiag][Snapshot][SoundDevice] hostapi index={index} "
-            f"name={str(hostapi.get('name', ''))!r} "
-            f"default_input={hostapi.get('default_input_device')} "
-            f"default_output={hostapi.get('default_output_device')}"
-        )
-    for index, device in enumerate(devices):
-        name = str(device.get("name", "") or "")
-        lines.append(
-            f"[AudioDiag][Snapshot][SoundDevice] device index={index} name={name!r} "
-            f"hostapi={device.get('hostapi')} "
-            f"max_input_channels={device.get('max_input_channels')} "
-            f"max_output_channels={device.get('max_output_channels')} "
-            f"default_samplerate={device.get('default_samplerate')} "
-            f"virtual_hint={_virtual_hint(name)}"
-        )
-    return lines
-
-
-def format_pyaudiowpatch_snapshot_lines(
-    *, loopback_devices: list[dict], default_loopback: dict | None
-) -> list[str]:
-    lines = ["[AudioDiag][Snapshot][Loopback] environment"]
-    if default_loopback is not None:
-        lines.append(
-            f"[AudioDiag][Snapshot][Loopback] default "
-            f"name={str(default_loopback.get('name', ''))!r} "
-            f"index={default_loopback.get('index')}"
-        )
-    for item in loopback_devices:
-        name = str(item.get("name", "") or "")
-        channels = item.get(
-            "maxInputChannels",
-            item.get(
-                "max_input_channels", item.get("maxOutputChannels", item.get("max_output_channels"))
-            ),
-        )
-        rate = item.get("defaultSampleRate", item.get("default_sample_rate"))
-        lines.append(
-            f"[AudioDiag][Snapshot][Loopback] device index={item.get('index')} "
-            f"name={name!r} channels={channels} default_samplerate={rate} "
-            f"virtual_hint={_virtual_hint(name)}"
-        )
-    return lines
-
-
-def collect_sounddevice_snapshot_lines() -> list[str]:
-    try:
-        import sounddevice as sd
-
-        return format_sounddevice_snapshot_lines(
-            hostapis=list(sd.query_hostapis()), devices=list(sd.query_devices())
-        )
-    except Exception as exc:
-        return [f"[AudioDiag][Snapshot][SoundDevice] query_failed error={exc}"]
-
-
-def collect_pyaudiowpatch_snapshot_lines() -> list[str]:
-    try:
-        import pyaudiowpatch as pyaudio
-
-        manager = pyaudio.PyAudio()
-        try:
-            devices = list(manager.get_loopback_device_info_generator())
-            default_query_error: str | None = None
-            try:
-                default_loopback = manager.get_default_wasapi_loopback()
-            except Exception as exc:
-                default_loopback = None
-                default_query_error = str(exc)
-            lines = format_pyaudiowpatch_snapshot_lines(
-                loopback_devices=devices, default_loopback=default_loopback
-            )
-            if default_query_error is not None:
-                lines.insert(
-                    1,
-                    "[AudioDiag][Snapshot][Loopback] "
-                    f"default_query_failed error={default_query_error}",
-                )
-            return lines
-        finally:
-            manager.terminate()
-    except Exception as exc:
-        return [f"[AudioDiag][Snapshot][Loopback] query_failed error={exc}"]
-
-
 def normalize_audio_fault_profile(profile: AudioFaultProfile | str | None) -> AudioFaultProfile:
     if profile is None:
         return AudioFaultProfile.NONE
@@ -251,16 +145,10 @@ def apply_audio_fault_profile(
 
 
 @dataclass(slots=True)
-class DiagnosticAudioSource(AudioSource):
+class FaultInjectingAudioSource(AudioSource):
     source: AudioSource
-    channel_label: str
-    is_detailed_enabled: Callable[[], bool]
-    log_detailed: Callable[[str], object] | None = None
     fault_profile: AudioFaultProfile | str = AudioFaultProfile.NONE
     fault_profile_provider: Callable[[], AudioFaultProfile | str | None] | None = None
-    summary_interval_audio_ms: int = 1000
-    extra_fields_provider: Callable[[], dict[str, object]] | None = None
-    _accumulated_audio_ms: float = field(init=False, default=0.0)
     _sequence_index: int = field(init=False, default=0)
 
     def _current_fault_profile(self) -> AudioFaultProfile:
@@ -271,8 +159,7 @@ class DiagnosticAudioSource(AudioSource):
     async def frames(self) -> AsyncIterator[AudioFrameF32]:
         async for frame in self.source.frames():
             profile = self._safe_current_fault_profile()
-            detailed_enabled = self._safe_detailed_enabled()
-            if profile is AudioFaultProfile.NONE and not detailed_enabled:
+            if profile is AudioFaultProfile.NONE:
                 yield frame
                 continue
 
@@ -282,22 +169,12 @@ class DiagnosticAudioSource(AudioSource):
                 sequence_index=self._sequence_index,
             )
             self._sequence_index += 1
-            if not detailed_enabled:
-                yield output
-                continue
-
-            self._safe_maybe_log_capture_diagnostics(output=output, profile=profile)
             yield output
 
     def _safe_current_fault_profile(self) -> AudioFaultProfile:
         with contextlib.suppress(Exception):
             return self._current_fault_profile()
         return AudioFaultProfile.NONE
-
-    def _safe_detailed_enabled(self) -> bool:
-        with contextlib.suppress(Exception):
-            return bool(self.is_detailed_enabled())
-        return False
 
     def _safe_apply_audio_fault_profile(
         self,
@@ -309,40 +186,6 @@ class DiagnosticAudioSource(AudioSource):
         with contextlib.suppress(Exception):
             return apply_audio_fault_profile(frame, profile, sequence_index=sequence_index)
         return frame
-
-    def _safe_extra_fields(self) -> str:
-        if self.extra_fields_provider is None:
-            return ""
-        with contextlib.suppress(Exception):
-            fields = self.extra_fields_provider()
-            return " " + " ".join(f"{key}={value}" for key, value in sorted(fields.items()))
-        return ""
-
-    def _safe_maybe_log_capture_diagnostics(
-        self,
-        *,
-        output: AudioFrameF32,
-        profile: AudioFaultProfile,
-    ) -> None:
-        with contextlib.suppress(Exception):
-            metrics = compute_audio_frame_metrics(output)
-            self._accumulated_audio_ms += metrics.audio_ms
-            if (
-                self.log_detailed is None
-                or self._accumulated_audio_ms < self.summary_interval_audio_ms
-            ):
-                return
-            self._accumulated_audio_ms = 0.0
-            extra = self._safe_extra_fields()
-            self.log_detailed(
-                f"[AudioDiag][Capture][{self.channel_label}] "
-                f"rate_hz={output.sample_rate_hz} channels={output.channels} "
-                f"fault_profile={profile.value} samples={metrics.samples} "
-                f"audio_ms={metrics.audio_ms:.1f} rms_db={metrics.rms_db:.1f} "
-                f"peak_db={metrics.peak_db:.1f} zero_ratio={metrics.zero_ratio:.3f} "
-                f"channel_rms_db={metrics.channel_rms_db} "
-                f"channel_peak_db={metrics.channel_peak_db}{extra}"
-            )
 
     async def close(self) -> None:
         await self.source.close()

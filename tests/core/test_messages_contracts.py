@@ -19,7 +19,7 @@ def test_message_and_diagnostic_dtos_are_frozen_slotted_and_metadata_only() -> N
         operation="commit",
         code="settings_commit_failed",
         category=messages.DIAGNOSTIC_CATEGORY_TRANSACTION,
-        visibility=messages.DIAGNOSTIC_VISIBILITY_DETAILED,
+        visibility=messages.DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
         content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
         status_code=None,
         retry_after_ms=None,

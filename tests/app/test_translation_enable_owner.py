@@ -115,7 +115,7 @@ def _owner(
         qq_dialog_sink=lambda: qq_values.append("show"),
         result_sink=lambda _result: None,
         log_basic=lambda message: log_values.append(("basic", message)),
-        log_detailed=lambda message: log_values.append(("detailed", message)),
+        log_diagnostic=lambda message: log_values.append(("detailed", message)),
         log_error=lambda message: log_values.append(("error", message)),
         founder_letter_sink=lambda: founder_values.append("show"),
         teardown=teardown,
@@ -143,11 +143,8 @@ async def test_nonmanaged_enable_owns_runtime_context_and_warmup_sequence() -> N
     assert runtime_values == [True]
     assert clears == ["clear"]
     assert warmups == ["warmup"]
-    assert ("basic", "[Translation] Enabled with provider: qwen") in logs
-    assert (
-        "detailed",
-        "[Translation] Provider detail: provider=qwen region=china",
-    ) in logs
+    assert ("basic", "[Translation] Enabled") in logs
+    assert not any(kind == "detailed" for kind, _message in logs)
 
 
 @pytest.mark.asyncio

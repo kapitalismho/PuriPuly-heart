@@ -30,7 +30,6 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 from puripuly_heart.core.overlay.sink import OverlayApplicationReceipt, OverlayEventUnion
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime.output import OutputRuntime
-from puripuly_heart.core.runtime_logging import SessionLoggingMode
 from puripuly_heart.domain.events import UIEvent, UIEventType
 from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 from tests.core.test_translation_owner_branch_coverage import (
@@ -769,37 +768,6 @@ async def test_new_generation_rejects_retired_turn_output_and_bounds_aggregate_s
 
 
 @pytest.mark.asyncio
-async def test_lifecycle_generation_retirement_rejects_output_without_new_admission() -> None:
-    configuration = TranslationRuntimeConfig(
-        target_language="zh-CN",
-        self_target_languages=("zh-CN", "ja"),
-    )
-    owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
-    runtime_logging, log_stream = _make_runtime_logging_capture()
-    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-    owner.diagnostics.runtime_logging = runtime_logging
-    retired = self_children(config_owner, turn_generation=0, turn_order=3)
-    assert owner.admit_self_turn(retired)
-
-    owner.retire_turn_generation("self", 1)
-    receipt = await owner.project_translation_result(self_submission(retired[0], text="retired"))
-
-    assert not receipt.record_runtime_translation
-    assert chatbox.messages == []
-    assert owner.self_turn_aggregate_count == 0
-    assert owner.self_turn_tombstone_count == 1
-    stale = next(
-        message
-        for message in _runtime_log_messages(log_stream)
-        if "translation_result_suppressed_stale_turn" in message
-    )
-    assert "turn_generation=0" in stale
-    assert "target_indexes=(0,)" in stale
-    assert "target_languages=('zh-CN',)" in stale
-    assert "revision=0" in stale
-
-
-@pytest.mark.asyncio
 async def test_generation_retirement_wins_before_waiting_snapshot_publication() -> None:
     configuration = TranslationRuntimeConfig(
         target_language="zh-CN",
@@ -908,13 +876,9 @@ def test_peer_segment_conversation_sources_keep_distinct_semantic_identity() -> 
             for message in _runtime_log_messages(log_stream)
             if message.startswith("[Conversation]")
         ]
-        source_records = [message for message in conversation if "source=" in message]
-        assert len(source_records) == 2
-        assert 'source="first segment"' in source_records[0]
-        assert "segment_index=0" in source_records[0]
-        assert 'source="second segment"' in source_records[1]
-        assert "segment_index=1" in source_records[1]
-        assert all(f'turn="{parent_id}"' in message for message in source_records)
+        assert len(conversation) == 4
+        assert sum("first segment" in message for message in conversation) == 1
+        assert sum("second segment" in message for message in conversation) == 1
     finally:
         runtime_logging.close()
 
@@ -938,65 +902,12 @@ def test_conversation_source_identity_dedupes_dual_target_per_semantic_segment()
             for message in _runtime_log_messages(log_stream)
             if message.startswith("[Conversation]")
         ]
-        source_records = [message for message in conversation if 'source="source text"' in message]
-        translation_records = [message for message in conversation if "translation=" in message]
-        assert len(source_records) == 1
-        assert "segment_index=0" in source_records[0]
-        assert len(translation_records) == 2
-        assert all("parent_turn=" in message for message in translation_records)
+        assert len(conversation) == 3
+        assert sum("source text" in message for message in conversation) == 1
+        assert sum("primary" in message for message in conversation) == 1
+        assert sum("secondary" in message for message in conversation) == 1
     finally:
         runtime_logging.close()
-
-
-@pytest.mark.asyncio
-async def test_dual_target_publication_denial_records_identity_and_attempt_latency() -> None:
-    configuration = TranslationRuntimeConfig(
-        target_language="zh-CN",
-        self_target_languages=("zh-CN", "ja"),
-    )
-    owner, chatbox, _ui_messages, config_owner = make_owner(
-        configuration=configuration,
-        chatbox=RecordingChatbox(fail=True),
-    )
-    runtime_logging, log_stream = _make_runtime_logging_capture()
-    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-    owner.diagnostics.runtime_logging = runtime_logging
-    children = self_children(config_owner, turn_generation=3, turn_order=4)
-    assert owner.admit_self_turn(children)
-
-    await owner.project_translation_result(self_submission(children[0], text="private primary"))
-    await owner.complete_self_target(children[0], "translated")
-    await owner.project_translation_result(self_submission(children[1], text="private secondary"))
-    await owner.complete_self_target(children[1], "translated")
-
-    messages = _runtime_log_messages(log_stream)
-    first_denied = next(
-        message for message in messages if "translation_first_result_publication_denied" in message
-    )
-    complete_denied = next(
-        message
-        for message in messages
-        if "translation_complete_result_publication_denied" in message
-    )
-    assert chatbox.messages == []
-    assert "turn_generation=3 turn_order=4" in first_denied
-    assert "target_indexes=(0,)" in first_denied
-    assert "target_languages=('zh-CN',)" in first_denied
-    assert "revision=1" in first_denied
-    assert "reason=destination_publish_failed" in first_denied
-    assert "publication_attempt_elapsed_ms=0" in first_denied
-    assert "first_visible_elapsed_ms=None" in first_denied
-    assert "target_indexes=(0, 1)" in complete_denied
-    assert "revision=2" in complete_denied
-    assert "complete_visible_elapsed_ms=None" in complete_denied
-    conversation = [message for message in messages if message.startswith("[Conversation]")]
-    technical = "\n".join(
-        message for message in messages if not message.startswith("[Conversation]")
-    )
-    assert "private primary" not in technical
-    assert "private secondary" not in technical
-    assert any('translation="private primary"' in message for message in conversation)
-    assert any('translation="private secondary"' in message for message in conversation)
 
 
 @pytest.mark.asyncio

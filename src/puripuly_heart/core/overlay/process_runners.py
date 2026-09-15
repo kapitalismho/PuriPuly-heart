@@ -89,8 +89,7 @@ class DefaultOverlayProcessRunner:
                 f"staged overlay executable is older than overlay source: {stale_source}",
             )
         if path.name == OVERLAY_EXECUTABLE_NAME:
-            bundled_runtime_path = self.ensure_bundled_openvr_runtime_dll(path)
-            logger.info("[overlay] OpenVR runtime DLL ready at %s", bundled_runtime_path)
+            self.ensure_bundled_openvr_runtime_dll(path)
         return path
 
     async def spawn(

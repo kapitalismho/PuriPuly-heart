@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
 from .diagnostics import OverlayDiagnosticsRecorder
-from .manifest import normalize_overlay_logging_mode
 
 logger = logging.getLogger("puripuly_heart.core.overlay.process")
 
@@ -25,7 +24,6 @@ _REVERSE_LIFECYCLE_CONTROL_TYPES = frozenset(
         "shutdown_complete",
         "owner_status",
         "desktop_first_visible",
-        "logging_mode_status",
     }
 )
 _REVERSE_TERMINAL_CONTROL_TYPES = frozenset({"startup_error", "runtime_error"})
@@ -128,7 +126,6 @@ class OverlayManagedProcess(Protocol):
     async def wait_for_exit(self) -> int | None: ...
     async def finish_readers(self) -> None: ...
     async def terminate(self) -> None: ...
-    def set_logging_mode(self, mode: str) -> None: ...
 
 
 @dataclass(slots=True)
@@ -143,7 +140,6 @@ class _AsyncioOverlayProcess:
     _reader_tasks: list[asyncio.Task[None]] = field(default_factory=list)
     _diagnostics: OverlayDiagnosticsRecorder | None = None
     _lifecycle_sink: Callable[[str, dict[str, object]], None] | None = None
-    _logging_mode: str = field(init=False, default="basic")
 
     def __post_init__(self) -> None:
         self._start_reader(self.process.stdout, "stdout")
@@ -157,9 +153,6 @@ class _AsyncioOverlayProcess:
     ) -> None:
         self._diagnostics = diagnostics
         self.overlay_instance_id = overlay_instance_id
-
-    def set_logging_mode(self, mode: str) -> None:
-        self._logging_mode = normalize_overlay_logging_mode(mode)
 
     def attach_lifecycle_sink(
         self,
@@ -315,7 +308,10 @@ class _AsyncioOverlayProcess:
                         pass
                     elif self._declared_level(line) is not None:
                         if self._should_capture_failure_line(line, stream_name):
-                            self._diagnostics.record_child_line(stream_name, line)
+                            self._diagnostics.record_child_line(
+                                stream_name,
+                                f"child_reported_{logging.getLevelName(self._declared_level(line) or logging.WARNING).lower()}",
+                            )
                     else:
                         self._diagnostics.note_input_rejected("unstamped_child_line")
                 self._log_passthrough_line(line, stream_name)
@@ -346,18 +342,17 @@ class _AsyncioOverlayProcess:
         return None
 
     def _log_passthrough_line(self, line: str, stream_name: str) -> None:
-        _ = stream_name
         if not line:
             return
         level = self._declared_level(line)
         if level is None:
             return
-        if level >= logging.ERROR:
-            logger.error(line)
-        elif level >= logging.WARNING:
-            logger.warning(line)
-        elif self._logging_mode == "detailed":
-            logger.info(line)
+        logger.log(
+            level,
+            "[OverlayChild] reported_failure stream=%s severity=%s",
+            stream_name,
+            logging.getLevelName(level),
+        )
 
     def _should_capture_failure_line(self, line: str, stream_name: str) -> bool:
         _ = stream_name

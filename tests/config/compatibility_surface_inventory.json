@@ -565,8 +565,7 @@
       "facade_contract": null,
       "exports": [
         {"name": "OVERLAY_CONTRACT_VERSION", "kind": "attribute"},
-        {"name": "OverlayLaunchManifest", "kind": "attribute"},
-        {"name": "normalize_overlay_logging_mode", "kind": "attribute"}
+        {"name": "OverlayLaunchManifest", "kind": "attribute"}
       ]
     },
     {

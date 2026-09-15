@@ -131,7 +131,7 @@ def make_application(
     diagnostics_port: object,
     *,
     output_projection: OutputProjection | None = None,
-    detailed_logs: list[tuple[str, int, Exception | None]] | None = None,
+    diagnostic_logs: list[tuple[str, int, Exception | None]] | None = None,
 ) -> OverlayApplicationOwner:
     return OverlayApplicationOwner(
         state_provider=lambda: OverlayApplicationState(
@@ -154,7 +154,6 @@ def make_application(
         cancel_bounds_persistence=_noop_async,
         clear_bounds_suppressed=lambda: None,
         calibration_provider=lambda: cast(OverlayCalibration, object()),
-        logging_mode_provider=lambda: "basic",
         log_dir_provider=lambda: "",
         desktop_controls_factory=lambda _config: [],
         interaction_mode_sink=lambda _mode: None,
@@ -163,9 +162,9 @@ def make_application(
         edit_interaction_mode="edit",
         clock=FakeClock(_now=0.0),
         log_basic=lambda _message, _level: None,
-        log_detailed=lambda message, level, exception: (
-            detailed_logs.append((message, level, exception))
-            if detailed_logs is not None
+        log_diagnostic=lambda message, level, exception: (
+            diagnostic_logs.append((message, level, exception))
+            if diagnostic_logs is not None
             else False
         ),
         translation_enabled_provider=lambda: True,
@@ -218,13 +217,13 @@ async def test_stale_start_cleanup_does_not_detach_current_diagnostics() -> None
 @pytest.mark.asyncio
 async def test_stale_start_cleanup_contains_diagnostics_detach_failure() -> None:
     diagnostics_port = FailingDiagnosticsPort()
-    detailed_logs: list[tuple[str, int, Exception | None]] = []
+    diagnostic_logs: list[tuple[str, int, Exception | None]] = []
     stale = OverlayDiagnostics()
     output_projection = OutputProjection(overlay_sink=object())
     application = make_application(
         diagnostics_port,
         output_projection=output_projection,
-        detailed_logs=detailed_logs,
+        diagnostic_logs=diagnostic_logs,
     )
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     runtime.attach_presenter(Presenter())
@@ -233,8 +232,8 @@ async def test_stale_start_cleanup_contains_diagnostics_detach_failure() -> None
     await application.close_stale_start(runtime)
 
     assert diagnostics_port.calls == [stale]
-    assert len(detailed_logs) == 1
-    message, _level, exception = detailed_logs[0]
+    assert len(diagnostic_logs) == 1
+    message, _level, exception = diagnostic_logs[0]
     assert message == "[Overlay] Stale diagnostics detach reported failure"
     assert isinstance(exception, RuntimeError)
 
@@ -242,13 +241,13 @@ async def test_stale_start_cleanup_contains_diagnostics_detach_failure() -> None
 @pytest.mark.asyncio
 async def test_stale_start_cleanup_contains_output_detach_failure() -> None:
     diagnostics_owner = make_diagnostics_owner()
-    detailed_logs: list[tuple[str, int, Exception | None]] = []
+    diagnostic_logs: list[tuple[str, int, Exception | None]] = []
     presenter = Presenter()
     output_projection = FailingOutputProjection(overlay_sink=presenter)
     application = make_application(
         diagnostics_owner,
         output_projection=output_projection,
-        detailed_logs=detailed_logs,
+        diagnostic_logs=diagnostic_logs,
     )
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     runtime.attach_presenter(presenter)
@@ -256,11 +255,13 @@ async def test_stale_start_cleanup_contains_output_detach_failure() -> None:
     await application.close_stale_start(runtime)
 
     assert output_projection.overlay_sink is presenter
-    assert [message for message, _level, _exception in detailed_logs] == [
+    assert [message for message, _level, _exception in diagnostic_logs] == [
         "[Overlay] Stale overlay start cleanup reported failure",
         "[Overlay] Stale output ingress detach reported failure",
     ]
-    assert all(isinstance(exception, RuntimeError) for _message, _level, exception in detailed_logs)
+    assert all(
+        isinstance(exception, RuntimeError) for _message, _level, exception in diagnostic_logs
+    )
 
 
 @pytest.mark.asyncio

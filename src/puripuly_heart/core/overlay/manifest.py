@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from puripuly_heart.core.runtime_logging import SessionLoggingMode
-
-OVERLAY_CONTRACT_VERSION = 8
+OVERLAY_CONTRACT_VERSION = 9
 OVERLAY_EXECUTION_CONTRACT = {"version": 1, "revision": "r2"}
 OVERLAY_NATIVE_RETRY_CONTRACT = {"version": 1, "ownership": "exclusive"}
 _MANIFEST_FIELDS = {
@@ -18,17 +16,7 @@ _MANIFEST_FIELDS = {
     "log_dir",
     "log_level",
     "locale",
-    "logging_mode",
-    "diagnostics_enabled",
 }
-
-
-def normalize_overlay_logging_mode(
-    mode: SessionLoggingMode | str | bool | object,
-) -> str:
-    if isinstance(mode, bool):
-        return SessionLoggingMode.DETAILED.value if mode else SessionLoggingMode.BASIC.value
-    return SessionLoggingMode(mode).value
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,7 +31,6 @@ class OverlayLaunchManifest:
     log_dir: str
     log_level: str
     locale: str
-    logging_mode: str = SessionLoggingMode.BASIC.value
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -57,7 +44,6 @@ class OverlayLaunchManifest:
             "log_dir": self.log_dir,
             "log_level": self.log_level,
             "locale": self.locale,
-            "logging_mode": normalize_overlay_logging_mode(self.logging_mode),
         }
 
     @classmethod
@@ -67,21 +53,11 @@ class OverlayLaunchManifest:
             joined = ", ".join(sorted(extra_fields))
             raise ValueError(f"overlay manifest contains unsupported runtime fields: {joined}")
 
-        required_fields = _MANIFEST_FIELDS - {
-            "logging_mode",
-            "diagnostics_enabled",
-        }
+        required_fields = _MANIFEST_FIELDS
         missing_fields = [field for field in required_fields if field not in data]
         if missing_fields:
             joined = ", ".join(sorted(missing_fields))
             raise ValueError(f"overlay manifest is missing required fields: {joined}")
-
-        if "logging_mode" not in data and "diagnostics_enabled" not in data:
-            raise ValueError("overlay manifest is missing required fields: logging_mode")
-
-        logging_mode = data.get("logging_mode")
-        if logging_mode is None:
-            logging_mode = data.get("diagnostics_enabled", False)
 
         return cls(
             contract_version=int(data["contract_version"]),
@@ -94,5 +70,4 @@ class OverlayLaunchManifest:
             log_dir=str(data["log_dir"]),
             log_level=str(data["log_level"]),
             locale=str(data["locale"]),
-            logging_mode=normalize_overlay_logging_mode(logging_mode),
         )

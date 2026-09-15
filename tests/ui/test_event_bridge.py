@@ -20,7 +20,6 @@ from puripuly_heart.core.managed_openrouter_release import (
 from puripuly_heart.core import messages
 from puripuly_heart.core.runtime_logging import (
     RealtimeLogHandler,
-    SessionLoggingMode,
     SessionRuntimeLoggingService,
 )
 from puripuly_heart.domain.events import STTSessionState, UIEvent, UIEventType
@@ -43,7 +42,6 @@ class DummyDashboard:
         self.display_calls: list[tuple[str, str | None, bool]] = []
         self.display_debug_prefixes: list[str | None] = []
         self.translation_calls: list[tuple[str, str | None]] = []
-        self.translation_metadata_calls: list[dict[str, object]] = []
         self.notice_calls: list[str | None] = []
 
     def set_status(self, status: str) -> None:
@@ -55,13 +53,6 @@ class DummyDashboard:
         *,
         language_code: str | None = None,
         is_error: bool = False,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        source_text_len: int | None = None,
-        transcript_kind: str | None = None,
-        should_log: bool = False,
         debug_prefix: str | None = None,
     ) -> None:
         self.display_calls.append((text, language_code, is_error))
@@ -72,30 +63,9 @@ class DummyDashboard:
         text: str,
         *,
         language_code: str | None = None,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        session_scope: str | None = None,
-        source_text_hash: str | None = None,
-        source_text_len: int | None = None,
-        logical_turn_key: str | None = None,
         debug_prefix: str | None = None,
     ) -> None:
         self.translation_calls.append((text, language_code))
-        self.translation_metadata_calls.append(
-            {
-                "update_id": update_id,
-                "origin_wall_clock_ms": origin_wall_clock_ms,
-                "utterance_id": utterance_id,
-                "channel": channel,
-                "session_scope": session_scope,
-                "source_text_hash": source_text_hash,
-                "source_text_len": source_text_len,
-                "logical_turn_key": logical_turn_key,
-                "debug_prefix": debug_prefix,
-            }
-        )
 
     def set_local_stt_notice(self, status: str | None) -> None:
         self.notice_calls.append(status)
@@ -107,29 +77,9 @@ class FailingTranslationDashboard(DummyDashboard):
         text: str,
         *,
         language_code: str | None = None,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        session_scope: str | None = None,
-        source_text_hash: str | None = None,
-        source_text_len: int | None = None,
-        logical_turn_key: str | None = None,
         debug_prefix: str | None = None,
     ) -> None:
-        _ = (
-            text,
-            language_code,
-            update_id,
-            origin_wall_clock_ms,
-            utterance_id,
-            channel,
-            session_scope,
-            source_text_hash,
-            source_text_len,
-            logical_turn_key,
-            debug_prefix,
-        )
+        _ = (text, language_code, debug_prefix)
         raise RuntimeError("dashboard setter failed")
 
 
@@ -219,10 +169,8 @@ class RuntimeLoggingCapture:
     def __init__(
         self,
         *,
-        detailed_enabled: bool = True,
         detailed_error: Exception | None = None,
     ) -> None:
-        self.detailed_enabled = detailed_enabled
         self.detailed_error = detailed_error
         self.basic_messages: list[tuple[int, str]] = []
         self.detailed_calls: list[tuple[int, str]] = []
@@ -231,12 +179,10 @@ class RuntimeLoggingCapture:
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
         self.basic_messages.append((level, message))
 
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
+    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool:
         self.detailed_calls.append((level, message))
         if self.detailed_error is not None:
             raise self.detailed_error
-        if not self.detailed_enabled:
-            return False
         self.detailed_messages.append((level, message))
         return True
 
@@ -315,17 +261,16 @@ async def test_event_bridge_reports_started_only_after_run_loop_entry() -> None:
 
 
 @pytest.mark.asyncio
-async def test_event_bridge_failure_log_identifies_event_without_payload(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+async def test_event_bridge_failure_log_identifies_event_without_payload() -> None:
     app = DummyApp()
     queue: asyncio.Queue[UIEvent] = asyncio.Queue()
-    bridge = make_bridge(app, event_queue=queue)
+    runtime_logging = RuntimeLoggingCapture()
+    bridge = make_bridge(app, event_queue=queue, runtime_logging=runtime_logging)
 
-    def fail_history(*_args: object, **_kwargs: object) -> None:
+    async def fail_event(_event: UIEvent) -> None:
         raise AttributeError("private transcript text")
 
-    bridge.history_destination = AppHistoryEventDestination(fail_history)
+    bridge._handle_event = fail_event  # type: ignore[method-assign]
     event = UIEvent(
         type=UIEventType.TRANSCRIPT_FINAL,
         payload=Transcript(utterance_id=uuid4(), text="secret", is_final=True),
@@ -339,13 +284,13 @@ async def test_event_bridge_failure_log_identifies_event_without_payload(
     task.cancel()
     await asyncio.gather(task, return_exceptions=True)
 
-    message = next(
-        record.getMessage() for record in caplog.records if record.levelno == logging.ERROR
-    )
-    assert message == (
-        "Error handling UI event: event_type=TRANSCRIPT_FINAL "
-        "channel=self exception_type=AttributeError"
-    )
+    assert runtime_logging.basic_messages == [
+        (
+            logging.ERROR,
+            "A user interface event failed · Event TRANSCRIPT_FINAL · Cause AttributeError",
+        )
+    ]
+    message = runtime_logging.basic_messages[0][1]
     assert "secret" not in message
     assert "private transcript text" not in message
 
@@ -371,7 +316,6 @@ def test_event_projection_builds_dtos_without_runtime_subscription() -> None:
         source_language="ko",
         target_language="en",
         translation_enabled=True,
-        runtime_logging_mode="detailed",
     )
     mapped_transcript = map_ui_event(
         UIEvent(
@@ -404,10 +348,10 @@ def test_event_projection_builds_dtos_without_runtime_subscription() -> None:
     translation_projection = service.project(mapped_translation, context)
 
     assert transcript_projection.transcript is not None
-    assert transcript_projection.transcript.channel == "self"
+    assert transcript_projection.transcript.language_code == "ko"
     assert transcript_projection.history[0].language_code == "ko"
     assert translation_projection.translation is not None
-    assert translation_projection.translation.channel == "self"
+    assert translation_projection.translation.language_code == "en"
     assert translation_projection.translation_diagnostic is not None
     assert translation_projection.translation_diagnostic.text_len == len("translated")
 
@@ -1000,96 +944,6 @@ async def test_event_bridge_routes_legacy_raw_fallback_through_central_redactor(
 
 
 @pytest.mark.asyncio
-async def test_event_bridge_passes_dashboard_translation_visual_commit_metadata_to_dashboard() -> (
-    None
-):
-    app = DummyApp()
-    bridge = make_bridge(app, event_queue=asyncio.Queue())
-    utterance_id = uuid4()
-    translation = Translation(
-        utterance_id=utterance_id,
-        text="translated peer",
-        channel="peer",
-        target_language="ja",
-        update_id="upd-dashboard-1",
-        origin_wall_clock_ms=1712345678901,
-        session_scope="session-42",
-        source_text_hash="src-hash-42",
-        source_text_len=17,
-        logical_turn_key="peer:turn-42",
-    )
-
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=translation,
-            source="Peer Mic",
-        )
-    )
-
-    assert app.view_dashboard.translation_calls == [("translated peer", "en")]
-    assert app.view_dashboard.translation_metadata_calls == [
-        {
-            "update_id": "upd-dashboard-1",
-            "origin_wall_clock_ms": 1712345678901,
-            "utterance_id": utterance_id,
-            "channel": "peer",
-            "session_scope": "session-42",
-            "source_text_hash": "src-hash-42",
-            "source_text_len": 17,
-            "logical_turn_key": "peer:turn-42",
-            "debug_prefix": None,
-        }
-    ]
-
-
-@pytest.mark.asyncio
-async def test_event_bridge_passes_peer_debug_prefix_when_runtime_logging_is_detailed() -> None:
-    app = DummyApp()
-    runtime_logging = RuntimeLoggingCapture()
-    runtime_logging.mode = SessionLoggingMode.DETAILED
-    bridge = make_bridge(
-        app,
-        event_queue=asyncio.Queue(),
-        runtime_logging=runtime_logging,
-    )
-    utterance_id = uuid4()
-
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSCRIPT_FINAL,
-            payload=Transcript(
-                utterance_id=utterance_id,
-                text="peer source",
-                is_final=True,
-                channel="peer",
-            ),
-            source="Peer Mic",
-        )
-    )
-
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=Translation(
-                utterance_id=utterance_id,
-                text="peer translation",
-                channel="peer",
-                target_language="en",
-                update_id="3bd7ffff-1111-2222-3333-444455556666",
-            ),
-            source="Peer Mic",
-        )
-    )
-
-    turn_tail = str(utterance_id).replace("-", "")[:4]
-    assert app.view_dashboard.display_debug_prefixes[-1] == f"[P {turn_tail}/src]"
-    assert app.view_dashboard.translation_metadata_calls[-1]["debug_prefix"] == (
-        f"[P {turn_tail}/3bd7]"
-    )
-
-
-@pytest.mark.asyncio
 async def test_event_bridge_logs_peer_dashboard_translation_applied_detail_only() -> None:
     app = DummyApp()
     runtime_logging = RuntimeLoggingCapture()
@@ -1191,30 +1045,6 @@ async def test_event_bridge_best_effort_translation_apply_logging_does_not_block
 
     assert app.view_dashboard.translation_calls == [("translated", "en")]
     assert app.history == [("Mic", "translated", True, "en")]
-    assert len(runtime_logging.detailed_calls) == 1
-    assert runtime_logging.detailed_messages == []
-    assert runtime_logging.basic_messages == []
-
-
-@pytest.mark.asyncio
-async def test_event_bridge_dashboard_translation_applied_detail_disabled_keeps_dashboard_and_history() -> (
-    None
-):
-    app = DummyApp()
-    runtime_logging = RuntimeLoggingCapture(detailed_enabled=False)
-    bridge = make_bridge(
-        app,
-        event_queue=asyncio.Queue(),
-        runtime_logging=runtime_logging,
-    )
-    translation = Translation(utterance_id=uuid4(), text="translated", channel="peer")
-
-    await bridge._handle_event(
-        UIEvent(type=UIEventType.TRANSLATION_DONE, payload=translation, source="Peer Mic")
-    )
-
-    assert app.view_dashboard.translation_calls == [("translated", "en")]
-    assert app.history == [("Peer Mic", "translated", True, "en")]
     assert len(runtime_logging.detailed_calls) == 1
     assert runtime_logging.detailed_messages == []
     assert runtime_logging.basic_messages == []
@@ -1367,14 +1197,13 @@ async def test_event_bridge_ignores_unknown_event_and_keeps_queue_alive() -> Non
 
 
 @pytest.mark.asyncio
-async def test_event_bridge_error_without_runtime_logging_uses_standard_logger_only(
+async def test_event_bridge_error_without_runtime_logging_uses_standard_logger(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app = DummyApp()
     bridge = make_bridge(app, event_queue=asyncio.Queue())
     seen: list[str] = []
-    monkeypatch.setattr(event_dispatch_module.logger, "error", lambda message: seen.append(message))
-
+    monkeypatch.setattr(event_dispatch_module.logger, "error", seen.append)
     await bridge._handle_event(UIEvent(type=UIEventType.ERROR, payload="plain failure"))
 
     assert seen == ["plain failure"]
@@ -1383,7 +1212,7 @@ async def test_event_bridge_error_without_runtime_logging_uses_standard_logger_o
 
 
 @pytest.mark.asyncio
-async def test_event_bridge_error_with_broken_runtime_logging_uses_standard_logger_only(
+async def test_event_bridge_error_with_broken_runtime_logging_uses_safe_standard_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app = DummyApp()
@@ -1394,7 +1223,7 @@ async def test_event_bridge_error_with_broken_runtime_logging_uses_standard_logg
             _ = level
             raise RuntimeError("emit failed")
 
-    monkeypatch.setattr(event_dispatch_module.logger, "error", lambda message: seen.append(message))
+    monkeypatch.setattr(event_dispatch_module.logger, "error", seen.append)
     bridge = make_bridge(
         app,
         event_queue=asyncio.Queue(),
@@ -1403,7 +1232,7 @@ async def test_event_bridge_error_with_broken_runtime_logging_uses_standard_logg
 
     await bridge._handle_event(UIEvent(type=UIEventType.ERROR, payload="broken runtime"))
 
-    assert seen == ["broken runtime"]
+    assert seen == ["A user interface operation failed."]
     assert app.view_logs.lines == []
     assert app.view_dashboard.display_calls[-1] == ("broken runtime", None, True)
 

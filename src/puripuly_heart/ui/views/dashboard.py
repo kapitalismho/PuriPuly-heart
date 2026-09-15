@@ -139,7 +139,6 @@ class DashboardView(ft.Column):
         )
         self.on_language_change: Callable[[LanguageSelectionChange], None] | None = None
         self.on_message_input_activity = None
-        self.runtime_log_detailed: Callable[..., bool | None] | None = None
 
         self._build_ui()
 
@@ -728,13 +727,6 @@ class DashboardView(ft.Column):
         *,
         language_code: str | None = None,
         is_error: bool = False,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        source_text_len: int | None = None,
-        transcript_kind: str | None = None,
-        should_log: bool = False,
         debug_prefix: str | None = None,
         as_translation: bool = False,
     ) -> None:
@@ -746,14 +738,6 @@ class DashboardView(ft.Column):
             text,
             is_error=is_error,
             font_family=font_family,
-            runtime_log_detailed=self.runtime_log_detailed,
-            update_id=update_id,
-            origin_wall_clock_ms=origin_wall_clock_ms,
-            utterance_id=utterance_id,
-            channel=channel,
-            source_text_len=source_text_len,
-            transcript_kind=transcript_kind,
-            should_log=should_log,
             debug_prefix=debug_prefix,
             as_translation=as_translation,
         )
@@ -763,14 +747,6 @@ class DashboardView(ft.Column):
         text: str | None,
         *,
         language_code: str | None = None,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        session_scope: str | None = None,
-        source_text_hash: str | None = None,
-        source_text_len: int | None = None,
-        logical_turn_key: str | None = None,
         debug_prefix: str | None = None,
     ) -> None:
         """Update the display card translation line."""
@@ -778,15 +754,6 @@ class DashboardView(ft.Column):
         self.display_card.set_display_translation(
             text,
             font_family=font_family,
-            runtime_log_detailed=self.runtime_log_detailed,
-            update_id=update_id,
-            origin_wall_clock_ms=origin_wall_clock_ms,
-            utterance_id=utterance_id,
-            channel=channel,
-            session_scope=session_scope,
-            source_text_hash=source_text_hash,
-            source_text_len=source_text_len,
-            logical_turn_key=logical_turn_key,
             debug_prefix=debug_prefix,
         )
 

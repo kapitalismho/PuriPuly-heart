@@ -5,12 +5,9 @@ from typing import Protocol
 
 
 class ApplicationRuntimeLoggingPort(Protocol):
-    @property
-    def mode(self) -> str: ...
-
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None: ...
 
-    def emit_detailed(
+    def emit_diagnostic(
         self,
         message: str,
         *,

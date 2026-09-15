@@ -9,7 +9,7 @@ from typing import Any, Final, Literal, TypeAlias, TypeVar
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_LIFECYCLE,
-    DIAGNOSTIC_VISIBILITY_DETAILED,
+    DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
     SEVERITY_ERROR,
     ErrorDiagnostics,
 )
@@ -351,7 +351,7 @@ class LifecycleScope:
             operation=phase,
             code="lifecycle_exception",
             category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
-            visibility=DIAGNOSTIC_VISIBILITY_DETAILED,
+            visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
             content_policy=CONTENT_POLICY_METADATA_ONLY,
             status_code=None,
             retry_after_ms=None,
@@ -360,7 +360,7 @@ class LifecycleScope:
         return DiagnosticEvent(
             category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
             severity=SEVERITY_ERROR,
-            visibility=DIAGNOSTIC_VISIBILITY_DETAILED,
+            visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
             content_policy=CONTENT_POLICY_METADATA_ONLY,
             correlation_id=None,
             diagnostics=diagnostics,
@@ -394,7 +394,7 @@ def _shutdown_diagnostic_event(
         operation=callback.phase,
         code="lifecycle_shutdown_exception",
         category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
-        visibility=DIAGNOSTIC_VISIBILITY_DETAILED,
+        visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
         content_policy=CONTENT_POLICY_METADATA_ONLY,
         status_code=None,
         retry_after_ms=None,
@@ -403,7 +403,7 @@ def _shutdown_diagnostic_event(
     return DiagnosticEvent(
         category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
         severity=SEVERITY_ERROR,
-        visibility=DIAGNOSTIC_VISIBILITY_DETAILED,
+        visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
         content_policy=CONTENT_POLICY_METADATA_ONLY,
         correlation_id=None,
         diagnostics=diagnostics,

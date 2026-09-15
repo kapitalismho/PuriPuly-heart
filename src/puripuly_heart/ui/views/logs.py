@@ -8,14 +8,13 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
 import flet as ft
 
 from puripuly_heart.ui.flet_runtime import control_page, update_control_if_mounted
 from puripuly_heart.ui.fonts import font_for_language
-from puripuly_heart.ui.i18n import get_locale, source_label, t
-from puripuly_heart.ui.logs.contract import LogsIntents, LogsSurfaceSlots
+from puripuly_heart.ui.i18n import get_locale, language_name, source_label, t
+from puripuly_heart.ui.logs.contract import LogsSurfaceSlots
 from puripuly_heart.ui.logs.renderer import compose_logs_surface
 from puripuly_heart.ui.theme import (
     COLOR_ON_BACKGROUND,
@@ -27,8 +26,6 @@ MAX_LOG_ENTRIES = 4000
 CLEANUP_BATCH = 500
 MAX_CONVERSATION_RECORDS = 1000
 _UPDATE_INTERVAL = 0.2  # 200ms throttling
-_BASIC_MODE = "basic"
-_DETAILED_MODE = "detailed"
 
 
 def _get_log_dir() -> Path:
@@ -122,6 +119,10 @@ class ConversationViewModel:
         rendered: list[str] = []
         for record in self._records:
             header = f"[{record.timestamp_label}] {source_label(record.source)}"
+            if record.translated_text and record.target_language:
+                header = f"{header} → {language_name(record.target_language)}"
+            elif record.source_text and record.source_language:
+                header = f"{header} · {language_name(record.source_language)}"
             body = [value for value in (record.source_text, record.translated_text) if value]
             rendered.append("\n".join((header, *body)))
         return "\n\n".join(rendered)
@@ -144,10 +145,7 @@ class LogsView(ft.Column):
     def __init__(self):
         super().__init__(expand=True, spacing=16)
 
-        self.on_mode_change: Callable[[str], None] | None = None
-
         self._title_text: ft.Text | None = None
-        self._mode_button: ft.TextButton | None = None
         self._log_text: ft.Text | None = None
         self._log_scroll: ft.Column | None = None
         self._folder_button: ft.TextButton | None = None
@@ -155,7 +153,6 @@ class LogsView(ft.Column):
         self._conversation_button: ft.TextButton | None = None
         self._showing_conversation = False
         self._conversation_model = ConversationViewModel()
-        self._runtime_logging_mode = _BASIC_MODE
 
         # Log buffer and throttling state
         self._model = LiveLogViewModel()
@@ -207,12 +204,6 @@ class LogsView(ft.Column):
             style=self._get_button_style(font_family),
             on_click=self._open_log_folder,
         )
-        self._mode_button = ft.TextButton(
-            content=self._mode_button_label(),
-            icon=ft.Icons.ARTICLE,
-            style=self._get_button_style(font_family),
-            on_click=self._on_mode_button_click,
-        )
         self._conversation_button = ft.TextButton(
             content=self._conversation_button_label(),
             icon=ft.Icons.CHAT_BUBBLE_OUTLINE,
@@ -235,7 +226,6 @@ class LogsView(ft.Column):
             LogsSurfaceSlots(
                 title=self._title_text,
                 folder_button=self._folder_button,
-                mode_button=self._mode_button,
                 conversation_button=self._conversation_button,
                 log_text=self._log_text,
             )
@@ -243,9 +233,6 @@ class LogsView(ft.Column):
         self._header_button_row = regions.header_button_row
         self._log_scroll = regions.log_scroll
         self.controls = [regions.root]
-
-    def bind_logs_intents(self, intents: LogsIntents) -> None:
-        self.on_mode_change = intents.runtime_logging_mode_change
 
     def append_log(self, record: str):
         """Append a log entry with throttled updates."""
@@ -445,9 +432,6 @@ class LogsView(ft.Column):
         if self._folder_button:
             self._folder_button.content = t("logs.open_folder")
             self._folder_button.style = self._get_button_style(font_family)
-        if self._mode_button:
-            self._mode_button.content = self._mode_button_label()
-            self._mode_button.style = self._get_button_style(font_family)
         if self._conversation_button:
             self._conversation_button.content = self._conversation_button_label()
             self._conversation_button.style = self._get_button_style(font_family)
@@ -455,31 +439,6 @@ class LogsView(ft.Column):
             self._render_conversation_text()
         # Only update if added to page
         update_control_if_mounted(self)
-
-    @property
-    def runtime_logging_mode(self) -> str:
-        return self._runtime_logging_mode
-
-    def set_runtime_logging_mode(self, mode: str) -> None:
-        self._runtime_logging_mode = self._normalize_mode(mode)
-        if self._mode_button is not None:
-            self._mode_button.content = self._mode_button_label()
-        update_control_if_mounted(self)
-
-    def _normalize_mode(self, mode: str) -> str:
-        normalized = str(getattr(mode, "value", mode)).lower()
-        if normalized not in {_BASIC_MODE, _DETAILED_MODE}:
-            raise ValueError(f"Unsupported runtime logging mode: {mode}")
-        return normalized
-
-    def _mode_button_label(self) -> str:
-        return t(f"logs.mode.{self._runtime_logging_mode}")
-
-    def _on_mode_button_click(self, _e: ft.ControlEvent | object) -> None:
-        next_mode = _DETAILED_MODE if self._runtime_logging_mode == _BASIC_MODE else _BASIC_MODE
-        self.set_runtime_logging_mode(next_mode)
-        if callable(self.on_mode_change):
-            self.on_mode_change(next_mode)
 
     async def scroll_to_bottom(self) -> None:
         """Scroll to the latest log entry."""

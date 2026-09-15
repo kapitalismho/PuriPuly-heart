@@ -323,8 +323,6 @@ def prepare_session(executable: Path) -> Path:
                 "text_scale": 1.0,
                 "background_alpha": 0.24,
             },
-            "logging_mode": "detailed",
-            "logging_comparison": "both_arms_use_detailed_instead_of_earlier_basic_measurement",
             "handoff_experiment_default": HANDOFF_EXPERIMENT_OFF,
         },
         "preregistration": {
@@ -614,13 +612,11 @@ async def run_measurement(
     diagnostics = OverlayDiagnosticsRecorder(
         overlay_instance_id=overlay_instance_id,
         diagnostics_dir=diagnostics_dir,
-        logging_mode="detailed",
+        capture_measurements=True,
     )
     runtime.attach_diagnostics(diagnostics)
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        diagnostics=diagnostics,
-        runtime_log_detailed=None,
         show_translation=True,
         show_peer_original=True,
         translation_enabled=True,
@@ -635,7 +631,6 @@ async def run_measurement(
         overlay_instance_id=overlay_instance_id,
         runtime_generation=1,
         diagnostics=diagnostics,
-        runtime_logging_mode="detailed",
         desktop_runtime_controls_enabled=False,
         task_factory=runtime.create_child_task,
     )
@@ -672,7 +667,6 @@ async def run_measurement(
                 log_dir=str(diagnostics_dir),
                 startup_timeout_ms=15000,
                 overlay_instance_id=overlay_instance_id,
-                logging_mode="detailed",
                 quiet_tail_profile="p05",
                 handoff_experiment=arm,
                 diagnostics_dir=diagnostics_dir,

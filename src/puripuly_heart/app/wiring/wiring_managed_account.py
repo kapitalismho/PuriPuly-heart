@@ -49,6 +49,7 @@ from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEClient
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )
+from puripuly_heart.core.runtime_logging import emit_basic_log
 
 from .wiring_managed_auth_factory import (
     ManagedAuthRuntimeAdapter,
@@ -199,11 +200,12 @@ class ManagedOpenRouterReleaseRuntime:
             client = HttpManagedOpenRouterBrokerClient(
                 base_url=broker_base_url,
             )
-        except ValueError as exc:
-            logger.warning(
-                "[Managed OpenRouter] Invalid broker base URL %r; using unavailable fallback: %s",
-                broker_base_url,
-                exc,
+        except ValueError:
+            emit_basic_log(
+                logger,
+                "[Managed OpenRouter] The managed translation broker configuration is invalid; "
+                "the service is unavailable.",
+                level=logging.WARNING,
             )
             client = UnavailableManagedOpenRouterReleaseClient()
 
@@ -339,10 +341,10 @@ def compose_managed_account(
     founder_dialog: Callable[[], bool],
     failure_route: Callable[[str], None],
     log_basic: Callable[[str], None],
-    log_detailed: Callable[[str], None],
+    log_diagnostic: Callable[[str], None],
     log_error: Callable[[str], None],
     basic_warning_sink: Callable[[str], None],
-    detailed_warning_sink: Callable[[str, BaseException | None], None],
+    diagnostic_warning_sink: Callable[[str, BaseException | None], None],
     runtime_state_changed: Callable[[], None] | None = None,
     managed_gemma: ManagedGemmaTranslationOwner | None = None,
     sync_local_translation_demand: Callable[[], Awaitable[None]] | None = None,
@@ -357,7 +359,7 @@ def compose_managed_account(
         settings=settings,
         config_path=config_path,
         callback_received=callback_received,
-        diagnostic_sink=detailed_warning_sink,
+        diagnostic_sink=diagnostic_warning_sink,
     )
     auth_adapter = ManagedAuthRuntimeAdapter(
         config_path=config_path,
@@ -409,7 +411,7 @@ def compose_managed_account(
 
     def warning_sink(message: str, exception: BaseException | None) -> None:
         if message.startswith("[ManagedAuth] Background refresh failed"):
-            detailed_warning_sink(message, exception)
+            diagnostic_warning_sink(message, exception)
             return
         basic_warning_sink(message)
 
@@ -485,7 +487,7 @@ def compose_managed_account(
         qq_dialog_sink=qq_dialog_sink,
         result_sink=results.set,
         log_basic=log_basic,
-        log_detailed=log_detailed,
+        log_diagnostic=log_diagnostic,
         log_error=log_error,
         founder_letter_sink=translation_adapter.show_founder_letter,
         teardown=teardown_translation,

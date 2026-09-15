@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -945,7 +944,6 @@ def _create_rolling_stt_backend(
     if not include_gemini and not include_scribe and not include_deepgram:
         include_scribe = True
 
-    key_started = time.monotonic()
     gemini_key = (
         _rolling_member_api_key(STTProviderName.GEMINI_TRANSCRIBE.value, secrets)
         if include_gemini
@@ -959,7 +957,6 @@ def _create_rolling_stt_backend(
     deepgram_key = (
         _rolling_member_api_key(STTProviderName.DEEPGRAM.value, secrets) if include_deepgram else ""
     )
-    key_s = time.monotonic() - key_started
 
     def build_gemini(api_key: str) -> STTBackend:
         from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
@@ -998,7 +995,6 @@ def _create_rolling_stt_backend(
             drain_timeout_s=config.drain_timeout_s,
         )
 
-    build_started = time.monotonic()
     definitions: list[RollingProviderDefinition] = []
     if include_scribe:
         definitions.append(
@@ -1024,16 +1020,6 @@ def _create_rolling_stt_backend(
                 build=build_deepgram,
             )
         )
-    build_s = time.monotonic() - build_started
-    configured = tuple(
-        definition.name.value for definition in definitions if definition.is_configured()
-    )
-    logger.info(
-        "[STT][Rolling] prepared configured=%s key_s=%.3f build_s=%.3f",
-        ",".join(configured) if configured else "none",
-        key_s,
-        build_s,
-    )
     return RollingSTTBackend(providers=tuple(definitions))
 
 
@@ -1054,10 +1040,10 @@ def create_stt_backend_from_resolved_config(
     config: ResolvedSTTConfig,
     *,
     secrets: SecretStore,
-    diagnostics_enabled: Callable[[], bool] | None = None,
     gpu_runtime: SharedGpuASRRuntime | None = None,
     gpu_model_path: Path | None = None,
     gpu_device_id: str = "auto",
+    basic_log_sink: Callable[[str, int], None] | None = None,
 ) -> STTBackend:
     stream_label = config.channel
     keyterms = _resolved_stt_keyterms(config)
@@ -1075,7 +1061,7 @@ def create_stt_backend_from_resolved_config(
             sample_rate_hz=config.sample_rate_hz,
             stream_label=stream_label,
             hotwords=keyterms,
-            diagnostics_enabled=diagnostics_enabled,
+            attempt_log_sink=basic_log_sink,
         )
     if config.provider in local_cpu_model_by_provider:
         from puripuly_heart.providers.stt.local_cpu import create_local_cpu_backend
@@ -1086,7 +1072,7 @@ def create_stt_backend_from_resolved_config(
             sample_rate_hz=config.sample_rate_hz,
             stream_label=stream_label,
             hotwords=() if config.provider == STT_PROVIDER_LOCAL_QWEN else keyterms,
-            diagnostics_enabled=diagnostics_enabled,
+            attempt_log_sink=basic_log_sink,
         )
     if config.provider == STT_PROVIDER_LOCAL_QWEN_GPU:
         if gpu_runtime is None:
@@ -1553,7 +1539,6 @@ def create_peer_stt_backend_from_resolved_config(
     config: ResolvedSTTConfig,
     *,
     secrets: SecretStore,
-    diagnostics_enabled: Callable[[], bool] | None = None,
     gpu_runtime: SharedGpuASRRuntime | None = None,
     gpu_model_path: Path | None = None,
     gpu_device_id: str = "auto",
@@ -1561,7 +1546,6 @@ def create_peer_stt_backend_from_resolved_config(
     return create_stt_backend_from_resolved_config(
         config,
         secrets=secrets,
-        diagnostics_enabled=diagnostics_enabled,
         gpu_runtime=gpu_runtime,
         gpu_model_path=gpu_model_path,
         gpu_device_id=gpu_device_id,

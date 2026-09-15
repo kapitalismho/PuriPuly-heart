@@ -523,64 +523,6 @@ async def test_production_manual_self_and_peer_finals_enter_the_generic_owner() 
 
 
 @pytest.mark.asyncio
-async def test_peer_final_segmentation_emits_one_metadata_only_detailed_receipt() -> None:
-    messages: list[str] = []
-
-    class DetailedLogging:
-        mode = "detailed"
-
-        def emit_basic(self, message: str, *, level: int = 20) -> None:
-            _ = message, level
-
-        def emit_detailed_lazy(self, build_message, *, level: int = 20) -> bool:
-            _ = level
-            messages.append(build_message())
-            return True
-
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=object(),
-        runtime_logging=DetailedLogging(),
-    )
-    parent_id = uuid4()
-    text = "known unknown"
-    request = TranslationTurnRequest(
-        transcript=Transcript(
-            utterance_id=parent_id,
-            text=text,
-            is_final=True,
-            channel="peer",
-            final_language_runs=(FinalLanguageRun(text, "en"),),
-            final_speaker_runs=(
-                FinalSpeakerRun("known ", "speaker-private", "session-private"),
-                FinalSpeakerRun("unknown", None, "session-private"),
-            ),
-            publication_generation=1,
-            source_order=1,
-        ),
-        source="Peer",
-        turn_kind="peer",
-        target_languages=("ja",),
-        config_snapshot=harness.configuration.snapshot(),
-    )
-
-    try:
-        await harness.translation_turns.submit(request, wait_for_parent=True)
-    finally:
-        await harness.translation_turns.close()
-
-    receipts = [message for message in messages if "peer_final_segmentation" in message]
-    assert receipts == [
-        "[Detailed][Translation] peer_final_segmentation "
-        f"parent_utterance_id={parent_id} segment_count=2 unknown_span_count=1"
-    ]
-    assert "known unknown" not in receipts[0]
-    assert "speaker-private" not in receipts[0]
-    assert "session-private" not in receipts[0]
-
-
-@pytest.mark.asyncio
 async def test_manual_and_self_single_child_preserve_parent_identity() -> None:
     for turn_kind in ("manual", "self"):
         parent_id = uuid4()

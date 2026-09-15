@@ -295,15 +295,6 @@ Execution options:
 
 Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
-Healthy cloud reuse follows [STT-REUSE-1 (#169)](https://github.com/kapitalismho/PuriPuly-heart/issues/169):
-
-- One submitted turn remains unresolved per connection. Successor input waits for the predecessor's authoritative terminal and completed seal/write cleanup; the healthy connection keeps its epoch while each admitted segment gets a new turn identity.
-- Soniox requires its pending manual `<fin>`, Deepgram requires a `from_finalize` ACK before close/drain wins, Gemini requires authoritative input transcription plus ActivityEnd, and Scribe requires the canonical committed transcript after a successful manual commit. Normal final/explicit-empty completion retains connection resources; timeout, ambiguity, error, EOF and abort retire authority irreversibly.
-- Unkeyed protocols rely on ordered provider completion, not fabricated native IDs or text equality. Captured stale identities and detectable idle contradictions are rejected; arbitrary old unkeyed text arriving after a new turn begins cannot be independently authenticated.
-- `ScopedRecognitionEngine` alone owns the 180-second soft connection age, 10-second recent-speech protection and independent idle timer. Capture/VAD owners report real speech and pending owned input; provider terminals and PEER delivery cuts are not acoustic silence. Age does not reset per turn.
-- Shared wiring enables deferred idle rotation for Soniox, Deepgram, Gemini, Scribe and Rolling Free. Due sessions close only after genuine quiet and drained owned work; no empty replacement is opened. Later speech uses bounded demand-driven recovery after cleanup quarantine, without mid-utterance replay.
-- Rolling retains its selected healthy member. Qwen task reuse, Custom keyed realtime/offline reuse and local CPU/GPU session/model release policies remain separate and unchanged. `intent.stt.drain_timeout_s` still bounds actual drain/cleanup; healthy reuse adds no fixed drain sleep.
-
 Controlled adapter/source tests do not certify live service conformance or latency improvement. Live acceptance requires credentials, model access and explicit paid-call permission. Retained Soniox stream duration, including post-speech protection, remains billable.
 
 GPU worker split:
@@ -399,9 +390,11 @@ Each generation owns its tasks and shutdown. Python owns caption lifetime; nativ
 | --- | --- |
 | `SessionRuntimeLoggingService` | Shared console, local file, and Logs view delivery |
 | Translation owners | Accepted SELF/PEER source and target records |
-| Overlay owners | Child logging modes and bounded failure evidence |
+| Overlay owners | Bounded failure evidence and reliable lifecycle warnings |
 
-Basic records outcomes; Detailed adds context. Conversation text uses a secret-protected path; technical diagnostics remain metadata-only. Delivery and retention are bounded, with explicit loss reporting.
+Basic-audience records are the only records delivered live to the console and Logs view. Accepted SELF/PEER conversation records, concise valid recognition RTF, VAD/SmartTurn activity, and useful latency outcomes are Basic. Selected technical diagnostics are file-only and metadata-only. The UTF-8 runtime file is written by one bounded-queue owner in batches, rotates at a 20 MiB record boundary with one backup, and flushes priority records promptly. A record larger than the file cap is rejected before file formatting when possible and counted in terminal loss evidence; queue pressure, failed or stalled I/O, forced termination, and ordinary buffered writes can also prevent complete persistence. File flush does not imply `fsync`.
+
+The 2,048-record queue reserves 64 slots for warning/error/terminal evidence and discards lower-priority diagnostics first without blocking producers. Ordinary root and child prose is reduced to bounded metadata unless it satisfies the selected diagnostic format; accepted conversation retains its separate secret-protected path. A timed-out close keeps writer ownership until the listener can finish and close its stream, preventing a replacement writer from racing the old one. A stalled operating-system write can still prevent complete shutdown.
 
 ## Lifecycle
 

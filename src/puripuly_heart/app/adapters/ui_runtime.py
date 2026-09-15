@@ -23,9 +23,6 @@ from puripuly_heart.app.ports.ui_models import (
 from puripuly_heart.app.services.application_after_launch import (
     ApplicationAfterLaunchOwner,
 )
-from puripuly_heart.app.services.application_runtime_logging import (
-    ApplicationRuntimeLoggingOwner,
-)
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.desktop_overlay_application import (
     DesktopOverlayApplicationOwner,
@@ -562,27 +559,9 @@ class UiEngagementRuntimeAdapter:
 
 @dataclass(slots=True)
 class UiDiagnosticsRuntimeAdapter:
-    runtime_logging: ApplicationRuntimeLoggingOwner
-    overlay: OverlayApplicationOwner
     cycle_capture_fault: Callable[[], str]
     cycle_stt_fault: Callable[[], str]
     clear_audio_faults: Callable[[], None]
-
-    def set_runtime_logging_mode(self, mode: str) -> None:
-        def mode_changed(normalized_mode: str) -> None:
-            runtime = self.overlay.runtime
-            manager = runtime.process_manager if runtime is not None else None
-            if manager is not None:
-                set_logging_mode = getattr(manager, "set_logging_mode", None)
-                if callable(set_logging_mode):
-                    set_logging_mode(normalized_mode)
-            self.runtime_logging.schedule_overlay_logging_mode_update()
-
-        self.runtime_logging.set_mode(
-            mode,
-            detailed_enabled=self.runtime_logging.schedule_audio_environment_snapshot,
-            mode_changed=mode_changed,
-        )
 
     def cycle_debug_capture_fault_profile(self) -> str:
         return self.cycle_capture_fault()

@@ -39,7 +39,7 @@ def _forbidden_imports(module: object) -> set[str]:
 def _diagnostics(
     *,
     fields: dict[str, Any] | None = None,
-    visibility: messages.DiagnosticVisibility = messages.DIAGNOSTIC_VISIBILITY_DETAILED,
+    visibility: messages.DiagnosticVisibility = messages.DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
     content_policy: messages.ContentPolicy = messages.CONTENT_POLICY_METADATA_ONLY,
 ) -> messages.ErrorDiagnostics:
     return messages.ErrorDiagnostics(
@@ -63,7 +63,7 @@ def test_diagnostic_sink_contract_covers_live_logs_persisted_and_failure_jsonl()
         validator.DIAGNOSTIC_SINK_SNACKBAR,
         validator.DIAGNOSTIC_SINK_CHATBOX_DISCLOSURE,
         validator.DIAGNOSTIC_SINK_BASIC_LOGS,
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
         validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
         validator.DIAGNOSTIC_SINK_FAILURE_JSONL,
     }
@@ -76,7 +76,7 @@ def test_diagnostic_sink_contract_covers_live_logs_persisted_and_failure_jsonl()
         validator.DIAGNOSTIC_SINK_SNACKBAR: messages.DIAGNOSTIC_VISIBILITY_BASIC,
         validator.DIAGNOSTIC_SINK_CHATBOX_DISCLOSURE: messages.DIAGNOSTIC_VISIBILITY_BASIC,
         validator.DIAGNOSTIC_SINK_BASIC_LOGS: messages.DIAGNOSTIC_VISIBILITY_BASIC,
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS: messages.DIAGNOSTIC_VISIBILITY_DETAILED,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS: messages.DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
         validator.DIAGNOSTIC_SINK_PERSISTED_LOGS: messages.DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
         validator.DIAGNOSTIC_SINK_FAILURE_JSONL: messages.DIAGNOSTIC_VISIBILITY_PERSISTED_FAILURE_ONLY,
     }
@@ -103,7 +103,7 @@ def test_validator_rejects_unsupported_field_types_before_sink_output() -> None:
 
     result = validator.validate_diagnostics_for_sink(
         _diagnostics(fields={"provider": "openrouter", "raw_headers": ["x-request-id"]}),
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
 
     assert result.status == validator.DIAGNOSTIC_VALIDATION_STATUS_REJECTED
@@ -119,7 +119,7 @@ def test_validator_rejects_excessive_field_depth_and_size() -> None:
     }
     size_result = validator.validate_diagnostics_for_sink(
         _diagnostics(fields=too_many_fields),
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert size_result.status == validator.DIAGNOSTIC_VALIDATION_STATUS_REJECTED
     assert validator.DIAGNOSTIC_VALIDATION_REASON_FIELD_LIMIT_EXCEEDED in size_result.reasons
@@ -129,7 +129,7 @@ def test_validator_rejects_excessive_field_depth_and_size() -> None:
         too_deep = {f"level_{index}": too_deep}
     depth_result = validator.validate_diagnostics_for_sink(
         _diagnostics(fields={"nested": too_deep}),
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert depth_result.status == validator.DIAGNOSTIC_VALIDATION_STATUS_REJECTED
     assert validator.DIAGNOSTIC_VALIDATION_REASON_EXCESSIVE_DEPTH in depth_result.reasons
@@ -145,14 +145,14 @@ def test_validator_rejects_known_secret_patterns_and_redactor_removes_them() -> 
 
     validation = validator.validate_diagnostics_for_sink(
         unsafe,
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert validation.status == validator.DIAGNOSTIC_VALIDATION_STATUS_REJECTED
     assert validator.DIAGNOSTIC_VALIDATION_REASON_SECRET_PATTERN in validation.reasons
 
     redacted = validator.redact_diagnostics_for_sink(
         unsafe,
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert redacted.status == validator.DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED
     assert redacted.redacted is True
@@ -178,14 +178,14 @@ def test_validator_rejects_token_assignment_variants_inside_values() -> None:
 
     validation = validator.validate_diagnostics_for_sink(
         unsafe,
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert validation.status == validator.DIAGNOSTIC_VALIDATION_STATUS_REJECTED
     assert validator.DIAGNOSTIC_VALIDATION_REASON_SECRET_PATTERN in validation.reasons
 
     redacted = validator.redact_diagnostics_for_sink(
         unsafe,
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert redacted.status == validator.DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED
     assert redacted.redacted is True
@@ -204,7 +204,7 @@ def test_text_redactor_removes_token_assignment_key_variants() -> None:
         "idToken=text-id-secret"
     )
 
-    result = validator.redact_text_for_sink(text, validator.DIAGNOSTIC_SINK_DETAILED_LOGS)
+    result = validator.redact_text_for_sink(text, validator.DIAGNOSTIC_SINK_PERSISTED_LOGS)
 
     assert result.status == validator.DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED
     assert result.redacted is True
@@ -233,14 +233,14 @@ def test_validator_rejects_quoted_json_secret_labels_inside_values(payload: str)
 
     validation = validator.validate_diagnostics_for_sink(
         unsafe,
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert validation.status == validator.DIAGNOSTIC_VALIDATION_STATUS_REJECTED
     assert validator.DIAGNOSTIC_VALIDATION_REASON_SECRET_PATTERN in validation.reasons
 
     redacted = validator.redact_diagnostics_for_sink(
         unsafe,
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert redacted.status == validator.DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED
     assert redacted.redacted is True
@@ -253,7 +253,7 @@ def test_token_metric_field_names_do_not_weaken_auth_token_rejection() -> None:
 
     safe_metrics = validator.validate_diagnostics_for_sink(
         _diagnostics(fields={"prompt_tokens": 12, "completion_tokens": 8, "token_count": 20}),
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert safe_metrics.status == validator.DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED
 
@@ -269,7 +269,7 @@ def test_token_metric_field_names_do_not_weaken_auth_token_rejection() -> None:
     ):
         rejected = validator.validate_diagnostics_for_sink(
             _diagnostics(fields={sensitive_key: "do-not-log"}),
-            validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+            validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
         )
         assert rejected.status == validator.DIAGNOSTIC_VALIDATION_STATUS_REJECTED
         assert validator.DIAGNOSTIC_VALIDATION_REASON_SECRET_PATTERN in rejected.reasons
@@ -366,7 +366,7 @@ def test_validator_rejects_managed_private_key_material_inside_values() -> None:
 
     validation = validator.validate_diagnostics_for_sink(
         unsafe,
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert validation.status == validator.DIAGNOSTIC_VALIDATION_STATUS_REJECTED
     assert validator.DIAGNOSTIC_VALIDATION_REASON_SECRET_PATTERN in validation.reasons
@@ -376,7 +376,7 @@ def test_validator_rejects_managed_private_key_material_inside_values() -> None:
             content_policy=messages.CONTENT_POLICY_REDACTED,
             fields={"broker_error": '{"managed_private_key":"do-not-log-this"}'},
         ),
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert redacted.status == validator.DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED
     assert redacted.redacted is True
@@ -404,21 +404,21 @@ def test_validator_rejects_and_redacts_raw_transcript_translation_source_fields(
 ) -> None:
     validator = _validator()
     unsafe = _diagnostics(
-        visibility=messages.DIAGNOSTIC_VISIBILITY_DETAILED,
+        visibility=messages.DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
         content_policy=messages.CONTENT_POLICY_REDACTED,
         fields={field_name: "raw user utterance text must not enter diagnostics"},
     )
 
     validation = validator.validate_diagnostics_for_sink(
         unsafe,
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert validation.status == validator.DIAGNOSTIC_VALIDATION_STATUS_REJECTED
     assert validator.DIAGNOSTIC_VALIDATION_REASON_UNSAFE_TEXT_PAYLOAD in validation.reasons
 
     redacted = validator.redact_diagnostics_for_sink(
         unsafe,
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
     )
     assert redacted.status == validator.DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED
     assert redacted.redacted is True
@@ -434,7 +434,7 @@ def test_text_redactor_removes_raw_transcript_translation_source_assignments() -
         "source text=original source text"
     )
 
-    result = validator.redact_text_for_sink(text, validator.DIAGNOSTIC_SINK_DETAILED_LOGS)
+    result = validator.redact_text_for_sink(text, validator.DIAGNOSTIC_SINK_PERSISTED_LOGS)
 
     assert result.status == validator.DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED
     assert result.redacted is True
@@ -538,7 +538,7 @@ def test_validator_contract_results_are_immutable_and_import_safe() -> None:
     policy = validator.DiagnosticRedactionPolicy()
     result = validator.validate_diagnostics_for_sink(
         _diagnostics(),
-        validator.DIAGNOSTIC_SINK_DETAILED_LOGS,
+        validator.DIAGNOSTIC_SINK_PERSISTED_LOGS,
         policy=policy,
     )
 

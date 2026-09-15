@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from types import SimpleNamespace
 
 import pytest
@@ -11,20 +10,6 @@ pytest.importorskip("flet")
 from puripuly_heart.ui.components import display_card as display_card_module
 from puripuly_heart.ui.components.display_card import DisplayCard
 from tests.helpers.flet_page import attach_dummy_page
-
-
-class RuntimeLoggingCapture:
-    def __init__(self, *, detailed_enabled: bool = True) -> None:
-        self.detailed_enabled = detailed_enabled
-        self.detailed_calls: list[tuple[int, str]] = []
-        self.detailed_messages: list[tuple[int, str]] = []
-
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
-        self.detailed_calls.append((level, message))
-        if not self.detailed_enabled:
-            return False
-        self.detailed_messages.append((level, message))
-        return True
 
 
 def _visible_text(card: DisplayCard) -> str:
@@ -472,7 +457,6 @@ def test_notice_action_button_is_exposed_only_with_a_label(
 
 def test_yielding_notice_defers_to_live_turn_content(monkeypatch: pytest.MonkeyPatch) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture()
 
     card.set_display("source text")
     card.set_notice(
@@ -485,21 +469,9 @@ def test_yielding_notice_defers_to_live_turn_content(monkeypatch: pytest.MonkeyP
     attach_dummy_page(monkeypatch, card._display_text)
     _mute_display_updates(monkeypatch, card)
 
-    card.set_display_translation(
-        "translated text",
-        runtime_log_detailed=runtime_logging.emit_detailed,
-        update_id="upd-notice-1",
-        origin_wall_clock_ms=1500,
-        utterance_id="utt-notice-1",
-        channel="self",
-        session_scope="session-notice-1",
-        source_text_hash="src-hash-notice-1",
-        source_text_len=11,
-        logical_turn_key="self:utt-notice-1",
-    )
+    card.set_display_translation("translated text")
 
     assert _visible_text(card) == "translated text"
-    assert len(runtime_logging.detailed_messages) == 1
 
 
 def test_yielding_notice_returns_once_the_card_is_idle_again(
@@ -521,33 +493,19 @@ def test_yielding_notice_returns_once_the_card_is_idle_again(
     assert _visible_text(card) == notice
 
 
-def test_non_yielding_notice_suppresses_the_translation_and_its_visual_commit(
+def test_non_yielding_notice_suppresses_the_translation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture()
 
     card.set_display("source text")
     card.set_notice("STT files are missing", tone="warning")
     attach_dummy_page(monkeypatch, card._display_text)
     _mute_display_updates(monkeypatch, card)
 
-    card.set_display_translation(
-        "translated text",
-        runtime_log_detailed=runtime_logging.emit_detailed,
-        update_id="upd-notice-2",
-        origin_wall_clock_ms=1500,
-        utterance_id="utt-notice-2",
-        channel="self",
-        session_scope="session-notice-2",
-        source_text_hash="src-hash-notice-2",
-        source_text_len=11,
-        logical_turn_key="self:utt-notice-2",
-    )
+    card.set_display_translation("translated text")
 
     assert _visible_text(card) == "STT files are missing"
-    assert runtime_logging.detailed_calls == []
-    assert runtime_logging.detailed_messages == []
 
 
 def test_debug_prefix_applies_to_the_visible_text_only(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -736,139 +694,3 @@ def test_input_footer_stays_outside_the_expanding_display_region() -> None:
     assert divider_container.padding.bottom == 4
     assert input_footer.expand is None
     assert input_footer.tight is True
-
-
-def test_translation_visual_commit_log_reports_the_redefined_schema(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture()
-    events: list[str] = []
-
-    card.set_display("source text", font_family="font-source")
-    attach_dummy_page(monkeypatch, card._display_text)
-    monkeypatch.setattr(type(card._display_text), "update", lambda self: events.append("display"))
-    monkeypatch.setattr(display_card_module.time, "time", lambda: 2.0)
-
-    def emit_detailed(message: str, *, level: int = logging.INFO) -> bool:
-        events.append("log")
-        return runtime_logging.emit_detailed(message, level=level)
-
-    card.set_display_translation(
-        "translated text",
-        font_family="font-target",
-        runtime_log_detailed=emit_detailed,
-        update_id="upd-1",
-        origin_wall_clock_ms=1500,
-        utterance_id="utt-1",
-        channel="peer",
-        session_scope="session-1",
-        source_text_hash="src-hash-1",
-        source_text_len=11,
-        logical_turn_key="peer:utt-1",
-    )
-
-    assert events == ["display", "log"]
-    assert len(runtime_logging.detailed_messages) == 1
-    level, message = runtime_logging.detailed_messages[0]
-    assert level == logging.INFO
-    assert "dashboard_translation_visual_commit" in message
-    assert "update_id=upd-1" in message
-    assert "origin_wall_clock_ms=1500" in message
-    assert "utterance_id=utt-1" in message
-    assert "channel=peer" in message
-    assert "session_scope=session-1" in message
-    assert "source_text_hash=src-hash-1" in message
-    assert "source_text_len=11" in message
-    assert "logical_turn_key=peer:utt-1" in message
-    assert "source_display_text_len=11" in message
-    assert "translation_text_len=15" in message
-    assert "translation_visible=True" in message
-    assert "display_update_issued=True" in message
-    assert "elapsed_ms=500" in message
-    assert "secondary_" not in message
-    assert "source text" not in message
-    assert "translated text" not in message
-
-
-def test_translation_visual_commit_log_is_suppressed_in_basic_mode(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture(detailed_enabled=False)
-
-    card.set_display("source text")
-    attach_dummy_page(monkeypatch, card._display_text)
-    _mute_display_updates(monkeypatch, card)
-
-    card.set_display_translation(
-        "translated text",
-        runtime_log_detailed=runtime_logging.emit_detailed,
-        update_id="upd-2",
-        origin_wall_clock_ms=1500,
-        utterance_id="utt-2",
-        channel="self",
-        session_scope="session-2",
-        source_text_hash="src-hash-2",
-        source_text_len=11,
-        logical_turn_key="self:utt-2",
-    )
-
-    assert len(runtime_logging.detailed_calls) == 1
-    assert runtime_logging.detailed_messages == []
-
-
-def test_source_applied_log_reports_the_redefined_schema(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture()
-
-    attach_dummy_page(monkeypatch, card._display_text)
-    _mute_display_updates(monkeypatch, card)
-    monkeypatch.setattr(display_card_module.time, "time", lambda: 2.0)
-
-    card.set_display(
-        "source text",
-        runtime_log_detailed=runtime_logging.emit_detailed,
-        origin_wall_clock_ms=1500,
-        utterance_id="utt-3",
-        channel="self",
-        source_text_len=11,
-        transcript_kind="final",
-        should_log=True,
-    )
-
-    assert len(runtime_logging.detailed_messages) == 1
-    _level, message = runtime_logging.detailed_messages[0]
-    assert "dashboard_source_applied" in message
-    assert "utterance_id=utt-3" in message
-    assert "channel=self" in message
-    assert "transcript_kind=final" in message
-    assert "source_text_len=11" in message
-    assert "source_display_text_len=11" in message
-    assert "translation_visible=False" in message
-    assert "display_update_issued=True" in message
-    assert "elapsed_ms=500" in message
-    assert "primary_" not in message
-    assert "source text" not in message
-
-
-def test_source_applied_log_is_skipped_when_not_requested(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture()
-
-    attach_dummy_page(monkeypatch, card._display_text)
-    _mute_display_updates(monkeypatch, card)
-
-    card.set_display(
-        "source text",
-        runtime_log_detailed=runtime_logging.emit_detailed,
-        utterance_id="utt-4",
-        channel="self",
-        should_log=False,
-    )
-
-    assert runtime_logging.detailed_calls == []

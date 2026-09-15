@@ -123,7 +123,7 @@ async def test_failed_self_runtime_apply_does_not_write_target_signature_cache_f
     )
     adapter._overlay = _Overlay()
     adapter._vrc_mic_sync = _VrcMic()
-    adapter._runtime_logging = SimpleNamespace(emit_detailed=lambda *_args, **_kwargs: None)
+    adapter._runtime_logging = SimpleNamespace(emit_diagnostic=lambda *_args, **_kwargs: None)
     adapter._presentation = SimpleNamespace(current_locale=lambda: "en")
     adapter._projection = SimpleNamespace()
     adapter._rebuild_managed_gemma = lambda: None
@@ -217,7 +217,7 @@ async def test_peer_refresh_recomputes_activation_after_eula_transition() -> Non
     adapter._overlay = _Overlay()
     adapter._vrc_mic_sync = _VrcMic()
     adapter._runtime_logging = SimpleNamespace(
-        emit_detailed=lambda *_args, **_kwargs: None,
+        emit_diagnostic=lambda *_args, **_kwargs: None,
         emit_basic=lambda *_args, **_kwargs: None,
     )
     adapter._presentation = SimpleNamespace(current_locale=lambda: "en")
@@ -298,7 +298,7 @@ async def test_stale_active_peer_with_matching_cache_retries_without_caching_non
     adapter._overlay = _Overlay()
     adapter._vrc_mic_sync = _VrcMic()
     adapter._runtime_logging = SimpleNamespace(
-        emit_detailed=lambda *_args, **_kwargs: None,
+        emit_diagnostic=lambda *_args, **_kwargs: None,
         emit_basic=lambda *_args, **_kwargs: None,
     )
     adapter._presentation = SimpleNamespace(current_locale=lambda: "en")

@@ -431,7 +431,6 @@ class ChatboxPaginator:
         )
 
     def _send_page(self, *, mode: str, text: str, remaining_parts: int) -> bool:
-        self._emit_send_attempt(mode=mode, text=text, remaining_parts=remaining_parts)
         try:
             self.sender.send_chatbox(text)
         except OSError as exc:
@@ -444,7 +443,6 @@ class ChatboxPaginator:
                     status="output_send_failed",
                 )
             return False
-        self._emit_send_delivered(mode=mode, text=text, remaining_parts=remaining_parts)
         if mode == "queued":
             active = self._active_message
             self._record_stage(
@@ -487,21 +485,9 @@ class ChatboxPaginator:
             **fields,
         )
 
-    def _emit_send_attempt(self, *, mode: str, text: str, remaining_parts: int) -> None:
-        self._emit_detailed(
-            f"[Detailed][OSC] send mode={mode} status=attempt chars={len(text)} "
-            f"remaining_parts={remaining_parts}"
-        )
-
-    def _emit_send_delivered(self, *, mode: str, text: str, remaining_parts: int) -> None:
-        self._emit_basic(
-            f"[Basic][OSC] send mode={mode} status=delivered chars={len(text)} "
-            f"remaining_parts={remaining_parts}"
-        )
-
     def _emit_send_failure(self, *, mode: str, exc: OSError) -> None:
         self._emit_basic(
-            f"[Basic][OSC] send mode={mode} status=failed error={exc}",
+            f"[Basic][OSC] send failed mode={mode} cause={type(exc).__name__}",
             level=logging.WARNING,
         )
 
@@ -511,9 +497,9 @@ class ChatboxPaginator:
             return
         logger.log(level, message)
 
-    def _emit_detailed(self, message: str, *, level: int = logging.INFO) -> None:
+    def _emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> None:
         if self.runtime_logging is not None:
-            self.runtime_logging.emit_detailed(message, level=level)
+            self.runtime_logging.emit_diagnostic(message, level=level)
             return
         logger.debug(message)
 

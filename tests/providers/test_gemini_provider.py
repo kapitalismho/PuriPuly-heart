@@ -50,7 +50,7 @@ class SpyRuntimeLogging:
         self.detailed_messages: list[tuple[str, int]] = []
         self.basic_messages: list[tuple[str, int]] = []
 
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
+    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool:
         self.detailed_messages.append((message, level))
         return self.detailed_return
 
@@ -348,7 +348,7 @@ async def test_google_genai_client_raises_on_empty_response(
                 target_language="ko",
             )
 
-    assert "[Basic][LLM] Gemini response missing text [translate]" in caplog.messages
+    assert any(record.levelno == logging.ERROR for record in caplog.records)
 
 
 @pytest.mark.asyncio

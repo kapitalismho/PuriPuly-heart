@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from dataclasses import replace
 
 import pytest
@@ -67,7 +66,6 @@ class FakeDisplayCard:
         self.display_calls: list[tuple[str, bool, str | None]] = []
         self.display_metadata_calls: list[dict[str, object]] = []
         self.translation_calls: list[tuple[str | None, str | None]] = []
-        self.translation_metadata_calls: list[dict[str, object]] = []
         self.notice_calls: list[tuple[str | None, str | None]] = []
         self.notice_actions: list[tuple[str | None, object | None]] = []
         self.notice_yields: list[bool] = []
@@ -85,19 +83,22 @@ class FakeDisplayCard:
         *,
         is_error: bool = False,
         font_family: str | None = None,
-        **_metadata,
+        debug_prefix: str | None = None,
+        as_translation: bool = False,
     ) -> None:
         self.display_calls.append((text, is_error, font_family))
-        self.display_metadata_calls.append(dict(_metadata))
+        self.display_metadata_calls.append(
+            {"debug_prefix": debug_prefix, "as_translation": as_translation}
+        )
 
     def set_display_translation(
         self,
         text: str | None,
         font_family: str | None = None,
-        **metadata,
+        *,
+        debug_prefix: str | None = None,
     ) -> None:
         self.translation_calls.append((text, font_family))
-        self.translation_metadata_calls.append(dict(metadata))
 
     def set_notice(
         self,
@@ -333,45 +334,6 @@ def test_dashboard_translation_toggle_controls_power_state(monkeypatch: pytest.M
     assert seen == [False, False, False, True, False]
     assert view.is_power_on is False
     assert any(call[0] == warn_llm for call in view.display_card.display_calls)
-
-
-def test_dashboard_translation_visual_commit_forwards_metadata_and_runtime_log(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view = _make_dashboard(monkeypatch)
-
-    def fake_runtime_log_detailed(message: str, *, level: int = logging.INFO) -> bool:
-        _ = (message, level)
-        return True
-
-    view.runtime_log_detailed = fake_runtime_log_detailed
-
-    view.set_display_translation_text(
-        "dst",
-        language_code="en",
-        update_id="upd-1",
-        origin_wall_clock_ms=1712345678901,
-        utterance_id="utt-1",
-        channel="peer",
-        session_scope="session-1",
-        source_text_hash="src-hash-1",
-        source_text_len=12,
-        logical_turn_key="peer:utt-1",
-    )
-
-    assert view.display_card.translation_calls[-1] == ("dst", "font-en")
-    assert view.display_card.translation_metadata_calls[-1] == {
-        "runtime_log_detailed": fake_runtime_log_detailed,
-        "update_id": "upd-1",
-        "origin_wall_clock_ms": 1712345678901,
-        "utterance_id": "utt-1",
-        "channel": "peer",
-        "session_scope": "session-1",
-        "source_text_hash": "src-hash-1",
-        "source_text_len": 12,
-        "logical_turn_key": "peer:utt-1",
-        "debug_prefix": None,
-    }
 
 
 def test_dashboard_submit_and_language_selection_paths(monkeypatch: pytest.MonkeyPatch) -> None:

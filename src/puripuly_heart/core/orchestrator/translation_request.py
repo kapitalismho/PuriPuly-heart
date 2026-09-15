@@ -30,13 +30,10 @@ from puripuly_heart.core.orchestrator.configuration import (
 )
 from puripuly_heart.core.orchestrator.context import ContextMode, ContextResolver
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
-    ContextApplicationDiagnostic,
-    ContextModeDiagnostic,
     LatencyStageDiagnostic,
     RuntimeDiagnostic,
     TranslationFailureDiagnostic,
     TranslationLatencyDiagnosticsOwner,
-    TranslationSkipDiagnostic,
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import TranslationUiMessage
 from puripuly_heart.core.orchestrator.translation_turn import (
@@ -425,26 +422,6 @@ class TranslationRequestOwner:
             other_target_language=self.target_language_for(other_channel, configuration),
             configuration=configuration,
         )
-        self.diagnostics.record_context_mode(
-            ContextModeDiagnostic(
-                channel=channel,
-                applied_mode=applied_mode,
-                parent_utterance_id=parent_utterance_id,
-                target_index=target_index,
-                target_language=target_language,
-            )
-        )
-        self.diagnostics.record_context_application(
-            ContextApplicationDiagnostic(
-                channel=channel,
-                request_chars=len(text),
-                context_lines=tuple(context.splitlines()) if context else (),
-                context_chars=len(context),
-                parent_utterance_id=parent_utterance_id,
-                target_index=target_index,
-                target_language=target_language,
-            )
-        )
         return PreparedTranslationRequest(
             system_prompt=render_translation_system_prompt(
                 configuration.system_prompt,
@@ -620,18 +597,6 @@ class TranslationRequestOwner:
             request.channel,
             configuration,
         ):
-            self.diagnostics.record_translation_skip(
-                TranslationSkipDiagnostic(
-                    stage="final",
-                    channel=request.channel,
-                    publish_chatbox=self.presentation.chatbox_is_eligible(request.channel),
-                    llm_available=self.provider_runtime.provider is not None,
-                    configuration=configuration,
-                    parent_utterance_id=request.parent_utterance_id,
-                    target_index=request.target_index,
-                    target_language=request.target_language,
-                )
-            )
             return self._result(
                 request,
                 "source_only",
@@ -714,7 +679,7 @@ class TranslationRequestOwner:
                 self.diagnostics.emit(
                     RuntimeDiagnostic(
                         message=(
-                            "[Detailed][Translation] secondary_prestart_provider_started "
+                            "[Diagnostic][Translation] secondary_prestart_provider_started "
                             "parent_utterance_id=%s target_index=%s target_language=%s "
                             "provider_generation=%s"
                         ),
@@ -724,7 +689,7 @@ class TranslationRequestOwner:
                             request.target_language,
                             generation,
                         ),
-                        detailed=True,
+                        diagnostic_only=True,
                     )
                 )
             try:
@@ -747,7 +712,7 @@ class TranslationRequestOwner:
                         self.diagnostics.emit(
                             RuntimeDiagnostic(
                                 message=(
-                                    "[Detailed][Translation] secondary_prestart_provider_finished "
+                                    "[Diagnostic][Translation] secondary_prestart_provider_finished "
                                     "parent_utterance_id=%s target_index=%s target_language=%s "
                                     "provider_generation=%s elapsed_ms=%s"
                                 ),
@@ -758,7 +723,7 @@ class TranslationRequestOwner:
                                     generation,
                                     int((self.clock.now() - provider_started_at) * 1000),
                                 ),
-                                detailed=True,
+                                diagnostic_only=True,
                             )
                         )
             except Exception:

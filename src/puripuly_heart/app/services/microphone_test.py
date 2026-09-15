@@ -265,10 +265,6 @@ class MicrophoneTestSessionOwner:
                     exception=initial.close_exception,
                 )
                 return False
-            self._log_self_capture_auto_off(
-                requested=False,
-                completed=True,
-            )
             return True
 
         try:
@@ -286,10 +282,6 @@ class MicrophoneTestSessionOwner:
             )
             return False
 
-        self._log_self_capture_auto_off(
-            requested=True,
-            completed=True,
-        )
         return True
 
     def _log_self_capture_auto_off(
@@ -299,17 +291,10 @@ class MicrophoneTestSessionOwner:
         completed: bool,
         exception: BaseException | None = None,
     ) -> None:
-        if self.log_sink is None:
+        if self.log_sink is None or completed:
             return
-        self.log_sink(
-            "[MicTest] stt_auto_off "
-            f"requested={requested} "
-            f"completed={completed} "
-            "exception_class="
-            f"{_log_value(type(exception).__name__ if exception else None)} "
-            "exception_message="
-            f"{_log_value(str(exception) if exception else None)}"
-        )
+        cause = type(exception).__name__ if exception is not None else "unavailable"
+        self.log_sink(f"[MicTest] failed to stop recognition cause={cause}")
 
     def _lock(self) -> asyncio.Lock:
         if self._lifecycle_lock is None:

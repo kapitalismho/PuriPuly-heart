@@ -16,13 +16,13 @@ use puripuly_heart_overlay::{
     load_manifest, resolve_quiet_tail_profile, run_with_manifest, submit_texture,
     validate_manifest, AdapterIdentity, BridgeClient, CaptionBlock, CaptionChannel,
     CaptionRenderer, FakeOpenVr, NativePresentationOwner, OpenVrError, OpenVrRuntimeEvent,
-    OverlayBridgeEvent, OverlayFrameSubmitter, OverlayLoggingMode, OverlayManifest,
-    OverlayPresentationBlock, OverlayPresentationBlockVariant, OverlayPresentationCalibration,
-    OverlayPresentationSnapshot, OverlayRuntime, PresentationBackend, PresentationCause,
-    PresentationCauseChannel, PresentationCauseKind, PresentationOutcome, PresentationStage,
-    PresentationStrategy, QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure,
-    SemanticRetirementFrontier, SpatialReanchorOutcome, StartupError, EXPECTED_CONTRACT_VERSION,
-    NATIVE_FRESH_RETRY_CADENCE, NATIVE_FRESH_RETRY_DEADLINE, NATIVE_FRESH_RETRY_MAX_COMPLETED,
+    OverlayBridgeEvent, OverlayFrameSubmitter, OverlayManifest, OverlayPresentationBlock,
+    OverlayPresentationBlockVariant, OverlayPresentationCalibration, OverlayPresentationSnapshot,
+    OverlayRuntime, PresentationBackend, PresentationCause, PresentationCauseChannel,
+    PresentationCauseKind, PresentationOutcome, PresentationStage, PresentationStrategy,
+    QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure, SemanticRetirementFrontier,
+    SpatialReanchorOutcome, StartupError, EXPECTED_CONTRACT_VERSION, NATIVE_FRESH_RETRY_CADENCE,
+    NATIVE_FRESH_RETRY_DEADLINE, NATIVE_FRESH_RETRY_MAX_COMPLETED,
     NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
 };
 
@@ -106,7 +106,7 @@ fn quiet_tail_profiles_have_exact_walls_and_opportunity_maxima() {
 }
 
 #[test]
-fn old_manifest_json_without_quiet_tail_profile_uses_product_default_p05() {
+fn manifest_without_quiet_tail_profile_uses_product_default_p05() {
     let path = unique_temp_file("legacy-profile", "json");
     std::fs::write(
         &path,
@@ -121,7 +121,6 @@ fn old_manifest_json_without_quiet_tail_profile_uses_product_default_p05() {
             "log_dir": std::env::temp_dir(),
             "log_level": "INFO",
             "locale": "en",
-            "logging_mode": "basic"
         }))
         .unwrap(),
     )
@@ -219,7 +218,6 @@ fn cli_reports_invalid_handoff_experiment_without_value_disclosure() {
             "log_dir": std::env::temp_dir(),
             "log_level": "INFO",
             "locale": "en",
-            "logging_mode": "basic"
         }))
         .unwrap(),
     )
@@ -254,7 +252,6 @@ fn cli_reports_invalid_quiet_tail_profile_as_structured_manifest_error() {
             "log_dir": std::env::temp_dir(),
             "log_level": "INFO",
             "locale": "en",
-            "logging_mode": "basic"
         }))
         .unwrap(),
     )
@@ -291,7 +288,6 @@ fn test_manifest() -> OverlayManifest {
             .to_string(),
         log_level: "INFO".into(),
         locale: "en".into(),
-        logging_mode: OverlayLoggingMode::Basic,
     }
 }
 
@@ -710,49 +706,6 @@ impl OverlayFrameSubmitter for DivergingVisibilitySubmitter {
 
     fn observed_overlay_visible(&self) -> Option<bool> {
         self.observed
-    }
-}
-
-#[derive(Default)]
-struct EventFloodState {
-    operations: Mutex<Vec<&'static str>>,
-    poll_calls: AtomicUsize,
-    max_events_in_one_poll: AtomicUsize,
-}
-
-struct EventFloodSubmitter {
-    state: Arc<EventFloodState>,
-}
-
-impl OverlayFrameSubmitter for EventFloodSubmitter {
-    fn submit_frame(&mut self, frame: &RenderedFrame) -> Result<(), OpenVrError> {
-        self.state
-            .operations
-            .lock()
-            .unwrap()
-            .push(if frame.layout().visible_blocks.is_empty() {
-                "submit:empty"
-            } else {
-                "submit:text"
-            });
-        Ok(())
-    }
-
-    fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
-        self.state
-            .operations
-            .lock()
-            .unwrap()
-            .push(if visible { "show" } else { "hide" });
-        Ok(())
-    }
-
-    fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
-        self.state.poll_calls.fetch_add(1, Ordering::SeqCst);
-        self.state
-            .max_events_in_one_poll
-            .fetch_max(max_events, Ordering::SeqCst);
-        vec![OpenVrRuntimeEvent::Ignored(1); max_events]
     }
 }
 
@@ -1182,9 +1135,7 @@ async fn connect_test_bridge_with_followups(
 }
 
 async fn test_logger(name: &str) -> OverlayLogger {
-    OverlayLogger::open(unique_log_dir(name), OverlayLoggingMode::Detailed)
-        .await
-        .unwrap()
+    OverlayLogger::open(unique_log_dir(name)).await.unwrap()
 }
 
 #[tokio::test]
@@ -1774,10 +1725,7 @@ async fn initial_shutdown_preempts_readiness_without_submit_or_ready() {
 
 #[tokio::test]
 async fn heartbeat_and_noop_control_do_not_cancel_initial_readiness() {
-    let followups = vec![
-        json!({"type": "heartbeat"}),
-        json!({"type": "runtime_control", "payload": {"logging_mode": "detailed", "logging_mode_revision": 1}}),
-    ];
+    let followups = vec![json!({"type": "heartbeat"}), json!({"type": "heartbeat"})];
     let (mut bridge, snapshot, mut server) =
         connect_test_bridge_with_followups(followups, None, None).await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
@@ -1809,7 +1757,7 @@ async fn ignored_message_flood_polls_readiness_and_reaches_ready() {
         followups.push(if index % 2 == 0 {
             json!({"type": "heartbeat"})
         } else {
-            json!({"type": "runtime_control", "payload": {"logging_mode": "detailed", "logging_mode_revision": 1}})
+            json!({"type": "heartbeat"})
         });
     }
     let (mut bridge, snapshot, mut server) =
@@ -1847,7 +1795,7 @@ async fn continuous_ignored_messages_hit_owner_timeout_without_submission() {
             if index % 2 == 0 {
                 json!({"type": "heartbeat"})
             } else {
-                json!({"type": "runtime_control", "payload": {"logging_mode": "detailed", "logging_mode_revision": 1}})
+                json!({"type": "heartbeat"})
             }
         })
         .collect();
@@ -1911,10 +1859,7 @@ async fn shutdown_after_ignored_flood_preempts_before_submission() {
 #[tokio::test]
 async fn followup_send_phase_stop_ack_precedes_client_drop() {
     let block = Arc::new(WriteGate::new());
-    let followups = vec![
-        json!({"type": "heartbeat"}),
-        json!({"type": "runtime_control", "payload": {"logging_mode": "detailed", "logging_mode_revision": 1}}),
-    ];
+    let followups = vec![json!({"type": "heartbeat"}), json!({"type": "heartbeat"})];
     let (mut bridge, _snapshot, mut server) =
         connect_test_bridge_with_followups(followups, None, Some(block.clone())).await;
     tokio::time::timeout(Duration::from_secs(5), block.entered.notified())
@@ -1941,7 +1886,7 @@ async fn followup_send_error_before_stop_propagates() {
             if index % 2 == 0 {
                 json!({"type": "heartbeat"})
             } else {
-                json!({"type": "runtime_control", "payload": {"logging_mode": "detailed", "logging_mode_revision": 1}})
+                json!({"type": "heartbeat"})
             }
         })
         .collect();
@@ -2033,8 +1978,8 @@ fn readiness_failures_expose_typed_parent_failure_reasons() {
 }
 
 #[test]
-fn runtime_expected_contract_version_is_r2_protocol_eight() {
-    assert_eq!(EXPECTED_CONTRACT_VERSION, 8);
+fn runtime_expected_contract_version_is_r2_protocol_nine() {
+    assert_eq!(EXPECTED_CONTRACT_VERSION, 9);
 }
 
 #[test]
@@ -4160,102 +4105,6 @@ async fn production_owner_single_readiness_timeout_retries_without_submit_or_exi
 }
 
 #[tokio::test]
-async fn production_owner_openvr_event_flood_does_not_starve_snapshot_submit() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let state = Arc::new(EventFloodState::default());
-    let server_state = state.clone();
-    let server = tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.unwrap();
-        let mut ws = accept_async(stream).await.unwrap();
-        let _auth = ws.next().await.unwrap().unwrap();
-        let first = json!({
-            "revision": 1,
-            "blocks": [block("self:flood-1", "self", "first", "", true)]
-        });
-        ws.send(Message::Text(
-            json!({"type":"snapshot","payload":first})
-                .to_string()
-                .into(),
-        ))
-        .await
-        .unwrap();
-        wait_for_owner_ready(&mut ws).await;
-        let second = json!({
-            "revision": 2,
-            "blocks": [block("self:flood-2", "self", "second", "", true)]
-        });
-        ws.send(Message::Text(
-            json!({"type":"snapshot","payload":second})
-                .to_string()
-                .into(),
-        ))
-        .await
-        .unwrap();
-        let waited = tokio::time::timeout(Duration::from_secs(5), async {
-            loop {
-                let submits = server_state
-                    .operations
-                    .lock()
-                    .unwrap()
-                    .iter()
-                    .filter(|operation| operation.starts_with("submit"))
-                    .count();
-                if submits >= 2 {
-                    break;
-                }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await;
-        assert!(
-            waited.is_ok(),
-            "second snapshot submit starved by OpenVR event flood"
-        );
-        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
-            .await
-            .unwrap();
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    });
-    let mut manifest = test_manifest();
-    manifest.bridge_url = format!("ws://{address}");
-    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
-    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
-        snapshot,
-        CaptionRenderer::new_for_test().unwrap(),
-        EventFloodSubmitter {
-            state: state.clone(),
-        },
-        Duration::from_millis(10),
-        Duration::from_millis(100),
-        2,
-    );
-
-    owner
-        .run(
-            &mut bridge,
-            &test_logger("openvr-event-flood-fairness").await,
-        )
-        .await
-        .unwrap();
-
-    assert!(state.poll_calls.load(Ordering::SeqCst) >= 1);
-    assert!(state.max_events_in_one_poll.load(Ordering::SeqCst) <= 8);
-    assert_eq!(
-        state
-            .operations
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|operation| operation.starts_with("submit"))
-            .count(),
-        2
-    );
-    assert!(owner.resources_released());
-    server.await.unwrap();
-}
-
-#[tokio::test]
 async fn production_owner_overlay_hidden_reasserts_show_when_desired_visible() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -4907,9 +4756,7 @@ async fn production_owner_pose_wait_outlives_no_progress_budget_then_handoffs_sa
         .await
         .expect("initial pose-unavailable reanchor was not attempted");
         ws.send(Message::Text(
-            json!({"type":"runtime_control","payload":{"logging_mode":"detailed","logging_mode_revision":1}})
-                .to_string()
-                .into(),
+            json!({"type":"heartbeat"}).to_string().into(),
         ))
         .await
         .unwrap();
@@ -6030,64 +5877,6 @@ async fn bridge_client_authenticates_and_receives_initial_snapshot() {
 
     server.await.unwrap();
     assert!(snapshot.blocks.is_empty());
-}
-
-#[tokio::test]
-async fn bridge_client_receives_runtime_logging_mode_updates() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let server = tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.unwrap();
-        let mut ws = accept_async(stream).await.unwrap();
-
-        let auth = ws.next().await.unwrap().unwrap();
-        let Message::Text(auth_text) = auth else {
-            panic!("expected auth text frame");
-        };
-        let auth_payload: serde_json::Value = serde_json::from_str(&auth_text).unwrap();
-        assert_eq!(auth_payload["type"], "auth");
-
-        ws.send(Message::Text(
-            json!({
-                "type": "snapshot",
-                "payload": {
-                    "revision": 0,
-                    "calibration": OverlayPresentationCalibration::default(),
-                    "blocks": [],
-                }
-            })
-            .to_string()
-            .into(),
-        ))
-        .await
-        .unwrap();
-        ws.send(Message::Text(
-            json!({
-                "type": "runtime_control",
-                "payload": {"logging_mode": "detailed", "logging_mode_revision": 1},
-            })
-            .to_string()
-            .into(),
-        ))
-        .await
-        .unwrap();
-    });
-
-    let mut manifest = test_manifest();
-    manifest.bridge_url = format!("ws://{}", address);
-
-    let (mut client, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
-    assert!(snapshot.blocks.is_empty());
-
-    let message = client.next_message().await.unwrap();
-
-    assert!(matches!(
-        message,
-        puripuly_heart_overlay::BridgeIncoming::Control(control)
-            if control.logging_mode == OverlayLoggingMode::Detailed
-                && control.logging_mode_revision == 1
-    ));
-    server.await.unwrap();
 }
 
 #[test]

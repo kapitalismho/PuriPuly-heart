@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 
 import numpy as np
 import pytest
@@ -297,9 +296,7 @@ async def test_local_decode_coordinator_stop_and_close_can_race() -> None:
 
 
 @pytest.mark.asyncio
-async def test_local_decode_coordinator_contains_failure_callback_errors(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+async def test_local_decode_coordinator_contains_failure_callback_errors() -> None:
     async def decode(samples_f32: np.ndarray) -> str:
         _ = samples_f32
         raise RuntimeError("decode failed")
@@ -318,17 +315,12 @@ async def test_local_decode_coordinator_contains_failure_callback_errors(
         on_failure=on_failure,
     )
 
-    with caplog.at_level(
-        logging.ERROR,
-        logger="puripuly_heart.providers.stt.local_decode",
-    ):
-        assert coordinator.enqueue(np.ones(160, dtype=np.float32)) is True
-        await asyncio.wait_for(coordinator.stop(), timeout=1.0)
-        await asyncio.wait_for(coordinator.close(), timeout=1.0)
+    assert coordinator.enqueue(np.ones(160, dtype=np.float32)) is True
+    await asyncio.wait_for(coordinator.stop(), timeout=1.0)
+    await asyncio.wait_for(coordinator.close(), timeout=1.0)
 
     assert coordinator.accepting is False
     assert coordinator.pending_jobs == 0
-    assert any("decode failure callback failed" in message for message in caplog.messages)
 
 
 @pytest.mark.asyncio

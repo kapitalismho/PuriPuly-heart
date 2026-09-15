@@ -1582,23 +1582,6 @@ def test_create_stt_backend_local_qwen_uses_shared_model_path_without_secret() -
     assert backend.stream_label == "self"
 
 
-def test_create_stt_backend_local_qwen_passes_diagnostics_enabled_predicate() -> None:
-    settings = _vnext(stt_provider="local_qwen")
-    secrets = InMemorySecretStore()
-
-    def diagnostics_enabled() -> bool:
-        return True
-
-    backend = create_stt_backend(
-        settings,
-        secrets=secrets,
-        diagnostics_enabled=diagnostics_enabled,
-    )
-
-    assert isinstance(backend, LocalQwenSherpaSTTBackend)
-    assert backend.diagnostics_enabled is diagnostics_enabled
-
-
 def test_create_stt_backend_local_qwen_passes_language_hint_without_hotwords() -> None:
     settings = _vnext(
         stt_provider="local_qwen",
@@ -2174,23 +2157,6 @@ def test_create_peer_stt_backend_uses_peer_local_qwen_provider_and_fixed_sample_
     assert backend.model_dir == default_local_stt_model_dir()
     assert backend.sample_rate_hz == 16000
     assert backend.stream_label == "peer"
-
-
-def test_create_peer_stt_backend_local_qwen_passes_diagnostics_enabled_predicate() -> None:
-    settings = _vnext(peer_stt_provider="local_qwen")
-    secrets = InMemorySecretStore()
-
-    def diagnostics_enabled() -> bool:
-        return True
-
-    backend = create_peer_stt_backend(
-        settings,
-        secrets=secrets,
-        diagnostics_enabled=diagnostics_enabled,
-    )
-
-    assert isinstance(backend, LocalQwenSherpaSTTBackend)
-    assert backend.diagnostics_enabled is diagnostics_enabled
 
 
 def test_create_peer_stt_backend_local_qwen_uses_peer_language_without_hotwords() -> None:

@@ -35,7 +35,6 @@ OverlayGenerationReplaceSink = Callable[[OverlayPresenter], Coroutine[object, ob
 OverlayGenerationSetDiagnostics = Callable[[OverlayDiagnosticsRecorder], None]
 OverlayGenerationSetTarget = Callable[[str], None]
 OverlayGenerationCalibrationSnapshot = Callable[[], OverlayCalibration]
-OverlayGenerationLoggingMode = Callable[[], str]
 OverlayGenerationLocale = Callable[[], str]
 OverlayGenerationLogDir = Callable[[], str]
 OverlayGenerationDesktopControls = Callable[
@@ -86,7 +85,6 @@ class OverlayGenerationStartEffects:
     set_diagnostics: OverlayGenerationSetDiagnostics
     set_target: OverlayGenerationSetTarget
     calibration_snapshot: OverlayGenerationCalibrationSnapshot
-    logging_mode: OverlayGenerationLoggingMode
     locale: OverlayGenerationLocale
     log_dir: OverlayGenerationLogDir
     build_desktop_controls: OverlayGenerationDesktopControls
@@ -143,37 +141,22 @@ class OverlayGenerationStartOwner:
             presenter = cast(OverlayPresenter | None, runtime.presenter)
             overlay_instance_id = f"overlay-{self.instance_token_factory()}"
             runtime.set_overlay_instance_id(overlay_instance_id)
-            diagnostics = OverlayDiagnosticsRecorder(
-                overlay_instance_id=overlay_instance_id,
-                logging_mode=effects.logging_mode(),
-            )
+            diagnostics = OverlayDiagnosticsRecorder(overlay_instance_id=overlay_instance_id)
             runtime.attach_diagnostics(diagnostics)
             request = request_factory()
             effects.set_target(request.target)
             native_retry_enabled = not request.desktop
-            effects.log_runtime(
-                "[Overlay][Start] "
-                f"target={request.target} "
-                f"overlay_instance_id={overlay_instance_id} "
-                f"logging_mode={effects.logging_mode()} "
-                f"native_retry_enabled={native_retry_enabled}"
-            )
             if presenter is None:
                 presenter = OverlayPresenter(
                     calibration=effects.calibration_snapshot(),
                     clock=request.clock,
-                    diagnostics=diagnostics,
-                    runtime_log_detailed=effects.log_runtime,
                     show_translation=request.config.show_translation,
                     show_peer_original=request.config.show_peer_original,
                     task_factory=runtime.create_child_task,
                     native_retry_enabled=native_retry_enabled,
                     translation_enabled=request.translation_enabled,
                 )
-            else:
-                presenter.runtime_log_detailed = effects.log_runtime
             presenter = cast(OverlayPresenter, runtime.adopt_presenter(presenter))
-            presenter.runtime_log_detailed = effects.log_runtime
             await presenter.update_translation_enabled(request.translation_enabled)
             await presenter.update_calibration(effects.calibration_snapshot())
             await presenter.update_display_preferences(
@@ -186,7 +169,6 @@ class OverlayGenerationStartOwner:
                 initial_snapshot=presenter.snapshot(),
                 overlay_instance_id=overlay_instance_id,
                 diagnostics=diagnostics,
-                runtime_logging_mode=effects.logging_mode(),
                 desktop_runtime_controls_enabled=request.desktop,
                 task_factory=runtime.create_child_task,
             )
@@ -259,7 +241,6 @@ class OverlayGenerationStartOwner:
                 "startup_timeout_ms": request.startup_timeout_ms,
                 "renderer_events": renderer_events,
                 "overlay_instance_id": overlay_instance_id,
-                "logging_mode": effects.logging_mode(),
                 "diagnostics": diagnostics,
                 "task_factory": runtime.create_child_task,
                 "selected_target": request.target,
@@ -380,7 +361,6 @@ __all__ = [
     "OverlayGenerationIsCurrent",
     "OverlayGenerationLocale",
     "OverlayGenerationLogDir",
-    "OverlayGenerationLoggingMode",
     "OverlayGenerationMonitor",
     "OverlayGenerationProcessRunnerFactory",
     "OverlayGenerationRefresh",

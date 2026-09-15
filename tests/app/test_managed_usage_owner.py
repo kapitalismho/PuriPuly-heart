@@ -235,7 +235,7 @@ async def test_status_refresh_preserves_cached_pass_on_failure() -> None:
 
     assert result.succeeded is False
     assert result.pass_status == pass_status
-    assert warnings == [("[ManagedAuth] Managed status refresh failed: status failed", error)]
+    assert warnings == [("[ManagedAuth] Managed status refresh failed", error)]
     await owner.close()
 
 

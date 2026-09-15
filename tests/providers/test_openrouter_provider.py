@@ -59,7 +59,7 @@ class SpyRuntimeLogging:
         self.detailed_messages: list[tuple[str, int]] = []
         self.basic_messages: list[tuple[str, int]] = []
 
-    def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
+    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool:
         self.detailed_messages.append((message, level))
         return self.detailed_return
 
@@ -632,12 +632,9 @@ async def test_httpx_openrouter_client_logs_basic_translate_failure_without_runt
                 target_language="en",
             )
 
-    assert len(caplog.messages) == 1
-    failure = caplog.messages[0]
-    assert "category=rate_limit code=provider.rate_limit" in failure
-    assert "operation=translate status=429 provider=openrouter" in failure
-    assert "exception_type=RuntimeError" in failure
-    assert "quota exceeded" not in failure
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.ERROR
+    assert "quota exceeded" not in caplog.messages[0]
 
 
 @pytest.mark.asyncio

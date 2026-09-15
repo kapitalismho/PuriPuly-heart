@@ -515,8 +515,7 @@ class VrcMicReceiverRuntime:
                     {"host": self._host, "port": self._port},
                 )
                 return
-            if self._state.update(is_muted):
-                logger.info("[OSC Receiver] VRChat mic muted state applied: %s", is_muted)
+            self._state.update(is_muted)
         except asyncio.CancelledError:
             raise
 

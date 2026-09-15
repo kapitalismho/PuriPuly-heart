@@ -14,7 +14,7 @@ class OverlayCalibrationOwner:
     emit: Callable[[OverlayCalibration], Awaitable[None]]
     can_persist: Callable[[], bool]
     can_emit: Callable[[], bool]
-    log_detailed: Callable[..., object]
+    log_diagnostic: Callable[..., object]
     _current: OverlayCalibration = field(
         init=False,
         default_factory=OverlayCalibration,
@@ -82,12 +82,12 @@ class OverlayCalibrationOwner:
             if self.schedule_task(task):
                 return
         except Exception:
-            self.log_detailed(
+            self.log_diagnostic(
                 "[Overlay] Calibration persistence skipped reason=page_run_task_failed",
                 level=logging.WARNING,
             )
             return
-        self.log_detailed(
+        self.log_diagnostic(
             "[Overlay] Calibration persistence skipped reason=page_run_task_unavailable",
             level=logging.WARNING,
         )
@@ -107,13 +107,13 @@ class OverlayCalibrationOwner:
             if self.schedule_task(self.emit_current):
                 return
         except Exception as exc:
-            self.log_detailed(
+            self.log_diagnostic(
                 "[Overlay] Failed to schedule calibration update via page.run_task",
                 level=logging.WARNING,
                 exception=exc,
             )
             return
-        self.log_detailed(
+        self.log_diagnostic(
             "[Overlay] Skipping calibration update; page.run_task unavailable",
             level=logging.WARNING,
         )

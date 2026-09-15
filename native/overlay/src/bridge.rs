@@ -9,19 +9,12 @@ use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream,
 };
 
-use crate::logging::OverlayLoggingMode;
 use crate::manifest::{OverlayManifest, EXPECTED_CONTRACT_VERSION};
 use crate::state::OverlayPresentationSnapshot;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OverlayBridgeEvent {
     Shutdown,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OverlayRuntimeControl {
-    pub logging_mode: OverlayLoggingMode,
-    pub logging_mode_revision: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,7 +27,6 @@ pub enum BridgeIncoming {
     Snapshot(OverlayPresentationSnapshot),
     Heartbeat,
     Event(OverlayBridgeEvent),
-    Control(OverlayRuntimeControl),
     HealthChallenge(HealthChallenge),
 }
 
@@ -192,39 +184,6 @@ impl BridgeClient {
             "heartbeat" => Ok(BridgeIncoming::Heartbeat),
             "auth_error" => Err(BridgeError::Auth("bridge rejected session token".into())),
             "shutdown" => Ok(BridgeIncoming::Event(OverlayBridgeEvent::Shutdown)),
-            "runtime_control" => {
-                let payload = map.get("payload").cloned().ok_or_else(|| {
-                    BridgeError::Protocol("runtime_control payload missing".into())
-                })?;
-                let payload_map = payload.as_object().ok_or_else(|| {
-                    BridgeError::Protocol("runtime_control payload must be an object".into())
-                })?;
-                if payload_map
-                    .keys()
-                    .any(|key| key != "logging_mode" && key != "logging_mode_revision")
-                {
-                    return Err(BridgeError::Protocol(
-                        "runtime_control payload contains unsupported fields".into(),
-                    ));
-                }
-                let logging_mode = payload_map.get("logging_mode").cloned().ok_or_else(|| {
-                    BridgeError::Protocol("runtime_control logging_mode missing".into())
-                })?;
-                let logging_mode = serde_json::from_value(logging_mode)
-                    .map_err(|error| BridgeError::Protocol(error.to_string()))?;
-                let logging_mode_revision = payload_map
-                    .get("logging_mode_revision")
-                    .and_then(Value::as_u64)
-                    .ok_or_else(|| {
-                        BridgeError::Protocol(
-                            "runtime_control logging_mode_revision missing".into(),
-                        )
-                    })?;
-                Ok(BridgeIncoming::Control(OverlayRuntimeControl {
-                    logging_mode,
-                    logging_mode_revision,
-                }))
-            }
             _ => Err(BridgeError::Protocol(format!(
                 "unsupported bridge payload type: {event_type}"
             ))),

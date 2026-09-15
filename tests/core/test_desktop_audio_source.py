@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 
 import numpy as np
@@ -156,7 +157,7 @@ async def test_desktop_loopback_source_exposes_default_fallback_metadata(monkeyp
 @pytest.mark.asyncio
 async def test_desktop_loopback_callback_tracks_status_and_drops_without_logging(monkeypatch):
     stream_ref: dict[str, object] = {}
-    warnings: list[str] = []
+    reports: list[tuple[tuple[object, ...], int]] = []
     allow_status_stringification = False
 
     class StatusWithoutCallbackStringification:
@@ -211,14 +212,10 @@ async def test_desktop_loopback_callback_tracks_status_and_drops_without_logging
     monkeypatch.setattr("platform.system", lambda: "Windows")
     monkeypatch.setitem(__import__("sys").modules, "pyaudiowpatch", fake_pyaudio)
 
-    def fake_warning(message, *args, **kwargs):
-        _ = kwargs
-        warnings.append(message % args if args else message)
+    def capture_report(_logger, _message, *args, level):
+        reports.append((args, level))
 
-    monkeypatch.setattr(
-        "puripuly_heart.core.audio.desktop_source.logger.warning",
-        fake_warning,
-    )
+    monkeypatch.setattr(desktop_source_module, "emit_basic_log", capture_report)
 
     source = DesktopLoopbackAudioSource(
         device_name="Steam Streaming Speakers [Loopback]", max_queue_frames=1
@@ -235,14 +232,13 @@ async def test_desktop_loopback_callback_tracks_status_and_drops_without_logging
         assert source.callback_status_count == 1
         assert source.queue_drop_count == 1
         assert source.last_callback_status is status
-        assert warnings == []
+        assert reports == []
 
         allow_status_stringification = True
         frame = await source.frames().__anext__()
 
         np.testing.assert_allclose(frame.samples, np.ones(4, dtype=np.float32))
-        assert any("callback status" in message and "count=1" in message for message in warnings)
-        assert any("queue drop" in message and "count=1" in message for message in warnings)
+        assert reports == [((1, 1, 1, 1), logging.WARNING)]
     finally:
         await source.close()
 
@@ -250,7 +246,7 @@ async def test_desktop_loopback_callback_tracks_status_and_drops_without_logging
 @pytest.mark.asyncio
 async def test_desktop_loopback_callback_warning_reporting_is_rate_limited(monkeypatch) -> None:
     stream_ref: dict[str, object] = {}
-    warnings: list[str] = []
+    reports: list[tuple[tuple[object, ...], int]] = []
     clock = SimpleNamespace(value=0.0)
 
     class FakeStream:
@@ -291,9 +287,8 @@ async def test_desktop_loopback_callback_warning_reporting_is_rate_limited(monke
         def terminate(self):
             return None
 
-    def fake_warning(message, *args, **kwargs):
-        _ = kwargs
-        warnings.append(message % args if args else message)
+    def capture_report(_logger, _message, *args, level):
+        reports.append((args, level))
 
     monkeypatch.setattr("platform.system", lambda: "Windows")
     monkeypatch.setitem(
@@ -307,7 +302,7 @@ async def test_desktop_loopback_callback_warning_reporting_is_rate_limited(monke
         SimpleNamespace(monotonic=lambda: clock.value),
         raising=False,
     )
-    monkeypatch.setattr(desktop_source_module.logger, "warning", fake_warning)
+    monkeypatch.setattr(desktop_source_module, "emit_basic_log", capture_report)
 
     source = DesktopLoopbackAudioSource(
         device_name="Steam Streaming Speakers [Loopback]", max_queue_frames=1
@@ -322,25 +317,20 @@ async def test_desktop_loopback_callback_warning_reporting_is_rate_limited(monke
     try:
         trigger_status_and_drop()
         await source.frames().__anext__()
-        assert len(warnings) == 1
-        assert "callback status count=2" in warnings[0]
-        assert "callback status new=2" in warnings[0]
-        assert "queue drop count=1" in warnings[0]
-        assert "queue drop new=1" in warnings[0]
+        assert reports == [((2, 2, 1, 1), logging.WARNING)]
 
         trigger_status_and_drop()
         await source.frames().__anext__()
-        assert len(warnings) == 1
+        assert len(reports) == 1
 
         clock.value = 1.1
         trigger_status_and_drop()
         await source.frames().__anext__()
 
-        assert len(warnings) == 2
-        assert "callback status count=6" in warnings[1]
-        assert "callback status new=4" in warnings[1]
-        assert "queue drop count=3" in warnings[1]
-        assert "queue drop new=2" in warnings[1]
+        assert reports == [
+            ((2, 2, 1, 1), logging.WARNING),
+            ((6, 4, 3, 2), logging.WARNING),
+        ]
     finally:
         await source.close()
 

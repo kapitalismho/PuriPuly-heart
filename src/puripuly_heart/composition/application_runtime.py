@@ -405,7 +405,7 @@ def _emit_managed_gemma_lifecycle_diagnostic(
     event: DiagnosticEvent,
     *,
     log_basic: Callable[..., object],
-    log_detailed: Callable[..., object],
+    log_diagnostic: Callable[..., object],
 ) -> None:
     phase = _managed_gemma_lifecycle_label(event, "phase")
     scope = _managed_gemma_lifecycle_label(event, "scope_name")
@@ -416,8 +416,8 @@ def _emit_managed_gemma_lifecycle_diagnostic(
         f"[ManagedGemma] lifecycle outcome=failed phase={phase} cause={exception_class}",
         level=logging.ERROR,
     )
-    log_detailed(
-        "[Detailed][ManagedGemma] lifecycle outcome=failed "
+    log_diagnostic(
+        "[Diagnostic][ManagedGemma] lifecycle outcome=failed "
         f"phase={phase} scope={scope} task={task} callback={callback} "
         f"exception_class={exception_class}",
         level=logging.ERROR,
@@ -515,13 +515,13 @@ def compose_application_runtime(
     def log_basic(message: str, *, level: int = logging.INFO) -> None:
         runtime_logging.emit_basic(message, level=level)
 
-    def log_detailed(
+    def log_diagnostic(
         message: str,
         *,
         level: int = logging.INFO,
         exception: BaseException | None = None,
     ) -> bool:
-        return runtime_logging.emit_detailed(
+        return runtime_logging.emit_diagnostic(
             message,
             level=level,
             exception=exception,
@@ -530,19 +530,9 @@ def compose_application_runtime(
     def log_error(message: str) -> None:
         log_basic(message, level=logging.ERROR)
 
-    async def emit_overlay_logging_mode_update() -> None:
-        owner = overlay
-        bridge = owner.current_bridge() if owner is not None else None
-        if bridge is not None:
-            await bridge.broadcast_runtime_control(logging_mode=runtime_logging.mode)
-
     runtime_logging = compose_application_runtime_logging(
         presentation=presentation,
         sinks=runtime_logging_sinks,
-        overlay_logging_mode_update=emit_overlay_logging_mode_update,
-        overlay_logging_mode_update_available=lambda: (
-            overlay is not None and overlay.current_bridge() is not None
-        ),
     )
     settings = compose_settings_owner(
         config_path,
@@ -553,23 +543,26 @@ def compose_application_runtime(
 
     def managed_gemma_status(snapshot: ManagedGemmaTranslationSnapshot) -> None:
         nonlocal managed_gemma_basic_state
-        fields = [f"state={snapshot.state}"]
-        if snapshot.backend is not None:
-            fields.append(f"backend={snapshot.backend}")
-        if snapshot.progress_percent is not None:
-            fields.append(f"progress_percent={snapshot.progress_percent}")
-        if snapshot.error_type is not None:
-            fields.append(f"error_type={snapshot.error_type}")
         basic_state = (snapshot.state, snapshot.backend, snapshot.error_type)
         if basic_state != managed_gemma_basic_state:
             managed_gemma_basic_state = basic_state
-            basic_fields = [f"state={snapshot.state}"]
-            if snapshot.backend is not None:
-                basic_fields.append(f"backend={snapshot.backend}")
-            if snapshot.error_type is not None:
-                basic_fields.append(f"cause={snapshot.error_type}")
-            log_basic("[ManagedGemma] " + " ".join(basic_fields))
-        log_detailed("[ManagedGemma] " + " ".join(fields))
+            if snapshot.state in {"checking", "ready", "failed"}:
+                fields = [f"state={snapshot.state}"]
+                if snapshot.backend is not None:
+                    fields.append(f"backend={snapshot.backend}")
+                if snapshot.error_type is not None:
+                    fields.append(f"cause={snapshot.error_type}")
+                log_basic(
+                    "[ManagedGemma] " + " ".join(fields),
+                    level=logging.ERROR if snapshot.state == "failed" else logging.INFO,
+                )
+        if snapshot.state == "failed":
+            log_diagnostic(
+                "[ManagedGemma] failed "
+                f"backend={snapshot.backend or 'unknown'} "
+                f"cause={snapshot.error_type or 'unavailable'}",
+                level=logging.ERROR,
+            )
         if snapshot.state not in {
             "checking",
             "downloading",
@@ -589,13 +582,13 @@ def compose_application_runtime(
 
     managed_gemma = ManagedGemmaTranslationOwner(
         runtime=create_managed_gemma_runtime(
-            log_sink=lambda message, level: log_detailed(message, level=level),
+            log_sink=lambda message, level: log_diagnostic(message, level=level),
         ),
         status_sink=managed_gemma_status,
         lifecycle_diagnostic_sink=lambda event: _emit_managed_gemma_lifecycle_diagnostic(
             event,
             log_basic=log_basic,
-            log_detailed=log_detailed,
+            log_diagnostic=log_diagnostic,
         ),
     )
 
@@ -685,7 +678,7 @@ def compose_application_runtime(
                         captions_locked=locked,
                     )
                 ),
-                log_detailed=lambda message, level, exception: log_detailed(
+                log_diagnostic=lambda message, level, exception: log_diagnostic(
                     message,
                     level=level,
                     exception=exception,
@@ -701,7 +694,7 @@ def compose_application_runtime(
                 settings_application_provider=require_settings_application,
                 overlay_provider=require_overlay,
                 schedule_task=presentation.schedule_task,
-                log_detailed=log_detailed,
+                log_diagnostic=log_diagnostic,
                 ingress_available=lambda: not ingress.frozen,
             )
         return calibration
@@ -731,7 +724,6 @@ def compose_application_runtime(
                 cancel_bounds_persistence=desktop_owner.bounds_owner.cancel,
                 clear_bounds_suppressed=desktop_owner.bounds_owner.clear_suppressed,
                 calibration_provider=lambda: calibration_owner.current.copy(),
-                logging_mode_provider=lambda: runtime_logging.mode,
                 log_dir_provider=lambda: str(user_config_dir()),
                 desktop_controls_factory=desktop_owner.initial_controls,
                 interaction_mode_sink=desktop_owner.set_interaction_mode,
@@ -740,7 +732,7 @@ def compose_application_runtime(
                 edit_interaction_mode=DESKTOP_INTERACTION_MODE_EDIT,
                 clock=clock,
                 log_basic=lambda message, level: log_basic(message, level=level),
-                log_detailed=lambda message, level, exception: log_detailed(
+                log_diagnostic=lambda message, level, exception: log_diagnostic(
                     message,
                     level=level,
                     exception=exception,
@@ -814,7 +806,7 @@ def compose_application_runtime(
                 localize=presentation.localize,
                 settings_presentation_sink=(presentation.refresh_settings_loopback_capture_target),
                 log_basic=log_basic,
-                log_detailed=log_detailed,
+                log_diagnostic=log_diagnostic,
                 translation_demand_sink=sync_local_translation_demand,
             )
         return peer
@@ -840,7 +832,7 @@ def compose_application_runtime(
     def on_gpu_install_diagnostic(
         diagnostic: LocalASRGpuProvisioningDiagnostic,
     ) -> None:
-        log_detailed(
+        log_diagnostic(
             "[GPU ASR] model_install failure=unexpected",
             level=logging.WARNING,
             exception=diagnostic.exception,
@@ -880,7 +872,7 @@ def compose_application_runtime(
                     notice=state.notice,
                     publish_notice=state.publish_notice,
                 ),
-                detailed_log_sink=log_detailed,
+                diagnostic_log_sink=log_diagnostic,
                 retry_activation=retry_gpu_activation,
                 install_diagnostic_sink=on_gpu_install_diagnostic,
             )
@@ -894,7 +886,7 @@ def compose_application_runtime(
                     message,
                     level=level,
                 ),
-                detailed_log_sink=log_detailed,
+                diagnostic_log_sink=log_diagnostic,
                 gpu_effect_sink=require_gpu().apply_diagnostics_effect,
                 gpu_discovery_origin_provider=lambda: require_gpu().snapshot.discovery_origin,
                 gpu_provider_id=STTProviderName.LOCAL_QWEN_GPU.value,
@@ -904,18 +896,22 @@ def compose_application_runtime(
     def on_provisioning_diagnostic(
         diagnostic: LocalASRProvisioningDiagnostic,
     ) -> None:
+        outcome = diagnostic.outcome or "observed"
+        if diagnostic.event == "cleanup" and outcome != "failed":
+            return
+        if diagnostic.event == "result_delivery" and outcome != "failed":
+            return
         fields = [
             f"model={diagnostic.model_id or 'unknown'}",
-            f"origin={diagnostic.origin or 'runtime'}",
-            f"outcome={diagnostic.outcome or 'observed'}",
+            f"outcome={outcome}",
         ]
         if diagnostic.elapsed_seconds is not None:
             fields.append(f"elapsed_seconds={diagnostic.elapsed_seconds:.3f}")
         if diagnostic.failure_type is not None:
-            fields.append(f"failure_type={diagnostic.failure_type}")
+            fields.append(f"cause={diagnostic.failure_type}")
         log_basic(
             f"[LocalASR][{diagnostic.event.title()}] {' '.join(fields)}",
-            level=(logging.ERROR if diagnostic.outcome == "failed" else logging.INFO),
+            level=(logging.ERROR if outcome == "failed" else logging.INFO),
         )
 
     def on_provisioning_state(
@@ -1054,10 +1050,21 @@ def compose_application_runtime(
         else:
             lifecycle = "idle"
         if lifecycle != last_self_capture_lifecycle:
-            log_basic(
-                "[STT][Runtime] self capture "
-                f"{lifecycle}: provider={snapshot.provider_id or 'none'}"
-            )
+            if lifecycle == "failed":
+                cause = (
+                    snapshot.failure_reason.value
+                    if snapshot.failure_reason is not None
+                    else "unavailable"
+                )
+                log_basic(
+                    "[STT] Recognition unavailable "
+                    f"provider={snapshot.provider_id or 'none'} cause={cause}",
+                    level=logging.WARNING,
+                )
+            elif lifecycle == "committed":
+                log_basic(f"[STT] Recognition active provider={snapshot.provider_id or 'unknown'}")
+            elif lifecycle == "idle" and last_self_capture_lifecycle == "committed":
+                log_basic("[STT] Recognition stopped")
             last_self_capture_lifecycle = lifecycle
         require_local_asr().adapters.notice.sync()
         publish_osc_state_from_runtime()
@@ -1100,7 +1107,7 @@ def compose_application_runtime(
                 sync_effective_flags=sync_effective_flags,
                 sync_local_notice=lambda: require_local_asr().adapters.notice.sync(),
                 log_basic=log_basic,
-                log_detailed=lambda message, level: log_detailed(
+                log_diagnostic=lambda message, level: log_diagnostic(
                     message,
                     level=level,
                 ),
@@ -1167,7 +1174,7 @@ def compose_application_runtime(
             vrc_mic_sync = compose_vrc_mic_sync(
                 state_provider=lambda: pipeline.vrc_mic_state,
                 gate_provider=lambda: pipeline.vrc_mic_audio_gate,
-                log_detailed=lambda message, level: log_detailed(
+                log_diagnostic=lambda message, level: log_diagnostic(
                     message,
                     level=level,
                 ),
@@ -1197,7 +1204,7 @@ def compose_application_runtime(
                 disable_self_capture=stop_self_capture,
                 clock=clock,
                 log_sink=log_basic,
-                detailed_sink=lambda message, level, exception: log_detailed(
+                diagnostic_sink=lambda message, level, exception: log_diagnostic(
                     message,
                     level=level,
                     exception=exception,
@@ -1222,7 +1229,7 @@ def compose_application_runtime(
             manual_typing = create_manual_typing_owner(
                 output_provider=output_provider,
                 completion_provider=completion_provider,
-                log_detailed=log_detailed,
+                log_diagnostic=log_diagnostic,
                 log_error=log_error,
                 idle_timeout_seconds=MANUAL_INPUT_TYPING_IDLE_TIMEOUT_S,
                 submit_timeout_seconds=MANUAL_SUBMIT_TYPING_TIMEOUT_S,
@@ -1511,7 +1518,7 @@ def compose_application_runtime(
                 ),
                 fallback_models=tuple(model.value for model in QwenLLMModel),
                 low_latency=(FIXED_TRANSLATION_POLICY.fast_translation_enabled),
-                diagnostics_sink=lambda event, metadata, exception: log_detailed(
+                diagnostics_sink=lambda event, metadata, exception: log_diagnostic(
                     "[ProviderVerification] Credential verification "
                     f"failed event={event} "
                     f"provider={metadata.get('provider')} "
@@ -1539,7 +1546,7 @@ def compose_application_runtime(
         event: str,
         metadata: Mapping[str, object],
     ) -> None:
-        log_detailed(
+        log_diagnostic(
             f"[Lifecycle][GithubStarPromptRuntime] event={event} metadata={dict(metadata)}",
             level=logging.WARNING,
         )
@@ -1563,7 +1570,7 @@ def compose_application_runtime(
         event: str,
         metadata: Mapping[str, object],
     ) -> None:
-        log_detailed(
+        log_diagnostic(
             f"[Telemetry] event={event} metadata={dict(metadata)}",
             level=logging.INFO,
         )
@@ -1588,7 +1595,7 @@ def compose_application_runtime(
                 presence_provider=lambda: vrchat_osc_presence,
                 port_provider=vrchat_probe_port,
                 publish_notice=presentation.set_dashboard_vrchat_osc_notice,
-                diagnostics_sink=lambda _event, _metadata, exception: log_detailed(
+                diagnostics_sink=lambda _event, _metadata, exception: log_diagnostic(
                     "[OSC] VRChat OSC presence probe failed",
                     level=logging.WARNING,
                     exception=exception,
@@ -1614,7 +1621,6 @@ def compose_application_runtime(
                 clock=clock,
                 reset_deadline_s=STT_RESET_DEADLINE_S,
                 gpu_model_path=local_gpu_model_path(),
-                diagnostics_enabled=require_audio_diagnostics().detailed_enabled,
                 on_final_transcript_suppressed=(
                     require_audio_diagnostics().on_final_transcript_suppressed
                 ),
@@ -1736,15 +1742,9 @@ def compose_application_runtime(
         ),
         clock=clock,
         log_basic=log_basic,
-        log_detailed=log_detailed,
-        detailed_enabled=require_audio_diagnostics().detailed_enabled,
-        source_wrapper=lambda source, channel: (
-            require_audio_diagnostics()
-            .capture_adapter()
-            .wrap_source(
-                source,
-                channel_label=channel,
-            )
+        log_diagnostic=log_diagnostic,
+        source_wrapper=lambda source: (
+            require_audio_diagnostics().capture_adapter().wrap_source(source)
         ),
         self_state_sink=on_self_capture_state,
         self_diagnostic_sink=(require_audio_diagnostics().capture_adapter().self_capture),
@@ -1877,13 +1877,13 @@ def compose_application_runtime(
         founder_dialog=presentation.show_founder_letter_dialog,
         failure_route=maybe_show_founder_letter,
         log_basic=log_basic,
-        log_detailed=log_detailed,
+        log_diagnostic=log_diagnostic,
         log_error=log_error,
         basic_warning_sink=lambda message: log_basic(
             message,
             level=logging.WARNING,
         ),
-        detailed_warning_sink=lambda message, exception: log_detailed(
+        diagnostic_warning_sink=lambda message, exception: log_diagnostic(
             message,
             level=logging.WARNING,
             exception=exception,
@@ -2133,8 +2133,6 @@ def compose_application_runtime(
             ),
         ),
         diagnostics=UiDiagnosticsRuntimeAdapter(
-            runtime_logging=runtime_logging,
-            overlay=overlay_owner,
             cycle_capture_fault=audio_owner.cycle_capture_fault_profile,
             cycle_stt_fault=audio_owner.cycle_stt_fault_profile,
             clear_audio_faults=audio_owner.clear_fault_profiles,
@@ -2149,7 +2147,6 @@ def compose_application_runtime(
                 calibration=calibration_owner,
                 microphone=lambda: microphone,
             ),
-            runtime_logging=runtime_logging,
         ),
         runtime_shutdown=runtime_shutdown,
         runtime_logging=runtime_logging,

@@ -105,7 +105,6 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "set_overlay_calibration_field",
         "set_overlay_enabled",
         "set_peer_translation_enabled",
-        "set_runtime_logging_mode",
         "set_stt_enabled",
         "set_translation_enabled",
         "start",
@@ -289,8 +288,8 @@ class UiApplicationBoundary:
     def log_basic(self, message: str, *, level: int = logging.INFO) -> None:
         self._runtime_logging.emit_basic(message, level=level)
 
-    def log_detailed(self, message: str, *, level: int = logging.INFO) -> None:
-        self._runtime_logging.emit_detailed(message, level=level)
+    def log_diagnostic(self, message: str, *, level: int = logging.INFO) -> None:
+        self._runtime_logging.emit_diagnostic(message, level=level)
 
     async def submit_text(self, text: str) -> None:
         await self._input_runtime.submit_text(text)
@@ -446,10 +445,6 @@ class UiApplicationBoundary:
         result = self._microphone.stop_microphone_test()
         if inspect.isawaitable(result):
             await result
-
-    def set_runtime_logging_mode(self, mode: str) -> str:
-        self._diagnostics.set_runtime_logging_mode(mode)
-        return self.state().runtime_logging_mode
 
     async def set_desktop_overlay_captions_locked(self, locked: bool) -> None:
         await self._overlay.set_desktop_overlay_captions_locked(locked)
@@ -668,7 +663,7 @@ class UiApplicationBoundary:
         metadata: object,
     ) -> None:
         details = dict(metadata) if isinstance(metadata, dict) else {}
-        self.log_detailed(
+        self.log_diagnostic(
             f"[Lifecycle][GithubStarPromptRuntime] event={event} metadata={details}",
             level=logging.WARNING,
         )

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
-import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from dataclasses import dataclass, field
@@ -12,12 +10,8 @@ from uuid import UUID
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.clock import Clock, SystemClock
 
-from .diagnostics import OverlayDiagnosticsRecorder
 from .presenter_acceptance import PresenterAcceptanceLedger
-from .presenter_projection import (
-    NativeRetryIntentProjection,
-    PresenterDiagnosticProjection,
-)
+from .presenter_projection import NativeRetryIntentProjection
 from .protocol import (
     OverlayPresentationBlock,
     OverlayPresentationCalibration,
@@ -41,7 +35,6 @@ from .state import (
     OverlayEntryRemovalRecord,
     OverlayPresentationState,
     OverlayReductionResult,
-    OverlayTurnDecisionRecord,
 )
 from .state import (
     OverlayLogicalTurnEntry as _LogicalTurnEntry,
@@ -68,16 +61,10 @@ class OverlayPresentationTransport(Protocol):
     async def broadcast_shutdown(self) -> None: ...
 
 
-class RuntimeDetailedLogger(Protocol):
-    def __call__(self, message: str, *, level: int = logging.INFO) -> bool: ...
-
-
 @dataclass(slots=True)
 class OverlayPresenter(OverlaySink):
     calibration: OverlayCalibration
     bridge: OverlayPresentationTransport | None = None
-    diagnostics: OverlayDiagnosticsRecorder | None = None
-    runtime_log_detailed: RuntimeDetailedLogger | None = None
     clock: Clock = field(default_factory=SystemClock)
     sleep: SleepFn = asyncio.sleep
     visible_window_target_blocks: int = VISIBLE_WINDOW_TARGET_BLOCKS
@@ -101,10 +88,6 @@ class OverlayPresenter(OverlaySink):
         init=False,
         default_factory=NativeRetryIntentProjection,
     )
-    _diagnostic_projection: PresenterDiagnosticProjection = field(
-        init=False,
-        default_factory=PresenterDiagnosticProjection,
-    )
     _presentation_state: OverlayPresentationState = field(init=False)
     _ownership_transition_lock: asyncio.Lock = field(
         init=False,
@@ -118,10 +101,6 @@ class OverlayPresenter(OverlaySink):
     def __post_init__(self) -> None:
         self._presentation_state = OverlayPresentationState()
         self._retry_projection.reset(enabled=self.native_retry_enabled)
-        self._diagnostic_projection.configure(
-            diagnostics=self.diagnostics,
-            runtime_log_detailed=self.runtime_log_detailed,
-        )
         self._presentation_state.generate_snapshot(
             revision=0,
             calibration=_calibration_from_overlay(self.calibration),
@@ -155,170 +134,9 @@ class OverlayPresenter(OverlaySink):
     def active_self_overlay_metadata(self) -> ActiveSelfOverlayMetadata | None:
         return self._presentation_state.active_self_overlay_metadata()
 
-    def _sync_diagnostic_projection(self) -> PresenterDiagnosticProjection:
-        self._diagnostic_projection.configure(
-            diagnostics=self.diagnostics,
-            runtime_log_detailed=self.runtime_log_detailed,
-        )
-        return self._diagnostic_projection
-
-    def _emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
-        return self._sync_diagnostic_projection().emit_lazy(
-            lambda: message,
-            level=level,
-        )
-
-    def _emit_detailed_lazy(
-        self,
-        build_message: Callable[[], str],
-        *,
-        level: int = logging.INFO,
-    ) -> bool:
-        return self._sync_diagnostic_projection().emit_lazy(build_message, level=level)
-
-    def _emit_turn_decision(
-        self,
-        decision: str,
-        *,
-        disposition: str | None = None,
-        key: tuple[str, UUID] | None = None,
-        entry: _LogicalTurnEntry | None = None,
-        block: OverlayPresentationBlock | None = None,
-        extras: dict[str, object] | None = None,
-    ) -> bool:
-        publishable = (
-            self._presentation_state.entry_is_publishable(
-                entry,
-                show_peer_original=self.show_peer_original,
-                translation_enabled=self.translation_enabled,
-            )
-            if entry is not None
-            else None
-        )
-        return self._sync_diagnostic_projection().emit_turn_decision(
-            decision,
-            disposition=disposition,
-            key=key,
-            entry=entry,
-            block=block,
-            extras=extras,
-            publishable=publishable,
-        )
-
-    def _emit_pair_state(
-        self,
-        key: tuple[str, UUID],
-        entry: _LogicalTurnEntry,
-        block: OverlayPresentationBlock,
-        *,
-        publish_kind: str,
-    ) -> bool:
-        rendered_sources = self._rendered_text_sources(entry, block)
-        return self._sync_diagnostic_projection().emit_pair_state(
-            key,
-            entry,
-            block,
-            publish_kind=publish_kind,
-            rendered_sources=rendered_sources,
-            rendered_pair_state=self._rendered_pair_state(*rendered_sources),
-            elapsed_ms=self._elapsed_from_origin_wall_clock_ms(block.origin_wall_clock_ms),
-        )
-
-    def _emit_skip_disposition(
-        self,
-        *,
-        decision: str,
-        disposition: str,
-        key: tuple[str, UUID] | None = None,
-        entry: _LogicalTurnEntry | None = None,
-        extras: dict[str, object] | None = None,
-    ) -> bool:
-        return self._emit_turn_decision(
-            decision,
-            disposition=disposition,
-            key=key,
-            entry=entry,
-            extras=extras,
-        )
-
-    def _emit_reduction_decisions(
-        self,
-        decisions: tuple[OverlayTurnDecisionRecord, ...],
-    ) -> None:
-        for decision in decisions:
-            self._emit_turn_decision(
-                decision.decision,
-                disposition=decision.disposition,
-                key=decision.key,
-                entry=decision.entry,
-                block=decision.block,
-                extras=decision.extras,
-            )
-
     def _finish_reduction_result(self, result: OverlayReductionResult) -> bool:
-        self._emit_reduction_decisions(result.decisions)
         self._drain_presentation_state_removals()
         return result.changed
-
-    def _elapsed_from_origin_wall_clock_ms(self, origin_wall_clock_ms: int | None) -> int | None:
-        if origin_wall_clock_ms is None:
-            return None
-        return max(0, int(time.time() * 1000) - origin_wall_clock_ms)
-
-    def _rendered_text_sources(
-        self,
-        entry: _LogicalTurnEntry,
-        block: OverlayPresentationBlock,
-    ) -> tuple[str, str]:
-        if not self.translation_enabled and entry.channel == "peer":
-            if block.block_variant == "active_peer":
-                return "live_text", "none"
-            return "original_text", "none"
-        if entry.channel == "peer" and block.block_variant == "active_peer":
-            secondary_visible = block.secondary_enabled and bool(block.secondary_text.strip())
-            return "blank", "source" if secondary_visible else "blank"
-        if entry.channel == "peer" and block.block_variant == "finalized":
-            if entry.translation_text.strip():
-                secondary_visible = block.secondary_enabled and bool(block.secondary_text.strip())
-                return "translation", "source" if secondary_visible else "blank"
-            secondary_visible = block.secondary_enabled and bool(block.secondary_text.strip())
-            return "blank", "source" if secondary_visible else "blank"
-
-        secondary_source = "none"
-        if block.secondary_enabled and block.secondary_text:
-            if entry.channel == "peer":
-                secondary_source = "original_text"
-            elif block.block_variant == "active_self" and entry.live_secondary_text.strip():
-                secondary_source = "live_secondary_text"
-            else:
-                secondary_source = "translation_text"
-
-        if block.block_variant == "active_self":
-            return "live_text", secondary_source
-        if entry.channel == "peer":
-            return "translation_text", secondary_source
-        return "original_text", secondary_source
-
-    def _rendered_pair_state(self, primary_source: str, secondary_source: str) -> str:
-        if primary_source == "live_text":
-            if secondary_source == "live_secondary_text":
-                return "live_with_preview_translation"
-            if secondary_source == "translation_text":
-                return "live_with_translation"
-            return "live_only"
-        if primary_source == "translation_text":
-            if secondary_source == "original_text":
-                return "translation_with_original"
-            return "translation_only"
-        if primary_source == "translation":
-            if secondary_source == "source":
-                return "translation_with_original"
-            return "translation_only"
-        if primary_source == "blank" and secondary_source == "source":
-            return "source_only"
-        if secondary_source in {"translation_text", "live_secondary_text"}:
-            return "original_with_translation"
-        return "original_only"
 
     def _terminal_update_reason(
         self,
@@ -348,7 +166,6 @@ class OverlayPresenter(OverlaySink):
         self._signal_peer_admission_change()
         self._appearance_seq = 0
         self._retry_projection.clear_scene()
-        self._diagnostic_projection.reset()
         self._presentation_state.generate_snapshot(
             revision=0,
             calibration=_calibration_from_overlay(self.calibration),
@@ -366,7 +183,6 @@ class OverlayPresenter(OverlaySink):
         self._live_peer_turn_key = None
         self._revision += 1
         self._retry_projection.clear_scene()
-        self._diagnostic_projection.reset()
         snapshot = self._presentation_state.generate_snapshot(
             revision=self._revision,
             calibration=_calibration_from_overlay(self.calibration),
@@ -390,41 +206,6 @@ class OverlayPresenter(OverlaySink):
             event = self._acceptance.normalize_sequence(event, self._entries)
             rejection_reason = self._application_rejection_reason(event)
             if rejection_reason is not None:
-                if (
-                    rejection_reason == "stale"
-                    and event.channel in {"self", "peer"}
-                    and event.utterance_id is not None
-                    and (event.channel, event.utterance_id) not in self._entries
-                ):
-                    key = (event.channel, event.utterance_id)
-                    terminal_reason = self._terminal_update_reason(*key)
-                    idle_hidden = terminal_reason == "expired"
-                    self._emit_turn_decision(
-                        (
-                            "overlay_turn_late_update_ignored_after_idle_hide"
-                            if idle_hidden
-                            else "overlay_turn_late_update_ignored_after_eviction"
-                        ),
-                        disposition="hidden_idle_ttl" if idle_hidden else "evicted",
-                        key=key,
-                        extras={
-                            "event_seq": event.seq,
-                            "terminal_reason": terminal_reason or "retired_frontier",
-                        },
-                    )
-                elif (
-                    rejection_reason == "stale"
-                    and event.channel in {"self", "peer"}
-                    and event.utterance_id is not None
-                ):
-                    key = (event.channel, event.utterance_id)
-                    self._emit_turn_decision(
-                        "overlay_turn_superseded",
-                        disposition="superseded",
-                        key=key,
-                        entry=self._entries.get(key),
-                        extras={"event_seq": event.seq},
-                    )
                 receipt = OverlayApplicationReceipt(
                     stage="application_accepted",
                     outcome="stale" if rejection_reason == "stale" else "not_applied",
@@ -877,14 +658,6 @@ class OverlayPresenter(OverlaySink):
             active_entry = self._entries.get(protected_key)
             if active_entry is not None:
                 active_entry.ever_visible = True
-        self._record_visible_window_selection(
-            active_self_present=selection.active_self_present,
-            finalized_limit=selection.finalized_limit,
-            candidate_keys=selection.candidate_keys,
-            selected_keys=selection.selected_keys,
-            protected_selected=selection.protected_keys,
-            retained_hidden=selection.retained_hidden,
-        )
         rendered_entries = selection.rendered_entries
         next_blocks = [block for _, block in rendered_entries]
         next_calibration = _calibration_from_overlay(self.calibration)
@@ -898,10 +671,6 @@ class OverlayPresenter(OverlaySink):
             previous_snapshot.blocks
         )
         next_rendered_signature = self._presentation_state.rendered_blocks_signature(next_blocks)
-        previous_signatures = {
-            block.id: self._presentation_state.rendered_block_signature(block)
-            for block in previous_snapshot.blocks
-        }
         self._refresh_visible_expiration_deadlines(
             rendered_entries,
             previous_blocks=previous_snapshot.blocks,
@@ -914,35 +683,7 @@ class OverlayPresenter(OverlaySink):
             and not force_protocol_publish
         ):
             self._signal_peer_admission_change()
-            self._emit_turn_decision(
-                "overlay_turn_no_visible_change",
-                disposition="rendered_signature_unchanged",
-                extras={"block_count": len(next_blocks)},
-            )
             return
-
-        for key, block in rendered_entries:
-            entry = self._entries.get(key)
-            if entry is None:
-                continue
-            previous_signature = previous_signatures.get(block.id)
-            if previous_signature is None:
-                self._emit_turn_decision(
-                    "overlay_turn_first_visible",
-                    key=key,
-                    entry=entry,
-                    block=block,
-                )
-                self._emit_pair_state(key, entry, block, publish_kind="first_visible")
-                continue
-            if previous_signature != self._presentation_state.rendered_block_signature(block):
-                self._emit_turn_decision(
-                    "overlay_turn_updated",
-                    key=key,
-                    entry=entry,
-                    block=block,
-                )
-                self._emit_pair_state(key, entry, block, publish_kind="visible_update")
 
         if fresh_render_channel is not None and self.native_retry_enabled:
             self._retry_projection.advance(fresh_render_channel, fresh_render_event)
@@ -968,23 +709,6 @@ class OverlayPresenter(OverlaySink):
         if next_occupants - previous_occupants:
             self._last_new_occupant_at = now
         self._signal_peer_admission_change()
-        blocks_summary = [
-            {
-                "id": block.id,
-                "variant": block.block_variant,
-                "update_id": block.update_id,
-                "origin_wall_clock_ms": block.origin_wall_clock_ms,
-                "session_scope": block.session_scope,
-                "primary_len": len(block.primary_text),
-                "secondary_len": len(block.secondary_text),
-            }
-            for block in next_blocks
-        ]
-        self._sync_diagnostic_projection().record_snapshot(
-            snapshot,
-            blocks=blocks_summary,
-            bridge_attached=self.bridge is not None,
-        )
         if self.bridge is not None:
             block_expirations = {
                 block.id: self._entry_expiration_deadline(entry)
@@ -1076,7 +800,6 @@ class OverlayPresenter(OverlaySink):
         if self._entry_expiration_deadline(entry) is None:
             return
         entry.expiration_revision += 1
-        self._record_deadline(entry)
         self._expiration_tasks[key] = self._create_task(
             self._expire_entry_after_ttl(key, entry.expiration_revision),
             task_name=f"presenter-expiration:{key[0]}:{key[1]}",
@@ -1174,57 +897,11 @@ class OverlayPresenter(OverlaySink):
         key = record.key
         entry = record.entry
         self._acceptance.retire_entry(key)
-        effective_deadline, visible_deadline, translation_deadline = (
-            self._entry_expiration_components(entry)
-        )
-        removal_time = record.now if record.now is not None else self.clock.now()
-        extra_fields: dict[str, object] = {}
-        if entry.channel == "self":
-            lifetime_ms = 0.0
-            if entry.visible_since is not None:
-                lifetime_ms = max(0.0, (removal_time - entry.visible_since) * 1000.0)
-            translated_lifetime_ms = 0.0
-            if entry.translation_observed_visible_since is not None:
-                translated_lifetime_ms = max(
-                    0.0,
-                    (removal_time - entry.translation_observed_visible_since) * 1000.0,
-                )
-            extra_fields = {
-                "lifetime_ms": lifetime_ms,
-                "translated_lifetime_ms": translated_lifetime_ms,
-                "had_translation": bool(entry.translation_text.strip()),
-                "ever_visible_with_translation": entry.translation_observed_visible_since
-                is not None,
-                "translation_observed_visible_since": entry.translation_observed_visible_since,
-            }
-        self._sync_diagnostic_projection().record_removal(
-            reason=record.reason,
-            key=key,
-            entry=entry,
-            now=removal_time,
-            visible_deadline=visible_deadline,
-            translation_deadline=translation_deadline,
-            effective_deadline=effective_deadline,
-            extra_fields=extra_fields,
-        )
         seq = record.tombstone_seq if record.tombstone_seq is not None else entry.closed_seq
         if record.reason == "expired" and entry.ever_visible:
             self._acceptance.remember_scene_terminal(key, record.reason)
-            self._emit_turn_decision(
-                "overlay_turn_hidden_idle_ttl",
-                disposition="hidden_idle_ttl",
-                key=key,
-                entry=entry,
-                extras={"deadline": effective_deadline},
-            )
         if record.reason == "evicted_by_newer_turn":
             self._acceptance.remember_scene_terminal(key, record.reason)
-            self._emit_turn_decision(
-                "overlay_turn_evicted_by_newer_turn",
-                disposition="evicted",
-                key=key,
-                entry=entry,
-            )
         if seq is not None:
             self._acceptance.remember_tombstone(key, seq)
 
@@ -1334,40 +1011,6 @@ class OverlayPresenter(OverlaySink):
     def _clear_entries_for_reason(self, reason: str) -> None:
         for key in list(self._entries):
             self._remove_entry(key, reason=reason, now=self.clock.now())
-
-    def _record_visible_window_selection(
-        self,
-        *,
-        active_self_present: bool,
-        finalized_limit: int,
-        candidate_keys: list[tuple[str, UUID]],
-        selected_keys: list[tuple[str, UUID]],
-        protected_selected: list[tuple[str, UUID]],
-        retained_hidden: list[tuple[str, UUID]],
-    ) -> None:
-        self._sync_diagnostic_projection().record_visible_window(
-            active_self_present=active_self_present,
-            finalized_limit=finalized_limit,
-            candidate_keys=candidate_keys,
-            selected_keys=selected_keys,
-            protected_selected=protected_selected,
-            retained_hidden=retained_hidden,
-        )
-
-    def _record_deadline(self, entry: _LogicalTurnEntry) -> None:
-        effective_deadline, visible_deadline, translation_deadline = (
-            self._entry_expiration_components(entry)
-        )
-        self._sync_diagnostic_projection().record_deadline(
-            entry,
-            visible_deadline=visible_deadline,
-            translation_deadline=translation_deadline,
-            effective_deadline=effective_deadline,
-        )
-
-    @staticmethod
-    def _format_entry_key(key: tuple[str, UUID]) -> str:
-        return PresenterDiagnosticProjection.format_key(key)
 
 
 def _calibration_from_overlay(

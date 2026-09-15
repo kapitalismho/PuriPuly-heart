@@ -38,7 +38,6 @@ def UiApplicationBoundary(
 class RecordingBackend:
     def __init__(self) -> None:
         self.config_path = Path("settings.json")
-        self.runtime_logging_mode = "detailed"
         self.settings = replace(
             AppSettingsVNext(),
             intent=replace(
@@ -67,7 +66,7 @@ class RecordingBackend:
     def log_basic(self, message: str, *, level: int) -> None:
         self.events.append(("log-basic", message, level))
 
-    def log_detailed(self, message: str, *, level: int) -> None:
+    def log_diagnostic(self, message: str, *, level: int) -> None:
         self.events.append(("log-detailed", message, level))
 
     async def submit_text(self, text: str) -> None:
@@ -236,7 +235,6 @@ def test_state_is_a_semantic_snapshot_without_exposing_backend_objects() -> None
     state = boundary.state()
 
     assert state.config_path == Path("settings.json")
-    assert state.runtime_logging_mode == "detailed"
     assert state.translation_enabled is True
     assert state.stt_state == "self-listening"
     assert state.peer_translation_eula_accepted is False
@@ -409,7 +407,7 @@ async def test_lifecycle_callbacks_diagnostics_and_logging_stay_behind_boundary(
     )
     assert boundary.emit_application_shutdown_diagnostic(diagnostic) is None
     boundary.log_basic("basic", level=10)
-    boundary.log_detailed("detailed", level=20)
+    boundary.log_diagnostic("detailed", level=20)
     await boundary.stop()
 
     assert backend.events == [

@@ -222,7 +222,6 @@ class SmartTurnInferenceOwner:
             return
         self._prepare_attempted = True
         self._availability = "loading"
-        logger.info("[STT][Runtime] smart-turn loading")
         self._prepare_task = asyncio.create_task(self._prepare(), name="SmartTurn:prepare")
 
     def submit(
@@ -232,30 +231,12 @@ class SmartTurnInferenceOwner:
         completion: Callable[[SmartTurnCompletion], Awaitable[None]],
     ) -> Literal["started", "busy", "unavailable"]:
         if self._closed:
-            logger.info(
-                "[STT][Runtime] smart-turn inference skipped segment=%s pause=%s "
-                "reason=unavailable availability=closed",
-                identity.segment_id,
-                identity.pause_id,
-            )
             return "unavailable"
         if self._execution_task is not None and not self._execution_task.done():
             self._busy_skip_count += 1
-            logger.info(
-                "[STT][Runtime] smart-turn inference skipped segment=%s pause=%s reason=busy",
-                identity.segment_id,
-                identity.pause_id,
-            )
             return "busy"
         if self._inference is None:
             self.request_prepare()
-            logger.info(
-                "[STT][Runtime] smart-turn inference skipped segment=%s pause=%s "
-                "reason=unavailable availability=%s",
-                identity.segment_id,
-                identity.pause_id,
-                self._availability,
-            )
             return "unavailable"
         owned_audio = np.asarray(audio, dtype=np.float32).reshape(-1).copy()
         self._active_request = identity
@@ -286,15 +267,12 @@ class SmartTurnInferenceOwner:
             if execution is not None:
                 await _await_owned_operation(asyncio.gather(execution, return_exceptions=True))
         finally:
+            self._availability = "closed"
             inference = self._inference
             self._inference = None
             close = getattr(inference, "close", None)
             if callable(close):
                 close()
-            previous_availability = self._availability
-            self._availability = "closed"
-            if previous_availability not in ("unloaded", "closed"):
-                logger.info("[STT][Runtime] smart-turn closed")
 
     async def _prepare(self) -> None:
         if self._closed:
@@ -335,7 +313,6 @@ class SmartTurnInferenceOwner:
             self._inference = inference
             self._availability = "ready"
             self._last_error = None
-            logger.info("[STT][Runtime] smart-turn ready")
         finally:
             self._prepare_task = None
 
@@ -355,11 +332,6 @@ class SmartTurnInferenceOwner:
         completion: Callable[[SmartTurnCompletion], Awaitable[None]],
     ) -> None:
         started = self._clock()
-        logger.info(
-            "[STT][Runtime] smart-turn inference started segment=%s pause=%s",
-            identity.segment_id,
-            identity.pause_id,
-        )
         outcome: Literal["complete", "error", "nonfinite"] = "error"
         score: float | None = None
         error: str | None = None
@@ -373,13 +345,6 @@ class SmartTurnInferenceOwner:
             )
             outcome = "complete" if math.isfinite(score) else "nonfinite"
         except asyncio.CancelledError:
-            logger.info(
-                "[STT][Runtime] smart-turn inference finished segment=%s pause=%s "
-                "status=cancelled duration_ms=%.1f",
-                identity.segment_id,
-                identity.pause_id,
-                max(0.0, self._clock() - started) * 1000.0,
-            )
             self._active_request = None
             self._execution_task = None
             raise
@@ -395,17 +360,11 @@ class SmartTurnInferenceOwner:
             duration_s=max(0.0, completed - started),
             outcome=outcome,
         )
-        logger.log(
-            logging.INFO if outcome == "complete" else logging.WARNING,
-            "[STT][Runtime] smart-turn inference finished segment=%s pause=%s "
-            "status=%s score=%s duration_ms=%.1f error=%s",
-            identity.segment_id,
-            identity.pause_id,
-            "ok" if outcome == "complete" else outcome,
-            score,
-            result.duration_s * 1000.0,
-            error,
-        )
+        if outcome != "complete":
+            logger.warning(
+                "[STT][Runtime] smart-turn inference failed cause=%s",
+                error or outcome,
+            )
         self._active_request = None
         try:
             await completion(result)

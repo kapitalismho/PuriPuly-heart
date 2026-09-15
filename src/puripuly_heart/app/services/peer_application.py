@@ -85,7 +85,7 @@ class PeerApplicationOwner:
     disclosure_sink: PeerApplicationEffect = field(repr=False)
     superseded_sink: PeerApplicationSupersededSink = field(repr=False)
     log_basic: PeerApplicationLogSink = field(repr=False)
-    log_detailed: PeerApplicationLogSink = field(repr=False)
+    log_diagnostic: PeerApplicationLogSink = field(repr=False)
     log_failure: PeerApplicationLogSink = field(repr=False)
     runtime_replace_timeout_s: float = field(
         default=DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS,
@@ -407,19 +407,10 @@ class PeerApplicationOwner:
             return
         self._activation_generation += 1
         generation = self._activation_generation
-        self.log_basic(f"[Peer] Toggle request: enabled={enabled}")
-        self.log_detailed(
-            "[Peer] Toggle detail: "
-            f"overlay_enabled={state.overlay_intent_enabled} "
-            f"overlay_state={state.overlay_state} "
-            f"peer_stt_available={state.peer_provider_available} "
-            f"eula_accepted={state.eula_accepted}"
-        )
         if enabled and not state.eula_accepted:
             self.disable_intent()
             self.sync_effective_flags()
             self.presentation_changed()
-            self.log_basic("[Peer] Toggle ignored: eula_accepted=False")
             await self._notify_translation_demand()
             return
         if enabled and not state.overlay_intent_enabled:
@@ -682,16 +673,29 @@ class PeerApplicationOwner:
         )
         if summary == self._last_runtime_state_summary:
             return
+        previous = self._last_runtime_state_summary
         self._last_runtime_state_summary = summary
-        self.log_basic(
-            "[PeerCapture] state_result "
-            f"generation={snapshot.generation} "
-            f"state={snapshot.state.value} "
-            f"provider_status={snapshot.provider_status.value} "
-            f"target_status={snapshot.target_status.value if snapshot.target_status is not None else 'none'} "
-            f"provider={snapshot.provider_id or 'none'} "
-            f"cause={snapshot.failure_reason.value if snapshot.failure_reason is not None else snapshot.admission_reason or snapshot.target_reason or 'none'}"
+        cause = (
+            snapshot.failure_reason.value
+            if snapshot.failure_reason is not None
+            else (
+                snapshot.admission_reason or snapshot.target_reason or "unavailable"
+                if snapshot.state.value in {"failed", "faulted"}
+                else None
+            )
         )
+        if cause is not None:
+            self.log_failure(
+                "[PeerCapture] unavailable "
+                f"state={snapshot.state.value} provider={snapshot.provider_id or 'none'} "
+                f"cause={cause}"
+            )
+        elif snapshot.state.value == "running" and (
+            previous is None or getattr(previous[0], "value", previous[0]) != "running"
+        ):
+            self.log_basic(f"[PeerCapture] active provider={snapshot.provider_id or 'unknown'}")
+        elif previous is not None and snapshot.state.value == "stopped":
+            self.log_basic("[PeerCapture] stopped")
 
     def on_runtime_diagnostic(self, diagnostic: PeerCaptureDiagnostic) -> None:
         unavailable_reason = getattr(
@@ -699,7 +703,7 @@ class PeerApplicationOwner:
             "detail",
             getattr(diagnostic, "process_unavailable_reason", None),
         )
-        self.log_detailed(
+        self.log_diagnostic(
             "[PeerRuntime] "
             f"reason={diagnostic.reason.value} "
             f"capture_kind={diagnostic.capture_kind} "

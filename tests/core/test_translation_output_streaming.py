@@ -23,9 +23,6 @@ from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
-from puripuly_heart.core.runtime_logging import (
-    SessionLoggingMode,
-)
 from puripuly_heart.core.translation_backend import LlmTranslationBackend
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import STTFinalEvent, STTPartialEvent, UIEventType
@@ -1403,133 +1400,48 @@ async def test_identical_inflight_peer_finals_reject_the_second_final() -> None:
 
 
 @pytest.mark.asyncio
-async def test_peer_overlay_applied_latency_summary_and_detailed_trace() -> None:
-    basic_runtime_logging, basic_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-
-    basic_clock = FakeClock(_now=10.0)
-    detailed_clock = FakeClock(_now=20.0)
-    basic_harness = compose_translation_test_harness(
+async def test_peer_overlay_applied_emits_compact_basic_latency_summary() -> None:
+    runtime_logging, stream = _make_runtime_logging_capture()
+    clock = FakeClock(_now=10.0)
+    harness = compose_translation_test_harness(
         stt=None,
-        llm=ClockedTranslateLLMProvider(
-            clock=basic_clock,
-            responses=[(0.15, "hello")],
-        ),
+        llm=ClockedTranslateLLMProvider(clock=clock, responses=[(0.15, "hello")]),
         osc=RecordingOscQueue(),
         overlay_sink=RecordingOverlaySink(),
         peer_translation_enabled=True,
-        runtime_logging=basic_runtime_logging,
-        clock=basic_clock,
-        peer_hangover_s=0.95,
-    )
-    detailed_harness = compose_translation_test_harness(
-        stt=None,
-        llm=ClockedTranslateLLMProvider(
-            clock=detailed_clock,
-            responses=[(0.15, "hello")],
-        ),
-        osc=RecordingOscQueue(),
-        overlay_sink=RecordingOverlaySink(),
-        peer_translation_enabled=True,
-        runtime_logging=detailed_runtime_logging,
-        clock=detailed_clock,
+        runtime_logging=runtime_logging,
+        clock=clock,
         peer_hangover_s=0.95,
     )
 
     try:
-        basic_utterance_id = uuid4()
-        basic_harness.record_peer_speech_end_for_test(basic_utterance_id)
-        basic_clock.advance(0.03)
-        await basic_harness.dispatch_stt_event(
+        utterance_id = uuid4()
+        harness.record_peer_speech_end_for_test(utterance_id)
+        clock.advance(0.03)
+        await harness.dispatch_stt_event(
             STTFinalEvent(
-                utterance_id=basic_utterance_id,
+                utterance_id=utterance_id,
                 transcript=Transcript(
-                    utterance_id=basic_utterance_id,
+                    utterance_id=utterance_id,
                     text="안녕",
                     is_final=True,
-                    created_at=basic_clock.now(),
+                    created_at=clock.now(),
                     channel="peer",
                 ),
             )
         )
-        await basic_harness.translation_turns.wait_for_idle()
-        await basic_harness.output_runtime.wait_for_peer_output_idle()
+        await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
 
-        detailed_utterance_id = uuid4()
-        detailed_harness.record_peer_speech_end_for_test(detailed_utterance_id)
-        detailed_clock.advance(0.03)
-        await detailed_harness.dispatch_stt_event(
-            STTFinalEvent(
-                utterance_id=detailed_utterance_id,
-                transcript=Transcript(
-                    utterance_id=detailed_utterance_id,
-                    text="안녕",
-                    is_final=True,
-                    created_at=detailed_clock.now(),
-                    channel="peer",
-                ),
-            )
+        latency_message = next(
+            message for message in _runtime_log_messages(stream) if "[Basic][Latency]" in message
         )
-        await detailed_harness.translation_turns.wait_for_idle()
-        await detailed_harness.output_runtime.wait_for_peer_output_idle()
-
-        basic_messages = _runtime_log_messages(basic_stream)
-        detailed_messages = _runtime_log_messages(detailed_stream)
-        basic_latency_message = next(
-            message for message in basic_messages if "[Basic][Latency]" in message
-        )
-
-        assert "channel=peer" in basic_latency_message
-        assert "endpoint=overlay_applied" in basic_latency_message
-        assert "last_speech_to_overlay_applied_ms=180" in basic_latency_message
-        assert not any("[Detailed][Latency]" in message for message in basic_messages)
-        assert not any("[Detailed][LatencyBreakdown]" in message for message in basic_messages)
-
-        detailed_peer_turn_id = detailed_harness.output_projection.overlay_sink.events[
-            0
-        ].utterance_id
-        detailed_trace_messages = [
-            message
-            for message in detailed_messages
-            if "[Detailed][Latency]" in message
-            and f"utterance_id={str(detailed_peer_turn_id)[:8]}" in message
-        ]
-        detailed_trace_stages = [
-            message.split("stage=")[1].split()[0] for message in detailed_trace_messages
-        ]
-
-        assert detailed_trace_stages == [
-            "last_speech",
-            "speech_end",
-            "stt_final",
-            "llm_request_start",
-            "llm_done",
-            "peer_overlay_applied",
-        ]
-        assert any(
-            "[Detailed][LatencyBreakdown]" in message
-            and "channel=peer" in message
-            and "endpoint=overlay_applied" in message
-            and "last_speech_to_overlay_applied_ms=180" in message
-            and "last_speech_to_speech_end_ms=0" in message
-            and "speech_end_to_stt_final_ms=30" in message
-            and "stt_final_to_overlay_applied_ms=150" in message
-            for message in detailed_messages
-        )
-        assert not any(
-            "[Detailed][Latency]" in message and "stage=llm_first_chunk" in message
-            for message in detailed_messages
-        )
-        assert not any(
-            "[Detailed][Latency]" in message and "stage=peer_overlay_first_render" in message
-            for message in detailed_messages
-        )
+        assert "channel=peer" in latency_message
+        assert "endpoint=overlay_applied" in latency_message
+        assert "last_speech_to_overlay_applied_ms=180" in latency_message
     finally:
-        basic_runtime_logging.close()
-        detailed_runtime_logging.close()
-        await basic_harness.stop()
-        await detailed_harness.stop()
+        runtime_logging.close()
+        await harness.stop()
 
 
 @pytest.mark.asyncio
@@ -1575,51 +1487,6 @@ async def test_peer_overlay_applied_waits_for_llm_done_and_application_receipt()
         await harness.output_runtime.wait_for_peer_output_idle()
         assert [event.type for event in sink.events] == ["translation_final", "utterance_closed"]
         assert any("[Basic][Latency]" in message for message in _runtime_log_messages(stream))
-    finally:
-        runtime_logging.close()
-        await harness.stop()
-
-
-@pytest.mark.asyncio
-async def test_peer_detailed_latency_trace_survives_basic_to_detailed_mode_switch() -> None:
-    runtime_logging, log_stream = _make_runtime_logging_capture()
-    clock = FakeClock(_now=10.0)
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        runtime_logging=runtime_logging,
-        clock=clock,
-    )
-    utterance_id = uuid4()
-
-    try:
-        harness.record_peer_speech_end_for_test(utterance_id)
-        runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-        clock.advance(0.05)
-
-        await harness.dispatch_stt_event(
-            STTFinalEvent(
-                utterance_id=utterance_id,
-                transcript=Transcript(
-                    utterance_id=utterance_id,
-                    text="안녕",
-                    is_final=True,
-                    created_at=clock.now(),
-                    channel="peer",
-                ),
-            )
-        )
-
-        messages = _runtime_log_messages(log_stream)
-        assert any(
-            "[Detailed][Latency]" in message and "stage=speech_end" in message
-            for message in messages
-        )
-        assert any(
-            "[Detailed][Latency]" in message and "stage=stt_final" in message
-            for message in messages
-        )
     finally:
         runtime_logging.close()
         await harness.stop()
@@ -2068,13 +1935,9 @@ async def test_terminal_without_output_retains_source_with_truthful_disposition(
             message for message in _runtime_log_messages(log_stream) if "[Conversation]" in message
         ]
         assert len(conversation) == 1
-        assert f"channel={channel}" in conversation[0]
-        assert f'turn="{utterance_id}"' in conversation[0]
-        assert f"disposition={terminal_outcome}" in conversation[0]
-        assert f'source="{source_text}"' in conversation[0]
-        assert "translation=" not in conversation[0]
-        assert "disposition=translated" not in conversation[0]
-        assert "disposition=stale" not in conversation[0]
+        assert source_text in conversation[0]
+        assert terminal_outcome.replace("_", " ") in conversation[0].lower()
+        assert "unused" not in conversation[0]
     finally:
         await harness.stop()
         runtime_logging.close()
@@ -3201,136 +3064,6 @@ async def test_translation_active_self_metadata_flows_through_presenter_accessor
         "source_text_len": active_block.source_text_len,
         "logical_turn_key": active_block.logical_turn_key,
     } == expected_metadata
-
-
-@pytest.mark.asyncio
-async def test_self_overlay_secondary_decision_logs_only_to_detailed_runtime_log() -> None:
-    basic_runtime_logging, basic_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-
-    # Contract under test: runtime detailed logging must emit the
-    # active_self_secondary token even when overlay_diagnostics is absent.
-    basic_sink = RecordingOverlaySink()
-    detailed_sink = RecordingOverlaySink()
-    basic_harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        overlay_sink=basic_sink,
-        overlay_diagnostics=None,
-        runtime_logging=basic_runtime_logging,
-        clock=FakeClock(_now=10.0),
-        low_latency_mode=True,
-    )
-    detailed_harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        overlay_sink=detailed_sink,
-        overlay_diagnostics=None,
-        runtime_logging=detailed_runtime_logging,
-        clock=FakeClock(_now=20.0),
-        low_latency_mode=True,
-    )
-
-    basic_buffer = _MergeBuffer(
-        merge_id=uuid4(),
-        parts=["hello live"],
-        utterance_ids=[uuid4()],
-    )
-    detailed_buffer = _MergeBuffer(
-        merge_id=uuid4(),
-        parts=["hello live"],
-        utterance_ids=[uuid4()],
-    )
-    basic_harness.self_owner.merge_buffer = basic_buffer
-    detailed_harness.self_owner.merge_buffer = detailed_buffer
-    basic_sink.active_self_metadata = _active_self_metadata_for_buffer(
-        basic_buffer,
-        text="hello live",
-        secondary_text="translated live",
-    )
-    detailed_sink.active_self_metadata = _active_self_metadata_for_buffer(
-        detailed_buffer,
-        text="hello live",
-        secondary_text="translated live",
-    )
-
-    try:
-        assert basic_harness.translation_diagnostics.overlay_diagnostics is None
-        assert detailed_harness.translation_diagnostics.overlay_diagnostics is None
-
-        await basic_harness.self_owner._sync_overlay_active_self(
-            basic_buffer, created_at=basic_harness.clock.now()
-        )
-        await detailed_harness.self_owner._sync_overlay_active_self(
-            detailed_buffer,
-            created_at=detailed_harness.clock.now(),
-        )
-
-        basic_messages = _runtime_log_messages(basic_stream)
-        detailed_messages = _runtime_log_messages(detailed_stream)
-        basic_decision_messages = [
-            message for message in basic_messages if "active_self_secondary" in message
-        ]
-        detailed_decision_messages = [
-            message for message in detailed_messages if "active_self_secondary" in message
-        ]
-
-        assert basic_decision_messages == []
-        assert detailed_decision_messages != [], (
-            "expected runtime detailed logging to emit active_self_secondary "
-            "without overlay_diagnostics"
-        )
-    finally:
-        basic_runtime_logging.close()
-        detailed_runtime_logging.close()
-        await basic_harness.stop()
-        await detailed_harness.stop()
-
-
-@pytest.mark.asyncio
-async def test_self_overlay_secondary_decision_emits_after_basic_to_detailed_mode_switch() -> None:
-    runtime_logging, log_stream = _make_runtime_logging_capture()
-    sink = RecordingOverlaySink()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        overlay_sink=sink,
-        overlay_diagnostics=None,
-        runtime_logging=runtime_logging,
-        clock=FakeClock(_now=10.0),
-        low_latency_mode=True,
-    )
-    buffer = _MergeBuffer(
-        merge_id=uuid4(),
-        parts=["hello live"],
-        utterance_ids=[uuid4()],
-    )
-    harness.self_owner.merge_buffer = buffer
-    sink.active_self_metadata = _active_self_metadata_for_buffer(
-        buffer,
-        text="hello live",
-        secondary_text="translated live",
-    )
-
-    try:
-        await harness.self_owner._sync_overlay_active_self(buffer, created_at=harness.clock.now())
-        assert not any(
-            "active_self_secondary" in message for message in _runtime_log_messages(log_stream)
-        )
-
-        runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-        await harness.self_owner._sync_overlay_active_self(buffer, created_at=harness.clock.now())
-
-        assert any(
-            "active_self_secondary" in message for message in _runtime_log_messages(log_stream)
-        )
-    finally:
-        runtime_logging.close()
-        await harness.stop()
 
 
 @pytest.mark.asyncio

@@ -430,7 +430,7 @@ class PeerTranslationChannelOwner:
                         terminal.failure_reason or receipt.failure_reason or terminal.outcome,
                     ),
                     level=(logging.ERROR if terminal.outcome == "failed" else logging.INFO),
-                    detailed=True,
+                    diagnostic_only=True,
                 )
             )
             return None
@@ -525,7 +525,7 @@ class PeerTranslationChannelOwner:
                         event.transcript.utterance_id,
                         self._source_language_for(self.runtime, configuration),
                     ),
-                    detailed=True,
+                    diagnostic_only=True,
                 )
             )
             await self._ensure_translation(
@@ -707,7 +707,7 @@ class PeerTranslationChannelOwner:
         self.diagnostics.emit(
             RuntimeDiagnostic(
                 message=(
-                    "[Detailed][Translation] peer_final_segmentation "
+                    "[Diagnostic][Translation] peer_final_segmentation "
                     "parent_utterance_id=%s segment_count=%s unknown_span_count=%s"
                 ),
                 args=(
@@ -715,7 +715,7 @@ class PeerTranslationChannelOwner:
                     segment_count,
                     unknown_span_count,
                 ),
-                detailed=True,
+                diagnostic_only=True,
             )
         )
         requests = tuple(

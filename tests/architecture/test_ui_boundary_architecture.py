@@ -39,7 +39,7 @@ UI_APPLICATION_NON_INTENT_MEMBERS = {
     "list_loopback_process_options",
     "local_llm_selected",
     "log_basic",
-    "log_detailed",
+    "log_diagnostic",
     "loopback_capture_summary",
     "managed_auth_last_failure_kind",
     "managed_auth_task_names",

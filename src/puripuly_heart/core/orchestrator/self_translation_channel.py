@@ -382,7 +382,7 @@ class SelfTranslationChannelOwner:
             self._send_stt_connected_notification()
             if low_latency_mode:
                 return
-            self._emit_detailed(
+            self._emit_diagnostic(
                 "[Translation] STT Partial: channel=%s utterance_id=%s text_len=%s",
                 event.channel,
                 event.transcript.utterance_id,
@@ -456,7 +456,7 @@ class SelfTranslationChannelOwner:
                     ),
                 )
             elif event.outcome not in {"final", "degraded"} or not event.text:
-                self._emit_detailed(
+                self._emit_diagnostic(
                     "[Pipeline] turn_result channel=self utterance_id=%s "
                     "origin=self recognition=%s provider_epoch=%s provider_turn=%s "
                     "cause=%s",
@@ -761,7 +761,7 @@ class SelfTranslationChannelOwner:
             self.diagnostics.emit(
                 RuntimeDiagnostic(
                     message=(
-                        "[Detailed][Translation] translation_target_started "
+                        "[Diagnostic][Translation] translation_target_started "
                         "parent_utterance_id=%s turn_generation=%s turn_order=%s "
                         "target_index=%s target_language=%s presentation_revision=%s "
                         "precomputed=%s prestarted=%s"
@@ -776,7 +776,7 @@ class SelfTranslationChannelOwner:
                         child.precomputed_translation is not None,
                         child.prestarted_translation is not None,
                     ),
-                    detailed=True,
+                    diagnostic_only=True,
                 )
             )
 
@@ -926,7 +926,7 @@ class SelfTranslationChannelOwner:
                 return
             turn_kind = "manual" if source not in {None, "Mic"} else "self"
             recognition = "not_applicable" if turn_kind == "manual" else "completed"
-            self._emit_detailed(
+            self._emit_diagnostic(
                 "[Pipeline] turn_result channel=self utterance_id=%s "
                 "origin=%s recognition=%s source_language=%s",
                 transcript.utterance_id,
@@ -1050,7 +1050,7 @@ class SelfTranslationChannelOwner:
             )
         )
 
-    def _emit_detailed(
+    def _emit_diagnostic(
         self,
         message: str,
         *args: object,
@@ -1063,7 +1063,7 @@ class SelfTranslationChannelOwner:
                 args=args,
                 level=level,
                 fallback_level=fallback_level,
-                detailed=True,
+                diagnostic_only=True,
             )
         )
 
@@ -1122,14 +1122,14 @@ class SelfTranslationChannelOwner:
         *,
         stage: str,
         exc: Exception,
-        detailed: bool = False,
+        diagnostic_only: bool = False,
     ) -> UserErrorReport:
         return self.diagnostics.record_translation_failure(
             TranslationFailureDiagnostic(
                 stage=stage,
                 channel="self",
                 exception=exc,
-                detailed=detailed,
+                diagnostic_only=diagnostic_only,
             )
         )
 
@@ -1959,7 +1959,7 @@ class SelfTranslationChannelOwner:
             self._log_translation_failure(
                 stage="spec",
                 exc=exc,
-                detailed=True,
+                diagnostic_only=True,
             )
             buffer = self.merge_buffer
             if buffer is None or buffer.merge_id != merge_id:

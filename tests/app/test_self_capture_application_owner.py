@@ -89,7 +89,7 @@ async def test_replace_provider_propagates_updated_config_by_capture_activity(
         sync_effective_flags=lambda: None,
         sync_local_notice=lambda: None,
         log_basic=lambda _message: None,
-        log_detailed=lambda _message, _level: None,
+        log_diagnostic=lambda _message, _level: None,
     )
 
     await owner.replace_provider(smooth_local=True)
@@ -113,9 +113,8 @@ async def test_replace_provider_propagates_updated_config_by_capture_activity(
         ensure_peer_local_ready=cast(Any, None),
         clock=cast(Any, None),
         log_basic=lambda _message: None,
-        log_detailed=lambda _message: None,
-        detailed_enabled=lambda: False,
-        source_wrapper=lambda source, _channel: source,
+        log_diagnostic=lambda _message: None,
+        source_wrapper=lambda source: source,
         self_state_sink=lambda _snapshot: None,
         self_diagnostic_sink=lambda _diagnostic: None,
         peer_state_sink=lambda _snapshot: None,

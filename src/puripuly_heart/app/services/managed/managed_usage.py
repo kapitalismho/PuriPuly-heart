@@ -177,7 +177,7 @@ class ManagedUsageOwner:
             try:
                 return await refresh_status()
             except Exception as exc:
-                self._warn(f"[ManagedAuth] Managed status refresh failed: {exc}", exc)
+                self._warn("[ManagedAuth] Managed status refresh failed", exc)
                 return self._failed_status(referral_id)
         legacy_refresh = getattr(
             resolved_service,
@@ -192,7 +192,7 @@ class ManagedUsageOwner:
                     succeeded=True,
                 )
             except Exception as exc:
-                self._warn(f"[ManagedAuth] Referral ID status refresh failed: {exc}", exc)
+                self._warn("[ManagedAuth] Referral ID status refresh failed", exc)
         return self._failed_status(referral_id)
 
     def schedule_status_refresh(
@@ -242,7 +242,7 @@ class ManagedUsageOwner:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                self._warn(f"[ManagedAuth] Referral ID status refresh failed: {exc}", exc)
+                self._warn("[ManagedAuth] Referral ID status refresh failed", exc)
 
         return self.refresh_owner.schedule_status_refresh(run)
 
@@ -261,7 +261,7 @@ class ManagedUsageOwner:
         try:
             await self.refresh()
         except Exception as exc:
-            self._warn(f"[ManagedAuth] Usage refresh failed: {exc}", exc)
+            self._warn("[ManagedAuth] Usage refresh failed", exc)
 
     async def refresh(self, *, auto_show_founder_letter: bool = True) -> None:
         state = self.state_provider()

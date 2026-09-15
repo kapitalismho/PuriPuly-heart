@@ -106,5 +106,4 @@ def ensure_local_qwen_windows_runtime() -> Path:
             f"{runtime_dir_str}{os.pathsep}{current_path}" if current_path else runtime_dir_str
         )
 
-    logger.info("[STT][local_qwen] Using Windows runtime DLL directory: %s", runtime_dir)
     return runtime_dir

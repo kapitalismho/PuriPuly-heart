@@ -552,9 +552,7 @@ async def test_soniox_session_on_speech_end_enqueues_finalize(caplog) -> None:
     finalize = await session._audio_q.get()
     assert isinstance(finalize, _FinalizeRequest)
     assert session._audio_q.empty()
-    assert "boundary_reason=soft_pause" in caplog.text
-    assert "observed_tail_ms=240" in caplog.text
-    assert "boundary_wait_ms=240" in caplog.text
+    assert caplog.text == ""
 
     caplog.clear()
     with caplog.at_level(logging.INFO):
@@ -563,8 +561,7 @@ async def test_soniox_session_on_speech_end_enqueues_finalize(caplog) -> None:
     finalize = await session._audio_q.get()
     assert isinstance(finalize, _FinalizeRequest)
     assert session._audio_q.empty()
-    assert "boundary_reason=None" in caplog.text
-    assert "boundary_wait_ms=None" in caplog.text
+    assert caplog.text == ""
 
 
 @pytest.mark.asyncio

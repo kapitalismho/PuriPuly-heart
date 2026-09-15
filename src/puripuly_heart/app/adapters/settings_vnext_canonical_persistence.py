@@ -104,6 +104,8 @@ class SettingsVNextCanonicalPersistenceAdapter:
         failed_count: int,
         failure_types: tuple[str, ...],
     ) -> None:
+        if removed_count == 0 and failed_count == 0:
+            return
         outcome = "completed" if failed_count == 0 else "partial"
         failure_summary = ",".join(failure_types[:3]) if failure_types else "none"
         message = (

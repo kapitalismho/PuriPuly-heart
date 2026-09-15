@@ -28,7 +28,7 @@ from puripuly_heart.core.orchestrator.translation_output_projection import (
 )
 from puripuly_heart.core.orchestrator.translation_request import DirectTranslationRequest
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
-from puripuly_heart.core.runtime_logging import SessionLoggingMode, SessionRuntimeLoggingService
+from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
 from puripuly_heart.core.stt.backend import (
     STTBackendTranscriptEvent,
 )
@@ -559,62 +559,6 @@ def test_send_stt_connected_notification_does_not_update_time_on_failed_send() -
     assert harness.self_owner._last_promo_time is None
 
 
-def test_prepare_llm_request_routes_context_logs_by_runtime_visibility() -> None:
-    basic_runtime_logging, basic_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-
-    basic_harness = compose_translation_test_harness(
-        stt=None,
-        llm=StubLLM(),
-        osc=RecordingOscQueue(),
-        clock=FakeClock(_now=10.0),
-        runtime_logging=basic_runtime_logging,
-    )
-    detailed_harness = compose_translation_test_harness(
-        stt=None,
-        llm=StubLLM(),
-        osc=RecordingOscQueue(),
-        clock=FakeClock(_now=10.0),
-        runtime_logging=detailed_runtime_logging,
-    )
-
-    try:
-        basic_harness.remember_context("안녕", 9.0)
-        detailed_harness.remember_context("안녕", 9.0)
-
-        basic_harness.prepare_translation_request_with_mode("입력")
-        detailed_harness.prepare_translation_request_with_mode("입력")
-
-        basic_messages = _runtime_log_messages(basic_stream)
-        detailed_messages = _runtime_log_messages(detailed_stream)
-        expected_context_chars = len('- [self] "안녕"')
-        expected_context_apply_fields = (
-            "parent_utterance_id=None target_index=None target_language=en "
-            "mode=integrated request_chars=2 entries=1 self_entries=1 peer_entries=0 "
-            f"context_chars={expected_context_chars}"
-        )
-
-        assert basic_messages.count("[Translation] Context mode: channel=self mode=integrated") == 1
-        assert not any("context_apply" in message for message in basic_messages)
-        assert not any("입력" in message for message in basic_messages)
-        assert not any("안녕" in message for message in basic_messages)
-
-        assert (
-            detailed_messages.count("[Translation] Context mode: channel=self mode=integrated") == 1
-        )
-        context_apply_messages = [
-            message for message in detailed_messages if "context_apply_target" in message
-        ]
-        assert len(context_apply_messages) == 1
-        assert expected_context_apply_fields in context_apply_messages[0]
-        assert not any("입력" in message for message in detailed_messages)
-        assert not any("안녕" in message for message in detailed_messages)
-    finally:
-        basic_runtime_logging.close()
-        detailed_runtime_logging.close()
-
-
 @pytest.mark.asyncio
 async def test_handle_stt_event_logs_basic_channel_state_breadcrumb() -> None:
     runtime_logging, log_stream = _make_runtime_logging_capture()
@@ -639,118 +583,6 @@ async def test_handle_stt_event_logs_basic_channel_state_breadcrumb() -> None:
         )
     finally:
         runtime_logging.close()
-
-
-@pytest.mark.asyncio
-async def test_handle_stt_partial_runtime_log_uses_metadata_without_transcript_text() -> None:
-    runtime_logging, log_stream = _make_runtime_logging_capture()
-    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-    utterance_id = uuid4()
-    raw_partial = "raw partial transcript should not enter runtime logs"
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        clock=FakeClock(),
-        runtime_logging=runtime_logging,
-    )
-
-    try:
-        await harness.dispatch_stt_event(
-            STTPartialEvent(
-                utterance_id=utterance_id,
-                transcript=Transcript(
-                    utterance_id=utterance_id,
-                    text=raw_partial,
-                    is_final=False,
-                    created_at=1.0,
-                ),
-            )
-        )
-
-        event = await harness.ui_events.get()
-        messages = _runtime_log_messages(log_stream)
-
-        assert event.type == UIEventType.TRANSCRIPT_PARTIAL
-        assert any(
-            message.startswith("[Translation] STT Partial:")
-            and "channel=self" in message
-            and f"utterance_id={utterance_id}" in message
-            and f"text_len={len(raw_partial)}" in message
-            for message in messages
-        )
-        assert not any(raw_partial in message for message in messages)
-        assert not any(raw_partial[:20] in message for message in messages)
-    finally:
-        runtime_logging.close()
-
-
-@pytest.mark.asyncio
-async def test_publish_chatbox_candidate_emits_metadata_preview_only_in_detailed_runtime_logs() -> (
-    None
-):
-    basic_runtime_logging, basic_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-
-    basic_harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        clock=FakeClock(),
-        runtime_logging=basic_runtime_logging,
-    )
-    detailed_harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        clock=FakeClock(),
-        runtime_logging=detailed_runtime_logging,
-    )
-    utterance_id = uuid4()
-
-    try:
-        await basic_harness.output_projection.publish_chatbox(
-            ChatboxProjection(
-                utterance_id=utterance_id,
-                channel="self",
-                transcript_text="hello world from transcript",
-                translation_text="hello world translated",
-                include_source=True,
-                source=None,
-            )
-        )
-        await detailed_harness.output_projection.publish_chatbox(
-            ChatboxProjection(
-                utterance_id=utterance_id,
-                channel="self",
-                transcript_text="hello world from transcript",
-                translation_text="hello world translated",
-                include_source=True,
-                source=None,
-            )
-        )
-
-        basic_event = await basic_harness.ui_events.get()
-        detailed_event = await detailed_harness.ui_events.get()
-        assert basic_event.type == UIEventType.OSC_SENT
-        assert detailed_event.type == UIEventType.OSC_SENT
-
-        basic_messages = _runtime_log_messages(basic_stream)
-        detailed_messages = _runtime_log_messages(detailed_stream)
-
-        assert not any("OSC enqueue preview" in message for message in basic_messages)
-        assert any(
-            message.startswith("[Translation] OSC enqueue preview:")
-            and "text_len=" in message
-            and "translation_text_present=True" in message
-            for message in detailed_messages
-        )
-        assert not any("hello world from transcript" in message for message in detailed_messages)
-        assert not any("hello world translated" in message for message in detailed_messages)
-    finally:
-        basic_runtime_logging.close()
-        detailed_runtime_logging.close()
 
 
 @pytest.mark.asyncio
@@ -865,48 +697,34 @@ async def test_restart_after_failed_output_runtime_close_keeps_owners_not_runnin
 
 @pytest.mark.asyncio
 async def test_handle_stt_event_routes_non_low_latency_events() -> None:
-    runtime_logging, log_stream = _make_runtime_logging_capture()
-    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
     harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
         clock=FakeClock(),
-        runtime_logging=runtime_logging,
     )
     harness.self_owner.mark_promo_eligible()
     utterance_id = uuid4()
     partial = Transcript(utterance_id=utterance_id, text="hel", is_final=False, created_at=1.0)
     final = Transcript(utterance_id=utterance_id, text="hello", is_final=True, created_at=2.0)
 
-    try:
-        await harness.dispatch_stt_event(STTSessionStateEvent(state=STTSessionState.STREAMING))
-        await harness.dispatch_stt_event(STTErrorEvent(message="boom"))
-        await harness.dispatch_stt_event(
-            STTPartialEvent(utterance_id=utterance_id, transcript=partial)
-        )
-        await harness.dispatch_stt_event(STTFinalEvent(utterance_id=utterance_id, transcript=final))
+    await harness.dispatch_stt_event(STTSessionStateEvent(state=STTSessionState.STREAMING))
+    await harness.dispatch_stt_event(STTErrorEvent(message="boom"))
+    await harness.dispatch_stt_event(STTPartialEvent(utterance_id=utterance_id, transcript=partial))
+    await harness.dispatch_stt_event(STTFinalEvent(utterance_id=utterance_id, transcript=final))
 
-        events = [await harness.ui_events.get() for _ in range(5)]
-        assert [event.type for event in events] == [
-            UIEventType.SESSION_STATE_CHANGED,
-            UIEventType.ERROR,
-            UIEventType.TRANSCRIPT_PARTIAL,
-            UIEventType.TRANSCRIPT_FINAL,
-            UIEventType.OSC_SENT,
-        ]
-        assert events[1].runtime_log_handled is False
-        assert harness.osc.immediate_messages == ["PuriPuly ON!"]
-        assert len(harness.osc.messages) == 1
-        assert harness.osc.messages[0].text == "hello"
-        assert any(
-            "translation=skipped" in message
-            and "channel=self" in message
-            and "cause=provider_unavailable" in message
-            for message in _runtime_log_messages(log_stream)
-        )
-    finally:
-        runtime_logging.close()
+    events = [await harness.ui_events.get() for _ in range(5)]
+    assert [event.type for event in events] == [
+        UIEventType.SESSION_STATE_CHANGED,
+        UIEventType.ERROR,
+        UIEventType.TRANSCRIPT_PARTIAL,
+        UIEventType.TRANSCRIPT_FINAL,
+        UIEventType.OSC_SENT,
+    ]
+    assert events[1].runtime_log_handled is False
+    assert harness.osc.immediate_messages == ["PuriPuly ON!"]
+    assert len(harness.osc.messages) == 1
+    assert harness.osc.messages[0].text == "hello"
 
 
 @pytest.mark.asyncio
@@ -947,11 +765,6 @@ async def test_translate_and_enqueue_emits_error_and_fallback_transcript() -> No
         assert [event.type for event in events] == [UIEventType.ERROR, UIEventType.OSC_SENT]
         assert events[0].runtime_log_handled is True
         assert harness.osc.messages[0].text == "hello"
-        assert any(
-            "translation=failed stage=final" in message
-            and "category=unknown code=provider.unknown" in message
-            for message in _runtime_log_messages(log_stream)
-        )
         assert "llm failed" not in "\n".join(_runtime_log_messages(log_stream))
     finally:
         runtime_logging.close()
@@ -997,12 +810,6 @@ async def test_translate_and_enqueue_logs_managed_auth_diagnostics() -> None:
         assert payload.diagnostics.fields["managed_subcode"] == "broker_backoff"
         assert "broker is temporarily unavailable" not in repr(payload)
         messages = _runtime_log_messages(log_stream)
-        assert any(
-            "managed_operation=issue managed_code=trial_unavailable "
-            "managed_error_class=retryable managed_subcode=broker_backoff retry_after_ms=9000"
-            in message
-            for message in messages
-        )
         assert "broker is temporarily unavailable" not in "\n".join(messages)
     finally:
         runtime_logging.close()
@@ -1045,66 +852,6 @@ async def test_next_action_evaluator_starts_failed_fallback_once(
 
 
 @pytest.mark.asyncio
-async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() -> None:
-    basic_runtime_logging, basic_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-
-    basic_harness = compose_translation_test_harness(
-        stt=None,
-        llm=StubLLM(should_fail=True),
-        osc=RecordingOscQueue(),
-        clock=FakeClock(),
-        runtime_logging=basic_runtime_logging,
-        low_latency_mode=True,
-    )
-    detailed_harness = compose_translation_test_harness(
-        stt=None,
-        llm=StubLLM(should_fail=True),
-        osc=RecordingOscQueue(),
-        clock=FakeClock(),
-        runtime_logging=detailed_runtime_logging,
-        low_latency_mode=True,
-    )
-    basic_buffer = _MergeBuffer(
-        merge_id=uuid4(),
-        parts=["hello"],
-        speculative_attempt=make_speculative_attempt(source_text="hello", sequence=1),
-    )
-    detailed_buffer = _MergeBuffer(
-        merge_id=uuid4(),
-        parts=["hello"],
-        speculative_attempt=make_speculative_attempt(source_text="hello", sequence=1),
-    )
-    basic_harness.self_owner.merge_buffer = basic_buffer
-    detailed_harness.self_owner.merge_buffer = detailed_buffer
-
-    try:
-        await basic_harness.self_owner._run_spec_translation(basic_buffer.merge_id, "hello", 1)
-        await detailed_harness.self_owner._run_spec_translation(
-            detailed_buffer.merge_id, "hello", 1
-        )
-        assert basic_buffer.speculative_attempt is not None
-        assert detailed_buffer.speculative_attempt is not None
-        assert basic_buffer.speculative_attempt.status is _SpeculativeAttemptStatus.FAILED
-        assert detailed_buffer.speculative_attempt.status is _SpeculativeAttemptStatus.FAILED
-
-        assert not any(
-            "translation=failed stage=spec" in message
-            for message in _runtime_log_messages(basic_stream)
-        )
-        assert any(
-            "translation=failed stage=spec" in message
-            and "category=unknown code=provider.unknown" in message
-            for message in _runtime_log_messages(detailed_stream)
-        )
-        assert "llm failed" not in "\n".join(_runtime_log_messages(detailed_stream))
-    finally:
-        basic_runtime_logging.close()
-        detailed_runtime_logging.close()
-
-
-@pytest.mark.asyncio
 async def test_peer_stt_failure_surfaces_status_without_conversation_publication() -> None:
     harness = compose_translation_test_harness(
         stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock()
@@ -1143,7 +890,6 @@ async def test_peer_stt_event_loop_failure_without_runtime_logging_is_safe(
             channel="peer",
         )
 
-    assert "[Translation] STT event loop crashed: RuntimeError" in caplog.messages
     assert "loop boom" not in "\n".join(caplog.messages)
     assert any(record.levelno == logging.ERROR for record in caplog.records)
 
@@ -1152,7 +898,6 @@ async def test_peer_stt_event_loop_failure_without_runtime_logging_is_safe(
 async def test_peer_stt_event_loop_failure_with_runtime_logging_is_safe() -> None:
     raw_detail = "stt event loop socket failed token=translation-stt-secret-123"
     runtime_logging, log_stream = _make_runtime_logging_capture()
-    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
     harness = compose_translation_test_harness(
         stt=None,
         llm=None,
@@ -1182,7 +927,6 @@ async def test_peer_stt_event_loop_failure_with_runtime_logging_is_safe() -> Non
 async def test_handle_stt_event_loop_exception_with_runtime_logging_uses_safe_stt_report() -> None:
     raw_detail = "stt owner task socket failed token=translation-stt-secret-456"
     runtime_logging, log_stream = _make_runtime_logging_capture()
-    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
     harness = compose_translation_test_harness(
         stt=None,
         llm=None,
@@ -1209,7 +953,6 @@ async def test_handle_stt_event_loop_exception_with_runtime_logging_uses_safe_st
 async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
     basic_runtime_logging, basic_stream = _make_runtime_logging_capture()
     detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
 
     basic_harness = compose_translation_test_harness(
         stt=None,

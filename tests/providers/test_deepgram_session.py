@@ -39,9 +39,7 @@ async def test_deepgram_session_on_speech_end_enqueues_finalize(caplog):
     finalize = session._audio_q.get_nowait()
     assert finalize is _FINALIZE
     assert session._audio_q.empty()
-    assert "boundary_reason=silence" in caplog.text
-    assert "observed_tail_ms=500" in caplog.text
-    assert "boundary_wait_ms=500" in caplog.text
+    assert caplog.text == ""
 
     caplog.clear()
     with caplog.at_level(logging.INFO):
@@ -49,8 +47,7 @@ async def test_deepgram_session_on_speech_end_enqueues_finalize(caplog):
     finalize = session._audio_q.get_nowait()
     assert finalize is _FINALIZE
     assert session._audio_q.empty()
-    assert "boundary_reason=max_duration" in caplog.text
-    assert "boundary_wait_ms=0" in caplog.text
+    assert caplog.text == ""
 
     caplog.clear()
     with caplog.at_level(logging.INFO):
@@ -58,8 +55,7 @@ async def test_deepgram_session_on_speech_end_enqueues_finalize(caplog):
     finalize = session._audio_q.get_nowait()
     assert finalize is _FINALIZE
     assert session._audio_q.empty()
-    assert "boundary_reason=soft_pause" in caplog.text
-    assert "boundary_wait_ms=160" in caplog.text
+    assert caplog.text == ""
 
 
 @pytest.mark.asyncio
@@ -69,8 +65,7 @@ async def test_deepgram_session_on_speech_end_boundary_unknown(caplog):
     with caplog.at_level(logging.INFO):
         await session.on_speech_end()
 
-    assert "boundary_reason=None" in caplog.text
-    assert "boundary_wait_ms=None" in caplog.text
+    assert caplog.text == ""
 
 
 @pytest.mark.asyncio
@@ -114,77 +109,6 @@ async def test_deepgram_session_emits_test_final() -> None:
     assert isinstance(event, STTBackendTranscriptEvent)
     assert event.text == "hello there"
     assert event.is_final is True
-
-
-def test_deepgram_peer_session_acknowledges_empty_final_with_dedicated_log(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    session = _make_session(stream_label="peer")
-    result = types.SimpleNamespace(
-        channel=types.SimpleNamespace(alternatives=[types.SimpleNamespace(transcript="")]),
-        is_final=True,
-        speech_final=False,
-    )
-
-    with caplog.at_level(logging.INFO, logger=deepgram_module.logger.name):
-        event = session._build_transcript_event(result)
-
-    assert isinstance(event, STTBackendTranscriptEvent)
-    assert event.text == ""
-    assert event.is_final is True
-    assert session._empty_final_acks == 1
-    assert any(
-        "[STT][peer] Empty final transcript acknowledged" in message for message in caplog.messages
-    )
-
-
-def test_deepgram_peer_session_counts_emitted_finals() -> None:
-    session = _make_session(stream_label="peer")
-    result = types.SimpleNamespace(
-        channel=types.SimpleNamespace(
-            alternatives=[types.SimpleNamespace(transcript="hello world")]
-        ),
-        is_final=True,
-        speech_final=False,
-    )
-
-    event = session._build_transcript_event(result)
-
-    assert isinstance(event, STTBackendTranscriptEvent)
-    assert event.text == "hello world"
-    assert session._emitted_finals == 1
-
-
-@pytest.mark.asyncio
-async def test_deepgram_peer_session_logs_summary_once_on_shutdown(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    session = _make_session(stream_label="peer")
-    empty_result = types.SimpleNamespace(
-        channel=types.SimpleNamespace(alternatives=[types.SimpleNamespace(transcript="")]),
-        is_final=True,
-        speech_final=False,
-    )
-    final_result = types.SimpleNamespace(
-        channel=types.SimpleNamespace(alternatives=[types.SimpleNamespace(transcript="hello")]),
-        is_final=True,
-        speech_final=False,
-    )
-
-    session._build_transcript_event(empty_result)
-    session._build_transcript_event(final_result)
-
-    with caplog.at_level(logging.INFO, logger=deepgram_module.logger.name):
-        await session.stop()
-        await session.close()
-
-    summary_messages = [
-        message for message in caplog.messages if "[STT][peer] Session summary:" in message
-    ]
-    assert len(summary_messages) == 1
-    assert "emitted_finals=1" in summary_messages[0]
-    assert "empty_final_acks=1" in summary_messages[0]
-    assert "total_finals_seen=2" in summary_messages[0]
 
 
 @pytest.mark.asyncio

@@ -224,7 +224,7 @@ class Harness:
             disclosure_sink=lambda: self.events.append("disclosure"),
             superseded_sink=lambda: self.events.append("superseded"),
             log_basic=lambda message: self.events.append(("basic", message)),
-            log_detailed=lambda message: self.events.append(("detail", message)),
+            log_diagnostic=lambda message: self.events.append(("detail", message)),
             log_failure=lambda message: self.events.append(("failure", message)),
             lifecycle_trace_sink=lambda event, fields: self.lifecycle_traces.append(
                 (event, fields)
@@ -237,7 +237,7 @@ class Harness:
         self.translation_demands.append(self.settings.ui.peer_translation_enabled)
 
 
-def test_peer_runtime_state_receipt_distinguishes_provider_wait_and_deduplicates() -> None:
+def test_peer_runtime_state_omits_intermediate_provider_wait() -> None:
     harness = Harness()
     owner = harness.owner()
     snapshot = SimpleNamespace(
@@ -257,12 +257,7 @@ def test_peer_runtime_state_receipt_distinguishes_provider_wait_and_deduplicates
     receipts = [
         event[1] for event in harness.events if isinstance(event, tuple) and event[0] == "basic"
     ]
-    assert len(receipts) == 1
-    assert "state=provider_pending" in receipts[0]
-    assert "provider_status=pending" in receipts[0]
-    assert "target_status=resolved" in receipts[0]
-    assert "generation=7" in receipts[0]
-    assert "cause=provider_wait" in receipts[0]
+    assert receipts == []
 
 
 @pytest.mark.asyncio

@@ -34,8 +34,6 @@ def test_adapter_constructs_engine_and_exact_peer_gating_policy() -> None:
     model_calls: list[bool] = []
     engine_calls: list[dict[str, object]] = []
     gating_calls: list[dict[str, object]] = []
-    logs: list[str] = []
-    detailed = [False]
     engine = object()
     vad = object()
 
@@ -55,8 +53,6 @@ def test_adapter_constructs_engine_and_exact_peer_gating_policy() -> None:
         model_path_resolver=model_path_resolver,
         engine_factory=engine_factory,
         gating_factory=gating_factory,
-        log_detailed=logs.append,
-        diagnostics_enabled=lambda: detailed[0],
     )
 
     result = adapter(_config())
@@ -71,17 +67,5 @@ def test_adapter_constructs_engine_and_exact_peer_gating_policy() -> None:
             "ring_buffer_ms": 420,
             "speech_threshold": 0.72,
             "hangover_ms": 950,
-            "diagnostic_event_callback": gating_calls[0]["diagnostic_event_callback"],
-            "diagnostics_enabled": gating_calls[0]["diagnostics_enabled"],
-            "diagnostic_label": "peer",
         }
     ]
-    callback = gating_calls[0]["diagnostic_event_callback"]
-    assert callable(callback)
-    callback("[AudioDiag][VAD][peer] probe")
-    assert logs == ["[AudioDiag][VAD][peer] probe"]
-    diagnostics_enabled = gating_calls[0]["diagnostics_enabled"]
-    assert callable(diagnostics_enabled)
-    assert diagnostics_enabled() is False
-    detailed[0] = True
-    assert diagnostics_enabled() is True

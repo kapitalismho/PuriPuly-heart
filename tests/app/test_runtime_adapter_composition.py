@@ -9,19 +9,14 @@ import pytest
 from puripuly_heart.app.services.osc.noop_query import NoopOscQueryService
 from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
 from puripuly_heart.app.wiring import wiring_application_runtime_logging, wiring_vrc_mic_sync
-from puripuly_heart.core.observability import SessionLoggingMode
 from puripuly_heart.core.osc.receiver_contract import VrcMicState
 
 
 class RecordingLoggingAdapter:
     def __init__(self) -> None:
-        self.mode = SessionLoggingMode.BASIC
         self.log_file = Path("runtime.log")
         self.basic_messages: list[tuple[int, str]] = []
         self.close_calls = 0
-
-    def set_mode(self, mode: SessionLoggingMode | str) -> None:
-        self.mode = SessionLoggingMode(mode)
 
     def attach_realtime_sink(self, _sink: object) -> None:
         return None
@@ -32,13 +27,13 @@ class RecordingLoggingAdapter:
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
         self.basic_messages.append((level, message))
 
-    def emit_detailed(self, _message: str, *, level: int = logging.INFO) -> bool:
+    def emit_diagnostic(self, _message: str, *, level: int = logging.INFO) -> bool:
         _ = level
-        return self.mode is SessionLoggingMode.DETAILED
+        return True
 
-    def emit_detailed_lazy(self, _build_message, *, level: int = logging.INFO) -> bool:
+    def emit_diagnostic_lazy(self, _build_message, *, level: int = logging.INFO) -> bool:
         _ = level
-        return self.mode is SessionLoggingMode.DETAILED
+        return True
 
     def emit_persisted(self, _message: str, *, level: int = logging.INFO) -> None:
         _ = level
@@ -95,8 +90,6 @@ def test_production_logging_composition_constructs_adapter_once(
             attach_runtime_log_sink=lambda service: attached.append(service)
         ),
         sinks=None,
-        overlay_logging_mode_update=lambda: _noop(),
-        overlay_logging_mode_update_available=lambda: False,
     )
 
     first = owner.service
@@ -125,7 +118,7 @@ async def test_production_receiver_composition_constructs_adapter_once(
     integration = wiring_vrc_mic_sync.compose_vrc_mic_sync(
         state_provider=lambda: state,
         gate_provider=RecordingGate,
-        log_detailed=lambda _message, _level: None,
+        log_diagnostic=lambda _message, _level: None,
         error_sink=lambda _message: None,
         settings_provider=lambda: None,
         apply_settings=_apply_settings,

@@ -33,14 +33,11 @@ class AudioDiagnosticsApplicationOwner:
     def debug_allowed(self) -> bool:
         return bool(getattr(self.presentation, "debug_ui_preview", False))
 
-    def detailed_enabled(self) -> bool:
-        return self.runtime_logging.mode == "detailed"
-
     def on_final_transcript_suppressed(
         self,
         notification: FinalTranscriptSuppressedNotification,
     ) -> None:
-        self.runtime_logging.emit_detailed(
+        self.runtime_logging.emit_diagnostic(
             "[STT][SuppressedFinalNotification] "
             f"provider={notification.stt_provider_name.value} "
             f"channel={notification.channel} "
@@ -55,7 +52,7 @@ class AudioDiagnosticsApplicationOwner:
     ) -> None:
         self.local_qwen_hallucination_detection_count += 1
         count = self.local_qwen_hallucination_detection_count
-        self.runtime_logging.emit_detailed(
+        self.runtime_logging.emit_diagnostic(
             "[STT][SuppressedFinalNotification] "
             f"local_qwen_guidance count={count} "
             f"channel={notification.channel} "
@@ -66,7 +63,7 @@ class AudioDiagnosticsApplicationOwner:
         if self.local_qwen_hallucination_modal_shown:
             return
         if not self.presentation.show_local_qwen_hallucination_dialog():
-            self.runtime_logging.emit_detailed(
+            self.runtime_logging.emit_diagnostic(
                 "[STT][SuppressedFinalNotification] "
                 f"local_qwen_guidance count={count} guidance_modal=unavailable"
             )
@@ -86,7 +83,7 @@ class AudioDiagnosticsApplicationOwner:
         current = AudioFaultProfile(self.capture_fault_profile)
         next_profile = profiles[(profiles.index(current) + 1) % len(profiles)]
         self.capture_fault_profile = next_profile.value
-        self.runtime_logging.emit_detailed(
+        self.runtime_logging.emit_diagnostic(
             "[AudioDiag][DebugFault] "
             f"capture_profile={next_profile.value} "
             "expected_signature="
@@ -104,7 +101,7 @@ class AudioDiagnosticsApplicationOwner:
         current = AudioFaultProfile(self.stt_fault_profile)
         next_profile = profiles[(profiles.index(current) + 1) % len(profiles)]
         self.stt_fault_profile = next_profile.value
-        self.runtime_logging.emit_detailed(
+        self.runtime_logging.emit_diagnostic(
             "[AudioDiag][DebugFault] "
             f"stt_profile={next_profile.value} "
             "expected_signature="
@@ -115,7 +112,7 @@ class AudioDiagnosticsApplicationOwner:
     def clear_fault_profiles(self) -> None:
         self.capture_fault_profile = "none"
         self.stt_fault_profile = "none"
-        self.runtime_logging.emit_detailed(
+        self.runtime_logging.emit_diagnostic(
             "[AudioDiag][DebugFault] capture_profile=none stt_profile=none"
         )
 
@@ -123,10 +120,9 @@ class AudioDiagnosticsApplicationOwner:
         adapter = self._capture_adapter
         if adapter is None:
             adapter = CaptureDiagnosticsAdapter(
-                detailed_enabled=self.detailed_enabled,
                 debug_allowed=self.debug_allowed,
                 capture_fault_profile=lambda: self.capture_fault_profile,
-                log_detailed=self.runtime_logging.emit_detailed,
+                log_diagnostic=self.runtime_logging.emit_diagnostic,
                 log_basic=self.runtime_logging.emit_basic,
             )
             self._capture_adapter = adapter

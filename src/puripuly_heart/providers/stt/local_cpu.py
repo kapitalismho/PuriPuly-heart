@@ -50,10 +50,10 @@ def create_local_cpu_backend(
     sample_rate_hz: int,
     stream_label: str | None,
     hotwords: tuple[str, ...] = (),
-    diagnostics_enabled: Callable[[], bool] | None = None,
     pending_ttl_s: float = LOCAL_ASR_PENDING_TTL_S,
     decode_clock: Callable[[], float] = time.perf_counter,
     queue_clock: Callable[[], float] = time.monotonic,
+    attempt_log_sink: Callable[[str, int], None] | None = None,
 ) -> STTBackend:
     if model_id not in {
         LOCAL_STT_MODEL_ID,
@@ -67,7 +67,6 @@ def create_local_cpu_backend(
         "model_dir": resolved_root / manifest.install_dirname,
         "sample_rate_hz": sample_rate_hz,
         "stream_label": stream_label,
-        "diagnostics_enabled": diagnostics_enabled,
         "pending_ttl_s": pending_ttl_s,
         "decode_clock": decode_clock,
         "queue_clock": queue_clock,
@@ -77,6 +76,7 @@ def create_local_cpu_backend(
             **common,
             language_hint=get_local_qwen_language_hint(source_language),
             hotwords=hotwords,
+            attempt_log_sink=attempt_log_sink,
         )
     if model_id == PARAKEET_V3_MODEL_ID:
         return LocalParakeetV3SherpaSTTBackend(**common)
@@ -92,10 +92,10 @@ class LocalCPUAutoSTTBackend(STTBackend):
     stream_label: str | None = None
     model_root: Path | None = None
     hotwords: tuple[str, ...] = ()
-    diagnostics_enabled: Callable[[], bool] | None = None
     pending_ttl_s: float = LOCAL_ASR_PENDING_TTL_S
     decode_clock: Callable[[], float] = field(default_factory=lambda: time.perf_counter)
     queue_clock: Callable[[], float] = field(default_factory=lambda: time.monotonic)
+    attempt_log_sink: Callable[[str, int], None] | None = field(default=None, repr=False)
     manifests: Mapping[str, LocalSTTAssetManifest] | None = None
     backend_factory: LocalCPUBackendFactory = create_local_cpu_backend
     _delegate: STTBackend | None = field(init=False, default=None, repr=False)
@@ -200,10 +200,10 @@ class LocalCPUAutoSTTBackend(STTBackend):
             sample_rate_hz=self.sample_rate_hz,
             stream_label=self.stream_label,
             hotwords=self.hotwords,
-            diagnostics_enabled=self.diagnostics_enabled,
             pending_ttl_s=self.pending_ttl_s,
             decode_clock=self.decode_clock,
             queue_clock=self.queue_clock,
+            attempt_log_sink=self.attempt_log_sink,
         )
         self._resolved_model_id = model_id
         self._delegate = delegate

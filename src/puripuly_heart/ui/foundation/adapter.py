@@ -10,7 +10,6 @@ from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 @dataclass(frozen=True, slots=True)
 class FoundationApplicationSnapshot:
     config_path: Path
-    runtime_logging_mode: str
     translation_enabled: bool
     debug_preview_enabled: bool
 
@@ -24,7 +23,6 @@ class FletFoundationAdapter:
         state = self._application.state()
         return FoundationApplicationSnapshot(
             config_path=state.config_path,
-            runtime_logging_mode=state.runtime_logging_mode,
             translation_enabled=state.translation_enabled,
             debug_preview_enabled=self.debug_preview_enabled,
         )

@@ -22,7 +22,6 @@ G14_SURFACE_INTENT_FIELDS = (
     "settings_changed",
     "show_snackbar",
     "runtime_log_basic",
-    "runtime_log_detailed",
     "open_api_keys_guide",
 )
 G14_PROVIDER_INTENT_FIELDS = (
@@ -50,7 +49,6 @@ G14_OWNED_VIEW_CALLBACKS = (
 G14_OWNED_VIEW_SINKS = (
     "show_snackbar",
     "runtime_log_basic",
-    "runtime_log_detailed",
 )
 G15_GENERAL_INTENT_FIELDS = (
     "start_microphone_test",

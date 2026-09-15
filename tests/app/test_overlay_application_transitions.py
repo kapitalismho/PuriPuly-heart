@@ -231,7 +231,7 @@ class PeerOverlayHarness:
             disclosure_sink=lambda: None,
             superseded_sink=lambda: None,
             log_basic=lambda _message: None,
-            log_detailed=lambda _message: None,
+            log_diagnostic=lambda _message: None,
             log_failure=lambda _message: None,
         )
         self.peer.bind_runtime(self.capture_runtime)  # type: ignore[arg-type]
@@ -256,7 +256,6 @@ class PeerOverlayHarness:
             cancel_bounds_persistence=_noop_async,
             clear_bounds_suppressed=lambda: None,
             calibration_provider=lambda: cast(OverlayCalibration, object()),
-            logging_mode_provider=lambda: "basic",
             log_dir_provider=lambda: "",
             desktop_controls_factory=lambda _config: [],
             interaction_mode_sink=lambda _mode: None,
@@ -265,7 +264,7 @@ class PeerOverlayHarness:
             edit_interaction_mode="edit",
             clock=FakeClock(_now=0.0),
             log_basic=lambda message, _level: self.logs.append(message),
-            log_detailed=lambda _message, _level, _exception: False,
+            log_diagnostic=lambda _message, _level, _exception: False,
             translation_enabled_provider=lambda: True,
         )
         self.overlay.state = "starting"
@@ -413,7 +412,6 @@ def make_owner(recorder: Recorder) -> OverlayApplicationOwner:
         cancel_bounds_persistence=_noop_async,
         clear_bounds_suppressed=lambda: None,
         calibration_provider=lambda: cast(OverlayCalibration, object()),
-        logging_mode_provider=lambda: "basic",
         log_dir_provider=lambda: "",
         desktop_controls_factory=lambda _config: [],
         interaction_mode_sink=lambda _mode: None,
@@ -422,7 +420,7 @@ def make_owner(recorder: Recorder) -> OverlayApplicationOwner:
         edit_interaction_mode="edit",
         clock=FakeClock(_now=0.0),
         log_basic=recorder.log_basic,
-        log_detailed=lambda _message, _level, _exception: False,
+        log_diagnostic=lambda _message, _level, _exception: False,
         translation_enabled_provider=lambda: True,
     )
 

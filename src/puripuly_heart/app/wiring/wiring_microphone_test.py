@@ -50,7 +50,7 @@ class MicrophoneTestRuntime:
     disable_self_capture: Callable[[], Awaitable[object]]
     clock: Clock
     log_sink: Callable[[str], None]
-    detailed_sink: Callable[[str, int, BaseException | None], None]
+    diagnostic_sink: Callable[[str, int, BaseException | None], None]
     error_sink: Callable[[str], None]
     source_factory: Callable[..., object] = field(default_factory=lambda: SoundDeviceAudioSource)
     _owner: MicrophoneTestSessionOwner | None = field(default=None, init=False, repr=False)
@@ -183,7 +183,7 @@ class MicrophoneTestRuntime:
             )
             logger.debug("Microphone-test meter callback raised", exc_info=exc_info)
             return
-        self.detailed_sink(
+        self.diagnostic_sink(
             f"[MicTest] owner event={event} error_type={metadata.get('error_type')}",
             logging.WARNING,
             exception,

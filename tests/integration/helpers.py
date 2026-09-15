@@ -44,11 +44,11 @@ class SuppressedRuntimeLogger:
     def emit_basic(self, *_args: object, **_kwargs: object) -> None:
         self.emitted_count += 1
 
-    def emit_detailed(self, *_args: object, **_kwargs: object) -> bool:
+    def emit_diagnostic(self, *_args: object, **_kwargs: object) -> bool:
         self.emitted_count += 1
         return False
 
-    def emit_detailed_lazy(self, *_args: object, **_kwargs: object) -> bool:
+    def emit_diagnostic_lazy(self, *_args: object, **_kwargs: object) -> bool:
         self.emitted_count += 1
         return False
 

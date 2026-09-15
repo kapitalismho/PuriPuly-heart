@@ -11,7 +11,6 @@ from puripuly_heart.ui.views import logs as logs_module
 from puripuly_heart.ui.views.logs import (
     CLEANUP_BATCH,
     MAX_LOG_ENTRIES,
-    LiveLogViewModel,
     LogsView,
     _get_log_dir,
 )
@@ -23,22 +22,13 @@ class TestLogsView:
 
         assert view._folder_button.content == logs_module.t("logs.open_folder")
 
-    def test_logs_view_exposes_mode_button_with_current_mode_label_and_icon(self):
-        view = LogsView()
-
-        assert view.runtime_logging_mode == "basic"
-        assert view._mode_button.content == logs_module.t("logs.mode.basic")
-        assert view._mode_button.icon == logs_module.ft.Icons.ARTICLE
-
-    def test_logs_view_exposes_conversation_button_after_mode_button(self):
+    def test_logs_view_exposes_conversation_button_after_folder_button(self):
         view = LogsView()
 
         assert view._conversation_button.content == logs_module.t("logs.conversation.show")
         assert view._conversation_button.icon == logs_module.ft.Icons.CHAT_BUBBLE_OUTLINE
-
         assert view._header_button_row.controls == [
             view._folder_button,
-            view._mode_button,
             view._conversation_button,
         ]
 
@@ -51,10 +41,6 @@ class TestLogsView:
 
             assert view._log_text.value == logs_module.t("logs.conversation.empty")
             assert view._conversation_button.content == logs_module.t("logs.conversation.hide")
-
-            view.set_runtime_logging_mode("detailed")
-            assert view._conversation_button.content == logs_module.t("logs.conversation.hide")
-            assert view._mode_button.content == logs_module.t("logs.mode.detailed")
 
             view._on_conversation_button_click(SimpleNamespace())
 
@@ -76,14 +62,24 @@ class TestLogsView:
                     source_text="ありがとう",
                     translated_text="고마워",
                     origin_wall_clock_ms=1712345678901,
+                    source_language="ja",
+                    target_language="ko",
                 )
-            with patch.object(logs_module, "source_label", return_value="Mic"):
+            with (
+                patch.object(logs_module, "source_label", return_value="Mic"),
+                patch.object(logs_module, "language_name", return_value="Korean"),
+            ):
                 view._on_conversation_button_click(SimpleNamespace())
-                assert view._log_text.value == "[18:06:12] Mic\nありがとう\n고마워"
-            with patch.object(logs_module, "source_label", return_value="마이크"):
+                assert "Mic → Korean" in view._log_text.value
+                assert "ありがとう" in view._log_text.value
+                assert "고마워" in view._log_text.value
+            with (
+                patch.object(logs_module, "source_label", return_value="마이크"),
+                patch.object(logs_module, "language_name", return_value="한국어"),
+            ):
                 view.apply_locale()
 
-        assert view._log_text.value == "[18:06:12] 마이크\nありがとう\n고마워"
+        assert "마이크 → 한국어" in view._log_text.value
         record = view.conversation_records[0]
         assert record == logs_module.ConversationRecord(
             timestamp_label="18:06:12",
@@ -91,6 +87,8 @@ class TestLogsView:
             channel="self",
             source_text="ありがとう",
             translated_text="고마워",
+            source_language="ja",
+            target_language="ko",
         )
 
     def test_conversation_records_returns_read_only_snapshot(self):
@@ -275,44 +273,6 @@ class TestLogsView:
         ]
         assert model.cleanup_count == 1
 
-    def test_logs_view_mode_button_toggles_mode_and_notifies_listener(self):
-        view = LogsView()
-        seen: list[str] = []
-
-        view.on_mode_change = lambda mode: seen.append(mode)
-
-        with patch.object(type(view), "page", new_callable=PropertyMock, return_value=None):
-            view._on_mode_button_click(SimpleNamespace())
-
-        assert view.runtime_logging_mode == "detailed"
-        assert view._mode_button.content == logs_module.t("logs.mode.detailed")
-        assert seen == ["detailed"]
-
-        with patch.object(type(view), "page", new_callable=PropertyMock, return_value=None):
-            view._on_mode_button_click(SimpleNamespace())
-
-        assert view.runtime_logging_mode == "basic"
-        assert view._mode_button.content == logs_module.t("logs.mode.basic")
-        assert seen == ["detailed", "basic"]
-
-    def test_logs_view_preserves_existing_lines_when_switching_back_to_basic(self):
-        model = LiveLogViewModel()
-
-        model.append("[DETAILED] line")
-        model.append("basic line")
-
-        assert model.visible_lines[-2:] == ["[DETAILED] line", "basic line"]
-
-        view = LogsView()
-        with patch.object(type(view), "page", new_callable=PropertyMock, return_value=None):
-            view.set_runtime_logging_mode("detailed")
-            view.append_log("[DETAILED] before off")
-            view.set_runtime_logging_mode("basic")
-            view.append_log("basic after off")
-            view._flush_logs()
-
-        assert view._log_text.value == "[DETAILED] before off\nbasic after off"
-
     def test_append_log_adds_entry(self):
         """로그 항목이 정상적으로 추가되는지 확인"""
         view = LogsView()
@@ -377,12 +337,9 @@ class TestLogsView:
     def test_apply_locale_updates_title_and_folder_text(self):
         view = LogsView()
         with patch.object(type(view), "page", new_callable=PropertyMock, return_value=None):
-            view.set_runtime_logging_mode("detailed")
             view.apply_locale()
         assert view._title_text.value == logs_module.t("logs.title")
         assert view._folder_button.content == logs_module.t("logs.open_folder")
-        assert view._mode_button.content == logs_module.t("logs.mode.detailed")
-        assert view._mode_button.icon == logs_module.ft.Icons.ARTICLE
 
     def test_open_log_folder_uses_platform_specific_launcher(self):
         view = LogsView()

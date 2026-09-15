@@ -15,34 +15,15 @@ from puripuly_heart.core.error_messages import (
 )
 from puripuly_heart.core.messages import UserErrorReport
 from puripuly_heart.core.orchestrator.configuration import (
-    TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
 )
-from puripuly_heart.core.orchestrator.context import ContextMode
 from puripuly_heart.core.orchestrator.ports import (
     TranslationRuntimeLoggingPort,
     format_basic_latency_summary,
-    format_detailed_latency_breakdown,
-    format_detailed_latency_trace,
-    format_latency_cause_metric,
-    format_translation_ready_for_output,
-    runtime_logging_mode_is_detailed,
 )
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.domain.models import ChannelId
 
-_LATENCY_TRACE_ORDER = (
-    "last_speech",
-    "speech_end",
-    "stt_final",
-    "llm_request_start",
-    "llm_first_chunk",
-    "llm_done",
-    "self_chatbox_send",
-    "peer_overlay_applied",
-    "dashboard_translation_applied",
-    "peer_overlay_first_render",
-)
 _LATENCY_SUMMARY_OUTPUT_STAGES = (
     ("self", "self_chatbox_send", "chatbox_send"),
     ("peer", "peer_overlay_applied", "overlay_applied"),
@@ -55,7 +36,7 @@ class RuntimeDiagnostic:
     args: tuple[object, ...] = ()
     level: int = logging.INFO
     fallback_level: int | None = None
-    detailed: bool = False
+    diagnostic_only: bool = False
     safe_exceptions: bool = False
 
 
@@ -74,45 +55,11 @@ class SttTurnFailureDiagnostic:
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationSkipDiagnostic:
-    stage: str
-    channel: ChannelId
-    publish_chatbox: bool
-    llm_available: bool
-    configuration: TranslationRuntimeConfig
-    parent_utterance_id: UUID | None = None
-    target_index: int | None = None
-    target_language: str | None = None
-    cause: str | None = None
-    segment_count: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class TranslationFailureDiagnostic:
     stage: str
     channel: ChannelId
     exception: Exception
-    detailed: bool = False
-    parent_utterance_id: UUID | None = None
-    target_index: int | None = None
-    target_language: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ContextModeDiagnostic:
-    channel: ChannelId
-    applied_mode: ContextMode
-    parent_utterance_id: UUID | None = None
-    target_index: int | None = None
-    target_language: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ContextApplicationDiagnostic:
-    channel: ChannelId
-    request_chars: int
-    context_lines: tuple[str, ...]
-    context_chars: int
+    diagnostic_only: bool = False
     parent_utterance_id: UUID | None = None
     target_index: int | None = None
     target_language: str | None = None
@@ -232,7 +179,6 @@ class OverlaySinkDurationDiagnostic:
 class TranslationLatencyDiagnosticsSnapshot:
     timeline_keys: frozenset[tuple[ChannelId, UUID]]
     last_error_source: str | None
-    context_modes: tuple[tuple[ChannelId, ContextMode | None], ...]
     overlay_diagnostics_attached: bool
 
 
@@ -261,16 +207,6 @@ class TranslationLatencyDiagnosticsOwner:
     overlay_diagnostics: OverlayDiagnosticsRecorder | None = None
     fallback_logger: logging.Logger = field(
         default_factory=lambda: logging.getLogger("puripuly_heart.core.orchestrator.translation"),
-        repr=False,
-    )
-    _last_context_modes: dict[ChannelId, ContextMode | None] = field(
-        init=False,
-        default_factory=lambda: {"self": None, "peer": None},
-        repr=False,
-    )
-    _last_target_context_modes: dict[tuple[ChannelId, str], ContextMode] = field(
-        init=False,
-        default_factory=dict,
         repr=False,
     )
     _last_overlay_runtime_signature: tuple[object, ...] | None = field(
@@ -304,26 +240,15 @@ class TranslationLatencyDiagnosticsOwner:
         return TranslationLatencyDiagnosticsSnapshot(
             timeline_keys=frozenset(self._timelines),
             last_error_source=self._last_error_source,
-            context_modes=tuple(self._last_context_modes.items()),
             overlay_diagnostics_attached=self.overlay_diagnostics is not None,
         )
 
-    @property
-    def detailed_enabled(self) -> bool:
-        logging_port = self.runtime_logging
-        return logging_port is not None and runtime_logging_mode_is_detailed(logging_port.mode)
-
     def emit(self, diagnostic: RuntimeDiagnostic) -> bool:
+        if diagnostic.diagnostic_only:
+            return False
         args = diagnostic.args
         if diagnostic.safe_exceptions:
             args = tuple(self._safe_log_arg(arg) for arg in args)
-        if diagnostic.detailed:
-            if self.runtime_logging is None:
-                return False
-            return self.runtime_logging.emit_detailed_lazy(
-                lambda: self._format_log_message(diagnostic.message, *args),
-                level=diagnostic.level,
-            )
         formatted = self._format_log_message(diagnostic.message, *args)
         if self.runtime_logging is not None:
             self.runtime_logging.emit_basic(formatted, level=diagnostic.level)
@@ -333,14 +258,12 @@ class TranslationLatencyDiagnosticsOwner:
         return True
 
     def emit_metric(self, message: str, *args: object) -> bool:
-        return self.emit(
-            RuntimeDiagnostic(
-                message=message,
-                args=args,
-                fallback_level=logging.DEBUG,
-                detailed=True,
-            )
-        )
+        formatted = self._format_log_message(message, *args)
+        if self.runtime_logging is not None:
+            self.runtime_logging.emit_basic(formatted)
+        else:
+            self.fallback_logger.info(formatted)
+        return True
 
     def record_stt_event_loop_failure(
         self,
@@ -397,41 +320,6 @@ class TranslationLatencyDiagnosticsOwner:
         )
         return report
 
-    def record_translation_skip(self, diagnostic: TranslationSkipDiagnostic) -> None:
-        parts = [
-            "[Translation] turn_result",
-            f"channel={diagnostic.channel}",
-            f"parent_utterance_id={diagnostic.parent_utterance_id}",
-            f"target_index={diagnostic.target_index}",
-            f"target_language={diagnostic.target_language}",
-            "translation=skipped",
-            f"destination_chatbox={'intended' if diagnostic.publish_chatbox else 'disabled'}",
-            f"cause={self._translation_skip_reason(diagnostic)}",
-        ]
-        if diagnostic.segment_count is not None:
-            parts.append(f"segment_count={diagnostic.segment_count}")
-        self.emit(
-            RuntimeDiagnostic(
-                message=" ".join(parts),
-                fallback_level=logging.INFO,
-            )
-        )
-        if diagnostic.target_language is not None:
-            self.emit(
-                RuntimeDiagnostic(
-                    message=(
-                        "[Detailed][Translation] translation_target_skipped "
-                        "parent_utterance_id=%s target_index=%s target_language=%s"
-                    ),
-                    args=(
-                        diagnostic.parent_utterance_id,
-                        diagnostic.target_index,
-                        diagnostic.target_language,
-                    ),
-                    detailed=True,
-                )
-            )
-
     def record_translation_failure(
         self,
         diagnostic: TranslationFailureDiagnostic,
@@ -443,143 +331,24 @@ class TranslationLatencyDiagnosticsOwner:
         )
         self.emit(
             RuntimeDiagnostic(
-                message=(
-                    "[Translation] turn_result channel=%s parent_utterance_id=%s "
-                    "target_index=%s target_language=%s translation=failed stage=%s cause=%s"
-                ),
+                message="[Translation] %s translation failed · Cause %s",
                 args=(
-                    diagnostic.channel,
-                    diagnostic.parent_utterance_id,
-                    diagnostic.target_index,
-                    diagnostic.target_language,
-                    diagnostic.stage,
+                    diagnostic.channel.title(),
                     format_error_report_for_log(report),
                 ),
                 level=logging.ERROR,
                 fallback_level=logging.ERROR,
-                detailed=diagnostic.detailed,
+                diagnostic_only=diagnostic.diagnostic_only,
             )
         )
-        if diagnostic.target_language is not None:
-            self.emit(
-                RuntimeDiagnostic(
-                    message=(
-                        "[Detailed][Translation] translation_target_failed "
-                        "parent_utterance_id=%s target_index=%s target_language=%s"
-                    ),
-                    args=(
-                        diagnostic.parent_utterance_id,
-                        diagnostic.target_index,
-                        diagnostic.target_language,
-                    ),
-                    detailed=True,
-                )
-            )
         return report
-
-    def record_context_mode(self, diagnostic: ContextModeDiagnostic) -> None:
-        target_key = (
-            (diagnostic.channel, diagnostic.target_language)
-            if diagnostic.target_language is not None
-            else None
-        )
-        legacy_changed = self._last_context_modes.get(diagnostic.channel) != diagnostic.applied_mode
-        target_changed = (
-            target_key is not None
-            and self._last_target_context_modes.get(target_key) != diagnostic.applied_mode
-        )
-        if legacy_changed:
-            self._last_context_modes[diagnostic.channel] = diagnostic.applied_mode
-            self.emit(
-                RuntimeDiagnostic(
-                    message="[Translation] Context mode: channel=%s mode=%s",
-                    args=(diagnostic.channel, diagnostic.applied_mode),
-                )
-            )
-        if target_key is not None:
-            self._last_target_context_modes[target_key] = diagnostic.applied_mode
-        if target_changed:
-            self.emit(
-                RuntimeDiagnostic(
-                    message=(
-                        "[Detailed][Translation] context_mode_target "
-                        "parent_utterance_id=%s target_index=%s target_language=%s mode=%s"
-                    ),
-                    args=(
-                        diagnostic.parent_utterance_id,
-                        diagnostic.target_index,
-                        diagnostic.target_language,
-                        diagnostic.applied_mode,
-                    ),
-                    detailed=True,
-                )
-            )
-
-    def record_context_application(
-        self,
-        diagnostic: ContextApplicationDiagnostic,
-    ) -> None:
-        applied_mode = (
-            self._last_target_context_modes.get((diagnostic.channel, diagnostic.target_language))
-            if diagnostic.target_language is not None
-            else self._last_context_modes.get(diagnostic.channel)
-        )
-        peer_entries = sum(
-            1
-            for line in diagnostic.context_lines
-            if line.startswith("- [peer]") or line.startswith("- [others]")
-        )
-        self_entries = len(diagnostic.context_lines) - peer_entries
-        if diagnostic.target_language is None:
-            self.emit(
-                RuntimeDiagnostic(
-                    message=(
-                        "[Detailed][Translation] context_apply channel=%s mode=%s "
-                        "request_chars=%s entries=%s self_entries=%s "
-                        "peer_entries=%s context_chars=%s"
-                    ),
-                    args=(
-                        diagnostic.channel,
-                        applied_mode,
-                        diagnostic.request_chars,
-                        len(diagnostic.context_lines),
-                        self_entries,
-                        peer_entries,
-                        diagnostic.context_chars,
-                    ),
-                    detailed=True,
-                )
-            )
-        if diagnostic.target_language is not None:
-            self.emit(
-                RuntimeDiagnostic(
-                    message=(
-                        "[Detailed][Translation] context_apply_target "
-                        "parent_utterance_id=%s target_index=%s target_language=%s "
-                        "mode=%s request_chars=%s entries=%s self_entries=%s "
-                        "peer_entries=%s context_chars=%s"
-                    ),
-                    args=(
-                        diagnostic.parent_utterance_id,
-                        diagnostic.target_index,
-                        diagnostic.target_language,
-                        applied_mode,
-                        diagnostic.request_chars,
-                        len(diagnostic.context_lines),
-                        self_entries,
-                        peer_entries,
-                        diagnostic.context_chars,
-                    ),
-                    detailed=True,
-                )
-            )
 
     def record_chatbox_stage(self, event: str, **fields: object) -> None:
         if event in {"chatbox_revision_replaced", "chatbox_older_turn_pruned"}:
             self.emit(
                 RuntimeDiagnostic(
                     message=(
-                        "[Detailed][Translation] %s parent_utterance_id=%s "
+                        "[Diagnostic][Translation] %s parent_utterance_id=%s "
                         "turn_generation=%s turn_order=%s target_indexes=%s "
                         "target_languages=%s presentation_revision=%s "
                         "previous_revision=%s location=%s dropped_pages=%s "
@@ -599,7 +368,7 @@ class TranslationLatencyDiagnosticsOwner:
                         fields.get("pruned_messages"),
                         fields.get("pruned_pages"),
                     ),
-                    detailed=True,
+                    diagnostic_only=True,
                 )
             )
         raw_utterance_id = fields.get("utterance_id")
@@ -815,39 +584,8 @@ class TranslationLatencyDiagnosticsOwner:
         self._emit_latency_contract(diagnostic.channel, diagnostic.utterance_id)
 
     def emit_translation_ready(self, diagnostic: TranslationReadyDiagnostic) -> bool:
-        logging_port = self.runtime_logging
-        if logging_port is None:
-            return False
-        timeline = self._get_timeline(diagnostic.channel, diagnostic.utterance_id)
-        elapsed_ms = None
-        if timeline is not None:
-            elapsed_ms = self._elapsed_ms(
-                timeline.stage_times.get("last_speech"),
-                timeline.stage_times.get("llm_done"),
-            )
-        return logging_port.emit_detailed_lazy(
-            lambda: format_translation_ready_for_output(
-                channel=diagnostic.channel,
-                utterance_id=str(diagnostic.utterance_id),
-                update_id=diagnostic.update_id,
-                origin_wall_clock_ms=diagnostic.origin_wall_clock_ms,
-                session_scope=diagnostic.session_scope,
-                source_text_hash=diagnostic.source_text_hash,
-                source_text_len=diagnostic.source_text_len,
-                logical_turn_key=diagnostic.logical_turn_key,
-                translation_len=diagnostic.translation_len,
-                elapsed_ms=elapsed_ms,
-                parent_utterance_id=(
-                    str(diagnostic.parent_utterance_id)
-                    if diagnostic.parent_utterance_id is not None
-                    else None
-                ),
-                target_index=diagnostic.target_index,
-                target_language=diagnostic.target_language,
-                turn_generation=diagnostic.turn_generation,
-                turn_order=diagnostic.turn_order,
-            )
-        )
+        _ = diagnostic
+        return False
 
     def record_self_overlay_decision(
         self,
@@ -884,7 +622,7 @@ class TranslationLatencyDiagnosticsOwner:
                         diagnostic.resume_confirmed,
                     ),
                     fallback_level=logging.INFO,
-                    detailed=True,
+                    diagnostic_only=True,
                 )
             )
             if emitted:
@@ -937,7 +675,7 @@ class TranslationLatencyDiagnosticsOwner:
         return self.emit(
             RuntimeDiagnostic(
                 message=(
-                    "[Detailed][Translation] overlay_sink_emit_duration "
+                    "[Diagnostic][Translation] overlay_sink_emit_duration "
                     "event_type=%s channel=%s utterance_id=%s "
                     "update_id=%s elapsed_ms=%s"
                 ),
@@ -948,7 +686,7 @@ class TranslationLatencyDiagnosticsOwner:
                     diagnostic.update_id,
                     diagnostic.elapsed_ms,
                 ),
-                detailed=True,
+                diagnostic_only=True,
             )
         )
 
@@ -987,18 +725,6 @@ class TranslationLatencyDiagnosticsOwner:
             channel = cast(ChannelId, provider_channel)
         return provider_label, channel
 
-    @staticmethod
-    def _translation_skip_reason(diagnostic: TranslationSkipDiagnostic) -> str:
-        if diagnostic.cause is not None:
-            return diagnostic.cause
-        if not diagnostic.llm_available:
-            return "provider_unavailable"
-        if not diagnostic.configuration.translation_enabled:
-            return "translation_disabled"
-        if diagnostic.channel == "peer" and not diagnostic.configuration.peer_translation_enabled:
-            return "peer_translation_disabled"
-        return "translation_disabled"
-
     def _get_timeline(
         self,
         channel: ChannelId,
@@ -1030,37 +756,7 @@ class TranslationLatencyDiagnosticsOwner:
         utterance_id: UUID,
         stage: str,
     ) -> None:
-        timeline = self._get_timeline(channel, utterance_id)
-        if timeline is None or timeline.pending_sources or stage in timeline.emitted_trace_points:
-            return
-        elapsed_ms = self._elapsed_ms(
-            timeline.stage_times.get("last_speech"),
-            timeline.stage_times.get(stage),
-        )
-        if elapsed_ms is None:
-            return
-        emitted = self.emit(
-            RuntimeDiagnostic(
-                message=format_detailed_latency_trace(
-                    channel=channel,
-                    utterance_id=str(utterance_id)[:8],
-                    stage=stage,
-                    elapsed_ms=elapsed_ms,
-                    parent_utterance_id=(
-                        str(timeline.parent_utterance_id)
-                        if timeline.parent_utterance_id is not None
-                        else None
-                    ),
-                    target_index=timeline.target_index,
-                    target_language=timeline.target_language,
-                    turn_generation=timeline.turn_generation,
-                    turn_order=timeline.turn_order,
-                ),
-                detailed=True,
-            )
-        )
-        if emitted:
-            timeline.emitted_trace_points.add(stage)
+        _ = (channel, utterance_id, stage)
 
     def _emit_latency_summary(
         self,
@@ -1082,11 +778,6 @@ class TranslationLatencyDiagnosticsOwner:
             self._awaiting_output.discard((channel, utterance_id))
             self.clear_latency_timeline(channel, utterance_id)
             return
-        speech_end_at = timeline.stage_times.get("speech_end")
-        stt_final_at = timeline.stage_times.get("stt_final")
-        stt_reference_at = None
-        if speech_end_at is not None and stt_final_at is not None:
-            stt_reference_at = max(speech_end_at, stt_final_at)
         self.emit(
             RuntimeDiagnostic(
                 message=format_basic_latency_summary(
@@ -1096,113 +787,13 @@ class TranslationLatencyDiagnosticsOwner:
                 )
             )
         )
-        self.emit(
-            RuntimeDiagnostic(
-                message=format_detailed_latency_breakdown(
-                    channel=channel,
-                    endpoint=endpoint,
-                    elapsed_ms=elapsed_ms,
-                    last_speech_to_speech_end_ms=self._elapsed_ms(
-                        last_speech_at,
-                        speech_end_at,
-                    ),
-                    speech_end_to_stt_final_ms=self._elapsed_ms(
-                        speech_end_at,
-                        stt_final_at,
-                    ),
-                    stt_final_to_final_output_ms=self._elapsed_ms(
-                        stt_reference_at,
-                        final_output_at,
-                    ),
-                ),
-                detailed=True,
-            )
-        )
-        self._emit_latency_cause(channel, utterance_id, final_output_stage, endpoint)
         timeline.basic_summary_emitted = True
         key = (channel, utterance_id)
         self._awaiting_output.discard(key)
         self.clear_latency_timeline(channel, utterance_id)
 
-    def _emit_latency_cause(
-        self,
-        channel: ChannelId,
-        utterance_id: UUID,
-        final_output_stage: str,
-        endpoint: str,
-    ) -> None:
-        timeline = self._get_timeline(channel, utterance_id)
-        if timeline is None or timeline.latency_cause_emitted:
-            return
-        stages = timeline.stage_times
-        last_speech_at = stages.get("last_speech")
-        speech_end_at = stages.get("speech_end")
-        stt_final_at = stages.get("stt_final")
-        llm_request_start_at = stages.get("llm_request_start")
-        llm_first_chunk_at = stages.get("llm_first_chunk")
-        llm_done_at = stages.get("llm_done")
-        final_output_at = stages.get(final_output_stage)
-        message = format_latency_cause_metric(
-            channel=channel,
-            provider="llm" if llm_request_start_at is not None else "stt",
-            utterance_id=str(utterance_id)[:8],
-            parent_utterance_id=(
-                str(timeline.parent_utterance_id)
-                if timeline.parent_utterance_id is not None
-                else None
-            ),
-            target_index=timeline.target_index,
-            target_language=timeline.target_language,
-            turn_generation=timeline.turn_generation,
-            turn_order=timeline.turn_order,
-            stage_durations_ms={
-                "last_speech_to_speech_end": self._elapsed_ms(
-                    last_speech_at,
-                    speech_end_at,
-                ),
-                "speech_end_to_stt_final": self._elapsed_ms(
-                    speech_end_at,
-                    stt_final_at,
-                ),
-                "stt_final_to_llm_request_start": self._elapsed_ms(
-                    stt_final_at,
-                    llm_request_start_at,
-                ),
-                "llm_request_to_first_chunk": self._elapsed_ms(
-                    llm_request_start_at,
-                    llm_first_chunk_at,
-                ),
-                "llm_request_to_llm_done": self._elapsed_ms(
-                    llm_request_start_at,
-                    llm_done_at,
-                ),
-                f"stt_final_to_{endpoint}": (
-                    self._elapsed_ms(stt_final_at, final_output_at)
-                    if llm_request_start_at is None
-                    else None
-                ),
-                f"llm_done_to_{endpoint}": (
-                    self._elapsed_ms(llm_done_at, final_output_at)
-                    if llm_request_start_at is not None
-                    else None
-                ),
-            },
-        )
-        if message is None:
-            return
-        if self.emit(
-            RuntimeDiagnostic(
-                message=message,
-                fallback_level=logging.DEBUG,
-                detailed=True,
-            )
-        ):
-            timeline.latency_cause_emitted = True
-
     def _emit_latency_contract(self, channel: ChannelId, utterance_id: UUID) -> None:
         self._resolve_latency_sources(channel, utterance_id)
-        for stage in _LATENCY_TRACE_ORDER:
-            self._emit_latency_trace(channel, utterance_id, stage)
         for summary_channel, stage, endpoint in _LATENCY_SUMMARY_OUTPUT_STAGES:
             if channel == summary_channel:
                 self._emit_latency_summary(channel, utterance_id, stage, endpoint)
@@ -1219,8 +810,6 @@ class TranslationLatencyDiagnosticsOwner:
 
 
 __all__ = [
-    "ContextApplicationDiagnostic",
-    "ContextModeDiagnostic",
     "LatencyInheritanceDiagnostic",
     "LatencyStageDiagnostic",
     "LatencyTimelineDiagnostic",
@@ -1234,5 +823,4 @@ __all__ = [
     "TranslationLatencyDiagnosticsOwner",
     "TranslationLatencyDiagnosticsSnapshot",
     "TranslationReadyDiagnostic",
-    "TranslationSkipDiagnostic",
 ]

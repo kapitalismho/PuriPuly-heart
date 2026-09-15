@@ -137,10 +137,6 @@ def _runtime_module_identity(module_name: str) -> dict[str, object]:
     }
 
 
-def _evidence_diagnostics_enabled() -> bool:
-    return True
-
-
 def _attempt_payload(message: str, expected_model_id: str) -> dict[str, object]:
     match = ATTEMPT_PATTERN.search(message)
     if match is None:
@@ -179,7 +175,6 @@ async def _decode_case(
         source_language=case.source_language,
         sample_rate_hz=16000,
         stream_label="evidence",
-        diagnostics_enabled=_evidence_diagnostics_enabled,
     )
     session = None
     load_started = time.perf_counter()

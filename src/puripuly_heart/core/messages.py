@@ -63,17 +63,14 @@ DIAGNOSTIC_CATEGORIES: Final[tuple[DiagnosticCategory, ...]] = (
 
 DiagnosticVisibility: TypeAlias = Literal[
     "basic",
-    "detailed",
     "diagnostic_only",
     "persisted_failure_only",
 ]
 DIAGNOSTIC_VISIBILITY_BASIC: Final[DiagnosticVisibility] = "basic"
-DIAGNOSTIC_VISIBILITY_DETAILED: Final[DiagnosticVisibility] = "detailed"
 DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY: Final[DiagnosticVisibility] = "diagnostic_only"
 DIAGNOSTIC_VISIBILITY_PERSISTED_FAILURE_ONLY: Final[DiagnosticVisibility] = "persisted_failure_only"
 DIAGNOSTIC_VISIBILITIES: Final[tuple[DiagnosticVisibility, ...]] = (
     DIAGNOSTIC_VISIBILITY_BASIC,
-    DIAGNOSTIC_VISIBILITY_DETAILED,
     DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
     DIAGNOSTIC_VISIBILITY_PERSISTED_FAILURE_ONLY,
 )
@@ -231,7 +228,6 @@ __all__ = [
     "DIAGNOSTIC_FIELD_VALUE_MAX_LENGTH",
     "DIAGNOSTIC_VISIBILITIES",
     "DIAGNOSTIC_VISIBILITY_BASIC",
-    "DIAGNOSTIC_VISIBILITY_DETAILED",
     "DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY",
     "DIAGNOSTIC_VISIBILITY_PERSISTED_FAILURE_ONLY",
     "DiagnosticCategory",

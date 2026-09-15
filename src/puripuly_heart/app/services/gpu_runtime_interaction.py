@@ -62,7 +62,7 @@ GpuRuntimeProvider = Callable[[], LocalASRProviderRuntimePort]
 GpuRuntimeProvisioningProvider = Callable[[], LocalASRProvisioningPort]
 GpuRuntimeInteractionStateProvider = Callable[[], GpuRuntimeInteractionState]
 GpuRuntimePresentationSink = Callable[[GpuRuntimePresentation], None]
-GpuRuntimeDetailedLogSink = Callable[[str], object]
+GpuRuntimeDiagnosticLogSink = Callable[[str], object]
 GpuRuntimeActivationRetry = Callable[[], Awaitable[None]]
 GpuRuntimeInstallDiagnosticSink = Callable[[LocalASRGpuProvisioningDiagnostic], None]
 
@@ -73,7 +73,7 @@ class GpuRuntimeInteractionOwner:
     provisioning_provider: GpuRuntimeProvisioningProvider = field(repr=False)
     state_provider: GpuRuntimeInteractionStateProvider = field(repr=False)
     presentation_sink: GpuRuntimePresentationSink = field(repr=False)
-    detailed_log_sink: GpuRuntimeDetailedLogSink = field(repr=False)
+    diagnostic_log_sink: GpuRuntimeDiagnosticLogSink = field(repr=False)
     retry_activation: GpuRuntimeActivationRetry = field(repr=False)
     install_diagnostic_sink: GpuRuntimeInstallDiagnosticSink | None = field(
         default=None,
@@ -269,7 +269,7 @@ class GpuRuntimeInteractionOwner:
         fields = [f"state={state}", f"origin={origin}"]
         if progress_percent is not None:
             fields.append(f"progress_percent={progress_percent}")
-        self.detailed_log_sink(f"[GPU ASR] {' '.join(fields)}")
+        self.diagnostic_log_sink(f"[GPU ASR] {' '.join(fields)}")
         devices = tuple(
             GpuDeviceOption(
                 device_id=device.device_id,
@@ -338,7 +338,7 @@ class GpuRuntimeInteractionOwner:
 
 __all__ = [
     "GpuRuntimeActivationRetry",
-    "GpuRuntimeDetailedLogSink",
+    "GpuRuntimeDiagnosticLogSink",
     "GpuRuntimeInstallDiagnosticSink",
     "GpuRuntimeInteractionOwner",
     "GpuRuntimeInteractionSnapshot",

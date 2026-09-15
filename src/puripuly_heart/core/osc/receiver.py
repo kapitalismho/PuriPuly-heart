@@ -84,8 +84,7 @@ class VrcOscReceiver:
             if is_muted:
                 await asyncio.sleep(self.mute_delay_s)
 
-            if self.state.update(is_muted):
-                logger.info("[OSC Receiver] VRChat mic muted state applied: %s", is_muted)
+            self.state.update(is_muted)
         except asyncio.CancelledError:
             raise
 
@@ -118,12 +117,6 @@ class VrcOscReceiver:
             )
             raise
 
-        logger.info(
-            "[OSC Receiver] Listening on %s:%s for VRChat parameters",
-            self.host,
-            self.port,
-        )
-
     def stop(self) -> None:
         if self._mute_task is not None and not self._mute_task.done():
             self._mute_task.cancel()
@@ -133,4 +126,3 @@ class VrcOscReceiver:
             self.transport.close()
             self.transport = None
             self.effective_port = self.port
-            logger.info("[OSC Receiver] Stopped listening.")

@@ -36,7 +36,7 @@ from puripuly_heart.app.services.gpu_provider_recovery_application import (
 )
 from puripuly_heart.app.services.gpu_runtime_interaction import (
     GpuRuntimeActivationRetry,
-    GpuRuntimeDetailedLogSink,
+    GpuRuntimeDiagnosticLogSink,
     GpuRuntimeInstallDiagnosticSink,
     GpuRuntimeInteractionOwner,
     GpuRuntimeInteractionStateProvider,
@@ -57,7 +57,7 @@ from puripuly_heart.app.services.local_asr_cpu_repair import (
 )
 from puripuly_heart.app.services.local_asr_diagnostics import (
     LocalASRBasicLogSink,
-    LocalASRDetailedLogSink,
+    LocalASRDiagnosticLogSink,
     LocalASRDiagnosticsGpuEffectSink,
     LocalASRDiagnosticsOwner,
     LocalASRGpuDiscoveryOriginProvider,
@@ -136,7 +136,7 @@ def create_manual_typing_owner(
     *,
     output_provider: Callable[[], SelfChatboxTypingPort | None],
     completion_provider: Callable[[object], object | None],
-    log_detailed: Callable[[str], object],
+    log_diagnostic: Callable[[str], object],
     log_error: Callable[[str], object],
     idle_timeout_seconds: float,
     submit_timeout_seconds: float,
@@ -144,7 +144,7 @@ def create_manual_typing_owner(
     return ManualTypingOwner(
         output_provider=output_provider,
         completion_provider=completion_provider,
-        log_detailed=log_detailed,
+        log_diagnostic=log_diagnostic,
         log_error=log_error,
         idle_timeout_seconds=idle_timeout_seconds,
         submit_timeout_seconds=submit_timeout_seconds,
@@ -178,7 +178,7 @@ def create_gpu_runtime_interaction_owner(
     provisioning_provider: GpuRuntimeProvisioningProvider,
     state_provider: GpuRuntimeInteractionStateProvider,
     presentation_sink: GpuRuntimePresentationSink,
-    detailed_log_sink: GpuRuntimeDetailedLogSink,
+    diagnostic_log_sink: GpuRuntimeDiagnosticLogSink,
     retry_activation: GpuRuntimeActivationRetry,
     install_diagnostic_sink: GpuRuntimeInstallDiagnosticSink | None = None,
 ) -> GpuRuntimeInteractionOwner:
@@ -187,7 +187,7 @@ def create_gpu_runtime_interaction_owner(
         provisioning_provider=provisioning_provider,
         state_provider=state_provider,
         presentation_sink=presentation_sink,
-        detailed_log_sink=detailed_log_sink,
+        diagnostic_log_sink=diagnostic_log_sink,
         retry_activation=retry_activation,
         install_diagnostic_sink=install_diagnostic_sink,
     )
@@ -231,14 +231,14 @@ def create_gpu_provider_recovery_application_owner(
 def create_local_asr_diagnostics_owner(
     *,
     basic_log_sink: LocalASRBasicLogSink,
-    detailed_log_sink: LocalASRDetailedLogSink,
+    diagnostic_log_sink: LocalASRDiagnosticLogSink,
     gpu_effect_sink: LocalASRDiagnosticsGpuEffectSink,
     gpu_discovery_origin_provider: LocalASRGpuDiscoveryOriginProvider,
     gpu_provider_id: str,
 ) -> LocalASRDiagnosticsOwner:
     return LocalASRDiagnosticsOwner(
         basic_log_sink=basic_log_sink,
-        detailed_log_sink=detailed_log_sink,
+        diagnostic_log_sink=diagnostic_log_sink,
         gpu_effect_sink=gpu_effect_sink,
         gpu_discovery_origin_provider=gpu_discovery_origin_provider,
         gpu_provider_id=gpu_provider_id,
@@ -318,7 +318,7 @@ def create_vrchat_osc_presence_probe_owner(
 
 def create_self_capture_source_adapter(
     *,
-    log_detailed: Callable[..., object],
+    log_diagnostic: Callable[..., object],
     wrap_source: Callable[[object], object],
 ) -> SelfCaptureSourceFactory:
     from puripuly_heart.app.adapters.self_capture_source import SelfCaptureSourceAdapter
@@ -334,7 +334,7 @@ def create_self_capture_source_adapter(
         resolve_device=resolve_sounddevice_input_device,
         channel_decision=determine_self_mic_capture_channels,
         source_factory=SoundDeviceAudioSource,
-        log_detailed=log_detailed,
+        log_diagnostic=log_diagnostic,
         wrap_source=wrap_source,
     )
 
@@ -356,11 +356,7 @@ def create_self_capture_admission_adapter(
     )
 
 
-def create_self_capture_vad_adapter(
-    *,
-    log_detailed: Callable[[str], object],
-    diagnostics_enabled: Callable[[], bool],
-) -> SelfCaptureVadFactory:
+def create_self_capture_vad_adapter() -> SelfCaptureVadFactory:
     from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
     from puripuly_heart.core.vad.bundled import bundled_silero_vad_onnx_path
     from puripuly_heart.core.vad.gating import VadGating
@@ -370,8 +366,6 @@ def create_self_capture_vad_adapter(
         model_path_resolver=bundled_silero_vad_onnx_path,
         engine_factory=SileroVadOnnx,
         gating_factory=VadGating,
-        log_detailed=log_detailed,
-        diagnostics_enabled=diagnostics_enabled,
     )
 
 
@@ -379,8 +373,6 @@ def create_self_capture_audio_loop_adapter(
     *,
     audio_gate_provider: Callable[[], object | None],
     log_basic: Callable[[str], object],
-    log_detailed: Callable[[str], object],
-    is_detailed_enabled: Callable[[], bool],
 ) -> SelfCaptureAudioLoop:
     from puripuly_heart.app.adapters.self_capture_audio_loop import (
         SelfCaptureAudioLoopAdapter,
@@ -390,17 +382,14 @@ def create_self_capture_audio_loop_adapter(
     return SelfCaptureAudioLoopAdapter(
         runner=run_audio_vad_loop,
         audio_gate_provider=audio_gate_provider,
-        log_detailed=log_detailed,
         log_basic=log_basic,
-        is_detailed_enabled=is_detailed_enabled,
     )
 
 
 def create_peer_capture_source_adapter(
     *,
-    log_detailed: Callable[[str], object],
+    log_diagnostic: Callable[[str], object],
     wrap_source: Callable[[object], object],
-    is_detailed_enabled: Callable[[], bool],
 ) -> PeerCaptureSourceFactory:
     from puripuly_heart.app.adapters.peer_capture_source import PeerCaptureSourceAdapter
     from puripuly_heart.core.audio.desktop_pipeline import DesktopPeerPipeline
@@ -413,9 +402,8 @@ def create_peer_capture_source_adapter(
         process_source_factory=ProcessAudioCaptureSource,
         process_watcher_factory=PsutilProcessIdentityWatcher,
         pipeline_factory=DesktopPeerPipeline,
-        log_detailed=log_detailed,
+        log_diagnostic=log_diagnostic,
         wrap_source=wrap_source,
-        is_detailed_enabled=is_detailed_enabled,
     )
 
 
@@ -432,11 +420,7 @@ def create_peer_capture_target_resolver_adapter() -> PeerCaptureTargetResolverPo
     return PeerCaptureTargetResolverAdapter(resolver_factory=create_process_resolver)
 
 
-def create_peer_capture_vad_adapter(
-    *,
-    log_detailed: Callable[[str], object],
-    diagnostics_enabled: Callable[[], bool],
-) -> PeerCaptureVadFactory:
+def create_peer_capture_vad_adapter() -> PeerCaptureVadFactory:
     from puripuly_heart.app.adapters.peer_capture_vad import PeerCaptureVadAdapter
     from puripuly_heart.core.vad.bundled import bundled_silero_vad_onnx_path
     from puripuly_heart.core.vad.gating import create_peer_vad_gating
@@ -446,16 +430,12 @@ def create_peer_capture_vad_adapter(
         model_path_resolver=bundled_silero_vad_onnx_path,
         engine_factory=SileroVadOnnx,
         gating_factory=create_peer_vad_gating,
-        log_detailed=log_detailed,
-        diagnostics_enabled=diagnostics_enabled,
     )
 
 
 def create_peer_capture_audio_loop_adapter(
     *,
     log_basic: Callable[[str], object],
-    log_detailed: Callable[[str], object],
-    is_detailed_enabled: Callable[[], bool],
 ) -> PeerCaptureAudioLoop:
     from puripuly_heart.app.adapters.peer_capture_audio_loop import (
         PeerCaptureAudioLoopAdapter,
@@ -464,9 +444,7 @@ def create_peer_capture_audio_loop_adapter(
 
     return PeerCaptureAudioLoopAdapter(
         runner=run_audio_vad_loop,
-        log_detailed=log_detailed,
         log_basic=log_basic,
-        is_detailed_enabled=is_detailed_enabled,
     )
 
 

@@ -10,8 +10,6 @@ from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 SelfCaptureVadModelPathResolver = Callable[[], Path]
 SelfCaptureVadEngineFactory = Callable[..., object]
 SelfCaptureVadGatingFactory = Callable[..., object]
-SelfCaptureVadDetailedLog = Callable[[str], object]
-SelfCaptureVadDiagnosticsEnabled = Callable[[], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,8 +17,6 @@ class SelfCaptureVadAdapter:
     model_path_resolver: SelfCaptureVadModelPathResolver
     engine_factory: SelfCaptureVadEngineFactory
     gating_factory: SelfCaptureVadGatingFactory
-    log_detailed: SelfCaptureVadDetailedLog
-    diagnostics_enabled: SelfCaptureVadDiagnosticsEnabled
 
     def __call__(self, config: SelfCaptureSessionConfig) -> object:
         return self.gating_factory(
@@ -30,16 +26,11 @@ class SelfCaptureVadAdapter:
             speech_threshold=config.vad_speech_threshold,
             continuation_threshold=vad_exit_threshold(config.vad_speech_threshold),
             hangover_ms=config.vad_hangover_ms,
-            diagnostic_event_callback=lambda message: self.log_detailed(message),
-            diagnostics_enabled=self.diagnostics_enabled,
-            diagnostic_label="self",
         )
 
 
 __all__ = [
     "SelfCaptureVadAdapter",
-    "SelfCaptureVadDetailedLog",
-    "SelfCaptureVadDiagnosticsEnabled",
     "SelfCaptureVadEngineFactory",
     "SelfCaptureVadGatingFactory",
     "SelfCaptureVadModelPathResolver",

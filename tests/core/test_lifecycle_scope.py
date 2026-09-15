@@ -10,7 +10,7 @@ import pytest
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_LIFECYCLE,
-    DIAGNOSTIC_VISIBILITY_DETAILED,
+    DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
     SEVERITY_ERROR,
 )
 from puripuly_heart.core.observability import DiagnosticEvent
@@ -155,7 +155,7 @@ async def test_task_that_raises_during_close_cancellation_emits_safe_diagnostic(
     assert event.fields["exception_class"] == "RuntimeError"
     assert event.category == DIAGNOSTIC_CATEGORY_LIFECYCLE
     assert event.severity == SEVERITY_ERROR
-    assert event.visibility == DIAGNOSTIC_VISIBILITY_DETAILED
+    assert event.visibility == DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY
     assert event.content_policy == CONTENT_POLICY_METADATA_ONLY
     assert not any("secret-token" in value for value in _all_diagnostic_field_values(event))
 
@@ -186,7 +186,7 @@ async def test_task_and_close_callback_failures_emit_metadata_only_diagnostics()
     assert {event.fields["scope_name"] for event in sink.events} == {"runtime"}
     assert {event.category for event in sink.events} == {DIAGNOSTIC_CATEGORY_LIFECYCLE}
     assert {event.severity for event in sink.events} == {SEVERITY_ERROR}
-    assert {event.visibility for event in sink.events} == {DIAGNOSTIC_VISIBILITY_DETAILED}
+    assert {event.visibility for event in sink.events} == {DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY}
     assert {event.content_policy for event in sink.events} == {CONTENT_POLICY_METADATA_ONLY}
 
     diagnostic_values = [

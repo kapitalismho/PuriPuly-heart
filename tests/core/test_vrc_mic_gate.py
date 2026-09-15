@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import logging
-
 import numpy as np
 import pytest
 
@@ -250,9 +248,8 @@ async def test_vrc_osc_receiver_start_is_idempotent_when_transport_exists(
 
 
 @pytest.mark.asyncio
-async def test_vrc_osc_receiver_start_logs_and_reraises_oserror(
+async def test_vrc_osc_receiver_start_reraises_oserror(
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     state = VrcMicState(muted=True)
 
@@ -263,10 +260,8 @@ async def test_vrc_osc_receiver_start_logs_and_reraises_oserror(
     monkeypatch.setattr(receiver_module, "AsyncIOOSCUDPServer", FailingServer)
     receiver = VrcOscReceiver(state=state)
 
-    with caplog.at_level(logging.ERROR, logger="puripuly_heart.core.osc.receiver"):
-        with pytest.raises(OSError, match="port already in use"):
-            await receiver.start()
+    with pytest.raises(OSError, match="port already in use"):
+        await receiver.start()
 
     assert state.muted is None
     assert receiver.transport is None
-    assert any("Failed to start AsyncIOOSCUDPServer" in message for message in caplog.messages)

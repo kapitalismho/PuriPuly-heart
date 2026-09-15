@@ -16,6 +16,7 @@ from puripuly_heart.core.audio.source import (
     CaptureProgressionSnapshot,
     PhysicalCaptureProgression,
 )
+from puripuly_heart.core.runtime_logging import emit_basic_log
 
 logger = logging.getLogger(__name__)
 
@@ -105,11 +106,11 @@ class DesktopLoopbackAudioSource:
             if not isinstance(resolved, DesktopLoopbackDevice):
                 raise RuntimeError("No Windows loopback output device is available")
             if resolution.used_default_fallback:
-                logger.warning(
-                    "Saved desktop loopback device unavailable, falling back to default output "
-                    "loopback (saved=%r, resolved=%r)",
-                    self.device_name,
-                    resolved.name,
+                emit_basic_log(
+                    logger,
+                    "[Peer · Capture] The selected loopback device is unavailable; "
+                    "the default loopback device is active.",
+                    level=logging.WARNING,
                 )
 
             self._resolved_device = resolved
@@ -232,15 +233,15 @@ class DesktopLoopbackAudioSource:
         self._last_reported_callback_status_count = callback_status_count
         self._last_reported_queue_drop_count = queue_drop_count
         with contextlib.suppress(Exception):
-            logger.warning(
-                "Desktop loopback audio callback status/drop observed: "
-                "callback status count=%s callback status new=%s "
-                "last_status=%s queue drop count=%s queue drop new=%s",
+            emit_basic_log(
+                logger,
+                "[Peer · Capture] Audio callback interruption observed · "
+                "Callback events %s (+%s) · Dropped frames %s (+%s)",
                 callback_status_count,
                 max(0, status_new_count),
-                self._last_callback_status,
                 queue_drop_count,
                 max(0, drop_new_count),
+                level=logging.WARNING,
             )
 
     async def close(self) -> None:

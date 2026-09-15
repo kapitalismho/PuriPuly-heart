@@ -583,27 +583,19 @@ async def test_receive_loop_continues_after_turn_complete() -> None:
 
 
 @pytest.mark.asyncio
-async def test_recv_failure_logs_exception_class_and_closes_session(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+async def test_recv_failure_closes_session() -> None:
     session = _FailingReceiveSession(_ApiFailure(code=400, status="INVALID_ARGUMENT"))
     backend, factory = _backend(session)
-    with caplog.at_level("ERROR"):
-        stt = await backend.open_session()
-        try:
-            with pytest.raises(_ApiFailure):
-                async for _event in stt.events():
-                    pass
-        finally:
-            await stt.close()
+    stt = await backend.open_session()
+    try:
+        with pytest.raises(_ApiFailure):
+            async for _event in stt.events():
+                pass
+    finally:
+        await stt.close()
     assert factory.context is not None
     assert factory.context.exited is True
     assert session.closed is True
-    combined = "\n".join(record.getMessage() for record in caplog.records)
-    assert "exception_class=_ApiFailure" in combined
-    assert "api_code=400" in combined
-    assert "api_status=INVALID_ARGUMENT" in combined
-    assert "message_kind=validation" in combined
 
 
 def test_gemini_transcribe_language_codes() -> None:

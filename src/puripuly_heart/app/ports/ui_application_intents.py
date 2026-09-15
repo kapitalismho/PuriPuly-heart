@@ -211,7 +211,6 @@ class UiEngagementRuntimePort(Protocol):
 
 
 class UiDiagnosticsRuntimePort(Protocol):
-    def set_runtime_logging_mode(self, mode: str) -> None: ...
 
     def cycle_debug_capture_fault_profile(self) -> str: ...
 
