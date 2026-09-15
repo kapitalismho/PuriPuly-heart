@@ -715,6 +715,50 @@ class LocalASRProviderRuntimeOwner:
             ):
                 return
 
+    async def observe_source_activity(
+        self,
+        channel: ProviderRuntimeChannel,
+        *,
+        speech_observed: bool,
+        observed_at_monotonic_s: float,
+    ) -> None:
+        self._require_open("dispatch provider source activity")
+        self._validate_channel(channel)
+        async with self._operation():
+            for provider in self._source_fact_targets(self._handles[channel]):
+                observe = getattr(provider, "observe_source_activity", None)
+                if not callable(observe):
+                    continue
+                await observe(
+                    speech_observed=speech_observed,
+                    observed_at_monotonic_s=observed_at_monotonic_s,
+                )
+
+    async def observe_pending_source_work(
+        self,
+        channel: ProviderRuntimeChannel,
+        *,
+        pending: bool,
+    ) -> None:
+        self._require_open("dispatch pending provider source work")
+        self._validate_channel(channel)
+        async with self._operation():
+            for provider in self._source_fact_targets(self._handles[channel]):
+                observe = getattr(provider, "observe_pending_source_work", None)
+                if callable(observe):
+                    await observe(pending=pending)
+
+    @staticmethod
+    def _source_fact_targets(handle: ProviderRuntimeHandle) -> tuple[object, ...]:
+        current, _generation = handle.current_provider_generation()
+        targets: list[object] = []
+        if current is not None:
+            targets.append(current)
+        for retained in handle.retained_scoped_providers:
+            if not any(candidate is retained for candidate in targets):
+                targets.append(retained)
+        return tuple(targets)
+
     async def handle_owned_vad_event(
         self,
         channel: ProviderRuntimeChannel,

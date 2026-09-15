@@ -12,6 +12,7 @@ import pytest
 from puripuly_heart.app.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
     SharedSTTProviderFactory,
+    _deferred_age_rotation_enabled,
     _recognition_retention_profile,
     _recognition_watchdogs,
 )
@@ -350,6 +351,20 @@ def test_scoped_watchdog_policy_covers_every_configured_selector(
     assert resolved.write_timeout_s == 5.0
     assert resolved.final_timeout_s == expected_final
     assert resolved.drain_timeout_s == 2.0
+
+
+@pytest.mark.parametrize("provider", tuple(STTProviderName))
+def test_deferred_age_rotation_eligibility_preserves_non_target_routes(
+    provider: STTProviderName,
+) -> None:
+    target_routes = {
+        STTProviderName.SONIOX,
+        STTProviderName.DEEPGRAM,
+        STTProviderName.GEMINI_TRANSCRIBE,
+        STTProviderName.ELEVENLABS_SCRIBE,
+        STTProviderName.ROLLING_FREE,
+    }
+    assert _deferred_age_rotation_enabled(provider.value) is (provider in target_routes)
 
 
 def test_local_asr_factory_binds_stt_event_ingress_observer() -> None:

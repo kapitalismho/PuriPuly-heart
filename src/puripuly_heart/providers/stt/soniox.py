@@ -36,6 +36,7 @@ _STOP = object()
 _SELECTIVE_PADDING_MS = 200
 _SELECTIVE_PAUSE_MIN_MS = 4000
 _SELECTIVE_PAUSE_MAX_MS = 7000
+_MAX_TURN_FINAL_TOKENS = 16384
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,6 +181,7 @@ class _SonioxSession(STTBackendSession):
     _send_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _recv_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _keepalive_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _send_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
     _stopped: bool = field(init=False, default=False)
     _last_send_at: float | None = field(init=False, default=None)
     _pending_tokens: list[_FinalToken] = field(init=False, default_factory=list)
@@ -238,25 +240,29 @@ class _SonioxSession(STTBackendSession):
             while True:
                 data = await self._audio_q.get()
                 if data is _STOP:
-                    await self._ws.send("")
-                    self._last_send_at = time.monotonic()
+                    async with self._send_lock:
+                        await self._ws.send("")
+                        self._last_send_at = time.monotonic()
                     return
                 if isinstance(data, _FinalizeRequest):
-                    if data.padding_pcm16le:
-                        await self._ws.send(data.padding_pcm16le)
-                    payload = {"type": "finalize"}
-                    await self._ws.send(json.dumps(payload))
-                    self._last_send_at = time.monotonic()
+                    async with self._send_lock:
+                        if data.padding_pcm16le:
+                            await self._ws.send(data.padding_pcm16le)
+                        payload = {"type": "finalize"}
+                        await self._ws.send(json.dumps(payload))
+                        self._last_send_at = time.monotonic()
                     self._resolve_write(data.completion, None)
                     continue
                 if isinstance(data, _AudioWrite):
-                    await self._ws.send(data.pcm16le)
-                    self._last_send_at = time.monotonic()
+                    async with self._send_lock:
+                        await self._ws.send(data.pcm16le)
+                        self._last_send_at = time.monotonic()
                     self._resolve_write(data.completion, None)
                     continue
                 if isinstance(data, bytes):
-                    await self._ws.send(data)
-                    self._last_send_at = time.monotonic()
+                    async with self._send_lock:
+                        await self._ws.send(data)
+                        self._last_send_at = time.monotonic()
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -305,8 +311,9 @@ class _SonioxSession(STTBackendSession):
                 now = time.monotonic()
                 last = self._last_send_at or 0.0
                 if now - last >= self.keepalive_interval_s:
-                    await self._ws.send(json.dumps({"type": "keepalive"}))
-                    self._last_send_at = now
+                    async with self._send_lock:
+                        await self._ws.send(json.dumps({"type": "keepalive"}))
+                        self._last_send_at = time.monotonic()
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -320,8 +327,14 @@ class _SonioxSession(STTBackendSession):
             message = message.decode("utf-8", errors="ignore")
         try:
             data = json.loads(message)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             logger.debug("Soniox message parse error")
+            if self._event_projection.is_scoped:
+                self._scoped_transport_failure("soniox_protocol_ambiguity", orderly=False)
+            return
+        if not isinstance(data, dict):
+            if self._event_projection.is_scoped:
+                self._scoped_transport_failure("soniox_protocol_ambiguity", orderly=False)
             return
 
         if "error" in data or "error_code" in data:
@@ -329,8 +342,12 @@ class _SonioxSession(STTBackendSession):
             self._scoped_transport_failure("soniox_request_failed", orderly=False)
             return
 
-        tokens = data.get("tokens") or []
+        tokens = data.get("tokens", [])
+        if tokens is None:
+            tokens = []
         if not isinstance(tokens, list):
+            if self._event_projection.is_scoped:
+                self._scoped_transport_failure("soniox_protocol_ambiguity", orderly=False)
             return
 
         if tokens:
@@ -338,6 +355,9 @@ class _SonioxSession(STTBackendSession):
 
         for token in tokens:
             if not isinstance(token, dict):
+                if self._event_projection.is_scoped:
+                    self._scoped_transport_failure("soniox_protocol_ambiguity", orderly=False)
+                    return
                 continue
             text = str(token.get("text", "") or "")
             is_final = bool(token.get("is_final"))
@@ -347,12 +367,28 @@ class _SonioxSession(STTBackendSession):
                 logger.debug(
                     "[STT] Soniox token finalize pending_tokens=%s", len(self._pending_tokens)
                 )
-                self._flush_final()
-                self._resolve_scoped_fin(data)
+                if self._event_projection.is_scoped:
+                    self._resolve_scoped_fin(data)
+                    if self._event_projection.retired:
+                        return
+                else:
+                    self._flush_final()
                 continue
             if text == "<end>":
-                self._flush_final()
                 continue
+            if self._event_projection.is_scoped and self._event_projection.active_identity is None:
+                self._scoped_transport_failure("soniox_idle_authoritative_text", orderly=False)
+                return
+            if len(self._pending_tokens) >= _MAX_TURN_FINAL_TOKENS:
+                if self._event_projection.is_scoped:
+                    self._scoped_transport_failure("soniox_token_buffer_overflow", orderly=False)
+                else:
+                    self._put_event(RuntimeError("Soniox token buffer overflow"))
+                    self._pending_tokens.clear()
+                    self._final_tokens.clear()
+                    self._pending_last_end_ms = None
+                    self._pending_finalize_requests = 0
+                return
             end_ms = token.get("end_ms")
             if isinstance(end_ms, (int, float)):
                 end_ms = int(end_ms)
@@ -387,6 +423,10 @@ class _SonioxSession(STTBackendSession):
             )
             self._pending_tokens.append(final_token)
             self._emit_scoped_token(final_token, token, data)
+
+        if data.get("finished") is True and self._event_projection.is_scoped:
+            self._scoped_transport_failure("soniox_stream_finished", orderly=True)
+            self._stopped = True
 
     def _emit_scoped_token(
         self,
@@ -433,8 +473,14 @@ class _SonioxSession(STTBackendSession):
 
     def _resolve_scoped_fin(self, message: dict[str, Any]) -> None:
         identity = self._event_projection.active_identity
-        if identity is None or not self._event_projection.sealed:
+        if (
+            identity is None
+            or not self._event_projection.sealed
+            or self._pending_finalize_requests != 1
+        ):
+            self._scoped_transport_failure("soniox_protocol_ambiguity", orderly=False)
             return
+        self._pending_finalize_requests -= 1
         request_id = message.get("request_id")
         provenance = STTNativeProvenance(
             native_request_id=str(request_id) if request_id is not None else None,
@@ -452,7 +498,7 @@ class _SonioxSession(STTBackendSession):
                 final_language_runs=runs,
                 final_speaker_runs=speaker_runs,
                 text_authority="authoritative",
-                epoch_disposition="retire",
+                epoch_disposition="reuse",
                 provenance=tuple(self._scoped_provenance),
             )
         )
@@ -505,6 +551,10 @@ class _SonioxSession(STTBackendSession):
         self._scoped_provenance.clear()
         self._scoped_tokens.clear()
         self._scoped_channel = None
+        self._pending_tokens.clear()
+        self._final_tokens.clear()
+        self._pending_last_end_ms = None
+        self._pending_finalize_requests = 0
 
     def _scoped_transport_failure(self, reason: str, *, orderly: bool) -> None:
         identity = self._event_projection.active_identity
@@ -524,7 +574,7 @@ class _SonioxSession(STTBackendSession):
                     provenance=tuple(self._scoped_provenance),
                 )
             )
-            self._clear_scoped_turn()
+        self._clear_scoped_turn()
         self._event_projection.end_epoch(
             orderly=orderly,
             reason=reason,
@@ -652,9 +702,8 @@ class _SonioxSession(STTBackendSession):
         if self._stopped or self._ws is None:
             raise RuntimeError("Soniox session is closed")
         self._event_projection.begin(request)
+        self._clear_scoped_turn()
         self._scoped_channel = request.channel
-        self._scoped_provenance.clear()
-        self._scoped_tokens.clear()
 
     async def send_turn_audio(
         self,

@@ -63,6 +63,28 @@ _ACTUAL_DEGRADATION_REASONS = frozenset(
         "invalid_speaker_run_fallback",
     }
 )
+_LOCAL_PROVIDER_IDS = frozenset(
+    {
+        STTProviderName.LOCAL_CPU_AUTO.value,
+        STTProviderName.LOCAL_PARAKEET_V3.value,
+        STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
+        STTProviderName.LOCAL_QWEN.value,
+        STTProviderName.LOCAL_QWEN_GPU.value,
+    }
+)
+_DEFERRED_AGE_ROTATION_PROVIDER_IDS = frozenset(
+    {
+        STTProviderName.SONIOX.value,
+        STTProviderName.DEEPGRAM.value,
+        STTProviderName.GEMINI_TRANSCRIBE.value,
+        STTProviderName.ELEVENLABS_SCRIBE.value,
+        STTProviderName.ROLLING_FREE.value,
+    }
+)
+
+
+def _deferred_age_rotation_enabled(provider_id: object) -> bool:
+    return str(provider_id) in _DEFERRED_AGE_ROTATION_PROVIDER_IDS
 
 
 @dataclass(slots=True)
@@ -162,6 +184,7 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
             channel=config.channel,
             session_factory=open_scoped_session,
             watchdog_resolver=lambda _settings: _recognition_watchdogs(config),
+            monotonic_clock=self.clock.now,
             accepted_settings_scope=(
                 config.provider,
                 request.provider_signature,
@@ -177,19 +200,14 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
             diagnostic_sink=(
                 _normalization_diagnostic_sink if runtime_logging is not None else None
             ),
+            deferred_age_rotation_enabled=_deferred_age_rotation_enabled(config.provider),
         )
 
 
 def _recognition_watchdogs(config: object) -> STTRecognitionWatchdogs:
     provider_id = str(getattr(config, "provider"))
     drain_timeout_s = float(getattr(config, "drain_timeout_s"))
-    local_provider_ids = {
-        STTProviderName.LOCAL_CPU_AUTO.value,
-        STTProviderName.LOCAL_PARAKEET_V3.value,
-        STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
-        STTProviderName.LOCAL_QWEN.value,
-        STTProviderName.LOCAL_QWEN_GPU.value,
-    }
+    local_provider_ids = _LOCAL_PROVIDER_IDS
     if provider_id in local_provider_ids:
         readiness_timeout_s = 60.0
         final_timeout_s = 30.0

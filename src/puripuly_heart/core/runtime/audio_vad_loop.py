@@ -232,13 +232,18 @@ async def run_audio_vad_loop(
                 if callable(process_owned)
                 else vad.process_chunk(chunk)
             )
+            speech_observed = bool(getattr(vad, "last_observation_was_speech", False))
+            observe_source_activity = getattr(sink, "observe_source_activity", None)
+            if callable(observe_source_activity):
+                await observe_source_activity(
+                    speech_observed=speech_observed,
+                    observed_at_monotonic_s=monotonic_clock(),
+                )
             for event in events:
                 await _dispatch(event)
             chunk_ms = chunk.size * 1000.0 / float(target_sample_rate_hz)
             progress_audio_ms += chunk_ms
-            progress_speech_observed = progress_speech_observed or bool(
-                getattr(vad, "last_observation_was_speech", False)
-            )
+            progress_speech_observed = progress_speech_observed or speech_observed
             if log_basic is not None and progress_audio_ms >= progress_interval_audio_ms:
                 state = (
                     "frames_with_admitted_speech"
@@ -256,7 +261,7 @@ async def run_audio_vad_loop(
                 progress_speech_observed = False
             if delivery_controller is not None:
                 await delivery_controller.observe_acoustic_chunk(
-                    speech_observed=bool(getattr(vad, "last_observation_was_speech", False)),
+                    speech_observed=speech_observed,
                     capture=chunk_capture,
                 )
 

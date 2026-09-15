@@ -674,6 +674,7 @@ async def test_rolling_session_preserves_scoped_member_protocol() -> None:
         projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
     )
     identity = object()
+    assert session.provider_name is STTProviderName.DEEPGRAM
     request = object()
 
     await session.begin_turn(request)

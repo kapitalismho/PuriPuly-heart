@@ -340,6 +340,23 @@ class PeerTranslationChannelOwner:
             source_language=source_language,
         )
 
+    async def observe_source_activity(
+        self,
+        *,
+        speech_observed: bool,
+        observed_at_monotonic_s: float,
+    ) -> None:
+        self._require_ingress()
+        await self.local_asr_runtime.observe_source_activity(
+            "peer",
+            speech_observed=speech_observed,
+            observed_at_monotonic_s=observed_at_monotonic_s,
+        )
+
+    async def observe_pending_source_work(self, *, pending: bool) -> None:
+        self._require_ingress()
+        await self.local_asr_runtime.observe_pending_source_work("peer", pending=pending)
+
     async def handle_peer_owned_vad_event(self, owned: object) -> None:
         self._record_peer_owned_vad_event(owned)
         await self.local_asr_runtime.handle_owned_vad_event("peer", owned)

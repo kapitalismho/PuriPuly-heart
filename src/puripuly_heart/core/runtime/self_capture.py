@@ -45,7 +45,14 @@ SelfCaptureDiagnosticSink = Callable[[SelfCaptureDiagnostic], object]
 
 class _VadSink(Protocol):
     async def handle_vad_event(self, event: object) -> None: ...
+    async def observe_source_activity(
+        self,
+        *,
+        speech_observed: bool,
+        observed_at_monotonic_s: float,
+    ) -> None: ...
 
+    async def observe_pending_source_work(self, *, pending: bool) -> None: ...
     async def reject_owned_segment(
         self,
         event: OwnedVadEvent,
@@ -110,6 +117,28 @@ class _GenerationGuardedVadSink:
     def retained_samples(self) -> int:
         return self._retained_samples
 
+    async def observe_source_activity(
+        self,
+        *,
+        speech_observed: bool,
+        observed_at_monotonic_s: float,
+    ) -> None:
+        if not self.owner.is_current_generation(self.capture_generation.value):
+            return
+        observe = getattr(self.sink, "observe_source_activity", None)
+        if callable(observe):
+            await observe(
+                speech_observed=speech_observed,
+                observed_at_monotonic_s=observed_at_monotonic_s,
+            )
+
+    async def _observe_pending_source_work(self, pending: bool) -> None:
+        if not self.owner.is_current_generation(self.capture_generation.value):
+            return
+        observe = getattr(self.sink, "observe_pending_source_work", None)
+        if callable(observe):
+            await observe(pending=pending)
+
     async def handle_vad_event(self, event: object) -> None:
         if not self.owner.is_current_generation(self.capture_generation.value):
             return
@@ -161,6 +190,7 @@ class _GenerationGuardedVadSink:
                 )
                 return
         self._queue.append(owned)
+        await self._observe_pending_source_work(True)
         worker = self._worker
         if worker is None:
             self._worker = asyncio.create_task(self._run(), name="self-vad-dispatch")
@@ -372,6 +402,7 @@ class _GenerationGuardedVadSink:
                     await cast(_VadSink, self.sink).handle_vad_event(owned)
             finally:
                 self._release_queue_charge(owned)
+                await self._observe_pending_source_work(bool(self._queue))
 
 
 class SelfCaptureSessionOwner:

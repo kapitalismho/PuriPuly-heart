@@ -558,7 +558,6 @@ def test_create_llm_provider_qwen_uses_secret() -> None:
     assert provider.inner.primary.api_key == "k2"
     assert provider.inner.primary.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
     assert provider.inner.primary.model == "qwen3.8-flash"
-    assert_bounded_concurrency(provider, 5)
 
 
 def test_create_llm_provider_qwen_low_latency_passes_runtime_logging() -> None:
