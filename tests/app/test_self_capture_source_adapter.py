@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 import pytest
 from puripuly_heart.app.adapters.self_capture_source import SelfCaptureSourceAdapter
 
-from puripuly_heart.app.wiring import create_self_capture_source_adapter
 from puripuly_heart.config.audio_host_api import (
     WINDOWS_WASAPI_COMPATIBILITY_HOST_API,
     normalize_input_host_api,
@@ -109,10 +108,8 @@ def test_adapter_contains_device_resolution_failure_and_opens_default_index() ->
             "wasapi_exclusive": False,
         }
     ]
-    assert any(
-        level == logging.WARNING and "device query failed" in message
-        for level, message in harness.logs
-    )
+    assert any(level == logging.WARNING for level, _message in harness.logs)
+    assert all("device query failed" not in message for _level, message in harness.logs)
 
 
 def test_adapter_exhausts_primary_name_and_system_default_in_order() -> None:
@@ -154,45 +151,12 @@ def test_adapter_exhausts_primary_name_and_system_default_in_order() -> None:
     assert harness.wrapped == []
     error_messages = [message for level, message in harness.logs if level == logging.ERROR]
     assert len(error_messages) == 3
-    assert "Microphone open detail" in error_messages[0]
-    assert "Fallback microphone detail" in error_messages[1]
-    assert "System default microphone detail" in error_messages[2]
-
-
-def test_adapter_uses_requested_channels_when_source_metadata_is_invalid() -> None:
-    class InvalidMetadataSource:
-        @property
-        def opened_channels(self) -> int:
-            raise ValueError("invalid opened channels")
-
-        frame_channels = "invalid"
-        actual_sample_rate_hz = "invalid"
-
-    harness = AdapterHarness(
-        resolve_device=lambda **_kwargs: 4,
-        source_factory=lambda **_kwargs: InvalidMetadataSource(),
-        preferred_channels=2,
+    assert all(
+        f"open failed {attempt}" not in message
+        for attempt in range(1, 4)
+        for message in error_messages
     )
 
-    harness.adapter()(_config())
-
-    format_log = next(
-        message for _level, message in harness.logs if "Microphone capture format" in message
-    )
-    assert "requested_channels=2" in format_log
-    assert "opened_channels=2" in format_log
-    assert "frame_channels=2" in format_log
-    assert "actual_sample_rate_hz=None" in format_log
 
 
-def test_wiring_factory_composes_internal_self_capture_source_adapter() -> None:
-    adapter = create_self_capture_source_adapter(
-        log_diagnostic=lambda *_args, **_kwargs: None,
-        wrap_source=lambda source: source,
-    )
 
-    assert isinstance(adapter, SelfCaptureSourceAdapter)
-    assert adapter.normalize_host_api is normalize_input_host_api
-    assert adapter.resolve_device.__name__ == "resolve_sounddevice_input_device"
-    assert adapter.channel_decision.__name__ == "determine_self_mic_capture_channels"
-    assert adapter.source_factory.__name__ == "SoundDeviceAudioSource"

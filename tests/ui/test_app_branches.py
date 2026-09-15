@@ -4258,7 +4258,7 @@ async def test_local_llm_secret_changed_ignores_non_local_llm_provider() -> None
     assert calls == []
 
 
-def test_toggle_handlers_route_basic_and_detailed_runtime_logs() -> None:
+def test_toggle_handlers_do_not_log_click_requests() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
     app.overlay_state = "connected"
@@ -4285,16 +4285,8 @@ def test_toggle_handlers_route_basic_and_detailed_runtime_logs() -> None:
     app._on_stt_toggle(False)
     app._on_overlay_toggle(True)
 
-    assert controller.basic_messages == [
-        "[Dashboard] Translation toggle requested: enabled=True",
-        "[Dashboard] STT toggle requested: enabled=False",
-        "[Dashboard] Overlay toggle requested: enabled=True",
-    ]
-    assert controller.detailed_messages == [
-        "[Dashboard] Translation toggle detail: dashboard_state=False overlay_state=connected",
-        "[Dashboard] STT toggle detail: dashboard_state=True overlay_state=connected",
-        "[Dashboard] Overlay toggle detail: overlay_state=connected failure_reason=runtime_crashed",
-    ]
+    assert controller.basic_messages == []
+    assert controller.detailed_messages == []
 
 
 def test_on_overlay_state_changed_routes_runtime_logs() -> None:

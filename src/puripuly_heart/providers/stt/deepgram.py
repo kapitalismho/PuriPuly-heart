@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Sequence
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
-from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
     STTBackend,
@@ -133,11 +133,7 @@ class _DeepgramSDKSession(STTBackendSession):
     _stopped: bool = field(init=False, default=False)
     _loop: asyncio.AbstractEventLoop | None = field(init=False, default=None, repr=False)
     _connected: threading.Event = field(init=False, repr=False)
-    _connect_started_at: float | None = field(init=False, default=None, repr=False)
     _error_reported: bool = field(init=False, default=False, repr=False)
-    _emitted_finals: int = field(init=False, default=0, repr=False)
-    _empty_final_acks: int = field(init=False, default=0, repr=False)
-    _summary_logged: bool = field(init=False, default=False, repr=False)
     _scoped_fragments: list[str] = field(init=False, default_factory=list, repr=False)
     _scoped_provenance: list[STTNativeProvenance] = field(
         init=False, default_factory=list, repr=False
@@ -181,26 +177,10 @@ class _DeepgramSDKSession(STTBackendSession):
                 from_finalize=from_finalize,
                 provenance=provenance,
             )
-        logger.info(
-            "[STT] Transcript metadata text_len=%s is_final=%s speech_final=%s",
-            len(transcript),
-            is_final,
-            speech_final,
-        )
         if self._event_projection.is_scoped or not (is_final or speech_final):
             return None
         if not transcript:
-            if self.stream_label == "peer":
-                self._empty_final_acks += 1
-                logger.info(
-                    "[STT][peer] Empty final transcript acknowledged "
-                    "(is_final=%s, speech_final=%s)",
-                    is_final,
-                    speech_final,
-                )
             return STTBackendTranscriptEvent(text="", is_final=True)
-        if self.stream_label == "peer":
-            self._emitted_finals += 1
         return STTBackendTranscriptEvent(text=transcript, is_final=True)
 
     def _schedule_scoped_result(
@@ -328,12 +308,10 @@ class _DeepgramSDKSession(STTBackendSession):
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
-        self._connect_started_at = time.monotonic()
         self._thread = threading.Thread(target=self._run_sync, name="deepgram-sdk", daemon=True)
         self._thread.start()
 
         # Wait for connection to be established
-        logger.info("[STT] Deepgram connecting (timeout=%.1fs)", self.connect_timeout_s)
         connected = await asyncio.to_thread(self._connected.wait, self.connect_timeout_s)
         if not connected:
             exc = RuntimeError("Deepgram SDK connection timeout")
@@ -376,13 +354,13 @@ class _DeepgramSDKSession(STTBackendSession):
                         event = self._build_transcript_event(result)
                         if event is not None:
                             self._put_event(event)
-                    except Exception as e:
-                        logger.debug(f"Deepgram parse error: {e}")
+                    except Exception as exc:
+                        logger.debug("Deepgram parse failed cause=%s", type(exc).__name__)
 
                 def on_error(error: Any) -> None:
-                    logger.warning(f"Deepgram error: {error}")
+                    logger.warning("Deepgram transport failed")
                     if not self._stopped:
-                        exc = RuntimeError(f"Deepgram error: {error}")
+                        exc = RuntimeError("Deepgram transport failed")
                         self._report_error(exc)
                         if self._loop is not None:
                             self._loop.call_soon_threadsafe(
@@ -398,7 +376,6 @@ class _DeepgramSDKSession(STTBackendSession):
 
                 def on_close(close_event: Any) -> None:
                     _ = close_event
-                    logger.debug("Deepgram: Connection closed")
                     orderly = self._scoped_close_sent or self._stopped
                     if self._loop is not None:
                         self._loop.call_soon_threadsafe(
@@ -416,10 +393,6 @@ class _DeepgramSDKSession(STTBackendSession):
 
                 def on_open(open_event: Any) -> None:
                     _ = open_event
-                    logger.debug("Deepgram: Connection opened")
-                    if self._connect_started_at is not None:
-                        elapsed = time.monotonic() - self._connect_started_at
-                        logger.info("[STT] Deepgram connected in %.2fs", elapsed)
                     self._connected.set()
 
                 connection.on(EventType.OPEN, on_open)
@@ -431,13 +404,11 @@ class _DeepgramSDKSession(STTBackendSession):
                 def listening_thread():
                     try:
                         connection.start_listening()
-                    except Exception as e:
-                        logger.debug(f"Listening thread ended: {e}")
+                    except Exception:
+                        pass
 
                 listen_thread = threading.Thread(target=listening_thread, daemon=True)
                 listen_thread.start()
-
-                logger.debug("Deepgram SDK connection and listening started")
 
                 # Start keepalive thread (sends KeepAlive every 5 seconds to prevent 10-second timeout)
                 def keepalive_thread():
@@ -447,16 +418,17 @@ class _DeepgramSDKSession(STTBackendSession):
                             break
                         try:
                             connection.send_control(ListenV1ControlMessage(type="KeepAlive"))
-                            logger.debug("[STT] KeepAlive sent")
-                        except Exception as e:
-                            logger.debug(f"KeepAlive failed: {e}")
+                        except Exception as exc:
+                            logger.debug(
+                                "Deepgram keepalive failed cause=%s",
+                                type(exc).__name__,
+                            )
                             break
 
                 ka_thread = threading.Thread(target=keepalive_thread, daemon=True)
                 ka_thread.start()
 
                 # Audio sending loop
-                audio_chunks_sent = 0
                 while True:
                     try:
                         data = self._audio_q.get(timeout=0.1)
@@ -466,9 +438,6 @@ class _DeepgramSDKSession(STTBackendSession):
                         continue
 
                     if data is _STOP:
-                        logger.debug(
-                            f"Deepgram: Stop signal received after {audio_chunks_sent} chunks"
-                        )
                         self._put_event(None)
                         break
 
@@ -480,21 +449,16 @@ class _DeepgramSDKSession(STTBackendSession):
                     try:
                         if payload is _FINALIZE:
                             connection.send_control(ListenV1ControlMessage(type="Finalize"))
-                            logger.info("[STT] Finalize message sent to Deepgram")
                         elif payload is _CLOSE_STREAM:
                             connection.send_control(ListenV1ControlMessage(type="CloseStream"))
-                            logger.info("[STT] CloseStream message sent to Deepgram")
                         elif isinstance(payload, bytes):
                             connection.send_media(payload)
-                            audio_chunks_sent += 1
-                            if audio_chunks_sent == 1:
-                                logger.info(
-                                    f"[STT] First audio chunk sent to Deepgram ({len(payload)} bytes)"
-                                )
-                            elif audio_chunks_sent % 50 == 0:
-                                logger.debug(f"[STT] Audio chunks sent: {audio_chunks_sent}")
+                            pass
                     except Exception as exc:
-                        logger.warning("Deepgram writer failed: %s", exc)
+                        logger.warning(
+                            "Deepgram writer failed cause=%s",
+                            type(exc).__name__,
+                        )
                         self._resolve_thread_write(completion, exc)
                         if self._loop is not None:
                             self._loop.call_soon_threadsafe(
@@ -661,27 +625,15 @@ class _DeepgramSDKSession(STTBackendSession):
         if self._stopped:
             return
 
-        existing_ms = max(int(trailing_silence_ms or 0), 0)
-        wait_ms = boundary_wait_ms(reason, observed_tail_ms=existing_ms)
-
-        logger.info(
-            "[STT][Tail] provider=deepgram boundary_reason=%s observed_tail_ms=%s "
-            "boundary_wait_ms=%s",
-            reason,
-            existing_ms,
-            wait_ms,
-        )
         self._audio_q.put_nowait(_FINALIZE)
 
     async def stop(self) -> None:
-        self._log_summary_once()
         if self._stopped:
             return
         self._stopped = True
         self._audio_q.put_nowait(_STOP)
 
     async def close(self) -> None:
-        self._log_summary_once()
         await self.stop()
         if self._thread is not None:
             self._thread.join(timeout=5.0)
@@ -691,17 +643,3 @@ class _DeepgramSDKSession(STTBackendSession):
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         async for event in self._event_projection.events():
             yield event
-
-    def _log_summary_once(self) -> None:
-        if self.stream_label != "peer" or self._summary_logged:
-            return
-        self._summary_logged = True
-        total_finals_seen = self._emitted_finals + self._empty_final_acks
-        empty_ratio = self._empty_final_acks / total_finals_seen if total_finals_seen > 0 else 0.0
-        logger.info(
-            "[STT][peer] Session summary: emitted_finals=%s empty_final_acks=%s total_finals_seen=%s empty_ratio=%.3f",
-            self._emitted_finals,
-            self._empty_final_acks,
-            total_finals_seen,
-            empty_ratio,
-        )

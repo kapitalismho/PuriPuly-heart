@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -945,7 +944,6 @@ def _create_rolling_stt_backend(
     if not include_gemini and not include_scribe and not include_deepgram:
         include_scribe = True
 
-    key_started = time.monotonic()
     gemini_key = (
         _rolling_member_api_key(STTProviderName.GEMINI_TRANSCRIBE.value, secrets)
         if include_gemini
@@ -959,7 +957,6 @@ def _create_rolling_stt_backend(
     deepgram_key = (
         _rolling_member_api_key(STTProviderName.DEEPGRAM.value, secrets) if include_deepgram else ""
     )
-    key_s = time.monotonic() - key_started
 
     def build_gemini(api_key: str) -> STTBackend:
         from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
@@ -998,7 +995,6 @@ def _create_rolling_stt_backend(
             drain_timeout_s=config.drain_timeout_s,
         )
 
-    build_started = time.monotonic()
     definitions: list[RollingProviderDefinition] = []
     if include_scribe:
         definitions.append(
@@ -1024,16 +1020,6 @@ def _create_rolling_stt_backend(
                 build=build_deepgram,
             )
         )
-    build_s = time.monotonic() - build_started
-    configured = tuple(
-        definition.name.value for definition in definitions if definition.is_configured()
-    )
-    logger.info(
-        "[STT][Rolling] prepared configured=%s key_s=%.3f build_s=%.3f",
-        ",".join(configured) if configured else "none",
-        key_s,
-        build_s,
-    )
     return RollingSTTBackend(providers=tuple(definitions))
 
 

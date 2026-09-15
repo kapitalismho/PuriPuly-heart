@@ -340,6 +340,38 @@ async def test_overlay_bridge_keeps_desktop_first_visible_connection_alive() -> 
 
 
 @pytest.mark.asyncio
+async def test_overlay_bridge_reserves_reverse_lifecycle_messages_during_diagnostic_flood() -> None:
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        initial_snapshot=OverlayPresentationSnapshot(
+            revision=0,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[],
+        ),
+    )
+    await bridge.start()
+    try:
+        async with connect(bridge.url) as ws:
+            await ws.send(_native_auth())
+            await asyncio.wait_for(ws.recv(), timeout=0.5)
+            for sequence in range(200):
+                await ws.send(json.dumps({"type": "overlay_event", "sequence": sequence}))
+            await ws.send(json.dumps({"type": "startup_error", "cause": "renderer_failed"}))
+            await ws.send(json.dumps({"type": "shutdown_complete", "status": "complete"}))
+            await _wait_until(
+                lambda: {"startup_error", "shutdown_complete"} <= set(bridge.messages._controls)
+            )
+
+            first = await asyncio.wait_for(bridge.messages.get(), timeout=0.5)
+            second = await asyncio.wait_for(bridge.messages.get(), timeout=0.5)
+    finally:
+        await bridge.stop()
+
+    assert [first["type"], second["type"]] == ["startup_error", "shutdown_complete"]
+    assert bridge.messages.dropped_diagnostics > 0
+
+
+@pytest.mark.asyncio
 async def test_overlay_bridge_resets_one_time_token_after_stop_and_restart() -> None:
     bridge = OverlayBridge(
         session_token="expected-token",

@@ -150,18 +150,13 @@ class OverlayGenerationStartOwner:
                 presenter = OverlayPresenter(
                     calibration=effects.calibration_snapshot(),
                     clock=request.clock,
-                    diagnostics=diagnostics,
-                    runtime_log_diagnostic=effects.log_runtime,
                     show_translation=request.config.show_translation,
                     show_peer_original=request.config.show_peer_original,
                     task_factory=runtime.create_child_task,
                     native_retry_enabled=native_retry_enabled,
                     translation_enabled=request.translation_enabled,
                 )
-            else:
-                presenter.runtime_log_diagnostic = effects.log_runtime
             presenter = cast(OverlayPresenter, runtime.adopt_presenter(presenter))
-            presenter.runtime_log_diagnostic = effects.log_runtime
             await presenter.update_translation_enabled(request.translation_enabled)
             await presenter.update_calibration(effects.calibration_snapshot())
             await presenter.update_display_preferences(

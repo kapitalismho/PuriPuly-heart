@@ -44,7 +44,11 @@ def _load_bundle(locale: str) -> dict[str, str]:
                     if isinstance(key, str) and isinstance(value, str)
                 }
     except Exception as exc:
-        logger.warning("Failed to load i18n bundle for locale '%s': %s", locale, exc)
+        logger.warning(
+            "Failed to load i18n bundle for locale '%s' · Cause %s",
+            locale,
+            type(exc).__name__,
+        )
 
     _bundles[locale] = data
     return data

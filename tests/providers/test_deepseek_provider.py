@@ -229,11 +229,6 @@ async def test_httpx_deepseek_client_logs_safe_request_failure(
             )
 
     rendered_logs = "\n".join(caplog.messages)
-    assert "category=service_unavailable code=provider.service_unavailable" in rendered_logs
-    assert "operation=translate status=503 provider=deepseek" in rendered_logs
-    assert "exception_type=RuntimeError" in rendered_logs
-    assert "message=upstream unavailable" in rendered_logs
-    assert "[redacted]" in rendered_logs
     assert raw_detail not in rendered_logs
     assert "deepseek-secret-123" not in rendered_logs
     assert "token=deepseek-secret-123" not in rendered_logs
@@ -252,7 +247,6 @@ async def test_httpx_deepseek_client_logs_safe_request_failure(
 )
 async def test_httpx_deepseek_client_non_200_extracts_safe_detail_order(
     monkeypatch,
-    caplog: pytest.LogCaptureFixture,
     response_data: dict,
     response_text: str,
     expected: str,
@@ -266,19 +260,14 @@ async def test_httpx_deepseek_client_non_200_extracts_safe_detail_order(
 
     client = HttpxDeepSeekClient(api_key="test-key", model="m", base_url="https://example")
 
-    with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.deepseek"):
-        with pytest.raises(RuntimeError) as exc_info:
-            await client.translate(
-                text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-            )
+    with pytest.raises(RuntimeError) as exc_info:
+        await client.translate(
+            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
+        )
 
     rendered_error = str(exc_info.value)
-    rendered_logs = "\n".join(caplog.messages)
     assert rendered_error == f"DeepSeek request failed (status=400 message={expected})"
-    assert "status=400" in rendered_logs
-    assert f"message={expected}" in rendered_logs
     assert "ignored text" not in rendered_error
-    assert "ignored text" not in rendered_logs
 
 
 @pytest.mark.asyncio

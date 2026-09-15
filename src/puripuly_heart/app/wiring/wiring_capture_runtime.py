@@ -71,31 +71,18 @@ class CaptureDiagnosticsAdapter:
         )
 
     def self_capture(self, diagnostic: SelfCaptureDiagnostic) -> None:
+        if diagnostic.event is not SelfCaptureDiagnosticEvent.FAILURE:
+            return
         fields = [
-            f"event={diagnostic.event.value}",
-            f"generation={diagnostic.generation}",
+            "[SelfCapture] failed",
             f"state={diagnostic.state.value}",
         ]
         if diagnostic.provider_id is not None:
             fields.append(f"provider={diagnostic.provider_id}")
         if diagnostic.reason is not None:
-            fields.append(f"reason={diagnostic.reason.value}")
-        if diagnostic.detail is not None:
-            fields.append(f"detail={diagnostic.detail}")
-        self.log_diagnostic(f"[SelfCapture] {' '.join(fields)}")
-        if diagnostic.event in {
-            SelfCaptureDiagnosticEvent.ADMISSION_CHANGED,
-            SelfCaptureDiagnosticEvent.PROVIDER_CHANGED,
-            SelfCaptureDiagnosticEvent.FAILURE,
-        }:
-            self.log_basic(
-                "[SelfCapture] state_result "
-                f"event={diagnostic.event.value} "
-                f"generation={diagnostic.generation} "
-                f"state={diagnostic.state.value} "
-                f"provider={diagnostic.provider_id or 'none'} "
-                f"cause={diagnostic.reason.value if diagnostic.reason is not None else 'none'}"
-            )
+            fields.append(f"cause={diagnostic.reason.value}")
+        self.log_basic(" ".join(fields))
+        self.log_diagnostic(" ".join(fields))
 
 
 @dataclass(frozen=True, slots=True)

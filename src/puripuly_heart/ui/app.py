@@ -1322,12 +1322,6 @@ class TranslatorApp:
         return "qq" if resolved == "qq" else "discord"
 
     def _on_translation_toggle(self, enabled: bool) -> bool:
-        self._log_basic(f"[Dashboard] Translation toggle requested: enabled={enabled}")
-        self._log_diagnostic(
-            "[Dashboard] Translation toggle detail: "
-            f"dashboard_state={getattr(getattr(self, 'view_dashboard', None), 'is_translation_on', None)} "
-            f"overlay_state={getattr(self, 'overlay_state', 'unknown')}"
-        )
         if enabled:
             managed_auth_action = self._dashboard_managed_auth_action()
             if managed_auth_action in {"prompt", "in_progress"}:
@@ -1346,12 +1340,6 @@ class TranslatorApp:
         return True
 
     def _on_stt_toggle(self, enabled: bool) -> None:
-        self._log_basic(f"[Dashboard] STT toggle requested: enabled={enabled}")
-        self._log_diagnostic(
-            "[Dashboard] STT toggle detail: "
-            f"dashboard_state={getattr(getattr(self, 'view_dashboard', None), 'is_stt_on', None)} "
-            f"overlay_state={getattr(self, 'overlay_state', 'unknown')}"
-        )
 
         async def _task():
             await self.application.set_stt_enabled(enabled)
@@ -1359,12 +1347,6 @@ class TranslatorApp:
         self._run_page_task(_task)
 
     def _on_overlay_toggle(self, enabled: bool) -> None:
-        self._log_basic(f"[Dashboard] Overlay toggle requested: enabled={enabled}")
-        self._log_diagnostic(
-            "[Dashboard] Overlay toggle detail: "
-            f"overlay_state={getattr(self, 'overlay_state', 'unknown')} "
-            f"failure_reason={getattr(self, 'overlay_failure_reason', None)}"
-        )
 
         async def _task():
             await self.application.set_overlay_enabled(enabled)
@@ -1372,12 +1354,6 @@ class TranslatorApp:
         self._run_page_task(_task)
 
     def _on_peer_translation_toggle(self, enabled: bool) -> None:
-        self._log_basic(f"[Dashboard] Peer toggle requested: enabled={enabled}")
-        self._log_diagnostic(
-            "[Dashboard] Peer toggle detail: "
-            f"overlay_state={getattr(self, 'overlay_state', 'unknown')} "
-            f"failure_reason={getattr(self, 'overlay_failure_reason', None)}"
-        )
         if enabled and self.application.state().peer_translation_eula_accepted is False:
             self._show_peer_translation_eula(self._accept_peer_translation_eula_and_enable)
             return
@@ -1388,7 +1364,6 @@ class TranslatorApp:
         self._run_page_task(_task)
 
     def _on_retry_peer_process_capture(self) -> None:
-        self._log_basic("[Dashboard] Peer process capture retry requested")
 
         async def _task():
             await self.application.retry_peer_process_capture()
@@ -1413,19 +1388,6 @@ class TranslatorApp:
             return
         languages = settings.intent.languages
         previous_source_code = languages.source_language
-        previous_target_code = languages.target_language
-        previous_peer_source_code = languages.peer_source_language
-        previous_peer_target_code = languages.peer_target_language
-        self._log_basic(
-            "[Dashboard] Language change requested: "
-            f"source={previous_source_code}->{change.source_code} "
-            f"target={previous_target_code}->{change.target_code} "
-            f"peer_source={previous_peer_source_code}->{change.peer_source_code} "
-            f"peer_target={previous_peer_target_code}->{change.peer_target_code}"
-        )
-        self._log_diagnostic(
-            f"[Dashboard] Language change detail: overlay_state={getattr(self, 'overlay_state', 'unknown')}"
-        )
 
         # Check STT provider compatibility and show warning if needed
         warning = None

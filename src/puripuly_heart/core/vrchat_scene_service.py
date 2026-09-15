@@ -247,7 +247,6 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._tracker.reset()
         self._publish_snapshot(self._tracker.snapshot())
         self._touch()
-        logger.info("[VrchatScene] lifecycle begin pid=%d", identity.pid)
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -275,7 +274,6 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._log_candidate = None
         self._tailer = VrchatSceneLogTailer(self.log_directory)
         self._tracker.reset()
-        logger.info("[VrchatScene] lifecycle end")
         self._publish_snapshot(UNAVAILABLE_SNAPSHOT)
 
     def _handle_terminal(self, generation: int, instance_id: str) -> None:
@@ -304,13 +302,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         if not self._fresh(generation) or tailer is not self._tailer:
             return
         self._log_candidate = _by_path(found, selected)
-        parsed = self._feed_lines(lines)
-        logger.info(
-            "[VrchatScene] log selected name=%s replayed=%d parsed=%d",
-            selected.name,
-            len(lines),
-            parsed,
-        )
+        self._feed_lines(lines)
         self._touch()
         self._settle_if_quiet(generation)
 
@@ -364,13 +356,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         if not self._fresh(generation) or tailer is not self._tailer:
             return
         self._log_candidate = selected
-        parsed = self._feed_lines(lines)
-        logger.info(
-            "[VrchatScene] log selected name=%s replayed=%d parsed=%d",
-            selected.path.name,
-            len(lines),
-            parsed,
-        )
+        self._feed_lines(lines)
         self._touch()
         self._settle_if_quiet(generation)
 
@@ -410,14 +396,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._snapshot = snapshot
         if snapshot.status == previous:
             return
-        if snapshot.status == "ready":
-            logger.info(
-                "[VrchatScene] status %s -> ready people=%d",
-                previous,
-                snapshot.participant_count,
-            )
-        else:
-            logger.info("[VrchatScene] status %s -> %s", previous, snapshot.status)
+        return
 
     def _mark_file_failure(self, generation: int, reason: str = "unknown") -> None:
         if generation != self._generation or not self._started or not self._in_lifecycle:

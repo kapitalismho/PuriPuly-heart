@@ -40,13 +40,16 @@ _CLOSE_TIMEOUT_SECONDS = 1.0
 _DELIVERY_RECEIPT_LIMIT = 128
 _REVERSE_CONTROL_TYPES = {
     "runtime_error",
+    "startup_error",
     "overlay_ready",
     "desktop_first_visible",
     "shutdown_ack",
+    "shutdown_complete",
     "window_bounds_changed",
     "interaction_mode_changed",
     "reset_to_bottom_center",
 }
+_REVERSE_CONTROL_SLOT_LIMIT = len(_REVERSE_CONTROL_TYPES)
 _REVERSE_KNOWN_TYPES = frozenset(
     _REVERSE_CONTROL_TYPES
     | {
@@ -79,9 +82,12 @@ class _BoundedReverseMessageQueue:
             return
         if payload_size > _CONTROL_BYTE_LIMIT:
             raise ValueError("overlay reverse control exceeds maximum size")
-        while message_type not in self._controls and len(self._controls) >= _CONTROL_SLOT_LIMIT:
+        while (
+            message_type not in self._controls
+            and len(self._controls) >= _REVERSE_CONTROL_SLOT_LIMIT
+        ):
             self._space_available.clear()
-            if len(self._controls) < _CONTROL_SLOT_LIMIT:
+            if len(self._controls) < _REVERSE_CONTROL_SLOT_LIMIT:
                 self._space_available.set()
                 continue
             await self._space_available.wait()
@@ -97,7 +103,10 @@ class _BoundedReverseMessageQueue:
         if message_type in _REVERSE_CONTROL_TYPES:
             if payload_size > _CONTROL_BYTE_LIMIT:
                 raise asyncio.QueueFull
-            if message_type not in self._controls and len(self._controls) >= _CONTROL_SLOT_LIMIT:
+            if (
+                message_type not in self._controls
+                and len(self._controls) >= _REVERSE_CONTROL_SLOT_LIMIT
+            ):
                 raise asyncio.QueueFull
             self._controls.pop(message_type, None)
             self._controls[message_type] = message
@@ -421,13 +430,6 @@ class OverlayBridge:
             self._authenticated_connections.add(connection)
             self._mailbox.replay_required = True
             authenticated = True
-            logger.info(
-                "[OverlayBridge] Overlay authenticated: overlay_instance_id=%s connection_id=%s revision=%s authenticated_connections=%s",
-                self.overlay_instance_id,
-                connection_id,
-                self._mailbox.snapshot.revision,
-                len(self._authenticated_connections),
-            )
             if self.diagnostics is not None:
                 self.diagnostics.record_bridge(
                     "connection_authenticated",
@@ -462,16 +464,6 @@ class OverlayBridge:
         except ConnectionClosed as exc:
             close_code = self._close_code(exc)
             close_reason = self._close_reason(exc)
-            logger.info(
-                "[OverlayBridge] Overlay connection closed: overlay_instance_id=%s connection_id=%s code=%s reason=%s authenticated=%s authenticated_connections=%s last_snapshot_revision=%s",
-                self.overlay_instance_id,
-                connection_id,
-                close_code,
-                close_reason,
-                authenticated,
-                len(self._authenticated_connections),
-                self._mailbox.last_snapshot_revision,
-            )
             if self.diagnostics is not None:
                 self.diagnostics.record_bridge(
                     "connection_closed",

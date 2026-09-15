@@ -392,6 +392,8 @@ Each generation owns its tasks and shutdown. Python owns caption lifetime; nativ
 
 Basic-audience records are the only records delivered live to the console and Logs view. Accepted SELF/PEER conversation records, concise valid recognition RTF, VAD/SmartTurn activity, and useful latency outcomes are Basic. Selected technical diagnostics are file-only and metadata-only. The UTF-8 runtime file is written by one bounded-queue owner in batches, rotates at a 20 MiB record boundary with one backup, and flushes priority records promptly. A record larger than the file cap is rejected before file formatting when possible and counted in terminal loss evidence; queue pressure, failed or stalled I/O, forced termination, and ordinary buffered writes can also prevent complete persistence. File flush does not imply `fsync`.
 
+The 2,048-record queue reserves 64 slots for warning/error/terminal evidence and discards lower-priority diagnostics first without blocking producers. Ordinary root and child prose is reduced to bounded metadata unless it satisfies the selected diagnostic format; accepted conversation retains its separate secret-protected path. A timed-out close keeps writer ownership until the listener can finish and close its stream, preventing a replacement writer from racing the old one. A stalled operating-system write can still prevent complete shutdown.
+
 ## Lifecycle
 
 Every owner of a task, process, source, or provider session must define:

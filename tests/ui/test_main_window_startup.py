@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from types import SimpleNamespace
 
 import pytest
@@ -79,34 +78,28 @@ async def test_prepare_and_show_main_window_tolerates_missing_readiness_method()
 
 
 @pytest.mark.asyncio
-async def test_prepare_and_show_main_window_shows_after_readiness_failure(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+async def test_prepare_and_show_main_window_shows_after_readiness_failure() -> None:
     async def wait_until_ready_to_show() -> None:
         raise RuntimeError("window not ready")
 
     page = _make_page(wait_until_ready_to_show=wait_until_ready_to_show)
 
-    with caplog.at_level(logging.WARNING, logger=app_module.__name__):
-        await app_module._prepare_and_show_main_window(page)
+    await app_module._prepare_and_show_main_window(page)
 
     assert page.window.visible is True
     assert page.visibility_updates == [False, True]
-    assert "Failed to center the main window before showing it" in caplog.text
 
 
 @pytest.mark.asyncio
-async def test_prepare_and_show_main_window_shows_after_center_failure(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+async def test_prepare_and_show_main_window_shows_after_center_failure() -> None:
     def center() -> None:
         raise RuntimeError("center failed")
 
     page = _make_page(center=center)
 
-    with caplog.at_level(logging.WARNING, logger=app_module.__name__):
-        await app_module._prepare_and_show_main_window(page)
+    await app_module._prepare_and_show_main_window(page)
 
     assert page.window.visible is True
     assert page.visibility_updates == [False, True]
-    assert "Failed to center the main window before showing it" in caplog.text
+
+

@@ -95,17 +95,12 @@ class TranslationEnableOwner:
             self.pending_sink(False)
             self._publish_starting(False)
         state = self.state_provider()
+        previous_enabled = state.translation_enabled
         if self._ingress_stopped or state.ingress_frozen or not state.runtime_available:
             if not enabled:
                 await self._teardown()
             self._publish_starting(False)
             return False
-        self.log_basic(f"[Translation] Toggle request: enabled={enabled}")
-        self.log_diagnostic(
-            "[Translation] Toggle detail: "
-            f"current_enabled={state.translation_enabled} "
-            f"llm_available={state.llm_available}"
-        )
         if enabled:
             self._publish_starting(True)
         try:
@@ -116,9 +111,6 @@ class TranslationEnableOwner:
                 enabled=True,
                 generation=request_generation,
             ):
-                self.log_diagnostic(
-                    "[Translation] Skipping stale enable request after newer toggle intent"
-                )
                 return False
             state = self.state_provider()
             if enabled and not state.llm_available:
@@ -126,20 +118,16 @@ class TranslationEnableOwner:
                 self.dashboard_sink(False)
                 self.log_error("Translation is ON but LLM provider is not configured.")
                 return False
-            if enabled and state.settings_available and state.provider_name is not None:
-                self.log_basic(f"[Translation] Enabled with provider: {state.provider_name}")
-                if state.provider_name == "qwen" and state.qwen_region is not None:
-                    self.log_diagnostic(
-                        "[Translation] Provider detail: "
-                        f"provider={state.provider_name} region={state.qwen_region}"
-                    )
             self.clear_context()
             self.runtime_sink(enabled)
             if enabled:
                 await self.warmup()
             else:
                 await self._teardown()
-            return self.state_provider().translation_enabled
+            applied = self.state_provider().translation_enabled
+            if applied != previous_enabled:
+                self.log_basic("[Translation] Enabled" if applied else "[Translation] Disabled")
+            return applied
         finally:
             if self.generation == request_generation:
                 self._publish_starting(False)
@@ -161,9 +149,6 @@ class TranslationEnableOwner:
             raise
         self.pending_sink(False)
         if not self.intent_matches(enabled=True, generation=request_generation):
-            self.log_diagnostic(
-                "[Translation] Skipping stale managed enable result after newer toggle intent"
-            )
             return False
         if result.transaction_result is not None:
             self.result_sink(result.transaction_result)

@@ -210,12 +210,6 @@ class ListenDeliveryController:
         pause_started = self._pause_started_at_s
         if pause_started is None:
             self._probe_status = "unavailable"
-            logger.info(
-                "[STT][Runtime] smart-turn inference skipped segment=%s pause=%s "
-                "reason=unavailable availability=missing_pause_frontier",
-                segment_id,
-                self._pause_id,
-            )
             return
         probe_samples = self.SMART_PROBE_MS * self._sample_rate_hz // 1000
         samples_after_probe = max(0, self._pause_samples - probe_samples)
@@ -249,22 +243,9 @@ class ListenDeliveryController:
             )
         )
         if reason is not None:
-            logger.info(
-                "[STT][Runtime] smart-turn result discarded segment=%s pause=%s reason=%s",
-                identity.segment_id,
-                identity.pause_id,
-                reason,
-            )
             return
         if completion.completed_at_monotonic_s >= identity.complete_deadline_monotonic_s:
             self._smart_turn_owner.record_late()
-            logger.info(
-                "[STT][Runtime] smart-turn result late segment=%s pause=%s late_by_ms=%.1f",
-                identity.segment_id,
-                identity.pause_id,
-                (completion.completed_at_monotonic_s - identity.complete_deadline_monotonic_s)
-                * 1000.0,
-            )
         self._completion = completion
 
     def _timely_incomplete(self, threshold: float | None) -> bool:
@@ -381,17 +362,6 @@ class ListenDeliveryController:
         event = seal(reason=reason)
         if event is None:
             return False
-        snapshot = self._current_snapshot(segment_id)
-        if snapshot is not None and snapshot.settings.delivery_profile_effective == "on":
-            logger.info(
-                "[STT][Runtime] smart-turn segment sealed segment=%s pause=%s "
-                "reason=%s rollover=%s observed_pause_ms=%s",
-                segment_id,
-                self._pause_id,
-                reason,
-                rollover,
-                self._observed_pause_ms(),
-            )
         await self.handle_vad_event(event)
         return True
 

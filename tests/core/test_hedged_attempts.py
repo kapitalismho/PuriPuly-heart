@@ -139,10 +139,7 @@ async def test_primary_error_starts_first_fallback_without_waiting_for_delay() -
     assert result.text == "fallback"
     assert fallback.started.is_set()
     assert sleeper.calls == [1.3]
-    assert any(
-        "outcome=success" in message and "cause=primary_error" in message and "winner=1" in message
-        for message in runtime_logging.messages
-    )
+    assert runtime_logging.messages == []
     await provider.close()
 
 
@@ -189,10 +186,7 @@ async def test_emergency_attempt_waits_for_schedule_after_earlier_errors() -> No
 
     assert result.text == "emergency"
     assert emergency.started.is_set()
-    assert any(
-        "outcome=success" in message and "cause=timeout" in message and "winner=2" in message
-        for message in runtime_logging.messages
-    )
+    assert runtime_logging.messages == []
     await provider.close()
 
 
@@ -234,13 +228,7 @@ async def test_total_failure_reports_terminal_outcome_without_false_winner() -> 
     with pytest.raises(LLMProviderRaceError, match="private primary payload"):
         await provider.translate(**_kwargs())
 
-    terminal = runtime_logging.messages[-1]
-    assert "outcome=failure" in terminal
-    assert "cause=" in terminal
-    assert "elapsed_ms=" in terminal
-    assert "winner=" not in terminal
-    assert "private primary payload" not in terminal
-    assert "private fallback payload" not in terminal
+    assert runtime_logging.messages == []
     await provider.close()
 
 
@@ -263,8 +251,5 @@ async def test_caller_cancellation_reports_terminal_outcome_after_hedge_launch()
     with pytest.raises(asyncio.CancelledError):
         await task
 
-    terminal = runtime_logging.messages[-1]
-    assert "outcome=cancelled" in terminal
-    assert "elapsed_ms=" in terminal
-    assert "winner=" not in terminal
+    assert runtime_logging.messages == []
     await provider.close()

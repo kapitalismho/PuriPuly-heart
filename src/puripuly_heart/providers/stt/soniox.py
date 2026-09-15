@@ -14,7 +14,7 @@ from typing import Any, AsyncIterator, Literal, Sequence
 from uuid import uuid4
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
-from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
     STTBackend,
@@ -150,7 +150,7 @@ class SonioxRealtimeSTTBackend(STTBackend):
                         raise Exception(data.get("error") or data.get("error_code"))
                     return True
             except Exception as exc:
-                raise Exception(f"Connection failed: {exc}") from exc
+                raise Exception("Connection failed") from exc
 
         return await _check()
 
@@ -216,13 +216,9 @@ class _SonioxSession(STTBackendSession):
         if self.context_terms:
             config["context"] = {"terms": self.context_terms}
 
-        logger.info("[STT] Soniox connecting (timeout=%.1fs)", self.connect_timeout_s)
-        start_at = time.monotonic()
         self._ws = await websockets.connect(
             self.endpoint, ping_interval=None, open_timeout=self.connect_timeout_s
         )
-        elapsed = time.monotonic() - start_at
-        logger.info("[STT] Soniox connected in %.2fs", elapsed)
         await self._ws.send(json.dumps(config))
         self._last_send_at = time.monotonic()
 
@@ -310,7 +306,7 @@ class _SonioxSession(STTBackendSession):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.debug(f"Soniox keepalive failed: {exc}")
+            logger.debug("Soniox keepalive failed cause=%s", type(exc).__name__)
             self._put_event(exc)
             self._scoped_transport_failure("soniox_keepalive_failed", orderly=False)
             self._stopped = True
@@ -321,7 +317,6 @@ class _SonioxSession(STTBackendSession):
         try:
             data = json.loads(message)
         except json.JSONDecodeError:
-            logger.debug("Soniox message parse error")
             return
 
         if "error" in data or "error_code" in data:
@@ -333,9 +328,6 @@ class _SonioxSession(STTBackendSession):
         if not isinstance(tokens, list):
             return
 
-        if tokens:
-            logger.debug("[STT] Soniox tokens received count=%s", len(tokens))
-
         for token in tokens:
             if not isinstance(token, dict):
                 continue
@@ -344,9 +336,6 @@ class _SonioxSession(STTBackendSession):
             if not is_final:
                 continue
             if text == "<fin>":
-                logger.debug(
-                    "[STT] Soniox token finalize pending_tokens=%s", len(self._pending_tokens)
-                )
                 self._flush_final()
                 self._resolve_scoped_fin(data)
                 continue
@@ -356,19 +345,7 @@ class _SonioxSession(STTBackendSession):
             end_ms = token.get("end_ms")
             if isinstance(end_ms, (int, float)):
                 end_ms = int(end_ms)
-                if self._pending_last_end_ms is not None and end_ms <= self._pending_last_end_ms:
-                    logger.debug(
-                        "[STT] Soniox token timestamp non-increasing end_ms=%s last_end_ms=%s",
-                        end_ms,
-                        self._pending_last_end_ms,
-                    )
                 self._pending_last_end_ms = end_ms
-            logger.debug(
-                "[STT] Soniox token final text_len=%s end_ms=%s pending_tokens=%s",
-                len(text),
-                end_ms,
-                len(self._pending_tokens) + 1,
-            )
             language = ""
             if self.enable_language_identification:
                 raw_language = token.get("language")
@@ -554,10 +531,6 @@ class _SonioxSession(STTBackendSession):
 
     def _flush_final(self) -> None:
         if not self._consume_pending_finalize_request():
-            logger.debug(
-                "[STT] Soniox finalize marker retained without pending request tokens=%s",
-                len(self._pending_tokens),
-            )
             return
         if self._event_projection.is_scoped:
             self._pending_tokens.clear()
@@ -582,12 +555,6 @@ class _SonioxSession(STTBackendSession):
         text = "".join(token.text for token in self._final_tokens)
         if not text:
             return False
-        logger.info("[STT] Transcript final text_len=%s", len(text))
-        logger.debug(
-            "[STT] Soniox final flush tokens=%s text_len=%s",
-            len(self._final_tokens),
-            len(text),
-        )
         self._put_event(
             STTBackendTranscriptEvent(
                 text=text,
@@ -642,7 +609,6 @@ class _SonioxSession(STTBackendSession):
         return self._speaker_runs_for_tokens(self._final_tokens)
 
     def _emit_empty_final_ack(self) -> None:
-        logger.debug("[STT] Soniox empty finalize ack")
         self._put_event(STTBackendTranscriptEvent(text="", is_final=True))
 
     def _put_event(self, event: STTBackendTranscriptEvent | BaseException | None) -> None:
@@ -751,15 +717,6 @@ class _SonioxSession(STTBackendSession):
             return
 
         self._pending_finalize_requests += 1
-        observed_tail_ms = max(int(trailing_silence_ms or 0), 0)
-        wait_ms = boundary_wait_ms(reason, observed_tail_ms=observed_tail_ms)
-        logger.info(
-            "[STT][Tail] provider=soniox boundary_reason=%s observed_tail_ms=%s "
-            "boundary_wait_ms=%s",
-            reason,
-            observed_tail_ms,
-            wait_ms,
-        )
         await self._audio_q.put(_FinalizeRequest())
 
     async def stop(self) -> None:

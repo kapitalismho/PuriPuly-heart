@@ -2028,7 +2028,7 @@ def test_local_llm_secret_failure_logs_do_not_include_secret(
         view._on_local_llm_secret_change("local_llm_api_key", "server-secret")
 
     assert "server-secret" not in caplog.text
-    assert "RuntimeError" in caplog.text
+    assert any(record.levelno == logging.WARNING for record in caplog.records)
 
 
 def test_local_llm_fields_update_provider_draft(monkeypatch: pytest.MonkeyPatch) -> None:

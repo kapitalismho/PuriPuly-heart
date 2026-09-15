@@ -414,16 +414,9 @@ class TranslationLatencyDiagnosticsOwner:
         )
         self.emit(
             RuntimeDiagnostic(
-                message=(
-                    "[Translation] turn_result channel=%s parent_utterance_id=%s "
-                    "target_index=%s target_language=%s translation=failed stage=%s cause=%s"
-                ),
+                message="[Translation] %s translation failed · Cause %s",
                 args=(
-                    diagnostic.channel,
-                    diagnostic.parent_utterance_id,
-                    diagnostic.target_index,
-                    diagnostic.target_language,
-                    diagnostic.stage,
+                    diagnostic.channel.title(),
                     format_error_report_for_log(report),
                 ),
                 level=logging.ERROR,
@@ -431,21 +424,6 @@ class TranslationLatencyDiagnosticsOwner:
                 diagnostic_only=diagnostic.diagnostic_only,
             )
         )
-        if diagnostic.target_language is not None:
-            self.emit(
-                RuntimeDiagnostic(
-                    message=(
-                        "[Diagnostic][Translation] translation_target_failed "
-                        "parent_utterance_id=%s target_index=%s target_language=%s"
-                    ),
-                    args=(
-                        diagnostic.parent_utterance_id,
-                        diagnostic.target_index,
-                        diagnostic.target_language,
-                    ),
-                    diagnostic_only=True,
-                )
-            )
         return report
 
     def record_context_mode(self, diagnostic: ContextModeDiagnostic) -> None:

@@ -304,7 +304,7 @@ def test_runtime_owner_safely_falls_back_when_session_delivery_fails() -> None:
         lazy_calls += 1
         return "provider_response_body=private-lazy-body"
 
-    service.emit_basic("The translation service failed.", level=logging.ERROR)
+    service.emit_basic("provider failed: provider secret body", level=logging.ERROR)
     assert (
         service.emit_diagnostic(
             "provider_response_body=private-direct-body",
@@ -315,7 +315,7 @@ def test_runtime_owner_safely_falls_back_when_session_delivery_fails() -> None:
     assert service.emit_diagnostic_lazy(lazy_message, level=logging.WARNING) is True
 
     rendered = "\n".join(message for _level, message in fallback.messages)
-    assert "The translation service failed." in rendered
+    assert "provider secret body" not in rendered
     assert "private-direct-body" not in rendered
     assert "private-lazy-body" not in rendered
     assert "diagnostic_delivery_failed" in rendered

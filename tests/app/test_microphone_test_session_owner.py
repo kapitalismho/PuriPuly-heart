@@ -122,10 +122,7 @@ async def test_owner_starts_stops_and_owns_meter_and_audio_signature() -> None:
     await capture_started.wait()
 
     assert disable_calls == 1
-    assert logs == [
-        "[MicTest] stt_auto_off requested=True completed=True "
-        "exception_class=None exception_message=None"
-    ]
+    assert logs == []
     assert owner.active is True
     assert owner.meter_level == 0.4
     assert owner.audio_signature == ("wasapi", "microphone", 16000, 1)
@@ -183,10 +180,7 @@ async def test_owner_rejects_retained_self_capture_failure_without_starting_runt
     assert await owner.start(MicrophoneTestSessionRequest(audio_signature=("signature",))) is False
     assert capture_calls == 0
     assert owner.active is False
-    assert logs == [
-        "[MicTest] stt_auto_off requested=False completed=False "
-        "exception_class='RuntimeError' exception_message='close detail'"
-    ]
+    assert logs == ["[MicTest] failed to stop recognition cause=RuntimeError"]
 
 
 @pytest.mark.asyncio
@@ -208,10 +202,7 @@ async def test_owner_contains_self_capture_disable_failure() -> None:
 
     assert await owner.start(MicrophoneTestSessionRequest(audio_signature=("signature",))) is False
     assert owner.active is False
-    assert logs == [
-        "[MicTest] stt_auto_off requested=True completed=False "
-        "exception_class='RuntimeError' exception_message='disable detail'"
-    ]
+    assert logs == ["[MicTest] failed to stop recognition cause=RuntimeError"]
 
 
 @pytest.mark.asyncio
@@ -239,11 +230,7 @@ async def test_owner_rejects_source_that_remains_open_after_disable() -> None:
 
     assert await owner.start(MicrophoneTestSessionRequest(audio_signature=("signature",))) is False
     assert owner.active is False
-    assert logs == [
-        "[MicTest] stt_auto_off requested=True completed=False "
-        "exception_class='RuntimeError' "
-        "exception_message='self microphone source still open after STT auto-off'"
-    ]
+    assert logs == ["[MicTest] failed to stop recognition cause=RuntimeError"]
 
 
 @pytest.mark.asyncio

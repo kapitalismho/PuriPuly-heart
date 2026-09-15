@@ -62,9 +62,7 @@ async def check_for_update() -> UpdateInfo | None:
                 headers={"Accept": "application/vnd.github.v3+json"},
                 follow_redirects=True,
             )
-
             if resp.status_code != 200:
-                logger.debug(f"GitHub API returned {resp.status_code}")
                 return None
 
             data: dict[str, Any] = resp.json()
@@ -72,9 +70,7 @@ async def check_for_update() -> UpdateInfo | None:
 
             if not latest_version:
                 return None
-
             if not _is_newer(latest_version, __version__):
-                logger.debug(f"Current version {__version__} is up to date")
                 return None
 
             # Find installer download URL
@@ -85,7 +81,6 @@ async def check_for_update() -> UpdateInfo | None:
                     download_url = asset.get("browser_download_url", download_url)
                     break
 
-            logger.info(f"New version available: {latest_version}")
             return UpdateInfo(
                 version=latest_version,
                 download_url=download_url,
@@ -93,8 +88,6 @@ async def check_for_update() -> UpdateInfo | None:
             )
 
     except httpx.TimeoutException:
-        logger.debug("Update check timed out")
         return None
-    except Exception as exc:
-        logger.debug(f"Update check failed: {exc}")
+    except Exception:
         return None

@@ -348,7 +348,7 @@ async def test_google_genai_client_raises_on_empty_response(
                 target_language="ko",
             )
 
-    assert "[Basic][LLM] Gemini response missing text [translate]" in caplog.messages
+    assert any(record.levelno == logging.ERROR for record in caplog.records)
 
 
 @pytest.mark.asyncio

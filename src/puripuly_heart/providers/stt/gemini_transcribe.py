@@ -6,13 +6,12 @@ import asyncio
 import concurrent.futures
 import contextlib
 import logging
-import time
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Callable, Sequence
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
-from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
     RecoverableSTTSessionError,
@@ -302,7 +301,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         self._setup_future = None
         self._setup_executor = None
         self._handshake_task = None
-        setup_start = time.monotonic()
         executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=1, thread_name_prefix="gemini-stt-setup"
         )
@@ -327,11 +325,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
             except (asyncio.CancelledError, Exception):
                 pass
             raise
-        setup_elapsed = time.monotonic() - setup_start
-        logger.info(
-            "[STT] Gemini Transcribe Live setup completed in %.2fs",
-            setup_elapsed,
-        )
         if self._stopped:
             try:
                 await self._teardown()
@@ -352,7 +345,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 pass
             raise
         self._live_context = live_context
-        handshake_start = time.monotonic()
         handshake_task = asyncio.create_task(live_context.__aenter__())
         self._handshake_task = handshake_task
         try:
@@ -364,13 +356,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 pass
             raise
         self._handshake_task = None
-        handshake_elapsed = time.monotonic() - handshake_start
-        logger.info(
-            "[STT] Gemini Transcribe Live ready in %.2fs (setup=%.2fs handshake=%.2fs)",
-            setup_elapsed + handshake_elapsed,
-            setup_elapsed,
-            handshake_elapsed,
-        )
         if self._stopped:
             try:
                 await self._teardown()
@@ -478,7 +463,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                     self._streaming_turn = item.turn
                     await self._send_realtime(activity_start=types.ActivityStart())
                     self._resolve_write(item.completion, None)
-                    logger.info("[STT] Gemini Transcribe Live activityStart sent")
                     continue
                 if isinstance(item, _EndTurn):
                     from google.genai import types
@@ -489,7 +473,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                     self._resolve_write(item.completion, None)
                     if turn in self._pending_turns:
                         turn.timeout_task = asyncio.create_task(self._finalize_timeout(turn))
-                    logger.info("[STT] Gemini Transcribe Live activityEnd sent (finalize)")
                     await turn.activity_end_ack.wait()
                     self._streaming_turn = None
                     if self._protocol_failed:
@@ -572,7 +555,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                                     provenance=provenance,
                                 )
                             )
-                logger.debug("[STT] Gemini Transcribe Live interim text_len=%s", len(text))
             final = content.input_transcription
             if final is not None:
                 self._handle_final(str(final.text or ""), provenance)
@@ -601,10 +583,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
             None,
         )
         if turn is None:
-            logger.debug(
-                "[STT] Gemini Transcribe Live final ignored without pending finalize text_len=%s",
-                len(text),
-            )
             return
         turn.authoritative_received = True
         turn.authoritative_text = text
@@ -628,7 +606,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
 
     def _handle_activity_end_ack(self, provenance: STTNativeProvenance) -> None:
         if not self._pending_turns:
-            logger.debug("[STT] Gemini Transcribe Live activityEnd ack without pending finalize")
             return
         turn = self._pending_turns[0]
         turn.activity_end_received = True
@@ -668,10 +645,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         if turn.final_emitted:
             return
         turn.final_emitted = True
-        if text:
-            logger.info("[STT] Transcript final text_len=%s", len(text))
-        else:
-            logger.debug("[STT] Gemini Transcribe Live empty finalize ack")
         if turn.identity is None:
             self._event_projection.put_legacy(STTBackendTranscriptEvent(text=text, is_final=True))
 
@@ -887,15 +860,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
     ) -> None:
         if self._stopped:
             return
-        observed_tail_ms = max(int(trailing_silence_ms or 0), 0)
-        wait_ms = boundary_wait_ms(reason, observed_tail_ms=observed_tail_ms)
-        logger.info(
-            "[STT][Tail] provider=gemini_transcribe boundary_reason=%s observed_tail_ms=%s "
-            "boundary_wait_ms=%s",
-            reason,
-            observed_tail_ms,
-            wait_ms,
-        )
         if self._capture_turn is not None:
             turn = self._capture_turn
             self._capture_turn = None

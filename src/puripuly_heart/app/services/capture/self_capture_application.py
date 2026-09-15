@@ -46,27 +46,10 @@ class SelfCaptureApplicationOwner:
         if enabled and not self.persist_manual_fallback():
             self.dashboard_enabled_sink(False)
             return
-        self.log_basic(f"[STT] Toggle request: enabled={enabled}")
-        owner = self.capture_owner_if_created()
-        self.log_diagnostic(
-            "[STT] Toggle detail: "
-            f"desired_before={owner is not None and owner.snapshot.desired_active} "
-            f"overlay_state={self.overlay_state_provider()}",
-            logging.INFO,
-        )
         self.force_immediate = force_immediate
         if not enabled:
             self.reset_local_pending()
             self.clear_gpu_pending()
-        settings = self.settings_provider()
-        if enabled and settings is not None:
-            provider = settings.provider_id
-            self.log_basic(f"[STT] Enabled with provider: {provider}")
-            if provider == "qwen_audio" and settings.qwen_region is not None:
-                self.log_diagnostic(
-                    f"[STT] Provider detail: provider={provider} " f"region={settings.qwen_region}",
-                    logging.INFO,
-                )
         if enabled and self.runtime_available():
             self.mark_promo_eligible()
         snapshot = await self.run_switch(desired=enabled)
@@ -111,24 +94,9 @@ class SelfCaptureApplicationOwner:
 
     async def replace_provider(self, *, smooth_local: bool = False) -> None:
         owner = self.capture_owner_if_created()
-        self.log_diagnostic(
-            "[STT] Replacing runtime provider detail: "
-            f"desired={owner is not None and owner.snapshot.desired_active} "
-            f"mic_task_active={owner is not None and owner.loop_task is not None}",
-            logging.INFO,
-        )
         settings = self.settings_provider()
         if settings is None or not self.runtime_available():
             return
-        requested_provider = settings.provider_id
-        current_provider = (
-            getattr(owner.snapshot, "provider_id", None) if owner is not None else None
-        )
-        self.log_diagnostic(
-            "[STT][Runtime] provider refresh requested: "
-            f"current={current_provider or 'none'} requested={requested_provider}",
-            logging.INFO,
-        )
         owner = self.capture_owner()
         config = settings.config
         if owner.snapshot.desired_active:
@@ -140,29 +108,6 @@ class SelfCaptureApplicationOwner:
             )
         else:
             snapshot = await owner.prepare_provider(config)
-        if (
-            snapshot.provider_status is SelfCaptureProviderStatus.READY
-            and snapshot.failure_reason is None
-            and snapshot.runtime_signature == config.runtime_signature
-        ):
-            if snapshot.desired_active and snapshot.effective_active:
-                self.log_diagnostic(
-                    "[STT][Runtime] provider handoff committed: "
-                    f"provider={getattr(snapshot, 'provider_id', config.provider_id)}",
-                    logging.INFO,
-                )
-            else:
-                self.log_diagnostic(
-                    "[STT][Runtime] provider prepared: "
-                    f"provider={getattr(snapshot, 'provider_id', config.provider_id)}",
-                    logging.INFO,
-                )
-        elif snapshot.provider_status is SelfCaptureProviderStatus.PENDING:
-            self.log_diagnostic(
-                "[STT][Runtime] provider handoff pending: "
-                f"requested={config.provider_id} reason={snapshot.admission_reason or 'boundary'}",
-                logging.INFO,
-            )
         self.state_sink(snapshot)
         self.project_availability(snapshot)
         self.restart_requested = False

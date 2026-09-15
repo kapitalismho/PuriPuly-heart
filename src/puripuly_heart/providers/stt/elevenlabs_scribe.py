@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Callable, Sequence
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
-from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
     STTBackend,
@@ -297,8 +297,6 @@ class _ElevenLabsScribeSession(STTBackendSession):
             language_code=self.language_code,
             keyterms=list(self.keyterms) if self.keyterms else None,
         )
-        logger.info("[STT] Scribe realtime connecting (timeout=%.1fs)", self.connect_timeout_s)
-        start_at = time.monotonic()
         if self.scribe_connect_factory is not None:
             connection = await asyncio.wait_for(
                 self.scribe_connect_factory(options), timeout=self.connect_timeout_s
@@ -309,8 +307,6 @@ class _ElevenLabsScribeSession(STTBackendSession):
                 scribe.connect(options), timeout=self.connect_timeout_s
             )
         self._connection = connection
-        elapsed = time.monotonic() - start_at
-        logger.info("[STT] Scribe realtime connected in %.2fs", elapsed)
 
         self._connection.on(RealtimeEvents.PARTIAL_TRANSCRIPT, self._on_partial)
         self._connection.on(RealtimeEvents.FINAL_TRANSCRIPT, self._on_partial)
@@ -348,11 +344,6 @@ class _ElevenLabsScribeSession(STTBackendSession):
 
     def _on_partial(self, data: Any) -> None:
         text = self._event_text(data)
-        logger.debug(
-            "[STT] Scribe %s non-authoritative text_len=%s",
-            self._event_name(data),
-            len(text),
-        )
         identity = self._event_projection.active_identity
         if identity is None:
             return
@@ -374,7 +365,6 @@ class _ElevenLabsScribeSession(STTBackendSession):
 
     def _on_committed(self, data: Any) -> None:
         text = self._event_text(data)
-        logger.info("[STT] Transcript final text_len=%s", len(text))
         if self._event_projection.is_legacy:
             self._enqueue_connection_event(STTBackendTranscriptEvent(text=text, is_final=True))
             return
@@ -591,15 +581,6 @@ class _ElevenLabsScribeSession(STTBackendSession):
     ) -> None:
         if self._stopped:
             return
-        observed_tail_ms = max(int(trailing_silence_ms or 0), 0)
-        wait_ms = boundary_wait_ms(reason, observed_tail_ms=observed_tail_ms)
-        logger.info(
-            "[STT][Tail] provider=scribe boundary_reason=%s observed_tail_ms=%s "
-            "boundary_wait_ms=%s",
-            reason,
-            observed_tail_ms,
-            wait_ms,
-        )
         if self._connection is None:
             return
         try:
@@ -607,7 +588,6 @@ class _ElevenLabsScribeSession(STTBackendSession):
         except Exception:
             self._end_connection_stream()
             return
-        logger.info("[STT] Scribe commit sent (finalize)")
 
     async def stop(self) -> None:
         if self._stopped:

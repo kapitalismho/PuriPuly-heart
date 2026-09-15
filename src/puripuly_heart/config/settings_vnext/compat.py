@@ -174,10 +174,6 @@ def load_vnext_settings(
             error=_error(SettingsPersistenceStatus.SAVE_FAILED, exc),
         )
 
-    logger.info(
-        "settings_migration source_shape=%s destination_shape=canonical status=success",
-        source_shape,
-    )
     return VNextSettingsLoadResult(
         status=SettingsPersistenceStatus.SUCCESS,
         settings=settings,

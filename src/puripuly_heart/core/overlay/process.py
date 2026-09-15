@@ -1067,11 +1067,6 @@ class OverlayProcessManager:
             self.state = "connected"
             self.failure_reason = None
             self.startup_failure_evidence = None
-            logger.info(
-                "[Overlay] Ready target=%s generation=%s",
-                self.selected_target or "unknown",
-                ready_generation,
-            )
             return "ready"
         if event_type == "owner_status":
             if (
@@ -1233,13 +1228,6 @@ class OverlayProcessManager:
         self._record_process(
             "desktop_first_visible",
             generation=generation,
-        )
-        logger.info(
-            "[OverlayProcess] Presentation: overlay_instance_id=%s runtime_generation=1 "
-            "classification=desktop_first_visible generation=%s "
-            "physical_hmd_visibility=not_observable",
-            self.overlay_instance_id,
-            generation,
         )
         callback = self.first_visible_callback
         if callback is not None:

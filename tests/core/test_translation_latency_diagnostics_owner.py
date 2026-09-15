@@ -19,7 +19,6 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     SelfOverlayDecisionDiagnostic,
     SttEventLoopFailureDiagnostic,
     TranslationLatencyDiagnosticsOwner,
-    TranslationSkipDiagnostic,
 )
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.domain.models import OSCMessage
@@ -499,32 +498,11 @@ def test_owner_fallback_stt_failure_does_not_read_provider_metadata(caplog) -> N
         )
     )
 
-    assert "RuntimeError" in caplog.text
     assert "private speech" not in caplog.text
+    assert any(record.levelname == "ERROR" for record in caplog.records)
     assert "secret-token" not in caplog.text
 
 
-def test_owner_derives_translation_skip_reason_from_runtime_state() -> None:
-    logging = RuntimeLogging()
-    owner = make_owner(runtime_logging=logging)
-
-    owner.record_translation_skip(
-        TranslationSkipDiagnostic(
-            stage="final",
-            channel="peer",
-            publish_chatbox=False,
-            llm_available=True,
-            configuration=replace(
-                TranslationRuntimeConfig(),
-                peer_translation_enabled=False,
-            ),
-        )
-    )
-
-    assert any(
-        "translation=skipped" in message and "cause=peer_translation_disabled" in message
-        for message in logging.basic
-    )
 
 
 def test_owner_replaces_overlay_diagnostics_by_expected_identity() -> None:

@@ -1852,37 +1852,6 @@ def test_post_replace_validation_and_restoration_failure_returns_safe_error(
     assert result.backup_path.read_bytes() == original_bytes
 
 
-def test_migration_diagnostics_include_only_approved_metadata(caplog, tmp_path: Path) -> None:
-    compat = _compat()
-    raw = _final_dev_v30_fixture()
-    prohibited_values = (
-        raw["system_prompt"],
-        raw["osc"]["host"],
-        raw["managed_identity"]["installation_id"],
-        raw["telemetry"]["identifier"],
-    )
-    success_path = tmp_path / "success.json"
-    _write_json_bytes(success_path, raw)
-
-    with caplog.at_level("INFO", logger=compat.__name__):
-        success = compat.load_vnext_settings(success_path)
-
-    assert success.ok
-    assert "source_shape=pre_vnext destination_shape=canonical status=success" in caplog.text
-    assert all(value not in caplog.text for value in prohibited_values)
-
-    caplog.clear()
-    failure_path = tmp_path / "failure.json"
-    failure_path.write_text("not-json-user-value", encoding="utf-8")
-    with caplog.at_level("WARNING", logger=compat.__name__):
-        failure = compat.load_vnext_settings(failure_path)
-
-    assert failure.status == compat.SettingsPersistenceStatus.PARSE_FAILED
-    assert failure.error is not None
-    assert failure.error.message == "parse_failed:JSONDecodeError"
-    assert "not-json-user-value" not in failure.error.message
-    assert "failure_category=parse_failed" in caplog.text
-    assert "not-json-user-value" not in caplog.text
 
 
 def test_parse_and_migration_failures_return_explicit_results_without_overwrite(

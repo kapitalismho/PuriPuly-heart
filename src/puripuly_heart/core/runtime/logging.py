@@ -7,12 +7,6 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
 
-from puripuly_heart.core.diagnostic_validation import (
-    DIAGNOSTIC_REDACTION_MARKER,
-    DIAGNOSTIC_SINK_BASIC_LOGS,
-    DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED,
-    redact_text_for_sink,
-)
 from puripuly_heart.core.messages import DiagnosticFieldValue
 from puripuly_heart.core.observability import ConversationRecordChannel, RealtimeLogSink
 
@@ -29,24 +23,18 @@ def emit_safe_fallback_log(
 ) -> bool:
     if logger.disabled or not logger.isEnabledFor(level):
         return False
-    if live:
-        redaction = redact_text_for_sink(message, DIAGNOSTIC_SINK_BASIC_LOGS)
-        rendered = (
-            redaction.text
-            if redaction.status == DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED
-            and redaction.text is not None
-            else DIAGNOSTIC_REDACTION_MARKER
-        )
-        extra = {LIVE_AUDIENCE_RECORD_ATTRIBUTE: LIVE_AUDIENCE_BASIC}
-    else:
-        level_name = logging.getLevelName(level)
-        rendered = (
+    level_name = logging.getLevelName(level)
+    rendered = (
+        "[Logging] A log message could not be delivered."
+        if live
+        else (
             "[Logging] diagnostic_delivery_failed "
             f"level={str(level_name).replace(' ', '_')} "
             f"message_len={len(message)} "
             f"message_sha256={hashlib.sha256(message.encode('utf-8', errors='replace')).hexdigest()[:16]}"
         )
-        extra = None
+    )
+    extra = {LIVE_AUDIENCE_RECORD_ATTRIBUTE: LIVE_AUDIENCE_BASIC} if live else None
     try:
         record = logger.makeRecord(
             logger.name,

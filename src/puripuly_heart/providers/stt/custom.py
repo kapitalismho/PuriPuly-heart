@@ -182,10 +182,6 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
             trust_env=False,
             follow_redirects=False,
         )
-        logger.info(
-            "[STT] Custom offline session ready endpoint=%s",
-            sanitize_endpoint_for_display(self._url),
-        )
 
     async def send_audio(self, pcm16le: bytes) -> None:
         if self._stopped or not pcm16le:
@@ -428,7 +424,6 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                 category=CUSTOM_STT_VALIDATION_COMPATIBILITY_MISMATCH,
             )
         normalized = text.strip()
-        logger.info("[STT] Custom offline final text_len=%s", len(normalized))
         return normalized
 
 
@@ -519,10 +514,6 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 category=CUSTOM_STT_VALIDATION_UNREACHABLE,
             ) from exc
         self._recv_task = asyncio.create_task(self._receive_loop())
-        logger.info(
-            "[STT] Custom realtime session ready endpoint=%s",
-            sanitize_endpoint_for_display(self._url),
-        )
 
     async def send_audio(self, pcm16le: bytes) -> None:
         if self._stopped or not pcm16le:
@@ -699,7 +690,6 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 self._pending_finals -= 1
             self._final_ready.set()
             return
-        logger.info("[STT] Custom realtime finalize sent")
 
     async def stop(self) -> None:
         await self.close()
@@ -955,7 +945,6 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                         )
                 self._pending_finals -= 1
                 self._final_ready.set()
-                logger.info("[STT] Custom realtime final text_len=%s", len(normalized_text))
                 self._event_projection.put_legacy(
                     STTBackendTranscriptEvent(text=normalized_text, is_final=True)
                 )

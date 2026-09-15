@@ -54,8 +54,7 @@ class SelfCaptureSourceAdapter:
             )
         except Exception as exc:
             self.log_diagnostic(
-                "[STT] Microphone open detail: "
-                f"host_api={host_api!r} device={config.input_device!r} error={exc}",
+                f"[STT] Microphone open failed cause={type(exc).__name__}",
                 level=logging.ERROR,
             )
         if source is None and config.input_device:
@@ -74,7 +73,7 @@ class SelfCaptureSourceAdapter:
                     )
                 except Exception as exc:
                     self.log_diagnostic(
-                        f"[STT] Fallback microphone detail: error={exc}",
+                        f"[STT] Fallback microphone failed cause={type(exc).__name__}",
                         level=logging.ERROR,
                     )
         if source is None:
@@ -89,7 +88,7 @@ class SelfCaptureSourceAdapter:
                 self.log_diagnostic("[STT] Microphone opened with system default")
             except Exception as exc:
                 self.log_diagnostic(
-                    f"[STT] System default microphone detail: error={exc}",
+                    f"[STT] System default microphone failed cause={type(exc).__name__}",
                     level=logging.ERROR,
                 )
         if source is None:
@@ -101,8 +100,7 @@ class SelfCaptureSourceAdapter:
             return self.resolve_device(host_api=host_api, device=device)
         except Exception as exc:
             self.log_diagnostic(
-                "[STT] Device resolution detail: "
-                f"host_api={host_api!r} device={device!r} error={exc}",
+                f"[STT] Device resolution failed cause={type(exc).__name__}",
                 level=logging.WARNING,
             )
             return None
@@ -138,18 +136,9 @@ class SelfCaptureSourceAdapter:
             if decision.preferred_capture_channels <= config.internal_channels:
                 raise
             self.log_diagnostic(
-                "[STT] Microphone open detail: "
-                f"attempt={attempt!r} "
-                f"host_api={host_api_for_log!r} "
-                f"device={device_for_log!r} "
-                f"device_idx={device_idx} "
-                f"preferred_capture_channels={decision.preferred_capture_channels} "
-                f"requested_channels={decision.preferred_capture_channels} "
-                f"wasapi_auto_convert={wasapi_auto_convert} "
-                f"wasapi_exclusive={wasapi_exclusive} "
-                f"metadata_status={decision.metadata.metadata_status!r} "
-                "will_retry_mono=True "
-                f"error={exc}",
+                "[STT] Microphone channel open failed "
+                f"attempt={attempt!r} will_retry_mono=True "
+                f"cause={type(exc).__name__}",
                 level=logging.WARNING,
             )
             return self._open_source_once(

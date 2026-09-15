@@ -181,7 +181,7 @@ def test_native_full_batch_preserves_safe_correlation_fields() -> None:
             "observed_at_ms": 1000 + index,
             "reason": "quiet_tail",
             "handoff_mode": "cached_frame_rehandoff",
-            "content_identity": f"digest-{index}",
+            "content_identity": index,
             "dropped_unacknowledged_records": 0,
             "logger_dropped_records": 0,
             "caption": "must not be retained",
@@ -199,6 +199,37 @@ def test_native_full_batch_preserves_safe_correlation_fields() -> None:
     serialized = json.dumps(list(recorder.native_events))
     assert "must not be retained" not in serialized
     assert "C:/private" not in serialized
+
+
+@pytest.mark.asyncio
+async def test_native_content_identity_rejects_raw_text_before_failure_artifact(
+    tmp_path,
+) -> None:
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-native-identity",
+        diagnostics_dir=tmp_path,
+        capture_measurements=True,
+    )
+    secret = "raw-secret"
+
+    assert recorder.ingest_native_child_line(
+        "presentation_diagnostics "
+        + json.dumps(
+            [
+                {
+                    "sequence": 1,
+                    "stage": "submission_returned",
+                    "content_identity": secret,
+                }
+            ]
+        )
+    )
+    path = await _dump_path(recorder)
+    raw_dump = path.read_text(encoding="utf-8")
+
+    assert secret not in raw_dump
+    assert "content_identity" not in recorder.native_events[0]
+    assert recorder.evidence_summary()["input_rejected"] == {"native_invalid_content_identity": 1}
 
 
 def test_native_evidence_distinguishes_real_render_from_successful_rehandoff() -> None:
@@ -224,7 +255,7 @@ def test_native_evidence_distinguishes_real_render_from_successful_rehandoff() -
                     "reason": "cached_completed_frame_rehandoff",
                     "render_generation": 4,
                     "submission_attempt": 5,
-                    "content_identity": "digest",
+                    "content_identity": 42,
                 },
             ]
         )

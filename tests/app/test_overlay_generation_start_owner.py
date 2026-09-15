@@ -28,8 +28,6 @@ class FakePresenter:
 
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = dict(kwargs)
-        self.runtime_log_diagnostic = kwargs["runtime_log_diagnostic"]
-        self.diagnostics = kwargs["diagnostics"]
         self.task_factory = kwargs["task_factory"]
         self.translation_enabled = bool(kwargs.get("translation_enabled", True))
         self.bridge: object | None = None
@@ -476,11 +474,7 @@ async def test_owner_propagates_cancellation_after_attaching_generation_resource
 async def test_owner_starts_fresh_native_epoch_for_preserved_crash_caption() -> None:
     harness = StartHarness()
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
-    presenter = FakePresenter(
-        runtime_log_diagnostic=lambda message, *, level=logging.INFO: False,
-        diagnostics=None,
-        task_factory=runtime.create_child_task,
-    )
+    presenter = FakePresenter(task_factory=runtime.create_child_task)
     presenter.snapshot_value = {
         "native_fresh_render_generations": {"self": 4},
         "text": "keep this caption",

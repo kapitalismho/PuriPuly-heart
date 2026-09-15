@@ -143,11 +143,8 @@ async def test_nonmanaged_enable_owns_runtime_context_and_warmup_sequence() -> N
     assert runtime_values == [True]
     assert clears == ["clear"]
     assert warmups == ["warmup"]
-    assert ("basic", "[Translation] Enabled with provider: qwen") in logs
-    assert (
-        "detailed",
-        "[Translation] Provider detail: provider=qwen region=china",
-    ) in logs
+    assert ("basic", "[Translation] Enabled") in logs
+    assert not any(kind == "detailed" for kind, _message in logs)
 
 
 @pytest.mark.asyncio

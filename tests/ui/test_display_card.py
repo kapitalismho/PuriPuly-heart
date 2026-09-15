@@ -496,7 +496,7 @@ def test_yielding_notice_defers_to_live_turn_content(monkeypatch: pytest.MonkeyP
     )
 
     assert _visible_text(card) == "translated text"
-    assert len(runtime_logging.detailed_messages) == 1
+    assert runtime_logging.detailed_messages == []
 
 
 def test_yielding_notice_returns_once_the_card_is_idle_again(
@@ -733,95 +733,6 @@ def test_input_footer_stays_outside_the_expanding_display_region() -> None:
     assert divider_container.padding.bottom == 4
     assert input_footer.expand is None
     assert input_footer.tight is True
-
-
-def test_translation_visual_commit_log_reports_the_redefined_schema(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture()
-    events: list[str] = []
-
-    card.set_display("source text", font_family="font-source")
-    attach_dummy_page(monkeypatch, card._display_text)
-    monkeypatch.setattr(type(card._display_text), "update", lambda self: events.append("display"))
-    monkeypatch.setattr(display_card_module.time, "time", lambda: 2.0)
-
-    def emit_diagnostic(message: str, *, level: int = logging.INFO) -> bool:
-        events.append("log")
-        return runtime_logging.emit_diagnostic(message, level=level)
-
-    card.set_display_translation(
-        "translated text",
-        font_family="font-target",
-        runtime_log_diagnostic=emit_diagnostic,
-        update_id="upd-1",
-        origin_wall_clock_ms=1500,
-        utterance_id="utt-1",
-        channel="peer",
-        session_scope="session-1",
-        source_text_hash="src-hash-1",
-        source_text_len=11,
-        logical_turn_key="peer:utt-1",
-    )
-
-    assert events == ["display", "log"]
-    assert len(runtime_logging.detailed_messages) == 1
-    level, message = runtime_logging.detailed_messages[0]
-    assert level == logging.INFO
-    assert "dashboard_translation_visual_commit" in message
-    assert "update_id=upd-1" in message
-    assert "origin_wall_clock_ms=1500" in message
-    assert "utterance_id=utt-1" in message
-    assert "channel=peer" in message
-    assert "session_scope=session-1" in message
-    assert "source_text_hash=src-hash-1" in message
-    assert "source_text_len=11" in message
-    assert "logical_turn_key=peer:utt-1" in message
-    assert "source_display_text_len=11" in message
-    assert "translation_text_len=15" in message
-    assert "translation_visible=True" in message
-    assert "display_update_issued=True" in message
-    assert "elapsed_ms=500" in message
-    assert "secondary_" not in message
-    assert "source text" not in message
-    assert "translated text" not in message
-
-
-def test_source_applied_log_reports_the_redefined_schema(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture()
-
-    attach_dummy_page(monkeypatch, card._display_text)
-    _mute_display_updates(monkeypatch, card)
-    monkeypatch.setattr(display_card_module.time, "time", lambda: 2.0)
-
-    card.set_display(
-        "source text",
-        runtime_log_diagnostic=runtime_logging.emit_diagnostic,
-        origin_wall_clock_ms=1500,
-        utterance_id="utt-3",
-        channel="self",
-        source_text_len=11,
-        transcript_kind="final",
-        should_log=True,
-    )
-
-    assert len(runtime_logging.detailed_messages) == 1
-    _level, message = runtime_logging.detailed_messages[0]
-    assert "dashboard_source_applied" in message
-    assert "utterance_id=utt-3" in message
-    assert "channel=self" in message
-    assert "transcript_kind=final" in message
-    assert "source_text_len=11" in message
-    assert "source_display_text_len=11" in message
-    assert "translation_visible=False" in message
-    assert "display_update_issued=True" in message
-    assert "elapsed_ms=500" in message
-    assert "primary_" not in message
-    assert "source text" not in message
 
 
 def test_source_applied_log_is_skipped_when_not_requested(

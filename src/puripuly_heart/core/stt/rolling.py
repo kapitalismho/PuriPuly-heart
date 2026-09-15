@@ -223,16 +223,6 @@ class RollingSTTBackend(STTBackend):
     def _mark(self, name: STTProviderName, state: RollingProviderState) -> None:
         if self._states.get(name) == state:
             return
-        previous = self._states.get(name)
-        previous_label = (
-            previous.value if previous is not None else RollingProviderState.AVAILABLE.value
-        )
-        logger.info(
-            "[STT][Rolling] provider=%s state=%s -> %s",
-            name.value,
-            previous_label,
-            state.value,
-        )
         self._states[name] = state
 
     def _provider_state(self, definition: RollingProviderDefinition) -> RollingProviderState:
@@ -265,11 +255,6 @@ class RollingSTTBackend(STTBackend):
             return False
         definition.rebind(api_key)
         self._states[name] = None
-        logger.info(
-            "[STT][Rolling] provider=%s rebound configured=%s",
-            name.value,
-            definition.is_configured(),
-        )
         return True
 
     async def open_session(
@@ -277,7 +262,6 @@ class RollingSTTBackend(STTBackend):
         *,
         projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
     ) -> STTBackendSession:
-        attempt_start = self.clock.now()
         last_error: BaseException | None = None
         for definition in self.providers:
             if not self._is_eligible(definition):
@@ -290,11 +274,6 @@ class RollingSTTBackend(STTBackend):
                 self._handle_open_error(definition, exc, kind)
                 last_error = exc
                 continue
-            logger.info(
-                "[STT][Rolling] session selected provider=%s connect_s=%.3f",
-                definition.name.value,
-                self.clock.now() - attempt_start,
-            )
             return _RollingSession(
                 definition=definition,
                 inner=session,
@@ -339,12 +318,6 @@ class RollingSTTBackend(STTBackend):
                 level=logging.WARNING,
             )
             return
-        logger.info(
-            "[STT][Rolling] provider=%s open failed kind=transient (%s); falling through "
-            "for this attempt",
-            definition.name.value,
-            type(exc).__name__,
-        )
 
     def _handle_session_error(
         self,

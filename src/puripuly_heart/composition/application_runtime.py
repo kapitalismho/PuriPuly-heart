@@ -543,23 +543,26 @@ def compose_application_runtime(
 
     def managed_gemma_status(snapshot: ManagedGemmaTranslationSnapshot) -> None:
         nonlocal managed_gemma_basic_state
-        fields = [f"state={snapshot.state}"]
-        if snapshot.backend is not None:
-            fields.append(f"backend={snapshot.backend}")
-        if snapshot.progress_percent is not None:
-            fields.append(f"progress_percent={snapshot.progress_percent}")
-        if snapshot.error_type is not None:
-            fields.append(f"error_type={snapshot.error_type}")
         basic_state = (snapshot.state, snapshot.backend, snapshot.error_type)
         if basic_state != managed_gemma_basic_state:
             managed_gemma_basic_state = basic_state
-            basic_fields = [f"state={snapshot.state}"]
-            if snapshot.backend is not None:
-                basic_fields.append(f"backend={snapshot.backend}")
-            if snapshot.error_type is not None:
-                basic_fields.append(f"cause={snapshot.error_type}")
-            log_basic("[ManagedGemma] " + " ".join(basic_fields))
-        log_diagnostic("[ManagedGemma] " + " ".join(fields))
+            if snapshot.state in {"checking", "ready", "failed"}:
+                fields = [f"state={snapshot.state}"]
+                if snapshot.backend is not None:
+                    fields.append(f"backend={snapshot.backend}")
+                if snapshot.error_type is not None:
+                    fields.append(f"cause={snapshot.error_type}")
+                log_basic(
+                    "[ManagedGemma] " + " ".join(fields),
+                    level=logging.ERROR if snapshot.state == "failed" else logging.INFO,
+                )
+        if snapshot.state == "failed":
+            log_diagnostic(
+                "[ManagedGemma] failed "
+                f"backend={snapshot.backend or 'unknown'} "
+                f"cause={snapshot.error_type or 'unavailable'}",
+                level=logging.ERROR,
+            )
         if snapshot.state not in {
             "checking",
             "downloading",
@@ -893,18 +896,22 @@ def compose_application_runtime(
     def on_provisioning_diagnostic(
         diagnostic: LocalASRProvisioningDiagnostic,
     ) -> None:
+        outcome = diagnostic.outcome or "observed"
+        if diagnostic.event == "cleanup" and outcome != "failed":
+            return
+        if diagnostic.event == "result_delivery" and outcome != "failed":
+            return
         fields = [
             f"model={diagnostic.model_id or 'unknown'}",
-            f"origin={diagnostic.origin or 'runtime'}",
-            f"outcome={diagnostic.outcome or 'observed'}",
+            f"outcome={outcome}",
         ]
         if diagnostic.elapsed_seconds is not None:
             fields.append(f"elapsed_seconds={diagnostic.elapsed_seconds:.3f}")
         if diagnostic.failure_type is not None:
-            fields.append(f"failure_type={diagnostic.failure_type}")
+            fields.append(f"cause={diagnostic.failure_type}")
         log_basic(
             f"[LocalASR][{diagnostic.event.title()}] {' '.join(fields)}",
-            level=(logging.ERROR if diagnostic.outcome == "failed" else logging.INFO),
+            level=(logging.ERROR if outcome == "failed" else logging.INFO),
         )
 
     def on_provisioning_state(
@@ -1043,10 +1050,21 @@ def compose_application_runtime(
         else:
             lifecycle = "idle"
         if lifecycle != last_self_capture_lifecycle:
-            log_basic(
-                "[STT][Runtime] self capture "
-                f"{lifecycle}: provider={snapshot.provider_id or 'none'}"
-            )
+            if lifecycle == "failed":
+                cause = (
+                    snapshot.failure_reason.value
+                    if snapshot.failure_reason is not None
+                    else "unavailable"
+                )
+                log_basic(
+                    "[STT] Recognition unavailable "
+                    f"provider={snapshot.provider_id or 'none'} cause={cause}",
+                    level=logging.WARNING,
+                )
+            elif lifecycle == "committed":
+                log_basic(f"[STT] Recognition active provider={snapshot.provider_id or 'unknown'}")
+            elif lifecycle == "idle" and last_self_capture_lifecycle == "committed":
+                log_basic("[STT] Recognition stopped")
             last_self_capture_lifecycle = lifecycle
         require_local_asr().adapters.notice.sync()
         publish_osc_state_from_runtime()

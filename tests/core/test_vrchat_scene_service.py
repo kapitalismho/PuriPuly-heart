@@ -979,57 +979,6 @@ async def test_first_replay_ingests_roster_before_next_poll(tmp_path: Path) -> N
 _SCENE_LOGGER = "puripuly_heart.core.vrchat_scene_service"
 
 
-async def test_lifecycle_logs_selection_and_ready_without_identities(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    create_time = time.time() - 5
-    file_name = _log_name(create_time)
-    (tmp_path / file_name).write_text(
-        "\n".join(_roster_block(("Self", "Peer"), (_USER_A, _USER_B), "Self")) + "\n",
-        encoding="utf-8",
-    )
-    snapshots = FakeSnapshots()
-    snapshots.items = (_snapshot(4242, "C:\\VRChat\\VRChat.exe", create_time),)
-    service = _service(snapshots, FakeWatcherFactory(snapshots), tmp_path)
-    with caplog.at_level(logging.INFO, logger=_SCENE_LOGGER):
-        await service.start()
-        try:
-            await _wait_for_status(service, "ready")
-        finally:
-            await service.close()
-
-    assert "[VrchatScene] lifecycle begin pid=4242" in caplog.messages
-    assert f"[VrchatScene] log selected name={file_name} replayed=6 parsed=5" in caplog.messages
-    assert "[VrchatScene] status syncing -> ready people=2" in caplog.messages
-    assert _USER_A not in caplog.text
-    assert _USER_B not in caplog.text
-    assert "VRChat.exe" not in caplog.text
-
-
-async def test_ready_transition_logs_once_across_polls(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    create_time = time.time() - 5
-    (tmp_path / _log_name(create_time)).write_text(
-        "\n".join(_roster_block(("Self", "Peer"), (_USER_A, _USER_B), "Self")) + "\n",
-        encoding="utf-8",
-    )
-    snapshots = FakeSnapshots()
-    snapshots.items = (_snapshot(4242, "C:\\VRChat\\VRChat.exe", create_time),)
-    service = _service(snapshots, FakeWatcherFactory(snapshots), tmp_path)
-    with caplog.at_level(logging.INFO, logger=_SCENE_LOGGER):
-        await service.start()
-        try:
-            await _wait_for_status(service, "ready")
-            for _ in range(5):
-                await service._poll_once(service._generation)
-        finally:
-            await service.close()
-
-    ready_logs = [message for message in caplog.messages if "-> ready people=" in message]
-    assert ready_logs == ["[VrchatScene] status syncing -> ready people=2"]
-
-
 async def test_deleted_log_warns_with_safe_reason_without_file_name(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:

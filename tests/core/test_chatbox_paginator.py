@@ -107,13 +107,7 @@ def test_detailed_send_attempt_records_length_without_chatbox_payload() -> None:
         )
     )
 
-    combined = "\n".join(message for _level, message in runtime_logging.detailed)
-    assert "status=attempt" in combined
-    assert f"chars={len(payload)}" in combined
-    assert "remaining_parts=0" in combined
-    assert "PRIVATE_PRIMARY" not in combined
-    assert "PRIVATE_SECONDARY" not in combined
-    assert "text=" not in combined
+    assert runtime_logging.detailed == []
 
 
 def test_default_limits_send_144_chars_immediately_and_paginate_145_chars_every_3s() -> None:
@@ -288,7 +282,7 @@ def test_failed_page_is_dropped_without_retrying_or_blocking_later_pages() -> No
     assert sender.sent == ["abcde", "klmno", "p"]
     assert (
         logging.WARNING,
-        "[Basic][OSC] send mode=queued status=failed error=boom",
+        "[Basic][OSC] send failed mode=queued cause=OSError",
     ) in runtime_logging.basic
 
 
@@ -306,7 +300,7 @@ def test_send_immediate_failure_returns_false_and_logs_basic_warning() -> None:
 
     assert sent is False
     assert runtime_logging.basic == [
-        (logging.WARNING, "[Basic][OSC] send mode=immediate status=failed error=boom")
+        (logging.WARNING, "[Basic][OSC] send failed mode=immediate cause=OSError")
     ]
 
 

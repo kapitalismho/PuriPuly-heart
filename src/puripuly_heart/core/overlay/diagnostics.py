@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 import threading
 import time
 from collections import Counter, deque
@@ -102,6 +103,19 @@ _SENSITIVE_DIAGNOSTIC_FIELD_KEYS = {
     "token",
     "transcript",
 }
+_OPAQUE_CONTENT_IDENTITY_RE = re.compile(
+    r"(?:[0-9a-fA-F]{16,128}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})"
+)
+
+
+def _is_opaque_content_identity(value: Any) -> bool:
+    return (
+        type(value) is int
+        and 0 <= value <= _MAX_U64
+        or isinstance(value, str)
+        and _OPAQUE_CONTENT_IDENTITY_RE.fullmatch(value) is not None
+    )
 
 
 def default_overlay_diagnostics_dir() -> Path:
@@ -127,7 +141,10 @@ def _json_safe_fields(fields: dict[Any, Any]) -> dict[str, Any]:
         normalized_key = str(key)
         compact_key = normalized_key.lower().replace("-", "_")
         if normalized_key == "content_identity":
-            safe_fields[normalized_key] = _json_safe(value)
+            if _is_opaque_content_identity(value):
+                safe_fields[normalized_key] = value
+            else:
+                redactions.append(DIAGNOSTIC_REDACTION_MARKER)
             continue
         if compact_key in _SENSITIVE_DIAGNOSTIC_FIELD_KEYS or any(
             sensitive in compact_key
@@ -337,7 +354,12 @@ class OverlayDiagnosticsRecorder:
                 loss_fields[f"{counter}_delta"] = delta
                 loss_fields[f"{counter}_state"] = "continuity_gap" if delta is None else "observed"
             safe = {key: record.get(key) for key in _NATIVE_SAFE_FIELDS if key in record}
-            for key in ("reason", "handoff_mode", "content_identity"):
+            if "content_identity" in safe and not _is_opaque_content_identity(
+                safe["content_identity"]
+            ):
+                safe.pop("content_identity")
+                self.note_input_rejected("native_invalid_content_identity")
+            for key in ("reason", "handoff_mode"):
                 value = safe.get(key)
                 if isinstance(value, str):
                     safe[key] = value[:128]

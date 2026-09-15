@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from dataclasses import dataclass, field
 from uuid import uuid4
 
@@ -717,50 +716,7 @@ class TestContextSerializationContract:
 
 
 class TestContextLogging:
-    def test_prepare_llm_request_without_runtime_logging_includes_redacted_context_summary(
-        self, caplog: pytest.LogCaptureFixture
-    ):
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(),
-            osc=FakeOscQueue(),
-            clock=FakeClock(initial_time=20.0),
-        )
-
-        with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.translation"):
-            harness.prepare_translation_request("입력")
-
-        assert "[Translation] Context mode: channel=self mode=integrated" in caplog.messages
-        assert not any("Context apply:" in message for message in caplog.messages)
-
-    def test_prepare_llm_request_without_runtime_logging_redacts_local_context_text(
-        self, caplog: pytest.LogCaptureFixture
-    ):
-        clock = FakeClock(initial_time=20.0)
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(),
-            osc=FakeOscQueue(),
-            clock=clock,
-        )
-        harness.self_runtime.remember_context(
-            "secret context",
-            timestamp=19.0,
-            source_language="ko",
-            target_language="en",
-        )
-
-        with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.translation"):
-            harness.prepare_translation_request("secret request")
-
-        assert "[Translation] Context mode: channel=self mode=integrated" in caplog.messages
-        assert not any("secret request" in message for message in caplog.messages)
-        assert not any("secret context" in message for message in caplog.messages)
-        assert not any("Context apply:" in message for message in caplog.messages)
-
-    def test_prepare_llm_request_counts_peer_local_context_as_peer_entries(
-        self, caplog: pytest.LogCaptureFixture
-    ):
+    def test_prepare_llm_request_counts_peer_local_context_as_peer_entries(self):
         clock = FakeClock(initial_time=20.0)
         harness = compose_translation_test_harness(
             stt=None,
@@ -774,96 +730,12 @@ class TestContextLogging:
             source_language="ko",
             target_language="en",
         )
-        expected_context = '- [peer] "secret peer context"'
 
-        with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.translation"):
-            _, context, _ = harness.prepare_translation_request(
-                "secret request", runtime=harness.peer_runtime
-            )
-
-        assert context == expected_context
-        assert "[Translation] Context mode: channel=peer mode=integrated" in caplog.messages
-        assert not any("secret request" in message for message in caplog.messages)
-        assert not any("secret peer context" in message for message in caplog.messages)
-        assert not any("Context apply:" in message for message in caplog.messages)
-
-    def test_prepare_llm_request_without_runtime_logging_redacts_integrated_context_text(
-        self, caplog: pytest.LogCaptureFixture
-    ):
-        clock = FakeClock(initial_time=20.0)
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(),
-            osc=FakeOscQueue(),
-            clock=clock,
-            integrated_context_enabled=True,
-            peer_translation_enabled=True,
-        )
-        harness.self_runtime.remember_context(
-            "secret self text",
-            timestamp=19.0,
-            source_language="ko",
-            target_language="en",
-        )
-        harness.peer_runtime.remember_context(
-            "secret peer text",
-            timestamp=19.5,
-            source_language="ko",
-            target_language="en",
+        _, context, _ = harness.prepare_translation_request(
+            "secret request", runtime=harness.peer_runtime
         )
 
-        with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.translation"):
-            harness.prepare_translation_request("secret request")
-
-        apply_logs = [
-            message
-            for message in caplog.messages
-            if message.startswith("[Translation] Context apply:")
-        ]
-        assert apply_logs == []
-        assert not any("secret request" in message for message in caplog.messages)
-        assert not any("secret self text" in message for message in caplog.messages)
-        assert not any("secret peer text" in message for message in caplog.messages)
-
-    def test_prepare_llm_request_logs_context_mode_only_when_changed(
-        self, caplog: pytest.LogCaptureFixture
-    ):
-        clock = FakeClock(initial_time=20.0)
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(),
-            osc=FakeOscQueue(),
-            clock=clock,
-        )
-        harness.self_runtime.remember_context(
-            "안녕",
-            timestamp=19.0,
-            source_language="ko",
-            target_language="en",
-        )
-
-        with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.translation"):
-            harness.prepare_translation_request("first")
-            harness.prepare_translation_request("second")
-            harness.replace_configuration(integrated_context_enabled=True)
-            harness.replace_configuration(peer_translation_enabled=True)
-            harness.peer_runtime.remember_context(
-                "peer context",
-                timestamp=19.5,
-                source_language="ko",
-                target_language="en",
-            )
-            harness.prepare_translation_request("third")
-            harness.prepare_translation_request("fourth")
-
-        mode_logs = [
-            message
-            for message in caplog.messages
-            if message.startswith("[Translation] Context mode:")
-        ]
-        assert mode_logs == [
-            "[Translation] Context mode: channel=self mode=integrated",
-        ]
+        assert context == '- [peer] "secret peer context"'
 
     @pytest.mark.asyncio
     async def test_submit_text_without_llm_enqueues_transcript_only(self):

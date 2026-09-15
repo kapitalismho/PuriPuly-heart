@@ -119,7 +119,7 @@ def test_owner_fallback_preserves_audience_and_never_forwards_raw_diagnostics() 
         lazy_calls += 1
         return "provider_response_body=private-lazy-body"
 
-    owner.emit_basic("The translation service failed.", level=logging.ERROR)
+    owner.emit_basic("private-basic-body", level=logging.ERROR)
     assert (
         owner.emit_diagnostic(
             "provider_response_body=private-direct-body",
@@ -130,7 +130,8 @@ def test_owner_fallback_preserves_audience_and_never_forwards_raw_diagnostics() 
     assert owner.emit_diagnostic_lazy(lazy_message, level=logging.WARNING) is True
 
     rendered = "\n".join(record.getMessage() for record in records)
-    assert "The translation service failed." in rendered
+    assert "private-basic-body" not in rendered
+    assert records[0].levelno == logging.ERROR
     assert "private-direct-body" not in rendered
     assert "private-lazy-body" not in rendered
     assert "diagnostic_delivery_failed" in rendered

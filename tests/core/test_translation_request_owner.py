@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 from dataclasses import dataclass, field, replace
 from types import SimpleNamespace
 from uuid import uuid4
@@ -492,19 +491,15 @@ async def test_prepared_peer_segments_reject_replacement_before_and_during_execu
     assert fixture.presentation.messages == []
 
 
-def test_clear_context_clears_both_channels_and_emits_established_diagnostic(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+def test_clear_context_clears_both_channels() -> None:
     fixture = build_owner()
     fixture.self_runtime.remember_context("self context", timestamp=fixture.clock.now())
     fixture.peer_runtime.remember_context("peer context", timestamp=fixture.clock.now())
 
-    with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.translation"):
-        fixture.owner.clear_context()
+    fixture.owner.clear_context()
 
     assert fixture.self_runtime.translation_history == []
     assert fixture.peer_runtime.translation_history == []
-    assert "[Translation] Context history cleared" in caplog.messages
 
 
 def test_prepare_uses_detected_language_and_integrated_peer_context() -> None:

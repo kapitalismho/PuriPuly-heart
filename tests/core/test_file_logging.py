@@ -72,17 +72,18 @@ def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared
     sink = _RealtimeSink()
     service.attach_realtime_sink(sink)
 
-    root_logger.info("root info")
+    root_logger.info("root arbitrary prose")
     service.emit_basic("basic line")
-    service.emit_diagnostic("first diagnostic")
-    service.emit_diagnostic("second diagnostic")
+    service.emit_diagnostic("[Provider] first_diagnostic cause=test")
+    service.emit_diagnostic("[Provider] second_diagnostic cause=test")
     service.close()
 
     content = log_file.read_text(encoding="utf-8")
-    assert "root info" in content
+    assert "root arbitrary prose" not in content
+    assert "untrusted_record_redacted" in content
     assert "basic line" in content
-    assert "first diagnostic" in content
-    assert "second diagnostic" in content
+    assert "first_diagnostic" in content
+    assert "second_diagnostic" in content
     assert sink.lines == ["basic line"]
 
 
@@ -261,8 +262,6 @@ def test_session_runtime_logging_service_persists_file_only_events_in_basic_mode
     assert sink.lines == ["basic line"]
     log_lines = log_file.read_text(encoding="utf-8").splitlines()
     assert log_lines[0] == "basic line"
-    assert log_lines[1].startswith("[Persisted][Fallback] ")
-    assert '"event": "race_finished"' in log_lines[1]
-    assert '"primary_model": "google/gemma-4-26b-a4b-it"' in log_lines[1]
-    assert '"fallback_model": "google/gemini-2.5-flash-lite"' in log_lines[1]
-    assert '"winner": "fallback"' in log_lines[1]
+    assert log_lines[1].startswith("[Logging] untrusted_record_redacted ")
+    assert "race_finished" not in log_lines[1]
+    assert "google/gemma" not in log_lines[1]

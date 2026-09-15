@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import logging
 import queue
+import re
 import time
 from collections import deque
 from collections.abc import Awaitable, Mapping
@@ -73,19 +75,27 @@ _QUEUE_HANDLER_LOG_FILE_ATTR = "_puripuly_heart_log_file"
 _QUEUE_HANDLER_FILE_HANDLER_ATTR = "_puripuly_heart_file_handler"
 _QUEUE_HANDLER_LISTENER_ATTR = "_puripuly_heart_queue_listener"
 _QUEUE_HANDLER_CLOSED_ATTR = "_puripuly_heart_queue_closed"
+_QUEUE_HANDLER_CLOSING_ATTR = "_puripuly_heart_queue_closing"
 _QUEUE_HANDLER_REFCOUNT_ATTR = "_puripuly_heart_queue_refcount"
 _QUEUE_HANDLER_QUEUE_ATTR = "_puripuly_heart_queue"
 _CONTENT_CATEGORY_ATTR = "_puripuly_heart_content_category"
 _CONVERSATION_CATEGORY = "accepted_conversation"
 _LIVE_AUDIENCE_ATTR = LIVE_AUDIENCE_RECORD_ATTRIBUTE
 _LIVE_AUDIENCE_BASIC = LIVE_AUDIENCE_BASIC
+_TERMINAL_RECORD_ATTR = "_puripuly_heart_terminal_record"
 _MAIN_FILE_QUEUE_CAPACITY = 2048
+_MAIN_FILE_PRIORITY_RESERVE = 64
 _FILE_DRAIN_TIMEOUT_S = 2.0
 _TERMINAL_ENQUEUE_TIMEOUT_S = 0.25
 _FILE_BATCH_MAX_AGE_S = 1.0
 _FILE_BATCH_MAX_BYTES = 64 * 1024
 _FILE_BATCH_MAX_RECORDS = 128
 _MAIN_LOG_MAX_BYTES = 20 * 1024 * 1024
+_METADATA_PREFIX_RE = re.compile(r"^(?:\[[A-Za-z][A-Za-z0-9_-]*\])+(?:\s+|$)")
+_METADATA_TOKEN_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.:-]*$")
+_METADATA_FIELD_RE = re.compile(
+    r"^[A-Za-z][A-Za-z0-9_.-]*=(?:[A-Za-z0-9_.:+,-]+|\[[A-Za-z0-9_.:+,-]*\])$"
+)
 
 
 LOG_FORMAT = "%(asctime)s.%(msecs)03d [%(levelname)s] %(name)s: %(message)s"
@@ -191,6 +201,29 @@ class RealtimeLogHandler(logging.Handler):
 ObservabilityRunner = Callable[[Awaitable[None]], None]
 
 
+def _is_metadata_only_text(message: str) -> bool:
+    if "\n" in message or "\r" in message:
+        return False
+    prefix = _METADATA_PREFIX_RE.match(message)
+    if prefix is None:
+        return False
+    tokens = message[prefix.end() :].split()
+    if not tokens or _METADATA_TOKEN_RE.fullmatch(tokens[0]) is None:
+        return False
+    return all(_METADATA_FIELD_RE.fullmatch(token) is not None for token in tokens[1:])
+
+
+def _metadata_only_log_envelope(record: logging.LogRecord, message: str) -> str:
+    level_name = logging.getLevelName(record.levelno)
+    return (
+        "[Logging] untrusted_record_redacted "
+        f"level={str(level_name).replace(' ', '_')} "
+        f"logger_sha256={hashlib.sha256(record.name.encode('utf-8', errors='replace')).hexdigest()[:16]} "
+        f"message_len={len(message)} "
+        f"message_sha256={hashlib.sha256(message.encode('utf-8', errors='replace')).hexdigest()[:16]}"
+    )
+
+
 class _DiagnosticRedactionFilter(logging.Filter):
     def __init__(self, sink: DiagnosticSink) -> None:
         super().__init__()
@@ -201,10 +234,21 @@ class _DiagnosticRedactionFilter(logging.Filter):
             return False
         with contextlib.suppress(Exception):
             message = record.getMessage()
-            if getattr(record, _CONTENT_CATEGORY_ATTR, None) == _CONVERSATION_CATEGORY:
+            category = getattr(record, _CONTENT_CATEGORY_ATTR, None)
+            if category == _CONVERSATION_CATEGORY:
                 safe_message = message
-            else:
+            elif (
+                self.sink == DIAGNOSTIC_SINK_BASIC_LOGS
+                or getattr(record, _LIVE_AUDIENCE_ATTR, None) == _LIVE_AUDIENCE_BASIC
+            ):
                 safe_message = _redact_legacy_text_for_sink(message, self.sink)
+            else:
+                redacted = _redact_legacy_text_for_sink(message, self.sink)
+                safe_message = (
+                    redacted
+                    if redacted == message and _is_metadata_only_text(message)
+                    else _metadata_only_log_envelope(record, message)
+                )
             if record.exc_info is not None or record.stack_info is not None:
                 record.msg = safe_message
                 record.args = ()
@@ -299,13 +343,51 @@ def _record_is_definitely_oversized(record: logging.LogRecord) -> bool:
     )
 
 
+def _is_priority_file_record(record: logging.LogRecord) -> bool:
+    return record.levelno >= logging.WARNING or bool(getattr(record, _TERMINAL_RECORD_ATTR, False))
+
+
+class _BoundedFileQueue(queue.Queue[logging.LogRecord]):
+    def admit(self, record: logging.LogRecord, *, force: bool = False) -> tuple[bool, int]:
+        priority = _is_priority_file_record(record)
+        with self.not_full:
+            limit = self.maxsize if priority else self.maxsize - _MAIN_FILE_PRIORITY_RESERVE
+            evicted = 0
+            if self._qsize() >= limit and priority:
+                for index, queued in enumerate(self.queue):
+                    if not _is_priority_file_record(queued):
+                        del self.queue[index]
+                        self.unfinished_tasks -= 1
+                        evicted = 1
+                        if self.unfinished_tasks == 0:
+                            self.all_tasks_done.notify_all()
+                        self.not_full.notify()
+                        break
+            if self._qsize() >= limit and force and self._qsize():
+                self._get()
+                self.unfinished_tasks -= 1
+                evicted += 1
+                if self.unfinished_tasks == 0:
+                    self.all_tasks_done.notify_all()
+                self.not_full.notify()
+            if self._qsize() >= limit:
+                return False, evicted
+            self._put(record)
+            self.unfinished_tasks += 1
+            self.not_empty.notify()
+            return True, evicted
+
+
 class _BoundedQueueHandler(QueueHandler):
-    def __init__(self, file_queue: queue.Queue[logging.LogRecord]) -> None:
+    def __init__(self, file_queue: _BoundedFileQueue) -> None:
         super().__init__(file_queue)
         self.dropped_records = 0
         self.oversized_records = 0
 
     def handle(self, record: logging.LogRecord) -> bool:
+        if getattr(self, _QUEUE_HANDLER_CLOSING_ATTR, False):
+            self.dropped_records += 1
+            return False
         if _record_is_definitely_oversized(record):
             self.oversized_records += 1
             return False
@@ -315,9 +397,9 @@ class _BoundedQueueHandler(QueueHandler):
         super().emit(record)
 
     def enqueue(self, record: logging.LogRecord) -> None:
-        try:
-            self.queue.put_nowait(record)
-        except queue.Full:
+        accepted, evicted = self.queue.admit(record)
+        self.dropped_records += evicted
+        if not accepted:
             self.dropped_records += 1
 
 
@@ -326,11 +408,18 @@ class _SafeQueueListener(QueueListener):
         super().__init__(file_queue, *handlers, respect_handler_level=True)
         self.delivery_failures = 0
         self.shutdown_drops = 0
+        self.cleanup_failures: list[Exception] = []
+        self.cleanup_complete = False
+        self._owned_handlers = handlers
+        self._sentinel_enqueued = False
 
     def enqueue_sentinel(self) -> None:
+        if self._sentinel_enqueued:
+            return
         while True:
             try:
                 self.queue.put_nowait(self._sentinel)
+                self._sentinel_enqueued = True
                 return
             except queue.Full:
                 try:
@@ -343,57 +432,70 @@ class _SafeQueueListener(QueueListener):
     def stop_bounded(self, *, timeout_s: float) -> bool:
         thread = self._thread
         if thread is None:
-            return True
+            return self.cleanup_complete
         if not thread.is_alive():
             self._thread = None
-            return True
+            return self.cleanup_complete
         self.enqueue_sentinel()
         thread.join(max(0.0, timeout_s))
         if thread.is_alive():
             return False
         self._thread = None
-        return True
+        return self.cleanup_complete
 
     def _monitor(self) -> None:
         batch: list[logging.LogRecord] = []
         batch_bytes = 0
         oldest_at = 0.0
-        while True:
-            timeout = None
-            if batch:
-                timeout = max(0.0, _FILE_BATCH_MAX_AGE_S - (time.monotonic() - oldest_at))
-            try:
-                record = (
-                    self.dequeue(block=True) if timeout is None else self.queue.get(True, timeout)
-                )
-            except queue.Empty:
-                self._deliver_batch(batch)
-                for _ in batch:
+        try:
+            while True:
+                timeout = None
+                if batch:
+                    timeout = max(
+                        0.0,
+                        _FILE_BATCH_MAX_AGE_S - (time.monotonic() - oldest_at),
+                    )
+                try:
+                    record = (
+                        self.dequeue(block=True)
+                        if timeout is None
+                        else self.queue.get(True, timeout)
+                    )
+                except queue.Empty:
+                    self._deliver_batch(batch)
+                    for _ in batch:
+                        self.queue.task_done()
+                    batch = []
+                    batch_bytes = 0
+                    continue
+                if record is self._sentinel:
+                    self._deliver_batch(batch)
+                    for _ in batch:
+                        self.queue.task_done()
                     self.queue.task_done()
-                batch = []
-                batch_bytes = 0
-                continue
-            if record is self._sentinel:
-                self._deliver_batch(batch)
-                for _ in batch:
-                    self.queue.task_done()
-                self.queue.task_done()
-                return
-            prepared = self.prepare(record)
-            if not batch:
-                oldest_at = time.monotonic()
-            batch.append(prepared)
-            batch_bytes += _estimated_record_bytes(prepared)
-            if (
-                len(batch) >= _FILE_BATCH_MAX_RECORDS
-                or batch_bytes >= _FILE_BATCH_MAX_BYTES
-                or prepared.levelno >= logging.WARNING
-            ):
-                self._deliver_batch(batch)
-                for _ in batch:
-                    self.queue.task_done()
-                batch = []
-                batch_bytes = 0
+                    return
+                prepared = self.prepare(record)
+                if not batch:
+                    oldest_at = time.monotonic()
+                batch.append(prepared)
+                batch_bytes += _estimated_record_bytes(prepared)
+                if (
+                    len(batch) >= _FILE_BATCH_MAX_RECORDS
+                    or batch_bytes >= _FILE_BATCH_MAX_BYTES
+                    or prepared.levelno >= logging.WARNING
+                ):
+                    self._deliver_batch(batch)
+                    for _ in batch:
+                        self.queue.task_done()
+                    batch = []
+                    batch_bytes = 0
+        finally:
+            for handler in self._owned_handlers:
+                try:
+                    _close_file_handler(handler)
+                except Exception as exc:
+                    self.cleanup_failures.append(exc)
+            self.cleanup_complete = True
 
     def _deliver_batch(self, records: list[logging.LogRecord]) -> None:
         if not records:
@@ -492,7 +594,7 @@ def configure_main_logging(
         file_handler.set_name(_MAIN_FILE_HANDLER_NAME)
         file_handler.setFormatter(_main_formatter())
         _ensure_redaction_filter(file_handler, DIAGNOSTIC_SINK_PERSISTED_LOGS)
-        file_queue: queue.Queue[logging.LogRecord] = queue.Queue(maxsize=_MAIN_FILE_QUEUE_CAPACITY)
+        file_queue = _BoundedFileQueue(maxsize=_MAIN_FILE_QUEUE_CAPACITY)
         file_queue_handler = _BoundedQueueHandler(file_queue)
         file_queue_handler.set_name(_MAIN_FILE_QUEUE_HANDLER_NAME)
         _ensure_redaction_filter(file_queue_handler, DIAGNOSTIC_SINK_PERSISTED_LOGS)
@@ -501,6 +603,7 @@ def configure_main_logging(
         setattr(file_queue_handler, _QUEUE_HANDLER_FILE_HANDLER_ATTR, file_handler)
         setattr(file_queue_handler, _QUEUE_HANDLER_LISTENER_ATTR, file_queue_listener)
         setattr(file_queue_handler, _QUEUE_HANDLER_CLOSED_ATTR, False)
+        setattr(file_queue_handler, _QUEUE_HANDLER_CLOSING_ATTR, False)
         setattr(file_queue_handler, _QUEUE_HANDLER_REFCOUNT_ATTR, 1)
         setattr(file_queue_handler, _QUEUE_HANDLER_QUEUE_ATTR, file_queue)
         target_logger.addHandler(file_queue_handler)
@@ -1328,7 +1431,7 @@ def _main_file_queue_for_handler(
 def _join_pending_file_queue(
     sinks: RuntimeLoggingSinks,
     *,
-    timeout_s: float = _FILE_DRAIN_TIMEOUT_S,
+    timeout_s: float | None = None,
 ) -> bool:
     file_queue_handler = getattr(sinks, "file_queue_handler", None)
     if file_queue_handler is None:
@@ -1340,7 +1443,8 @@ def _join_pending_file_queue(
     )
     if file_queue is None:
         return True
-    deadline = time.monotonic() + max(0.0, timeout_s)
+    timeout = _FILE_DRAIN_TIMEOUT_S if timeout_s is None else timeout_s
+    deadline = time.monotonic() + max(0.0, timeout)
     while file_queue.unfinished_tasks and time.monotonic() < deadline:
         time.sleep(0.005)
     return file_queue.unfinished_tasks == 0
@@ -1355,6 +1459,13 @@ def _enqueue_terminal_file_record(
     if handler is None or file_queue is None:
         sinks.file_handler.handle(record)
         return
+    setattr(record, _TERMINAL_RECORD_ATTR, True)
+    if isinstance(file_queue, _BoundedFileQueue):
+        accepted, evicted = file_queue.admit(record, force=True)
+        sinks.abandoned_records = int(getattr(sinks, "abandoned_records", 0)) + evicted
+        if not accepted:
+            sinks.abandoned_records += 1
+        return
     deadline = time.monotonic() + _TERMINAL_ENQUEUE_TIMEOUT_S
     while True:
         try:
@@ -1365,9 +1476,8 @@ def _enqueue_terminal_file_record(
                 file_queue.get_nowait()
             except queue.Empty:
                 continue
-            else:
-                file_queue.task_done()
-                sinks.abandoned_records = int(getattr(sinks, "abandoned_records", 0)) + 1
+            file_queue.task_done()
+            sinks.abandoned_records = int(getattr(sinks, "abandoned_records", 0)) + 1
 
 
 def _file_delivery_loss_suffix(sinks: RuntimeLoggingSinks) -> str:
@@ -1407,89 +1517,76 @@ def _note_oversized_rejection(sinks: RuntimeLoggingSinks) -> None:
 
 def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Handler) -> None:
     failures: list[Exception] = []
-    try:
-        logger.removeHandler(handler)
-    except Exception as exc:
-        failures.append(exc)
+    already_closing = bool(getattr(handler, _QUEUE_HANDLER_CLOSING_ATTR, False))
     setattr(handler, _QUEUE_HANDLER_REFCOUNT_ATTR, 0)
+    setattr(handler, _QUEUE_HANDLER_CLOSING_ATTR, True)
 
     file_queue = _main_file_queue_for_handler(handler)
-    drained = True
-    if file_queue is not None:
-        sinks = RuntimeLoggingSinks(
-            stream_handler=logging.NullHandler(),
-            file_handler=getattr(handler, _QUEUE_HANDLER_FILE_HANDLER_ATTR),
-            log_file=Path(getattr(handler, _QUEUE_HANDLER_LOG_FILE_ATTR)),
-            file_queue_handler=handler,
-            file_queue_listener=getattr(handler, _QUEUE_HANDLER_LISTENER_ATTR),
-            file_queue=file_queue,
-        )
-        drained = _join_pending_file_queue(sinks)
-        if not drained:
-            abandoned = 0
-            while True:
-                try:
-                    file_queue.get_nowait()
-                except queue.Empty:
-                    break
-                else:
-                    file_queue.task_done()
-                    abandoned += 1
-            if isinstance(handler, _BoundedQueueHandler):
-                handler.dropped_records += abandoned
-
     listener = getattr(handler, _QUEUE_HANDLER_LISTENER_ATTR, None)
+    file_handler = getattr(handler, _QUEUE_HANDLER_FILE_HANDLER_ATTR, None)
+    sinks = RuntimeLoggingSinks(
+        stream_handler=logging.NullHandler(),
+        file_handler=file_handler,
+        log_file=Path(getattr(handler, _QUEUE_HANDLER_LOG_FILE_ATTR)),
+        file_queue_handler=handler,
+        file_queue_listener=listener,
+        file_queue=file_queue,
+    )
+    drained = _join_pending_file_queue(sinks)
+    initial_delivery_failures = (
+        file_handler.delivery_failures
+        if isinstance(file_handler, _BatchingRotatingFileHandler)
+        else 0
+    )
+    dropped = handler.dropped_records if isinstance(handler, _BoundedQueueHandler) else 0
+    rejected = handler.oversized_records if isinstance(handler, _BoundedQueueHandler) else 0
+    if isinstance(file_handler, _BatchingRotatingFileHandler):
+        rejected += file_handler.oversized_records
+    delivery_failures = initial_delivery_failures
+    if isinstance(listener, _SafeQueueListener):
+        dropped += listener.shutdown_drops
+        delivery_failures += listener.delivery_failures
+    if not already_closing and (dropped or rejected or delivery_failures or not drained):
+        record = logger.makeRecord(
+            _SESSION_LOGGER_NAME,
+            logging.WARNING,
+            fn="",
+            lno=0,
+            msg=(
+                "[Lifecycle][Shutdown] logging_delivery_terminal "
+                f"dropped={dropped} oversized_rejected={rejected} "
+                f"delivery_failures={delivery_failures} drain_complete={str(drained).lower()}"
+            ),
+            args=(),
+            exc_info=None,
+        )
+        _enqueue_terminal_file_record(sinks, record)
+
     listener_stopped = True
     if isinstance(listener, _SafeQueueListener):
         listener_stopped = listener.stop_bounded(timeout_s=_TERMINAL_ENQUEUE_TIMEOUT_S)
+        failures.extend(listener.cleanup_failures)
     elif isinstance(listener, QueueListener) and drained:
         try:
             listener.stop()
         except Exception as exc:
             failures.append(exc)
             listener_stopped = False
-
-    file_handler = getattr(handler, _QUEUE_HANDLER_FILE_HANDLER_ATTR, None)
-    if isinstance(file_handler, logging.Handler) and listener_stopped:
-        initial_delivery_failures = (
-            file_handler.delivery_failures
-            if isinstance(file_handler, _BatchingRotatingFileHandler)
-            else 0
-        )
-        dropped = handler.dropped_records if isinstance(handler, _BoundedQueueHandler) else 0
-        rejected = handler.oversized_records if isinstance(handler, _BoundedQueueHandler) else 0
-        if isinstance(file_handler, _BatchingRotatingFileHandler):
-            rejected += file_handler.oversized_records
-        if isinstance(listener, _SafeQueueListener):
-            dropped += listener.shutdown_drops
-            delivery_failures = listener.delivery_failures + initial_delivery_failures
-        else:
-            delivery_failures = initial_delivery_failures
-        if dropped or rejected or delivery_failures:
+        if listener_stopped and isinstance(file_handler, logging.Handler):
             try:
-                record = logger.makeRecord(
-                    _SESSION_LOGGER_NAME,
-                    logging.WARNING,
-                    fn="",
-                    lno=0,
-                    msg=(
-                        "[Lifecycle][Shutdown] logging_delivery_terminal "
-                        f"dropped={dropped} oversized_rejected={rejected} "
-                        f"delivery_failures={delivery_failures}"
-                    ),
-                    args=(),
-                    exc_info=None,
-                )
-                file_handler.handle(record)
+                _close_file_handler(file_handler)
             except Exception as exc:
                 failures.append(exc)
+
+    if listener_stopped:
         try:
-            _close_file_handler(file_handler)
+            logger.removeHandler(handler)
         except Exception as exc:
             failures.append(exc)
+        setattr(handler, _QUEUE_HANDLER_CLOSED_ATTR, True)
         if (
             isinstance(file_handler, _BatchingRotatingFileHandler)
-            and file_handler.delivery_failures > initial_delivery_failures
+            and file_handler.delivery_failures
         ):
             failures.append(
                 RuntimeError(
@@ -1497,17 +1594,11 @@ def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Hand
                     f"record_count={file_handler.delivery_failures}"
                 )
             )
-        elif initial_delivery_failures:
-            failures.append(
-                RuntimeError(
-                    "Runtime logging file delivery failed "
-                    f"record_count={initial_delivery_failures}"
-                )
-            )
-        setattr(handler, _QUEUE_HANDLER_CLOSED_ATTR, True)
-    if not listener_stopped:
+    else:
         failures.append(
-            TimeoutError("Runtime logging file listener stop timed out; delivery abandoned")
+            TimeoutError(
+                "Runtime logging file listener stop timed out; cleanup remains listener-owned"
+            )
         )
     _raise_close_failures("Runtime logging queue handler close failed", failures)
 
@@ -1536,9 +1627,11 @@ def _remove_stale_main_file_queue_handlers(logger: logging.Logger, *, log_file: 
     for handler in list(logger.handlers):
         if handler.get_name() != _MAIN_FILE_QUEUE_HANDLER_NAME:
             continue
-        if getattr(handler, _QUEUE_HANDLER_LOG_FILE_ATTR, None) == expected_path and not getattr(
-            handler, _QUEUE_HANDLER_CLOSED_ATTR, False
-        ):
+        same_file = getattr(handler, _QUEUE_HANDLER_LOG_FILE_ATTR, None) == expected_path
+        usable = not getattr(handler, _QUEUE_HANDLER_CLOSED_ATTR, False) and not getattr(
+            handler, _QUEUE_HANDLER_CLOSING_ATTR, False
+        )
+        if same_file and usable:
             continue
         _close_main_file_queue_handler(logger, handler)
 

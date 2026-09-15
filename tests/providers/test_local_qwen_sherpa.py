@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import sys
 import threading
 from pathlib import Path
@@ -1128,47 +1127,3 @@ async def test_local_qwen_speech_end_without_audio_emits_empty_final_boundary(
     assert event.is_final is True
 
 
-@pytest.mark.asyncio
-async def test_local_qwen_logs_backlog_warning_once_with_stream_metadata(
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    started = asyncio.Event()
-    release = asyncio.Event()
-
-    async def ensure_recognizer(self) -> object:
-        self._recognizer = object()
-        return self._recognizer
-
-    async def decode_f32(self, samples_f32: np.ndarray) -> str:
-        _ = samples_f32
-        started.set()
-        await release.wait()
-        return ""
-
-    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
-    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
-
-    backend = LocalQwenSherpaSTTBackend(
-        model_dir=Path("/models/qwen"),
-        stream_label="peer",
-    )
-    session = await backend.open_session()
-
-    with caplog.at_level(logging.WARNING, logger=local_qwen_module.__name__):
-        await session.send_audio_f32(np.ones(160, dtype=np.float32))
-        await session.on_speech_end()
-        await asyncio.wait_for(started.wait(), timeout=0.1)
-        for _ in range(9):
-            await session.send_audio_f32(np.ones(160, dtype=np.float32))
-            await session.on_speech_end()
-
-    warnings = [message for message in caplog.messages if "Decode backlog" in message]
-    assert len(warnings) == 1
-    assert "[STT][local_qwen][peer]" in warnings[0]
-    assert "pending_jobs=9" in warnings[0]
-    assert "buffered_audio_ms=90.0" in warnings[0]
-    assert "threshold=8" in warnings[0]
-
-    release.set()
-    await session.stop()

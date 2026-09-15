@@ -5,11 +5,9 @@ import builtins
 import contextlib
 import inspect
 import json
-import logging
 import os
 import subprocess
 import sys
-import traceback
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -3179,9 +3177,7 @@ async def test_desktop_overlay_reasserts_topmost_after_locked_render_update() ->
 
 
 @pytest.mark.asyncio
-async def test_desktop_overlay_keeps_locked_state_when_zorder_port_fails(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+async def test_desktop_overlay_keeps_locked_state_when_zorder_port_fails() -> None:
     app = FakeFletApp()
     sink = RecordingLifecycleSink()
     port = RecordingWindowZOrderPort(error=RuntimeError("z-order failed"))
@@ -3195,24 +3191,20 @@ async def test_desktop_overlay_keeps_locked_state_when_zorder_port_fails(
 
     try:
         await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
-
-        with caplog.at_level(logging.WARNING):
-            await window.dispatch_runtime_control(
-                {"command": "set_interaction_mode", "mode": "pass_through"}
-            )
-            z_order_task = window._window_z_order_task
-            if z_order_task is not None:
-                await z_order_task
+        await window.dispatch_runtime_control(
+            {"command": "set_interaction_mode", "mode": "pass_through"}
+        )
+        z_order_task = window._window_z_order_task
+        if z_order_task is not None:
+            await z_order_task
 
         assert app.page.window.ignore_mouse_events is True
         assert sink.events[-1] == {
             "type": "overlay_event",
             "payload": {"event": "interaction_mode_changed", "mode": "pass_through"},
         }
-        assert "reason=port_error exception_type=RuntimeError" in caplog.text
     finally:
         await window.close()
-
 
 @pytest.mark.asyncio
 async def test_desktop_overlay_cancels_stale_zorder_before_edit_event() -> None:
@@ -5276,9 +5268,7 @@ async def test_desktop_overlay_rejects_flet_startup_without_canonical_bounds() -
 
 
 @pytest.mark.asyncio
-async def test_desktop_overlay_window_start_failure_reports_window_configuration_error(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+async def test_desktop_overlay_window_start_failure_reports_window_configuration_error() -> None:
     token = "window-start-secret-token"
     bridge = OverlayBridge(
         session_token=token,
@@ -5296,7 +5286,6 @@ async def test_desktop_overlay_window_start_failure_reports_window_configuration
     )
 
     try:
-        caplog.set_level(logging.WARNING, logger="puripuly_heart.ui.desktop_overlay")
         assert await renderer.run() == 1
         bridge_event = await _next_bridge_event(bridge, expected_type="startup_error")
     finally:
@@ -5312,21 +5301,6 @@ async def test_desktop_overlay_window_start_failure_reports_window_configuration
     }
     assert token not in json.dumps(sink.events)
     assert token not in json.dumps(bridge_event)
-    assert any(
-        "Renderer startup failed" in record.message
-        and "exception_type=RuntimeError" in record.message
-        and "exception_message=window bootstrap failed with token <redacted>" in record.message
-        and "exception_traceback=" in record.message
-        and record.exc_info is None
-        for record in caplog.records
-    )
-    formatted_tracebacks = "\n".join(
-        "".join(traceback.format_exception(*record.exc_info))
-        for record in caplog.records
-        if record.exc_info is not None
-    )
-    assert token not in json.dumps(caplog.messages)
-    assert token not in formatted_tracebacks
 
 
 @pytest.mark.asyncio

@@ -697,47 +697,38 @@ async def test_restart_after_failed_output_runtime_close_keeps_owners_not_runnin
 
 @pytest.mark.asyncio
 async def test_handle_stt_event_routes_non_low_latency_events() -> None:
-    runtime_logging, log_stream = _make_runtime_logging_capture()
     harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
         clock=FakeClock(),
-        runtime_logging=runtime_logging,
     )
     harness.self_owner.mark_promo_eligible()
     utterance_id = uuid4()
     partial = Transcript(utterance_id=utterance_id, text="hel", is_final=False, created_at=1.0)
     final = Transcript(utterance_id=utterance_id, text="hello", is_final=True, created_at=2.0)
 
-    try:
-        await harness.dispatch_stt_event(STTSessionStateEvent(state=STTSessionState.STREAMING))
-        await harness.dispatch_stt_event(STTErrorEvent(message="boom"))
-        await harness.dispatch_stt_event(
-            STTPartialEvent(utterance_id=utterance_id, transcript=partial)
-        )
-        await harness.dispatch_stt_event(STTFinalEvent(utterance_id=utterance_id, transcript=final))
+    await harness.dispatch_stt_event(STTSessionStateEvent(state=STTSessionState.STREAMING))
+    await harness.dispatch_stt_event(STTErrorEvent(message="boom"))
+    await harness.dispatch_stt_event(
+        STTPartialEvent(utterance_id=utterance_id, transcript=partial)
+    )
+    await harness.dispatch_stt_event(
+        STTFinalEvent(utterance_id=utterance_id, transcript=final)
+    )
 
-        events = [await harness.ui_events.get() for _ in range(5)]
-        assert [event.type for event in events] == [
-            UIEventType.SESSION_STATE_CHANGED,
-            UIEventType.ERROR,
-            UIEventType.TRANSCRIPT_PARTIAL,
-            UIEventType.TRANSCRIPT_FINAL,
-            UIEventType.OSC_SENT,
-        ]
-        assert events[1].runtime_log_handled is False
-        assert harness.osc.immediate_messages == ["PuriPuly ON!"]
-        assert len(harness.osc.messages) == 1
-        assert harness.osc.messages[0].text == "hello"
-        assert any(
-            "translation=skipped" in message
-            and "channel=self" in message
-            and "cause=provider_unavailable" in message
-            for message in _runtime_log_messages(log_stream)
-        )
-    finally:
-        runtime_logging.close()
+    events = [await harness.ui_events.get() for _ in range(5)]
+    assert [event.type for event in events] == [
+        UIEventType.SESSION_STATE_CHANGED,
+        UIEventType.ERROR,
+        UIEventType.TRANSCRIPT_PARTIAL,
+        UIEventType.TRANSCRIPT_FINAL,
+        UIEventType.OSC_SENT,
+    ]
+    assert events[1].runtime_log_handled is False
+    assert harness.osc.immediate_messages == ["PuriPuly ON!"]
+    assert len(harness.osc.messages) == 1
+    assert harness.osc.messages[0].text == "hello"
 
 
 @pytest.mark.asyncio
@@ -778,11 +769,6 @@ async def test_translate_and_enqueue_emits_error_and_fallback_transcript() -> No
         assert [event.type for event in events] == [UIEventType.ERROR, UIEventType.OSC_SENT]
         assert events[0].runtime_log_handled is True
         assert harness.osc.messages[0].text == "hello"
-        assert any(
-            "translation=failed stage=final" in message
-            and "category=unknown code=provider.unknown" in message
-            for message in _runtime_log_messages(log_stream)
-        )
         assert "llm failed" not in "\n".join(_runtime_log_messages(log_stream))
     finally:
         runtime_logging.close()
@@ -828,12 +814,6 @@ async def test_translate_and_enqueue_logs_managed_auth_diagnostics() -> None:
         assert payload.diagnostics.fields["managed_subcode"] == "broker_backoff"
         assert "broker is temporarily unavailable" not in repr(payload)
         messages = _runtime_log_messages(log_stream)
-        assert any(
-            "managed_operation=issue managed_code=trial_unavailable "
-            "managed_error_class=retryable managed_subcode=broker_backoff retry_after_ms=9000"
-            in message
-            for message in messages
-        )
         assert "broker is temporarily unavailable" not in "\n".join(messages)
     finally:
         runtime_logging.close()
@@ -914,7 +894,6 @@ async def test_peer_stt_event_loop_failure_without_runtime_logging_is_safe(
             channel="peer",
         )
 
-    assert "[Translation] STT event loop crashed: RuntimeError" in caplog.messages
     assert "loop boom" not in "\n".join(caplog.messages)
     assert any(record.levelno == logging.ERROR for record in caplog.records)
 

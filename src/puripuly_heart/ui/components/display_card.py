@@ -1,5 +1,3 @@
-import logging
-import time
 from typing import Callable
 
 import flet as ft
@@ -249,22 +247,7 @@ class DisplayCard(ft.Container):
         self._turn_size_cap = _display_layout_for_length(
             _weighted_len(_apply_debug_prefix(text or "", debug_prefix))
         )[0]
-        measure = should_log and runtime_log_diagnostic is not None
-        display_update_issued, flet_update_elapsed_us = self._sync_display(
-            measure_flet_update=measure
-        )
-        if should_log:
-            self._emit_dashboard_source_applied(
-                runtime_log_diagnostic=runtime_log_diagnostic,
-                update_id=update_id,
-                origin_wall_clock_ms=origin_wall_clock_ms,
-                utterance_id=utterance_id,
-                channel=channel,
-                source_text_len=source_text_len,
-                transcript_kind=transcript_kind,
-                display_update_issued=display_update_issued,
-                flet_update_elapsed_us=flet_update_elapsed_us,
-            )
+        self._sync_display()
 
     def set_display_translation(
         self,
@@ -288,23 +271,7 @@ class DisplayCard(ft.Container):
         self._translation_value = text or None
         self._translation_font_family = font_family if text else None
         self._debug_prefix = debug_prefix
-        measure = runtime_log_diagnostic is not None
-        display_update_issued, flet_update_elapsed_us = self._sync_display(
-            measure_flet_update=measure
-        )
-        self._emit_dashboard_translation_visual_commit(
-            runtime_log_diagnostic=runtime_log_diagnostic,
-            update_id=update_id,
-            origin_wall_clock_ms=origin_wall_clock_ms,
-            utterance_id=utterance_id,
-            channel=channel,
-            session_scope=session_scope,
-            source_text_hash=source_text_hash,
-            source_text_len=source_text_len,
-            logical_turn_key=logical_turn_key,
-            display_update_issued=display_update_issued,
-            flet_update_elapsed_us=flet_update_elapsed_us,
-        )
+        self._sync_display()
 
     def set_status(self, status: str, font_family: str | None = None):
         """Update connection status display."""
@@ -380,104 +347,9 @@ class DisplayCard(ft.Container):
             self._translation_font_family = None
             self._sync_display()
 
-    def _emit_dashboard_translation_visual_commit(
-        self,
-        *,
-        runtime_log_diagnostic: Callable[..., bool | None] | None,
-        update_id: str | None,
-        origin_wall_clock_ms: int | None,
-        utterance_id: object | None,
-        channel: str | None,
-        session_scope: str | None,
-        source_text_hash: str | None,
-        source_text_len: int | None,
-        logical_turn_key: str | None,
-        display_update_issued: bool,
-        flet_update_elapsed_us: int | None = None,
-    ) -> None:
-        if runtime_log_diagnostic is None or update_id is None:
-            return
-        if not display_update_issued:
-            return
-        if not self._translation_is_visible or not self._display_text.value:
             return
 
-        elapsed_ms = None
-        if origin_wall_clock_ms is not None:
-            elapsed_ms = max(0, int(time.time() * 1000) - origin_wall_clock_ms)
-
-        parts = [
-            "[Diagnostic][DisplayCard] dashboard_translation_visual_commit",
-            f"utterance_id={utterance_id}",
-            f"channel={channel}",
-            f"update_id={update_id}",
-            f"origin_wall_clock_ms={origin_wall_clock_ms}",
-            f"session_scope={session_scope}",
-            f"source_text_hash={source_text_hash}",
-            f"source_text_len={source_text_len}",
-            f"logical_turn_key={logical_turn_key}",
-            f"source_display_text_len={len(self._source_value or '')}",
-            f"translation_text_len={len(self._translation_value or '')}",
-            f"translation_visible={self._translation_is_visible}",
-            f"showing_status={self._showing_status}",
-            f"display_update_issued={display_update_issued}",
-        ]
-        if elapsed_ms is not None:
-            parts.append(f"elapsed_ms={elapsed_ms}")
-        if flet_update_elapsed_us is not None:
-            parts.append(f"flet_update_elapsed_us={flet_update_elapsed_us}")
-
-        try:
-            runtime_log_diagnostic(" ".join(parts), level=logging.INFO)
-        except Exception:
-            return
-
-    def _emit_dashboard_source_applied(
-        self,
-        *,
-        runtime_log_diagnostic: Callable[..., bool | None] | None,
-        update_id: str | None,
-        origin_wall_clock_ms: int | None,
-        utterance_id: object | None,
-        channel: str | None,
-        source_text_len: int | None,
-        transcript_kind: str | None,
-        display_update_issued: bool,
-        flet_update_elapsed_us: int | None = None,
-    ) -> None:
-        if runtime_log_diagnostic is None:
-            return
-        if not display_update_issued:
-            return
-
-        elapsed_ms = None
-        if origin_wall_clock_ms is not None:
-            elapsed_ms = max(0, int(time.time() * 1000) - origin_wall_clock_ms)
-
-        parts = [
-            "[Diagnostic][DisplayCard] dashboard_source_applied",
-            f"utterance_id={utterance_id}",
-            f"channel={channel}",
-            f"update_id={update_id if update_id is not None else 'none'}",
-            f"origin_wall_clock_ms={origin_wall_clock_ms}",
-            f"transcript_kind={transcript_kind}",
-            f"source_text_len={source_text_len}",
-            f"source_display_text_len={len(self._source_value or '')}",
-            f"translation_visible={self._translation_is_visible}",
-            f"showing_status={self._showing_status}",
-            f"display_update_issued={display_update_issued}",
-        ]
-        if elapsed_ms is not None:
-            parts.append(f"elapsed_ms={elapsed_ms}")
-        if flet_update_elapsed_us is not None:
-            parts.append(f"flet_update_elapsed_us={flet_update_elapsed_us}")
-
-        try:
-            runtime_log_diagnostic(" ".join(parts), level=logging.INFO)
-        except Exception:
-            return
-
-    def _sync_display(self, *, measure_flet_update: bool = False) -> tuple[bool, int | None]:
+    def _sync_display(self) -> tuple[bool, None]:
         notice_blocks = self._notice_value is not None and (
             not self._notice_yields_to_content or self._showing_status
         )
@@ -517,13 +389,7 @@ class DisplayCard(ft.Container):
 
         display_update_issued = is_control_mounted(self._display_text)
 
-        flet_update_elapsed_us: int | None = None
-        start_ns = time.perf_counter_ns() if measure_flet_update else 0
-
         if display_update_issued:
             self._display_text.update()
 
-        if measure_flet_update:
-            flet_update_elapsed_us = max(0, (time.perf_counter_ns() - start_ns) // 1000)
-
-        return display_update_issued, flet_update_elapsed_us
+        return display_update_issued, None
