@@ -757,7 +757,6 @@ class ConstructionDummyDashboardView(ft.Container):
         self.on_toggle_peer_translation = None
         self.on_language_change = None
         self.overlay_peer_contract = None
-        self.runtime_log_diagnostic = None
 
     def bind_dashboard_intents(self, *, translation, capture) -> None:
         self.on_send_message = translation.submit_message
@@ -804,8 +803,6 @@ class ConstructionDummySettingsView(ft.Container):
         self.show_snackbar = surface.show_snackbar
         if surface.runtime_log_basic is not None:
             self.runtime_log_basic = surface.runtime_log_basic
-        if surface.runtime_log_diagnostic is not None:
-            self.runtime_log_diagnostic = surface.runtime_log_diagnostic
         self.on_providers_changed = provider.providers_changed
         self.on_request_openrouter_pkce = provider.request_openrouter_pkce
         self.on_verify_api_key = provider.verify_api_key
@@ -952,7 +949,6 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert not hasattr(app.view_settings, "on_overlay_toggle")
     assert not hasattr(app.view_settings, "on_peer_translation_toggle")
     assert app.view_settings.runtime_log_basic == app.application.log_basic
-    assert app.view_settings.runtime_log_diagnostic == app.application.log_diagnostic
     assert isinstance(app.application, UiApplicationBoundary)
     assert app.application is app._ui_application
     assert isinstance(backend.app, FletUiPresentationAdapter)
@@ -1695,127 +1691,6 @@ def test_translator_app_keeps_debug_ui_preview_out_of_controller(
         Path("settings.json"),
     )
     assert not hasattr(app._presentation_adapter, "app")
-
-
-def test_translator_app_wires_runtime_log_diagnostic_into_dashboard_visual_commit_path(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class DummyController:
-        def __init__(self, page, app, config_path, debug_ui_preview: bool = False):
-            self.page = page
-            self.app = app
-            self.config_path = config_path
-            self.debug_ui_preview = debug_ui_preview
-            self.settings = None
-
-        def log_basic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
-            _ = (message, level)
-
-        def log_diagnostic(self, message: str, *, level: int = app_module.logging.INFO) -> bool:
-            _ = (message, level)
-            return True
-
-    class DummyDashboardView(ft.Container):
-        def __init__(self) -> None:
-            super().__init__()
-            self.on_send_message = None
-            self.on_toggle_translation = None
-            self.on_toggle_stt = None
-            self.on_toggle_overlay = None
-            self.on_toggle_peer_translation = None
-            self.on_language_change = None
-            self.runtime_log_diagnostic = None
-
-        def bind_dashboard_intents(self, *, translation, capture) -> None:
-            self.on_send_message = translation.submit_message
-            self.on_toggle_translation = translation.toggle_translation
-            self.on_language_change = translation.change_language
-            self.on_message_input_activity = translation.report_input_activity
-            self.on_toggle_stt = capture.toggle_self_capture
-            self.on_toggle_peer_translation = capture.toggle_peer_capture
-            self.on_toggle_overlay = capture.toggle_overlay
-            self.on_retry_peer_process_capture = capture.retry_peer_process_capture
-            self.on_gpu_notice_action = capture.run_gpu_notice_action
-
-        def apply_locale(self) -> None:
-            return None
-
-    class DummySettingsView(ft.Container):
-        def __init__(self) -> None:
-            super().__init__()
-            self.on_settings_changed = None
-            self.on_prompt_apply_settings = None
-            self.on_providers_changed = None
-            self.on_verify_api_key = None
-            self.on_secret_cleared = None
-            self.show_snackbar = None
-
-        def bind_settings_intents(self, *, surface, provider, general, prompt, overlay) -> None:
-            self.on_settings_changed = surface.settings_changed
-            self.show_snackbar = surface.show_snackbar
-            self.on_providers_changed = provider.providers_changed
-            self.on_request_openrouter_pkce = provider.request_openrouter_pkce
-            self.on_verify_api_key = provider.verify_api_key
-            self.on_provider_secret_change = provider.provider_secret_change
-            self.on_secret_cleared = provider.secret_cleared
-            self.on_local_llm_secret_changed = provider.local_llm_secret_changed
-            self.on_gpu_discovery_requested = provider.gpu_discovery_requested
-            self.on_start_microphone_test = general.start_microphone_test
-            self.on_prompt_apply_settings = prompt.prompt_apply_settings
-            self.on_view_logs = overlay.view_logs
-
-        def set_overlay_runtime_state(self, *_args, **_kwargs) -> None:
-            return None
-
-        def apply_locale(self) -> None:
-            return None
-
-    class DummyLogsView(ft.Container):
-        def __init__(self) -> None:
-            super().__init__()
-
-        def apply_locale(self) -> None:
-            return None
-
-        async def scroll_to_bottom(self) -> None:
-            return None
-
-    monkeypatch.setattr(app_module, "DashboardView", DummyDashboardView)
-    monkeypatch.setattr(app_module, "SettingsView", DummySettingsView)
-    monkeypatch.setattr(app_module, "LogsView", DummyLogsView)
-    monkeypatch.setattr(app_module, "AboutView", lambda: ft.Container())
-    monkeypatch.setattr(
-        app_module,
-        "TitleBar",
-        lambda _page, *, on_close: ft.Container(data=on_close),
-    )
-    monkeypatch.setattr(app_module, "BottomNavBar", lambda on_change: ft.Container(data=on_change))
-    monkeypatch.setattr(app_module, "register_fonts", lambda _page: None)
-    monkeypatch.setattr(app_module, "get_app_theme", lambda **_kwargs: "theme")
-    monkeypatch.setattr(app_module, "font_for_language", lambda _code: "font")
-    monkeypatch.setattr(app_module, "get_locale", lambda: "en")
-
-    def application_factory(
-        *,
-        presentation,
-        config_path,
-        runtime_logging_sinks=None,
-        vrchat_osc_presence=None,
-    ):
-        _ = (
-            runtime_logging_sinks,
-            vrchat_osc_presence,
-        )
-        controller = DummyController(None, presentation, config_path)
-        return compose_test_ui_application_boundary(controller)
-
-    app = TranslatorApp(
-        DummyPage(),
-        config_path=Path("settings.json"),
-        application_factory=application_factory,
-    )
-
-    assert app.view_dashboard.runtime_log_diagnostic == app._log_diagnostic
 
 
 def test_settings_view_pkce_callback_is_wired(monkeypatch: pytest.MonkeyPatch) -> None:

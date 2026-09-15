@@ -248,7 +248,6 @@ class TranslatorApp:
         )
 
         runtime_log_basic = self.application.log_basic
-        runtime_log_diagnostic = self.application.log_diagnostic
         calibration_begin = self.application.begin_overlay_calibration
         calibration_change = self.application.set_overlay_calibration_field
         calibration_apply = self.application.apply_overlay_calibration
@@ -258,9 +257,6 @@ class TranslatorApp:
                 settings_changed=self._on_settings_changed,
                 show_snackbar=self._show_snackbar,
                 runtime_log_basic=(runtime_log_basic if callable(runtime_log_basic) else None),
-                runtime_log_diagnostic=(
-                    runtime_log_diagnostic if callable(runtime_log_diagnostic) else None
-                ),
                 open_api_keys_guide=self._open_api_keys_guide,
             ),
             provider=SettingsProviderIntents(
@@ -308,7 +304,6 @@ class TranslatorApp:
                 calibration_cancel=(calibration_cancel if callable(calibration_cancel) else None),
             ),
         )
-        self.view_dashboard.runtime_log_diagnostic = self._log_diagnostic
 
         set_overlay_calibration = getattr(self.view_settings, "set_overlay_calibration", None)
         overlay_calibration = self.application.overlay_calibration

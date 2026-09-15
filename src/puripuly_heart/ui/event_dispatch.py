@@ -48,11 +48,6 @@ class DashboardEventDestination(Protocol):
         text: str,
         *,
         language_code: str | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        source_text_len: int | None = None,
-        transcript_kind: str | None = None,
-        should_log: bool = False,
         debug_prefix: str | None = None,
     ) -> bool | None: ...
 
@@ -61,14 +56,6 @@ class DashboardEventDestination(Protocol):
         text: str,
         *,
         language_code: str | None = None,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        session_scope: str | None = None,
-        source_text_hash: str | None = None,
-        source_text_len: int | None = None,
-        logical_turn_key: str | None = None,
         debug_prefix: str | None = None,
     ) -> bool | None: ...
 
@@ -97,7 +84,6 @@ class ErrorEventDestination(Protocol):
 
 
 class RuntimeLoggingPort(Protocol):
-    mode: object
 
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None: ...
 
@@ -118,11 +104,6 @@ class AppDashboardEventDestination:
         text: str,
         *,
         language_code: str | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        source_text_len: int | None = None,
-        transcript_kind: str | None = None,
-        should_log: bool = False,
         debug_prefix: str | None = None,
     ) -> bool:
         dashboard = self._dashboard
@@ -131,11 +112,6 @@ class AppDashboardEventDestination:
         dashboard.set_display_text(
             text,
             language_code=language_code,
-            utterance_id=utterance_id,
-            channel=channel,
-            source_text_len=source_text_len,
-            transcript_kind=transcript_kind,
-            should_log=should_log,
             debug_prefix=debug_prefix,
         )
         return True
@@ -145,14 +121,6 @@ class AppDashboardEventDestination:
         text: str,
         *,
         language_code: str | None = None,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        session_scope: str | None = None,
-        source_text_hash: str | None = None,
-        source_text_len: int | None = None,
-        logical_turn_key: str | None = None,
         debug_prefix: str | None = None,
     ) -> bool:
         dashboard = self._dashboard
@@ -161,14 +129,6 @@ class AppDashboardEventDestination:
         dashboard.set_display_translation_text(
             text,
             language_code=language_code,
-            update_id=update_id,
-            origin_wall_clock_ms=origin_wall_clock_ms,
-            utterance_id=utterance_id,
-            channel=channel,
-            session_scope=session_scope,
-            source_text_hash=source_text_hash,
-            source_text_len=source_text_len,
-            logical_turn_key=logical_turn_key,
             debug_prefix=debug_prefix,
         )
         return True
@@ -473,11 +433,6 @@ class UIEventBridge:
             self.dashboard_destination.publish_transcript(
                 transcript_projection.text,
                 language_code=transcript_projection.language_code,
-                utterance_id=transcript_projection.utterance_id,
-                channel=transcript_projection.channel,
-                source_text_len=transcript_projection.source_text_len,
-                transcript_kind=transcript_projection.transcript_kind,
-                should_log=transcript_projection.should_log,
                 debug_prefix=transcript_projection.debug_prefix,
             )
             for history in projection.history:
@@ -497,14 +452,6 @@ class UIEventBridge:
             dashboard_published = self.dashboard_destination.publish_translation(
                 translation_projection.text,
                 language_code=translation_projection.language_code,
-                update_id=translation_projection.update_id,
-                origin_wall_clock_ms=translation_projection.origin_wall_clock_ms,
-                utterance_id=translation_projection.utterance_id,
-                channel=translation_projection.channel,
-                session_scope=translation_projection.session_scope,
-                source_text_hash=translation_projection.source_text_hash,
-                source_text_len=translation_projection.source_text_len,
-                logical_turn_key=translation_projection.logical_turn_key,
                 debug_prefix=translation_projection.debug_prefix,
             )
             if dashboard_published is not False and projection.translation_diagnostic is not None:

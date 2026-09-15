@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from types import SimpleNamespace
 
 import pytest
@@ -11,17 +10,6 @@ pytest.importorskip("flet")
 from puripuly_heart.ui.components import display_card as display_card_module
 from puripuly_heart.ui.components.display_card import DisplayCard
 from tests.helpers.flet_page import attach_dummy_page
-
-
-class RuntimeLoggingCapture:
-    def __init__(self) -> None:
-        self.detailed_calls: list[tuple[int, str]] = []
-        self.detailed_messages: list[tuple[int, str]] = []
-
-    def emit_diagnostic(self, message: str, *, level: int = logging.INFO) -> bool:
-        self.detailed_calls.append((level, message))
-        self.detailed_messages.append((level, message))
-        return True
 
 
 def _visible_text(card: DisplayCard) -> str:
@@ -469,7 +457,6 @@ def test_notice_action_button_is_exposed_only_with_a_label(
 
 def test_yielding_notice_defers_to_live_turn_content(monkeypatch: pytest.MonkeyPatch) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture()
 
     card.set_display("source text")
     card.set_notice(
@@ -482,21 +469,9 @@ def test_yielding_notice_defers_to_live_turn_content(monkeypatch: pytest.MonkeyP
     attach_dummy_page(monkeypatch, card._display_text)
     _mute_display_updates(monkeypatch, card)
 
-    card.set_display_translation(
-        "translated text",
-        runtime_log_diagnostic=runtime_logging.emit_diagnostic,
-        update_id="upd-notice-1",
-        origin_wall_clock_ms=1500,
-        utterance_id="utt-notice-1",
-        channel="self",
-        session_scope="session-notice-1",
-        source_text_hash="src-hash-notice-1",
-        source_text_len=11,
-        logical_turn_key="self:utt-notice-1",
-    )
+    card.set_display_translation("translated text")
 
     assert _visible_text(card) == "translated text"
-    assert runtime_logging.detailed_messages == []
 
 
 def test_yielding_notice_returns_once_the_card_is_idle_again(
@@ -518,33 +493,19 @@ def test_yielding_notice_returns_once_the_card_is_idle_again(
     assert _visible_text(card) == notice
 
 
-def test_non_yielding_notice_suppresses_the_translation_and_its_visual_commit(
+def test_non_yielding_notice_suppresses_the_translation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture()
 
     card.set_display("source text")
     card.set_notice("STT files are missing", tone="warning")
     attach_dummy_page(monkeypatch, card._display_text)
     _mute_display_updates(monkeypatch, card)
 
-    card.set_display_translation(
-        "translated text",
-        runtime_log_diagnostic=runtime_logging.emit_diagnostic,
-        update_id="upd-notice-2",
-        origin_wall_clock_ms=1500,
-        utterance_id="utt-notice-2",
-        channel="self",
-        session_scope="session-notice-2",
-        source_text_hash="src-hash-notice-2",
-        source_text_len=11,
-        logical_turn_key="self:utt-notice-2",
-    )
+    card.set_display_translation("translated text")
 
     assert _visible_text(card) == "STT files are missing"
-    assert runtime_logging.detailed_calls == []
-    assert runtime_logging.detailed_messages == []
 
 
 def test_debug_prefix_applies_to_the_visible_text_only(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -733,23 +694,3 @@ def test_input_footer_stays_outside_the_expanding_display_region() -> None:
     assert divider_container.padding.bottom == 4
     assert input_footer.expand is None
     assert input_footer.tight is True
-
-
-def test_source_applied_log_is_skipped_when_not_requested(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    runtime_logging = RuntimeLoggingCapture()
-
-    attach_dummy_page(monkeypatch, card._display_text)
-    _mute_display_updates(monkeypatch, card)
-
-    card.set_display(
-        "source text",
-        runtime_log_diagnostic=runtime_logging.emit_diagnostic,
-        utterance_id="utt-4",
-        channel="self",
-        should_log=False,
-    )
-
-    assert runtime_logging.detailed_calls == []

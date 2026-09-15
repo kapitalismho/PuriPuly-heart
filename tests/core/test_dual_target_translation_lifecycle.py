@@ -124,7 +124,6 @@ class RecordingOverlay:
 
 
 class RecordingRuntimeLogging:
-    mode = "detailed"
 
     def __init__(self) -> None:
         self.messages: list[str] = []

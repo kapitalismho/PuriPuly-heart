@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 from dataclasses import dataclass, field
 from uuid import uuid4
 
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.presenter import (
     PEER_REPLACEMENT_INTERVAL_SECONDS,
     SELF_TRANSLATION_MIN_VISIBLE_SECONDS,
@@ -34,10 +32,6 @@ from puripuly_heart.core.overlay.state import (
 )
 from puripuly_heart.domain.models import Transcript
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
-from tests.core.test_translation_owner_branch_coverage import (
-    _make_runtime_logging_capture,
-    _runtime_log_messages,
-)
 
 
 @dataclass(slots=True)
@@ -53,69 +47,6 @@ class RecordingPresentationBridge:
 
     async def broadcast_shutdown(self) -> None:
         self.shutdown_calls += 1
-
-
-def _overlay_presenter_decisions(stream: object) -> list[str]:
-    decisions: list[str] = []
-    for message in _runtime_log_messages(stream):
-        if "[OverlayPresenter][Decision]" not in message or "decision=" not in message:
-            continue
-        decisions.append(message.split("decision=", 1)[1].split()[0])
-    return decisions
-
-
-def _overlay_presenter_pair_messages(stream: object) -> list[str]:
-    return [
-        message
-        for message in _runtime_log_messages(stream)
-        if "[OverlayPresenter][PairState]" in message
-    ]
-
-
-def _overlay_presenter_disposition_messages(stream: object) -> list[str]:
-    return [
-        message
-        for message in _runtime_log_messages(stream)
-        if "[OverlayPresenter][Decision]" in message and "disposition=" in message
-    ]
-
-
-@dataclass(slots=True)
-class RecordingPresenterRemovalDiagnostics:
-    removal_events: list[dict[str, object]] = field(default_factory=list)
-
-    def record_presenter(self, event: str, **fields: object) -> dict[str, object]:
-        _ = (event, fields)
-        return {}
-
-    def record_presenter_removal(
-        self, event: str = "entry_removed", **fields: object
-    ) -> dict[str, object]:
-        payload = {"event": event, **fields}
-        self.removal_events.append(payload)
-        return payload
-
-
-@dataclass(slots=True)
-class RecordingPresenterDiagnostics:
-    events: list[tuple[str, dict[str, object]]] = field(default_factory=list)
-
-    def record_presenter(self, event: str, **fields: object) -> dict[str, object]:
-        payload = dict(fields)
-        self.events.append((event, payload))
-        return payload
-
-    def record_presenter_removal(
-        self, event: str = "entry_removed", **fields: object
-    ) -> dict[str, object]:
-        payload = dict(fields)
-        self.events.append((event, payload))
-        return payload
-
-
-class _ExplodingValue:
-    def __str__(self) -> str:
-        raise AssertionError("formatted eagerly")
 
 
 def _generate_overlay_state_snapshot(
@@ -670,20 +601,7 @@ class _NonSelectableState(OverlayPresentationState):
         return False
 
 
-def test_presentation_state_self_reducers_return_diagnostics_without_emit_callbacks() -> None:
-    reducer_methods = [
-        OverlayPresentationState.apply_self_active_update,
-        OverlayPresentationState.apply_self_active_clear,
-        OverlayPresentationState.apply_self_finalized_update,
-        OverlayPresentationState.apply_self_translation_update,
-        OverlayPresentationState.apply_self_utterance_closed,
-    ]
-    for reducer_method in reducer_methods:
-        assert not {
-            "emit_skip_disposition",
-            "emit_turn_decision",
-        }.intersection(inspect.signature(reducer_method).parameters)
-
+def test_presentation_state_self_active_reducer_rejects_stale_updates() -> None:
     state = OverlayPresentationState()
     utterance_id = uuid4()
     initial_result = state.apply_self_active_update(
@@ -718,7 +636,6 @@ def test_presentation_state_self_reducers_return_diagnostics_without_emit_callba
 
     assert initial_result.changed is True
     assert stale_result.changed is False
-    assert [decision.decision for decision in stale_result.decisions] == ["overlay_turn_superseded"]
 
 
 def test_presentation_state_coalesced_self_active_update_refreshes_language_metadata() -> None:
@@ -768,7 +685,6 @@ def test_presentation_state_coalesced_self_active_update_refreshes_language_meta
 
     metadata = state.active_self_overlay_metadata()
     assert language_only_result.changed is True
-    assert [decision.disposition for decision in language_only_result.decisions] == ["coalesced"]
     assert metadata is not None
     assert metadata.primary_language == "ja"
     assert metadata.secondary_language is None
@@ -824,24 +740,7 @@ def test_presentation_state_coalesced_peer_active_update_refreshes_language_meta
     )
 
     assert language_only_result.changed is True
-    assert [decision.disposition for decision in language_only_result.decisions] == ["coalesced"]
     assert entry.original_language == "ja"
-
-
-def test_presentation_state_peer_reducers_return_diagnostics_without_emit_callbacks() -> None:
-    reducer_methods = [
-        "apply_peer_active_update",
-        "apply_peer_finalized_update",
-        "apply_peer_translation_update",
-        "apply_peer_utterance_closed",
-    ]
-    for reducer_method_name in reducer_methods:
-        reducer_method = getattr(OverlayPresentationState, reducer_method_name, None)
-        assert reducer_method is not None
-        assert not {
-            "emit_skip_disposition",
-            "emit_turn_decision",
-        }.intersection(inspect.signature(reducer_method).parameters)
 
 
 @pytest.mark.asyncio
@@ -2095,179 +1994,6 @@ async def test_presenter_hidden_self_translation_update_does_not_extend_visible_
     await asyncio.sleep(0)
 
     assert presenter.snapshot().blocks == []
-
-
-@pytest.mark.asyncio
-async def test_presenter_records_expired_entry_diagnostic_with_deadlines(
-    tmp_path,
-) -> None:
-    bridge = RecordingPresentationBridge()
-    clock = FakeClock(_now=10.0)
-
-    async def fake_sleep(delay: float) -> None:
-        clock.advance(delay)
-        await asyncio.sleep(0)
-
-    diagnostics = OverlayDiagnosticsRecorder(
-        overlay_instance_id="overlay-test",
-        diagnostics_dir=tmp_path,
-    )
-    presenter = OverlayPresenter(
-        bridge=bridge,
-        calibration=OverlayCalibration(),
-        clock=clock,
-        diagnostics=diagnostics,
-        sleep=fake_sleep,
-    )
-    adapter = OverlayEventAdapter(clock=clock)
-    utterance_id = uuid4()
-
-    await presenter.emit(
-        adapter.transcript_final(
-            Transcript(
-                utterance_id=utterance_id,
-                channel="self",
-                text="self original",
-                is_final=True,
-                created_at=10.0,
-            ),
-            source_language="ko",
-            target_language="en",
-        )
-    )
-    await presenter.emit(
-        adapter.utterance_closed(
-            utterance_id=utterance_id,
-            channel="self",
-            created_at=10.1,
-        )
-    )
-    clock.advance(7.0)
-    await presenter.emit(
-        adapter.translation_final(
-            utterance_id=utterance_id,
-            channel="self",
-            text="self translation",
-            source_language="ko",
-            target_language="en",
-            applied_context_mode=None,
-            created_at=17.0,
-        )
-    )
-
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
-
-    assert list(diagnostics.presenter_events) == []
-    assert list(diagnostics.presenter_removal_events) == []
-
-
-@pytest.mark.asyncio
-async def test_presenter_records_untranslated_self_visibility_duration(
-    tmp_path,
-) -> None:
-    bridge = RecordingPresentationBridge()
-    clock = FakeClock(_now=10.0)
-
-    async def fake_sleep(delay: float) -> None:
-        clock.advance(delay)
-        await asyncio.sleep(0)
-
-    diagnostics = OverlayDiagnosticsRecorder(
-        overlay_instance_id="overlay-test",
-        diagnostics_dir=tmp_path,
-    )
-    presenter = OverlayPresenter(
-        bridge=bridge,
-        calibration=OverlayCalibration(),
-        clock=clock,
-        diagnostics=diagnostics,
-        sleep=fake_sleep,
-    )
-    adapter = OverlayEventAdapter(clock=clock)
-    utterance_id = uuid4()
-
-    await presenter.emit(
-        adapter.transcript_final(
-            Transcript(
-                utterance_id=utterance_id,
-                channel="self",
-                text="self original",
-                is_final=True,
-                created_at=10.0,
-            ),
-            source_language="ko",
-            target_language="en",
-        )
-    )
-    await presenter.emit(
-        adapter.utterance_closed(
-            utterance_id=utterance_id,
-            channel="self",
-            created_at=10.1,
-        )
-    )
-
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
-
-    assert list(diagnostics.presenter_events) == []
-    assert list(diagnostics.presenter_removal_events) == []
-
-
-@pytest.mark.asyncio
-async def test_presenter_records_peer_displacement_as_removal_diagnostic(tmp_path) -> None:
-    bridge = RecordingPresentationBridge()
-    clock = FakeClock(_now=10.0)
-    diagnostics = OverlayDiagnosticsRecorder(
-        overlay_instance_id="overlay-test",
-        diagnostics_dir=tmp_path,
-    )
-    presenter = OverlayPresenter(
-        bridge=bridge,
-        calibration=OverlayCalibration(),
-        clock=clock,
-        diagnostics=diagnostics,
-    )
-    adapter = OverlayEventAdapter(clock=clock)
-    utterance_ids = [uuid4(), uuid4(), uuid4()]
-
-    for index, utterance_id in enumerate(utterance_ids, start=1):
-        await presenter.emit(
-            adapter.transcript_final(
-                Transcript(
-                    utterance_id=utterance_id,
-                    channel="peer",
-                    text=f"peer original {index}",
-                    is_final=True,
-                    created_at=float(index),
-                ),
-                source_language="en",
-                target_language="ko",
-            )
-        )
-        await presenter.emit(
-            adapter.translation_final(
-                utterance_id=utterance_id,
-                channel="peer",
-                text=f"peer translation {index}",
-                source_language="en",
-                target_language="ko",
-                applied_context_mode=None,
-                created_at=float(index) + 0.1,
-            )
-        )
-        await presenter.emit(
-            adapter.utterance_closed(
-                utterance_id=utterance_id,
-                channel="peer",
-                is_final=True,
-                created_at=float(index) + 0.2,
-            )
-        )
-
-    assert list(diagnostics.presenter_events) == []
-    assert list(diagnostics.presenter_removal_events) == []
 
 
 @pytest.mark.asyncio
@@ -4101,27 +3827,6 @@ async def test_presenter_same_text_from_different_turn_replaces_visible_row() ->
 
     assert len(bridge.snapshots) == 2
     assert [block.id for block in bridge.snapshots[-1].blocks] == [f"self:{second_turn_id}"]
-
-
-def test_presenter_turn_decision_lazy_skips_formatting_when_detailed_mode_is_off() -> None:
-    runtime_logging, _log_stream = _make_runtime_logging_capture()
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-        clock=FakeClock(_now=10.0),
-        runtime_log_diagnostic=runtime_logging.emit_diagnostic,
-    )
-
-    try:
-        assert (
-            presenter._emit_turn_decision(
-                "lazy_guard",
-                key=("self", uuid4()),
-                extras={"expensive": _ExplodingValue()},
-            )
-            is False
-        )
-    finally:
-        runtime_logging.close()
 
 
 @pytest.mark.asyncio

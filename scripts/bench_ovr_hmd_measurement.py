@@ -619,8 +619,6 @@ async def run_measurement(
     runtime.attach_diagnostics(diagnostics)
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        diagnostics=diagnostics,
-        runtime_log_diagnostic=None,
         show_translation=True,
         show_peer_original=True,
         translation_enabled=True,

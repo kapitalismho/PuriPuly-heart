@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Literal
+from dataclasses import dataclass
 
 from puripuly_heart.domain.events import STTSessionState
 from puripuly_heart.domain.models import Transcript, Translation
@@ -20,11 +19,6 @@ class EventProjectionContext:
 class DashboardTranscriptProjection:
     text: str
     language_code: str | None
-    utterance_id: object | None
-    channel: str | None
-    source_text_len: int
-    transcript_kind: Literal["partial", "final"]
-    should_log: bool
     debug_prefix: str | None
 
 
@@ -32,14 +26,6 @@ class DashboardTranscriptProjection:
 class DashboardTranslationProjection:
     text: str
     language_code: str | None
-    update_id: str | None
-    origin_wall_clock_ms: int | None
-    utterance_id: object | None
-    channel: str | None
-    session_scope: str | None
-    source_text_hash: str | None
-    source_text_len: int | None
-    logical_turn_key: str | None
     debug_prefix: str | None
 
 
@@ -73,12 +59,10 @@ class EventProjectionBatch:
 
 @dataclass(slots=True)
 class EventProjectionService:
-    _primary_first_partial_emitted: set[str] = field(default_factory=set)
     _closed: bool = False
 
     def close(self) -> None:
         self._closed = True
-        self._primary_first_partial_emitted.clear()
 
     def project(
         self,
@@ -107,14 +91,6 @@ class EventProjectionService:
         context: EventProjectionContext,
     ) -> EventProjectionBatch:
         is_final = mapped.transcript_kind == "final"
-        utterance_key = str(transcript.utterance_id)
-        if is_final:
-            should_log = True
-            self._primary_first_partial_emitted.discard(utterance_key)
-        else:
-            should_log = utterance_key not in self._primary_first_partial_emitted
-            if should_log:
-                self._primary_first_partial_emitted.add(utterance_key)
         history = ()
         if is_final:
             history = (
@@ -128,11 +104,6 @@ class EventProjectionService:
             transcript=DashboardTranscriptProjection(
                 text=transcript.text,
                 language_code=context.source_language,
-                utterance_id=transcript.utterance_id,
-                channel=transcript.channel,
-                source_text_len=len(transcript.text),
-                transcript_kind="final" if is_final else "partial",
-                should_log=should_log,
                 debug_prefix=None,
             ),
             history=history,
@@ -149,14 +120,6 @@ class EventProjectionService:
             translation=DashboardTranslationProjection(
                 text=translation.text,
                 language_code=context.target_language,
-                update_id=translation.update_id,
-                origin_wall_clock_ms=translation.origin_wall_clock_ms,
-                utterance_id=translation.utterance_id,
-                channel=translation.channel,
-                session_scope=translation.session_scope,
-                source_text_hash=translation.source_text_hash,
-                source_text_len=translation.source_text_len,
-                logical_turn_key=translation.logical_turn_key,
                 debug_prefix=None,
             ),
             history=(

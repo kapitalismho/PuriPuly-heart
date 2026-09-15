@@ -186,7 +186,6 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
         settings_changed=make("settings_changed"),
         show_snackbar=make("show_snackbar"),
         runtime_log_basic=make("runtime_log_basic"),
-        runtime_log_diagnostic=make("runtime_log_diagnostic"),
     )
     provider = SettingsProviderIntents(
         providers_changed=make("providers_changed"),
@@ -232,7 +231,6 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     assert view.on_settings_changed is surface.settings_changed
     assert view.show_snackbar is surface.show_snackbar
     assert view.runtime_log_basic is surface.runtime_log_basic
-    assert view.runtime_log_diagnostic is surface.runtime_log_diagnostic
     assert view.on_providers_changed is provider.providers_changed
     assert view.on_request_openrouter_pkce is provider.request_openrouter_pkce
     assert view.on_verify_api_key is provider.verify_api_key
@@ -271,7 +269,6 @@ def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
     monkeypatch.setattr(settings_view_module.SettingsView, "update", lambda self: None)
     view = settings_view_module.SettingsView()
     existing_basic = view.runtime_log_basic
-    existing_detailed = view.runtime_log_diagnostic
     existing_calibration_begin = view.on_overlay_calibration_begin
 
     view.bind_settings_intents(
@@ -310,7 +307,6 @@ def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
     )
 
     assert view.runtime_log_basic is existing_basic
-    assert view.runtime_log_diagnostic is existing_detailed
     assert view.on_overlay_calibration_begin is existing_calibration_begin
 
 

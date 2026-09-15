@@ -449,7 +449,6 @@ class SettingsView(ft.Column):
         self.on_open_api_keys_guide: Callable[[], None] | None = None
         self.show_snackbar: Callable[[str, str], None] | None = None
         self.runtime_log_basic: Callable[..., None] | None = None
-        self.runtime_log_diagnostic: Callable[..., None] | None = None
         self._settings_secrets: SettingsSecretsPort | None = None
 
         self._http_extensions = (
@@ -564,8 +563,6 @@ class SettingsView(ft.Column):
         self.show_snackbar = surface.show_snackbar
         if surface.runtime_log_basic is not None:
             self.runtime_log_basic = surface.runtime_log_basic
-        if surface.runtime_log_diagnostic is not None:
-            self.runtime_log_diagnostic = surface.runtime_log_diagnostic
         if surface.open_api_keys_guide is not None:
             self.on_open_api_keys_guide = surface.open_api_keys_guide
         self.on_providers_changed = provider.providers_changed

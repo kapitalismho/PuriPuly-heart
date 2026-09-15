@@ -3695,19 +3695,14 @@ def test_on_llm_selected_skips_log_when_selection_is_unchanged(
     )
     settings = _vnext(settings, llm=LLMProviderName.QWEN)
     basic_messages: list[str] = []
-    detailed_messages: list[str] = []
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
     view.runtime_log_basic = lambda message, *, level=logging.INFO: basic_messages.append(message)
-    view.runtime_log_diagnostic = lambda message, *, level=logging.INFO: detailed_messages.append(
-        message
-    )
 
     view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
 
     assert basic_messages == []
-    assert detailed_messages == []
 
 
 def test_on_ui_and_region_selection_emit_changes(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3855,15 +3850,11 @@ def test_audio_change_messages_use_basic_runtime_log(
     settings = _vnext(settings, input_device="Old Mic")
     settings = _vnext(settings, desktop_output_device="Old Speakers")
     basic_messages: list[str] = []
-    detailed_messages: list[str] = []
     changed: list[AppSettingsVNext] = []
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
     view.runtime_log_basic = lambda message, *, level=logging.INFO: basic_messages.append(message)
-    view.runtime_log_diagnostic = lambda message, *, level=logging.INFO: detailed_messages.append(
-        message
-    )
     view.on_settings_changed = lambda incoming: changed.append(incoming)
 
     view._audio_settings.host_api = "MME"
@@ -3876,14 +3867,8 @@ def test_audio_change_messages_use_basic_runtime_log(
         "[Settings] Microphone changed: Old Mic -> New Mic",
         "[Settings] Desktop loopback output changed: Old Speakers -> New Speakers",
     ]
-    audio_change_prefixes = (
-        "[Settings] Audio Host changed:",
-        "[Settings] Microphone changed:",
-        "[Settings] Desktop loopback output changed:",
-    )
 
     assert all(message in basic_messages for message in expected_messages)
-    assert not any(message.startswith(audio_change_prefixes) for message in detailed_messages)
     assert view._settings.intent.audio.input_host_api == "MME"
     assert view._settings.intent.audio.input_device == "New Mic"
     assert view._settings.intent.desktop_audio.output_device == "New Speakers"
@@ -6107,14 +6092,10 @@ def test_custom_vocabulary_empty_and_duplicate_adds_clear_input_without_emit(
     settings = _vnext(settings, custom_terms={"ko": ["Puripuly"], "en": ["Avatar"]})
     settings = _vnext(settings, custom_vocabulary_enabled=True)
     changed: list[AppSettingsVNext] = []
-    detailed_messages: list[str] = []
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
     view.on_settings_changed = changed.append
-    view.runtime_log_diagnostic = lambda message, *, level=logging.INFO: detailed_messages.append(
-        message
-    )
     view._custom_vocab_tag_editor._input_field.value = " Puripuly  Puripuly  \n "  # noqa: SLF001
 
     view._custom_vocab_tag_editor._input_field.on_change(None)  # noqa: SLF001
@@ -6123,7 +6104,6 @@ def test_custom_vocabulary_empty_and_duplicate_adds_clear_input_without_emit(
     assert settings.intent.stt.custom_terms == {"ko": ["Puripuly"], "en": ["Avatar"]}
     assert _custom_vocab_chip_terms(view) == ["Puripuly"]
     assert changed == []
-    assert detailed_messages == []
 
 
 def test_custom_vocabulary_typing_add_input_does_not_emit_or_persist(
@@ -6220,7 +6200,7 @@ def test_custom_vocabulary_add_caps_partial_terms_and_shows_snackbar(
     ]
 
 
-def test_custom_vocabulary_add_when_bucket_full_shows_limit_without_emit_or_runtime_log(
+def test_custom_vocabulary_add_when_bucket_full_shows_limit_without_emit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
@@ -6230,15 +6210,11 @@ def test_custom_vocabulary_add_when_bucket_full_shows_limit_without_emit_or_runt
     settings = _vnext(settings, custom_vocabulary_enabled=True)
     changed: list[AppSettingsVNext] = []
     snackbars: list[tuple[str, str]] = []
-    detailed_messages: list[str] = []
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
     view.on_settings_changed = changed.append
     view.show_snackbar = lambda msg, bg: snackbars.append((msg, bg))
-    view.runtime_log_diagnostic = lambda message, *, level=logging.INFO: detailed_messages.append(
-        message
-    )
 
     view._on_custom_vocabulary_add_terms(["overflow"])
 
@@ -6249,7 +6225,6 @@ def test_custom_vocabulary_add_when_bucket_full_shows_limit_without_emit_or_runt
     assert snackbars == [
         (t("snackbar.custom_vocabulary_limit", max_terms=100), settings_view.COLOR_WARNING)
     ]
-    assert detailed_messages == []
 
 
 def test_on_qwen_region_selected_updates_provider_draft(

@@ -224,14 +224,6 @@ class DisplayCard(ft.Container):
         is_error: bool = False,
         font_family: str | None = None,
         *,
-        runtime_log_diagnostic: Callable[..., bool | None] | None = None,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        source_text_len: int | None = None,
-        transcript_kind: str | None = None,
-        should_log: bool = False,
         debug_prefix: str | None = None,
         as_translation: bool = False,
     ):
@@ -254,18 +246,9 @@ class DisplayCard(ft.Container):
         text: str | None,
         font_family: str | None = None,
         *,
-        runtime_log_diagnostic: Callable[..., bool | None] | None = None,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        session_scope: str | None = None,
-        source_text_hash: str | None = None,
-        source_text_len: int | None = None,
-        logical_turn_key: str | None = None,
         debug_prefix: str | None = None,
     ) -> None:
-        """Replace the visible slot with the translation and emit a visual commit marker."""
+        """Replace the visible slot with the translation."""
         self._showing_status = False
         self._source_as_message = False
         self._translation_value = text or None

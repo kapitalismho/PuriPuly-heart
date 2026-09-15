@@ -42,7 +42,6 @@ class DummyDashboard:
         self.display_calls: list[tuple[str, str | None, bool]] = []
         self.display_debug_prefixes: list[str | None] = []
         self.translation_calls: list[tuple[str, str | None]] = []
-        self.translation_metadata_calls: list[dict[str, object]] = []
         self.notice_calls: list[str | None] = []
 
     def set_status(self, status: str) -> None:
@@ -54,13 +53,6 @@ class DummyDashboard:
         *,
         language_code: str | None = None,
         is_error: bool = False,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        source_text_len: int | None = None,
-        transcript_kind: str | None = None,
-        should_log: bool = False,
         debug_prefix: str | None = None,
     ) -> None:
         self.display_calls.append((text, language_code, is_error))
@@ -71,30 +63,9 @@ class DummyDashboard:
         text: str,
         *,
         language_code: str | None = None,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        session_scope: str | None = None,
-        source_text_hash: str | None = None,
-        source_text_len: int | None = None,
-        logical_turn_key: str | None = None,
         debug_prefix: str | None = None,
     ) -> None:
         self.translation_calls.append((text, language_code))
-        self.translation_metadata_calls.append(
-            {
-                "update_id": update_id,
-                "origin_wall_clock_ms": origin_wall_clock_ms,
-                "utterance_id": utterance_id,
-                "channel": channel,
-                "session_scope": session_scope,
-                "source_text_hash": source_text_hash,
-                "source_text_len": source_text_len,
-                "logical_turn_key": logical_turn_key,
-                "debug_prefix": debug_prefix,
-            }
-        )
 
     def set_local_stt_notice(self, status: str | None) -> None:
         self.notice_calls.append(status)
@@ -106,29 +77,9 @@ class FailingTranslationDashboard(DummyDashboard):
         text: str,
         *,
         language_code: str | None = None,
-        update_id: str | None = None,
-        origin_wall_clock_ms: int | None = None,
-        utterance_id: object | None = None,
-        channel: str | None = None,
-        session_scope: str | None = None,
-        source_text_hash: str | None = None,
-        source_text_len: int | None = None,
-        logical_turn_key: str | None = None,
         debug_prefix: str | None = None,
     ) -> None:
-        _ = (
-            text,
-            language_code,
-            update_id,
-            origin_wall_clock_ms,
-            utterance_id,
-            channel,
-            session_scope,
-            source_text_hash,
-            source_text_len,
-            logical_turn_key,
-            debug_prefix,
-        )
+        _ = (text, language_code, debug_prefix)
         raise RuntimeError("dashboard setter failed")
 
 
@@ -397,10 +348,10 @@ def test_event_projection_builds_dtos_without_runtime_subscription() -> None:
     translation_projection = service.project(mapped_translation, context)
 
     assert transcript_projection.transcript is not None
-    assert transcript_projection.transcript.channel == "self"
+    assert transcript_projection.transcript.language_code == "ko"
     assert transcript_projection.history[0].language_code == "ko"
     assert translation_projection.translation is not None
-    assert translation_projection.translation.channel == "self"
+    assert translation_projection.translation.language_code == "en"
     assert translation_projection.translation_diagnostic is not None
     assert translation_projection.translation_diagnostic.text_len == len("translated")
 
@@ -990,50 +941,6 @@ async def test_event_bridge_routes_legacy_raw_fallback_through_central_redactor(
     assert "file_contents" not in combined
     assert "user document text" not in combined
     assert "[redacted]" in combined
-
-
-@pytest.mark.asyncio
-async def test_event_bridge_passes_dashboard_translation_visual_commit_metadata_to_dashboard() -> (
-    None
-):
-    app = DummyApp()
-    bridge = make_bridge(app, event_queue=asyncio.Queue())
-    utterance_id = uuid4()
-    translation = Translation(
-        utterance_id=utterance_id,
-        text="translated peer",
-        channel="peer",
-        target_language="ja",
-        update_id="upd-dashboard-1",
-        origin_wall_clock_ms=1712345678901,
-        session_scope="session-42",
-        source_text_hash="src-hash-42",
-        source_text_len=17,
-        logical_turn_key="peer:turn-42",
-    )
-
-    await bridge._handle_event(
-        UIEvent(
-            type=UIEventType.TRANSLATION_DONE,
-            payload=translation,
-            source="Peer Mic",
-        )
-    )
-
-    assert app.view_dashboard.translation_calls == [("translated peer", "en")]
-    assert app.view_dashboard.translation_metadata_calls == [
-        {
-            "update_id": "upd-dashboard-1",
-            "origin_wall_clock_ms": 1712345678901,
-            "utterance_id": utterance_id,
-            "channel": "peer",
-            "session_scope": "session-42",
-            "source_text_hash": "src-hash-42",
-            "source_text_len": 17,
-            "logical_turn_key": "peer:turn-42",
-            "debug_prefix": None,
-        }
-    ]
 
 
 @pytest.mark.asyncio
