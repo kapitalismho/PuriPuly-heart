@@ -19,8 +19,19 @@ from puripuly_heart.core.stt.backend import (
 from puripuly_heart.providers.stt.elevenlabs_scribe import ElevenLabsScribeSTTBackend
 
 
+class _NoNetworkWebSocket:
+    async def close(self, *_args) -> None:
+        pass
+
+
 class _ControlledConnection:
     def __init__(self) -> None:
+        from elevenlabs.realtime import RealtimeConnection
+
+        self._sdk_connection = RealtimeConnection(
+            _NoNetworkWebSocket(),
+            current_sample_rate=16000,
+        )
         self.handlers: dict = {}
         self.sent: list[dict] = []
         self.commits = 0
@@ -30,6 +41,7 @@ class _ControlledConnection:
 
     def on(self, event, callback) -> None:
         self.handlers[event] = callback
+        self._sdk_connection.on(event, callback)
 
     async def send(self, payload: dict) -> None:
         self.sent.append(payload)
@@ -40,9 +52,15 @@ class _ControlledConnection:
 
     async def close(self) -> None:
         self.closed += 1
+        await self._sdk_connection.close()
 
     def emit(self, event: str, payload: dict) -> None:
-        self.handlers[event](payload)
+        self._sdk_connection._emit(event, payload)
+
+    def emit_close(self) -> None:
+        from elevenlabs.realtime import RealtimeEvents
+
+        self._sdk_connection._emit(RealtimeEvents.CLOSE)
 
 
 def _request(order: int, *, channel: str = "self") -> STTProviderTurnRequest:
@@ -165,7 +183,24 @@ async def test_consecutive_final_empty_and_identical_turns_reuse_one_connection(
         assert session._keepalive_task is keepalive_task
     finally:
         await session.close()
+        await session.close()
     assert connection.closed == 1
+
+
+@pytest.mark.asyncio
+async def test_native_sdk_close_retires_idle_epoch_and_rejects_next_begin() -> None:
+    connection = _ControlledConnection()
+    session, _ = await _session(connection)
+    try:
+        connection.emit_close()
+        ended = await _next(session)
+        assert isinstance(ended, STTProviderEpochEnded)
+        assert ended.reason == "scribe_connection_closed"
+        assert ended.orderly is True
+        with pytest.raises(RuntimeError, match="Scribe session is closed"):
+            await session.begin_turn(_request(1))
+    finally:
+        await session.close()
 
 
 @pytest.mark.asyncio
@@ -352,7 +387,10 @@ async def test_provider_failure_and_eof_retire_active_turn(
     request = _request(1)
     try:
         await session.begin_turn(request)
-        connection.emit(event_name, {"message_type": event_name})
+        if event_name == "close":
+            connection.emit_close()
+        else:
+            connection.emit(event_name, {"message_type": event_name})
         failed = await _next(session)
         ended = await _next(session)
         assert isinstance(failed, STTProviderTurnTerminal)

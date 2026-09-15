@@ -124,8 +124,7 @@ async def verify_scribe_realtime_connection(
     def _on_error(data: Any) -> None:
         outcomes.put_nowait(("error", _scribe_verify_event_detail(data)))
 
-    def _on_closed(data: Any) -> None:
-        _ = data
+    def _on_closed() -> None:
         outcomes.put_nowait(("closed",))
 
     options = RealtimeAudioOptions(
@@ -473,8 +472,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
         self._scoped_transport_failure(f"scribe_{event_name}", orderly=False)
         self._enqueue_connection_event(RuntimeError(f"Scribe realtime error: {event_name}"))
 
-    def _on_closed(self, data: Any) -> None:
-        _ = data
+    def _on_closed(self) -> None:
         if self._stopped:
             return
         self._scoped_transport_failure("scribe_connection_closed", orderly=True)
