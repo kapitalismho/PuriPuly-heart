@@ -710,12 +710,8 @@ async def test_handle_stt_event_routes_non_low_latency_events() -> None:
 
     await harness.dispatch_stt_event(STTSessionStateEvent(state=STTSessionState.STREAMING))
     await harness.dispatch_stt_event(STTErrorEvent(message="boom"))
-    await harness.dispatch_stt_event(
-        STTPartialEvent(utterance_id=utterance_id, transcript=partial)
-    )
-    await harness.dispatch_stt_event(
-        STTFinalEvent(utterance_id=utterance_id, transcript=final)
-    )
+    await harness.dispatch_stt_event(STTPartialEvent(utterance_id=utterance_id, transcript=partial))
+    await harness.dispatch_stt_event(STTFinalEvent(utterance_id=utterance_id, transcript=final))
 
     events = [await harness.ui_events.get() for _ in range(5)]
     assert [event.type for event in events] == [

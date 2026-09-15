@@ -101,5 +101,3 @@ async def test_prepare_and_show_main_window_shows_after_center_failure() -> None
 
     assert page.window.visible is True
     assert page.visibility_updates == [False, True]
-
-

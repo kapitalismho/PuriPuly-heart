@@ -1852,8 +1852,6 @@ def test_post_replace_validation_and_restoration_failure_returns_safe_error(
     assert result.backup_path.read_bytes() == original_bytes
 
 
-
-
 def test_parse_and_migration_failures_return_explicit_results_without_overwrite(
     tmp_path: Path,
 ) -> None:

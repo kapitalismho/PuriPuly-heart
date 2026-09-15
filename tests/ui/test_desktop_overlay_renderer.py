@@ -3206,6 +3206,7 @@ async def test_desktop_overlay_keeps_locked_state_when_zorder_port_fails() -> No
     finally:
         await window.close()
 
+
 @pytest.mark.asyncio
 async def test_desktop_overlay_cancels_stale_zorder_before_edit_event() -> None:
     class BlockingWindowZOrderPort(RecordingWindowZOrderPort):

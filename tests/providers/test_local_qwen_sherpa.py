@@ -1125,5 +1125,3 @@ async def test_local_qwen_speech_end_without_audio_emits_empty_final_boundary(
     assert decode_calls == 0
     assert event.text == ""
     assert event.is_final is True
-
-

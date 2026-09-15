@@ -156,7 +156,3 @@ def test_adapter_exhausts_primary_name_and_system_default_in_order() -> None:
         for attempt in range(1, 4)
         for message in error_messages
     )
-
-
-
-
