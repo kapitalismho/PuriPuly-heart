@@ -2727,8 +2727,8 @@ mod tests {
         );
     }
     use crate::openvr::{
-        FakeOpenVr, OpenVrError, OpenVrStartupPreflightError, OverlayFrameSubmitter,
-        SpatialReanchorOutcome,
+        FakeOpenVr, OpenVrError, OpenVrRuntimeEvent, OpenVrStartupPreflightError,
+        OverlayFrameSubmitter, SpatialReanchorOutcome,
     };
     use crate::presentation::{
         AdapterIdentity, PresentationBackend, PresentationCause, PresentationCauseChannel,
@@ -2746,7 +2746,10 @@ mod tests {
     use serde_json::json;
     use std::cell::Cell;
     use std::io;
-    use std::sync::{Arc, Mutex};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    };
     use tokio::net::TcpListener;
     use tokio_tungstenite::{accept_async, tungstenite::Message};
 
@@ -3409,6 +3412,46 @@ mod tests {
             ..Default::default()
         }
     }
+    #[derive(Default)]
+    struct EventFloodState {
+        operations: Mutex<Vec<&'static str>>,
+        poll_calls: AtomicUsize,
+        max_events_in_one_poll: AtomicUsize,
+    }
+
+    struct EventFloodSubmitter {
+        state: Arc<EventFloodState>,
+    }
+
+    impl OverlayFrameSubmitter for EventFloodSubmitter {
+        fn submit_frame(&mut self, frame: &RenderedFrame) -> Result<(), OpenVrError> {
+            self.state.operations.lock().unwrap().push(
+                if frame.layout().visible_blocks.is_empty() {
+                    "submit:empty"
+                } else {
+                    "submit:text"
+                },
+            );
+            Ok(())
+        }
+
+        fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+            self.state
+                .operations
+                .lock()
+                .unwrap()
+                .push(if visible { "show" } else { "hide" });
+            Ok(())
+        }
+
+        fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
+            self.state.poll_calls.fetch_add(1, Ordering::SeqCst);
+            self.state
+                .max_events_in_one_poll
+                .fetch_max(max_events, Ordering::SeqCst);
+            vec![OpenVrRuntimeEvent::Ignored(1); max_events]
+        }
+    }
 
     struct SpatialSubmitProbe {
         outcome: SpatialReanchorOutcome,
@@ -3448,6 +3491,47 @@ mod tests {
         }
     }
 
+    fn controlled_manifest(address: std::net::SocketAddr) -> OverlayManifest {
+        OverlayManifest {
+            contract_version: EXPECTED_CONTRACT_VERSION,
+            app_version: env!("CARGO_PKG_VERSION").to_string(),
+            overlay_instance_id: "spatial-runtime-unit".to_string(),
+            bridge_url: format!("ws://{address}"),
+            session_token: "unit-token".to_string(),
+            parent_pid: 1,
+            startup_deadline_ms: 3000,
+            log_dir: std::env::temp_dir().display().to_string(),
+            log_level: "INFO".to_string(),
+            locale: "en".to_string(),
+        }
+    }
+
+    async fn wait_for_owner_ready(
+        ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+    ) {
+        ws.send(Message::Text(
+            json!({
+                "type": "health_challenge",
+                "challenge_id": 1,
+                "overlay_instance_id": "spatial-runtime-unit",
+                "runtime_generation": 1
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        let mut ready = false;
+        let mut healthy = false;
+        while !ready || !healthy {
+            let message = ws.next().await.unwrap().unwrap();
+            let payload: serde_json::Value =
+                serde_json::from_str(message.to_text().unwrap()).unwrap();
+            ready |= payload["type"] == "overlay_ready";
+            healthy |= payload["type"] == "owner_status" && payload["health_challenge_id"] == 1;
+        }
+    }
+
     async fn controlled_test_bridge(
         followup: Option<(Arc<tokio::sync::Notify>, OverlayPresentationSnapshot)>,
     ) -> (BridgeClient, tokio::task::JoinHandle<()>) {
@@ -3479,20 +3563,100 @@ mod tests {
             }
             while ws.next().await.is_some() {}
         });
-        let manifest = OverlayManifest {
-            contract_version: EXPECTED_CONTRACT_VERSION,
-            app_version: env!("CARGO_PKG_VERSION").to_string(),
-            overlay_instance_id: "spatial-runtime-unit".to_string(),
-            bridge_url: format!("ws://{address}"),
-            session_token: "unit-token".to_string(),
-            parent_pid: 1,
-            startup_deadline_ms: 3000,
-            log_dir: std::env::temp_dir().display().to_string(),
-            log_level: "INFO".to_string(),
-            locale: "en".to_string(),
-        };
+        let manifest = controlled_manifest(address);
         let (bridge, _) = BridgeClient::connect(&manifest).await.unwrap();
         (bridge, server)
+    }
+    #[tokio::test]
+    async fn production_owner_openvr_event_flood_does_not_starve_snapshot_submit() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let state = Arc::new(EventFloodState::default());
+        let server_state = state.clone();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = accept_async(stream).await.unwrap();
+            let _auth = ws.next().await.unwrap().unwrap();
+            let first = json!({
+                "revision": 1,
+                "blocks": [block("self:flood-1", "self", "first", "", true)]
+            });
+            ws.send(Message::Text(
+                json!({"type":"snapshot","payload":first})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+            wait_for_owner_ready(&mut ws).await;
+            let second = json!({
+                "revision": 2,
+                "blocks": [block("self:flood-2", "self", "second", "", true)]
+            });
+            ws.send(Message::Text(
+                json!({"type":"snapshot","payload":second})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+            tokio::time::timeout(Duration::from_secs(5), async {
+                loop {
+                    let submits = server_state
+                        .operations
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .filter(|operation| operation.starts_with("submit"))
+                        .count();
+                    if submits >= 2 {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .expect("second snapshot submit starved by OpenVR event flood");
+            ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+                .await
+                .unwrap();
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        });
+        let manifest = controlled_manifest(address);
+        let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+        let stdout = ControlledSink::new(ControlledSinkMode::Success);
+        let logger = controlled_logger(stdout.clone());
+        let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
+            snapshot,
+            CaptionRenderer::new_for_test().unwrap(),
+            EventFloodSubmitter {
+                state: state.clone(),
+            },
+            Duration::from_millis(10),
+            Duration::from_millis(100),
+            2,
+        );
+
+        owner.run(&mut bridge, &logger).await.unwrap();
+
+        assert!(state.poll_calls.load(Ordering::SeqCst) >= 1);
+        assert!(state.max_events_in_one_poll.load(Ordering::SeqCst) <= 8);
+        assert_eq!(
+            state
+                .operations
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|operation| operation.starts_with("submit"))
+                .count(),
+            2
+        );
+        assert!(owner.resources_released());
+        assert!(String::from_utf8(stdout.contents())
+            .unwrap()
+            .contains("\"type\":\"shutdown_complete\""));
+        logger.shutdown().unwrap();
+        server.await.unwrap();
     }
 
     #[tokio::test]
