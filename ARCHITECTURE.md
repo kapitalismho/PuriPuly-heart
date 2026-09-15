@@ -295,6 +295,8 @@ Execution options:
 
 Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
+Controlled adapter/source tests do not certify live service conformance or latency improvement. Live acceptance requires credentials, model access and explicit paid-call permission. Retained Soniox stream duration, including post-speech protection, remains billable.
+
 GPU worker split:
 
 - Python adapter: process launch, authentication, requests, heartbeat, cancellation, shutdown.

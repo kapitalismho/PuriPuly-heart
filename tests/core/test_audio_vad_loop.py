@@ -78,10 +78,19 @@ async def test_peer_audio_ownership_preserves_resampled_ranges_for_continuous_sp
         ),
     )
     owned_events: list[OwnedVadEvent] = []
+    source_activity: list[tuple[bool, float]] = []
 
     class OwnedSink:
         async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None:
             owned_events.append(event)
+
+        async def observe_source_activity(
+            self,
+            *,
+            speech_observed: bool,
+            observed_at_monotonic_s: float,
+        ) -> None:
+            source_activity.append((speech_observed, observed_at_monotonic_s))
 
         async def handle_vad_event(self, event: object) -> None:
             raise AssertionError(f"unowned event reached sink: {event!r}")
@@ -94,6 +103,7 @@ async def test_peer_audio_ownership_preserves_resampled_ranges_for_continuous_sp
         segment_ledger=ledger,
         monotonic_clock=lambda: 2.0,
     )
+    assert source_activity == [(True, 2.0), (True, 2.0), (True, 2.0)]
 
     snapshots = ledger.snapshots
     assert len(snapshots) == 1

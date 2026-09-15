@@ -30,6 +30,27 @@ class _FakeConnection:
     async def close(self) -> None:
         self.closed = True
 
+    def emit_close(self) -> None:
+        from elevenlabs.realtime import RealtimeEvents
+
+        self.handlers[RealtimeEvents.CLOSE]()
+
+
+class _GateEOFWebSocket:
+    def __init__(self) -> None:
+        self.release = asyncio.Event()
+        self.closed = False
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        await self.release.wait()
+        raise StopAsyncIteration
+
+    async def close(self, *_args) -> None:
+        self.closed = True
+
 
 def _backend(
     connection: _FakeConnection,
@@ -199,7 +220,10 @@ async def test_recoverable_scribe_events_end_stream_without_raising(event_name: 
     session = await backend.open_session()
     events_task = asyncio.create_task(_collect(session, 1))
     try:
-        _emit(session, event_name, {"message_type": event_name})
+        if event_name == "close":
+            connection.emit_close()
+        else:
+            _emit(session, event_name, {"message_type": event_name})
         events = await asyncio.wait_for(events_task, timeout=1)
         assert events == []
         await session.send_audio(b"\x00\x00" * 16)
@@ -243,7 +267,7 @@ async def test_fatal_error_is_not_hidden_by_later_close_or_send_failure() -> Non
     try:
         _emit(session, "quota_exceeded", {"message_type": "quota_exceeded", "text": ""})
         await session.send_audio(b"\x00\x00" * 16)
-        _emit(session, "close", {"message_type": "close"})
+        connection.emit_close()
         error = await asyncio.wait_for(events_task, timeout=1)
         assert "quota_exceeded" in str(error)
     finally:
@@ -270,7 +294,7 @@ async def test_close_terminates_event_stream() -> None:
     backend, _ = _backend(connection)
     session = await backend.open_session()
     try:
-        _emit(session, "close", {"message_type": "close"})
+        connection.emit_close()
         await asyncio.sleep(0.05)
         assert session._queue_task is not None
         await session.close()
@@ -348,33 +372,40 @@ async def test_verify_api_key_reports_auth_rejection_as_unauthorized() -> None:
 
 @pytest.mark.asyncio
 async def test_verify_api_key_reports_close_before_session_start() -> None:
-    from elevenlabs.realtime import RealtimeEvents
+    from elevenlabs.realtime import RealtimeConnection, RealtimeEvents
 
-    connection = _FakeConnection()
+    websocket = _GateEOFWebSocket()
+    connection = RealtimeConnection(websocket, current_sample_rate=16000)
 
     async def factory(options):
         _ = options
+        connection._message_task = asyncio.create_task(connection._start_message_handler())
         return connection
 
     async def emit_close() -> None:
         for _ in range(200):
-            handler = connection.handlers.get(RealtimeEvents.CLOSE)
-            if handler is not None:
-                handler({"message_type": "close"})
+            if RealtimeEvents.CLOSE in connection._event_handlers:
+                websocket.release.set()
                 return
             await asyncio.sleep(0.01)
         raise AssertionError("close handler was never registered")
 
     task = asyncio.create_task(
-        ElevenLabsScribeSTTBackend.verify_api_key("secret", scribe_connect_factory=factory)
+        ElevenLabsScribeSTTBackend.verify_api_key(
+            "secret",
+            scribe_connect_factory=factory,
+            settle_timeout_s=0.05,
+        )
     )
     emitter = asyncio.create_task(emit_close())
     try:
         with pytest.raises(Exception, match="closed before session start"):
-            await asyncio.wait_for(task, timeout=5)
+            await asyncio.wait_for(task, timeout=1)
     finally:
         emitter.cancel()
         await asyncio.gather(emitter, return_exceptions=True)
+
+    assert websocket.closed is True
 
 
 @pytest.mark.asyncio

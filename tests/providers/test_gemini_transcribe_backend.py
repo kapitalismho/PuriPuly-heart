@@ -237,6 +237,9 @@ async def test_activity_end_emits_single_final_per_finalize() -> None:
         await _wait_for_sent(session, "activity_end")
         session.push(_final("hello"))
         session.push(_final("hello again"))
+        await asyncio.sleep(0)
+        assert stt._event_projection._legacy_events.empty()
+        session.push(_activity_end_ack())
         assert session.sent[-1].get("activity_end") is not None
         events = await asyncio.wait_for(events_task, timeout=1)
         assert [event.text for event in events] == ["hello"]
@@ -255,23 +258,6 @@ async def test_empty_final_still_acknowledges_finalize() -> None:
         await stt.on_speech_end(trailing_silence_ms=100, reason="silence")
         await _wait_for_sent(session, "activity_end")
         session.push(_final(""))
-        events = await asyncio.wait_for(events_task, timeout=1)
-        assert [event.text for event in events] == [""]
-        assert all(event.is_final for event in events)
-    finally:
-        await stt.close()
-
-
-@pytest.mark.asyncio
-async def test_activity_end_ack_emits_empty_final_without_transcription() -> None:
-    session = _FakeLiveSession()
-    backend, _ = _backend(session)
-    stt = await backend.open_session()
-    events_task = asyncio.create_task(_collect(stt, 1))
-    try:
-        await stt.send_audio(b"\x00\x00" * 16)
-        await stt.on_speech_end(trailing_silence_ms=100, reason="silence")
-        await _wait_for_sent(session, "activity_end")
         session.push(_activity_end_ack())
         events = await asyncio.wait_for(events_task, timeout=1)
         assert [event.text for event in events] == [""]
@@ -281,11 +267,29 @@ async def test_activity_end_ack_emits_empty_final_without_transcription() -> Non
 
 
 @pytest.mark.asyncio
-async def test_activity_end_ack_promotes_latest_interim_when_final_is_missing() -> None:
+async def test_activity_end_ack_without_transcription_times_out() -> None:
     session = _FakeLiveSession()
-    backend, _ = _backend(session)
+    backend, _ = _backend(session, finalize_timeout_s=0.01)
     stt = await backend.open_session()
-    events_task = asyncio.create_task(_collect(stt, 1))
+    try:
+        await stt.send_audio(b"\x00\x00" * 16)
+        await stt.on_speech_end(trailing_silence_ms=100, reason="silence")
+        await _wait_for_sent(session, "activity_end")
+        session.push(_activity_end_ack())
+        events = stt.events()
+        event = await asyncio.wait_for(anext(events), timeout=1)
+        assert event.text == ""
+        with pytest.raises(Exception, match="finalize timed out"):
+            await asyncio.wait_for(anext(events), timeout=1)
+    finally:
+        await stt.close()
+
+
+@pytest.mark.asyncio
+async def test_activity_end_ack_with_interim_uses_timeout_fallback() -> None:
+    session = _FakeLiveSession()
+    backend, _ = _backend(session, finalize_timeout_s=0.01)
+    stt = await backend.open_session()
     try:
         await stt.send_audio(b"\x00\x00" * 16)
         await _wait_for_sent(session, "audio")
@@ -294,8 +298,11 @@ async def test_activity_end_ack_promotes_latest_interim_when_final_is_missing() 
         await stt.on_speech_end(trailing_silence_ms=100, reason="silence")
         await _wait_for_sent(session, "activity_end")
         session.push(_activity_end_ack())
-        events = await asyncio.wait_for(events_task, timeout=1)
-        assert [event.text for event in events] == ["latest"]
+        events = stt.events()
+        event = await asyncio.wait_for(anext(events), timeout=1)
+        assert event.text == "latest"
+        with pytest.raises(Exception, match="finalize timed out"):
+            await asyncio.wait_for(anext(events), timeout=1)
     finally:
         await stt.close()
 
@@ -331,6 +338,7 @@ async def test_empty_turn_does_not_shift_following_transcript() -> None:
         await stt.on_speech_end(trailing_silence_ms=100, reason="silence")
         await _wait_for_sent(session, "activity_end")
         session.push(_activity_end_ack())
+        session.push(_final(""))
 
         await stt.send_audio(b"\x00\x00" * 16)
         await stt.on_speech_end(trailing_silence_ms=100, reason="silence")
@@ -361,12 +369,15 @@ async def test_next_activity_waits_for_previous_server_activity_end() -> None:
         assert sum("activity_start" in call for call in session.sent) == 1
 
         session.push(_activity_end_ack())
+        await asyncio.sleep(0)
+        assert sum("activity_start" in call for call in session.sent) == 1
+        session.push(_final("first"))
         await _wait_for_sent(session, "activity_end", count=2)
         session.push(_final("second"))
         session.push(_activity_end_ack())
 
         events = await asyncio.wait_for(events_task, timeout=1)
-        assert [event.text for event in events] == ["", "second"]
+        assert [event.text for event in events] == ["first", "second"]
         assert sum("activity_start" in call for call in session.sent) == 2
     finally:
         await stt.close()

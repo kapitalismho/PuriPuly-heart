@@ -1,5 +1,18 @@
 # Cloud ASR Finalization 정책 교정 계획서
 
+## 현재 구현과 역사적 계획의 구분
+
+아래 2026-08-12 계획은 당시 구조와 결정을 보존한 역사적 기록이다. 현재 scoped recognition 계약은 [#134](https://github.com/kapitalismho/PuriPuly-heart/issues/134), [#143](https://github.com/kapitalismho/PuriPuly-heart/issues/143), [#144](https://github.com/kapitalismho/PuriPuly-heart/issues/144)를 따르며, 정상 연결 재사용과 회전은 [#169 `STT-REUSE-1`](https://github.com/kapitalismho/PuriPuly-heart/issues/169) 및 provider별 #170–#173이 정한다. 아래 legacy controller/FIFO, 과거 endpoint 수치와 Qwen realtime 경로 설명은 현재 구현 지침이 아니다.
+
+- 정상 Soniox `<fin>`, Deepgram Finalize ACK, Gemini authoritative transcription + ActivityEnd, Scribe manual committed transcript는 각각 검증된 완료 장벽이다. 같은 연결/epoch에서 별도 turn identity를 사용하며, 장벽과 turn-local cleanup 전에는 다음 발화 PCM을 보내지 않는다.
+- Deepgram의 미응답 CloseStream/drain과 Gemini의 불완전 장벽 timeout은 결과 text가 있어도 retirement 경로다. 실패·EOF·abort·설정/generation 무효화 이후 성공 응답이 도착해도 연결 권한을 되살리지 않는다.
+- 180초 soft age와 실제 speech 이후 10초 보호는 공통 `ScopedRecognitionEngine` 한 곳에서 소유한다. source/VAD는 speech와 이미 소유한 대기 입력을 보고하며, provider별 회전 정책을 만들지 않는다. 계속된 speech와 provider finalization/대기 입력은 회전을 미루고, 실제 quiet 및 drain 완료 후 독립 타이머가 idle close한다.
+- idle close 직후 빈 연결을 재생성하지 않는다. 다음 실제 입력이 기존 bounded recovery로 연결을 열며, 끊긴 발화의 lossless 재개나 replay bridge를 제공하지 않는다. Qwen/Custom/local의 기존 release 정책은 바꾸지 않는다.
+- unkeyed protocol은 단일 outstanding turn과 provider의 순서 보장에 의존한다. 식별 가능한 stale callback과 idle contradiction은 거부하지만, B 시작 뒤 들어오는 임의의 unkeyed A text까지 구별한다고 주장하지 않는다. 동일한 정상 A/B 발화는 보존한다.
+- `intent.stt.drain_timeout_s`는 실제 drain/cleanup에 계속 사용된다. 정상 재사용에는 고정 drain sleep을 추가하지 않는다. Soniox는 유지된 stream과 post-speech 보호 시간도 과금 대상이다.
+
+현재 system map은 `ARCHITECTURE.md`의 STT 절을 참조한다. Controlled 검증과 실제 서비스 검증은 별도이며, 유료 호출 명시 승인 없이 수행하지 않은 live 항목은 미충족 상태다. 지연·품질·비용 개선 수치를 주장하지 않는다.
+
 ## 1. 문서의 성격
 
 - 작성일: 2026-08-12

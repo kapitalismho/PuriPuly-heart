@@ -308,6 +308,19 @@ class LocalASRProviderRuntimePort(Protocol):
         channel: ProviderRuntimeChannel,
         event: object,
     ) -> None: ...
+    async def observe_source_activity(
+        self,
+        channel: ProviderRuntimeChannel,
+        *,
+        speech_observed: bool,
+        observed_at_monotonic_s: float,
+    ) -> None: ...
+    async def observe_pending_source_work(
+        self,
+        channel: ProviderRuntimeChannel,
+        *,
+        pending: bool,
+    ) -> None: ...
 
     async def handle_owned_vad_event(
         self,

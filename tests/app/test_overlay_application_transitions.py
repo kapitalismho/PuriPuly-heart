@@ -28,7 +28,11 @@ from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter
-from puripuly_heart.core.peer_capture import PeerCaptureProviderStatus
+from puripuly_heart.core.peer_capture import (
+    PeerCaptureProviderStatus,
+    PeerCaptureSessionSnapshot,
+    PeerCaptureSessionState,
+)
 from puripuly_heart.domain.models import Transcript
 from puripuly_heart.ui.overlay_peer_contract import (
     build_overlay_peer_consumer_contract_from_state,
@@ -91,23 +95,76 @@ class Recorder:
 
 class CaptureRuntime:
     def __init__(self) -> None:
-        self.current_signature = None
+        self.current_signature: object | None = None
         self.prepare_calls = 0
         self.policy_calls: list[tuple[bool, str]] = []
         self.close_calls = 0
-        self.snapshot = SimpleNamespace(
-            desired_active=False,
-            effective_active=False,
-            provider_id=None,
-            runtime_signature=None,
-            provider_status=PeerCaptureProviderStatus.READY,
-            failure_reason=None,
+        self._config = None
+        self._generation = 0
+        self._state = PeerCaptureSessionState.STOPPED
+        self._provider_status = PeerCaptureProviderStatus.DETACHED
+        self._target_status = None
+        self._desired_active = False
+        self._effective_active = False
+        self._failure_reason = None
+        self._has_source = False
+        self._has_vad = False
+        self._has_loop_task = False
+        self._closed = False
+
+    @property
+    def snapshot(self) -> PeerCaptureSessionSnapshot:
+        config = self._config
+        return PeerCaptureSessionSnapshot(
+            state=self._state,
+            provider_status=self._provider_status,
+            target_status=self._target_status,
+            desired_active=self._desired_active,
+            effective_active=self._effective_active,
+            generation=self._generation,
+            provider_id=config.provider_id if config is not None else None,
+            runtime_signature=(config.runtime_signature if config is not None else None),
+            capture_target=config.capture_target if config is not None else None,
+            resolved_target=None,
+            language=config.delivery_language if config is not None else None,
+            failure_reason=self._failure_reason,
+            admission_reason=None,
+            target_reason=None,
+            retry_available=False,
+            has_source=self._has_source,
+            has_vad=self._has_vad,
+            has_loop_task=self._has_loop_task,
+            cleanup_debt=0,
+            closed=self._closed,
         )
 
     async def prepare_provider(self, config):
         self.prepare_calls += 1
+        self._config = config
         self.current_signature = config.runtime_signature
+        self._generation += 1
+        self._state = PeerCaptureSessionState.STOPPED
+        self._provider_status = PeerCaptureProviderStatus.READY
+        self._desired_active = False
+        self._effective_active = False
+        self._failure_reason = None
+        self._has_source = False
+        self._has_vad = False
+        self._has_loop_task = False
         return self.snapshot
+
+    def activate_capture(self) -> None:
+        if self._config is None:
+            raise AssertionError("capture must be prepared before activation")
+        self._generation += 1
+        self._state = PeerCaptureSessionState.RUNNING
+        self._provider_status = PeerCaptureProviderStatus.READY
+        self._desired_active = True
+        self._effective_active = True
+        self._failure_reason = None
+        self._has_source = True
+        self._has_vad = True
+        self._has_loop_task = True
 
     async def apply_policy(
         self,
@@ -116,13 +173,31 @@ class CaptureRuntime:
         desired_active: bool,
         stop_mode: str = "retain",
     ) -> None:
-        self.snapshot.desired_active = desired_active
-        self.snapshot.provider_id = config.provider_id
-        self.snapshot.runtime_signature = config.runtime_signature
+        self._config = config
+        self.current_signature = config.runtime_signature
         self.policy_calls.append((desired_active, stop_mode))
+        if desired_active and not self._desired_active:
+            self._generation += 1
+        self._desired_active = desired_active
+        self._effective_active = desired_active
+        self._state = (
+            PeerCaptureSessionState.RUNNING if desired_active else PeerCaptureSessionState.STOPPED
+        )
+        self._provider_status = PeerCaptureProviderStatus.READY
+        self._failure_reason = None
+        self._has_source = desired_active
+        self._has_vad = desired_active
+        self._has_loop_task = desired_active
 
     async def close(self) -> None:
         self.close_calls += 1
+        self._closed = True
+        self._desired_active = False
+        self._effective_active = False
+        self._state = PeerCaptureSessionState.STOPPED
+        self._has_source = False
+        self._has_vad = False
+        self._has_loop_task = False
 
 
 class PeerOverlayHarness:
@@ -444,7 +519,7 @@ async def test_retry_every_enable_policy_retries_configured_steamvr_after_disabl
 async def test_caption_disable_keeps_listen_intent_and_capture_demand() -> None:
     harness = PeerOverlayHarness()
     await harness.activate_peer()
-    harness.capture_runtime.snapshot.effective_active = True
+    harness.capture_runtime.activate_capture()
     harness.peer.sync_effective_flags()
 
     await harness.overlay.set_enabled(False)

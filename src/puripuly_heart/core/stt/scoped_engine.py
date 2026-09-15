@@ -52,6 +52,7 @@ class STTRecognitionWatchdogs:
     final_timeout_s: float = 20.0
     drain_timeout_s: float = 1.5
     healthy_reset_age_s: float = 180.0
+    recent_speech_window_s: float = 10.0
     connect_attempts: int = 3
     connect_retry_base_s: float = 0.8
     connect_retry_max_s: float = 1.6
@@ -63,6 +64,7 @@ class STTRecognitionWatchdogs:
             self.final_timeout_s,
             self.drain_timeout_s,
             self.healthy_reset_age_s,
+            self.recent_speech_window_s,
             self.connect_retry_base_s,
             self.connect_retry_max_s,
         )
@@ -100,6 +102,7 @@ class _ActiveTurn:
     settings: AudioSegmentSettingsSnapshot
     normalizer: STTScopedTurnNormalizer
     watchdogs: STTRecognitionWatchdogs
+    authority_generation: int
     terminal_ready: asyncio.Future[STTProviderTurnTerminal]
     retention_profile: STTRetentionProfile | None
     payload_sequence: int = 0
@@ -128,6 +131,7 @@ class ScopedRecognitionEngine:
     ) = None
     event_drain_timeout_s: float = 1.5
     terminal_failure_sink: Callable[[Exception], Awaitable[None] | None] | None = None
+    deferred_age_rotation_enabled: bool = True
     exclusive_provider_ids: frozenset[str] = frozenset(
         {
             "local_cpu_auto",
@@ -149,7 +153,12 @@ class ScopedRecognitionEngine:
     )
     _ended_provider_epoch_id: str | None = field(init=False, default=None, repr=False)
     _turn: _ActiveTurn | None = field(init=False, default=None, repr=False)
+    _source_speech_active: bool = field(init=False, default=False, repr=False)
+    _last_source_speech_at_s: float | None = field(init=False, default=None, repr=False)
+    _source_work_pending: bool = field(init=False, default=False, repr=False)
+    _rotation_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _input_lock: asyncio.Lock = field(init=False, repr=False)
+    _turn_resolved: asyncio.Event = field(init=False, repr=False)
     _abort_lock: asyncio.Lock = field(init=False, repr=False)
     _cleanup_tasks: set[asyncio.Task[None]] = field(init=False, default_factory=set, repr=False)
     _factory_tasks: set[asyncio.Task[STTScopedTurnSession]] = field(
@@ -202,6 +211,8 @@ class ScopedRecognitionEngine:
     def __post_init__(self) -> None:
         self._input_lock = asyncio.Lock()
         self._abort_lock = asyncio.Lock()
+        self._turn_resolved = asyncio.Event()
+        self._turn_resolved.set()
         self._event_buffer = STTProviderEventBuffer()
         self._event_drained = asyncio.Event()
         self._event_drained.set()
@@ -262,18 +273,27 @@ class ScopedRecognitionEngine:
         if not isinstance(owned, OwnedVadEvent):
             raise TypeError("scoped recognition requires OwnedVadEvent")
         event = owned.event
+        if isinstance(event, SpeechEnd):
+            if not self._closed:
+                await self._handle_end(owned, event)
+            return
         authority_generation = self._authority_generation
         if isinstance(event, SpeechStart):
             await asyncio.sleep(0)
+            while True:
+                async with self._input_lock:
+                    if self._closed or authority_generation != self._authority_generation:
+                        return
+                    if self._turn is None:
+                        await self._handle_start(owned, event, authority_generation)
+                        return
+                    resolved = self._turn_resolved
+                await resolved.wait()
         async with self._input_lock:
             if self._closed:
                 return
-            if isinstance(event, SpeechStart):
-                await self._handle_start(owned, event, authority_generation)
-            elif isinstance(event, SpeechChunk):
+            if isinstance(event, SpeechChunk):
                 await self._handle_chunk(owned, event)
-            elif isinstance(event, SpeechEnd):
-                await self._handle_end(owned, event)
             else:
                 raise TypeError(f"unknown owned VAD event: {type(event)!r}")
 
@@ -313,6 +333,26 @@ class ScopedRecognitionEngine:
         self._set_turn_failure(turn, reason, allow_provisional=True)
         turn.write_failed = True
         await self._finish_failed_turn_immediately(turn)
+
+    async def observe_source_activity(
+        self,
+        *,
+        speech_observed: bool,
+        observed_at_monotonic_s: float | None = None,
+    ) -> None:
+        if self._closed or not self.deferred_age_rotation_enabled:
+            return
+        now = self.monotonic_clock() if observed_at_monotonic_s is None else observed_at_monotonic_s
+        self._source_speech_active = speech_observed
+        if speech_observed:
+            self._last_source_speech_at_s = now
+        self._schedule_rotation_check()
+
+    async def observe_pending_source_work(self, *, pending: bool) -> None:
+        if self._closed or not self.deferred_age_rotation_enabled:
+            return
+        self._source_work_pending = pending
+        self._schedule_rotation_check()
 
     async def abort(self, *, reason: str = "cancelled") -> None:
         # Invalidate provider authority before waiting for any in-flight
@@ -354,6 +394,7 @@ class ScopedRecognitionEngine:
             return
         await self.abort(reason="closed")
         self._closed = True
+        self._cancel_rotation_check()
         await self._await_event_drain(self.event_drain_timeout_s)
         self._event_buffer.close()
         event_task = self._event_dispatch_task
@@ -434,9 +475,11 @@ class ScopedRecognitionEngine:
             ),
             watchdogs=watchdogs,
             terminal_ready=loop.create_future(),
+            authority_generation=authority_generation,
             retention_budget=(owned.retention.budget if owned.retention is not None else None),
         )
         self._turn = turn
+        self._turn_resolved.clear()
         if open_failure is not None or session is None or self._provider_epoch_id is None:
             self._set_turn_failure(
                 turn,
@@ -467,7 +510,7 @@ class ScopedRecognitionEngine:
                 event.pre_roll_capture,
                 context_only=True,
             )
-        if not turn.write_failed and event.chunk.size:
+        if self._has_write_authority(session, turn) and event.chunk.size:
             await self._send_payload(
                 turn,
                 session,
@@ -481,10 +524,7 @@ class ScopedRecognitionEngine:
         if turn is None or turn.write_failed:
             return
         session = self._session
-        if session is None:
-            self._set_turn_failure(turn, "provider_session_unavailable")
-            turn.write_failed = True
-            await self._finish_failed_turn_immediately(turn)
+        if session is None or not self._has_write_authority(session, turn):
             return
         await self._send_payload(
             turn,
@@ -502,7 +542,11 @@ class ScopedRecognitionEngine:
             raise RuntimeError("recognition terminality requires a locally sealed segment")
         turn.local_sealed = True
         session = self._session
-        if not turn.write_failed and session is not None:
+        if (
+            not turn.write_failed
+            and session is not None
+            and self._has_write_authority(session, turn)
+        ):
             sent = await self._run_write(
                 session,
                 turn,
@@ -514,7 +558,7 @@ class ScopedRecognitionEngine:
                     observed_trailing_silence_ms=event.trailing_silence_ms,
                 ),
             )
-            if sent:
+            if sent and self._has_write_authority(session, turn):
                 await self._await_terminal(turn)
         if not turn.terminal_ready.done():
             self._set_turn_failure(turn, "provider_turn_failed_before_terminal")
@@ -530,6 +574,8 @@ class ScopedRecognitionEngine:
         *,
         context_only: bool,
     ) -> None:
+        if not self._has_write_authority(session, turn):
+            return
         sample_count = int(getattr(samples, "size", 0))
         if sample_count <= 0:
             return
@@ -635,11 +681,13 @@ class ScopedRecognitionEngine:
         if self._session is not None:
             if self._ended_provider_epoch_id == self._provider_epoch_id:
                 self._retire_current_session(watchdogs)
-            else:
+            elif self._session_scope == scope:
                 opened_at = self._session_opened_at_s
                 age = 0.0 if opened_at is None else self.monotonic_clock() - opened_at
-                if self._session_scope == scope and age < watchdogs.healthy_reset_age_s:
+                if self.deferred_age_rotation_enabled or age < watchdogs.healthy_reset_age_s:
                     return
+                self._retire_current_session(watchdogs)
+            else:
                 self._retire_current_session(watchdogs)
         if self.cleanup_debt:
             await self._await_cleanup_debt(watchdogs.readiness_timeout_s)
@@ -681,6 +729,7 @@ class ScopedRecognitionEngine:
                         self._consume_session_events(session, epoch_id),
                         name=f"scoped-stt-events:{epoch_id}",
                     )
+                    self._schedule_rotation_check()
                     return
             if self._episode_failures < watchdogs.connect_attempts:
                 delay = min(
@@ -757,7 +806,10 @@ class ScopedRecognitionEngine:
             return
         session = self._session
         allow_interim = bool(getattr(session, "allows_interim_timeout_fallback", False))
-        allow_interim = allow_interim and turn.settings.provider_id == "gemini_transcribe"
+        allow_interim = allow_interim and turn.settings.provider_id in {
+            "gemini_transcribe",
+            "rolling_free",
+        }
         self._set_turn_failure(
             turn,
             "provider_final_timeout",
@@ -779,9 +831,10 @@ class ScopedRecognitionEngine:
         operations.add(task)
         done, _pending = await asyncio.wait({task}, timeout=turn.watchdogs.write_timeout_s)
         if task not in done:
-            self._set_turn_failure(turn, f"provider_{operation}_timeout")
-            turn.write_failed = True
-            self._retire_current_session(turn.watchdogs)
+            if self._has_write_authority(session, turn):
+                self._set_turn_failure(turn, f"provider_{operation}_timeout")
+                turn.write_failed = True
+                self._retire_current_session(turn.watchdogs)
             return False
         operations.discard(task)
         if not operations:
@@ -789,11 +842,26 @@ class ScopedRecognitionEngine:
         try:
             task.result()
         except BaseException as exc:
-            self._set_turn_failure(turn, f"provider_{operation}_failed:{type(exc).__name__}")
-            turn.write_failed = True
-            self._retire_current_session(turn.watchdogs)
+            if self._has_write_authority(session, turn):
+                self._set_turn_failure(turn, f"provider_{operation}_failed:{type(exc).__name__}")
+                turn.write_failed = True
+                self._retire_current_session(turn.watchdogs)
             return False
-        return True
+        return self._has_write_authority(session, turn)
+
+    def _has_write_authority(
+        self,
+        session: STTScopedTurnSession,
+        turn: _ActiveTurn,
+    ) -> bool:
+        return (
+            not self._closed
+            and not turn.terminal_emitted
+            and turn.authority_generation == self._authority_generation
+            and turn is self._turn
+            and session is self._session
+            and turn.identity.provider_epoch_id == self._provider_epoch_id
+        )
 
     def _set_turn_failure(
         self,
@@ -843,6 +911,7 @@ class ScopedRecognitionEngine:
         turn.retained_samples = 0
         turn.retained_bytes = 0
         self._turn = None
+        self._turn_resolved.set()
         if terminal.outcome in ("final", "empty"):
             self._episode_failures = 0
             self._terminal_failure_notified = False
@@ -856,6 +925,7 @@ class ScopedRecognitionEngine:
             self._retire_current_session(turn.watchdogs)
         if should_emit:
             await self._emit(terminal)
+        self._schedule_rotation_check()
 
     def _matching_turn(self, owned: OwnedVadEvent) -> _ActiveTurn | None:
         turn = self._turn
@@ -869,6 +939,7 @@ class ScopedRecognitionEngine:
         self,
         watchdogs: STTRecognitionWatchdogs | None = None,
     ) -> None:
+        self._cancel_rotation_check()
         session = self._session
         if session is None:
             return
@@ -894,6 +965,74 @@ class ScopedRecognitionEngine:
         )
         self._cleanup_tasks.add(task)
         task.add_done_callback(self._cleanup_done)
+
+    def _schedule_rotation_check(self) -> None:
+        if (
+            not self.deferred_age_rotation_enabled
+            or self._closed
+            or self._session is None
+            or self._session_opened_at_s is None
+            or self._session_watchdogs is None
+        ):
+            return
+        task = self._rotation_task
+        current = asyncio.current_task()
+        if task is not None and task is not current and not task.done():
+            task.cancel()
+        now = self.monotonic_clock()
+        age_due_at = self._session_opened_at_s + self._session_watchdogs.healthy_reset_age_s
+        if (self._source_speech_active or self._source_work_pending) and now >= age_due_at:
+            if task is not current:
+                self._rotation_task = None
+            return
+        quiet_due_at = (
+            now
+            if self._last_source_speech_at_s is None
+            else self._last_source_speech_at_s + self._session_watchdogs.recent_speech_window_s
+        )
+        delay = max(0.0, age_due_at - now, quiet_due_at - now)
+        self._rotation_task = asyncio.create_task(
+            self._run_rotation_check(delay),
+            name="scoped-stt-age-rotation",
+        )
+
+    async def _run_rotation_check(self, delay_s: float) -> None:
+        try:
+            await self.sleep(delay_s)
+            async with self._input_lock:
+                if self._closed or self._session is None:
+                    return
+                watchdogs = self._session_watchdogs
+                opened_at = self._session_opened_at_s
+                if watchdogs is None or opened_at is None:
+                    return
+                now = self.monotonic_clock()
+                age_due = now >= opened_at + watchdogs.healthy_reset_age_s
+                speech_protected = self._source_speech_active or (
+                    self._last_source_speech_at_s is not None
+                    and now < self._last_source_speech_at_s + watchdogs.recent_speech_window_s
+                )
+                work_protected = self._source_work_pending or self._turn is not None
+                if age_due and not speech_protected and not work_protected:
+                    self._retire_current_session(watchdogs)
+                    return
+                if not age_due or (
+                    not self._source_speech_active
+                    and not self._source_work_pending
+                    and self._turn is None
+                ):
+                    self._schedule_rotation_check()
+        except asyncio.CancelledError:
+            return
+        finally:
+            if self._rotation_task is asyncio.current_task():
+                self._rotation_task = None
+
+    def _cancel_rotation_check(self) -> None:
+        task = self._rotation_task
+        self._rotation_task = None
+        if task is not None and task is not asyncio.current_task() and not task.done():
+            task.cancel()
 
     async def _emit(self, event: STTProviderTurnEvent) -> None:
         sink = self.event_sink

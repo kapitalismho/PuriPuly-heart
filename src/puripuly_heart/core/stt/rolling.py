@@ -353,6 +353,10 @@ class _RollingSession(STTBackendSession):
     def provider_name(self) -> STTProviderName:
         return self.definition.name
 
+    @property
+    def allows_interim_timeout_fallback(self) -> bool:
+        return bool(getattr(self.inner, "allows_interim_timeout_fallback", False))
+
     def _scoped_inner(self) -> STTScopedTurnSession:
         if not isinstance(self.inner, STTScopedTurnSession):
             raise TypeError(f"rolling member {self.definition.name.value} is not scoped")
