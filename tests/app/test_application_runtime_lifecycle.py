@@ -12,8 +12,12 @@ from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
+from puripuly_heart.app.services.managed_gemma_translation import (
+    ManagedGemmaTranslationSnapshot,
+)
 from puripuly_heart.composition.application_runtime import (
     _emit_managed_gemma_lifecycle_diagnostic,
+    _managed_gemma_failure_diagnostic,
 )
 from puripuly_heart.core.lifecycle import (
     LIFECYCLE_SHUTDOWN_PHASE_ORDER,
@@ -191,6 +195,26 @@ def test_managed_gemma_lifecycle_logs_bounded_failure_identity() -> None:
             logging.ERROR,
         )
     ]
+
+
+def test_managed_gemma_failure_log_contains_only_bounded_metadata() -> None:
+    snapshot = ManagedGemmaTranslationSnapshot(
+        state="failed",
+        backend="cpu",
+        progress_percent=None,
+        error_type="GemmaProvisioningError",
+        failure_phase="download",
+        failure_code="download_failed",
+        cause_type="RuntimeError",
+        worker_exit_code=1,
+        status_code=503,
+    )
+
+    assert _managed_gemma_failure_diagnostic(snapshot) == (
+        "[Diagnostic][ManagedGemma] prepare outcome=failed backend=cpu "
+        "phase=download failure=download_failed cause=RuntimeError "
+        "worker_exit_code=1 status_code=503"
+    )
 
 
 @pytest.mark.asyncio

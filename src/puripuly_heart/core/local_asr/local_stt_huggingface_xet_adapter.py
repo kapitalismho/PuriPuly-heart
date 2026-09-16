@@ -130,14 +130,26 @@ class HuggingFaceXetDownloadAdapter:
             event_path.touch()
             command = tuple(self._worker_command_factory(request, request_path, event_path))
             creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-                creationflags=creationflags,
-            )
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    stdin=asyncio.subprocess.DEVNULL,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                    creationflags=creationflags,
+                )
+            except Exception as exc:
+                raise LocalSTTDownloadPortError(
+                    "Hugging Face/Xet worker could not start",
+                    failure_code="worker_spawn_failed",
+                    cause_type=type(exc).__name__,
+                    os_error_code=_os_error_code(exc),
+                ) from exc
             error_message: str | None = None
+            error_failure_code: str | None = None
+            error_cause_type: str | None = None
+            error_status_code: int | None = None
+            error_os_code: int | None = None
             completed_path: Path | None = None
 
             with event_path.open("r", encoding="utf-8") as event_stream:
@@ -154,7 +166,9 @@ class HuggingFaceXetDownloadAdapter:
                         message = json.loads(line)
                     except json.JSONDecodeError as exc:
                         raise LocalSTTDownloadPortError(
-                            "invalid Hugging Face/Xet worker response"
+                            "invalid Hugging Face/Xet worker response",
+                            failure_code="worker_protocol_failed",
+                            cause_type=type(exc).__name__,
                         ) from exc
                     message_type = message.get("type")
                     if message_type == "progress" and on_progress is not None:
@@ -174,11 +188,24 @@ class HuggingFaceXetDownloadAdapter:
                         error_message = str(
                             message.get("message") or "Hugging Face/Xet worker failed"
                         )
+                        error_failure_code = str(
+                            message.get("failure_code") or "worker_reported_failure"
+                        )
+                        error_cause_type = str(message.get("error_type") or "unavailable")
+                        error_status_code = _optional_int(message.get("status_code"))
+                        error_os_code = _optional_int(message.get("os_error_code"))
 
             return_code = await process.wait()
             if return_code != 0 or completed_path is None:
                 detail = error_message or f"worker exited with code {return_code}"
-                raise LocalSTTDownloadPortError(detail)
+                raise LocalSTTDownloadPortError(
+                    detail,
+                    failure_code=error_failure_code or "worker_exited",
+                    cause_type=error_cause_type,
+                    worker_exit_code=return_code,
+                    status_code=error_status_code,
+                    os_error_code=error_os_code,
+                )
             return completed_path
         except asyncio.CancelledError:
             if process is not None:
@@ -244,17 +271,40 @@ def _write_worker_message(message: dict[str, object]) -> None:
             handle.flush()
 
 
+def _optional_int(value: object) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _os_error_code(exc: BaseException) -> int | None:
+    return _optional_int(getattr(exc, "winerror", None)) or _optional_int(
+        getattr(exc, "errno", None)
+    )
+
+
+def _http_status_code(exc: BaseException) -> int | None:
+    response = getattr(exc, "response", None)
+    return _optional_int(getattr(response, "status_code", None))
+
+
 def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
     global _WORKER_EVENT_PATH
     previous_xet_cache = os.environ.get("HF_XET_CACHE")
     _WORKER_EVENT_PATH = event_path
+    failure_code = "worker_request_failed"
     try:
         payload = json.loads(request_path.read_text(encoding="utf-8"))
         local_dir = Path(str(payload["local_dir"])).resolve()
         xet_cache_dir = local_dir / ".cache" / "xet"
         os.environ["HF_XET_CACHE"] = str(xet_cache_dir)
+        failure_code = "worker_import_failed"
         from huggingface_hub import hf_hub_download
 
+        failure_code = "download_failed"
         downloaded_path = Path(
             hf_hub_download(
                 repo_id=str(payload["repo_id"]),
@@ -269,7 +319,19 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
         _write_worker_message({"type": "complete", "path": str(downloaded_path)})
         return 0
     except Exception as exc:
-        _write_worker_message({"type": "error", "message": str(exc)})
+        message: dict[str, object] = {
+            "type": "error",
+            "failure_code": failure_code,
+            "error_type": type(exc).__name__,
+            "message": str(exc),
+        }
+        status_code = _http_status_code(exc)
+        if status_code is not None:
+            message["status_code"] = status_code
+        os_error_code = _os_error_code(exc)
+        if os_error_code is not None:
+            message["os_error_code"] = os_error_code
+        _write_worker_message(message)
         return 1
     finally:
         if previous_xet_cache is None:

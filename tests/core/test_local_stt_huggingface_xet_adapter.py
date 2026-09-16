@@ -333,3 +333,74 @@ def test_worker_uses_token_false_local_dir_and_removes_hf_metadata(
     messages = [json.loads(line) for line in event_path.read_text(encoding="utf-8").splitlines()]
     assert messages[0]["type"] == "progress"
     assert messages[-1]["type"] == "complete"
+
+
+def test_worker_failure_reports_bounded_error_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    local_dir = tmp_path / "local"
+    request_path = tmp_path / "request.json"
+    event_path = tmp_path / "events.jsonl"
+
+    def fail_download(**_kwargs):
+        raise OSError(28, "fixture disk full")
+
+    import huggingface_hub
+
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", fail_download)
+    request_path.write_text(
+        json.dumps(
+            {
+                "repo_id": "fixture/repo",
+                "revision": "pinned-revision",
+                "remote_path": "folder/model.gguf",
+                "local_dir": str(local_dir),
+                "expected_size_bytes": 7,
+            }
+        ),
+        encoding="utf-8",
+    )
+    event_path.touch()
+
+    assert run_huggingface_xet_worker(request_path=request_path, event_path=event_path) == 1
+
+    message = json.loads(event_path.read_text(encoding="utf-8").splitlines()[-1])
+    assert message["type"] == "error"
+    assert message["failure_code"] == "download_failed"
+    assert message["error_type"] == "OSError"
+    assert message["os_error_code"] == 28
+
+
+@pytest.mark.asyncio
+async def test_adapter_preserves_worker_failure_metadata(tmp_path: Path) -> None:
+    script = (
+        "import json,pathlib,sys;"
+        "pathlib.Path(sys.argv[1]).write_text(json.dumps({"
+        "'type':'error','failure_code':'download_failed','error_type':'RuntimeError',"
+        "'message':'fixture failure','status_code':503})+'\\n');"
+        "raise SystemExit(1)"
+    )
+    adapter = HuggingFaceXetDownloadAdapter(
+        worker_command_factory=lambda _request, _request_path, event_path: [
+            sys.executable,
+            "-c",
+            script,
+            str(event_path),
+        ]
+    )
+    request = HuggingFaceDownloadRequest(
+        repo_id="fixture/repo",
+        revision="pinned-revision",
+        remote_path="model.gguf",
+        local_dir=tmp_path / "local",
+        expected_size_bytes=7,
+    )
+
+    with pytest.raises(LocalSTTDownloadPortError) as captured:
+        await adapter.download(request, cancel_event=None, on_progress=None)
+
+    assert captured.value.failure_code == "download_failed"
+    assert captured.value.cause_type == "RuntimeError"
+    assert captured.value.worker_exit_code == 1
+    assert captured.value.status_code == 503

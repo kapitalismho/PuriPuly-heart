@@ -12,6 +12,7 @@ from puripuly_heart.app.ports.managed_gemma_translation import (
 from puripuly_heart.app.services.managed_gemma_translation import (
     ManagedGemmaTranslationOwner,
 )
+from puripuly_heart.core.local_asr.local_stt_download_port import LocalSTTDownloadPortError
 from puripuly_heart.core.local_translation.provisioning import (
     GemmaProvisioningCancelled,
     GemmaProvisioningUpdate,
@@ -145,6 +146,31 @@ async def test_failed_prepare_can_be_retried_and_activated() -> None:
     assert activation.backend == "cpu"
     assert owner.snapshot.state == "ready"
     assert attempts == 2
+
+
+@pytest.mark.asyncio
+async def test_failed_prepare_exposes_bounded_download_diagnostics() -> None:
+    def prepare(**_kwargs: object) -> ManagedGemmaReadiness:
+        download_failure = LocalSTTDownloadPortError(
+            "sensitive worker detail",
+            failure_code="download_failed",
+            cause_type="RuntimeError",
+            worker_exit_code=1,
+            status_code=503,
+        )
+        raise RuntimeError("provisioning wrapper") from download_failure
+
+    owner = ManagedGemmaTranslationOwner(runtime=RecordingRuntime(prepare))
+
+    with pytest.raises(RuntimeError, match="provisioning wrapper"):
+        await owner.prepare(_selection())
+
+    assert owner.snapshot.failure_phase == "download"
+    assert owner.snapshot.failure_code == "download_failed"
+    assert owner.snapshot.cause_type == "RuntimeError"
+    assert owner.snapshot.worker_exit_code == 1
+    assert owner.snapshot.status_code == 503
+    assert "sensitive worker detail" not in repr(owner.snapshot)
 
 
 @pytest.mark.asyncio

@@ -10,14 +10,19 @@ from puripuly_heart.app.ports.managed_gemma_translation import (
     ManagedGemmaTranslationSelection,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
-from puripuly_heart.core.local_asr.local_stt_download_port import HuggingFaceDownloadPort
+from puripuly_heart.core.local_asr.local_stt_download_port import (
+    HuggingFaceDownloadPort,
+    LocalSTTDownloadPortError,
+)
 from puripuly_heart.core.local_translation.assets import resolve_gemma_spec
 from puripuly_heart.core.local_translation.provisioning import (
     GemmaProvisioningCancelled,
+    GemmaProvisioningError,
     GemmaProvisioningUpdate,
 )
 from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaReadiness,
+    ManagedGemmaRuntimeError,
     ManagedGemmaRuntimeOwner,
 )
 from puripuly_heart.core.observability import DiagnosticEvent
@@ -29,6 +34,12 @@ class ManagedGemmaTranslationSnapshot:
     backend: str | None
     progress_percent: int | None
     error_type: str | None = None
+    failure_phase: str | None = None
+    failure_code: str | None = None
+    cause_type: str | None = None
+    worker_exit_code: int | None = None
+    status_code: int | None = None
+    os_error_code: int | None = None
 
 
 ManagedGemmaTranslationStatusSink = Callable[[ManagedGemmaTranslationSnapshot], None]
@@ -144,11 +155,18 @@ class ManagedGemmaTranslationOwner:
                 self._publish("cancelled", backend=backend, progress_percent=None)
                 raise
             except Exception as exc:
+                failure = _failure_metadata(exc)
                 self._publish(
                     "failed",
                     backend=backend,
                     progress_percent=None,
                     error_type=type(exc).__name__,
+                    failure_phase=failure["phase"],
+                    failure_code=failure["code"],
+                    cause_type=failure["cause_type"],
+                    worker_exit_code=failure["worker_exit_code"],
+                    status_code=failure["status_code"],
+                    os_error_code=failure["os_error_code"],
                 )
                 raise
             finally:
@@ -291,17 +309,80 @@ class ManagedGemmaTranslationOwner:
         backend: str | None,
         progress_percent: int | None,
         error_type: str | None = None,
+        failure_phase: str | None = None,
+        failure_code: str | None = None,
+        cause_type: str | None = None,
+        worker_exit_code: int | None = None,
+        status_code: int | None = None,
+        os_error_code: int | None = None,
     ) -> None:
         snapshot = ManagedGemmaTranslationSnapshot(
             state=state,
             backend=backend,
             progress_percent=progress_percent,
             error_type=error_type,
+            failure_phase=failure_phase,
+            failure_code=failure_code,
+            cause_type=cause_type,
+            worker_exit_code=worker_exit_code,
+            status_code=status_code,
+            os_error_code=os_error_code,
         )
         self._snapshot = snapshot
         if self._status_sink is not None:
             with contextlib.suppress(Exception):
                 self._status_sink(snapshot)
+
+
+def _exception_chain(exception: BaseException) -> tuple[BaseException, ...]:
+    chain: list[BaseException] = []
+    seen: set[int] = set()
+    current: BaseException | None = exception
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+    return tuple(chain)
+
+
+def _failure_metadata(exception: BaseException) -> dict[str, str | int | None]:
+    chain = _exception_chain(exception)
+    download_failure = next(
+        (item for item in chain if isinstance(item, LocalSTTDownloadPortError)),
+        None,
+    )
+    if download_failure is not None:
+        return {
+            "phase": "download",
+            "code": download_failure.failure_code,
+            "cause_type": download_failure.cause_type or type(chain[-1]).__name__,
+            "worker_exit_code": download_failure.worker_exit_code,
+            "status_code": download_failure.status_code,
+            "os_error_code": download_failure.os_error_code,
+        }
+    if isinstance(exception, GemmaProvisioningError):
+        phase = "provisioning"
+        code = "provisioning_failed"
+    elif isinstance(exception, ManagedGemmaRuntimeError):
+        phase = "runtime"
+        code = "runtime_failed"
+    else:
+        phase = "prepare"
+        code = "prepare_failed"
+    root = chain[-1]
+    os_error_code = None
+    if isinstance(root, OSError):
+        phase = "provisioning"
+        code = "filesystem_failed"
+        os_error_code = getattr(root, "winerror", None) or root.errno
+    return {
+        "phase": phase,
+        "code": code,
+        "cause_type": type(root).__name__,
+        "worker_exit_code": None,
+        "status_code": None,
+        "os_error_code": os_error_code,
+    }
 
 
 __all__ = [

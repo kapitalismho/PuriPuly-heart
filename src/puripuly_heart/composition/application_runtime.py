@@ -424,6 +424,23 @@ def _emit_managed_gemma_lifecycle_diagnostic(
     )
 
 
+def _managed_gemma_failure_diagnostic(snapshot: ManagedGemmaTranslationSnapshot) -> str:
+    fields = [
+        "[Diagnostic][ManagedGemma] prepare outcome=failed",
+        f"backend={snapshot.backend or 'unknown'}",
+        f"phase={snapshot.failure_phase or 'unknown'}",
+        f"failure={snapshot.failure_code or 'unavailable'}",
+        f"cause={snapshot.cause_type or snapshot.error_type or 'unavailable'}",
+    ]
+    if snapshot.worker_exit_code is not None:
+        fields.append(f"worker_exit_code={snapshot.worker_exit_code}")
+    if snapshot.status_code is not None:
+        fields.append(f"status_code={snapshot.status_code}")
+    if snapshot.os_error_code is not None:
+        fields.append(f"os_error_code={snapshot.os_error_code}")
+    return " ".join(fields)
+
+
 def compose_application_runtime(
     *,
     presentation: UiPresentationPort,
@@ -558,9 +575,7 @@ def compose_application_runtime(
                 )
         if snapshot.state == "failed":
             log_diagnostic(
-                "[ManagedGemma] failed "
-                f"backend={snapshot.backend or 'unknown'} "
-                f"cause={snapshot.error_type or 'unavailable'}",
+                _managed_gemma_failure_diagnostic(snapshot),
                 level=logging.ERROR,
             )
         if snapshot.state not in {
