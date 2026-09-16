@@ -1,6 +1,9 @@
 # Code signing policy
 
-PuriPuly has not applied to SignPath Foundation. The current official installer is unsigned. This policy describes the planned signing process.
+PuriPuly is applying to the SignPath Foundation open-source code-signing program.
+Current official releases are unsigned until the application and signing integration are complete.
+
+Free code signing provided by SignPath.io, certificate by SignPath Foundation.
 
 ## Official source and downloads
 
