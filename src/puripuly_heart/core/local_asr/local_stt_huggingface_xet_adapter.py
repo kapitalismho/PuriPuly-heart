@@ -25,6 +25,7 @@ _XET_TRANSFER_LOCK = threading.Lock()
 _WORKER_STOP_TIMEOUT_S = 5.0
 _WORKER_EVENT_LOCK = threading.Lock()
 _WORKER_EVENT_PATH: Path | None = None
+_SSL_PATH_ENV = (("SSL_CERT_FILE", "file"), ("SSL_CERT_DIR", "directory"))
 
 
 def _default_worker_command(
@@ -55,6 +56,24 @@ def _worker_payload(request: HuggingFaceDownloadRequest) -> dict[str, object]:
         "local_dir": str(request.local_dir),
         "expected_size_bytes": request.expected_size_bytes,
     }
+
+
+def _worker_environment(*, disable_xet: bool) -> dict[str, str]:
+    environment = os.environ.copy()
+    for name, path_type in _SSL_PATH_ENV:
+        value = environment.get(name)
+        if not value:
+            continue
+        path = Path(value)
+        try:
+            valid = path.is_file() if path_type == "file" else path.is_dir()
+        except OSError:
+            valid = False
+        if not valid:
+            environment.pop(name, None)
+    if disable_xet:
+        environment["HF_HUB_DISABLE_XET"] = "1"
+    return environment
 
 
 async def _stop_worker(process: asyncio.subprocess.Process) -> None:
@@ -111,9 +130,6 @@ class HuggingFaceXetDownloadAdapter:
         on_progress: HuggingFaceProgressCallback | None,
     ) -> Path:
         acquired = False
-        process: asyncio.subprocess.Process | None = None
-        request_path: Path | None = None
-        event_path: Path | None = None
         try:
             while not acquired:
                 if cancel_event is not None and cancel_event.is_set():
@@ -123,9 +139,42 @@ class HuggingFaceXetDownloadAdapter:
                     await asyncio.sleep(0.05)
 
             request.local_dir.mkdir(parents=True, exist_ok=True)
-            ipc_id = uuid4().hex
-            request_path = request.local_dir / f".hf-xet-request-{ipc_id}.json"
-            event_path = request.local_dir / f".hf-xet-events-{ipc_id}.jsonl"
+            try:
+                return await self._download_attempt(
+                    request,
+                    cancel_event=cancel_event,
+                    on_progress=on_progress,
+                    disable_xet=False,
+                )
+            except LocalSTTDownloadPortError as exc:
+                if exc.failure_code != "download_failed":
+                    raise
+            shutil.rmtree(request.local_dir / ".cache", ignore_errors=True)
+            if cancel_event is not None and cancel_event.is_set():
+                raise LocalSTTDownloadPortCancelled("Hugging Face/Xet download cancelled")
+            return await self._download_attempt(
+                request,
+                cancel_event=cancel_event,
+                on_progress=on_progress,
+                disable_xet=True,
+            )
+        finally:
+            if acquired:
+                _XET_TRANSFER_LOCK.release()
+
+    async def _download_attempt(
+        self,
+        request: HuggingFaceDownloadRequest,
+        *,
+        cancel_event: threading.Event | None,
+        on_progress: HuggingFaceProgressCallback | None,
+        disable_xet: bool,
+    ) -> Path:
+        process: asyncio.subprocess.Process | None = None
+        ipc_id = uuid4().hex
+        request_path = request.local_dir / f".hf-xet-request-{ipc_id}.json"
+        event_path = request.local_dir / f".hf-xet-events-{ipc_id}.jsonl"
+        try:
             request_path.write_text(json.dumps(_worker_payload(request)), encoding="utf-8")
             event_path.touch()
             command = tuple(self._worker_command_factory(request, request_path, event_path))
@@ -137,6 +186,7 @@ class HuggingFaceXetDownloadAdapter:
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                     creationflags=creationflags,
+                    env=_worker_environment(disable_xet=disable_xet),
                 )
             except Exception as exc:
                 raise LocalSTTDownloadPortError(
@@ -218,12 +268,8 @@ class HuggingFaceXetDownloadAdapter:
         finally:
             if process is not None and process.returncode is None:
                 await _stop_worker(process)
-            if request_path is not None:
-                request_path.unlink(missing_ok=True)
-            if event_path is not None:
-                event_path.unlink(missing_ok=True)
-            if acquired:
-                _XET_TRANSFER_LOCK.release()
+            request_path.unlink(missing_ok=True)
+            event_path.unlink(missing_ok=True)
 
 
 class _WorkerProgress:

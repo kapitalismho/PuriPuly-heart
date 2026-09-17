@@ -7,6 +7,7 @@ import json
 import os
 import socketserver
 import sys
+import textwrap
 import threading
 from functools import partial
 from pathlib import Path
@@ -404,3 +405,87 @@ async def test_adapter_preserves_worker_failure_metadata(tmp_path: Path) -> None
     assert captured.value.cause_type == "RuntimeError"
     assert captured.value.worker_exit_code == 1
     assert captured.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_adapter_sanitizes_invalid_ssl_paths_and_retries_without_xet(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    script = textwrap.dedent("""
+        import json
+        import os
+        import pathlib
+        import sys
+
+        request_path = pathlib.Path(sys.argv[1])
+        event_path = pathlib.Path(sys.argv[2])
+        payload = json.loads(request_path.read_text(encoding="utf-8"))
+        local_dir = pathlib.Path(payload["local_dir"])
+        attempts_path = local_dir / "attempts.jsonl"
+        attempt = len(attempts_path.read_text(encoding="utf-8").splitlines()) if attempts_path.exists() else 0
+        record = {
+            "disable_xet": os.environ.get("HF_HUB_DISABLE_XET"),
+            "ssl_cert_file": os.environ.get("SSL_CERT_FILE"),
+            "ssl_cert_dir": os.environ.get("SSL_CERT_DIR"),
+            "cache_exists": (local_dir / ".cache").exists(),
+        }
+        with attempts_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record) + "\\n")
+        if attempt == 0:
+            cache = local_dir / ".cache" / "xet"
+            cache.mkdir(parents=True)
+            (cache / "partial").write_bytes(b"partial")
+            event_path.write_text(json.dumps({
+                "type": "error",
+                "failure_code": "download_failed",
+                "error_type": "RuntimeError",
+                "message": "fixture xet failure",
+            }) + "\\n", encoding="utf-8")
+            raise SystemExit(1)
+        target = local_dir / payload["remote_path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"fixture")
+        event_path.write_text(json.dumps({"type": "complete", "path": str(target)}) + "\\n", encoding="utf-8")
+        """)
+    monkeypatch.setenv("SSL_CERT_FILE", str(tmp_path / "missing.pem"))
+    monkeypatch.setenv("SSL_CERT_DIR", str(tmp_path / "missing-certs"))
+    monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
+    adapter = HuggingFaceXetDownloadAdapter(
+        worker_command_factory=lambda _request, request_path, event_path: [
+            sys.executable,
+            "-c",
+            script,
+            str(request_path),
+            str(event_path),
+        ]
+    )
+    request = HuggingFaceDownloadRequest(
+        repo_id="fixture/repo",
+        revision="pinned-revision",
+        remote_path="model.gguf",
+        local_dir=tmp_path / "local",
+        expected_size_bytes=7,
+    )
+
+    downloaded = await adapter.download(request, cancel_event=None, on_progress=None)
+
+    attempts = [
+        json.loads(line)
+        for line in (request.local_dir / "attempts.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert downloaded.read_bytes() == b"fixture"
+    assert attempts == [
+        {
+            "disable_xet": None,
+            "ssl_cert_file": None,
+            "ssl_cert_dir": None,
+            "cache_exists": False,
+        },
+        {
+            "disable_xet": "1",
+            "ssl_cert_file": None,
+            "ssl_cert_dir": None,
+            "cache_exists": False,
+        },
+    ]
