@@ -1,0 +1,6481 @@
+{
+  "schema": "PSEM-SAVED-SPEAKER-SCORE-DIAGNOSTIC-1",
+  "status": "Frozen methods for a model-free diagnostic; not an adoption, new checkpoint selection or full issue164 disposition",
+  "authority_id": "AUTONOMY-2",
+  "decision_question": "Does the selected GT student's loss improvement contain within-source speaker-sensitive score information beyond common speech activity and static slot priors, despite near-silent threshold0.5 predictions?",
+  "methods": {
+    "solo_mask": "Original activity validity AND exactly one target column equal to 1 AND all other target columns equal to 0. Mixed/straddle/partial/overlap bins are excluded and counted. Relation-only nonlexical masks do not erase known activity.",
+    "conditional_identity": "On solo bins, softmax(logits) is the independent-Bernoulli model conditioned on exactly one active slot. Canonical unthresholded argmax uses first-index ties. Absent classes are JSON null with denominators.",
+    "baselines": "Same-initialization untrained scores, constant logit(FIT occupancy prior), and uniform four-slot logits, using identical observed-class denominators.",
+    "oracle_permutation": "Maximum observed-class balanced argmax accuracy over all 24 fixed source-global four-slot bijections; lexicographic tie-break; oracle scoring only.",
+    "first_speaker_vs_rest": "Threshold-free ROC-AUC and ordinary/class-balanced binary log loss for GT first-appearance slot0 versus other slots using conditional softmax probability of slot0. Not production CURRENT/OTHER.",
+    "common_logit_control": "b = mean(logits - row_mean(logits)) over valid FIT frames only, for untrained and selected390 separately. Control logits = a(t)+b with a(t)=row_mean(logits(t)). Independent masked BCE/Brier on all original activity-valid bins. No FIT controls for CAL78/780.",
+    "cal_trajectory": "Conditional diagnostics for retained CAL78/390/780 plus initial scores. Original selected390 is unchanged.",
+    "numerics": "CPU float64; no bootstrap, threshold sweep, significance claim, or fitted hyperparameters beyond the specified FIT-only common-logit vector b."
+  },
+  "baselines": [
+    "untrained_seed20260915",
+    "constant_fit_prior",
+    "uniform"
+  ],
+  "limitations": [
+    "Correlated 80ms frames and two DEV sources do not support statistical generalization or significance claims.",
+    "Common-logit control isolates a shared activity-plus-static-slot-bias explanation from relative-head variation; it does not prove voice-identity causality or remove temporal/source confounding.",
+    "Source-global permutation is oracle scoring, not inference, per-chunk remapping, or checkpoint selection.",
+    "First-appearance slot0 versus rest is a GT-anchor score diagnostic, not production 156 CURRENT/OTHER ownership.",
+    "This diagnostic does not change thresholds, model, objective, data, or policy, and does not accept or reject the parallel GT pilot candidate."
+  ],
+  "provenance": {
+    "contract_sha256": "d5091fc9b90fa02b770ed8e04bdfacb10144b1bcda4fce3689831902688e2617",
+    "analyzer_sha256": "b8880483ebd3528fb31627913124f8755720e11e1c821537ffdfbb5dcb3f360d",
+    "input_manifest_sha256": "49f272ab990a534491fc0f72d000e0bc4f1cff6bf74f7cb38c75317bb8f0d13a",
+    "probe_receipt_sha256": "82aba69419cb94bd912c11126ee20295530a4b0d1eb7ad756d2809cb8f25f93f",
+    "origin_config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+    "prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+    "replay_result_sha256": "896782c1e61c4dc305a1e9ef3177d43f66fea1b3eeb76c39f4761e15c6ddcff0",
+    "replay_execution_commit": "bc77e0c0439c379b268b1c047b2c965aef69c41c",
+    "evaluator_config_sha256": "445bd0b86a96166cd27642d8092ab72d83474b24bbaaf35b0ba65148c8e15ced",
+    "fit_only_occupancy_prior": [
+      0.26317110657691956,
+      0.10770361125469208,
+      0.11625641584396362,
+      0.06539624184370041
+    ],
+    "logit_files": [
+      {
+        "file": "untrained_seed20260915_ami_ES2005a.pt",
+        "sha256": "c94921ceba22f6d5ef476ffc1ab56e774ac1f5d999d04be89856922c3f6f9c03",
+        "bytes": 89661,
+        "weight_id": "untrained_seed20260915",
+        "checkpoint_sha256": null,
+        "source_id": "ami_ES2005a",
+        "frames": 3610,
+        "finite": true
+      },
+      {
+        "file": "untrained_seed20260915_ami_ES2006a.pt",
+        "sha256": "0d21148fb2738330a1b8ea7064b7ba74b409f6f2bb5407657897e6f45d6318b0",
+        "bytes": 98813,
+        "weight_id": "untrained_seed20260915",
+        "checkpoint_sha256": null,
+        "source_id": "ami_ES2006a",
+        "frames": 3990,
+        "finite": true
+      },
+      {
+        "file": "untrained_seed20260915_ami_ES2007a.pt",
+        "sha256": "99b0a129d04825a8b597b32e84210ae04a24443f0bfc0a1b0fec6a50d802c101",
+        "bytes": 89661,
+        "weight_id": "untrained_seed20260915",
+        "checkpoint_sha256": null,
+        "source_id": "ami_ES2007a",
+        "frames": 3610,
+        "finite": true
+      },
+      {
+        "file": "untrained_seed20260915_ami_ES2008a.pt",
+        "sha256": "32c644bf5960fc6f8583611710df98a706cb7076d1189456985a801045fc76a5",
+        "bytes": 89661,
+        "weight_id": "untrained_seed20260915",
+        "checkpoint_sha256": null,
+        "source_id": "ami_ES2008a",
+        "frames": 3610,
+        "finite": true
+      },
+      {
+        "file": "untrained_seed20260915_ami_ES2010a.pt",
+        "sha256": "fa373320420d616c21e70d14714288e505cd09e3f31e75519a5cf7d91e95ec86",
+        "bytes": 89661,
+        "weight_id": "untrained_seed20260915",
+        "checkpoint_sha256": null,
+        "source_id": "ami_ES2010a",
+        "frames": 3610,
+        "finite": true
+      },
+      {
+        "file": "untrained_seed20260915_ami_ES2009d.pt",
+        "sha256": "f684dccd154c3270183ff72b358495f54a152ea2a11259950eb5ec11141f8bce",
+        "bytes": 61821,
+        "weight_id": "untrained_seed20260915",
+        "checkpoint_sha256": null,
+        "source_id": "ami_ES2009d",
+        "frames": 2450,
+        "finite": true
+      },
+      {
+        "file": "untrained_seed20260915_ami_EN2009d.pt",
+        "sha256": "ebd4bf0024421ea7fdd0f2def2ce8c6801723e301c924c4732f8424a098ae58e",
+        "bytes": 17533,
+        "weight_id": "untrained_seed20260915",
+        "checkpoint_sha256": null,
+        "source_id": "ami_EN2009d",
+        "frames": 605,
+        "finite": true
+      },
+      {
+        "file": "checkpoint_78_ami_ES2010a.pt",
+        "sha256": "bf3f5fee1d18935b15b5e94be2afb72529a92e2fdb8066457e1ade182daedb19",
+        "bytes": 89589,
+        "weight_id": "checkpoint_78",
+        "checkpoint_sha256": "c9a3d69554f3c2cdb74512e83dd137bdf47d4b5148a52a0f4af53473b4465d72",
+        "source_id": "ami_ES2010a",
+        "frames": 3610,
+        "finite": true
+      },
+      {
+        "file": "checkpoint_390_ami_ES2005a.pt",
+        "sha256": "f0df2bb775fea2cd64d1ef9b54563319ac4a4f9aa60db7cbe53ea305140db1ba",
+        "bytes": 89597,
+        "weight_id": "checkpoint_390",
+        "checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+        "source_id": "ami_ES2005a",
+        "frames": 3610,
+        "finite": true
+      },
+      {
+        "file": "checkpoint_390_ami_ES2006a.pt",
+        "sha256": "f129d3d782eb69576727949ae7e498cea36977584e826a460131848c64d92d1f",
+        "bytes": 98749,
+        "weight_id": "checkpoint_390",
+        "checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+        "source_id": "ami_ES2006a",
+        "frames": 3990,
+        "finite": true
+      },
+      {
+        "file": "checkpoint_390_ami_ES2007a.pt",
+        "sha256": "49fb181c05ce05c8432b3682ff6e764d95f4b142e29a597267dd97039d7e21f6",
+        "bytes": 89597,
+        "weight_id": "checkpoint_390",
+        "checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+        "source_id": "ami_ES2007a",
+        "frames": 3610,
+        "finite": true
+      },
+      {
+        "file": "checkpoint_390_ami_ES2008a.pt",
+        "sha256": "0157fa8138f37aff5eabca27ade89ad5d3c9dee82ec20a95e6de2b0a6480557e",
+        "bytes": 89597,
+        "weight_id": "checkpoint_390",
+        "checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+        "source_id": "ami_ES2008a",
+        "frames": 3610,
+        "finite": true
+      },
+      {
+        "file": "checkpoint_390_ami_ES2010a.pt",
+        "sha256": "96f1c01bb2ac70d96982430b04dbb4613f67e9c2877017a1b05c447aadffa497",
+        "bytes": 89597,
+        "weight_id": "checkpoint_390",
+        "checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+        "source_id": "ami_ES2010a",
+        "frames": 3610,
+        "finite": true
+      },
+      {
+        "file": "checkpoint_390_ami_ES2009d.pt",
+        "sha256": "c8aeedc45dd205f7235541ab3a916fe4fc8e74cf5cf6f27c64329b8dd887f795",
+        "bytes": 61757,
+        "weight_id": "checkpoint_390",
+        "checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+        "source_id": "ami_ES2009d",
+        "frames": 2450,
+        "finite": true
+      },
+      {
+        "file": "checkpoint_390_ami_EN2009d.pt",
+        "sha256": "905223c1e2c2e0fd40d42f50a687fba0c80cbf925f07f98cea713c9f16eef309",
+        "bytes": 17533,
+        "weight_id": "checkpoint_390",
+        "checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+        "source_id": "ami_EN2009d",
+        "frames": 605,
+        "finite": true
+      },
+      {
+        "file": "checkpoint_780_ami_ES2010a.pt",
+        "sha256": "3352b5759c9505590877aea08291cc9b60038a56889e20253db6bae75c9c99d5",
+        "bytes": 89597,
+        "weight_id": "checkpoint_780",
+        "checkpoint_sha256": "c44fd8f621867ab75971b79d041e76ba30beddf104ec205cb53730e5363d4ec1",
+        "source_id": "ami_ES2010a",
+        "frames": 3610,
+        "finite": true
+      }
+    ],
+    "command": [
+      "experiments/psem_streaming_student/speaker_score_diagnostic.py",
+      "analyze"
+    ],
+    "python": "3.12.3",
+    "torch": "2.13.0+rocm10.0.0",
+    "numpy": "2.5.2",
+    "device": "cpu"
+  },
+  "logic_probes": {
+    "perfect_auc": 1.0,
+    "reversed_auc": 0.0,
+    "tied_auc": 0.5,
+    "absent_class_auc_null": true,
+    "unused_head_predictions_reduce_observed_recall": true,
+    "observed_balanced_accuracy": 0.75,
+    "softmax_shift_invariant": true,
+    "common_logit_no_within_source_ranking_variation": true,
+    "global_permutation_lexicographic": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "global_permutation_cannot_use_per_chunk_maps": true,
+    "per_chunk_remap_not_used": true,
+    "empty_and_absent_nulls": true,
+    "model_object_created": false
+  },
+  "identities": {
+    "ami_ES2005a": {
+      "role": "FIT",
+      "prefix_samples": 4620800,
+      "frames": 3610,
+      "valid_bins": 3607,
+      "slots": [
+        "MEE017",
+        "MEE018",
+        "FEE019",
+        "MEO020"
+      ],
+      "frontiers_start": 1280,
+      "frontiers_end": 4620800
+    },
+    "ami_ES2006a": {
+      "role": "FIT",
+      "prefix_samples": 5107200,
+      "frames": 3990,
+      "valid_bins": 3987,
+      "slots": [
+        "FEE021",
+        "FEO023",
+        "MEO022",
+        "FEE024"
+      ],
+      "frontiers_start": 1280,
+      "frontiers_end": 5107200
+    },
+    "ami_ES2007a": {
+      "role": "FIT",
+      "prefix_samples": 4620800,
+      "frames": 3610,
+      "valid_bins": 3607,
+      "slots": [
+        "MEE025",
+        "FEO026",
+        "FEE028",
+        "MEE027"
+      ],
+      "frontiers_start": 1280,
+      "frontiers_end": 4620800
+    },
+    "ami_ES2008a": {
+      "role": "FIT",
+      "prefix_samples": 4620800,
+      "frames": 3610,
+      "valid_bins": 3607,
+      "slots": [
+        "FEE032",
+        "FEE029",
+        "FEE030",
+        "MEE031"
+      ],
+      "frontiers_start": 1280,
+      "frontiers_end": 4620800
+    },
+    "ami_ES2010a": {
+      "role": "CAL",
+      "prefix_samples": 4620800,
+      "frames": 3610,
+      "valid_bins": 3607,
+      "slots": [
+        "FEE037",
+        "FEE040",
+        "FEE038",
+        "FEE039"
+      ],
+      "frontiers_start": 1280,
+      "frontiers_end": 4620800
+    },
+    "ami_ES2009d": {
+      "role": "DEV",
+      "prefix_samples": 3136000,
+      "frames": 2450,
+      "valid_bins": 2447,
+      "slots": [
+        "FEE036",
+        "MEE035",
+        "MEE033",
+        "MEE034"
+      ],
+      "frontiers_start": 1280,
+      "frontiers_end": 3136000
+    },
+    "ami_EN2009d": {
+      "role": "DEV",
+      "prefix_samples": 774400,
+      "frames": 605,
+      "valid_bins": 602,
+      "slots": [
+        "FEE096",
+        "FEE083",
+        null,
+        null
+      ],
+      "frontiers_start": 1280,
+      "frontiers_end": 774400
+    }
+  },
+  "fit_common_logit_b": {
+    "untrained": [
+      0.011910639090363771,
+      -0.012049074129150277,
+      -0.05494938573000592,
+      0.05508782076879243
+    ],
+    "selected_390": [
+      0.5912070782314318,
+      0.23620794869235673,
+      0.022310054541912587,
+      -0.8497250814657011
+    ],
+    "fit_sources": [
+      "ami_ES2005a",
+      "ami_ES2006a",
+      "ami_ES2007a",
+      "ami_ES2008a"
+    ],
+    "fitted_on": "valid FIT frames only; CAL/DEV logits unused for b"
+  },
+  "per_source": {
+    "ami_ES2005a": {
+      "role": "FIT",
+      "slots": [
+        "MEE017",
+        "MEE018",
+        "FEE019",
+        "MEO020"
+      ],
+      "bin_counts": {
+        "activity_valid": 3607,
+        "solo_known_complete": 1945,
+        "excluded_from_solo_diagnostic": 1662,
+        "all_zero": 1193,
+        "two_or_more_full_ones": 178,
+        "any_fractional_occupancy": 295,
+        "other_nonzero_incomplete": 0
+      },
+      "scores": {
+        "untrained": {
+          "solo_bins": 1945,
+          "class_counts": [
+            764,
+            208,
+            403,
+            570
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              0,
+              0,
+              0,
+              764
+            ],
+            [
+              0,
+              0,
+              0,
+              208
+            ],
+            [
+              0,
+              0,
+              0,
+              403
+            ],
+            [
+              0,
+              0,
+              0,
+              570
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "recall_denominators": [
+            764,
+            208,
+            403,
+            570
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.3801932287828445,
+          "class_balanced_conditional_log_loss": 1.3879936364306198,
+          "ovr_auc": [
+            0.43428122409352266,
+            0.3855619768832204,
+            0.4031936224103916,
+            0.14349346092503987
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 764,
+              "negative": 1181
+            },
+            {
+              "positive": 208,
+              "negative": 1737
+            },
+            {
+              "positive": 403,
+              "negative": 1542
+            },
+            {
+              "positive": 570,
+              "negative": 1375
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 764,
+            "n_rest": 1181,
+            "auc": 0.43428122409352266,
+            "ordinary_binary_log_loss": 0.7171355077748478,
+            "class_balanced_binary_log_loss": 0.8332580450085562
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2005a",
+          "role": "FIT",
+          "weight_id": "untrained_seed20260915",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1945,
+            "excluded_from_solo_diagnostic": 1662,
+            "all_zero": 1193,
+            "two_or_more_full_ones": 178,
+            "any_fractional_occupancy": 295,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6903347815568368,
+          "independent_activity_valid_brier": 0.24487973896020465,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0011524057799324583,
+              "range": 0.00830676918849349
+            },
+            {
+              "slot": 1,
+              "std": 0.0036429482559377975,
+              "range": 0.016785220010206103
+            },
+            {
+              "slot": 2,
+              "std": 0.0016300697346701334,
+              "range": 0.01060931058600545
+            },
+            {
+              "slot": 3,
+              "std": 0.003062743015129422,
+              "range": 0.014247549930587411
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.011910639090363771,
+              -0.012049074129150277,
+              -0.05494938573000592,
+              0.05508782076879243
+            ],
+            "independent_activity_valid_bce": 0.6901735038222284,
+            "independent_activity_valid_brier": 0.24479912147459282,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 1.734723475976807e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 2,
+                "std": 6.938893903907228e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 3,
+                "std": 6.938893903907228e-18,
+                "range": 0.0
+              }
+            ]
+          }
+        },
+        "constant_fit_prior": {
+          "solo_bins": 1945,
+          "class_counts": [
+            764,
+            208,
+            403,
+            570
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              764,
+              0,
+              0,
+              0
+            ],
+            [
+              208,
+              0,
+              0,
+              0
+            ],
+            [
+              403,
+              0,
+              0,
+              0
+            ],
+            [
+              570,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            764,
+            208,
+            403,
+            570
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.4436827931265146,
+          "class_balanced_conditional_log_loss": 1.571442958488925,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 764,
+              "negative": 1181
+            },
+            {
+              "positive": 208,
+              "negative": 1737
+            },
+            {
+              "positive": 403,
+              "negative": 1542
+            },
+            {
+              "positive": 570,
+              "negative": 1375
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 764,
+            "n_rest": 1181,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 0.7055075932017781,
+            "class_balanced_binary_log_loss": 0.6944714591046749
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2005a",
+          "role": "FIT",
+          "weight_id": "constant_fit_prior",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1945,
+            "excluded_from_solo_diagnostic": 1662,
+            "all_zero": 1193,
+            "two_or_more_full_ones": 178,
+            "any_fractional_occupancy": 295,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.46721222148707736,
+          "independent_activity_valid_brier": 0.13953800383017956,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 1.1102230246251565e-16,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 1.1102230246251565e-16,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "uniform": {
+          "solo_bins": 1945,
+          "class_counts": [
+            764,
+            208,
+            403,
+            570
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              764,
+              0,
+              0,
+              0
+            ],
+            [
+              208,
+              0,
+              0,
+              0
+            ],
+            [
+              403,
+              0,
+              0,
+              0
+            ],
+            [
+              570,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            764,
+            208,
+            403,
+            570
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.3862943611198906,
+          "class_balanced_conditional_log_loss": 1.3862943611198906,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 764,
+              "negative": 1181
+            },
+            {
+              "positive": 208,
+              "negative": 1737
+            },
+            {
+              "positive": 403,
+              "negative": 1542
+            },
+            {
+              "positive": 570,
+              "negative": 1375
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 764,
+            "n_rest": 1181,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 0.7192192387975062,
+            "class_balanced_binary_log_loss": 0.8369882167858358
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2005a",
+          "role": "FIT",
+          "weight_id": "uniform",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1945,
+            "excluded_from_solo_diagnostic": 1662,
+            "all_zero": 1193,
+            "two_or_more_full_ones": 178,
+            "any_fractional_occupancy": 295,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6931471805599451,
+          "independent_activity_valid_brier": 0.24628546706086646,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 0.0,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "selected_390": {
+          "solo_bins": 1945,
+          "class_counts": [
+            764,
+            208,
+            403,
+            570
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              631,
+              133,
+              0,
+              0
+            ],
+            [
+              158,
+              50,
+              0,
+              0
+            ],
+            [
+              356,
+              47,
+              0,
+              0
+            ],
+            [
+              236,
+              334,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.8259162303664922,
+            0.2403846153846154,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            764,
+            208,
+            403,
+            570
+          ],
+          "balanced_accuracy": 0.2665752114377769,
+          "ordinary_conditional_log_loss": 1.3577737992065113,
+          "class_balanced_conditional_log_loss": 1.422371959523651,
+          "ovr_auc": [
+            0.6891488710871522,
+            0.5787083167264514,
+            0.35219318148902684,
+            0.7977161084529506
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 764,
+              "negative": 1181
+            },
+            {
+              "positive": 208,
+              "negative": 1737
+            },
+            {
+              "positive": 403,
+              "negative": 1542
+            },
+            {
+              "positive": 570,
+              "negative": 1375
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 764,
+            "n_rest": 1181,
+            "auc": 0.6891488710871522,
+            "ordinary_binary_log_loss": 0.6262254793726332,
+            "class_balanced_binary_log_loss": 0.6504914778689326
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              2,
+              3,
+              0,
+              1
+            ],
+            "balanced_accuracy": 0.3673349005267511,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2005a",
+          "role": "FIT",
+          "weight_id": "checkpoint_390",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1945,
+            "excluded_from_solo_diagnostic": 1662,
+            "all_zero": 1193,
+            "two_or_more_full_ones": 178,
+            "any_fractional_occupancy": 295,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.4273822789294548,
+          "independent_activity_valid_brier": 0.13244512240856027,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.5339240968260934,
+              "range": 2.2085102032870054
+            },
+            {
+              "slot": 1,
+              "std": 0.14478303676085652,
+              "range": 0.7909865081310272
+            },
+            {
+              "slot": 2,
+              "std": 0.11162643450936514,
+              "range": 0.6344212144613266
+            },
+            {
+              "slot": 3,
+              "std": 0.4782948533687872,
+              "range": 2.050246985629201
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.5912070782314318,
+              0.23620794869235673,
+              0.022310054541912587,
+              -0.8497250814657011
+            ],
+            "independent_activity_valid_bce": 0.45479209875352594,
+            "independent_activity_valid_brier": 0.14338751903938926,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 1.1526482522225852e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 2,
+                "std": 1.1076368037613708e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 3,
+                "std": 1.1102230246251565e-16,
+                "range": 0.0
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ami_ES2006a": {
+      "role": "FIT",
+      "slots": [
+        "FEE021",
+        "FEO023",
+        "MEO022",
+        "FEE024"
+      ],
+      "bin_counts": {
+        "activity_valid": 3987,
+        "solo_known_complete": 2251,
+        "excluded_from_solo_diagnostic": 1736,
+        "all_zero": 1443,
+        "two_or_more_full_ones": 44,
+        "any_fractional_occupancy": 249,
+        "other_nonzero_incomplete": 0
+      },
+      "scores": {
+        "untrained": {
+          "solo_bins": 2251,
+          "class_counts": [
+            1909,
+            15,
+            270,
+            57
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              0,
+              0,
+              0,
+              1909
+            ],
+            [
+              0,
+              0,
+              0,
+              15
+            ],
+            [
+              0,
+              0,
+              0,
+              270
+            ],
+            [
+              0,
+              0,
+              0,
+              57
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "recall_denominators": [
+            1909,
+            15,
+            270,
+            57
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.3824379433710094,
+          "class_balanced_conditional_log_loss": 1.387160292227908,
+          "ovr_auc": [
+            0.42134977744693497,
+            0.7181872391174716,
+            0.34905304092583245,
+            0.30631387036415103
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 1909,
+              "negative": 342
+            },
+            {
+              "positive": 15,
+              "negative": 2236
+            },
+            {
+              "positive": 270,
+              "negative": 1981
+            },
+            {
+              "positive": 57,
+              "negative": 2194
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 1909,
+            "n_rest": 342,
+            "auc": 0.42134977744693497,
+            "ordinary_binary_log_loss": 1.210672963329418,
+            "class_balanced_binary_log_loss": 0.833399702443742
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2006a",
+          "role": "FIT",
+          "weight_id": "untrained_seed20260915",
+          "bin_counts": {
+            "activity_valid": 3987,
+            "solo_known_complete": 2251,
+            "excluded_from_solo_diagnostic": 1736,
+            "all_zero": 1443,
+            "two_or_more_full_ones": 44,
+            "any_fractional_occupancy": 249,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6901193426562799,
+          "independent_activity_valid_brier": 0.24589812476459733,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0008836539333299926,
+              "range": 0.006734160706400871
+            },
+            {
+              "slot": 1,
+              "std": 0.002885496570580717,
+              "range": 0.01504065701738
+            },
+            {
+              "slot": 2,
+              "std": 0.001061549150135938,
+              "range": 0.00962923327460885
+            },
+            {
+              "slot": 3,
+              "std": 0.0024519428305676202,
+              "range": 0.014241363620385528
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.011910639090363771,
+              -0.012049074129150277,
+              -0.05494938573000592,
+              0.05508782076879243
+            ],
+            "independent_activity_valid_bce": 0.690092722069274,
+            "independent_activity_valid_brier": 0.24588487755938465,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 1.734723475976807e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 1.734723475976807e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 2,
+                "std": 1.3877787807814457e-17,
+                "range": 0.0
+              },
+              {
+                "slot": 3,
+                "std": 6.938893903907228e-18,
+                "range": 0.0
+              }
+            ]
+          }
+        },
+        "constant_fit_prior": {
+          "solo_bins": 2251,
+          "class_counts": [
+            1909,
+            15,
+            270,
+            57
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              1909,
+              0,
+              0,
+              0
+            ],
+            [
+              15,
+              0,
+              0,
+              0
+            ],
+            [
+              270,
+              0,
+              0,
+              0
+            ],
+            [
+              57,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            1909,
+            15,
+            270,
+            57
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 0.811307712905451,
+          "class_balanced_conditional_log_loss": 1.571442958488925,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 1909,
+              "negative": 342
+            },
+            {
+              "positive": 15,
+              "negative": 2236
+            },
+            {
+              "positive": 270,
+              "negative": 1981
+            },
+            {
+              "positive": 57,
+              "negative": 2194
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 1909,
+            "n_rest": 342,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 0.6586375637582287,
+            "class_balanced_binary_log_loss": 0.694471459104675
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2006a",
+          "role": "FIT",
+          "weight_id": "constant_fit_prior",
+          "bin_counts": {
+            "activity_valid": 3987,
+            "solo_known_complete": 2251,
+            "excluded_from_solo_diagnostic": 1736,
+            "all_zero": 1443,
+            "two_or_more_full_ones": 44,
+            "any_fractional_occupancy": 249,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.3414117212072457,
+          "independent_activity_valid_brier": 0.1037977576239343,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 2.220446049250313e-16,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 2.7755575615628914e-17,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 3.3306690738754696e-16,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "uniform": {
+          "solo_bins": 2251,
+          "class_counts": [
+            1909,
+            15,
+            270,
+            57
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              1909,
+              0,
+              0,
+              0
+            ],
+            [
+              15,
+              0,
+              0,
+              0
+            ],
+            [
+              270,
+              0,
+              0,
+              0
+            ],
+            [
+              57,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            1909,
+            15,
+            270,
+            57
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.3862943611198908,
+          "class_balanced_conditional_log_loss": 1.3862943611198906,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 1909,
+              "negative": 342
+            },
+            {
+              "positive": 15,
+              "negative": 2236
+            },
+            {
+              "positive": 270,
+              "negative": 1981
+            },
+            {
+              "positive": 57,
+              "negative": 2194
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 1909,
+            "n_rest": 342,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 1.2193794776349978,
+            "class_balanced_binary_log_loss": 0.8369882167858357
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2006a",
+          "role": "FIT",
+          "weight_id": "uniform",
+          "bin_counts": {
+            "activity_valid": 3987,
+            "solo_known_complete": 2251,
+            "excluded_from_solo_diagnostic": 1736,
+            "all_zero": 1443,
+            "two_or_more_full_ones": 44,
+            "any_fractional_occupancy": 249,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6931471805599454,
+          "independent_activity_valid_brier": 0.2474115778696026,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 0.0,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "selected_390": {
+          "solo_bins": 2251,
+          "class_counts": [
+            1909,
+            15,
+            270,
+            57
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              1870,
+              39,
+              0,
+              0
+            ],
+            [
+              15,
+              0,
+              0,
+              0
+            ],
+            [
+              236,
+              34,
+              0,
+              0
+            ],
+            [
+              57,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.9795704557359874,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            1909,
+            15,
+            270,
+            57
+          ],
+          "balanced_accuracy": 0.24489261393399686,
+          "ordinary_conditional_log_loss": 0.8313766636924876,
+          "class_balanced_conditional_log_loss": 1.7538459850166976,
+          "ovr_auc": [
+            0.5815879842788393,
+            0.295855694692904,
+            0.5228821956737151,
+            0.4765628748260807
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 1909,
+              "negative": 342
+            },
+            {
+              "positive": 15,
+              "negative": 2236
+            },
+            {
+              "positive": 270,
+              "negative": 1981
+            },
+            {
+              "positive": 57,
+              "negative": 2194
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 1909,
+            "n_rest": 342,
+            "auc": 0.5815879842788393,
+            "ordinary_binary_log_loss": 0.6578658148773053,
+            "class_balanced_binary_log_loss": 0.6830776975875994
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              2,
+              0,
+              1,
+              3
+            ],
+            "balanced_accuracy": 0.2814814814814815,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2006a",
+          "role": "FIT",
+          "weight_id": "checkpoint_390",
+          "bin_counts": {
+            "activity_valid": 3987,
+            "solo_known_complete": 2251,
+            "excluded_from_solo_diagnostic": 1736,
+            "all_zero": 1443,
+            "two_or_more_full_ones": 44,
+            "any_fractional_occupancy": 249,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.36026547389782726,
+          "independent_activity_valid_brier": 0.10937742463904042,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.4209991097846948,
+              "range": 2.2637942507863045
+            },
+            {
+              "slot": 1,
+              "std": 0.1267067357144105,
+              "range": 0.7957364842295647
+            },
+            {
+              "slot": 2,
+              "std": 0.10588522580792503,
+              "range": 0.6067701876163483
+            },
+            {
+              "slot": 3,
+              "std": 0.3614985048811684,
+              "range": 1.94219172000885
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.5912070782314318,
+              0.23620794869235673,
+              0.022310054541912587,
+              -0.8497250814657011
+            ],
+            "independent_activity_valid_bce": 0.4036885020751008,
+            "independent_activity_valid_brier": 0.12209777349630437,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 1.0036334988223413e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 2,
+                "std": 8.797332348225924e-17,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 3,
+                "std": 1.1102230246251565e-16,
+                "range": 0.0
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ami_ES2007a": {
+      "role": "FIT",
+      "slots": [
+        "MEE025",
+        "FEO026",
+        "FEE028",
+        "MEE027"
+      ],
+      "bin_counts": {
+        "activity_valid": 3607,
+        "solo_known_complete": 1052,
+        "excluded_from_solo_diagnostic": 2555,
+        "all_zero": 2381,
+        "two_or_more_full_ones": 7,
+        "any_fractional_occupancy": 167,
+        "other_nonzero_incomplete": 0
+      },
+      "scores": {
+        "untrained": {
+          "solo_bins": 1052,
+          "class_counts": [
+            740,
+            176,
+            122,
+            14
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              0,
+              0,
+              0,
+              740
+            ],
+            [
+              0,
+              0,
+              0,
+              176
+            ],
+            [
+              0,
+              0,
+              0,
+              122
+            ],
+            [
+              0,
+              0,
+              0,
+              14
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "recall_denominators": [
+            740,
+            176,
+            122,
+            14
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.3861704657559946,
+          "class_balanced_conditional_log_loss": 1.3874905516869203,
+          "ovr_auc": [
+            0.43256670131670133,
+            0.28416225612287255,
+            0.6146042658205535,
+            0.43283787503440685
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 740,
+              "negative": 312
+            },
+            {
+              "positive": 176,
+              "negative": 876
+            },
+            {
+              "positive": 122,
+              "negative": 930
+            },
+            {
+              "positive": 14,
+              "negative": 1038
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 740,
+            "n_rest": 312,
+            "auc": 0.43256670131670133,
+            "ordinary_binary_log_loss": 1.0536265512675007,
+            "class_balanced_binary_log_loss": 0.8332541285202412
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2007a",
+          "role": "FIT",
+          "weight_id": "untrained_seed20260915",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1052,
+            "excluded_from_solo_diagnostic": 2555,
+            "all_zero": 2381,
+            "two_or_more_full_ones": 7,
+            "any_fractional_occupancy": 167,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6903360834767701,
+          "independent_activity_valid_brier": 0.246557842512372,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0009685034798787536,
+              "range": 0.009041761979460716
+            },
+            {
+              "slot": 1,
+              "std": 0.0035665430809104434,
+              "range": 0.016629881924018264
+            },
+            {
+              "slot": 2,
+              "std": 0.0015170218887265296,
+              "range": 0.010606864001601934
+            },
+            {
+              "slot": 3,
+              "std": 0.002715951594766643,
+              "range": 0.013075413182377815
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.011910639090363771,
+              -0.012049074129150277,
+              -0.05494938573000592,
+              0.05508782076879243
+            ],
+            "independent_activity_valid_bce": 0.6903445836162284,
+            "independent_activity_valid_brier": 0.24656212492245333,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 1.734723475976807e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 2,
+                "std": 6.938893903907228e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 3,
+                "std": 6.938893903907228e-18,
+                "range": 0.0
+              }
+            ]
+          }
+        },
+        "constant_fit_prior": {
+          "solo_bins": 1052,
+          "class_counts": [
+            740,
+            176,
+            122,
+            14
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              740,
+              0,
+              0,
+              0
+            ],
+            [
+              176,
+              0,
+              0,
+              0
+            ],
+            [
+              122,
+              0,
+              0,
+              0
+            ],
+            [
+              14,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            740,
+            176,
+            122,
+            14
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 0.9620199920737372,
+          "class_balanced_conditional_log_loss": 1.571442958488925,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 740,
+              "negative": 312
+            },
+            {
+              "positive": 176,
+              "negative": 876
+            },
+            {
+              "positive": 122,
+              "negative": 930
+            },
+            {
+              "positive": 14,
+              "negative": 1038
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 740,
+            "n_rest": 312,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 0.6735289579182298,
+            "class_balanced_binary_log_loss": 0.6944714591046748
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2007a",
+          "role": "FIT",
+          "weight_id": "constant_fit_prior",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1052,
+            "excluded_from_solo_diagnostic": 2555,
+            "all_zero": 2381,
+            "two_or_more_full_ones": 7,
+            "any_fractional_occupancy": 167,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.26291036607306584,
+          "independent_activity_valid_brier": 0.06860716699180358,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 1.1102230246251565e-16,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 1.1102230246251565e-16,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "uniform": {
+          "solo_bins": 1052,
+          "class_counts": [
+            740,
+            176,
+            122,
+            14
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              740,
+              0,
+              0,
+              0
+            ],
+            [
+              176,
+              0,
+              0,
+              0
+            ],
+            [
+              122,
+              0,
+              0,
+              0
+            ],
+            [
+              14,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            740,
+            176,
+            122,
+            14
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.3862943611198904,
+          "class_balanced_conditional_log_loss": 1.3862943611198906,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 740,
+              "negative": 312
+            },
+            {
+              "positive": 176,
+              "negative": 876
+            },
+            {
+              "positive": 122,
+              "negative": 930
+            },
+            {
+              "positive": 14,
+              "negative": 1038
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 740,
+            "n_rest": 312,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 1.0604701842525424,
+            "class_balanced_binary_log_loss": 0.8369882167858357
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2007a",
+          "role": "FIT",
+          "weight_id": "uniform",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1052,
+            "excluded_from_solo_diagnostic": 2555,
+            "all_zero": 2381,
+            "two_or_more_full_ones": 7,
+            "any_fractional_occupancy": 167,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6931471805599451,
+          "independent_activity_valid_brier": 0.247962847852058,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 0.0,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "selected_390": {
+          "solo_bins": 1052,
+          "class_counts": [
+            740,
+            176,
+            122,
+            14
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              560,
+              180,
+              0,
+              0
+            ],
+            [
+              152,
+              24,
+              0,
+              0
+            ],
+            [
+              102,
+              20,
+              0,
+              0
+            ],
+            [
+              6,
+              8,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.7567567567567568,
+            0.13636363636363635,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            740,
+            176,
+            122,
+            14
+          ],
+          "balanced_accuracy": 0.2232800982800983,
+          "ordinary_conditional_log_loss": 1.0993616516219675,
+          "class_balanced_conditional_log_loss": 1.5090163160356411,
+          "ovr_auc": [
+            0.4375649688149688,
+            0.4365400581154006,
+            0.5502203419707385,
+            0.7804156344618772
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 740,
+              "negative": 312
+            },
+            {
+              "positive": 176,
+              "negative": 876
+            },
+            {
+              "positive": 122,
+              "negative": 930
+            },
+            {
+              "positive": 14,
+              "negative": 1038
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 740,
+            "n_rest": 312,
+            "auc": 0.4375649688149688,
+            "ordinary_binary_log_loss": 0.842277861227713,
+            "class_balanced_binary_log_loss": 0.798883849460248
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              2,
+              0,
+              3,
+              1
+            ],
+            "balanced_accuracy": 0.35876623376623373,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2007a",
+          "role": "FIT",
+          "weight_id": "checkpoint_390",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1052,
+            "excluded_from_solo_diagnostic": 2555,
+            "all_zero": 2381,
+            "two_or_more_full_ones": 7,
+            "any_fractional_occupancy": 167,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.20566121936264284,
+          "independent_activity_valid_brier": 0.05863594429491204,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.4288467191142843,
+              "range": 2.378319278359413
+            },
+            {
+              "slot": 1,
+              "std": 0.13224200554127036,
+              "range": 0.7712119519710541
+            },
+            {
+              "slot": 2,
+              "std": 0.11144534200991149,
+              "range": 0.6028963774442673
+            },
+            {
+              "slot": 3,
+              "std": 0.37426836558132526,
+              "range": 2.105453198775649
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.5912070782314318,
+              0.23620794869235673,
+              0.022310054541912587,
+              -0.8497250814657011
+            ],
+            "independent_activity_valid_bce": 0.20588165961368501,
+            "independent_activity_valid_brier": 0.05770950389769252,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 1.0610303213992995e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 2,
+                "std": 9.661790905597976e-17,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 3,
+                "std": 1.1102230246251565e-16,
+                "range": 0.0
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ami_ES2008a": {
+      "role": "FIT",
+      "slots": [
+        "FEE032",
+        "FEE029",
+        "FEE030",
+        "MEE031"
+      ],
+      "bin_counts": {
+        "activity_valid": 3607,
+        "solo_known_complete": 1831,
+        "excluded_from_solo_diagnostic": 1776,
+        "all_zero": 1551,
+        "two_or_more_full_ones": 36,
+        "any_fractional_occupancy": 191,
+        "other_nonzero_incomplete": 0
+      },
+      "scores": {
+        "untrained": {
+          "solo_bins": 1831,
+          "class_counts": [
+            33,
+            952,
+            622,
+            224
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              0,
+              0,
+              0,
+              33
+            ],
+            [
+              0,
+              0,
+              0,
+              952
+            ],
+            [
+              0,
+              0,
+              0,
+              622
+            ],
+            [
+              0,
+              0,
+              0,
+              224
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "recall_denominators": [
+            33,
+            952,
+            622,
+            224
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.4024193906874551,
+          "class_balanced_conditional_log_loss": 1.3856085694999605,
+          "ovr_auc": [
+            0.6402568510466174,
+            0.8392642039751054,
+            0.6820058032069234,
+            0.8633461863276736
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 33,
+              "negative": 1798
+            },
+            {
+              "positive": 952,
+              "negative": 879
+            },
+            {
+              "positive": 622,
+              "negative": 1209
+            },
+            {
+              "positive": 224,
+              "negative": 1607
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 33,
+            "n_rest": 1798,
+            "auc": 0.6402568510466174,
+            "ordinary_binary_log_loss": 0.3110401956921917,
+            "class_balanced_binary_log_loss": 0.8327017002161963
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2008a",
+          "role": "FIT",
+          "weight_id": "untrained_seed20260915",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1831,
+            "excluded_from_solo_diagnostic": 1776,
+            "all_zero": 1551,
+            "two_or_more_full_ones": 36,
+            "any_fractional_occupancy": 191,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.692684333345272,
+          "independent_activity_valid_brier": 0.24744979138528014,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0012296449493100577,
+              "range": 0.007469220785424113
+            },
+            {
+              "slot": 1,
+              "std": 0.003900291866566344,
+              "range": 0.016759969294071198
+            },
+            {
+              "slot": 2,
+              "std": 0.002038604266265036,
+              "range": 0.01292829541489482
+            },
+            {
+              "slot": 3,
+              "std": 0.003003370132458697,
+              "range": 0.014516819035634398
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.011910639090363771,
+              -0.012049074129150277,
+              -0.05494938573000592,
+              0.05508782076879243
+            ],
+            "independent_activity_valid_bce": 0.6930217466779718,
+            "independent_activity_valid_brier": 0.24761845358428078,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 1.734723475976807e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 2,
+                "std": 6.938893903907228e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 3,
+                "std": 6.938893903907228e-18,
+                "range": 0.0
+              }
+            ]
+          }
+        },
+        "constant_fit_prior": {
+          "solo_bins": 1831,
+          "class_counts": [
+            33,
+            952,
+            622,
+            224
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              33,
+              0,
+              0,
+              0
+            ],
+            [
+              952,
+              0,
+              0,
+              0
+            ],
+            [
+              622,
+              0,
+              0,
+              0
+            ],
+            [
+              224,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            33,
+            952,
+            622,
+            224
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.7457806767839088,
+          "class_balanced_conditional_log_loss": 1.571442958488925,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 33,
+              "negative": 1798
+            },
+            {
+              "positive": 952,
+              "negative": 879
+            },
+            {
+              "positive": 622,
+              "negative": 1209
+            },
+            {
+              "positive": 224,
+              "negative": 1607
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 33,
+            "n_rest": 1798,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 0.7440914733874676,
+            "class_balanced_binary_log_loss": 0.6944714591046749
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2008a",
+          "role": "FIT",
+          "weight_id": "constant_fit_prior",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1831,
+            "excluded_from_solo_diagnostic": 1776,
+            "all_zero": 1551,
+            "two_or_more_full_ones": 36,
+            "any_fractional_occupancy": 191,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.4515028421060798,
+          "independent_activity_valid_brier": 0.13202007150844425,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 1.1102230246251565e-16,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 1.1102230246251565e-16,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "uniform": {
+          "solo_bins": 1831,
+          "class_counts": [
+            33,
+            952,
+            622,
+            224
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              33,
+              0,
+              0,
+              0
+            ],
+            [
+              952,
+              0,
+              0,
+              0
+            ],
+            [
+              622,
+              0,
+              0,
+              0
+            ],
+            [
+              224,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            33,
+            952,
+            622,
+            224
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.3862943611198904,
+          "class_balanced_conditional_log_loss": 1.3862943611198906,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 33,
+              "negative": 1798
+            },
+            {
+              "positive": 952,
+              "negative": 879
+            },
+            {
+              "positive": 622,
+              "negative": 1209
+            },
+            {
+              "positive": 224,
+              "negative": 1607
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 33,
+            "n_rest": 1798,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 0.3074822939296877,
+            "class_balanced_binary_log_loss": 0.8369882167858357
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2008a",
+          "role": "FIT",
+          "weight_id": "uniform",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1831,
+            "excluded_from_solo_diagnostic": 1776,
+            "all_zero": 1551,
+            "two_or_more_full_ones": 36,
+            "any_fractional_occupancy": 191,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6931471805599451,
+          "independent_activity_valid_brier": 0.24768088743443104,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 0.0,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "selected_390": {
+          "solo_bins": 1831,
+          "class_counts": [
+            33,
+            952,
+            622,
+            224
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              20,
+              13,
+              0,
+              0
+            ],
+            [
+              290,
+              662,
+              0,
+              0
+            ],
+            [
+              379,
+              243,
+              0,
+              0
+            ],
+            [
+              220,
+              4,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.6060606060606061,
+            0.6953781512605042,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            33,
+            952,
+            622,
+            224
+          ],
+          "balanced_accuracy": 0.3253596893302776,
+          "ordinary_conditional_log_loss": 1.474137462035712,
+          "class_balanced_conditional_log_loss": 1.663165381504391,
+          "ovr_auc": [
+            0.49880338423163784,
+            0.7331084310857449,
+            0.5377567493530568,
+            0.20025113343408302
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 33,
+              "negative": 1798
+            },
+            {
+              "positive": 952,
+              "negative": 879
+            },
+            {
+              "positive": 622,
+              "negative": 1209
+            },
+            {
+              "positive": 224,
+              "negative": 1607
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 33,
+            "n_rest": 1798,
+            "auc": 0.49880338423163784,
+            "ordinary_binary_log_loss": 0.4523298456393309,
+            "class_balanced_binary_log_loss": 0.8227057991629129
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              2,
+              1,
+              3,
+              0
+            ],
+            "balanced_accuracy": 0.4193802521008403,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2008a",
+          "role": "FIT",
+          "weight_id": "checkpoint_390",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1831,
+            "excluded_from_solo_diagnostic": 1776,
+            "all_zero": 1551,
+            "two_or_more_full_ones": 36,
+            "any_fractional_occupancy": 191,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.38352453832142014,
+          "independent_activity_valid_brier": 0.11262198403310199,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.5267229140676173,
+              "range": 2.0880134887993336
+            },
+            {
+              "slot": 1,
+              "std": 0.1434790230187969,
+              "range": 0.7644975036382675
+            },
+            {
+              "slot": 2,
+              "std": 0.12078828774552357,
+              "range": 0.6307239793241024
+            },
+            {
+              "slot": 3,
+              "std": 0.48234517902483914,
+              "range": 1.9937862269580364
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.5912070782314318,
+              0.23620794869235673,
+              0.022310054541912587,
+              -0.8497250814657011
+            ],
+            "independent_activity_valid_bce": 0.3858952024345971,
+            "independent_activity_valid_brier": 0.11627291539370707,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 1.1632721329973313e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 2,
+                "std": 1.110043712502475e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 3,
+                "std": 1.1102230246251565e-16,
+                "range": 0.0
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ami_ES2010a": {
+      "role": "CAL",
+      "slots": [
+        "FEE037",
+        "FEE040",
+        "FEE038",
+        "FEE039"
+      ],
+      "bin_counts": {
+        "activity_valid": 3607,
+        "solo_known_complete": 1483,
+        "excluded_from_solo_diagnostic": 2124,
+        "all_zero": 1917,
+        "two_or_more_full_ones": 40,
+        "any_fractional_occupancy": 174,
+        "other_nonzero_incomplete": 0
+      },
+      "scores": {
+        "untrained": {
+          "solo_bins": 1483,
+          "class_counts": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              0,
+              0,
+              0,
+              1129
+            ],
+            [
+              0,
+              0,
+              0,
+              202
+            ],
+            [
+              0,
+              0,
+              0,
+              139
+            ],
+            [
+              0,
+              0,
+              0,
+              13
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "recall_denominators": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.3836177392412392,
+          "class_balanced_conditional_log_loss": 1.3856398367211726,
+          "ovr_auc": [
+            0.49710758483333584,
+            0.6486501109127306,
+            0.584591255566975,
+            0.9640502354788069
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 1129,
+              "negative": 354
+            },
+            {
+              "positive": 202,
+              "negative": 1281
+            },
+            {
+              "positive": 139,
+              "negative": 1344
+            },
+            {
+              "positive": 13,
+              "negative": 1470
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 1129,
+            "n_rest": 354,
+            "auc": 0.49710758483333584,
+            "ordinary_binary_log_loss": 1.1162113341929791,
+            "class_balanced_binary_log_loss": 0.8331666622131765
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2010a",
+          "role": "CAL",
+          "weight_id": "untrained_seed20260915",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1483,
+            "excluded_from_solo_diagnostic": 2124,
+            "all_zero": 1917,
+            "two_or_more_full_ones": 40,
+            "any_fractional_occupancy": 174,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6901904484280567,
+          "independent_activity_valid_brier": 0.24649174429445295,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.00104918015044285,
+              "range": 0.007082347525283694
+            },
+            {
+              "slot": 1,
+              "std": 0.003948406204681683,
+              "range": 0.016146164620295167
+            },
+            {
+              "slot": 2,
+              "std": 0.0016137612420646158,
+              "range": 0.011403587413951755
+            },
+            {
+              "slot": 3,
+              "std": 0.003085832771074412,
+              "range": 0.013924614526331425
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.011910639090363771,
+              -0.012049074129150277,
+              -0.05494938573000592,
+              0.05508782076879243
+            ],
+            "independent_activity_valid_bce": 0.6902607783335909,
+            "independent_activity_valid_brier": 0.24652692948941157,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 1.734723475976807e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 2,
+                "std": 6.938893903907228e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 3,
+                "std": 6.938893903907228e-18,
+                "range": 0.0
+              }
+            ]
+          }
+        },
+        "constant_fit_prior": {
+          "solo_bins": 1483,
+          "class_counts": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              1129,
+              0,
+              0,
+              0
+            ],
+            [
+              202,
+              0,
+              0,
+              0
+            ],
+            [
+              139,
+              0,
+              0,
+              0
+            ],
+            [
+              13,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 0.8986733280876794,
+          "class_balanced_conditional_log_loss": 1.571442958488925,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 1129,
+              "negative": 354
+            },
+            {
+              "positive": 202,
+              "negative": 1281
+            },
+            {
+              "positive": 139,
+              "negative": 1344
+            },
+            {
+              "positive": 13,
+              "negative": 1470
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 1129,
+            "n_rest": 354,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 0.667570914588777,
+            "class_balanced_binary_log_loss": 0.6944714591046748
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2010a",
+          "role": "CAL",
+          "weight_id": "constant_fit_prior",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1483,
+            "excluded_from_solo_diagnostic": 2124,
+            "all_zero": 1917,
+            "two_or_more_full_ones": 40,
+            "any_fractional_occupancy": 174,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.3069011692617191,
+          "independent_activity_valid_brier": 0.08758304180565195,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 1.1102230246251565e-16,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 1.1102230246251565e-16,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "uniform": {
+          "solo_bins": 1483,
+          "class_counts": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              1129,
+              0,
+              0,
+              0
+            ],
+            [
+              202,
+              0,
+              0,
+              0
+            ],
+            [
+              139,
+              0,
+              0,
+              0
+            ],
+            [
+              13,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.3862943611198908,
+          "class_balanced_conditional_log_loss": 1.3862943611198906,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 1129,
+              "negative": 354
+            },
+            {
+              "positive": 202,
+              "negative": 1281
+            },
+            {
+              "positive": 139,
+              "negative": 1344
+            },
+            {
+              "positive": 13,
+              "negative": 1470
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 1129,
+            "n_rest": 354,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 1.1240497554634437,
+            "class_balanced_binary_log_loss": 0.8369882167858357
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2010a",
+          "role": "CAL",
+          "weight_id": "uniform",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1483,
+            "excluded_from_solo_diagnostic": 2124,
+            "all_zero": 1917,
+            "two_or_more_full_ones": 40,
+            "any_fractional_occupancy": 174,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6931471805599451,
+          "independent_activity_valid_brier": 0.24796956222104946,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 0.0,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "selected_390": {
+          "solo_bins": 1483,
+          "class_counts": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              869,
+              260,
+              0,
+              0
+            ],
+            [
+              130,
+              72,
+              0,
+              0
+            ],
+            [
+              112,
+              27,
+              0,
+              0
+            ],
+            [
+              13,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.7697077059344553,
+            0.3564356435643564,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "balanced_accuracy": 0.2815358373747029,
+          "ordinary_conditional_log_loss": 1.0172355976920098,
+          "class_balanced_conditional_log_loss": 1.577642864526218,
+          "ovr_auc": [
+            0.5380642836768702,
+            0.5931164545025931,
+            0.5338675488180884,
+            0.5071690214547357
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 1129,
+              "negative": 354
+            },
+            {
+              "positive": 202,
+              "negative": 1281
+            },
+            {
+              "positive": 139,
+              "negative": 1344
+            },
+            {
+              "positive": 13,
+              "negative": 1470
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 1129,
+            "n_rest": 354,
+            "auc": 0.5380642836768702,
+            "ordinary_binary_log_loss": 0.8066183486515122,
+            "class_balanced_binary_log_loss": 0.7300451350060102
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              2,
+              1,
+              3,
+              0
+            ],
+            "balanced_accuracy": 0.3391089108910891,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2010a",
+          "role": "CAL",
+          "weight_id": "checkpoint_390",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1483,
+            "excluded_from_solo_diagnostic": 2124,
+            "all_zero": 1917,
+            "two_or_more_full_ones": 40,
+            "any_fractional_occupancy": 174,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.26681996209776937,
+          "independent_activity_valid_brier": 0.08003007348168467,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.4494314293510332,
+              "range": 2.288705814629793
+            },
+            {
+              "slot": 1,
+              "std": 0.1321362938931743,
+              "range": 0.8045274540781975
+            },
+            {
+              "slot": 2,
+              "std": 0.11271192574886564,
+              "range": 0.6101613789796829
+            },
+            {
+              "slot": 3,
+              "std": 0.38366583115988817,
+              "range": 1.9820771552622318
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.5912070782314318,
+              0.23620794869235673,
+              0.022310054541912587,
+              -0.8497250814657011
+            ],
+            "independent_activity_valid_bce": 0.2722988377305254,
+            "independent_activity_valid_brier": 0.08115072372214718,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 1.1664715556671107e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 2,
+                "std": 1.0833366198261104e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 3,
+                "std": 1.1102230246251565e-16,
+                "range": 0.0
+              }
+            ]
+          }
+        },
+        "cal_78": {
+          "solo_bins": 1483,
+          "class_counts": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              0,
+              1056,
+              73,
+              0
+            ],
+            [
+              0,
+              188,
+              11,
+              3
+            ],
+            [
+              0,
+              118,
+              21,
+              0
+            ],
+            [
+              0,
+              9,
+              4,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.0,
+            0.9306930693069307,
+            0.1510791366906475,
+            0.0
+          ],
+          "recall_denominators": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "balanced_accuracy": 0.27044305149939457,
+          "ordinary_conditional_log_loss": 1.9549449534272538,
+          "class_balanced_conditional_log_loss": 2.123052233514712,
+          "ovr_auc": [
+            0.4882576951754715,
+            0.4266700674751316,
+            0.602908744433025,
+            0.07362637362637363
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 1129,
+              "negative": 354
+            },
+            {
+              "positive": 202,
+              "negative": 1281
+            },
+            {
+              "positive": 139,
+              "negative": 1344
+            },
+            {
+              "positive": 13,
+              "negative": 1470
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 1129,
+            "n_rest": 354,
+            "auc": 0.4882576951754715,
+            "ordinary_binary_log_loss": 1.7524021590320484,
+            "class_balanced_binary_log_loss": 1.1929615784445533
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              1,
+              3,
+              0,
+              2
+            ],
+            "balanced_accuracy": 0.3144712006459895,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2010a",
+          "role": "CAL",
+          "weight_id": "checkpoint_78",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1483,
+            "excluded_from_solo_diagnostic": 2124,
+            "all_zero": 1917,
+            "two_or_more_full_ones": 40,
+            "any_fractional_occupancy": 174,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.4100472246761334,
+          "independent_activity_valid_brier": 0.12203377000014921,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.06606005619026098,
+              "range": 0.4413923779502511
+            },
+            {
+              "slot": 1,
+              "std": 0.21770605683060143,
+              "range": 1.5604822263121605
+            },
+            {
+              "slot": 2,
+              "std": 0.2761292767468271,
+              "range": 1.7504839524626732
+            },
+            {
+              "slot": 3,
+              "std": 0.42779794486459843,
+              "range": 2.9392965212464333
+            }
+          ],
+          "common_logit_control": null
+        },
+        "cal_780": {
+          "solo_bins": 1483,
+          "class_counts": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              562,
+              543,
+              9,
+              15
+            ],
+            [
+              72,
+              119,
+              0,
+              11
+            ],
+            [
+              64,
+              74,
+              1,
+              0
+            ],
+            [
+              4,
+              9,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.4977856510186005,
+            0.5891089108910891,
+            0.007194244604316547,
+            0.0
+          ],
+          "recall_denominators": [
+            1129,
+            202,
+            139,
+            13
+          ],
+          "balanced_accuracy": 0.27352220162850155,
+          "ordinary_conditional_log_loss": 1.2415387169408245,
+          "class_balanced_conditional_log_loss": 1.38781556552479,
+          "ovr_auc": [
+            0.5822061421286775,
+            0.6057419559286139,
+            0.6521978845495032,
+            0.6770277341705914
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 1129,
+              "negative": 354
+            },
+            {
+              "positive": 202,
+              "negative": 1281
+            },
+            {
+              "positive": 139,
+              "negative": 1344
+            },
+            {
+              "positive": 13,
+              "negative": 1470
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 1129,
+            "n_rest": 354,
+            "auc": 0.5822061421286775,
+            "ordinary_binary_log_loss": 1.0244562260710937,
+            "class_balanced_binary_log_loss": 0.7916342152547488
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              3,
+              2,
+              1
+            ],
+            "balanced_accuracy": 0.31293575836879095,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2010a",
+          "role": "CAL",
+          "weight_id": "checkpoint_780",
+          "bin_counts": {
+            "activity_valid": 3607,
+            "solo_known_complete": 1483,
+            "excluded_from_solo_diagnostic": 2124,
+            "all_zero": 1917,
+            "two_or_more_full_ones": 40,
+            "any_fractional_occupancy": 174,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.28602745059559515,
+          "independent_activity_valid_brier": 0.08632368722228381,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.574114551667791,
+              "range": 2.737317591905594
+            },
+            {
+              "slot": 1,
+              "std": 0.1860681464398777,
+              "range": 1.0254010260105133
+            },
+            {
+              "slot": 2,
+              "std": 0.10679521386946857,
+              "range": 0.768526017665863
+            },
+            {
+              "slot": 3,
+              "std": 0.5059616750761031,
+              "range": 2.345263324677944
+            }
+          ],
+          "common_logit_control": null
+        }
+      }
+    },
+    "ami_ES2009d": {
+      "role": "DEV",
+      "slots": [
+        "FEE036",
+        "MEE035",
+        "MEE033",
+        "MEE034"
+      ],
+      "bin_counts": {
+        "activity_valid": 2447,
+        "solo_known_complete": 1279,
+        "excluded_from_solo_diagnostic": 1168,
+        "all_zero": 1025,
+        "two_or_more_full_ones": 15,
+        "any_fractional_occupancy": 128,
+        "other_nonzero_incomplete": 0
+      },
+      "scores": {
+        "untrained": {
+          "solo_bins": 1279,
+          "class_counts": [
+            59,
+            11,
+            1178,
+            31
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              0,
+              0,
+              0,
+              59
+            ],
+            [
+              0,
+              0,
+              0,
+              11
+            ],
+            [
+              0,
+              0,
+              0,
+              1178
+            ],
+            [
+              0,
+              0,
+              0,
+              31
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "recall_denominators": [
+            59,
+            11,
+            1178,
+            31
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.4374091690536952,
+          "class_balanced_conditional_log_loss": 1.3873891883575444,
+          "ovr_auc": [
+            0.2874687413170325,
+            0.35739891023802695,
+            0.28835583048967034,
+            0.5373500827129859
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 59,
+              "negative": 1220
+            },
+            {
+              "positive": 11,
+              "negative": 1268
+            },
+            {
+              "positive": 1178,
+              "negative": 101
+            },
+            {
+              "positive": 31,
+              "negative": 1248
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 59,
+            "n_rest": 1220,
+            "auc": 0.2874687413170325,
+            "ordinary_binary_log_loss": 0.3415646329496269,
+            "class_balanced_binary_log_loss": 0.8335267065296458
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2009d",
+          "role": "DEV",
+          "weight_id": "untrained_seed20260915",
+          "bin_counts": {
+            "activity_valid": 2447,
+            "solo_known_complete": 1279,
+            "excluded_from_solo_diagnostic": 1168,
+            "all_zero": 1025,
+            "two_or_more_full_ones": 15,
+            "any_fractional_occupancy": 128,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6976109605216799,
+          "independent_activity_valid_brier": 0.2499753007461833,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.001093383120608977,
+              "range": 0.0064021325670182705
+            },
+            {
+              "slot": 1,
+              "std": 0.0032444422629974725,
+              "range": 0.01599769201129675
+            },
+            {
+              "slot": 2,
+              "std": 0.0015566424263685405,
+              "range": 0.011908549116924405
+            },
+            {
+              "slot": 3,
+              "std": 0.0026408688958605465,
+              "range": 0.013234813930466771
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.011910639090363771,
+              -0.012049074129150277,
+              -0.05494938573000592,
+              0.05508782076879243
+            ],
+            "independent_activity_valid_bce": 0.6973975842320016,
+            "independent_activity_valid_brier": 0.24986863188028915,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 1.734723475976807e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 2,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 3,
+                "std": 0.0,
+                "range": 0.0
+              }
+            ]
+          }
+        },
+        "constant_fit_prior": {
+          "solo_bins": 1279,
+          "class_counts": [
+            59,
+            11,
+            1178,
+            31
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              59,
+              0,
+              0,
+              0
+            ],
+            [
+              11,
+              0,
+              0,
+              0
+            ],
+            [
+              1178,
+              0,
+              0,
+              0
+            ],
+            [
+              31,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            59,
+            11,
+            1178,
+            31
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.6117791972656776,
+          "class_balanced_conditional_log_loss": 1.5714429584889247,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 59,
+              "negative": 1220
+            },
+            {
+              "positive": 11,
+              "negative": 1268
+            },
+            {
+              "positive": 1178,
+              "negative": 101
+            },
+            {
+              "positive": 31,
+              "negative": 1248
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 59,
+            "n_rest": 1220,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 0.7411978453714919,
+            "class_balanced_binary_log_loss": 0.6944714591046748
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2009d",
+          "role": "DEV",
+          "weight_id": "constant_fit_prior",
+          "bin_counts": {
+            "activity_valid": 2447,
+            "solo_known_complete": 1279,
+            "excluded_from_solo_diagnostic": 1168,
+            "all_zero": 1025,
+            "two_or_more_full_ones": 15,
+            "any_fractional_occupancy": 128,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.4360898005577056,
+          "independent_activity_valid_brier": 0.1295074603222454,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 2.220446049250313e-16,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 1.1102230246251565e-16,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "uniform": {
+          "solo_bins": 1279,
+          "class_counts": [
+            59,
+            11,
+            1178,
+            31
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              59,
+              0,
+              0,
+              0
+            ],
+            [
+              11,
+              0,
+              0,
+              0
+            ],
+            [
+              1178,
+              0,
+              0,
+              0
+            ],
+            [
+              31,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            59,
+            11,
+            1178,
+            31
+          ],
+          "balanced_accuracy": 0.25,
+          "ordinary_conditional_log_loss": 1.3862943611198908,
+          "class_balanced_conditional_log_loss": 1.3862943611198904,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 59,
+              "negative": 1220
+            },
+            {
+              "positive": 11,
+              "negative": 1268
+            },
+            {
+              "positive": 1178,
+              "negative": 101
+            },
+            {
+              "positive": 31,
+              "negative": 1248
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 59,
+            "n_rest": 1220,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 0.3383608254083238,
+            "class_balanced_binary_log_loss": 0.8369882167858358
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2009d",
+          "role": "DEV",
+          "weight_id": "uniform",
+          "bin_counts": {
+            "activity_valid": 2447,
+            "solo_known_complete": 1279,
+            "excluded_from_solo_diagnostic": 1168,
+            "all_zero": 1025,
+            "two_or_more_full_ones": 15,
+            "any_fractional_occupancy": 128,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6931471805599453,
+          "independent_activity_valid_brier": 0.247744000954622,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 0.0,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "selected_390": {
+          "solo_bins": 1279,
+          "class_counts": [
+            59,
+            11,
+            1178,
+            31
+          ],
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "absent_slots": [],
+          "confusion": [
+            [
+              54,
+              5,
+              0,
+              0
+            ],
+            [
+              6,
+              5,
+              0,
+              0
+            ],
+            [
+              637,
+              541,
+              0,
+              0
+            ],
+            [
+              11,
+              20,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.9152542372881356,
+            0.45454545454545453,
+            0.0,
+            0.0
+          ],
+          "recall_denominators": [
+            59,
+            11,
+            1178,
+            31
+          ],
+          "balanced_accuracy": 0.34244992295839755,
+          "ordinary_conditional_log_loss": 1.5571143636507325,
+          "class_balanced_conditional_log_loss": 1.4303385111102467,
+          "ovr_auc": [
+            0.7748402333981662,
+            0.4620734155434471,
+            0.4994704903427524,
+            0.5203422249793217
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 59,
+              "negative": 1220
+            },
+            {
+              "positive": 11,
+              "negative": 1268
+            },
+            {
+              "positive": 1178,
+              "negative": 101
+            },
+            {
+              "positive": 31,
+              "negative": 1248
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 59,
+            "n_rest": 1220,
+            "auc": 0.7748402333981662,
+            "ordinary_binary_log_loss": 0.49697431000027675,
+            "class_balanced_binary_log_loss": 0.5862190983439826
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              2,
+              3,
+              1
+            ],
+            "balanced_accuracy": 0.3901038819026791,
+            "permutation_count": 24
+          },
+          "source_id": "ami_ES2009d",
+          "role": "DEV",
+          "weight_id": "checkpoint_390",
+          "bin_counts": {
+            "activity_valid": 2447,
+            "solo_known_complete": 1279,
+            "excluded_from_solo_diagnostic": 1168,
+            "all_zero": 1025,
+            "two_or_more_full_ones": 15,
+            "any_fractional_occupancy": 128,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.39651624051359063,
+          "independent_activity_valid_brier": 0.1254972501612846,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.520130240938185,
+              "range": 2.0550699159502983
+            },
+            {
+              "slot": 1,
+              "std": 0.15241262094570074,
+              "range": 0.7644135728478432
+            },
+            {
+              "slot": 2,
+              "std": 0.11166575452450314,
+              "range": 0.5841961055994034
+            },
+            {
+              "slot": 3,
+              "std": 0.4652749447738422,
+              "range": 1.8946969509124756
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.5912070782314318,
+              0.23620794869235673,
+              0.022310054541912587,
+              -0.8497250814657011
+            ],
+            "independent_activity_valid_bce": 0.388841133937776,
+            "independent_activity_valid_brier": 0.12235077797655386,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 1.1102230246251565e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 2,
+                "std": 1.09328446683667e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 3,
+                "std": 2.220446049250313e-16,
+                "range": 0.0
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ami_EN2009d": {
+      "role": "DEV",
+      "slots": [
+        "FEE096",
+        "FEE083",
+        null,
+        null
+      ],
+      "bin_counts": {
+        "activity_valid": 602,
+        "solo_known_complete": 360,
+        "excluded_from_solo_diagnostic": 242,
+        "all_zero": 135,
+        "two_or_more_full_ones": 48,
+        "any_fractional_occupancy": 59,
+        "other_nonzero_incomplete": 0
+      },
+      "scores": {
+        "untrained": {
+          "solo_bins": 360,
+          "class_counts": [
+            72,
+            288,
+            0,
+            0
+          ],
+          "observed_slots": [
+            0,
+            1
+          ],
+          "absent_slots": [
+            2,
+            3
+          ],
+          "confusion": [
+            [
+              0,
+              0,
+              0,
+              72
+            ],
+            [
+              0,
+              0,
+              0,
+              288
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.0,
+            0.0,
+            null,
+            null
+          ],
+          "recall_denominators": [
+            72,
+            288,
+            0,
+            0
+          ],
+          "balanced_accuracy": 0.0,
+          "ordinary_conditional_log_loss": 1.3921255121994374,
+          "class_balanced_conditional_log_loss": 1.3849406680552865,
+          "ovr_auc": [
+            0.4714988425925926,
+            0.38671875,
+            null,
+            null
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 72,
+              "negative": 288
+            },
+            {
+              "positive": 288,
+              "negative": 72
+            },
+            {
+              "positive": 0,
+              "negative": 360
+            },
+            {
+              "positive": 0,
+              "negative": 360
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 72,
+            "n_rest": 288,
+            "auc": 0.4714988425925926,
+            "ordinary_binary_log_loss": 0.5083440948195982,
+            "class_balanced_binary_log_loss": 0.8325772821928872
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              3,
+              1,
+              2
+            ],
+            "balanced_accuracy": 0.5,
+            "permutation_count": 24
+          },
+          "source_id": "ami_EN2009d",
+          "role": "DEV",
+          "weight_id": "untrained_seed20260915",
+          "bin_counts": {
+            "activity_valid": 602,
+            "solo_known_complete": 360,
+            "excluded_from_solo_diagnostic": 242,
+            "all_zero": 135,
+            "two_or_more_full_ones": 48,
+            "any_fractional_occupancy": 59,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6921010879805757,
+          "independent_activity_valid_brier": 0.24526674586481867,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0018446642222737218,
+              "range": 0.009955991758033633
+            },
+            {
+              "slot": 1,
+              "std": 0.0027735379036144927,
+              "range": 0.013873377116397023
+            },
+            {
+              "slot": 2,
+              "std": 0.0017397115453975744,
+              "range": 0.01135326735675335
+            },
+            {
+              "slot": 3,
+              "std": 0.0029567294639201874,
+              "range": 0.012879301561042666
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.011910639090363771,
+              -0.012049074129150277,
+              -0.05494938573000592,
+              0.05508782076879243
+            ],
+            "independent_activity_valid_bce": 0.6926367792732697,
+            "independent_activity_valid_brier": 0.24553445225400825,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 1.734723475976807e-18,
+                "range": 0.0
+              },
+              {
+                "slot": 2,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 3,
+                "std": 0.0,
+                "range": 0.0
+              }
+            ]
+          }
+        },
+        "constant_fit_prior": {
+          "solo_bins": 360,
+          "class_counts": [
+            72,
+            288,
+            0,
+            0
+          ],
+          "observed_slots": [
+            0,
+            1
+          ],
+          "absent_slots": [
+            2,
+            3
+          ],
+          "confusion": [
+            [
+              72,
+              0,
+              0,
+              0
+            ],
+            [
+              288,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            null,
+            null
+          ],
+          "recall_denominators": [
+            72,
+            288,
+            0,
+            0
+          ],
+          "balanced_accuracy": 0.5,
+          "ordinary_conditional_log_loss": 1.5108871291733446,
+          "class_balanced_conditional_log_loss": 1.1854279428086856,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            null,
+            null
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 72,
+              "negative": 288
+            },
+            {
+              "positive": 288,
+              "negative": 72
+            },
+            {
+              "positive": 0,
+              "negative": 360
+            },
+            {
+              "positive": 0,
+              "negative": 360
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 72,
+            "n_rest": 288,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 0.7253567552469277,
+            "class_balanced_binary_log_loss": 0.6944714591046748
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.5,
+            "permutation_count": 24
+          },
+          "source_id": "ami_EN2009d",
+          "role": "DEV",
+          "weight_id": "constant_fit_prior",
+          "bin_counts": {
+            "activity_valid": 602,
+            "solo_known_complete": 360,
+            "excluded_from_solo_diagnostic": 242,
+            "all_zero": 135,
+            "two_or_more_full_ones": 48,
+            "any_fractional_occupancy": 59,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.5308176116613728,
+          "independent_activity_valid_brier": 0.16577697445699716,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 1.1102230246251565e-16,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 0.0,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "uniform": {
+          "solo_bins": 360,
+          "class_counts": [
+            72,
+            288,
+            0,
+            0
+          ],
+          "observed_slots": [
+            0,
+            1
+          ],
+          "absent_slots": [
+            2,
+            3
+          ],
+          "confusion": [
+            [
+              72,
+              0,
+              0,
+              0
+            ],
+            [
+              288,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            1.0,
+            0.0,
+            null,
+            null
+          ],
+          "recall_denominators": [
+            72,
+            288,
+            0,
+            0
+          ],
+          "balanced_accuracy": 0.5,
+          "ordinary_conditional_log_loss": 1.3862943611198906,
+          "class_balanced_conditional_log_loss": 1.3862943611198906,
+          "ovr_auc": [
+            0.5,
+            0.5,
+            null,
+            null
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 72,
+              "negative": 288
+            },
+            {
+              "positive": 288,
+              "negative": 72
+            },
+            {
+              "positive": 0,
+              "negative": 360
+            },
+            {
+              "positive": 0,
+              "negative": 360
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 72,
+            "n_rest": 288,
+            "auc": 0.5,
+            "ordinary_binary_log_loss": 0.5074045301854028,
+            "class_balanced_binary_log_loss": 0.8369882167858357
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.5,
+            "permutation_count": 24
+          },
+          "source_id": "ami_EN2009d",
+          "role": "DEV",
+          "weight_id": "uniform",
+          "bin_counts": {
+            "activity_valid": 602,
+            "solo_known_complete": 360,
+            "excluded_from_solo_diagnostic": 242,
+            "all_zero": 135,
+            "two_or_more_full_ones": 48,
+            "any_fractional_occupancy": 59,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.6931471805599453,
+          "independent_activity_valid_brier": 0.24578910142481497,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 1,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 2,
+              "std": 0.0,
+              "range": 0.0
+            },
+            {
+              "slot": 3,
+              "std": 0.0,
+              "range": 0.0
+            }
+          ],
+          "common_logit_control": null
+        },
+        "selected_390": {
+          "solo_bins": 360,
+          "class_counts": [
+            72,
+            288,
+            0,
+            0
+          ],
+          "observed_slots": [
+            0,
+            1
+          ],
+          "absent_slots": [
+            2,
+            3
+          ],
+          "confusion": [
+            [
+              26,
+              46,
+              0,
+              0
+            ],
+            [
+              156,
+              132,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "per_observed_slot_recall": [
+            0.3611111111111111,
+            0.4583333333333333,
+            null,
+            null
+          ],
+          "recall_denominators": [
+            72,
+            288,
+            0,
+            0
+          ],
+          "balanced_accuracy": 0.4097222222222222,
+          "ordinary_conditional_log_loss": 1.3662186754164922,
+          "class_balanced_conditional_log_loss": 1.3858361302662094,
+          "ovr_auc": [
+            0.3644868827160494,
+            0.3893229166666667,
+            null,
+            null
+          ],
+          "ovr_auc_denominators": [
+            {
+              "positive": 72,
+              "negative": 288
+            },
+            {
+              "positive": 288,
+              "negative": 72
+            },
+            {
+              "positive": 0,
+              "negative": 360
+            },
+            {
+              "positive": 0,
+              "negative": 360
+            }
+          ],
+          "first_slot0_vs_rest": {
+            "n_slot0": 72,
+            "n_rest": 288,
+            "auc": 0.3644868827160494,
+            "ordinary_binary_log_loss": 0.7067825963819276,
+            "class_balanced_binary_log_loss": 0.9736885808696065
+          },
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              1,
+              0,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.5902777777777777,
+            "permutation_count": 24
+          },
+          "source_id": "ami_EN2009d",
+          "role": "DEV",
+          "weight_id": "checkpoint_390",
+          "bin_counts": {
+            "activity_valid": 602,
+            "solo_known_complete": 360,
+            "excluded_from_solo_diagnostic": 242,
+            "all_zero": 135,
+            "two_or_more_full_ones": 48,
+            "any_fractional_occupancy": 59,
+            "other_nonzero_incomplete": 0
+          },
+          "independent_activity_valid_bce": 0.47653970433802245,
+          "independent_activity_valid_brier": 0.1523975627515223,
+          "centered_logit_temporal": [
+            {
+              "slot": 0,
+              "std": 0.6585962899105904,
+              "range": 2.1135116419754922
+            },
+            {
+              "slot": 1,
+              "std": 0.17424905221682982,
+              "range": 0.6838353946805
+            },
+            {
+              "slot": 2,
+              "std": 0.11079816841091167,
+              "range": 0.5309946089982986
+            },
+            {
+              "slot": 3,
+              "std": 0.6032288539105022,
+              "range": 1.967212522868067
+            }
+          ],
+          "common_logit_control": {
+            "b": [
+              0.5912070782314318,
+              0.23620794869235673,
+              0.022310054541912587,
+              -0.8497250814657011
+            ],
+            "independent_activity_valid_bce": 0.44230860511842246,
+            "independent_activity_valid_brier": 0.13950760351846064,
+            "softmax_constant_across_valid_frames": true,
+            "centered_logit_temporal": [
+              {
+                "slot": 0,
+                "std": 0.0,
+                "range": 0.0
+              },
+              {
+                "slot": 1,
+                "std": 1.0204948928862238e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 2,
+                "std": 1.0082201665013689e-16,
+                "range": 2.220446049250313e-16
+              },
+              {
+                "slot": 3,
+                "std": 0.0,
+                "range": 0.0
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "role_macro": {
+    "FIT": {
+      "untrained": {
+        "balanced_accuracy": {
+          "mean": 0.25,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.387805257149326,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.3870632624613521,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.6908686352587897,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.24619637440561354,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        }
+      },
+      "constant_fit_prior": {
+        "balanced_accuracy": {
+          "mean": 0.25,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.2406977937224029,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.571442958488925,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.3807592877183672,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.11099074998859042,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        }
+      },
+      "uniform": {
+        "balanced_accuracy": {
+          "mean": 0.25,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.3862943611198906,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.3862943611198906,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.6931471805599452,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.2473351950542395,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        }
+      },
+      "selected_390": {
+        "balanced_accuracy": {
+          "mean": 0.2650269032455374,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.1906623941391696,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.5870999105200951,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.34420837762783624,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.10327011884390368,
+          "n_sources_with_value": 4,
+          "sources": [
+            "ami_ES2005a",
+            "ami_ES2006a",
+            "ami_ES2007a",
+            "ami_ES2008a"
+          ],
+          "observed_class_count_sum": 16,
+          "solo_bins_sum": 7079
+        }
+      }
+    },
+    "CAL": {
+      "untrained": {
+        "balanced_accuracy": {
+          "mean": 0.25,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.3836177392412392,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.3856398367211726,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.6901904484280567,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.24649174429445295,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        }
+      },
+      "constant_fit_prior": {
+        "balanced_accuracy": {
+          "mean": 0.25,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 0.8986733280876794,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.571442958488925,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.3069011692617191,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.08758304180565195,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        }
+      },
+      "uniform": {
+        "balanced_accuracy": {
+          "mean": 0.25,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.3862943611198908,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.3862943611198906,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.6931471805599451,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.24796956222104946,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        }
+      },
+      "selected_390": {
+        "balanced_accuracy": {
+          "mean": 0.2815358373747029,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.0172355976920098,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.577642864526218,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.26681996209776937,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.08003007348168467,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        }
+      },
+      "cal_78": {
+        "balanced_accuracy": {
+          "mean": 0.27044305149939457,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.9549449534272538,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 2.123052233514712,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.4100472246761334,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.12203377000014921,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        }
+      },
+      "cal_780": {
+        "balanced_accuracy": {
+          "mean": 0.27352220162850155,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.2415387169408245,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.38781556552479,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.28602745059559515,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.08632368722228381,
+          "n_sources_with_value": 1,
+          "sources": [
+            "ami_ES2010a"
+          ],
+          "observed_class_count_sum": 4,
+          "solo_bins_sum": 1483
+        }
+      }
+    },
+    "DEV": {
+      "untrained": {
+        "balanced_accuracy": {
+          "mean": 0.125,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.4147673406265664,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.3861649282064155,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.6948560242511278,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.24762102330550098,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        }
+      },
+      "constant_fit_prior": {
+        "balanced_accuracy": {
+          "mean": 0.375,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.561333163219511,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.378435450648805,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.4834537061095392,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.14764221738962127,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        }
+      },
+      "uniform": {
+        "balanced_accuracy": {
+          "mean": 0.375,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.3862943611198908,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.3862943611198904,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.6931471805599453,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.2467665511897185,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        }
+      },
+      "selected_390": {
+        "balanced_accuracy": {
+          "mean": 0.3760860725903099,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "ordinary_conditional_log_loss": {
+          "mean": 1.4616665195336123,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "class_balanced_conditional_log_loss": {
+          "mean": 1.408087320688228,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "independent_activity_valid_bce": {
+          "mean": 0.43652797242580654,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        },
+        "independent_activity_valid_brier": {
+          "mean": 0.13894740645640347,
+          "n_sources_with_value": 2,
+          "sources": [
+            "ami_ES2009d",
+            "ami_EN2009d"
+          ],
+          "observed_class_count_sum": 6,
+          "solo_bins_sum": 1639
+        }
+      }
+    }
+  },
+  "cal_trajectory": {
+    "source_id": "ami_ES2010a",
+    "untrained": {
+      "solo_bins": 1483,
+      "class_counts": [
+        1129,
+        202,
+        139,
+        13
+      ],
+      "observed_slots": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "absent_slots": [],
+      "confusion": [
+        [
+          0,
+          0,
+          0,
+          1129
+        ],
+        [
+          0,
+          0,
+          0,
+          202
+        ],
+        [
+          0,
+          0,
+          0,
+          139
+        ],
+        [
+          0,
+          0,
+          0,
+          13
+        ]
+      ],
+      "per_observed_slot_recall": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "recall_denominators": [
+        1129,
+        202,
+        139,
+        13
+      ],
+      "balanced_accuracy": 0.25,
+      "ordinary_conditional_log_loss": 1.3836177392412392,
+      "class_balanced_conditional_log_loss": 1.3856398367211726,
+      "ovr_auc": [
+        0.49710758483333584,
+        0.6486501109127306,
+        0.584591255566975,
+        0.9640502354788069
+      ],
+      "ovr_auc_denominators": [
+        {
+          "positive": 1129,
+          "negative": 354
+        },
+        {
+          "positive": 202,
+          "negative": 1281
+        },
+        {
+          "positive": 139,
+          "negative": 1344
+        },
+        {
+          "positive": 13,
+          "negative": 1470
+        }
+      ],
+      "first_slot0_vs_rest": {
+        "n_slot0": 1129,
+        "n_rest": 354,
+        "auc": 0.49710758483333584,
+        "ordinary_binary_log_loss": 1.1162113341929791,
+        "class_balanced_binary_log_loss": 0.8331666622131765
+      },
+      "oracle_permutation": {
+        "role": "source_global_oracle_diagnostic_only",
+        "not_used_for_inference_or_selection": true,
+        "not_per_chunk_remapping": true,
+        "permutation": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "balanced_accuracy": 0.25,
+        "permutation_count": 24
+      },
+      "source_id": "ami_ES2010a",
+      "role": "CAL",
+      "weight_id": "untrained_seed20260915",
+      "bin_counts": {
+        "activity_valid": 3607,
+        "solo_known_complete": 1483,
+        "excluded_from_solo_diagnostic": 2124,
+        "all_zero": 1917,
+        "two_or_more_full_ones": 40,
+        "any_fractional_occupancy": 174,
+        "other_nonzero_incomplete": 0
+      },
+      "independent_activity_valid_bce": 0.6901904484280567,
+      "independent_activity_valid_brier": 0.24649174429445295,
+      "centered_logit_temporal": [
+        {
+          "slot": 0,
+          "std": 0.00104918015044285,
+          "range": 0.007082347525283694
+        },
+        {
+          "slot": 1,
+          "std": 0.003948406204681683,
+          "range": 0.016146164620295167
+        },
+        {
+          "slot": 2,
+          "std": 0.0016137612420646158,
+          "range": 0.011403587413951755
+        },
+        {
+          "slot": 3,
+          "std": 0.003085832771074412,
+          "range": 0.013924614526331425
+        }
+      ],
+      "common_logit_control": {
+        "b": [
+          0.011910639090363771,
+          -0.012049074129150277,
+          -0.05494938573000592,
+          0.05508782076879243
+        ],
+        "independent_activity_valid_bce": 0.6902607783335909,
+        "independent_activity_valid_brier": 0.24652692948941157,
+        "softmax_constant_across_valid_frames": true,
+        "centered_logit_temporal": [
+          {
+            "slot": 0,
+            "std": 1.734723475976807e-18,
+            "range": 0.0
+          },
+          {
+            "slot": 1,
+            "std": 0.0,
+            "range": 0.0
+          },
+          {
+            "slot": 2,
+            "std": 6.938893903907228e-18,
+            "range": 0.0
+          },
+          {
+            "slot": 3,
+            "std": 6.938893903907228e-18,
+            "range": 0.0
+          }
+        ]
+      }
+    },
+    "cal_78": {
+      "solo_bins": 1483,
+      "class_counts": [
+        1129,
+        202,
+        139,
+        13
+      ],
+      "observed_slots": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "absent_slots": [],
+      "confusion": [
+        [
+          0,
+          1056,
+          73,
+          0
+        ],
+        [
+          0,
+          188,
+          11,
+          3
+        ],
+        [
+          0,
+          118,
+          21,
+          0
+        ],
+        [
+          0,
+          9,
+          4,
+          0
+        ]
+      ],
+      "per_observed_slot_recall": [
+        0.0,
+        0.9306930693069307,
+        0.1510791366906475,
+        0.0
+      ],
+      "recall_denominators": [
+        1129,
+        202,
+        139,
+        13
+      ],
+      "balanced_accuracy": 0.27044305149939457,
+      "ordinary_conditional_log_loss": 1.9549449534272538,
+      "class_balanced_conditional_log_loss": 2.123052233514712,
+      "ovr_auc": [
+        0.4882576951754715,
+        0.4266700674751316,
+        0.602908744433025,
+        0.07362637362637363
+      ],
+      "ovr_auc_denominators": [
+        {
+          "positive": 1129,
+          "negative": 354
+        },
+        {
+          "positive": 202,
+          "negative": 1281
+        },
+        {
+          "positive": 139,
+          "negative": 1344
+        },
+        {
+          "positive": 13,
+          "negative": 1470
+        }
+      ],
+      "first_slot0_vs_rest": {
+        "n_slot0": 1129,
+        "n_rest": 354,
+        "auc": 0.4882576951754715,
+        "ordinary_binary_log_loss": 1.7524021590320484,
+        "class_balanced_binary_log_loss": 1.1929615784445533
+      },
+      "oracle_permutation": {
+        "role": "source_global_oracle_diagnostic_only",
+        "not_used_for_inference_or_selection": true,
+        "not_per_chunk_remapping": true,
+        "permutation": [
+          1,
+          3,
+          0,
+          2
+        ],
+        "balanced_accuracy": 0.3144712006459895,
+        "permutation_count": 24
+      },
+      "source_id": "ami_ES2010a",
+      "role": "CAL",
+      "weight_id": "checkpoint_78",
+      "bin_counts": {
+        "activity_valid": 3607,
+        "solo_known_complete": 1483,
+        "excluded_from_solo_diagnostic": 2124,
+        "all_zero": 1917,
+        "two_or_more_full_ones": 40,
+        "any_fractional_occupancy": 174,
+        "other_nonzero_incomplete": 0
+      },
+      "independent_activity_valid_bce": 0.4100472246761334,
+      "independent_activity_valid_brier": 0.12203377000014921,
+      "centered_logit_temporal": [
+        {
+          "slot": 0,
+          "std": 0.06606005619026098,
+          "range": 0.4413923779502511
+        },
+        {
+          "slot": 1,
+          "std": 0.21770605683060143,
+          "range": 1.5604822263121605
+        },
+        {
+          "slot": 2,
+          "std": 0.2761292767468271,
+          "range": 1.7504839524626732
+        },
+        {
+          "slot": 3,
+          "std": 0.42779794486459843,
+          "range": 2.9392965212464333
+        }
+      ],
+      "common_logit_control": null
+    },
+    "cal_390": {
+      "solo_bins": 1483,
+      "class_counts": [
+        1129,
+        202,
+        139,
+        13
+      ],
+      "observed_slots": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "absent_slots": [],
+      "confusion": [
+        [
+          869,
+          260,
+          0,
+          0
+        ],
+        [
+          130,
+          72,
+          0,
+          0
+        ],
+        [
+          112,
+          27,
+          0,
+          0
+        ],
+        [
+          13,
+          0,
+          0,
+          0
+        ]
+      ],
+      "per_observed_slot_recall": [
+        0.7697077059344553,
+        0.3564356435643564,
+        0.0,
+        0.0
+      ],
+      "recall_denominators": [
+        1129,
+        202,
+        139,
+        13
+      ],
+      "balanced_accuracy": 0.2815358373747029,
+      "ordinary_conditional_log_loss": 1.0172355976920098,
+      "class_balanced_conditional_log_loss": 1.577642864526218,
+      "ovr_auc": [
+        0.5380642836768702,
+        0.5931164545025931,
+        0.5338675488180884,
+        0.5071690214547357
+      ],
+      "ovr_auc_denominators": [
+        {
+          "positive": 1129,
+          "negative": 354
+        },
+        {
+          "positive": 202,
+          "negative": 1281
+        },
+        {
+          "positive": 139,
+          "negative": 1344
+        },
+        {
+          "positive": 13,
+          "negative": 1470
+        }
+      ],
+      "first_slot0_vs_rest": {
+        "n_slot0": 1129,
+        "n_rest": 354,
+        "auc": 0.5380642836768702,
+        "ordinary_binary_log_loss": 0.8066183486515122,
+        "class_balanced_binary_log_loss": 0.7300451350060102
+      },
+      "oracle_permutation": {
+        "role": "source_global_oracle_diagnostic_only",
+        "not_used_for_inference_or_selection": true,
+        "not_per_chunk_remapping": true,
+        "permutation": [
+          2,
+          1,
+          3,
+          0
+        ],
+        "balanced_accuracy": 0.3391089108910891,
+        "permutation_count": 24
+      },
+      "source_id": "ami_ES2010a",
+      "role": "CAL",
+      "weight_id": "checkpoint_390",
+      "bin_counts": {
+        "activity_valid": 3607,
+        "solo_known_complete": 1483,
+        "excluded_from_solo_diagnostic": 2124,
+        "all_zero": 1917,
+        "two_or_more_full_ones": 40,
+        "any_fractional_occupancy": 174,
+        "other_nonzero_incomplete": 0
+      },
+      "independent_activity_valid_bce": 0.26681996209776937,
+      "independent_activity_valid_brier": 0.08003007348168467,
+      "centered_logit_temporal": [
+        {
+          "slot": 0,
+          "std": 0.4494314293510332,
+          "range": 2.288705814629793
+        },
+        {
+          "slot": 1,
+          "std": 0.1321362938931743,
+          "range": 0.8045274540781975
+        },
+        {
+          "slot": 2,
+          "std": 0.11271192574886564,
+          "range": 0.6101613789796829
+        },
+        {
+          "slot": 3,
+          "std": 0.38366583115988817,
+          "range": 1.9820771552622318
+        }
+      ],
+      "common_logit_control": {
+        "b": [
+          0.5912070782314318,
+          0.23620794869235673,
+          0.022310054541912587,
+          -0.8497250814657011
+        ],
+        "independent_activity_valid_bce": 0.2722988377305254,
+        "independent_activity_valid_brier": 0.08115072372214718,
+        "softmax_constant_across_valid_frames": true,
+        "centered_logit_temporal": [
+          {
+            "slot": 0,
+            "std": 0.0,
+            "range": 0.0
+          },
+          {
+            "slot": 1,
+            "std": 1.1664715556671107e-16,
+            "range": 2.220446049250313e-16
+          },
+          {
+            "slot": 2,
+            "std": 1.0833366198261104e-16,
+            "range": 2.220446049250313e-16
+          },
+          {
+            "slot": 3,
+            "std": 1.1102230246251565e-16,
+            "range": 0.0
+          }
+        ]
+      }
+    },
+    "cal_780": {
+      "solo_bins": 1483,
+      "class_counts": [
+        1129,
+        202,
+        139,
+        13
+      ],
+      "observed_slots": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "absent_slots": [],
+      "confusion": [
+        [
+          562,
+          543,
+          9,
+          15
+        ],
+        [
+          72,
+          119,
+          0,
+          11
+        ],
+        [
+          64,
+          74,
+          1,
+          0
+        ],
+        [
+          4,
+          9,
+          0,
+          0
+        ]
+      ],
+      "per_observed_slot_recall": [
+        0.4977856510186005,
+        0.5891089108910891,
+        0.007194244604316547,
+        0.0
+      ],
+      "recall_denominators": [
+        1129,
+        202,
+        139,
+        13
+      ],
+      "balanced_accuracy": 0.27352220162850155,
+      "ordinary_conditional_log_loss": 1.2415387169408245,
+      "class_balanced_conditional_log_loss": 1.38781556552479,
+      "ovr_auc": [
+        0.5822061421286775,
+        0.6057419559286139,
+        0.6521978845495032,
+        0.6770277341705914
+      ],
+      "ovr_auc_denominators": [
+        {
+          "positive": 1129,
+          "negative": 354
+        },
+        {
+          "positive": 202,
+          "negative": 1281
+        },
+        {
+          "positive": 139,
+          "negative": 1344
+        },
+        {
+          "positive": 13,
+          "negative": 1470
+        }
+      ],
+      "first_slot0_vs_rest": {
+        "n_slot0": 1129,
+        "n_rest": 354,
+        "auc": 0.5822061421286775,
+        "ordinary_binary_log_loss": 1.0244562260710937,
+        "class_balanced_binary_log_loss": 0.7916342152547488
+      },
+      "oracle_permutation": {
+        "role": "source_global_oracle_diagnostic_only",
+        "not_used_for_inference_or_selection": true,
+        "not_per_chunk_remapping": true,
+        "permutation": [
+          0,
+          3,
+          2,
+          1
+        ],
+        "balanced_accuracy": 0.31293575836879095,
+        "permutation_count": 24
+      },
+      "source_id": "ami_ES2010a",
+      "role": "CAL",
+      "weight_id": "checkpoint_780",
+      "bin_counts": {
+        "activity_valid": 3607,
+        "solo_known_complete": 1483,
+        "excluded_from_solo_diagnostic": 2124,
+        "all_zero": 1917,
+        "two_or_more_full_ones": 40,
+        "any_fractional_occupancy": 174,
+        "other_nonzero_incomplete": 0
+      },
+      "independent_activity_valid_bce": 0.28602745059559515,
+      "independent_activity_valid_brier": 0.08632368722228381,
+      "centered_logit_temporal": [
+        {
+          "slot": 0,
+          "std": 0.574114551667791,
+          "range": 2.737317591905594
+        },
+        {
+          "slot": 1,
+          "std": 0.1860681464398777,
+          "range": 1.0254010260105133
+        },
+        {
+          "slot": 2,
+          "std": 0.10679521386946857,
+          "range": 0.768526017665863
+        },
+        {
+          "slot": 3,
+          "std": 0.5059616750761031,
+          "range": 2.345263324677944
+        }
+      ],
+      "common_logit_control": null
+    },
+    "fit_centered_controls_present_for": [
+      "untrained",
+      "cal_390"
+    ],
+    "fit_centered_controls_absent_for": [
+      "cal_78",
+      "cal_780"
+    ]
+  },
+  "accounting": {
+    "model_instantiation_or_forward": 0,
+    "new_waveform_model_exposure": 0,
+    "backward_calls": 0,
+    "optimizer_updates": 0,
+    "teacher_passes": 0,
+    "gpu_use": false,
+    "cumulative_optimizer_updates_remain": 803,
+    "source_passes": 0,
+    "wall_seconds": 3.173144853,
+    "external_cost": 0
+  },
+  "remaining_uncertainty": [
+    "Speaker-sensitive relative-head variation, if present, may still be confounded by source, occupancy, channel, or non-identity temporal structure.",
+    "Frame-grid 80ms occupancy is not a voice-identity test and does not resolve sub-frame overlap or production admission.",
+    "DEV evidence is two already-exposed prefixes only."
+  ],
+  "adoption_or_next_experiment_decision": null
+}
