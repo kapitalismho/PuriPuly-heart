@@ -828,28 +828,1046 @@
     ]
   },
   "metric_repair": {
+    "activity_bce_agreement": {
+      "all_exact_zero": true,
+      "max_abs_delta": 0.0,
+      "rows": [
+        {
+          "abs_delta": 0.0,
+          "label": "untrained",
+          "origin": 0.6903347969055176,
+          "repaired": 0.6903347969055176,
+          "source_id": "ami_ES2005a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "untrained",
+          "origin": 0.6901192665100098,
+          "repaired": 0.6901192665100098,
+          "source_id": "ami_ES2006a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "untrained",
+          "origin": 0.6903361082077026,
+          "repaired": 0.6903361082077026,
+          "source_id": "ami_ES2007a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "untrained",
+          "origin": 0.6926843523979187,
+          "repaired": 0.6926843523979187,
+          "source_id": "ami_ES2008a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "untrained",
+          "origin": 0.6901904940605164,
+          "repaired": 0.6901904940605164,
+          "source_id": "ami_ES2010a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "untrained",
+          "origin": 0.6976109743118286,
+          "repaired": 0.6976109743118286,
+          "source_id": "ami_ES2009d"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "untrained",
+          "origin": 0.6921011209487915,
+          "repaired": 0.6921011209487915,
+          "source_id": "ami_EN2009d"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "cal_78",
+          "origin": 0.4100472331047058,
+          "repaired": 0.4100472331047058,
+          "source_id": "ami_ES2010a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "cal_390",
+          "origin": 0.26681995391845703,
+          "repaired": 0.26681995391845703,
+          "source_id": "ami_ES2010a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "cal_780",
+          "origin": 0.2860274314880371,
+          "repaired": 0.2860274314880371,
+          "source_id": "ami_ES2010a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "selected_390",
+          "origin": 0.42738229036331177,
+          "repaired": 0.42738229036331177,
+          "source_id": "ami_ES2005a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "selected_390",
+          "origin": 0.36026546359062195,
+          "repaired": 0.36026546359062195,
+          "source_id": "ami_ES2006a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "selected_390",
+          "origin": 0.20566123723983765,
+          "repaired": 0.20566123723983765,
+          "source_id": "ami_ES2007a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "selected_390",
+          "origin": 0.3835245370864868,
+          "repaired": 0.3835245370864868,
+          "source_id": "ami_ES2008a"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "selected_390",
+          "origin": 0.39651626348495483,
+          "repaired": 0.39651626348495483,
+          "source_id": "ami_ES2009d"
+        },
+        {
+          "abs_delta": 0.0,
+          "label": "selected_390",
+          "origin": 0.4765397310256958,
+          "repaired": 0.4765397310256958,
+          "source_id": "ami_EN2009d"
+        }
+      ],
+      "tolerance": 1e-06
+    },
+    "artifacts": {
+      "director_release.json": {
+        "bytes": 1420,
+        "sha256": "57edd87ca891ecca65acf7b0cf1fc2c0193fe9e94c281ace9663e1ad70cf0afe"
+      },
+      "execution_receipt.json": {
+        "bytes": 1378,
+        "sha256": "ff116879de578bc5f1daf6390acf364acc56dc9ab6d3f9667bfe727bb5453dcc"
+      },
+      "frozen_config.json": {
+        "bytes": 15525,
+        "sha256": "445bd0b86a96166cd27642d8092ab72d83474b24bbaaf35b0ba65148c8e15ced"
+      },
+      "repair_eval.json": {
+        "bytes": 178046,
+        "sha256": "896782c1e61c4dc305a1e9ef3177d43f66fea1b3eeb76c39f4761e15c6ddcff0"
+      },
+      "replay_logits/checkpoint_390_ami_EN2009d.pt": {
+        "bytes": 17533,
+        "sha256": "905223c1e2c2e0fd40d42f50a687fba0c80cbf925f07f98cea713c9f16eef309"
+      },
+      "replay_logits/checkpoint_390_ami_ES2005a.pt": {
+        "bytes": 89597,
+        "sha256": "f0df2bb775fea2cd64d1ef9b54563319ac4a4f9aa60db7cbe53ea305140db1ba"
+      },
+      "replay_logits/checkpoint_390_ami_ES2006a.pt": {
+        "bytes": 98749,
+        "sha256": "f129d3d782eb69576727949ae7e498cea36977584e826a460131848c64d92d1f"
+      },
+      "replay_logits/checkpoint_390_ami_ES2007a.pt": {
+        "bytes": 89597,
+        "sha256": "49fb181c05ce05c8432b3682ff6e764d95f4b142e29a597267dd97039d7e21f6"
+      },
+      "replay_logits/checkpoint_390_ami_ES2008a.pt": {
+        "bytes": 89597,
+        "sha256": "0157fa8138f37aff5eabca27ade89ad5d3c9dee82ec20a95e6de2b0a6480557e"
+      },
+      "replay_logits/checkpoint_390_ami_ES2009d.pt": {
+        "bytes": 61757,
+        "sha256": "c8aeedc45dd205f7235541ab3a916fe4fc8e74cf5cf6f27c64329b8dd887f795"
+      },
+      "replay_logits/checkpoint_390_ami_ES2010a.pt": {
+        "bytes": 89597,
+        "sha256": "96f1c01bb2ac70d96982430b04dbb4613f67e9c2877017a1b05c447aadffa497"
+      },
+      "replay_logits/checkpoint_780_ami_ES2010a.pt": {
+        "bytes": 89597,
+        "sha256": "3352b5759c9505590877aea08291cc9b60038a56889e20253db6bae75c9c99d5"
+      },
+      "replay_logits/checkpoint_78_ami_ES2010a.pt": {
+        "bytes": 89589,
+        "sha256": "bf3f5fee1d18935b15b5e94be2afb72529a92e2fdb8066457e1ade182daedb19"
+      },
+      "replay_logits/untrained_seed20260915_ami_EN2009d.pt": {
+        "bytes": 17533,
+        "sha256": "ebd4bf0024421ea7fdd0f2def2ce8c6801723e301c924c4732f8424a098ae58e"
+      },
+      "replay_logits/untrained_seed20260915_ami_ES2005a.pt": {
+        "bytes": 89661,
+        "sha256": "c94921ceba22f6d5ef476ffc1ab56e774ac1f5d999d04be89856922c3f6f9c03"
+      },
+      "replay_logits/untrained_seed20260915_ami_ES2006a.pt": {
+        "bytes": 98813,
+        "sha256": "0d21148fb2738330a1b8ea7064b7ba74b409f6f2bb5407657897e6f45d6318b0"
+      },
+      "replay_logits/untrained_seed20260915_ami_ES2007a.pt": {
+        "bytes": 89661,
+        "sha256": "99b0a129d04825a8b597b32e84210ae04a24443f0bfc0a1b0fec6a50d802c101"
+      },
+      "replay_logits/untrained_seed20260915_ami_ES2008a.pt": {
+        "bytes": 89661,
+        "sha256": "32c644bf5960fc6f8583611710df98a706cb7076d1189456985a801045fc76a5"
+      },
+      "replay_logits/untrained_seed20260915_ami_ES2009d.pt": {
+        "bytes": 61821,
+        "sha256": "f684dccd154c3270183ff72b358495f54a152ea2a11259950eb5ec11141f8bce"
+      },
+      "replay_logits/untrained_seed20260915_ami_ES2010a.pt": {
+        "bytes": 89661,
+        "sha256": "fa373320420d616c21e70d14714288e505cd09e3f31e75519a5cf7d91e95ec86"
+      }
+    },
     "authorized_replay_after_GO": {
+      "exit": 0,
+      "hub_uptime_s": 41.6,
       "new_run_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-metric-repair-1",
-      "not_run": true,
+      "not_run": false,
       "retain_raw_float32_logits": true,
       "stage": "repair-evaluate"
     },
+    "corrected_scores": {
+      "cal": {
+        "390": {
+          "ami_ES2010a": {
+            "canonical_masked_bce": 0.26681995391845703,
+            "event_proxy": {
+              "collars": [
+                {
+                  "collar_ms": 100,
+                  "false_events": 11,
+                  "false_rate": 0.9166666666666666,
+                  "matched": 1,
+                  "missed_events": 156,
+                  "missed_rate": 0.9936305732484076
+                },
+                {
+                  "collar_ms": 250,
+                  "false_events": 11,
+                  "false_rate": 0.9166666666666666,
+                  "matched": 1,
+                  "missed_events": 156,
+                  "missed_rate": 0.9936305732484076
+                },
+                {
+                  "collar_ms": 500,
+                  "false_events": 10,
+                  "false_rate": 0.8333333333333334,
+                  "matched": 2,
+                  "missed_events": 155,
+                  "missed_rate": 0.9872611464968153
+                }
+              ],
+              "gap_reset": true,
+              "permutation_not_applied": true,
+              "predicted_events": 12,
+              "reference_events": 157,
+              "solo_aba_interruptions_le_1s": {
+                "predicted": 0,
+                "reference": 0
+              },
+              "validity": "activity_valid_and_relation_unmasked"
+            },
+            "relation_mask_excluded_valid_bins": 279,
+            "relation_mask_exposed_valid_bins": 3328,
+            "relation_mask_overlapping_valid_bins": 279,
+            "relation_masks_do_not_erase_activity_targets": true,
+            "valid_bins": 3607
+          },
+          "checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089"
+        },
+        "78": {
+          "ami_ES2010a": {
+            "canonical_masked_bce": 0.4100472331047058,
+            "event_proxy": {
+              "collars": [
+                {
+                  "collar_ms": 100,
+                  "false_events": 31,
+                  "false_rate": 0.7560975609756098,
+                  "matched": 10,
+                  "missed_events": 147,
+                  "missed_rate": 0.9363057324840764
+                },
+                {
+                  "collar_ms": 250,
+                  "false_events": 30,
+                  "false_rate": 0.7317073170731707,
+                  "matched": 11,
+                  "missed_events": 146,
+                  "missed_rate": 0.9299363057324841
+                },
+                {
+                  "collar_ms": 500,
+                  "false_events": 26,
+                  "false_rate": 0.6341463414634146,
+                  "matched": 15,
+                  "missed_events": 142,
+                  "missed_rate": 0.9044585987261147
+                }
+              ],
+              "gap_reset": true,
+              "permutation_not_applied": true,
+              "predicted_events": 41,
+              "reference_events": 157,
+              "solo_aba_interruptions_le_1s": {
+                "predicted": 0,
+                "reference": 0
+              },
+              "validity": "activity_valid_and_relation_unmasked"
+            },
+            "relation_mask_excluded_valid_bins": 279,
+            "relation_mask_exposed_valid_bins": 3328,
+            "relation_mask_overlapping_valid_bins": 279,
+            "relation_masks_do_not_erase_activity_targets": true,
+            "valid_bins": 3607
+          },
+          "checkpoint_sha256": "c9a3d69554f3c2cdb74512e83dd137bdf47d4b5148a52a0f4af53473b4465d72"
+        },
+        "780": {
+          "ami_ES2010a": {
+            "canonical_masked_bce": 0.2860274314880371,
+            "event_proxy": {
+              "collars": [
+                {
+                  "collar_ms": 100,
+                  "false_events": 0,
+                  "false_rate": null,
+                  "matched": 0,
+                  "missed_events": 157,
+                  "missed_rate": 1.0
+                },
+                {
+                  "collar_ms": 250,
+                  "false_events": 0,
+                  "false_rate": null,
+                  "matched": 0,
+                  "missed_events": 157,
+                  "missed_rate": 1.0
+                },
+                {
+                  "collar_ms": 500,
+                  "false_events": 0,
+                  "false_rate": null,
+                  "matched": 0,
+                  "missed_events": 157,
+                  "missed_rate": 1.0
+                }
+              ],
+              "gap_reset": true,
+              "permutation_not_applied": true,
+              "predicted_events": 0,
+              "reference_events": 157,
+              "solo_aba_interruptions_le_1s": {
+                "predicted": 0,
+                "reference": 0
+              },
+              "validity": "activity_valid_and_relation_unmasked"
+            },
+            "relation_mask_excluded_valid_bins": 279,
+            "relation_mask_exposed_valid_bins": 3328,
+            "relation_mask_overlapping_valid_bins": 279,
+            "relation_masks_do_not_erase_activity_targets": true,
+            "valid_bins": 3607
+          },
+          "checkpoint_sha256": "c44fd8f621867ab75971b79d041e76ba30beddf104ec205cb53730e5363d4ec1"
+        }
+      },
+      "selected_cal_is_in_cal_not_final": true,
+      "selected_step_390_fit_and_dev": {
+        "ami_EN2009d": {
+          "canonical_masked_bce": 0.4765397310256958,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 15,
+                "false_rate": 0.75,
+                "matched": 5,
+                "missed_events": 55,
+                "missed_rate": 0.9166666666666666
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 12,
+                "false_rate": 0.6,
+                "matched": 8,
+                "missed_events": 52,
+                "missed_rate": 0.8666666666666667
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 9,
+                "false_rate": 0.45,
+                "matched": 11,
+                "missed_events": 49,
+                "missed_rate": 0.8166666666666667
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 20,
+            "reference_events": 60,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 0,
+          "relation_mask_exposed_valid_bins": 602,
+          "relation_mask_overlapping_valid_bins": 0,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 602
+        },
+        "ami_ES2005a": {
+          "canonical_masked_bce": 0.42738229036331177,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 43,
+                "false_rate": 0.9347826086956522,
+                "matched": 3,
+                "missed_events": 291,
+                "missed_rate": 0.9897959183673469
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 40,
+                "false_rate": 0.8695652173913043,
+                "matched": 6,
+                "missed_events": 288,
+                "missed_rate": 0.9795918367346939
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 34,
+                "false_rate": 0.7391304347826086,
+                "matched": 12,
+                "missed_events": 282,
+                "missed_rate": 0.9591836734693877
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 46,
+            "reference_events": 294,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 298,
+          "relation_mask_exposed_valid_bins": 3309,
+          "relation_mask_overlapping_valid_bins": 298,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 3607
+        },
+        "ami_ES2006a": {
+          "canonical_masked_bce": 0.36026546359062195,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 244,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 244,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 244,
+                "missed_rate": 1.0
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 0,
+            "reference_events": 244,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 106,
+          "relation_mask_exposed_valid_bins": 3881,
+          "relation_mask_overlapping_valid_bins": 106,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 3987
+        },
+        "ami_ES2007a": {
+          "canonical_masked_bce": 0.20566123723983765,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 4,
+                "false_rate": 0.6666666666666666,
+                "matched": 2,
+                "missed_events": 158,
+                "missed_rate": 0.9875
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 2,
+                "false_rate": 0.3333333333333333,
+                "matched": 4,
+                "missed_events": 156,
+                "missed_rate": 0.975
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 0,
+                "false_rate": 0.0,
+                "matched": 6,
+                "missed_events": 154,
+                "missed_rate": 0.9625
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 6,
+            "reference_events": 160,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 1
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 126,
+          "relation_mask_exposed_valid_bins": 3481,
+          "relation_mask_overlapping_valid_bins": 126,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 3607
+        },
+        "ami_ES2008a": {
+          "canonical_masked_bce": 0.3835245370864868,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 26,
+                "false_rate": 0.9285714285714286,
+                "matched": 2,
+                "missed_events": 184,
+                "missed_rate": 0.989247311827957
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 23,
+                "false_rate": 0.8214285714285714,
+                "matched": 5,
+                "missed_events": 181,
+                "missed_rate": 0.9731182795698925
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 20,
+                "false_rate": 0.7142857142857143,
+                "matched": 8,
+                "missed_events": 178,
+                "missed_rate": 0.956989247311828
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 28,
+            "reference_events": 186,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 239,
+          "relation_mask_exposed_valid_bins": 3368,
+          "relation_mask_overlapping_valid_bins": 239,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 3607
+        },
+        "ami_ES2009d": {
+          "canonical_masked_bce": 0.39651626348495483,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 17,
+                "false_rate": 0.9444444444444444,
+                "matched": 1,
+                "missed_events": 120,
+                "missed_rate": 0.9917355371900827
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 16,
+                "false_rate": 0.8888888888888888,
+                "matched": 2,
+                "missed_events": 119,
+                "missed_rate": 0.9834710743801653
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 16,
+                "false_rate": 0.8888888888888888,
+                "matched": 2,
+                "missed_events": 119,
+                "missed_rate": 0.9834710743801653
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 18,
+            "reference_events": 121,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 215,
+          "relation_mask_exposed_valid_bins": 2232,
+          "relation_mask_overlapping_valid_bins": 215,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 2447
+        }
+      },
+      "untrained": {
+        "ami_EN2009d": {
+          "canonical_masked_bce": 0.6921011209487915,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 60,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 60,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 60,
+                "missed_rate": 1.0
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 0,
+            "reference_events": 60,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 0,
+          "relation_mask_exposed_valid_bins": 602,
+          "relation_mask_overlapping_valid_bins": 0,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 602
+        },
+        "ami_ES2005a": {
+          "canonical_masked_bce": 0.6903347969055176,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 294,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 294,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 294,
+                "missed_rate": 1.0
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 0,
+            "reference_events": 294,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 298,
+          "relation_mask_exposed_valid_bins": 3309,
+          "relation_mask_overlapping_valid_bins": 298,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 3607
+        },
+        "ami_ES2006a": {
+          "canonical_masked_bce": 0.6901192665100098,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 244,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 244,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 244,
+                "missed_rate": 1.0
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 0,
+            "reference_events": 244,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 106,
+          "relation_mask_exposed_valid_bins": 3881,
+          "relation_mask_overlapping_valid_bins": 106,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 3987
+        },
+        "ami_ES2007a": {
+          "canonical_masked_bce": 0.6903361082077026,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 160,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 160,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 160,
+                "missed_rate": 1.0
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 0,
+            "reference_events": 160,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 1
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 126,
+          "relation_mask_exposed_valid_bins": 3481,
+          "relation_mask_overlapping_valid_bins": 126,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 3607
+        },
+        "ami_ES2008a": {
+          "canonical_masked_bce": 0.6926843523979187,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 6,
+                "false_rate": 1.0,
+                "matched": 0,
+                "missed_events": 186,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 6,
+                "false_rate": 1.0,
+                "matched": 0,
+                "missed_events": 186,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 5,
+                "false_rate": 0.8333333333333334,
+                "matched": 1,
+                "missed_events": 185,
+                "missed_rate": 0.9946236559139785
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 6,
+            "reference_events": 186,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 239,
+          "relation_mask_exposed_valid_bins": 3368,
+          "relation_mask_overlapping_valid_bins": 239,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 3607
+        },
+        "ami_ES2009d": {
+          "canonical_masked_bce": 0.6976109743118286,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 121,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 121,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 121,
+                "missed_rate": 1.0
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 0,
+            "reference_events": 121,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 215,
+          "relation_mask_exposed_valid_bins": 2232,
+          "relation_mask_overlapping_valid_bins": 215,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 2447
+        },
+        "ami_ES2010a": {
+          "canonical_masked_bce": 0.6901904940605164,
+          "event_proxy": {
+            "collars": [
+              {
+                "collar_ms": 100,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 157,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 250,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 157,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 500,
+                "false_events": 0,
+                "false_rate": null,
+                "matched": 0,
+                "missed_events": 157,
+                "missed_rate": 1.0
+              }
+            ],
+            "gap_reset": true,
+            "permutation_not_applied": true,
+            "predicted_events": 0,
+            "reference_events": 157,
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            },
+            "validity": "activity_valid_and_relation_unmasked"
+          },
+          "relation_mask_excluded_valid_bins": 279,
+          "relation_mask_exposed_valid_bins": 3328,
+          "relation_mask_overlapping_valid_bins": 279,
+          "relation_masks_do_not_erase_activity_targets": true,
+          "valid_bins": 3607
+        }
+      }
+    },
     "cpu_probe": {
-      "command_and_exit_proof": "hub transcript gt-pilot-metric-repair-probes-lf",
-      "exit": 0,
-      "hub_uptime_s": 6.1,
-      "model_forward": false,
-      "prior_probe_root_preserved": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-metric-repair-probes",
       "probe_receipt_sha256": "39585d00c9782903a3d78e35f1662f2d086ae2acdaf6eca1c92c4d6ddb26e607",
-      "run_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-metric-repair-probes-lf",
-      "stage": "probe"
+      "run_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-metric-repair-probes-lf"
     },
     "cumulative_optimizer_updates_remain": 803,
     "evaluator_config_sha256": "445bd0b86a96166cd27642d8092ab72d83474b24bbaaf35b0ba65148c8e15ced",
     "evaluator_gt_pilot_sha256": "861ce06b3d5cd5a9e0e88908742d41e6342bb507a2c36d9019f628eaa83523e5",
+    "execution_commit": "bc77e0c0439c379b268b1c047b2c965aef69c41c",
+    "execution_receipt_sha256": "ff116879de578bc5f1daf6390acf364acc56dc9ab6d3f9667bfe727bb5453dcc",
+    "logit_files": 16,
+    "new_artifact_bytes": 1448793,
     "optimizer_updates_this_repair": 0,
-    "origin_event_aba_metrics_in_this_file": "historical defective derivation; corrected relation-gated counts require authorized no-update replay",
-    "status": "code_ready_awaiting_director_commit_and_GO"
+    "origin_config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+    "origin_prepared_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+    "reference_events": {
+      "corrected_activity_valid_and_relation_unmasked_with_gap_reset": {
+        "ami_EN2009d": 60,
+        "ami_ES2005a": 294,
+        "ami_ES2006a": 244,
+        "ami_ES2007a": 160,
+        "ami_ES2008a": 186,
+        "ami_ES2009d": 121,
+        "ami_ES2010a": 157
+      },
+      "expected_from_adjudication": {
+        "ami_EN2009d": 60,
+        "ami_ES2005a": 294,
+        "ami_ES2006a": 244,
+        "ami_ES2007a": 160,
+        "ami_ES2008a": 186,
+        "ami_ES2009d": 121,
+        "ami_ES2010a": 157
+      },
+      "matches_adjudication": true,
+      "origin_defective_activity_validity_only": {
+        "ami_EN2009d": 60,
+        "ami_ES2005a": 318,
+        "ami_ES2006a": 254,
+        "ami_ES2007a": 171,
+        "ami_ES2008a": 207,
+        "ami_ES2009d": 134,
+        "ami_ES2010a": 177
+      }
+    },
+    "relation_denominators": {
+      "ami_EN2009d": {
+        "relation_mask_excluded_valid_bins": 0,
+        "relation_mask_exposed_valid_bins": 602,
+        "relation_mask_overlapping_valid_bins": 0,
+        "valid_bins": 602
+      },
+      "ami_ES2005a": {
+        "relation_mask_excluded_valid_bins": 298,
+        "relation_mask_exposed_valid_bins": 3309,
+        "relation_mask_overlapping_valid_bins": 298,
+        "valid_bins": 3607
+      },
+      "ami_ES2006a": {
+        "relation_mask_excluded_valid_bins": 106,
+        "relation_mask_exposed_valid_bins": 3881,
+        "relation_mask_overlapping_valid_bins": 106,
+        "valid_bins": 3987
+      },
+      "ami_ES2007a": {
+        "relation_mask_excluded_valid_bins": 126,
+        "relation_mask_exposed_valid_bins": 3481,
+        "relation_mask_overlapping_valid_bins": 126,
+        "valid_bins": 3607
+      },
+      "ami_ES2008a": {
+        "relation_mask_excluded_valid_bins": 239,
+        "relation_mask_exposed_valid_bins": 3368,
+        "relation_mask_overlapping_valid_bins": 239,
+        "valid_bins": 3607
+      },
+      "ami_ES2009d": {
+        "relation_mask_excluded_valid_bins": 215,
+        "relation_mask_exposed_valid_bins": 2232,
+        "relation_mask_overlapping_valid_bins": 215,
+        "valid_bins": 2447
+      },
+      "ami_ES2010a": {
+        "relation_mask_excluded_valid_bins": 279,
+        "relation_mask_exposed_valid_bins": 3328,
+        "relation_mask_overlapping_valid_bins": 279,
+        "valid_bins": 3607
+      }
+    },
+    "release_id": "GT-PILOT-METRIC-REPAIR-1-GO",
+    "retain_raw_float32_logits": true,
+    "run_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-metric-repair-1",
+    "source_passes": 16,
+    "status": "executed_corrected_metrics_frozen_for_review"
   },
   "not_authorized_or_not_this_report": [
     "additional optimizer updates",
@@ -857,7 +1875,8 @@
     "HOLDOUT/EVAL access",
     "production/policy changes",
     "issue closure",
-    "adoption decision"
+    "adoption decision",
+    "further model inference after this repair proof"
   ],
   "not_production": true,
   "optimizer_step_accounting": {
@@ -5086,10 +6105,10 @@
   },
   "status": "executed_pilot_complete_not_issue164",
   "verification_gaps": [
-    "Independent review not performed in this assignment",
-    "Pause-process elapsed/peaks are not in the current accounting.json",
-    "Seven-stage command/exit proof is hub transcript, not a durable runroot field",
-    "Corrected relation/event/ABA metrics are not yet replayed; metric-repair inference is blocked until Director commit and GO",
-    "Oracle-aligned event/transition/ABA fields are null in origin source_global_aligned.metrics; canonical event_proxy is the durable event diagnostic after authorized replay"
+    "Independent targeted REPAIR_VERIFY not performed in this assignment",
+    "Pause-process elapsed/peaks are not in the current origin accounting.json",
+    "Seven-stage original training command/exit proof is hub transcript, not a durable origin runroot field",
+    "Repair-evaluate command/exit is hub transcript plus repair-root execution_receipt.json",
+    "Repair-evaluate did not emit a separate GPU timing receipt; hub wall 41.6s is process uptime, not a live 80ms or matched-teacher claim"
   ]
 }
