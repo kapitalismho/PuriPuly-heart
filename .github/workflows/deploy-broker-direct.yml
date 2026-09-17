@@ -784,7 +784,7 @@ jobs:
             sleep 60
           done
 
-      - name: Verify 0022 and 0023 applied with 0021 and 0024 still pending
+      - name: Verify deferred network identity migrations are consistent
         shell: bash
         working-directory: broker
         env:
@@ -805,10 +805,15 @@ jobs:
               raise SystemExit('0022 issuance-context migration must be applied before the deferred 0021 purge')
           if '0023_backfill_operation_route_rate_limits.sql' not in applied:
               raise SystemExit('0023 route rate-limit migration must be applied before the deferred 0021 purge')
-          if '0021_network_identity_purge.sql' in applied:
-              raise SystemExit('0021 purge migration must remain pending until the keyed-only backfill gate')
-          if '0024_allow_unattributed_request_events.sql' in applied:
-              raise SystemExit('0024 unattributed-schema rebuild must remain pending until the keyed-only backfill gate')
+          deferred = {
+              '0021_network_identity_purge.sql',
+              '0024_allow_unattributed_request_events.sql',
+          }
+          applied_deferred = deferred & applied
+          if applied_deferred and applied_deferred != deferred:
+              raise SystemExit(
+                  '0021 purge and 0024 unattributed-schema rebuild must be either both pending or both applied'
+              )
           PY
 
       - name: Apply deferred 0021 purge followed by 0024 rebuild
