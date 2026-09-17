@@ -42,6 +42,7 @@ from experiments.psem_relative_occupancy_gate.evaluate import (
 
 SCHEMA = "PSEM-ISSUE-164-GT-PILOT-1"
 CHECKPOINT_SCHEMA = "PSEM-ISSUE-164-GT-PILOT-CHECKPOINT-1"
+BOUND_CHECKPOINT_SCHEMA = "PSEM-ISSUE-164-GT-PILOT-CHECKPOINT-2"
 OUTPUT_SLOTS = 4
 HOP = StreamingStudent.output_hop_samples
 SAMPLE_RATE = StreamingStudent.sample_rate
@@ -411,6 +412,8 @@ def active_set_events(
     previous_index = None
     for index, valid in enumerate(validity.tolist()):
         if not valid:
+            previous = None
+            previous_index = None
             continue
         current = frozenset(
             slot for slot, value in enumerate(occupancy[index]) if value >= threshold
@@ -537,6 +540,7 @@ def score_outputs(
     )
     brier = float(((probabilities[validity] - targets[validity]) ** 2).mean())
     relation = mask_overlap_frames(frontiers, masks)
+    excluded = validity & relation
     exposed = validity & ~relation
     flags = overlap_bin_flags(frontiers, timeline)
     canonical = binary_metrics(
@@ -552,27 +556,30 @@ def score_outputs(
         threshold,
         flags,
     )
+    relation_valid = exposed.numpy()
     pred_events = active_set_events(
-        probabilities.numpy(), frontiers.numpy(), validity.numpy(), threshold
+        probabilities.numpy(), frontiers.numpy(), relation_valid, threshold
     )
     ref_events = active_set_events(
-        targets.numpy(), frontiers.numpy(), validity.numpy(), threshold
+        targets.numpy(), frontiers.numpy(), relation_valid, threshold
     )
     event_rates = [match_event_rates(pred_events, ref_events, collar) for collar in COLLARS_MS]
-    aba_ref = solo_aba_interruptions(targets.numpy(), validity.numpy(), threshold, HOP)
-    aba_pred = solo_aba_interruptions(probabilities.numpy(), validity.numpy(), threshold, HOP)
+    aba_ref = solo_aba_interruptions(targets.numpy(), relation_valid, threshold, HOP)
+    aba_pred = solo_aba_interruptions(probabilities.numpy(), relation_valid, threshold, HOP)
     return {
         "canonical_masked_bce": bce,
         "canonical_brier": brier,
         "valid_bins": int(validity.sum()),
-        "relation_mask_overlapping_valid_bins": int((validity & relation).sum()),
-        "relation_mask_excluded_valid_bins": int(exposed.sum()),
+        "relation_mask_overlapping_valid_bins": int(excluded.sum()),
+        "relation_mask_excluded_valid_bins": int(excluded.sum()),
+        "relation_mask_exposed_valid_bins": int(exposed.sum()),
         "relation_masks_do_not_erase_activity_targets": True,
         "canonical": canonical,
         "source_global_aligned": {
             **aligned,
             "metrics": aligned_metrics,
             "aligned_masked_bce": aligned["best"]["masked_bce"],
+            "event_proxy_uses_unpermuted_occupancy": True,
         },
         "event_proxy": {
             "predicted_events": len(pred_events),
@@ -582,6 +589,9 @@ def score_outputs(
                 "reference": len(aba_ref),
                 "predicted": len(aba_pred),
             },
+            "validity": "activity_valid_and_relation_unmasked",
+            "gap_reset": True,
+            "permutation_not_applied": True,
             "limitations": "frame-grid 80ms active-set transitions; sub-frame timing is not resolved; not fixed156-policy admission evaluation",
         },
         "operating_point": threshold,
@@ -776,12 +786,57 @@ def synthetic_metric_probes() -> dict[str, Any]:
     oracle = permutation_oracle(swapped, targets, validity)
     if oracle["best"]["permutation"] != [1, 0, 2, 3]:
         raise RuntimeError("source-global permutation oracle did not recover the swap")
-    pred_events = active_set_events(
-        torch.sigmoid(swapped).numpy(), frontiers.numpy(), validity.numpy(), 0.5
+    original_validity = validity.clone()
+    original_targets = targets.clone()
+    scored = score_outputs(logits, targets, validity, frontiers, relation_masks, 0.5, timeline)
+    if not torch.equal(validity, original_validity) or not torch.equal(targets, original_targets):
+        raise RuntimeError("relation scoring mutated activity validity or targets")
+    if scored["relation_mask_excluded_valid_bins"] != scored["relation_mask_overlapping_valid_bins"]:
+        raise RuntimeError("excluded relation bins must equal overlapping valid relation-mask bins")
+    if scored["relation_mask_excluded_valid_bins"] + scored["relation_mask_exposed_valid_bins"] != scored["valid_bins"]:
+        raise RuntimeError("excluded plus exposed relation bins must equal activity-valid bins")
+    if scored["relation_mask_exposed_valid_bins"] == scored["valid_bins"] and bool(relation.any()):
+        raise RuntimeError("exposed complement was stored as excluded")
+    activity_events = active_set_events(targets.numpy(), frontiers.numpy(), validity.numpy(), 0.5)
+    relation_events = active_set_events(
+        targets.numpy(), frontiers.numpy(), (validity & ~relation).numpy(), 0.5
     )
-    ref_events = active_set_events(targets.numpy(), frontiers.numpy(), validity.numpy(), 0.5)
-    matched = match_event_rates(ref_events, ref_events, 100)
-    if matched["matched"] != len(ref_events) or matched["false_events"] != 0:
+    if scored["event_proxy"]["reference_events"] != len(relation_events):
+        raise RuntimeError("event proxy did not use relation-unmasked activity-valid bins")
+    gap_occupancy = np.zeros((3, 4), dtype=np.float32)
+    gap_occupancy[0, 0] = 1.0
+    gap_occupancy[2, 1] = 1.0
+    gap_frontiers = np.array([hop, 2 * hop, 3 * hop], dtype=np.int64)
+    carried = active_set_events(
+        gap_occupancy, gap_frontiers, np.array([True, False, True]), 0.5
+    )
+    if carried:
+        raise RuntimeError("active-set events bridged an invalid gap")
+    relation_gap_valid = np.array([True, False, True])
+    relation_gap_occ = np.zeros((3, 4), dtype=np.float32)
+    relation_gap_occ[0, 0] = 1.0
+    relation_gap_occ[2, 0] = 1.0
+    if active_set_events(relation_gap_occ, gap_frontiers, relation_gap_valid, 0.5):
+        raise RuntimeError("active-set events bridged a relation-masked gap")
+    aba_bridge_occ = np.zeros((3, 4), dtype=np.float32)
+    aba_bridge_occ[0, 0] = 1.0
+    aba_bridge_occ[1, 1] = 1.0
+    aba_bridge_occ[2, 0] = 1.0
+    aba_activity = np.array([True, True, True])
+    if not solo_aba_interruptions(aba_bridge_occ, aba_activity, 0.5, hop):
+        raise RuntimeError("contiguous solo A-B-A probe failed")
+    aba_relation_valid = np.array([True, False, True])
+    if solo_aba_interruptions(aba_bridge_occ, aba_relation_valid, 0.5, hop):
+        raise RuntimeError("ABA bridged a relation or unknown gap")
+    swapped_scored = score_outputs(
+        swapped, targets, validity, frontiers, relation_masks, 0.5, timeline
+    )
+    if swapped_scored["event_proxy"]["reference_events"] != scored["event_proxy"]["reference_events"]:
+        raise RuntimeError("source-global permutation hid or altered reference transitions")
+    if swapped_scored["source_global_aligned"]["best"]["permutation"] != [1, 0, 2, 3]:
+        raise RuntimeError("permutation oracle was not independent of event gating")
+    matched = match_event_rates(relation_events, relation_events, 100)
+    if matched["matched"] != len(relation_events) or matched["false_events"] != 0:
         raise RuntimeError("self-matched event proxy failed")
     return {
         "padded_slots": slots,
@@ -789,10 +844,19 @@ def synthetic_metric_probes() -> dict[str, Any]:
         "overlap_preserved": True,
         "ambiguous_invalid": True,
         "relation_mask_does_not_erase_activity": True,
+        "relation_excluded_bins": scored["relation_mask_excluded_valid_bins"],
+        "relation_exposed_bins": scored["relation_mask_exposed_valid_bins"],
+        "activity_valid_bins": scored["valid_bins"],
+        "activity_events_without_relation_gate": len(activity_events),
+        "relation_gated_reference_events": len(relation_events),
+        "invalid_gap_reset": True,
+        "relation_gap_reset": True,
+        "aba_breaks_relation_gap": True,
+        "permutation_does_not_hide_reference_transitions": True,
         "solo_aba_interruptions": len(aba),
         "permutation_recovered": oracle["best"]["permutation"],
         "self_matched_events": matched,
-        "unused_event_proxy_on_swapped_logits": len(pred_events),
+        "unused_event_proxy_on_swapped_logits": swapped_scored["event_proxy"]["predicted_events"],
         "straddle_vs_overlap": {
             "activity_targets_unchanged": True,
             "straddle_bin_occupancy": [0.5, 0.5],
@@ -850,6 +914,7 @@ def check_stage(config_path: Path, run_root: Path) -> None:
     if count != config["training"]["student_parameter_count"]:
         raise RuntimeError(f"student parameter count differs: {count}")
     probes = synthetic_metric_probes()
+    checkpoint_probes = checkpoint_identity_probes(config)
     slot_report = {
         source_id: {
             "slots": projected["slots"],
@@ -882,6 +947,7 @@ def check_stage(config_path: Path, run_root: Path) -> None:
                 "frozen_seconds": config["sources"]["confirmed_es2006a_fourth_speaker_seconds"],
             },
             "synthetic_metric_probes": probes,
+            "checkpoint_identity_probes": checkpoint_probes,
             "student_parameter_count": count,
             "runtime": pilot_runtime(config_path),
         },
@@ -1148,7 +1214,7 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
                 "scores": scored,
                 "inference_cost": {
                     "elapsed_seconds_synchronized": elapsed,
-                    "scope": "warm selected-checkpoint source-zero prefix replay over FIT+DEV after model load; excludes training; not live 80ms admission or matched teacher cost",
+                    "scope": "selected-checkpoint source-zero prefix replay over FIT+DEV after model load; timer starts after load, peak reset, and device synchronize; first streamed prefixes are included; not a warmup pass; excludes training; not live 80ms admission or matched teacher cost",
                     "peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
                     "peak_reserved_bytes": torch.cuda.max_memory_reserved(device),
                     "device": device_report(device),
@@ -1170,6 +1236,73 @@ def optimizer_step_count(optimizer: torch.optim.Optimizer) -> set[int]:
     }
 
 
+def optimizer_settings_from_config(config: dict[str, Any]) -> dict[str, Any]:
+    optimizer = config["training"]["optimizer"]
+    return {
+        "name": optimizer["name"],
+        "learning_rate": float(optimizer["learning_rate"]),
+        "weight_decay": float(optimizer["weight_decay"]),
+        "gradient_clip_norm": float(optimizer["gradient_clip_norm"]),
+    }
+
+
+def optimizer_counters_from_state_dict(state_dict: dict[str, Any]) -> set[int]:
+    counts: set[int] = set()
+    for value in (state_dict or {}).get("state", {}).values():
+        if isinstance(value, dict) and "step" in value:
+            step = value["step"]
+            counts.add(int(step.item()) if torch.is_tensor(step) else int(step))
+    return counts
+
+
+def optimizer_settings_from_state_dict(state_dict: dict[str, Any]) -> dict[str, float]:
+    groups = (state_dict or {}).get("param_groups") or []
+    if not groups:
+        return {}
+    rates = {float(group["lr"]) for group in groups}
+    decays = {float(group.get("weight_decay", 0.0)) for group in groups}
+    if len(rates) != 1 or len(decays) != 1:
+        raise RuntimeError("optimizer param groups have mixed learning rate or weight decay")
+    return {"learning_rate": next(iter(rates)), "weight_decay": next(iter(decays))}
+
+
+def numeric_state_position(state: Any) -> dict[str, int] | None:
+    if state is None:
+        return None
+    if isinstance(state, dict):
+        return {
+            "total_samples": int(state["total_samples"]),
+            "emitted_outputs": int(state["emitted_outputs"]),
+        }
+    return {
+        "total_samples": int(state.total_samples),
+        "emitted_outputs": int(state.emitted_outputs),
+    }
+
+
+def expected_numeric_state(
+    cursor: dict[str, Any] | None, config: dict[str, Any]
+) -> dict[str, int] | None:
+    if cursor is None:
+        return None
+    count = int(cursor["chunk_index"]) + 1
+    return {
+        "total_samples": count * int(config["training"]["chunk_samples"]),
+        "emitted_outputs": count * int(config["training"]["frames_per_update"]),
+    }
+
+
+def expected_cursor(schedule: list[dict[str, Any]], completed: int) -> dict[str, Any] | None:
+    if completed == 0:
+        return None
+    row = schedule[completed - 1]
+    return {
+        "source_id": row["source_id"],
+        "epoch": row["epoch"],
+        "chunk_index": row["chunk_index"],
+    }
+
+
 def save_checkpoint(
     path: Path,
     config: dict[str, Any],
@@ -1179,13 +1312,24 @@ def save_checkpoint(
     completed: int,
     cursor: dict[str, Any] | None,
     witness: dict[str, Any] | None,
+    *,
+    config_sha256: str,
+    prepared_sha256: str,
 ) -> str:
+    numeric = numeric_state_position(None if state is None else state.cpu_dict())
     payload = {
-        "schema": CHECKPOINT_SCHEMA,
+        "schema": BOUND_CHECKPOINT_SCHEMA,
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
         "config_schema": config["schema"],
+        "config_sha256": config_sha256,
+        "implementation_sha256": dict(config["implementation_sha256"]),
+        "prepared_sha256": prepared_sha256,
+        "source_order": list(config["training"]["source_order"]),
+        "optimizer_settings": optimizer_settings_from_config(config),
+        "optimizer_step_counters": sorted(optimizer_step_count(optimizer)),
         "completed_updates": completed,
+        "numeric_state": numeric,
         "rng": rng_state(),
         "streaming_state": None if state is None else state.cpu_dict(),
         "schedule_cursor": cursor,
@@ -1205,6 +1349,202 @@ def refuse_stale_checkpoint(checkpoint: dict[str, Any], ledger_rows: list[dict[s
     if status["intent"] > completed and status["completed"] < status["intent"]:
         raise RuntimeError("in-flight uncertain update is charged; automatic retry is forbidden")
 
+
+def validate_bound_checkpoint_for_resume(
+    checkpoint: dict[str, Any],
+    config: dict[str, Any],
+    config_sha256: str,
+    prepared_sha256: str,
+    schedule: list[dict[str, Any]],
+    ledger_rows: list[dict[str, Any]],
+) -> None:
+    refuse_stale_checkpoint(checkpoint, ledger_rows)
+    if checkpoint.get("schema") != BOUND_CHECKPOINT_SCHEMA:
+        raise RuntimeError(
+            "unbound historical checkpoint cannot silently resume; historical evaluation must use an explicit artifact hash"
+        )
+    if checkpoint.get("config_schema") != config["schema"]:
+        raise RuntimeError("checkpoint config schema does not match the frozen config")
+    if checkpoint.get("config_sha256") != config_sha256:
+        raise RuntimeError("checkpoint config identity does not match the frozen config")
+    if checkpoint.get("implementation_sha256") != config["implementation_sha256"]:
+        raise RuntimeError("checkpoint implementation identity does not match")
+    if checkpoint.get("prepared_sha256") != prepared_sha256:
+        raise RuntimeError("checkpoint prepared-input identity does not match")
+    if list(checkpoint.get("source_order") or []) != list(config["training"]["source_order"]):
+        raise RuntimeError("checkpoint source order does not match")
+    completed = int(checkpoint["completed_updates"])
+    if completed < 0 or completed > len(schedule):
+        raise RuntimeError("checkpoint completed_updates is outside the frozen schedule")
+    cursor = checkpoint.get("schedule_cursor")
+    expected = expected_cursor(schedule, completed)
+    if expected is None:
+        if cursor is not None:
+            raise RuntimeError("zero-update checkpoint must not carry a schedule cursor")
+    else:
+        if cursor is None:
+            raise RuntimeError("checkpoint is missing schedule cursor")
+        for key in ("source_id", "epoch", "chunk_index"):
+            if cursor.get(key) != expected[key]:
+                raise RuntimeError(
+                    "checkpoint cursor does not match the completed schedule position"
+                )
+    expected_numeric = expected_numeric_state(cursor, config)
+    stored_numeric = checkpoint.get("numeric_state")
+    actual_numeric = numeric_state_position(checkpoint.get("streaming_state"))
+    if stored_numeric != expected_numeric or actual_numeric != expected_numeric:
+        raise RuntimeError("checkpoint numeric stream position does not match the completed cursor")
+    settings = optimizer_settings_from_config(config)
+    stored_settings = checkpoint.get("optimizer_settings") or {}
+    for key in ("name", "learning_rate", "weight_decay"):
+        if stored_settings.get(key) != settings[key]:
+            raise RuntimeError("checkpoint optimizer settings do not match the frozen config")
+    live_settings = optimizer_settings_from_state_dict(checkpoint.get("optimizer") or {})
+    if live_settings and (
+        live_settings["learning_rate"] != settings["learning_rate"]
+        or live_settings["weight_decay"] != settings["weight_decay"]
+    ):
+        raise RuntimeError("optimizer state settings do not match the frozen config")
+    derived = optimizer_counters_from_state_dict(checkpoint.get("optimizer") or {})
+    stored_counters = set(int(value) for value in (checkpoint.get("optimizer_step_counters") or []))
+    if completed == 0:
+        if derived or stored_counters:
+            raise RuntimeError("zero-update checkpoint must not carry optimizer step counters")
+        return
+    if derived != {completed} or stored_counters != {completed}:
+        raise RuntimeError("optimizer counters do not match completed updates")
+
+
+def load_historical_checkpoint_for_eval(path: Path, expected_sha256: str) -> dict[str, Any]:
+    digest = sha256_file(path)
+    if digest != expected_sha256:
+        raise RuntimeError(f"historical checkpoint hash mismatch for {path.name}: {digest}")
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+    if "model" not in payload:
+        raise RuntimeError(f"{path.name} lacks model weights")
+    return payload
+
+
+def _expect_resume_rejection(
+    checkpoint: dict[str, Any],
+    config: dict[str, Any],
+    config_sha256: str,
+    prepared_sha256: str,
+    schedule: list[dict[str, Any]],
+    ledger_rows: list[dict[str, Any]],
+    needle: str,
+) -> str:
+    try:
+        validate_bound_checkpoint_for_resume(
+            checkpoint, config, config_sha256, prepared_sha256, schedule, ledger_rows
+        )
+    except RuntimeError as exc:
+        message = str(exc)
+        if needle not in message:
+            raise RuntimeError(f"rejected for the wrong reason: {message}") from exc
+        return message
+    raise RuntimeError(f"expected resume rejection containing {needle}")
+
+
+def checkpoint_identity_probes(config: dict[str, Any]) -> dict[str, Any]:
+    schedule = fit_schedule(config)
+    config_sha256 = "a" * 64
+    prepared_sha256 = "b" * 64
+    settings = optimizer_settings_from_config(config)
+    cursor = expected_cursor(schedule, 2)
+    numeric = expected_numeric_state(cursor, config)
+    ledger = [
+        {"kind": "intent", "update_index": 1},
+        {"kind": "completed", "update_index": 1},
+        {"kind": "intent", "update_index": 2},
+        {"kind": "completed", "update_index": 2},
+    ]
+    bound = {
+        "schema": BOUND_CHECKPOINT_SCHEMA,
+        "model": {},
+        "optimizer": {
+            "state": {0: {"step": torch.tensor(2)}},
+            "param_groups": [
+                {
+                    "lr": settings["learning_rate"],
+                    "weight_decay": settings["weight_decay"],
+                }
+            ],
+        },
+        "config_schema": config["schema"],
+        "config_sha256": config_sha256,
+        "implementation_sha256": dict(config["implementation_sha256"]),
+        "prepared_sha256": prepared_sha256,
+        "source_order": list(config["training"]["source_order"]),
+        "optimizer_settings": settings,
+        "optimizer_step_counters": [2],
+        "completed_updates": 2,
+        "numeric_state": numeric,
+        "streaming_state": {
+            "total_samples": numeric["total_samples"],
+            "emitted_outputs": numeric["emitted_outputs"],
+        },
+        "schedule_cursor": cursor,
+    }
+    validate_bound_checkpoint_for_resume(
+        bound, config, config_sha256, prepared_sha256, schedule, ledger
+    )
+    foreign = dict(bound)
+    foreign["config_sha256"] = "c" * 64
+    wrong_cursor = dict(bound)
+    wrong_cursor["schedule_cursor"] = {**cursor, "chunk_index": cursor["chunk_index"] + 1}
+    wrong_settings = dict(bound)
+    wrong_settings["optimizer_settings"] = {**settings, "learning_rate": 0.001}
+    wrong_counters = dict(bound)
+    wrong_counters["optimizer_step_counters"] = [1]
+    wrong_counters["optimizer"] = {
+        "state": {0: {"step": torch.tensor(1)}},
+        "param_groups": bound["optimizer"]["param_groups"],
+    }
+    unbound = dict(bound)
+    unbound["schema"] = CHECKPOINT_SCHEMA
+    stale_ledger = ledger + [
+        {"kind": "intent", "update_index": 3},
+        {"kind": "completed", "update_index": 3},
+    ]
+    uncertain_ledger = ledger + [{"kind": "intent", "update_index": 3}]
+    return {
+        "bound_resume_accepted": True,
+        "foreign_config_rejected": _expect_resume_rejection(
+            foreign, config, config_sha256, prepared_sha256, schedule, ledger, "config identity"
+        ),
+        "wrong_cursor_rejected": _expect_resume_rejection(
+            wrong_cursor, config, config_sha256, prepared_sha256, schedule, ledger, "cursor"
+        ),
+        "wrong_optimizer_settings_rejected": _expect_resume_rejection(
+            wrong_settings,
+            config,
+            config_sha256,
+            prepared_sha256,
+            schedule,
+            ledger,
+            "optimizer settings",
+        ),
+        "wrong_optimizer_counters_rejected": _expect_resume_rejection(
+            wrong_counters, config, config_sha256, prepared_sha256, schedule, ledger, "counters"
+        ),
+        "unbound_resume_rejected": _expect_resume_rejection(
+            unbound, config, config_sha256, prepared_sha256, schedule, ledger, "unbound historical"
+        ),
+        "stale_ledger_rejected": _expect_resume_rejection(
+            bound, config, config_sha256, prepared_sha256, schedule, stale_ledger, "stale checkpoint"
+        ),
+        "uncertain_ledger_rejected": _expect_resume_rejection(
+            bound,
+            config,
+            config_sha256,
+            prepared_sha256,
+            schedule,
+            uncertain_ledger,
+            "uncertain update",
+        ),
+        "historical_eval_uses_explicit_hash": True,
+    }
 
 def next_chunk_logits(
     model: StreamingStudent,
@@ -1231,6 +1571,8 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
     ledger_path = run_root / "update_ledger.jsonl"
     accounting_path = run_root / "accounting.json"
     latest_path = run_root / "checkpoint_latest.pt"
+    config_sha256 = sha256_file(config_path)
+    prepared_sha256 = sha256_file(run_root / "prepared_sources.pt")
     started = time.perf_counter()
     deadline = float(config["resource_guard"]["per_run_wall_seconds"])
     max_reserved = int(config["resource_guard"]["max_gpu_allocator_reserved_bytes"])
@@ -1239,7 +1581,14 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
         if not latest_path.exists():
             raise RuntimeError("resume requested without checkpoint_latest.pt")
         checkpoint = torch.load(latest_path, map_location="cpu", weights_only=False)
-        refuse_stale_checkpoint(checkpoint, read_ledger(ledger_path))
+        validate_bound_checkpoint_for_resume(
+            checkpoint,
+            config,
+            config_sha256,
+            prepared_sha256,
+            schedule,
+            read_ledger(ledger_path),
+        )
         seed_everything(int(config["training"]["seed"]))
         model = StreamingStudent().to(device)
         model.load_state_dict(checkpoint["model"])
@@ -1304,7 +1653,18 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
         completed = 0
         state = None
         cursor = None
-        save_checkpoint(latest_path, config, model, optimizer, None, 0, None, None)
+        save_checkpoint(
+            latest_path,
+            config,
+            model,
+            optimizer,
+            None,
+            0,
+            None,
+            None,
+            config_sha256=config_sha256,
+            prepared_sha256=prepared_sha256,
+        )
     model.train()
     torch.cuda.reset_peak_memory_stats(device)
     records = []
@@ -1437,7 +1797,16 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
         cal_step = completed in set(config["evaluation"]["calibration_checkpoint_steps"])
         if boundary or cal_step or pause_after == completed or completed == len(schedule):
             digest = save_checkpoint(
-                latest_path, config, model, optimizer, state, completed, cursor, witness
+                latest_path,
+                config,
+                model,
+                optimizer,
+                state,
+                completed,
+                cursor,
+                witness,
+                config_sha256=config_sha256,
+                prepared_sha256=prepared_sha256,
             )
             if cal_step:
                 candidate = run_root / f"checkpoint_step_{completed}.pt"
@@ -1459,14 +1828,23 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
                         "peak_reserved_bytes": torch.cuda.max_memory_reserved(device),
                         "peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
                         "training_elapsed_seconds_synchronized": time.perf_counter() - started,
-                        "timing_scope": "this process wall from train_stage entry through pause checkpoint, including host/device transfers and optimizer updates",
+                        "timing_scope": "wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through pause checkpoint, including host/device transfers and optimizer updates; excludes that pre-timer setup. Allocator peak reset is after resume restore/witness or after the initial zero-update checkpoint on a fresh train.",
                     },
                 )
                 return
     if optimizer_step_count(optimizer) != {780}:
         raise RuntimeError("optimizer counters do not equal 780 after the full allocation")
     digest = save_checkpoint(
-        latest_path, config, model, optimizer, state, 780, cursor, None
+        latest_path,
+        config,
+        model,
+        optimizer,
+        state,
+        780,
+        cursor,
+        None,
+        config_sha256=config_sha256,
+        prepared_sha256=prepared_sha256,
     )
     final_path = run_root / "checkpoint_step_780.pt"
     if not final_path.exists():
@@ -1482,7 +1860,7 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
             "peak_reserved_bytes": torch.cuda.max_memory_reserved(device),
             "peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
             "training_elapsed_seconds_synchronized": time.perf_counter() - started,
-            "timing_scope": "this process wall from train_stage entry through final checkpoint, including host/device transfers and optimizer updates",
+            "timing_scope": "wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through final checkpoint, including host/device transfers and optimizer updates; excludes that pre-timer setup. Allocator peak reset is after resume restore/witness or after the initial zero-update checkpoint on a fresh train.",
         },
     )
 
@@ -1553,10 +1931,198 @@ def report_stage(config_path: Path, run_root: Path) -> None:
     )
 
 
+def probe_stage(config_path: Path, run_root: Path) -> None:
+    config_path = bind_pilot_config(config_path, run_root)
+    config = load_pilot_config(config_path)
+    atomic_json(
+        run_root / "probe_receipt.json",
+        {
+            "stage": "probe",
+            "optimizer_steps": 0,
+            "model_forward": False,
+            "model_backward": False,
+            "synthetic_metric_probes": synthetic_metric_probes(),
+            "checkpoint_identity_probes": checkpoint_identity_probes(config),
+            "runtime": pilot_runtime(config_path),
+        },
+    )
+
+
+def repair_evaluate_stage(config_path: Path, run_root: Path) -> None:
+    config_path = bind_pilot_config(config_path, run_root)
+    config = load_pilot_config(config_path)
+    require_authorization()
+    repair = config["metric_repair"]
+    origin = (Path(__file__).resolve().parent.parent.parent / repair["origin_run_root"]).resolve()
+    if origin == run_root.resolve():
+        raise RuntimeError("repair output root must not overwrite the origin runroot")
+    origin_prepared = origin / "prepared_sources.pt"
+    origin_frozen = origin / "frozen_config.json"
+    if sha256_file(origin_prepared) != repair["origin_prepared_sources_sha256"]:
+        raise RuntimeError("origin prepared identity mismatch")
+    if sha256_file(origin_frozen) != repair["origin_config_sha256"]:
+        raise RuntimeError("origin frozen config identity mismatch")
+    evaluator_config_sha256 = sha256_file(config_path)
+    if evaluator_config_sha256 == repair["origin_config_sha256"]:
+        raise RuntimeError("repair evaluator config must be distinct from the origin frozen config")
+    prepared = torch.load(origin_prepared, map_location="cpu", weights_only=False)
+    device = require_gpu(config)
+    max_reserved = int(repair["bounds"]["max_gpu_allocator_reserved_bytes"])
+    deadline = time.perf_counter() + float(repair["bounds"]["wall_seconds"])
+    chunk = int(config["training"]["chunk_samples"])
+    threshold = float(config["evaluation"]["operating_point"])
+    fit_ids = [source["source_id"] for source in config["sources"]["FIT"]]
+    cal_ids = [source["source_id"] for source in config["sources"]["CAL"]]
+    dev_ids = [source["source_id"] for source in config["sources"]["DEV"]]
+    logits_root = run_root / "replay_logits"
+    logits_root.mkdir(parents=True, exist_ok=True)
+    source_passes = 0
+
+    def run_pass(
+        model: StreamingStudent,
+        source_ids: list[str],
+        weight_id: str,
+        checkpoint_sha256: str | None,
+    ) -> dict[str, Any]:
+        nonlocal source_passes
+        results: dict[str, Any] = {}
+        model.eval()
+        with torch.no_grad():
+            for source_id in source_ids:
+                if time.perf_counter() > deadline:
+                    raise RuntimeError("repair wall cap exhausted")
+                payload = prepared["sources"][source_id]
+                logits, frontiers = stream_source(
+                    model, payload["waveform"], device, chunk
+                )
+                if torch.cuda.max_memory_reserved(device) > max_reserved:
+                    raise RuntimeError("repair GPU reserved cap exceeded")
+                if not torch.equal(frontiers, payload["frontiers"]):
+                    raise RuntimeError(f"{source_id} repair frontiers differ")
+                atomic_torch_save(
+                    logits_root / f"{weight_id}_{source_id}.pt",
+                    {
+                        "schema": "PSEM-ISSUE-164-GT-PILOT-REPAIR-LOGITS-1",
+                        "weight_id": weight_id,
+                        "checkpoint_sha256": checkpoint_sha256,
+                        "source_id": source_id,
+                        "logits": logits.to(dtype=torch.float32).contiguous(),
+                        "frontiers": frontiers,
+                        "origin_prepared_sha256": repair["origin_prepared_sources_sha256"],
+                        "evaluator_config_sha256": evaluator_config_sha256,
+                        "evaluator_implementation_sha256": dict(config["implementation_sha256"]),
+                    },
+                )
+                results[source_id] = {
+                    "label": weight_id,
+                    "slots": payload["slots"],
+                    **score_outputs(
+                        logits,
+                        payload["targets"],
+                        payload["validity"],
+                        payload["frontiers"],
+                        payload["relation_only_nonlexical_masks"],
+                        threshold,
+                        payload["timeline"],
+                    ),
+                }
+                source_passes += 1
+        return results
+
+    untrained_model = build_fresh_model(config, device)
+    untrained = run_pass(untrained_model, fit_ids + cal_ids + dev_ids, "untrained_seed20260915", None)
+    cal_rows: dict[str, Any] = {}
+    for step in config["evaluation"]["calibration_checkpoint_steps"]:
+        path = origin / f"checkpoint_step_{step}.pt"
+        expected = repair["checkpoint_sha256"][str(step)]
+        payload = load_historical_checkpoint_for_eval(path, expected)
+        model = StreamingStudent().to(device)
+        model.load_state_dict(payload["model"])
+        cal_rows[str(step)] = {
+            "checkpoint_sha256": expected,
+            "cal": run_pass(model, cal_ids, f"checkpoint_{step}", expected),
+        }
+    selected_step = int(repair["frozen_selected_step"])
+    selected_sha = repair["checkpoint_sha256"][str(selected_step)]
+    selected_payload = load_historical_checkpoint_for_eval(
+        origin / f"checkpoint_step_{selected_step}.pt", selected_sha
+    )
+    selected_model = StreamingStudent().to(device)
+    selected_model.load_state_dict(selected_payload["model"])
+    selected = run_pass(
+        selected_model, fit_ids + dev_ids, f"checkpoint_{selected_step}", selected_sha
+    )
+    if source_passes != int(repair["maximum_source_passes"]):
+        raise RuntimeError(
+            f"repair source passes {source_passes} != {repair['maximum_source_passes']}"
+        )
+    origin_initial = json.loads((origin / "initial_eval.json").read_text(encoding="utf-8"))
+    origin_cal = json.loads((origin / "cal_selection.json").read_text(encoding="utf-8"))
+    origin_final = json.loads((origin / "final_eval.json").read_text(encoding="utf-8"))
+    agreement = float(repair["activity_bce_agreement"])
+    bce_comparisons = []
+
+    def agree(label: str, source_id: str, actual: float, expected: float) -> None:
+        delta = abs(actual - expected)
+        bce_comparisons.append(
+            {
+                "label": label,
+                "source_id": source_id,
+                "repaired": actual,
+                "origin": expected,
+                "abs_delta": delta,
+            }
+        )
+        if delta > agreement:
+            raise RuntimeError(f"{label} {source_id} BCE delta {delta} exceeds {agreement}")
+
+    for source_id, row in untrained.items():
+        agree(
+            "untrained",
+            source_id,
+            row["canonical_masked_bce"],
+            origin_initial["untrained"][source_id]["canonical_masked_bce"],
+        )
+    for step, row in cal_rows.items():
+        source_id = cal_ids[0]
+        agree(
+            f"cal_{step}",
+            source_id,
+            row["cal"][source_id]["canonical_masked_bce"],
+            origin_cal["candidates"][step]["cal"][source_id]["canonical_masked_bce"],
+        )
+    for source_id, row in selected.items():
+        agree(
+            f"selected_{selected_step}",
+            source_id,
+            row["canonical_masked_bce"],
+            origin_final["scores"][source_id]["canonical_masked_bce"],
+        )
+    atomic_json(
+        run_root / "repair_eval.json",
+        {
+            "stage": "repair_evaluate",
+            "optimizer_steps": 0,
+            "source_passes": source_passes,
+            "origin_run_root": str(origin),
+            "origin_prepared_sha256": repair["origin_prepared_sources_sha256"],
+            "origin_config_sha256": repair["origin_config_sha256"],
+            "evaluator_config_sha256": evaluator_config_sha256,
+            "frozen_selected_step": selected_step,
+            "untrained": untrained,
+            "cal": cal_rows,
+            "selected_fit_dev": selected,
+            "activity_bce_agreement": bce_comparisons,
+            "runtime": pilot_runtime(config_path),
+        },
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "stage", choices=("check", "prepare", "train", "evaluate", "report")
+        "stage",
+        choices=("check", "prepare", "train", "evaluate", "report", "probe", "repair-evaluate"),
     )
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--run-root", type=Path, required=True)
@@ -1583,6 +2149,10 @@ def main() -> int:
         )
     elif args.stage == "evaluate":
         evaluate_stage(args.config.resolve(), args.run_root.resolve(), args.which)
+    elif args.stage == "probe":
+        probe_stage(args.config.resolve(), args.run_root.resolve())
+    elif args.stage == "repair-evaluate":
+        repair_evaluate_stage(args.config.resolve(), args.run_root.resolve())
     else:
         report_stage(args.config.resolve(), args.run_root.resolve())
     return 0
