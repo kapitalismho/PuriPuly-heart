@@ -258,8 +258,11 @@ def jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def selected_normalized_labels(config: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
-    source = config["source"]
+def resolve_frozen_source(
+    config: dict[str, Any], source: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    if source is None:
+        source = config["source"]
     repo_root = Path(__file__).resolve().parents[2]
     data_root = repo_root / "experiments" / "psem_training_strategy_gate" / "data" / "v2"
     manifest_paths = {
@@ -282,18 +285,34 @@ def selected_normalized_labels(config: dict[str, Any]) -> tuple[dict[str, Any], 
     component = matching_components[0]
     if component["component_id"] != source["component_id"] or component["role"] != source["role"]:
         raise RuntimeError("selected source split role/component differs from the frozen choice")
+    if source["role"] == "PSEM-STRATEGY-EVAL" or component["role"] == "PSEM-STRATEGY-EVAL":
+        raise RuntimeError("EVAL sources are excluded from this learning path")
     identities = json.loads(manifest_paths["identity_components"].read_text(encoding="utf-8"))
     identity_component = next(
         (row for row in identities["components"] if row["component_id"] == source["component_id"]),
         None,
     )
+    closure = config.get("locked_identity_closure") or {}
+    forbidden = set(closure.get("source_ids", []))
+    if source["source_id"] in forbidden or (
+        identity_component is not None
+        and any(source_id in forbidden for source_id in identity_component["source_ids"])
+    ):
+        raise RuntimeError("selected source is inside the locked identity-component closure")
     if (
         identity_component is None
         or identity_component["eval_forbidden"]
-        or identity_component["selection_exposed_source_ids"]
         or not identity_component["split_assignment_eligible"]
     ):
         raise RuntimeError("selected source component is not eligible for this FIT probe")
+    if source["role"] == "PSEM-STRATEGY-TRAIN":
+        if identity_component["selection_exposed_source_ids"]:
+            raise RuntimeError("selected source component is not eligible for this FIT probe")
+    elif source["role"] == "PSEM-STRATEGY-DEV":
+        if component["role"] != "PSEM-STRATEGY-DEV":
+            raise RuntimeError("DEV source is not assigned PSEM-STRATEGY-DEV")
+    else:
+        raise RuntimeError(f"unsupported source role {source['role']}")
     source_rows = [
         row
         for row in jsonl(manifest_paths["source_manifest"])
@@ -309,6 +328,23 @@ def selected_normalized_labels(config: dict[str, Any]) -> tuple[dict[str, Any], 
     source_row = source_rows[0]
     if source_row["waveform_sha256"] != source["waveform_sha256"]:
         raise RuntimeError("selected source manifest waveform identity differs")
+    return {
+        "source": source,
+        "source_row": source_row,
+        "topology_row": topology_rows[0],
+        "component": component,
+        "identity_component": identity_component,
+        "manifest_paths": manifest_paths,
+    }
+
+
+def selected_normalized_labels(
+    config: dict[str, Any], source: dict[str, Any] | None = None
+) -> tuple[dict[str, Any], dict[str, str]]:
+    resolved = resolve_frozen_source(config, source)
+    source = resolved["source"]
+    source_row = resolved["source_row"]
+    topology_row = resolved["topology_row"]
     from experiments.psem_training_strategy_gate.data.reference_normalization import (
         normalize_reference_session,
         open_reference_checkout,
@@ -322,7 +358,7 @@ def selected_normalized_labels(config: dict[str, Any]) -> tuple[dict[str, Any], 
     label_sha256 = canonical_sha256(label_dict)
     if (
         label_sha256 != source["label_result_sha256"]
-        or label_sha256 != topology_rows[0]["label_result_sha256"]
+        or label_sha256 != topology_row["label_result_sha256"]
     ):
         raise RuntimeError("selected normalized labels differ from the frozen topology artifact")
     if normalized.reference_sha256 != source["reference_rttm_sha256"]:
@@ -353,7 +389,13 @@ def selected_normalized_labels(config: dict[str, Any]) -> tuple[dict[str, Any], 
     }
 
 
-def first_appearance_slots(timeline: list[dict[str, Any]], permitted_end_sample: int) -> list[str]:
+def first_appearance_slots(
+    timeline: list[dict[str, Any]],
+    permitted_end_sample: int,
+    *,
+    output_slots: int = 4,
+    require_all_slots: bool = True,
+) -> list[str | None]:
     first: dict[str, int] = {}
     for row in timeline:
         if row["masked_for_activity"] or int(row["start_sample"]) >= permitted_end_sample:
@@ -363,20 +405,30 @@ def first_appearance_slots(timeline: list[dict[str, Any]], permitted_end_sample:
                 first.get(speaker, int(row["start_sample"])), int(row["start_sample"])
             )
     ordered = sorted(first, key=lambda speaker: (first[speaker], speaker))
-    if len(ordered) != 4:
+    if require_all_slots:
+        if len(ordered) != output_slots:
+            raise RuntimeError(
+                f"selected source does not expose exactly four known speakers: {ordered}"
+            )
+        return ordered
+    if len(ordered) > output_slots:
         raise RuntimeError(
-            f"selected source does not expose exactly four known speakers: {ordered}"
+            f"selected source exposes more than {output_slots} known speakers: {ordered}"
         )
-    return ordered
+    return ordered + [None] * (output_slots - len(ordered))
 
 
 def projected_targets(
-    frontiers: Tensor, timeline: list[dict[str, Any]], slots: list[str], receptive_field: int
+    frontiers: Tensor,
+    timeline: list[dict[str, Any]],
+    slots: list[str | None],
+    receptive_field: int,
 ) -> tuple[Tensor, Tensor]:
     targets = torch.zeros(frontiers.numel(), len(slots), dtype=torch.float32)
     validity = torch.zeros(frontiers.numel(), dtype=torch.bool)
+    hop = StreamingStudent.output_hop_samples
     for frame, frontier_value in enumerate(frontiers.tolist()):
-        left = frontier_value - StreamingStudent.output_hop_samples
+        left = frontier_value - hop
         right = frontier_value
         overlaps = [
             row
@@ -390,19 +442,21 @@ def projected_targets(
         valid = (
             left >= 0
             and frontier_value >= receptive_field
-            and covered == StreamingStudent.output_hop_samples
+            and covered == hop
             and not any(bool(row["masked_for_activity"]) for row in overlaps)
         )
         validity[frame] = valid
         if not valid:
             continue
         for slot, speaker in enumerate(slots):
+            if speaker is None:
+                continue
             active = sum(
                 max(0, min(right, int(row["end_sample"])) - max(left, int(row["start_sample"])))
                 for row in overlaps
                 if speaker in row["active_speakers"]
             )
-            targets[frame, slot] = min(1.0, active / StreamingStudent.output_hop_samples)
+            targets[frame, slot] = min(1.0, active / hop)
     return targets, validity
 
 
