@@ -775,7 +775,7 @@
     "frozen_config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
     "implementation_base_commit_in_frozen_runtime_receipts": "3cb7f405b681c496df1520400d2f95b370f079fd",
     "implementation_sha256": {
-      "gt_pilot.py": "938b1bd11a792c86b4106fec96eee4773566cf1045a690eab358ae5f20485fc1",
+      "gt_pilot.py": "b453a38e042cd0a8603282e792d7edce11733cf18584ceebec39af7f6e818774",
       "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
       "run_gt_pilot.sh": "526e7a33ff295cd4d2b66f2dbb967f18091b2b763c469e4bb7ebc455945f9654",
       "student.py": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d"
@@ -1051,6 +1051,30 @@
       "not_run": false,
       "retain_raw_float32_logits": true,
       "stage": "repair-evaluate"
+    },
+    "checkpoint_consumer_repair": {
+      "cpu_probe": {
+        "cal_step78_accepted_with_ledger_780": true,
+        "exit": 0,
+        "historical_explicit_hash_reader_accepted": true,
+        "hub_uptime_s": 6.5,
+        "model_forward": false,
+        "probe_receipt_sha256": "aab4077887a45803113e1e73630805abdb6bceb30f03eb766e46b365e037930b",
+        "resume_rejects_stale_step78_versus_ledger_780": true,
+        "run_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-checkpoint-consumer-probes-ledger",
+        "selected_step390_accepted_with_ledger_780": true,
+        "unbound_legacy_rejected": true,
+        "valid_current_bound_accepted": true,
+        "wrong_config_rejected": true,
+        "wrong_expected_step_rejected": true
+      },
+      "current_schema": "PSEM-ISSUE-164-GT-PILOT-CHECKPOINT-2",
+      "finding": "REPAIR-REGRESSION-CAL-CHECKPOINT-SCHEMA",
+      "historical_reader": "load_historical_checkpoint_for_eval",
+      "historical_schema": "PSEM-ISSUE-164-GT-PILOT-CHECKPOINT-1",
+      "no_schema_fallback": true,
+      "ordinary_loader": "load_current_checkpoint_for_eval",
+      "ordinary_loader_does_not_consult_training_ledger": true
     },
     "corrected_scores": {
       "cal": {
@@ -1796,8 +1820,8 @@
     },
     "cumulative_optimizer_updates_remain": 803,
     "current_fields_are_corrected_derivation": true,
-    "evaluator_config_sha256": "445bd0b86a96166cd27642d8092ab72d83474b24bbaaf35b0ba65148c8e15ced",
-    "evaluator_gt_pilot_sha256": "861ce06b3d5cd5a9e0e88908742d41e6342bb507a2c36d9019f628eaa83523e5",
+    "evaluator_config_sha256": "26408e62be90189715cd5f2024abba8daecb7fad3962710ef961b9eba7f0db89",
+    "evaluator_gt_pilot_sha256": "b453a38e042cd0a8603282e792d7edce11733cf18584ceebec39af7f6e818774",
     "execution_commit": "bc77e0c0439c379b268b1c047b2c965aef69c41c",
     "execution_receipt_sha256": "ff116879de578bc5f1daf6390acf364acc56dc9ab6d3f9667bfe727bb5453dcc",
     "historical_defective_metrics_location": "origin runroot JSON only; not current GT_PILOT_RESULT score fields",
@@ -6226,6 +6250,7 @@
     "Pause-process elapsed/peaks are not in the current origin accounting.json",
     "Seven-stage original training command/exit proof is hub transcript, not a durable origin runroot field",
     "Repair-evaluate command/exit is hub transcript plus repair-root execution_receipt.json",
-    "Repair-evaluate did not emit a separate GPU timing receipt; hub wall 41.6s is process uptime, not a live 80ms or matched-teacher claim"
+    "Repair-evaluate did not emit a separate GPU timing receipt; hub wall 41.6s is process uptime, not a live 80ms or matched-teacher claim",
+    "Ordinary CAL/final now load current bound checkpoints only; historical v1 remains explicit-hash"
   ]
 }

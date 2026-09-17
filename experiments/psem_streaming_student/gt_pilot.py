@@ -41,8 +41,8 @@ from experiments.psem_relative_occupancy_gate.evaluate import (
 )
 
 SCHEMA = "PSEM-ISSUE-164-GT-PILOT-1"
-CHECKPOINT_SCHEMA = "PSEM-ISSUE-164-GT-PILOT-CHECKPOINT-1"
-BOUND_CHECKPOINT_SCHEMA = "PSEM-ISSUE-164-GT-PILOT-CHECKPOINT-2"
+HISTORICAL_CHECKPOINT_SCHEMA = "PSEM-ISSUE-164-GT-PILOT-CHECKPOINT-1"
+CURRENT_CHECKPOINT_SCHEMA = "PSEM-ISSUE-164-GT-PILOT-CHECKPOINT-2"
 OUTPUT_SLOTS = 4
 HOP = StreamingStudent.output_hop_samples
 SAMPLE_RATE = StreamingStudent.sample_rate
@@ -1100,6 +1100,9 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
     config = load_pilot_config(config_path)
     require_authorization()
     prepared = load_prepared(run_root, config_path)
+    config_sha256 = sha256_file(config_path)
+    prepared_sha256 = sha256_file(run_root / "prepared_sources.pt")
+    schedule = fit_schedule(config)
     device = require_gpu(config)
     chunk = int(config["training"]["chunk_samples"])
     threshold = float(config["evaluation"]["operating_point"])
@@ -1146,9 +1149,14 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
         rows = {}
         for step in config["evaluation"]["calibration_checkpoint_steps"]:
             path = run_root / f"checkpoint_step_{step}.pt"
-            payload = torch.load(path, map_location="cpu", weights_only=False)
-            if payload["schema"] != CHECKPOINT_SCHEMA or payload["completed_updates"] != step:
-                raise RuntimeError(f"CAL candidate {step} identity is incorrect")
+            payload = load_current_checkpoint_for_eval(
+                path,
+                config,
+                config_sha256,
+                prepared_sha256,
+                int(step),
+                schedule,
+            )
             model = StreamingStudent().to(device)
             model.load_state_dict(payload["model"])
             rows[str(step)] = {
@@ -1192,7 +1200,14 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
         path = run_root / f"checkpoint_step_{step}.pt"
         if sha256_file(path) != selection["selected"]["checkpoint_sha256"]:
             raise RuntimeError("selected checkpoint identity changed before final evaluation")
-        payload = torch.load(path, map_location="cpu", weights_only=False)
+        payload = load_current_checkpoint_for_eval(
+            path,
+            config,
+            config_sha256,
+            prepared_sha256,
+            int(step),
+            schedule,
+        )
         model = StreamingStudent().to(device)
         model.load_state_dict(payload["model"])
         fit_ids = [source["source_id"] for source in config["sources"]["FIT"]]
@@ -1318,7 +1333,7 @@ def save_checkpoint(
 ) -> str:
     numeric = numeric_state_position(None if state is None else state.cpu_dict())
     payload = {
-        "schema": BOUND_CHECKPOINT_SCHEMA,
+        "schema": CURRENT_CHECKPOINT_SCHEMA,
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
         "config_schema": config["schema"],
@@ -1350,18 +1365,17 @@ def refuse_stale_checkpoint(checkpoint: dict[str, Any], ledger_rows: list[dict[s
         raise RuntimeError("in-flight uncertain update is charged; automatic retry is forbidden")
 
 
-def validate_bound_checkpoint_for_resume(
+def validate_current_checkpoint_identity(
     checkpoint: dict[str, Any],
     config: dict[str, Any],
     config_sha256: str,
     prepared_sha256: str,
     schedule: list[dict[str, Any]],
-    ledger_rows: list[dict[str, Any]],
+    expected_completed: int | None = None,
 ) -> None:
-    refuse_stale_checkpoint(checkpoint, ledger_rows)
-    if checkpoint.get("schema") != BOUND_CHECKPOINT_SCHEMA:
+    if checkpoint.get("schema") != CURRENT_CHECKPOINT_SCHEMA:
         raise RuntimeError(
-            "unbound historical checkpoint cannot silently resume; historical evaluation must use an explicit artifact hash"
+            "unbound historical checkpoint cannot be used by the current bound consumer; historical evaluation must use an explicit artifact hash"
         )
     if checkpoint.get("config_schema") != config["schema"]:
         raise RuntimeError("checkpoint config schema does not match the frozen config")
@@ -1374,6 +1388,10 @@ def validate_bound_checkpoint_for_resume(
     if list(checkpoint.get("source_order") or []) != list(config["training"]["source_order"]):
         raise RuntimeError("checkpoint source order does not match")
     completed = int(checkpoint["completed_updates"])
+    if expected_completed is not None and completed != int(expected_completed):
+        raise RuntimeError(
+            f"checkpoint completed_updates {completed} does not match expected step {expected_completed}"
+        )
     if completed < 0 or completed > len(schedule):
         raise RuntimeError("checkpoint completed_updates is outside the frozen schedule")
     cursor = checkpoint.get("schedule_cursor")
@@ -1413,6 +1431,40 @@ def validate_bound_checkpoint_for_resume(
         return
     if derived != {completed} or stored_counters != {completed}:
         raise RuntimeError("optimizer counters do not match completed updates")
+
+
+def validate_bound_checkpoint_for_resume(
+    checkpoint: dict[str, Any],
+    config: dict[str, Any],
+    config_sha256: str,
+    prepared_sha256: str,
+    schedule: list[dict[str, Any]],
+    ledger_rows: list[dict[str, Any]],
+) -> None:
+    refuse_stale_checkpoint(checkpoint, ledger_rows)
+    validate_current_checkpoint_identity(
+        checkpoint, config, config_sha256, prepared_sha256, schedule
+    )
+
+
+def load_current_checkpoint_for_eval(
+    path: Path,
+    config: dict[str, Any],
+    config_sha256: str,
+    prepared_sha256: str,
+    expected_completed: int,
+    schedule: list[dict[str, Any]],
+) -> dict[str, Any]:
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+    validate_current_checkpoint_identity(
+        payload,
+        config,
+        config_sha256,
+        prepared_sha256,
+        schedule,
+        expected_completed=expected_completed,
+    )
+    return payload
 
 
 def load_historical_checkpoint_for_eval(path: Path, expected_sha256: str) -> dict[str, Any]:
@@ -1460,7 +1512,7 @@ def checkpoint_identity_probes(config: dict[str, Any]) -> dict[str, Any]:
         {"kind": "completed", "update_index": 2},
     ]
     bound = {
-        "schema": BOUND_CHECKPOINT_SCHEMA,
+        "schema": CURRENT_CHECKPOINT_SCHEMA,
         "model": {},
         "optimizer": {
             "state": {0: {"step": torch.tensor(2)}},
@@ -1502,7 +1554,7 @@ def checkpoint_identity_probes(config: dict[str, Any]) -> dict[str, Any]:
         "param_groups": bound["optimizer"]["param_groups"],
     }
     unbound = dict(bound)
-    unbound["schema"] = CHECKPOINT_SCHEMA
+    unbound["schema"] = HISTORICAL_CHECKPOINT_SCHEMA
     stale_ledger = ledger + [
         {"kind": "intent", "update_index": 3},
         {"kind": "completed", "update_index": 3},
@@ -1544,6 +1596,186 @@ def checkpoint_identity_probes(config: dict[str, Any]) -> dict[str, Any]:
             "uncertain update",
         ),
         "historical_eval_uses_explicit_hash": True,
+    }
+
+
+def _expect_eval_loader_rejection(
+    path: Path,
+    config: dict[str, Any],
+    config_sha256: str,
+    prepared_sha256: str,
+    expected_completed: int,
+    schedule: list[dict[str, Any]],
+    needle: str,
+) -> str:
+    try:
+        load_current_checkpoint_for_eval(
+            path, config, config_sha256, prepared_sha256, expected_completed, schedule
+        )
+    except RuntimeError as exc:
+        message = str(exc)
+        if needle not in message:
+            raise RuntimeError(f"rejected for the wrong reason: {message}") from exc
+        return message
+    raise RuntimeError(f"expected ordinary eval loader rejection containing {needle}")
+
+
+def _current_bound_checkpoint_payload(
+    config: dict[str, Any],
+    completed: int,
+    config_sha256: str,
+    prepared_sha256: str,
+    *,
+    fixture_role: str,
+) -> dict[str, Any]:
+    schedule = fit_schedule(config)
+    settings = optimizer_settings_from_config(config)
+    cursor = expected_cursor(schedule, completed)
+    numeric = expected_numeric_state(cursor, config)
+    return {
+        "schema": CURRENT_CHECKPOINT_SCHEMA,
+        "model": {},
+        "fixture_role": fixture_role,
+        "optimizer": {
+            "state": {0: {"step": torch.tensor(completed)}},
+            "param_groups": [
+                {
+                    "lr": settings["learning_rate"],
+                    "weight_decay": settings["weight_decay"],
+                }
+            ],
+        },
+        "config_schema": config["schema"],
+        "config_sha256": config_sha256,
+        "implementation_sha256": dict(config["implementation_sha256"]),
+        "prepared_sha256": prepared_sha256,
+        "source_order": list(config["training"]["source_order"]),
+        "optimizer_settings": settings,
+        "optimizer_step_counters": [completed],
+        "completed_updates": completed,
+        "numeric_state": numeric,
+        "streaming_state": {
+            "total_samples": numeric["total_samples"],
+            "emitted_outputs": numeric["emitted_outputs"],
+        },
+        "schedule_cursor": cursor,
+    }
+
+
+def current_checkpoint_eval_loader_probes(
+    config: dict[str, Any], fixture_dir: Path
+) -> dict[str, Any]:
+    fixture_dir.mkdir(parents=True, exist_ok=True)
+    schedule = fit_schedule(config)
+    config_sha256 = "a" * 64
+    prepared_sha256 = "b" * 64
+    bound = _current_bound_checkpoint_payload(
+        config,
+        2,
+        config_sha256,
+        prepared_sha256,
+        fixture_role="current-bound-eval-loader-fixture-not-training",
+    )
+    bound_path = fixture_dir / "current_bound_step2.pt"
+    atomic_torch_save(bound_path, bound)
+    loaded = load_current_checkpoint_for_eval(
+        bound_path, config, config_sha256, prepared_sha256, 2, schedule
+    )
+    if loaded["schema"] != CURRENT_CHECKPOINT_SCHEMA or loaded["completed_updates"] != 2:
+        raise RuntimeError("ordinary CAL/final loader rejected a valid current bound checkpoint")
+    foreign = dict(bound)
+    foreign["config_sha256"] = "c" * 64
+    foreign_path = fixture_dir / "foreign_config.pt"
+    atomic_torch_save(foreign_path, foreign)
+    historical = {
+        "schema": HISTORICAL_CHECKPOINT_SCHEMA,
+        "model": {},
+        "fixture_role": "historical-unbound-v1-fixture-not-a-current-training-checkpoint",
+        "completed_updates": 2,
+    }
+    historical_path = fixture_dir / "historical_v1_fixture.pt"
+    atomic_torch_save(historical_path, historical)
+    historical_sha256 = sha256_file(historical_path)
+    historical_loaded = load_historical_checkpoint_for_eval(historical_path, historical_sha256)
+    if historical_loaded["schema"] != HISTORICAL_CHECKPOINT_SCHEMA:
+        raise RuntimeError("explicit-hash historical reader failed the marked v1 fixture")
+    cal78 = _current_bound_checkpoint_payload(
+        config,
+        78,
+        config_sha256,
+        prepared_sha256,
+        fixture_role="current-bound-cal-step78-fixture-not-training",
+    )
+    cal78_path = fixture_dir / "current_bound_step78.pt"
+    atomic_torch_save(cal78_path, cal78)
+    selected390 = _current_bound_checkpoint_payload(
+        config,
+        390,
+        config_sha256,
+        prepared_sha256,
+        fixture_role="current-bound-selected-step390-fixture-not-training",
+    )
+    selected390_path = fixture_dir / "current_bound_step390.pt"
+    atomic_torch_save(selected390_path, selected390)
+    ledger_780 = [
+        {"kind": "intent", "update_index": 780},
+        {"kind": "completed", "update_index": 780},
+    ]
+    loaded78 = load_current_checkpoint_for_eval(
+        cal78_path, config, config_sha256, prepared_sha256, 78, schedule
+    )
+    loaded390 = load_current_checkpoint_for_eval(
+        selected390_path, config, config_sha256, prepared_sha256, 390, schedule
+    )
+    if loaded78["completed_updates"] != 78 or loaded390["completed_updates"] != 390:
+        raise RuntimeError("ordinary eval loader failed an earlier bound CAL/final candidate")
+    resume_stale_78 = _expect_resume_rejection(
+        cal78,
+        config,
+        config_sha256,
+        prepared_sha256,
+        schedule,
+        ledger_780,
+        "stale checkpoint",
+    )
+    return {
+        "ordinary_loader": "load_current_checkpoint_for_eval",
+        "ordinary_loader_does_not_consult_training_ledger": True,
+        "valid_current_bound_accepted": True,
+        "wrong_expected_step_rejected": _expect_eval_loader_rejection(
+            bound_path,
+            config,
+            config_sha256,
+            prepared_sha256,
+            78,
+            schedule,
+            "expected step",
+        ),
+        "wrong_config_rejected": _expect_eval_loader_rejection(
+            foreign_path,
+            config,
+            config_sha256,
+            prepared_sha256,
+            2,
+            schedule,
+            "config identity",
+        ),
+        "unbound_legacy_rejected": _expect_eval_loader_rejection(
+            historical_path,
+            config,
+            config_sha256,
+            prepared_sha256,
+            2,
+            schedule,
+            "unbound historical",
+        ),
+        "historical_explicit_hash_reader_accepted": True,
+        "historical_fixture_sha256": historical_sha256,
+        "historical_fixture_role": historical_loaded["fixture_role"],
+        "end_of_training_ledger_completed": 780,
+        "cal_step78_accepted_with_ledger_780": True,
+        "selected_step390_accepted_with_ledger_780": True,
+        "resume_rejects_stale_step78_versus_ledger_780": resume_stale_78,
     }
 
 def next_chunk_logits(
@@ -1943,6 +2175,9 @@ def probe_stage(config_path: Path, run_root: Path) -> None:
             "model_backward": False,
             "synthetic_metric_probes": synthetic_metric_probes(),
             "checkpoint_identity_probes": checkpoint_identity_probes(config),
+            "current_checkpoint_eval_loader_probes": current_checkpoint_eval_loader_probes(
+                config, run_root / "checkpoint_loader_fixtures"
+            ),
             "runtime": pilot_runtime(config_path),
         },
     )
