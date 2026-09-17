@@ -1,0 +1,5070 @@
+{
+  "schema": "PSEM-ISSUE-164-GT-PILOT-1",
+  "status": "executed_pilot_complete_not_issue164",
+  "scope": "First bounded multi-source GT learning decision pilot; not issue 164 completion, not production, not KD, not architecture verdict, not generalization.",
+  "adoption": null,
+  "issue164_open": true,
+  "not_production": true,
+  "identity": {
+    "authority_id": "AUTONOMY-2",
+    "contract_schema": "PSEM-GT-DECISION-PILOT-1",
+    "contract_path": "experiments/psem_streaming_student/.stage-control/autonomous-research/gt-pilot-1-contract.json",
+    "release_id": "GT-PILOT-1-GO",
+    "release_schema": "PSEM-GT-PILOT-DIRECTOR-RELEASE-1",
+    "execution_commit": "e16a93c067baacc1d6eadcf296996b00a915527b",
+    "baseline_commit": "3cb7f405b681c496df1520400d2f95b370f079fd",
+    "implementation_base_commit_in_frozen_runtime_receipts": "3cb7f405b681c496df1520400d2f95b370f079fd",
+    "config_path": "experiments/psem_streaming_student/gt_pilot_config.json",
+    "config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+    "frozen_config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+    "implementation_sha256": {
+      "gt_pilot.py": "938b1bd11a792c86b4106fec96eee4773566cf1045a690eab358ae5f20485fc1",
+      "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
+      "run_gt_pilot.sh": "526e7a33ff295cd4d2b66f2dbb967f18091b2b763c469e4bb7ebc455945f9654",
+      "student.py": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d"
+    },
+    "student_parameters": 5940740,
+    "seed": 20260915,
+    "precision": "float32",
+    "optimizer": "AdamW lr=1e-4 weight_decay=1e-4 clip=5"
+  },
+  "runtime": {
+    "distribution": "WSL Ubuntu",
+    "python": "3.12.3",
+    "torch": "2.13.0+rocm10.0.0",
+    "torch_hip": "7.15.26333",
+    "device": "AMD Radeon RX 7900 XTX",
+    "launcher": "wsl.exe -d Ubuntu --exec; PATH venv/bin:/usr/bin:/bin; LD_LIBRARY_PATH=/opt/rocm/lib:/usr/lib/wsl/lib",
+    "source": "python/torch/torch_hip from prepare_receipt.json runtime; device name from final_eval.json inference_cost.device; gfx1100 is the assigned ROCm target, not re-probed in this report"
+  },
+  "optimizer_step_accounting": {
+    "prior_cumulative": 23,
+    "this_run_intent": 780,
+    "this_run_completed": 780,
+    "uncertain": 0,
+    "cumulative": 803,
+    "maximum_cumulative": 803,
+    "automatic_retry": false,
+    "ledger_path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/update_ledger.jsonl",
+    "ledger_sha256": "899a0f88365291a7f9f63601ee0f2a27ae2d4131e563b99fa6627c6d696b7955",
+    "resume_accounting_records": "updates 3-780"
+  },
+  "stages": {
+    "command_and_exit_proof": "hub process transcripts from this assignment (gt-pilot-prepare, gt-pilot-eval-initial, gt-pilot-train-pause2, gt-pilot-train-resume, gt-pilot-eval-cal, gt-pilot-eval-final, gt-pilot-report). Not a durable execution-log field in runroot.",
+    "sequence": [
+      {
+        "stage": "prepare",
+        "exit": 0,
+        "hub_uptime_s": 56.3,
+        "command": [
+          "wsl.exe",
+          "-d",
+          "Ubuntu",
+          "--exec",
+          "bash",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/run_gt_pilot.sh",
+          "prepare",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/gt_pilot_config.json",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1",
+          "--authorize-material"
+        ]
+      },
+      {
+        "stage": "evaluate",
+        "which": "initial",
+        "exit": 0,
+        "hub_uptime_s": 30.1,
+        "command": [
+          "wsl.exe",
+          "-d",
+          "Ubuntu",
+          "--exec",
+          "bash",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/run_gt_pilot.sh",
+          "evaluate",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/gt_pilot_config.json",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1",
+          "--which",
+          "initial",
+          "--authorize-material"
+        ]
+      },
+      {
+        "stage": "train",
+        "pause_after": 2,
+        "exit": 0,
+        "hub_uptime_s": 9.3,
+        "command": [
+          "wsl.exe",
+          "-d",
+          "Ubuntu",
+          "--exec",
+          "bash",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/run_gt_pilot.sh",
+          "train",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/gt_pilot_config.json",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1",
+          "--pause-after",
+          "2",
+          "--authorize-material"
+        ]
+      },
+      {
+        "stage": "train",
+        "resume": true,
+        "exit": 0,
+        "hub_uptime_s": 82,
+        "command": [
+          "wsl.exe",
+          "-d",
+          "Ubuntu",
+          "--exec",
+          "bash",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/run_gt_pilot.sh",
+          "train",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/gt_pilot_config.json",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1",
+          "--resume",
+          "--authorize-material"
+        ]
+      },
+      {
+        "stage": "evaluate",
+        "which": "cal",
+        "exit": 0,
+        "hub_uptime_s": 17.3,
+        "command": [
+          "wsl.exe",
+          "-d",
+          "Ubuntu",
+          "--exec",
+          "bash",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/run_gt_pilot.sh",
+          "evaluate",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/gt_pilot_config.json",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1",
+          "--which",
+          "cal",
+          "--authorize-material"
+        ]
+      },
+      {
+        "stage": "evaluate",
+        "which": "final",
+        "exit": 0,
+        "hub_uptime_s": 16.8,
+        "command": [
+          "wsl.exe",
+          "-d",
+          "Ubuntu",
+          "--exec",
+          "bash",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/run_gt_pilot.sh",
+          "evaluate",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/gt_pilot_config.json",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1",
+          "--which",
+          "final",
+          "--authorize-material"
+        ]
+      },
+      {
+        "stage": "report",
+        "exit": 0,
+        "hub_uptime_s": 11.5,
+        "command": [
+          "wsl.exe",
+          "-d",
+          "Ubuntu",
+          "--exec",
+          "bash",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/run_gt_pilot.sh",
+          "report",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/gt_pilot_config.json",
+          "/mnt/c/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1",
+          "--authorize-material"
+        ]
+      }
+    ]
+  },
+  "resume_witness": {
+    "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/resume_witness.json",
+    "sha256": "eb04228b0a8c0e83773450ce64b58964d85ff8730cb48ce9d449b339320d55d6",
+    "completed_updates_at_compare": 2,
+    "max_abs_logit_delta": 0.0,
+    "tolerance": 0.0001,
+    "precision": "float32",
+    "extra_optimizer_updates": 0
+  },
+  "cal_selection": {
+    "rule": "lowest canonical masked BCE on CAL only; earliest step on exact ties",
+    "step": 390,
+    "cal_masked_bce": 0.26681995391845703,
+    "checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+    "candidates": {
+      "78": {
+        "checkpoint_sha256": "c9a3d69554f3c2cdb74512e83dd137bdf47d4b5148a52a0f4af53473b4465d72",
+        "ami_ES2010a": {
+          "canonical_masked_bce": 0.4100472331047058,
+          "canonical_brier": 0.12203376740217209,
+          "valid_bins": 3607,
+          "operating_point": 0.5,
+          "slots": [
+            "FEE037",
+            "FEE040",
+            "FEE038",
+            "FEE039"
+          ],
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.004694835680751174,
+            "all_silence_valid_fraction": 0.982811200443582,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 3545,
+              "1": 40,
+              "2": 4,
+              "3": 3,
+              "4": 15
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 1226,
+                "f1": 0.011254019292604502,
+                "precision": 0.3888888888888889,
+                "recall": 0.005709624796084829
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 242,
+                "f1": 0.08552631578947367,
+                "precision": 0.20967741935483872,
+                "recall": 0.05371900826446281
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 184,
+                "f1": 0.06896551724137931,
+                "precision": 0.3684210526315789,
+                "recall": 0.03804347826086957
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 30,
+                "f1": 0.04166666666666667,
+                "precision": 0.05555555555555555,
+                "recall": 0.03333333333333333
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 56,
+              "f1": 0.23076923076923078,
+              "precision": 0.4090909090909091,
+              "recall": 0.16071428571428573,
+              "stable_physical_overlap_bins": 32,
+              "mixed_coverage_valid_bins": 209
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 49,
+              "f1": 0.22535211267605632
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 209,
+              "physical_overlap_valid_bins": 56,
+              "slot_threshold_overlap_proxy_gt_bins": 49,
+              "stable_physical_overlap_valid_bins": 32,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": {
+            "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+            "predicted_events": 45,
+            "reference_events": 177,
+            "collars": [
+              {
+                "collar_ms": 100,
+                "matched": 10,
+                "false_events": 35,
+                "missed_events": 167,
+                "false_rate": 0.7777777777777778,
+                "missed_rate": 0.943502824858757
+              },
+              {
+                "collar_ms": 250,
+                "matched": 11,
+                "false_events": 34,
+                "missed_events": 166,
+                "false_rate": 0.7555555555555555,
+                "missed_rate": 0.9378531073446328
+              },
+              {
+                "collar_ms": 500,
+                "matched": 18,
+                "false_events": 27,
+                "missed_events": 159,
+                "false_rate": 0.6,
+                "missed_rate": 0.8983050847457628
+              }
+            ],
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            }
+          },
+          "oracle_aligned": {
+            "diagnostic_only": true,
+            "not_used_for_inference_or_selection": true,
+            "aligned_masked_bce": 0.3033382296562195,
+            "permutation": [
+              1,
+              2,
+              0,
+              3
+            ],
+            "permutation_count": 24,
+            "speaker": {
+              "solo_speaker_balanced_accuracy": 0.004815745393634841,
+              "all_silence_valid_fraction": 0.982811200443582,
+              "one_slot_collapse": false,
+              "predicted_active_count": {
+                "0": 3545,
+                "1": 40,
+                "2": 4,
+                "3": 3,
+                "4": 15
+              },
+              "per_slot": [
+                {
+                  "slot": 0,
+                  "positive_valid_bins": 1226,
+                  "f1": 0.052795031055900624,
+                  "precision": 0.5483870967741935,
+                  "recall": 0.02773246329526917
+                },
+                {
+                  "slot": 1,
+                  "positive_valid_bins": 242,
+                  "f1": 0.038314176245210725,
+                  "precision": 0.2631578947368421,
+                  "recall": 0.02066115702479339
+                },
+                {
+                  "slot": 2,
+                  "positive_valid_bins": 184,
+                  "f1": 0.05940594059405941,
+                  "precision": 0.3333333333333333,
+                  "recall": 0.03260869565217391
+                },
+                {
+                  "slot": 3,
+                  "positive_valid_bins": 30,
+                  "f1": 0.04166666666666667,
+                  "precision": 0.05555555555555555,
+                  "recall": 0.03333333333333333
+                }
+              ]
+            },
+            "overlap": {
+              "physical_from_raw_intervals": {
+                "gt_bins": 56,
+                "f1": 0.23076923076923078,
+                "precision": 0.4090909090909091,
+                "recall": 0.16071428571428573,
+                "stable_physical_overlap_bins": 32,
+                "mixed_coverage_valid_bins": 209
+              },
+              "slot_threshold_overlap_proxy": {
+                "not_physical_overlap": true,
+                "gt_bins": 49,
+                "f1": 0.22535211267605632
+              },
+              "confounded_slot_threshold_without_physical_overlap_bins": 0,
+              "denominators": {
+                "confounded_straddle_or_mixed_bins": 0,
+                "mixed_coverage_valid_bins": 209,
+                "physical_overlap_valid_bins": 56,
+                "slot_threshold_overlap_proxy_gt_bins": 49,
+                "stable_physical_overlap_valid_bins": 32,
+                "valid_bins": 3607
+              }
+            },
+            "transition_event_proxy": null
+          },
+          "relation_mask_overlapping_valid_bins": 279,
+          "relation_mask_excluded_valid_bins": 3328,
+          "relation_masks_do_not_erase_activity_targets": true
+        }
+      },
+      "390": {
+        "checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+        "ami_ES2010a": {
+          "canonical_masked_bce": 0.26681995391845703,
+          "canonical_brier": 0.08003007620573044,
+          "valid_bins": 3607,
+          "operating_point": 0.5,
+          "slots": [
+            "FEE037",
+            "FEE040",
+            "FEE038",
+            "FEE039"
+          ],
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.004694835680751174,
+            "all_silence_valid_fraction": 0.995564180759634,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 3591,
+              "1": 16,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 1226,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 242,
+                "f1": 0.03125,
+                "precision": 0.2857142857142857,
+                "recall": 0.01652892561983471
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 184,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 30,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 56,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 32,
+              "mixed_coverage_valid_bins": 209
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 49,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 209,
+              "physical_overlap_valid_bins": 56,
+              "slot_threshold_overlap_proxy_gt_bins": 49,
+              "stable_physical_overlap_valid_bins": 32,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": {
+            "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+            "predicted_events": 12,
+            "reference_events": 177,
+            "collars": [
+              {
+                "collar_ms": 100,
+                "matched": 1,
+                "false_events": 11,
+                "missed_events": 176,
+                "false_rate": 0.9166666666666666,
+                "missed_rate": 0.9943502824858758
+              },
+              {
+                "collar_ms": 250,
+                "matched": 1,
+                "false_events": 11,
+                "missed_events": 176,
+                "false_rate": 0.9166666666666666,
+                "missed_rate": 0.9943502824858758
+              },
+              {
+                "collar_ms": 500,
+                "matched": 2,
+                "false_events": 10,
+                "missed_events": 175,
+                "false_rate": 0.8333333333333334,
+                "missed_rate": 0.9887005649717514
+              }
+            ],
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            }
+          },
+          "oracle_aligned": {
+            "diagnostic_only": true,
+            "not_used_for_inference_or_selection": true,
+            "aligned_masked_bce": 0.26681995391845703,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "permutation_count": 24,
+            "speaker": {
+              "solo_speaker_balanced_accuracy": 0.004694835680751174,
+              "all_silence_valid_fraction": 0.995564180759634,
+              "one_slot_collapse": false,
+              "predicted_active_count": {
+                "0": 3591,
+                "1": 16,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "per_slot": [
+                {
+                  "slot": 0,
+                  "positive_valid_bins": 1226,
+                  "f1": 0.0,
+                  "precision": 0.0,
+                  "recall": 0.0
+                },
+                {
+                  "slot": 1,
+                  "positive_valid_bins": 242,
+                  "f1": 0.03125,
+                  "precision": 0.2857142857142857,
+                  "recall": 0.01652892561983471
+                },
+                {
+                  "slot": 2,
+                  "positive_valid_bins": 184,
+                  "f1": 0.0,
+                  "precision": 0.0,
+                  "recall": 0.0
+                },
+                {
+                  "slot": 3,
+                  "positive_valid_bins": 30,
+                  "f1": 0.0,
+                  "precision": 0.0,
+                  "recall": 0.0
+                }
+              ]
+            },
+            "overlap": {
+              "physical_from_raw_intervals": {
+                "gt_bins": 56,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0,
+                "stable_physical_overlap_bins": 32,
+                "mixed_coverage_valid_bins": 209
+              },
+              "slot_threshold_overlap_proxy": {
+                "not_physical_overlap": true,
+                "gt_bins": 49,
+                "f1": 0.0
+              },
+              "confounded_slot_threshold_without_physical_overlap_bins": 0,
+              "denominators": {
+                "confounded_straddle_or_mixed_bins": 0,
+                "mixed_coverage_valid_bins": 209,
+                "physical_overlap_valid_bins": 56,
+                "slot_threshold_overlap_proxy_gt_bins": 49,
+                "stable_physical_overlap_valid_bins": 32,
+                "valid_bins": 3607
+              }
+            },
+            "transition_event_proxy": null
+          },
+          "relation_mask_overlapping_valid_bins": 279,
+          "relation_mask_excluded_valid_bins": 3328,
+          "relation_masks_do_not_erase_activity_targets": true
+        }
+      },
+      "780": {
+        "checkpoint_sha256": "c44fd8f621867ab75971b79d041e76ba30beddf104ec205cb53730e5363d4ec1",
+        "ami_ES2010a": {
+          "canonical_masked_bce": 0.2860274314880371,
+          "canonical_brier": 0.08632369339466095,
+          "valid_bins": 3607,
+          "operating_point": 0.5,
+          "slots": [
+            "FEE037",
+            "FEE040",
+            "FEE038",
+            "FEE039"
+          ],
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 1.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 3607,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 1226,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 242,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 184,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 30,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 56,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 32,
+              "mixed_coverage_valid_bins": 209
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 49,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 209,
+              "physical_overlap_valid_bins": 56,
+              "slot_threshold_overlap_proxy_gt_bins": 49,
+              "stable_physical_overlap_valid_bins": 32,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": {
+            "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+            "predicted_events": 0,
+            "reference_events": 177,
+            "collars": [
+              {
+                "collar_ms": 100,
+                "matched": 0,
+                "false_events": 0,
+                "missed_events": 177,
+                "false_rate": null,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 250,
+                "matched": 0,
+                "false_events": 0,
+                "missed_events": 177,
+                "false_rate": null,
+                "missed_rate": 1.0
+              },
+              {
+                "collar_ms": 500,
+                "matched": 0,
+                "false_events": 0,
+                "missed_events": 177,
+                "false_rate": null,
+                "missed_rate": 1.0
+              }
+            ],
+            "solo_aba_interruptions_le_1s": {
+              "predicted": 0,
+              "reference": 0
+            }
+          },
+          "oracle_aligned": {
+            "diagnostic_only": true,
+            "not_used_for_inference_or_selection": true,
+            "aligned_masked_bce": 0.28400588035583496,
+            "permutation": [
+              1,
+              2,
+              0,
+              3
+            ],
+            "permutation_count": 24,
+            "speaker": {
+              "solo_speaker_balanced_accuracy": 0.0,
+              "all_silence_valid_fraction": 1.0,
+              "one_slot_collapse": false,
+              "predicted_active_count": {
+                "0": 3607,
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "per_slot": [
+                {
+                  "slot": 0,
+                  "positive_valid_bins": 1226,
+                  "f1": 0.0,
+                  "precision": 0.0,
+                  "recall": 0.0
+                },
+                {
+                  "slot": 1,
+                  "positive_valid_bins": 242,
+                  "f1": 0.0,
+                  "precision": 0.0,
+                  "recall": 0.0
+                },
+                {
+                  "slot": 2,
+                  "positive_valid_bins": 184,
+                  "f1": 0.0,
+                  "precision": 0.0,
+                  "recall": 0.0
+                },
+                {
+                  "slot": 3,
+                  "positive_valid_bins": 30,
+                  "f1": 0.0,
+                  "precision": 0.0,
+                  "recall": 0.0
+                }
+              ]
+            },
+            "overlap": {
+              "physical_from_raw_intervals": {
+                "gt_bins": 56,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0,
+                "stable_physical_overlap_bins": 32,
+                "mixed_coverage_valid_bins": 209
+              },
+              "slot_threshold_overlap_proxy": {
+                "not_physical_overlap": true,
+                "gt_bins": 49,
+                "f1": 0.0
+              },
+              "confounded_slot_threshold_without_physical_overlap_bins": 0,
+              "denominators": {
+                "confounded_straddle_or_mixed_bins": 0,
+                "mixed_coverage_valid_bins": 209,
+                "physical_overlap_valid_bins": 56,
+                "slot_threshold_overlap_proxy_gt_bins": 49,
+                "stable_physical_overlap_valid_bins": 32,
+                "valid_bins": 3607
+              }
+            },
+            "transition_event_proxy": null
+          },
+          "relation_mask_overlapping_valid_bins": 279,
+          "relation_mask_excluded_valid_bins": 3328,
+          "relation_masks_do_not_erase_activity_targets": true
+        }
+      }
+    }
+  },
+  "sources": {
+    "ami_ES2005a": {
+      "source_id": "ami_ES2005a",
+      "pilot_role": "FIT",
+      "split_role": "PSEM-STRATEGY-TRAIN",
+      "component_id": "component-9bde89b69d0e4b542ec46d0132128e14ec230a5f90ae0965fce7ab19567b707c",
+      "component_source_ids": [
+        "ami_ES2005a",
+        "ami_ES2005b",
+        "ami_ES2005c",
+        "ami_ES2005d"
+      ],
+      "speaker_ids": [
+        "FEE019",
+        "MEE017",
+        "MEE018",
+        "MEO020"
+      ],
+      "waveform_sha256": "ac33e7b18ae72931e65dc279af4b129370ad62ca6ed64299b9e35f356e3f8ed8",
+      "reference_rttm_sha256": "821f901941b449977ac9130b3ce0fbccb44da7b097d2ee73795cac65ae16c24a",
+      "label_result_sha256": "c073bfbb2570581a6ec55c9eee44c3a50851512574e59624318fa1305941f029"
+    },
+    "ami_ES2006a": {
+      "source_id": "ami_ES2006a",
+      "pilot_role": "FIT",
+      "split_role": "PSEM-STRATEGY-TRAIN",
+      "component_id": "component-897638f99176a183210cea1eddb59800761daedeb83673d66bc2a4611271ff7c",
+      "component_source_ids": [
+        "ami_ES2006a",
+        "ami_ES2006b",
+        "ami_ES2006c",
+        "ami_ES2006d"
+      ],
+      "speaker_ids": [
+        "FEE021",
+        "FEE024",
+        "FEO023",
+        "MEO022"
+      ],
+      "waveform_sha256": "1b1a0b273f2f589abc8788b6f9a2ba5ae343c2aa71fc425f48c8b79ce1406eef",
+      "reference_rttm_sha256": "dbbec3c68e61d0b626df259c9f5ad71c98c863086298a72031172d93168c469e",
+      "label_result_sha256": "044ca2ff47457ee02c58e4534642761e65a26c2bf4b4aa43e625e250e369b732"
+    },
+    "ami_ES2007a": {
+      "source_id": "ami_ES2007a",
+      "pilot_role": "FIT",
+      "split_role": "PSEM-STRATEGY-TRAIN",
+      "component_id": "component-dc39eec1ecb832f93577981a68253ba52e133a6677ad3b896f36d97f6dd5ebc9",
+      "component_source_ids": [
+        "ami_ES2007a",
+        "ami_ES2007b",
+        "ami_ES2007c",
+        "ami_ES2007d"
+      ],
+      "speaker_ids": [
+        "FEE028",
+        "FEO026",
+        "MEE025",
+        "MEE027"
+      ],
+      "waveform_sha256": "57a4e0015ca37f9d6fa5c7ce91e78538b772a80234ed774009e8c7c3e89908a1",
+      "reference_rttm_sha256": "3e302ec019bb475b6558b919170676e888f8467129f0b3adb69f0c035c47a22c",
+      "label_result_sha256": "af11e7c6769a8a63498fc0a166267dadb6b4fbec050837c221a3e77dc867d77e"
+    },
+    "ami_ES2008a": {
+      "source_id": "ami_ES2008a",
+      "pilot_role": "FIT",
+      "split_role": "PSEM-STRATEGY-TRAIN",
+      "component_id": "component-d450792174beac24ff37c65abbb0be659775ec55ae8ed3aa82922bf3da7c7a3e",
+      "component_source_ids": [
+        "ami_ES2008a",
+        "ami_ES2008b",
+        "ami_ES2008c",
+        "ami_ES2008d"
+      ],
+      "speaker_ids": [
+        "FEE029",
+        "FEE030",
+        "FEE032",
+        "MEE031"
+      ],
+      "waveform_sha256": "65fcfc924e9bdb0388cbc3242a17bda88291ebc638f486e39a9ede78e92cb1e6",
+      "reference_rttm_sha256": "5bffd1abd40879374f13f9a2c77e5f6bd9d55a10f5b43c9db265a087f5dc7587",
+      "label_result_sha256": "6adf2e3259488304e87d24556c8a5b50040d85d67b7656d498849e0911018575"
+    },
+    "ami_ES2010a": {
+      "source_id": "ami_ES2010a",
+      "pilot_role": "CAL",
+      "split_role": "PSEM-STRATEGY-TRAIN",
+      "component_id": "component-dd5094cf0c5e5db2c7eae8c93abd081453e43092ad81c26160221699e3491924",
+      "component_source_ids": [
+        "ami_ES2010a",
+        "ami_ES2010b",
+        "ami_ES2010c"
+      ],
+      "speaker_ids": [
+        "FEE037",
+        "FEE038",
+        "FEE039",
+        "FEE040"
+      ],
+      "waveform_sha256": "bd188f52a76a0eb2cf1036b3179fff8ed1d075e6f90bc4b0e035e069816ed180",
+      "reference_rttm_sha256": "6939c10d1b715952bffec4eb3196cf0d62497aa1809b0289fdcfc292014c9c1e",
+      "label_result_sha256": "b24fad8908b0318f95a7fe563369b3d92151334841339c665ffc916468ea6013"
+    },
+    "ami_ES2009d": {
+      "source_id": "ami_ES2009d",
+      "pilot_role": "DEV",
+      "split_role": "PSEM-STRATEGY-DEV",
+      "component_id": "component-901fa1981208fcdfa89f44e76dd73f36368aa6a5d447b4ccea311def65c05a5f",
+      "component_source_ids": [
+        "ami_ES2009a",
+        "ami_ES2009b",
+        "ami_ES2009c",
+        "ami_ES2009d"
+      ],
+      "speaker_ids": [
+        "FEE036",
+        "MEE033",
+        "MEE034",
+        "MEE035"
+      ],
+      "waveform_sha256": "b5ef423361ce67c804042ec479c6aeaf2cb8c19f73a779d61fabb7501e9e9b10",
+      "reference_rttm_sha256": "990fb206b0bb2202f8c506a9e82a73ba470fd0d3cac49394be4104552975cfad",
+      "label_result_sha256": "6d48b7e9ba58f4910867bbb2b2bc155cc50d54122fe4f48b641201ad8006b9c6"
+    },
+    "ami_EN2009d": {
+      "source_id": "ami_EN2009d",
+      "pilot_role": "DEV",
+      "split_role": "PSEM-STRATEGY-DEV",
+      "component_id": "component-683e652a160fea14a3db3011276b63a5e35176d866de639cadc829f1d6aba454",
+      "component_source_ids": [
+        "ami_EN2009d"
+      ],
+      "speaker_ids": [
+        "FEE083",
+        "FEE096",
+        "MEE094",
+        "MEE095"
+      ],
+      "waveform_sha256": "eeb4a5ff47cadba8c75bdf32213b9264805027faa943c7f55eec0423c6ea4312",
+      "reference_rttm_sha256": "bcb7f3329eb9546cc8309e377093899811151ff80b870a629cd91439ec4ab593",
+      "label_result_sha256": "3da041a861db3bcf14a22e8913bf2ae85828839d721dfd802099abfc9a44098b"
+    }
+  },
+  "locked_identity_closure": {
+    "authority": "issue156 HOLDOUT plus sibling identity-component closure",
+    "component_ids": [
+      "component-b1881151ceb4c45a76b7a2eb785a3c0acd418e5fb220ec6008488eca1d526f76",
+      "component-7af7aefbea846ff09f579d93ff564ad94b22b1a327441e8e0bc8451072a56410",
+      "component-dc3bb1765fab3eda3b1a225834677cb3eaace7dbeb71e8109b8187ea61eb845a",
+      "component-67e127b0ec388ae17e55b0bc00389966c25aa5d5b2c17163d7d47447612f6b10",
+      "component-98ee3df2e8a276ebdee44c786f2b3ef1dba60cd15ecbfd629d968d23ec77e889",
+      "component-1b8e4b03bda87f444008c2910b9fcfbfc644d3fe99ed57d1dd5c02e903cdb948",
+      "component-087be36be293f71ed6a2eafc140c6d057a67d583dc65afd34dbeb3b932001d78",
+      "component-ecf1a677ac9deb0c151d923296fece2a8752879d8432d127feea0fc25c4aeb69",
+      "component-41cd351370950f92a90989e3af42bb7ef19581ec5ff949d52e4859fd73f3e384",
+      "component-c1fd3b8318481c5c1b681bed51dc80f603ebe8e7156141ab62b24cda7d0e0904"
+    ],
+    "direct_holdout_protocol": "experiments/psem_e2o2_continuous_ownership/EXPANDED_PROTOCOL.json",
+    "meetings": [
+      "ES2003a",
+      "ES2004a",
+      "ES2011a",
+      "ES2011b",
+      "ES2011d",
+      "ES2014a",
+      "IS1008a",
+      "IS1009a",
+      "TS3003b",
+      "TS3004a",
+      "TS3006a",
+      "TS3007a"
+    ],
+    "source_ids": [
+      "ami_ES2003a",
+      "ami_ES2004a",
+      "ami_ES2011a",
+      "ami_ES2011b",
+      "ami_ES2011d",
+      "ami_ES2014a",
+      "ami_IS1008a",
+      "ami_IS1009a",
+      "ami_TS3003b",
+      "ami_TS3004a",
+      "ami_TS3006a",
+      "ami_TS3007a"
+    ]
+  },
+  "fit_constant_prior_slot_means": [
+    0.26317110657691956,
+    0.10770361125469208,
+    0.11625641584396362,
+    0.06539624184370041
+  ],
+  "scores": {
+    "untrained": {
+      "ami_ES2005a": {
+        "canonical_masked_bce": 0.6903347969055176,
+        "canonical_brier": 0.24487975239753723,
+        "valid_bins": 3607,
+        "operating_point": 0.5,
+        "slots": [
+          "MEE017",
+          "MEE018",
+          "FEE019",
+          "MEO020"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 0.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 0,
+            "1": 0,
+            "2": 3607,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 996,
+              "f1": 0.43276124266782534,
+              "precision": 0.2761297477127807,
+              "recall": 1.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 341,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 568,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 620,
+              "f1": 0.2933522592855453,
+              "precision": 0.17188799556418077,
+              "recall": 1.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 259,
+            "f1": 0.13398861872736678,
+            "precision": 0.0718048239534239,
+            "recall": 1.0,
+            "stable_physical_overlap_bins": 173,
+            "mixed_coverage_valid_bins": 328
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 220,
+            "f1": 0.11497256336556048
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 328,
+            "physical_overlap_valid_bins": 259,
+            "slot_threshold_overlap_proxy_gt_bins": 220,
+            "stable_physical_overlap_valid_bins": 173,
+            "valid_bins": 3607
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 318,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 318,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 318,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 318,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.6883637309074402,
+          "permutation": [
+            3,
+            2,
+            0,
+            1
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 0.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 0,
+              "1": 0,
+              "2": 3607,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 996,
+                "f1": 0.43276124266782534,
+                "precision": 0.2761297477127807,
+                "recall": 1.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 341,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 568,
+                "f1": 0.27209580838323355,
+                "precision": 0.1574715830329914,
+                "recall": 1.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 620,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 259,
+              "f1": 0.13398861872736678,
+              "precision": 0.0718048239534239,
+              "recall": 1.0,
+              "stable_physical_overlap_bins": 173,
+              "mixed_coverage_valid_bins": 328
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 220,
+              "f1": 0.11497256336556048
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 328,
+              "physical_overlap_valid_bins": 259,
+              "slot_threshold_overlap_proxy_gt_bins": 220,
+              "stable_physical_overlap_valid_bins": 173,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 298,
+        "relation_mask_excluded_valid_bins": 3309,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2006a": {
+        "canonical_masked_bce": 0.6901192665100098,
+        "canonical_brier": 0.24589814245700836,
+        "valid_bins": 3987,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE021",
+          "FEO023",
+          "MEO022",
+          "FEE024"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 0.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 0,
+            "1": 0,
+            "2": 3987,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 2061,
+              "f1": 0.681547619047619,
+              "precision": 0.5169300225733634,
+              "recall": 1.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 42,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 311,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 65,
+              "f1": 0.032082922013820334,
+              "precision": 0.016302984700275896,
+              "recall": 1.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 61,
+            "f1": 0.030138339920948616,
+            "precision": 0.015299724103335842,
+            "recall": 1.0,
+            "stable_physical_overlap_bins": 44,
+            "mixed_coverage_valid_bins": 264
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 50,
+            "f1": 0.02477086945751796
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 264,
+            "physical_overlap_valid_bins": 61,
+            "slot_threshold_overlap_proxy_gt_bins": 50,
+            "stable_physical_overlap_valid_bins": 44,
+            "valid_bins": 3987
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 254,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 254,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 254,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 254,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.6835697889328003,
+          "permutation": [
+            3,
+            2,
+            0,
+            1
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 0.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 0,
+              "1": 0,
+              "2": 3987,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 2061,
+                "f1": 0.681547619047619,
+                "precision": 0.5169300225733634,
+                "recall": 1.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 42,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 311,
+                "f1": 0.14471847370870172,
+                "precision": 0.07800351141208929,
+                "recall": 1.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 65,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 61,
+              "f1": 0.030138339920948616,
+              "precision": 0.015299724103335842,
+              "recall": 1.0,
+              "stable_physical_overlap_bins": 44,
+              "mixed_coverage_valid_bins": 264
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 50,
+              "f1": 0.02477086945751796
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 264,
+              "physical_overlap_valid_bins": 61,
+              "slot_threshold_overlap_proxy_gt_bins": 50,
+              "stable_physical_overlap_valid_bins": 44,
+              "valid_bins": 3987
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 106,
+        "relation_mask_excluded_valid_bins": 3881,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2007a": {
+        "canonical_masked_bce": 0.6903361082077026,
+        "canonical_brier": 0.24655786156654358,
+        "valid_bins": 3607,
+        "operating_point": 0.5,
+        "slots": [
+          "MEE025",
+          "FEO026",
+          "FEE028",
+          "MEE027"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 0.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 0,
+            "1": 0,
+            "2": 3607,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 796,
+              "f1": 0.3615716556893028,
+              "precision": 0.22068200720820627,
+              "recall": 1.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 205,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 148,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 16,
+              "f1": 0.00883245928788297,
+              "precision": 0.004435819240365955,
+              "recall": 1.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 15,
+            "f1": 0.008282716731087797,
+            "precision": 0.004158580537843083,
+            "recall": 1.0,
+            "stable_physical_overlap_bins": 7,
+            "mixed_coverage_valid_bins": 188
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 11,
+            "f1": 0.006080707573244886
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 188,
+            "physical_overlap_valid_bins": 15,
+            "slot_threshold_overlap_proxy_gt_bins": 11,
+            "stable_physical_overlap_valid_bins": 7,
+            "valid_bins": 3607
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 171,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 171,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 171,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 171,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 1
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.6873977184295654,
+          "permutation": [
+            3,
+            0,
+            1,
+            2
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 0.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 0,
+              "1": 0,
+              "2": 3607,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 796,
+                "f1": 0.3615716556893028,
+                "precision": 0.22068200720820627,
+                "recall": 1.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 205,
+                "f1": 0.10755508919202518,
+                "precision": 0.0568339340171888,
+                "recall": 1.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 148,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 16,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 15,
+              "f1": 0.008282716731087797,
+              "precision": 0.004158580537843083,
+              "recall": 1.0,
+              "stable_physical_overlap_bins": 7,
+              "mixed_coverage_valid_bins": 188
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 11,
+              "f1": 0.006080707573244886
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 188,
+              "physical_overlap_valid_bins": 15,
+              "slot_threshold_overlap_proxy_gt_bins": 11,
+              "stable_physical_overlap_valid_bins": 7,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 126,
+        "relation_mask_excluded_valid_bins": 3481,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2008a": {
+        "canonical_masked_bce": 0.6926843523979187,
+        "canonical_brier": 0.24744978547096252,
+        "valid_bins": 3607,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE032",
+          "FEE029",
+          "FEE030",
+          "MEE031"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 0.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 0,
+            "1": 8,
+            "2": 3599,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 43,
+              "f1": 0.02361339923119165,
+              "precision": 0.011947763267574326,
+              "recall": 1.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 1007,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 703,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 273,
+              "f1": 0.14072164948453608,
+              "precision": 0.07568616578874411,
+              "recall": 1.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 54,
+            "f1": 0.029564741308513547,
+            "precision": 0.015004167824395665,
+            "recall": 1.0,
+            "stable_physical_overlap_bins": 32,
+            "mixed_coverage_valid_bins": 222
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 45,
+            "f1": 0.02469813391877058
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 222,
+            "physical_overlap_valid_bins": 54,
+            "slot_threshold_overlap_proxy_gt_bins": 45,
+            "stable_physical_overlap_valid_bins": 32,
+            "valid_bins": 3607
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 8,
+          "reference_events": 207,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 8,
+              "missed_events": 207,
+              "false_rate": 1.0,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 8,
+              "missed_events": 207,
+              "false_rate": 1.0,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 1,
+              "false_events": 7,
+              "missed_events": 206,
+              "false_rate": 0.875,
+              "missed_rate": 0.9951690821256038
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.6868104934692383,
+          "permutation": [
+            2,
+            3,
+            0,
+            1
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 0.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 0,
+              "1": 8,
+              "2": 3599,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 43,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 1007,
+                "f1": 0.4364976159514521,
+                "precision": 0.2791793734405323,
+                "recall": 1.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 703,
+                "f1": 0.32682473268247325,
+                "precision": 0.19533203667685467,
+                "recall": 1.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 273,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 54,
+              "f1": 0.029564741308513547,
+              "precision": 0.015004167824395665,
+              "recall": 1.0,
+              "stable_physical_overlap_bins": 32,
+              "mixed_coverage_valid_bins": 222
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 45,
+              "f1": 0.02469813391877058
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 222,
+              "physical_overlap_valid_bins": 54,
+              "slot_threshold_overlap_proxy_gt_bins": 45,
+              "stable_physical_overlap_valid_bins": 32,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 239,
+        "relation_mask_excluded_valid_bins": 3368,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2010a": {
+        "canonical_masked_bce": 0.6901904940605164,
+        "canonical_brier": 0.2464917153120041,
+        "valid_bins": 3607,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE037",
+          "FEE040",
+          "FEE038",
+          "FEE039"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 0.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 0,
+            "1": 0,
+            "2": 3607,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 1226,
+              "f1": 0.5073453341609766,
+              "precision": 0.3398946492930413,
+              "recall": 1.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 242,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 184,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 30,
+              "f1": 0.016497113005224086,
+              "precision": 0.008317161075686166,
+              "recall": 1.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 56,
+            "f1": 0.030576030576030578,
+            "precision": 0.015525367341280842,
+            "recall": 1.0,
+            "stable_physical_overlap_bins": 32,
+            "mixed_coverage_valid_bins": 209
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 49,
+            "f1": 0.026805251641137853
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 209,
+            "physical_overlap_valid_bins": 56,
+            "slot_threshold_overlap_proxy_gt_bins": 49,
+            "stable_physical_overlap_valid_bins": 32,
+            "valid_bins": 3607
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 177,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 177,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 177,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 177,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.685992419719696,
+          "permutation": [
+            3,
+            0,
+            1,
+            2
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 0.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 0,
+              "1": 0,
+              "2": 3607,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 1226,
+                "f1": 0.5073453341609766,
+                "precision": 0.3398946492930413,
+                "recall": 1.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 242,
+                "f1": 0.12574694725902832,
+                "precision": 0.06709176601053507,
+                "recall": 1.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 184,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 30,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 56,
+              "f1": 0.030576030576030578,
+              "precision": 0.015525367341280842,
+              "recall": 1.0,
+              "stable_physical_overlap_bins": 32,
+              "mixed_coverage_valid_bins": 209
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 49,
+              "f1": 0.026805251641137853
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 209,
+              "physical_overlap_valid_bins": 56,
+              "slot_threshold_overlap_proxy_gt_bins": 49,
+              "stable_physical_overlap_valid_bins": 32,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 279,
+        "relation_mask_excluded_valid_bins": 3328,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2009d": {
+        "canonical_masked_bce": 0.6976109743118286,
+        "canonical_brier": 0.2499753087759018,
+        "valid_bins": 2447,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE036",
+          "MEE035",
+          "MEE033",
+          "MEE034"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 0.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 0,
+            "1": 0,
+            "2": 2447,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 68,
+              "f1": 0.05407554671968191,
+              "precision": 0.027789129546383327,
+              "recall": 1.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 14,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 1254,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 51,
+              "f1": 0.04083266613290633,
+              "precision": 0.020841847159787496,
+              "recall": 1.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 24,
+            "f1": 0.01942533387292594,
+            "precision": 0.009807928075194115,
+            "recall": 1.0,
+            "stable_physical_overlap_bins": 14,
+            "mixed_coverage_valid_bins": 164
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 19,
+            "f1": 0.0154095701540957
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 164,
+            "physical_overlap_valid_bins": 24,
+            "slot_threshold_overlap_proxy_gt_bins": 19,
+            "stable_physical_overlap_valid_bins": 14,
+            "valid_bins": 2447
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 134,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 134,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 134,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 134,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.6840659976005554,
+          "permutation": [
+            0,
+            2,
+            3,
+            1
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 0.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 0,
+              "1": 0,
+              "2": 2447,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 68,
+                "f1": 0.05407554671968191,
+                "precision": 0.027789129546383327,
+                "recall": 1.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 14,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 1254,
+                "f1": 0.6776546879221832,
+                "precision": 0.5124642419288925,
+                "recall": 1.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 51,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 24,
+              "f1": 0.01942533387292594,
+              "precision": 0.009807928075194115,
+              "recall": 1.0,
+              "stable_physical_overlap_bins": 14,
+              "mixed_coverage_valid_bins": 164
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 19,
+              "f1": 0.0154095701540957
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 164,
+              "physical_overlap_valid_bins": 24,
+              "slot_threshold_overlap_proxy_gt_bins": 19,
+              "stable_physical_overlap_valid_bins": 14,
+              "valid_bins": 2447
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 215,
+        "relation_mask_excluded_valid_bins": 2232,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_EN2009d": {
+        "canonical_masked_bce": 0.6921011209487915,
+        "canonical_brier": 0.24526676535606384,
+        "valid_bins": 602,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE096",
+          "FEE083",
+          null,
+          null
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 0.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 0,
+            "1": 0,
+            "2": 602,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 131,
+              "f1": 0.35743519781718963,
+              "precision": 0.21760797342192692,
+              "recall": 1.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 368,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 0,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 0,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 59,
+            "f1": 0.178517397881997,
+            "precision": 0.09800664451827243,
+            "recall": 1.0,
+            "stable_physical_overlap_bins": 48,
+            "mixed_coverage_valid_bins": 59
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 52,
+            "f1": 0.15902140672782875
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 59,
+            "physical_overlap_valid_bins": 59,
+            "slot_threshold_overlap_proxy_gt_bins": 52,
+            "stable_physical_overlap_valid_bins": 48,
+            "valid_bins": 602
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 60,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 60,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 60,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 60,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.6828560829162598,
+          "permutation": [
+            0,
+            3,
+            1,
+            2
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 0.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 0,
+              "1": 0,
+              "2": 602,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 131,
+                "f1": 0.35743519781718963,
+                "precision": 0.21760797342192692,
+                "recall": 1.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 368,
+                "f1": 0.7587628865979381,
+                "precision": 0.6112956810631229,
+                "recall": 1.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 0,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 0,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 59,
+              "f1": 0.178517397881997,
+              "precision": 0.09800664451827243,
+              "recall": 1.0,
+              "stable_physical_overlap_bins": 48,
+              "mixed_coverage_valid_bins": 59
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 52,
+              "f1": 0.15902140672782875
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 59,
+              "physical_overlap_valid_bins": 59,
+              "slot_threshold_overlap_proxy_gt_bins": 52,
+              "stable_physical_overlap_valid_bins": 48,
+              "valid_bins": 602
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 0,
+        "relation_mask_excluded_valid_bins": 602,
+        "relation_masks_do_not_erase_activity_targets": true
+      }
+    },
+    "fit_constant_prior": {
+      "ami_ES2005a": {
+        "canonical_masked_bce": 0.4672122299671173,
+        "canonical_brier": 0.1395380049943924,
+        "valid_bins": 3607,
+        "operating_point": 0.5,
+        "slots": [
+          "MEE017",
+          "MEE018",
+          "FEE019",
+          "MEO020"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 1.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 3607,
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 996,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 341,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 568,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 620,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 259,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 173,
+            "mixed_coverage_valid_bins": 328
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 220,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 328,
+            "physical_overlap_valid_bins": 259,
+            "slot_threshold_overlap_proxy_gt_bins": 220,
+            "stable_physical_overlap_valid_bins": 173,
+            "valid_bins": 3607
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 318,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 318,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 318,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 318,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.45646417140960693,
+          "permutation": [
+            0,
+            3,
+            1,
+            2
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 1.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 3607,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 996,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 341,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 568,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 620,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 259,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 173,
+              "mixed_coverage_valid_bins": 328
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 220,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 328,
+              "physical_overlap_valid_bins": 259,
+              "slot_threshold_overlap_proxy_gt_bins": 220,
+              "stable_physical_overlap_valid_bins": 173,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 298,
+        "relation_mask_excluded_valid_bins": 3309,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2006a": {
+        "canonical_masked_bce": 0.3414117395877838,
+        "canonical_brier": 0.10379775613546371,
+        "valid_bins": 3987,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE021",
+          "FEO023",
+          "MEO022",
+          "FEE024"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 1.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 3987,
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 2061,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 42,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 311,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 65,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 61,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 44,
+            "mixed_coverage_valid_bins": 264
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 50,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 264,
+            "physical_overlap_valid_bins": 61,
+            "slot_threshold_overlap_proxy_gt_bins": 50,
+            "stable_physical_overlap_valid_bins": 44,
+            "valid_bins": 3987
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 254,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 254,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 254,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 254,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.3406621515750885,
+          "permutation": [
+            0,
+            3,
+            2,
+            1
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 1.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 3987,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 2061,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 42,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 311,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 65,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 61,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 44,
+              "mixed_coverage_valid_bins": 264
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 50,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 264,
+              "physical_overlap_valid_bins": 61,
+              "slot_threshold_overlap_proxy_gt_bins": 50,
+              "stable_physical_overlap_valid_bins": 44,
+              "valid_bins": 3987
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 106,
+        "relation_mask_excluded_valid_bins": 3881,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2007a": {
+        "canonical_masked_bce": 0.2629103362560272,
+        "canonical_brier": 0.0686071589589119,
+        "valid_bins": 3607,
+        "operating_point": 0.5,
+        "slots": [
+          "MEE025",
+          "FEO026",
+          "FEE028",
+          "MEE027"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 1.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 3607,
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 796,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 205,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 148,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 16,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 15,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 7,
+            "mixed_coverage_valid_bins": 188
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 11,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 188,
+            "physical_overlap_valid_bins": 15,
+            "slot_threshold_overlap_proxy_gt_bins": 11,
+            "stable_physical_overlap_valid_bins": 7,
+            "valid_bins": 3607
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 171,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 171,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 171,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 171,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 1
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.26255112886428833,
+          "permutation": [
+            0,
+            2,
+            1,
+            3
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 1.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 3607,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 796,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 205,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 148,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 16,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 15,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 7,
+              "mixed_coverage_valid_bins": 188
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 11,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 188,
+              "physical_overlap_valid_bins": 15,
+              "slot_threshold_overlap_proxy_gt_bins": 11,
+              "stable_physical_overlap_valid_bins": 7,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 126,
+        "relation_mask_excluded_valid_bins": 3481,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2008a": {
+        "canonical_masked_bce": 0.45150285959243774,
+        "canonical_brier": 0.13202007114887238,
+        "valid_bins": 3607,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE032",
+          "FEE029",
+          "FEE030",
+          "MEE031"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 1.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 3607,
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 43,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 1007,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 703,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 273,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 54,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 32,
+            "mixed_coverage_valid_bins": 222
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 45,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 222,
+            "physical_overlap_valid_bins": 54,
+            "slot_threshold_overlap_proxy_gt_bins": 45,
+            "stable_physical_overlap_valid_bins": 32,
+            "valid_bins": 3607
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 207,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 207,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 207,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 207,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.3705199062824249,
+          "permutation": [
+            3,
+            0,
+            2,
+            1
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 1.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 3607,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 43,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 1007,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 703,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 273,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 54,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 32,
+              "mixed_coverage_valid_bins": 222
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 45,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 222,
+              "physical_overlap_valid_bins": 54,
+              "slot_threshold_overlap_proxy_gt_bins": 45,
+              "stable_physical_overlap_valid_bins": 32,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 239,
+        "relation_mask_excluded_valid_bins": 3368,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2010a": {
+        "canonical_masked_bce": 0.30690115690231323,
+        "canonical_brier": 0.0875830426812172,
+        "valid_bins": 3607,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE037",
+          "FEE040",
+          "FEE038",
+          "FEE039"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 1.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 3607,
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 1226,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 242,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 184,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 30,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 56,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 32,
+            "mixed_coverage_valid_bins": 209
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 49,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 209,
+            "physical_overlap_valid_bins": 56,
+            "slot_threshold_overlap_proxy_gt_bins": 49,
+            "stable_physical_overlap_valid_bins": 32,
+            "valid_bins": 3607
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 177,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 177,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 177,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 177,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.30654826760292053,
+          "permutation": [
+            0,
+            2,
+            1,
+            3
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 1.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 3607,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 1226,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 242,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 184,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 30,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 56,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 32,
+              "mixed_coverage_valid_bins": 209
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 49,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 209,
+              "physical_overlap_valid_bins": 56,
+              "slot_threshold_overlap_proxy_gt_bins": 49,
+              "stable_physical_overlap_valid_bins": 32,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 279,
+        "relation_mask_excluded_valid_bins": 3328,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2009d": {
+        "canonical_masked_bce": 0.43608978390693665,
+        "canonical_brier": 0.12950745224952698,
+        "valid_bins": 2447,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE036",
+          "MEE035",
+          "MEE033",
+          "MEE034"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 1.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 2447,
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 68,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 14,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 1254,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 51,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 24,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 14,
+            "mixed_coverage_valid_bins": 164
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 19,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 164,
+            "physical_overlap_valid_bins": 24,
+            "slot_threshold_overlap_proxy_gt_bins": 19,
+            "stable_physical_overlap_valid_bins": 14,
+            "valid_bins": 2447
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 134,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 134,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 134,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 134,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.31330668926239014,
+          "permutation": [
+            2,
+            3,
+            0,
+            1
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 1.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 2447,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 68,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 14,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 1254,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 51,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 24,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 14,
+              "mixed_coverage_valid_bins": 164
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 19,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 164,
+              "physical_overlap_valid_bins": 24,
+              "slot_threshold_overlap_proxy_gt_bins": 19,
+              "stable_physical_overlap_valid_bins": 14,
+              "valid_bins": 2447
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 215,
+        "relation_mask_excluded_valid_bins": 2232,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_EN2009d": {
+        "canonical_masked_bce": 0.5308175683021545,
+        "canonical_brier": 0.16577698290348053,
+        "valid_bins": 602,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE096",
+          "FEE083",
+          null,
+          null
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 1.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 602,
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 131,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 368,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 0,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 0,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 59,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 48,
+            "mixed_coverage_valid_bins": 59
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 52,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 59,
+            "physical_overlap_valid_bins": 59,
+            "slot_threshold_overlap_proxy_gt_bins": 52,
+            "stable_physical_overlap_valid_bins": 48,
+            "valid_bins": 602
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 60,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 60,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 60,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 60,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.42006567120552063,
+          "permutation": [
+            2,
+            0,
+            1,
+            3
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 1.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 602,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 131,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 368,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 0,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 0,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 59,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 48,
+              "mixed_coverage_valid_bins": 59
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 52,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 59,
+              "physical_overlap_valid_bins": 59,
+              "slot_threshold_overlap_proxy_gt_bins": 52,
+              "stable_physical_overlap_valid_bins": 48,
+              "valid_bins": 602
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 0,
+        "relation_mask_excluded_valid_bins": 602,
+        "relation_masks_do_not_erase_activity_targets": true
+      }
+    },
+    "selected_step_390_fit_and_dev": {
+      "ami_ES2005a": {
+        "canonical_masked_bce": 0.42738229036331177,
+        "canonical_brier": 0.13244512677192688,
+        "valid_bins": 3607,
+        "operating_point": 0.5,
+        "slots": [
+          "MEE017",
+          "MEE018",
+          "FEE019",
+          "MEO020"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 0.9756029941779872,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 3519,
+            "1": 85,
+            "2": 3,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 996,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 341,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 568,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 620,
+              "f1": 0.009630818619582664,
+              "precision": 1.0,
+              "recall": 0.004838709677419355
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 259,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 173,
+            "mixed_coverage_valid_bins": 328
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 220,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 328,
+            "physical_overlap_valid_bins": 259,
+            "slot_threshold_overlap_proxy_gt_bins": 220,
+            "stable_physical_overlap_valid_bins": 173,
+            "valid_bins": 3607
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 46,
+          "reference_events": 318,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 3,
+              "false_events": 43,
+              "missed_events": 315,
+              "false_rate": 0.9347826086956522,
+              "missed_rate": 0.9905660377358491
+            },
+            {
+              "collar_ms": 250,
+              "matched": 6,
+              "false_events": 40,
+              "missed_events": 312,
+              "false_rate": 0.8695652173913043,
+              "missed_rate": 0.9811320754716981
+            },
+            {
+              "collar_ms": 500,
+              "matched": 12,
+              "false_events": 34,
+              "missed_events": 306,
+              "false_rate": 0.7391304347826086,
+              "missed_rate": 0.9622641509433962
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.4215800166130066,
+          "permutation": [
+            0,
+            3,
+            2,
+            1
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0330820770519263,
+            "all_silence_valid_fraction": 0.9756029941779872,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 3519,
+              "1": 85,
+              "2": 3,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 996,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 341,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 568,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 620,
+                "f1": 0.2344632768361582,
+                "precision": 0.9431818181818182,
+                "recall": 0.1338709677419355
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 259,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 173,
+              "mixed_coverage_valid_bins": 328
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 220,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 328,
+              "physical_overlap_valid_bins": 259,
+              "slot_threshold_overlap_proxy_gt_bins": 220,
+              "stable_physical_overlap_valid_bins": 173,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 298,
+        "relation_mask_excluded_valid_bins": 3309,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2006a": {
+        "canonical_masked_bce": 0.36026546359062195,
+        "canonical_brier": 0.1093774363398552,
+        "valid_bins": 3987,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE021",
+          "FEO023",
+          "MEO022",
+          "FEE024"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 1.0,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 3987,
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 2061,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 42,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 311,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 65,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 61,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 44,
+            "mixed_coverage_valid_bins": 264
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 50,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 264,
+            "physical_overlap_valid_bins": 61,
+            "slot_threshold_overlap_proxy_gt_bins": 50,
+            "stable_physical_overlap_valid_bins": 44,
+            "valid_bins": 3987
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 0,
+          "reference_events": 254,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 254,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 250,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 254,
+              "false_rate": null,
+              "missed_rate": 1.0
+            },
+            {
+              "collar_ms": 500,
+              "matched": 0,
+              "false_events": 0,
+              "missed_events": 254,
+              "false_rate": null,
+              "missed_rate": 1.0
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.3554210960865021,
+          "permutation": [
+            0,
+            3,
+            1,
+            2
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 1.0,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 3987,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 2061,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 42,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 311,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 65,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 61,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 44,
+              "mixed_coverage_valid_bins": 264
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 50,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 264,
+              "physical_overlap_valid_bins": 61,
+              "slot_threshold_overlap_proxy_gt_bins": 50,
+              "stable_physical_overlap_valid_bins": 44,
+              "valid_bins": 3987
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 106,
+        "relation_mask_excluded_valid_bins": 3881,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2007a": {
+        "canonical_masked_bce": 0.20566123723983765,
+        "canonical_brier": 0.05863594636321068,
+        "valid_bins": 3607,
+        "operating_point": 0.5,
+        "slots": [
+          "MEE025",
+          "FEO026",
+          "FEE028",
+          "MEE027"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 0.997782090379817,
+          "one_slot_collapse": true,
+          "predicted_active_count": {
+            "0": 3599,
+            "1": 8,
+            "2": 0,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 796,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 205,
+              "f1": 0.028169014084507043,
+              "precision": 0.375,
+              "recall": 0.014634146341463415
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 148,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 16,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 15,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 7,
+            "mixed_coverage_valid_bins": 188
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 11,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 188,
+            "physical_overlap_valid_bins": 15,
+            "slot_threshold_overlap_proxy_gt_bins": 11,
+            "stable_physical_overlap_valid_bins": 7,
+            "valid_bins": 3607
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 6,
+          "reference_events": 171,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 2,
+              "false_events": 4,
+              "missed_events": 169,
+              "false_rate": 0.6666666666666666,
+              "missed_rate": 0.9883040935672515
+            },
+            {
+              "collar_ms": 250,
+              "matched": 4,
+              "false_events": 2,
+              "missed_events": 167,
+              "false_rate": 0.3333333333333333,
+              "missed_rate": 0.9766081871345029
+            },
+            {
+              "collar_ms": 500,
+              "matched": 6,
+              "false_events": 0,
+              "missed_events": 165,
+              "false_rate": 0.0,
+              "missed_rate": 0.9649122807017544
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 1
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.20566123723983765,
+          "permutation": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 0.997782090379817,
+            "one_slot_collapse": true,
+            "predicted_active_count": {
+              "0": 3599,
+              "1": 8,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 796,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 205,
+                "f1": 0.028169014084507043,
+                "precision": 0.375,
+                "recall": 0.014634146341463415
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 148,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 16,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 15,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 7,
+              "mixed_coverage_valid_bins": 188
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 11,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 188,
+              "physical_overlap_valid_bins": 15,
+              "slot_threshold_overlap_proxy_gt_bins": 11,
+              "stable_physical_overlap_valid_bins": 7,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 126,
+        "relation_mask_excluded_valid_bins": 3481,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2008a": {
+        "canonical_masked_bce": 0.3835245370864868,
+        "canonical_brier": 0.11262199282646179,
+        "valid_bins": 3607,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE032",
+          "FEE029",
+          "FEE030",
+          "MEE031"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.006559031281533804,
+          "all_silence_valid_fraction": 0.9908511228167453,
+          "one_slot_collapse": true,
+          "predicted_active_count": {
+            "0": 3574,
+            "1": 33,
+            "2": 0,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 43,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 1007,
+              "f1": 0.049999999999999996,
+              "precision": 0.7878787878787878,
+              "recall": 0.025819265143992055
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 703,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 273,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 54,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 32,
+            "mixed_coverage_valid_bins": 222
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 45,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 222,
+            "physical_overlap_valid_bins": 54,
+            "slot_threshold_overlap_proxy_gt_bins": 45,
+            "stable_physical_overlap_valid_bins": 32,
+            "valid_bins": 3607
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 28,
+          "reference_events": 207,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 2,
+              "false_events": 26,
+              "missed_events": 205,
+              "false_rate": 0.9285714285714286,
+              "missed_rate": 0.9903381642512077
+            },
+            {
+              "collar_ms": 250,
+              "matched": 6,
+              "false_events": 22,
+              "missed_events": 201,
+              "false_rate": 0.7857142857142857,
+              "missed_rate": 0.9710144927536232
+            },
+            {
+              "collar_ms": 500,
+              "matched": 9,
+              "false_events": 19,
+              "missed_events": 198,
+              "false_rate": 0.6785714285714286,
+              "missed_rate": 0.9565217391304348
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.3417937755584717,
+          "permutation": [
+            3,
+            1,
+            0,
+            2
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.006559031281533804,
+            "all_silence_valid_fraction": 0.9908511228167453,
+            "one_slot_collapse": true,
+            "predicted_active_count": {
+              "0": 3574,
+              "1": 33,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 43,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 1007,
+                "f1": 0.049999999999999996,
+                "precision": 0.7878787878787878,
+                "recall": 0.025819265143992055
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 703,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 273,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 54,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 32,
+              "mixed_coverage_valid_bins": 222
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 45,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 222,
+              "physical_overlap_valid_bins": 54,
+              "slot_threshold_overlap_proxy_gt_bins": 45,
+              "stable_physical_overlap_valid_bins": 32,
+              "valid_bins": 3607
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 239,
+        "relation_mask_excluded_valid_bins": 3368,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_ES2009d": {
+        "canonical_masked_bce": 0.39651626348495483,
+        "canonical_brier": 0.1254972517490387,
+        "valid_bins": 2447,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE036",
+          "MEE035",
+          "MEE033",
+          "MEE034"
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0,
+          "all_silence_valid_fraction": 0.9926440539436044,
+          "one_slot_collapse": true,
+          "predicted_active_count": {
+            "0": 2429,
+            "1": 18,
+            "2": 0,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 68,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 14,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 1254,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 51,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 24,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 14,
+            "mixed_coverage_valid_bins": 164
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 19,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 164,
+            "physical_overlap_valid_bins": 24,
+            "slot_threshold_overlap_proxy_gt_bins": 19,
+            "stable_physical_overlap_valid_bins": 14,
+            "valid_bins": 2447
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 18,
+          "reference_events": 134,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 1,
+              "false_events": 17,
+              "missed_events": 133,
+              "false_rate": 0.9444444444444444,
+              "missed_rate": 0.9925373134328358
+            },
+            {
+              "collar_ms": 250,
+              "matched": 2,
+              "false_events": 16,
+              "missed_events": 132,
+              "false_rate": 0.8888888888888888,
+              "missed_rate": 0.9850746268656716
+            },
+            {
+              "collar_ms": 500,
+              "matched": 2,
+              "false_events": 16,
+              "missed_events": 132,
+              "false_rate": 0.8888888888888888,
+              "missed_rate": 0.9850746268656716
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.34070155024528503,
+          "permutation": [
+            2,
+            3,
+            0,
+            1
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0,
+            "all_silence_valid_fraction": 0.9926440539436044,
+            "one_slot_collapse": true,
+            "predicted_active_count": {
+              "0": 2429,
+              "1": 18,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 68,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 14,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 1254,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 51,
+                "f1": 0.02898550724637681,
+                "precision": 0.05555555555555555,
+                "recall": 0.0196078431372549
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 24,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 14,
+              "mixed_coverage_valid_bins": 164
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 19,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 164,
+              "physical_overlap_valid_bins": 24,
+              "slot_threshold_overlap_proxy_gt_bins": 19,
+              "stable_physical_overlap_valid_bins": 14,
+              "valid_bins": 2447
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 215,
+        "relation_mask_excluded_valid_bins": 2232,
+        "relation_masks_do_not_erase_activity_targets": true
+      },
+      "ami_EN2009d": {
+        "canonical_masked_bce": 0.4765397310256958,
+        "canonical_brier": 0.15239755809307098,
+        "valid_bins": 602,
+        "operating_point": 0.5,
+        "slots": [
+          "FEE096",
+          "FEE083",
+          null,
+          null
+        ],
+        "speaker": {
+          "solo_speaker_balanced_accuracy": 0.0490506329113924,
+          "all_silence_valid_fraction": 0.920265780730897,
+          "one_slot_collapse": false,
+          "predicted_active_count": {
+            "0": 554,
+            "1": 44,
+            "2": 4,
+            "3": 0,
+            "4": 0
+          },
+          "per_slot": [
+            {
+              "slot": 0,
+              "positive_valid_bins": 131,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 1,
+              "positive_valid_bins": 368,
+              "f1": 0.17788461538461542,
+              "precision": 0.7708333333333334,
+              "recall": 0.10054347826086957
+            },
+            {
+              "slot": 2,
+              "positive_valid_bins": 0,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            },
+            {
+              "slot": 3,
+              "positive_valid_bins": 0,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0
+            }
+          ]
+        },
+        "overlap": {
+          "physical_from_raw_intervals": {
+            "gt_bins": 59,
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "stable_physical_overlap_bins": 48,
+            "mixed_coverage_valid_bins": 59
+          },
+          "slot_threshold_overlap_proxy": {
+            "not_physical_overlap": true,
+            "gt_bins": 52,
+            "f1": 0.0
+          },
+          "confounded_slot_threshold_without_physical_overlap_bins": 0,
+          "denominators": {
+            "confounded_straddle_or_mixed_bins": 0,
+            "mixed_coverage_valid_bins": 59,
+            "physical_overlap_valid_bins": 59,
+            "slot_threshold_overlap_proxy_gt_bins": 52,
+            "stable_physical_overlap_valid_bins": 48,
+            "valid_bins": 602
+          }
+        },
+        "transition_event_proxy": {
+          "geometry": "80ms frame-grid active-set transitions; one-to-one matching; not fixed156-policy admission",
+          "predicted_events": 20,
+          "reference_events": 60,
+          "collars": [
+            {
+              "collar_ms": 100,
+              "matched": 5,
+              "false_events": 15,
+              "missed_events": 55,
+              "false_rate": 0.75,
+              "missed_rate": 0.9166666666666666
+            },
+            {
+              "collar_ms": 250,
+              "matched": 8,
+              "false_events": 12,
+              "missed_events": 52,
+              "false_rate": 0.6,
+              "missed_rate": 0.8666666666666667
+            },
+            {
+              "collar_ms": 500,
+              "matched": 11,
+              "false_events": 9,
+              "missed_events": 49,
+              "false_rate": 0.45,
+              "missed_rate": 0.8166666666666667
+            }
+          ],
+          "solo_aba_interruptions_le_1s": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "oracle_aligned": {
+          "diagnostic_only": true,
+          "not_used_for_inference_or_selection": true,
+          "aligned_masked_bce": 0.4414244592189789,
+          "permutation": [
+            1,
+            0,
+            2,
+            3
+          ],
+          "permutation_count": 24,
+          "speaker": {
+            "solo_speaker_balanced_accuracy": 0.0379746835443038,
+            "all_silence_valid_fraction": 0.920265780730897,
+            "one_slot_collapse": false,
+            "predicted_active_count": {
+              "0": 554,
+              "1": 44,
+              "2": 4,
+              "3": 0,
+              "4": 0
+            },
+            "per_slot": [
+              {
+                "slot": 0,
+                "positive_valid_bins": 131,
+                "f1": 0.1787709497206704,
+                "precision": 0.3333333333333333,
+                "recall": 0.12213740458015267
+              },
+              {
+                "slot": 1,
+                "positive_valid_bins": 368,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 2,
+                "positive_valid_bins": 0,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              },
+              {
+                "slot": 3,
+                "positive_valid_bins": 0,
+                "f1": 0.0,
+                "precision": 0.0,
+                "recall": 0.0
+              }
+            ]
+          },
+          "overlap": {
+            "physical_from_raw_intervals": {
+              "gt_bins": 59,
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "stable_physical_overlap_bins": 48,
+              "mixed_coverage_valid_bins": 59
+            },
+            "slot_threshold_overlap_proxy": {
+              "not_physical_overlap": true,
+              "gt_bins": 52,
+              "f1": 0.0
+            },
+            "confounded_slot_threshold_without_physical_overlap_bins": 0,
+            "denominators": {
+              "confounded_straddle_or_mixed_bins": 0,
+              "mixed_coverage_valid_bins": 59,
+              "physical_overlap_valid_bins": 59,
+              "slot_threshold_overlap_proxy_gt_bins": 52,
+              "stable_physical_overlap_valid_bins": 48,
+              "valid_bins": 602
+            }
+          },
+          "transition_event_proxy": null
+        },
+        "relation_mask_overlapping_valid_bins": 0,
+        "relation_mask_excluded_valid_bins": 602,
+        "relation_masks_do_not_erase_activity_targets": true
+      }
+    },
+    "selected_cal_is_in_cal_selection_not_final_eval": true
+  },
+  "cost": {
+    "external": 0,
+    "pause2_train": {
+      "elapsed_s": 6.134571484999995,
+      "peak_allocated_bytes": 292306432,
+      "peak_reserved_bytes": 320864256,
+      "scope": "pause-process train_stage wall through pause checkpoint, including host/device transfers and 2 optimizer updates",
+      "durable_pause_checkpoint": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/checkpoint_pause_update2.pt",
+      "note": "pause accounting.json was overwritten by the resume process; elapsed/peaks for pause2 are from the pre-overwrite snapshot, not the current accounting.json"
+    },
+    "resume_train": {
+      "elapsed_s": 78.489717646,
+      "timing_scope": "this process wall from train_stage entry through final checkpoint, including host/device transfers and optimizer updates",
+      "peak_allocated_bytes": 292838912,
+      "peak_reserved_bytes": 320864256,
+      "records": "updates 3-780 only"
+    },
+    "final_inference": {
+      "device": {
+        "backend": "PyTorch ROCm through torch.cuda API",
+        "device": "cuda:0",
+        "name": "AMD Radeon RX 7900 XTX",
+        "total_memory_bytes": 25725259776
+      },
+      "elapsed_seconds_synchronized": 13.092628055999967,
+      "peak_allocated_bytes": 130274816,
+      "peak_reserved_bytes": 153092096,
+      "scope": "warm selected-checkpoint source-zero prefix replay over FIT+DEV after model load; excludes training; not live 80ms admission or matched teacher cost"
+    },
+    "not_claimed": [
+      "live 80ms RTF",
+      "matched teacher speedup",
+      "mean step latency as admission cost"
+    ]
+  },
+  "artifacts": {
+    "prepare_receipt.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/prepare_receipt.json",
+      "sha256": "86ad3fe433ab8819b9f1c59212687e8a505e074452d1c923a786f97d323415f8",
+      "bytes": 8967
+    },
+    "prepared_sources.pt": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/prepared_sources.pt",
+      "sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+      "bytes": 111627089
+    },
+    "initial_eval.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/initial_eval.json",
+      "sha256": "ce786f612d4df2a44fbbbf167d7376ae909a88174f490d96b2a736d95cc98cc0",
+      "bytes": 145166
+    },
+    "checkpoint_pause_update2.pt": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/checkpoint_pause_update2.pt",
+      "sha256": "c1ab5a1956d1681ade3e0f9a48b54f5fbf71c2d1a3218f8cdd621e7c40cdb080",
+      "bytes": 71400421
+    },
+    "resume_witness.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/resume_witness.json",
+      "sha256": "eb04228b0a8c0e83773450ce64b58964d85ff8730cb48ce9d449b339320d55d6",
+      "bytes": 140
+    },
+    "accounting.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/accounting.json",
+      "sha256": "af2702748696c575a4ca7f80a61d652a32226905d479446f9dde335438df2a2d",
+      "bytes": 160167
+    },
+    "update_ledger.jsonl": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/update_ledger.jsonl",
+      "sha256": "899a0f88365291a7f9f63601ee0f2a27ae2d4131e563b99fa6627c6d696b7955",
+      "bytes": 212215
+    },
+    "checkpoint_step_78.pt": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/checkpoint_step_78.pt",
+      "sha256": "c9a3d69554f3c2cdb74512e83dd137bdf47d4b5148a52a0f4af53473b4465d72",
+      "bytes": 71396532
+    },
+    "checkpoint_step_390.pt": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/checkpoint_step_390.pt",
+      "sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+      "bytes": 71396611
+    },
+    "checkpoint_step_780.pt": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/checkpoint_step_780.pt",
+      "sha256": "c44fd8f621867ab75971b79d041e76ba30beddf104ec205cb53730e5363d4ec1",
+      "bytes": 71396611
+    },
+    "checkpoint_latest.pt": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/checkpoint_latest.pt",
+      "sha256": "5032e4b579ddc2c188fa920e8e9be49741d080fe7279749315a5356950df061c",
+      "bytes": 71397157
+    },
+    "cal_selection.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/cal_selection.json",
+      "sha256": "a853b38f4f44aee490ac51af67cf243bf320fe6a35d22ddc5b88e3aa953f44f3",
+      "bytes": 36733
+    },
+    "final_eval.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/final_eval.json",
+      "sha256": "f04d012c5e76905501a6cd94fb34cd427f349d21da88d1e8df49ed2ed9f3fd0b",
+      "bytes": 63115
+    },
+    "result.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/result.json",
+      "sha256": "4df30c30d79d5fad39369b7f832f3ee0f1dc60fcc3b923bba3bef548c71dba63",
+      "bytes": 404537
+    },
+    "director_release.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/director_release.json",
+      "sha256": "7ae2477c4f01056ea59f0fc540e6960fd8f1b8252590907274da304e9921b96a",
+      "bytes": 1549
+    },
+    "check_receipt.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/check_receipt.json",
+      "sha256": "fd896359302b74019c157d57427e4c94000845e6257f4d3b22b9bafce948334c",
+      "bytes": 12675
+    },
+    "frozen_config.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/frozen_config.json",
+      "sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+      "bytes": 14687
+    },
+    "report_receipt.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/report_receipt.json",
+      "sha256": "d1f76e79492fccabecab21a8a32d279b08c948cd29e15658b7c759ce7737c386",
+      "bytes": 782
+    }
+  },
+  "historical_gt_checkpoint_untouched": {
+    "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-checkpoint/student_gt_checkpoint.pt",
+    "required_sha256": "1928a9ae14d257282a9eefbc8e819876de1f8db325e0565831875dded8a434ac",
+    "observed_sha256": "1928a9ae14d257282a9eefbc8e819876de1f8db325e0565831875dded8a434ac",
+    "bytes": 71402202,
+    "matches_required": true
+  },
+  "limitations": [
+    "80ms frame-grid event proxies cannot resolve sub-frame admission timing and are not fixed156-policy evaluation",
+    "source-global 24-permutation scoring is oracle diagnostic only",
+    "DEV prefixes are already-exposed directional diagnosis, not generalization",
+    "EN2009d prefix has two speakers; unused output columns remain null/zero activity",
+    "slot-threshold overlap proxy is not physical overlap; mixed-coverage and physical-vs-proxy denominators are required",
+    "accounting.json after resume holds updates 3-780; updates 1-2 remain in update_ledger.jsonl and checkpoint_pause_update2.pt",
+    "stage command/exit codes are hub transcripts, not a durable runroot execution log",
+    "this pilot is not issue164 completion"
+  ],
+  "directional_read": {
+    "fit_bce_improved_vs_untrained": true,
+    "cal_selected_below_untrained_and_prior": true,
+    "dev_bce_below_untrained_and_prior": true,
+    "fit_vs_constant_prior_mixed": "ES2005a/ES2007a/ES2008a selected BCE below FIT prior; ES2006a selected 0.360 worse than prior 0.341 and is all-silence at 0.5",
+    "speaker_sensitive_evidence_weak": "solo balanced accuracy near 0; frequent all-silence; some one-slot collapse; physical-overlap F1 0; event proxies mostly missed. Improvements look like occupancy/silence prior more than speaker discrimination."
+  },
+  "not_authorized_or_not_this_report": [
+    "additional optimizer updates",
+    "teacher/KD",
+    "HOLDOUT/EVAL access",
+    "production/policy changes",
+    "issue closure",
+    "adoption decision"
+  ],
+  "verification_gaps": [
+    "Independent review not performed in this assignment",
+    "Pause-process elapsed/peaks are not in the current accounting.json",
+    "Seven-stage command/exit proof is hub transcript, not a durable runroot field",
+    "Oracle-aligned event/transition/ABA fields are null: retained source_global_aligned.metrics has speaker/overlap but not event_proxy; canonical transition_event_proxy and solo_aba_interruptions_le_1s are the durable event diagnostics"
+  ]
+}
