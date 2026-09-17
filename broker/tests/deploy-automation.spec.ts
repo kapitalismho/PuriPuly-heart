@@ -312,6 +312,48 @@ describe('broker direct deploy automation', () => {
     ]);
   });
 
+  it.skipIf(!bashAvailable)('accepts repeat deploys after both deferred network identity migrations are already applied', () => {
+    const workflow = readFileSync(deployWorkflow, 'utf8');
+    const verifyScript = extractWorkflowRunBlock(
+      workflow,
+      'Verify deferred network identity migrations are consistent',
+    ).replaceAll('${{ steps.render.outputs.config_path }}', 'wrangler.production.jsonc');
+    const requiredMigrations = [
+      '0022_managed_operation_issuance_context.sql',
+      '0023_backfill_operation_route_rate_limits.sql',
+    ];
+    const deferredMigrations = [
+      '0021_network_identity_purge.sql',
+      '0024_allow_unattributed_request_events.sql',
+    ];
+    const scenarios = [
+      { migrations: requiredMigrations, status: 0 },
+      { migrations: [...requiredMigrations, ...deferredMigrations], status: 0 },
+      { migrations: [...requiredMigrations, deferredMigrations[0]], status: 1 },
+      { migrations: [...requiredMigrations, deferredMigrations[1]], status: 1 },
+      { migrations: [requiredMigrations[0]], status: 1 },
+    ];
+
+    for (const scenario of scenarios) {
+      const tempDir = createRepoTempDir();
+      const bashEnvPath = join(tempDir, 'bash-env.sh');
+      writeFileSync(
+        bashEnvPath,
+        'pnpm() { printf \'%s\' "$JOURNAL_JSON"; }\n',
+      );
+      const journalJson = JSON.stringify([
+        { results: scenario.migrations.map((name) => ({ name })) },
+      ]);
+
+      const result = runBashScript(verifyScript, tempDir, {
+        BASH_ENV: './bash-env.sh',
+        JOURNAL_JSON: journalJson,
+      });
+
+      expect(result.status, scenario.migrations.join(',')).toBe(scenario.status);
+    }
+  });
+
   it.skipIf(!bashAvailable)('requires the dedicated deletion inputs and a usable backup before staging and applying only migration 0025', () => {
     const workflow = readFileSync(deployWorkflow, 'utf8');
     const guardScript = extractWorkflowRunBlock(
@@ -579,7 +621,7 @@ describe('broker direct deploy automation', () => {
       'Verify legacy network identity columns are gone',
     );
     const migrationJournalGateIndex = workflow.indexOf(
-      'Verify 0022 and 0023 applied with 0021 and 0024 still pending',
+      'Verify deferred network identity migrations are consistent',
     );
 
     expect(workflow).toContain('workflow_dispatch:');
@@ -651,10 +693,10 @@ describe('broker direct deploy automation', () => {
     expect(workflow).toContain('pragma_table_info');
     expect(workflow).toContain('attempt_ip_hash');
     expect(workflow).toContain('Await network identity backfill until keyed_only');
-    expect(workflow).toContain('Verify 0022 and 0023 applied with 0021 and 0024 still pending');
+    expect(workflow).toContain('Verify deferred network identity migrations are consistent');
     expect(workflow).toContain('SELECT name FROM d1_migrations;');
     expect(workflow).toContain("'0023_backfill_operation_route_rate_limits.sql' not in applied");
-    expect(workflow).toContain("'0024_allow_unattributed_request_events.sql' in applied");
+    expect(workflow).toContain('applied_deferred and applied_deferred != deferred');
     expect(workflow).toContain('Apply deferred 0021 purge followed by 0024 rebuild');
     expect(workflow).toContain('Verify legacy network identity columns are gone');
     expect(workflow).toMatch(
