@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -149,6 +149,26 @@ class ApplicationRuntimeLoggingOwner:
                 "reason=logging_failure exception_class=%s",
                 utterance_id,
                 speaker_channel,
+                type(exc).__name__,
+            )
+
+    def record_request_context(
+        self,
+        *,
+        utterance_id: str,
+        context_texts: Sequence[str],
+        segment_index: int | None = None,
+    ) -> None:
+        try:
+            self.service.record_request_context(
+                utterance_id=utterance_id,
+                context_texts=context_texts,
+                segment_index=segment_index,
+            )
+        except Exception as exc:
+            self.fallback_logger.error(
+                "[Context] record_rejected turn=%s reason=logging_failure exception_class=%s",
+                utterance_id,
                 type(exc).__name__,
             )
 

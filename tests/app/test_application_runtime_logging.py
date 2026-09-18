@@ -39,6 +39,12 @@ class RecordingRuntimeLogging:
     def emit_persisted(self, message: str, *, level: int) -> None:
         self.persisted.append((level, message))
 
+    def record_conversation_observation(self, **_kwargs: object) -> None:
+        return None
+
+    def record_request_context(self, **_kwargs: object) -> None:
+        return None
+
     def close_after_producers_stop(self, *, cleanup_failures=()) -> None:
         self.close_failures = tuple(cleanup_failures)
 
@@ -246,6 +252,22 @@ def test_composed_logging_persists_source_and_translation(composed_logging, capl
         (None, "Hello"),
     ]
     assert "record_rejected" not in caplog.text
+
+
+def test_composed_logging_persists_request_context_without_conversation_view(
+    composed_logging,
+) -> None:
+    owner, log_file, conversation = composed_logging
+    owner.record_request_context(
+        utterance_id="manual-turn",
+        context_texts=("어제 뭐 했어", "응 그냥 있었어"),
+        segment_index=0,
+    )
+
+    persisted = log_file.read_text(encoding="utf-8")
+    assert "[Context] utterance_id=manual-turn context_count=2" in persisted
+    assert '"어제 뭐 했어"' in persisted
+    assert conversation == []
 
 
 def test_composed_logging_ignores_conversation_after_close(composed_logging, caplog) -> None:

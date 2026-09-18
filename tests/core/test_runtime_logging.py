@@ -1368,3 +1368,103 @@ def test_close_after_producers_stop_preserves_safe_first_cleanup_cause() -> None
     assert "cleanup_failure_count=2" in log_text
     assert "first_cleanup_exception_type=RuntimeError" in log_text
     assert "secret cleanup detail" not in log_text
+
+
+def test_record_request_context_is_file_only_and_keeps_original_texts(tmp_path) -> None:
+    stream = io.StringIO()
+    stream_handler = logging.StreamHandler(stream)
+    stream_handler.setFormatter(logging.Formatter("%(message)s"))
+    log_file = tmp_path / "request-context.log"
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(message)s"))
+    root_logger = logging.getLogger(f"test.runtime_logging.context.root.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    session_logger = logging.getLogger(f"test.runtime_logging.context.session.{uuid4()}")
+    session_logger.handlers.clear()
+    session_logger.propagate = False
+    runtime_logging = SessionRuntimeLoggingService(
+        root_logger=root_logger,
+        session_logger=session_logger,
+        sinks=_SharedSinkBundle(
+            stream_handler=stream_handler,
+            file_handler=file_handler,
+            log_file=log_file,
+        ),
+    )
+
+    try:
+        runtime_logging.record_conversation_observation(
+            utterance_id="utt-1",
+            speaker_channel="self",
+            transcript_text="오늘 뭐 해",
+            translation_text=None,
+            source_language="ko",
+            target_language=None,
+        )
+        runtime_logging.record_request_context(
+            utterance_id="utt-1",
+            context_texts=("어제 뭐 했어", "응 그냥 있었어"),
+            segment_index=0,
+        )
+        runtime_logging.record_request_context(
+            utterance_id="utt-1",
+            context_texts=("duplicate should not persist",),
+            segment_index=0,
+        )
+        runtime_logging.record_request_context(
+            utterance_id="utt-2",
+            context_texts=(),
+            segment_index=0,
+        )
+        file_handler.flush()
+
+        live = stream.getvalue()
+        persisted = log_file.read_text(encoding="utf-8")
+        assert '"오늘 뭐 해"' in live
+        assert "[Context]" not in live
+        assert "어제 뭐 했어" not in live
+        assert "[Context] utterance_id=utt-1 context_count=2" in persisted
+        assert '"어제 뭐 했어"' in persisted
+        assert '"응 그냥 있었어"' in persisted
+        assert "duplicate should not persist" not in persisted
+        assert "[Context] utterance_id=utt-2 context_count=0" in persisted
+        assert "texts=" not in persisted.split("utt-2 context_count=0")[-1].splitlines()[0]
+    finally:
+        runtime_logging.close()
+        file_handler.close()
+
+
+def test_record_request_context_redacts_secret_shaped_text(tmp_path) -> None:
+    log_file = tmp_path / "request-context-redaction.log"
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(message)s"))
+    root_logger = logging.getLogger(f"test.runtime_logging.context.redact.root.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    session_logger = logging.getLogger(f"test.runtime_logging.context.redact.session.{uuid4()}")
+    session_logger.handlers.clear()
+    session_logger.propagate = False
+    runtime_logging = SessionRuntimeLoggingService(
+        root_logger=root_logger,
+        session_logger=session_logger,
+        sinks=_SharedSinkBundle(
+            stream_handler=logging.StreamHandler(io.StringIO()),
+            file_handler=file_handler,
+            log_file=log_file,
+        ),
+    )
+
+    try:
+        runtime_logging.record_request_context(
+            utterance_id="utt-secret",
+            context_texts=("api_key=super-secret-value",),
+        )
+        file_handler.flush()
+        persisted = log_file.read_text(encoding="utf-8")
+        assert "[Context]" in persisted
+        assert "super-secret-value" not in persisted
+        assert "Content redacted" in persisted
+    finally:
+        runtime_logging.close()
+        file_handler.close()

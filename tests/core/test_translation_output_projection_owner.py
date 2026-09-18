@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import io
+import logging
 from dataclasses import dataclass, field, replace
 from uuid import uuid4
 
@@ -30,11 +32,13 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 from puripuly_heart.core.overlay.sink import OverlayApplicationReceipt, OverlayEventUnion
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime.output import OutputRuntime
+from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
 from puripuly_heart.domain.events import UIEvent, UIEventType
 from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 from tests.core.test_translation_owner_branch_coverage import (
     _make_runtime_logging_capture,
     _runtime_log_messages,
+    _RuntimeLogSinks,
 )
 
 
@@ -908,6 +912,121 @@ def test_conversation_source_identity_dedupes_dual_target_per_semantic_segment()
         assert sum("secondary" in message for message in conversation) == 1
     finally:
         runtime_logging.close()
+
+
+def test_conversation_source_writes_file_only_context_once_for_dual_target(tmp_path) -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    owner, _chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    stream = io.StringIO()
+    stream_handler = logging.StreamHandler(stream)
+    stream_handler.setFormatter(logging.Formatter("%(message)s"))
+    log_file = tmp_path / "context.log"
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(message)s"))
+    root_logger = logging.getLogger(f"test.projection.context.root.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    session_logger = logging.getLogger(f"test.projection.context.session.{uuid4()}")
+    session_logger.handlers.clear()
+    session_logger.propagate = False
+    runtime_logging = SessionRuntimeLoggingService(
+        root_logger=root_logger,
+        session_logger=session_logger,
+        sinks=_RuntimeLogSinks(
+            stream_handler=stream_handler,
+            file_handler=file_handler,
+            log_file=log_file,
+        ),
+    )
+    owner.diagnostics.runtime_logging = runtime_logging
+    children = self_children(config_owner)
+    context_texts = ("어제 뭐 했어", "응 그냥 있었어")
+
+    try:
+        owner._record_conversation_submission(
+            replace(self_submission(children[0], text="primary"), context_texts=context_texts)
+        )
+        owner._record_conversation_submission(
+            replace(self_submission(children[1], text="secondary"), context_texts=context_texts)
+        )
+        file_handler.flush()
+
+        live = stream.getvalue()
+        persisted = log_file.read_text(encoding="utf-8")
+        assert live.count("[Conversation]") == 3
+        assert "[Context]" not in live
+        assert "어제 뭐 했어" not in live
+        assert persisted.count("[Context]") == 1
+        assert f"utterance_id={children[0].parent_utterance_id}" in persisted
+        assert "context_count=2" in persisted
+        assert '"어제 뭐 했어"' in persisted
+        assert '"응 그냥 있었어"' in persisted
+        assert '"source text"' in persisted
+        assert '"primary"' in persisted
+        assert '"secondary"' in persisted
+    finally:
+        runtime_logging.close()
+        file_handler.close()
+
+
+def test_child_terminal_original_writes_file_only_context(tmp_path) -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    owner, _chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    stream = io.StringIO()
+    stream_handler = logging.StreamHandler(stream)
+    stream_handler.setFormatter(logging.Formatter("%(message)s"))
+    log_file = tmp_path / "terminal-context.log"
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(message)s"))
+    root_logger = logging.getLogger(f"test.projection.terminal.context.root.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    session_logger = logging.getLogger(f"test.projection.terminal.context.session.{uuid4()}")
+    session_logger.handlers.clear()
+    session_logger.propagate = False
+    runtime_logging = SessionRuntimeLoggingService(
+        root_logger=root_logger,
+        session_logger=session_logger,
+        sinks=_RuntimeLogSinks(
+            stream_handler=stream_handler,
+            file_handler=file_handler,
+            log_file=log_file,
+        ),
+    )
+    owner.diagnostics.runtime_logging = runtime_logging
+    children = self_children(config_owner)
+    context_texts = ("어제 뭐 했어",)
+
+    try:
+        owner.record_child_terminal_conversation(
+            children[0],
+            "cancelled",
+            context_texts=context_texts,
+        )
+        owner.record_child_terminal_conversation(
+            children[1],
+            "cancelled",
+            context_texts=context_texts,
+        )
+        file_handler.flush()
+
+        live = stream.getvalue()
+        persisted = log_file.read_text(encoding="utf-8")
+        assert live.count("[Conversation]") == 1
+        assert "[Context]" not in live
+        assert "어제 뭐 했어" not in live
+        assert persisted.count("[Context]") == 1
+        assert "context_count=1" in persisted
+        assert '"어제 뭐 했어"' in persisted
+    finally:
+        runtime_logging.close()
+        file_handler.close()
 
 
 @pytest.mark.asyncio

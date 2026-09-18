@@ -185,6 +185,7 @@ class PreparedTranslationRequest:
     target_language: str
     scene_snapshot: VrchatSceneSnapshot = field(default_factory=VrchatSceneSnapshot)
     provider_generation: int | None = None
+    context_texts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -413,7 +414,7 @@ class TranslationRequestOwner:
         target_language = target_language or self.target_language_for(channel, configuration)
         other_channel: ChannelId = "self" if channel == "peer" else "peer"
         other_runtime = self.runtime_for_channel(other_channel)
-        context, applied_mode = self.context_resolver.resolve_for_request(
+        context_texts, context, applied_mode = self.context_resolver.resolve_selected_for_request(
             runtime=runtime,
             other_runtime=other_runtime,
             source_language=source_language,
@@ -437,6 +438,7 @@ class TranslationRequestOwner:
             source_language=source_language,
             target_language=target_language,
             scene_snapshot=self._scene_snapshot(),
+            context_texts=context_texts,
         )
 
     def admit(
@@ -592,6 +594,7 @@ class TranslationRequestOwner:
         prepared: PreparedTranslationRequest | None = None,
     ) -> TranslationTurnProcessResult:
         configuration = request.config_snapshot.value
+        prepared_context_texts = None if prepared is None else prepared.context_texts
         provider_request = self._capture_provider_request()
         if provider_request is None or not self.translation_enabled_for(
             request.channel,
@@ -602,6 +605,7 @@ class TranslationRequestOwner:
                 "source_only",
                 "translation_unavailable",
                 source_language=request.detected_language,
+                context_texts=prepared_context_texts,
             )
         backend, generation = provider_request
         if (
@@ -617,6 +621,7 @@ class TranslationRequestOwner:
                 "failed",
                 "stale_provider_completion",
                 source_language=request.detected_language,
+                context_texts=prepared_context_texts,
             )
         request_source = self._request_source_language(
             request.channel,
@@ -637,9 +642,11 @@ class TranslationRequestOwner:
                 outcome,
                 "unsupported_source_language",
                 source_language=request.detected_language,
+                context_texts=prepared_context_texts,
             )
         source_language, _ = request_source
         applied_mode: ContextMode | None = None
+        context_texts: tuple[str, ...] | None = None
         try:
             if prepared is None:
                 prepared = self.prepare(
@@ -664,6 +671,7 @@ class TranslationRequestOwner:
             elif prepared.target_language != request.target_language:
                 raise ValueError("prepared translation target mismatch")
             applied_mode = prepared.applied_context_mode
+            context_texts = prepared.context_texts
             self._record_latency(
                 request.channel,
                 request.utterance_id,
@@ -757,6 +765,7 @@ class TranslationRequestOwner:
                 "failed",
                 "stale_provider_completion",
                 source_language=source_language,
+                context_texts=context_texts,
             )
         except Exception as exc:
             report = self._record_failure(request, exc)
@@ -767,6 +776,7 @@ class TranslationRequestOwner:
                 "failed",
                 "provider_error",
                 source_language=source_language,
+                context_texts=context_texts,
             )
         return TranslationTurnProcessResult(
             "translated",
@@ -790,6 +800,7 @@ class TranslationRequestOwner:
                 source_order=request.source_order,
                 turn_kind=request.turn_kind,
                 parent_output_count=request.parent_output_count,
+                context_texts=context_texts,
             ),
         )
 
@@ -938,6 +949,7 @@ class TranslationRequestOwner:
         failure_code: str,
         *,
         source_language: str | None = None,
+        context_texts: tuple[str, ...] | None = None,
     ) -> TranslationTurnProcessResult:
         return TranslationTurnProcessResult(
             outcome,
@@ -960,6 +972,7 @@ class TranslationRequestOwner:
                 source_order=request.source_order,
                 turn_kind=request.turn_kind,
                 parent_output_count=request.parent_output_count,
+                context_texts=context_texts,
             ),
         )
 

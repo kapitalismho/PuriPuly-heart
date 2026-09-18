@@ -104,6 +104,14 @@ class RuntimeLoggingAdapterPort(Protocol):
         correlation_id: str | None = None,
     ) -> None: ...
 
+    def record_request_context(
+        self,
+        *,
+        utterance_id: str,
+        context_texts: Sequence[str],
+        segment_index: int | None = None,
+    ) -> None: ...
+
     def close_terminal_owner(self) -> None: ...
 
 
@@ -250,6 +258,21 @@ class RuntimeLoggingService:
             target_language=target_language,
             metadata=metadata,
             correlation_id=correlation_id,
+        )
+
+    def record_request_context(
+        self,
+        *,
+        utterance_id: str,
+        context_texts: Sequence[str],
+        segment_index: int | None = None,
+    ) -> None:
+        if self._closed:
+            return
+        self._session.record_request_context(
+            utterance_id=utterance_id,
+            context_texts=context_texts,
+            segment_index=segment_index,
         )
 
     def close_after_producers_stop(

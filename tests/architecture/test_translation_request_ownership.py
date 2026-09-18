@@ -79,7 +79,7 @@ def test_request_side_effects_are_owned_only_by_translation_request_owner() -> N
     assert [path for path, _line in prompt_render_calls] == [OWNER_PATH]
     assert "current_provider_generation()" in owner_source
     assert "is_current_provider_generation(" in owner_source
-    assert "resolve_for_request(" in owner_source
+    assert "resolve_selected_for_request(" in owner_source
 
 
 def test_translation_request_owner_has_no_lifecycle_or_output_delivery_authority() -> None:

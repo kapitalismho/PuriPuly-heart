@@ -521,6 +521,7 @@ def test_prepare_uses_detected_language_and_integrated_peer_context() -> None:
     assert prepared.target_language == "ja"
     assert prepared.system_prompt == "Chinese|Japanese"
     assert "previous peer text" in prepared.context
+    assert prepared.context_texts == ("previous peer text",)
     assert prepared.applied_context_mode == "integrated"
 
 
@@ -560,6 +561,7 @@ def test_prepare_uses_integrated_context_without_eligible_peer_entry() -> None:
     prepared = fixture.owner.prepare("안녕")
 
     assert "previous self text" in prepared.context
+    assert prepared.context_texts == ("previous self text",)
     assert prepared.applied_context_mode == "integrated"
 
 
@@ -710,10 +712,18 @@ async def test_process_propagates_parent_turn_and_target_identity_to_output() ->
         turn_order=7,
     )
 
+    fixture.self_runtime.remember_context(
+        "previous self text",
+        timestamp=fixture.clock.now(),
+        source_language="ko",
+        target_language="en",
+    )
+
     result = await fixture.owner.process(request)
 
     assert result.outcome == "translated"
     assert result.output is not None
+    assert result.output.context_texts == ("previous self text",)
     assert result.output.parent_utterance_id == request.parent_utterance_id
     assert result.output.target_index == 1
     assert result.output.target_language == request.target_language
@@ -726,12 +736,33 @@ async def test_process_returns_source_only_when_provider_is_unavailable() -> Non
     fixture = build_owner()
 
     result = await fixture.owner.process(process_request(fixture, channel="peer"))
+    assert result.output is not None
+    assert result.output.context_texts is None
 
     assert result.outcome == "source_only"
     assert result.output is not None
     assert result.output.failure_code == "translation_unavailable"
     assert result.output.channel == "peer"
     assert fixture.presentation.messages == []
+
+
+@pytest.mark.asyncio
+async def test_process_keeps_prepared_context_when_translation_unavailable() -> None:
+    fixture = build_owner()
+    fixture.self_runtime.remember_context(
+        "previous self text",
+        timestamp=fixture.clock.now(),
+        source_language="ko",
+        target_language="en",
+    )
+    prepared = fixture.owner.prepare("request")
+
+    result = await fixture.owner.process(process_request(fixture), prepared=prepared)
+
+    assert result.outcome == "source_only"
+    assert result.output is not None
+    assert result.output.failure_code == "translation_unavailable"
+    assert result.output.context_texts == ("previous self text",)
 
 
 @pytest.mark.asyncio

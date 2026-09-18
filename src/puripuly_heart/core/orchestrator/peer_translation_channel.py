@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt, OwnedVadEvent
@@ -603,7 +603,8 @@ class PeerTranslationChannelOwner:
             else child.target_language
         )
         if child.precomputed_translation is not None:
-            if child.utterance_id not in self._prepared_requests:
+            prepared = self._prepared_requests.get(child.utterance_id)
+            if prepared is None:
                 self._remember_context_entry(
                     child.transcript.text,
                     self.clock.now(),
@@ -632,6 +633,7 @@ class PeerTranslationChannelOwner:
                     source_order=child.transcript.source_order,
                     turn_kind=child.turn_kind,
                     parent_output_count=child.parent_output_count,
+                    context_texts=None if prepared is None else prepared.context_texts,
                 ),
             )
         result = await self.translation_requests.process(
@@ -740,12 +742,16 @@ class PeerTranslationChannelOwner:
     ) -> None:
         if child.channel != "peer":
             raise ValueError("Peer translation owner received a non-Peer child")
-        self._prepared_requests.pop(child.utterance_id, None)
+        prepared = self._prepared_requests.pop(child.utterance_id, None)
         runtime = self.runtime
         runtime.translation_tasks.pop(child.utterance_id, None)
         output_submitted = self.translation_turns.child_output_was_submitted(child.utterance_id)
         if not output_submitted:
-            self.output_projection.record_child_terminal_conversation(child, outcome)
+            self.output_projection.record_child_terminal_conversation(
+                child,
+                outcome,
+                context_texts=None if prepared is None else prepared.context_texts,
+            )
         if (
             outcome
             in {
@@ -870,13 +876,24 @@ class PeerTranslationChannelOwner:
             wait_for_parent=wait_for_parent,
         )
 
+    def _with_prepared_context(
+        self,
+        submission: TranslationOutputSubmission,
+    ) -> TranslationOutputSubmission:
+        if submission.context_texts is not None:
+            return submission
+        prepared = self._prepared_requests.get(submission.child_utterance_id)
+        if prepared is None:
+            return submission
+        return replace(submission, context_texts=prepared.context_texts)
+
     async def submit_translation_output(
         self,
         submission: TranslationOutputSubmission,
     ) -> TranslationResultProjectionReceipt:
         if submission.channel != "peer":
             raise ValueError("Peer translation owner received non-Peer output")
-        return await self._publish_translation_result(submission)
+        return await self._publish_translation_result(self._with_prepared_context(submission))
 
     async def _publish_translation_result(
         self,

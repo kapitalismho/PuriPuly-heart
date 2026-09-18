@@ -700,6 +700,7 @@ class SelfTranslationChannelOwner:
                     turn_order=child.turn_order,
                     turn_kind=child.turn_kind,
                     parent_output_count=child.parent_output_count,
+                    context_texts=None if prepared is None else prepared.context_texts,
                 ),
             )
         if child.prestarted_translation is not None:
@@ -787,10 +788,14 @@ class SelfTranslationChannelOwner:
     ) -> None:
         if child.channel != "self":
             raise ValueError("Self translation owner received a non-Self child")
-        self._admitted_requests.pop(child.utterance_id, None)
+        prepared = self._admitted_requests.pop(child.utterance_id, None)
         self.runtime.translation_tasks.pop(child.utterance_id, None)
         if not self.translation_turns.child_output_was_submitted(child.utterance_id):
-            self.output_projection.record_child_terminal_conversation(child, outcome)
+            self.output_projection.record_child_terminal_conversation(
+                child,
+                outcome,
+                context_texts=None if prepared is None else prepared.context_texts,
+            )
         await self.output_projection.complete_self_target(child, outcome)
         dual_target = len(child.config_snapshot.value.self_target_languages) == 2
         await self.output_projection.complete_translation_parent_output(
@@ -828,9 +833,21 @@ class SelfTranslationChannelOwner:
         if finalized:
             self._clear_runtime_latency_bookkeeping(child.utterance_id)
 
+    def _with_prepared_context(
+        self,
+        submission: TranslationOutputSubmission,
+    ) -> TranslationOutputSubmission:
+        if submission.context_texts is not None:
+            return submission
+        prepared = self._admitted_requests.get(submission.child_utterance_id)
+        if prepared is None:
+            return submission
+        return replace(submission, context_texts=prepared.context_texts)
+
     async def submit_translation_output(self, submission: TranslationOutputSubmission) -> None:
         if submission.channel != "self":
             raise ValueError("Self translation owner received non-Self output")
+        submission = self._with_prepared_context(submission)
         translation = submission.translation
         dual_target = len(submission.config_snapshot.value.self_target_languages) == 2
         admitted_destinations = await self.output_projection.await_translation_parent_output(

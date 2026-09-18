@@ -65,6 +65,28 @@ class ContextResolver:
         other_target_language: str | None = None,
         configuration: TranslationRuntimeConfig | None = None,
     ) -> tuple[str, ContextMode]:
+        _texts, formatted, mode = self.resolve_selected_for_request(
+            runtime=runtime,
+            other_runtime=other_runtime,
+            source_language=source_language,
+            target_language=target_language,
+            other_source_language=other_source_language,
+            other_target_language=other_target_language,
+            configuration=configuration,
+        )
+        return formatted, mode
+
+    def resolve_selected_for_request(
+        self,
+        *,
+        runtime: ChannelRuntime,
+        other_runtime: ChannelRuntime,
+        source_language: str,
+        target_language: str,
+        other_source_language: str | None = None,
+        other_target_language: str | None = None,
+        configuration: TranslationRuntimeConfig | None = None,
+    ) -> tuple[tuple[str, ...], str, ContextMode]:
         configuration = self._configuration(configuration)
         integrated_entries = self._get_integrated_entries(
             runtime=runtime,
@@ -75,7 +97,8 @@ class ContextResolver:
             other_target_language=other_target_language,
             configuration=configuration,
         )
-        return self.format_integrated(integrated_entries), "integrated"
+        texts = tuple(entry.text for _, entry in integrated_entries)
+        return texts, self.format_integrated(integrated_entries), "integrated"
 
     def _format_entries(self, entries: list[ContextEntry]) -> str:
         if not entries:

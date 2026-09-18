@@ -61,6 +61,12 @@ class FakeSessionRuntimeLogging:
         if self.persisted_error is not None:
             raise self.persisted_error
 
+    def record_conversation_observation(self, **_kwargs: object) -> None:
+        return None
+
+    def record_request_context(self, **_kwargs: object) -> None:
+        return None
+
     def close(self) -> None:
         self.close_calls += 1
         self.events.append("session_close")

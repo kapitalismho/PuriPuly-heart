@@ -2314,6 +2314,8 @@ class TranslationOutputProjectionOwner:
         self,
         child: TranslationTurnChild,
         outcome: TranslationTurnOutcome,
+        *,
+        context_texts: tuple[str, ...] | None = None,
     ) -> None:
         if outcome not in {"source_only", "failed", "cancelled"}:
             return
@@ -2341,6 +2343,11 @@ class TranslationOutputProjectionOwner:
             publication_generation=child.transcript.publication_generation,
             source_order=child.transcript.source_order,
             origin_wall_clock_ms=None,
+        )
+        self._record_request_context(
+            utterance_id=child.parent_utterance_id,
+            segment_index=segment_index,
+            context_texts=context_texts,
         )
 
     def _record_conversation_submission(
@@ -2380,6 +2387,11 @@ class TranslationOutputProjectionOwner:
             publication_generation=submission.publication_generation,
             source_order=submission.source_order,
             origin_wall_clock_ms=origin_wall_clock_ms,
+        )
+        self._record_request_context(
+            utterance_id=submission.parent_utterance_id,
+            segment_index=segment_index,
+            context_texts=submission.context_texts,
         )
         if submission.outcome != "translated" or translation is None:
             return
@@ -2467,6 +2479,25 @@ class TranslationOutputProjectionOwner:
             correlation_id=(
                 f"conversation:{channel}:{utterance_id}:{segment_index}:{target_index}"
             ),
+        )
+
+    def _record_request_context(
+        self,
+        *,
+        utterance_id: UUID,
+        segment_index: int,
+        context_texts: tuple[str, ...] | None,
+    ) -> None:
+        if context_texts is None:
+            return
+        runtime_logging = self.diagnostics.runtime_logging
+        record = getattr(runtime_logging, "record_request_context", None)
+        if not callable(record):
+            return
+        record(
+            utterance_id=str(utterance_id),
+            context_texts=context_texts,
+            segment_index=segment_index,
         )
 
     async def publish_chatbox(

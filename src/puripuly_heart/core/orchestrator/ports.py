@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Protocol
 
 from puripuly_heart.core.output.models import OutputRoutingDecision
@@ -31,6 +31,14 @@ class TranslationRuntimeLoggingPort(Protocol):
         target_language: str | None,
         metadata: Mapping[str, str | int | float | bool | None] | None = None,
         correlation_id: str | None = None,
+    ) -> None: ...
+
+    def record_request_context(
+        self,
+        *,
+        utterance_id: str,
+        context_texts: Sequence[str],
+        segment_index: int | None = None,
     ) -> None: ...
 
 

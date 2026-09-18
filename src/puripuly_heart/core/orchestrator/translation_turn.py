@@ -292,6 +292,7 @@ class TranslationOutputSubmission:
     source_order: int | None = None
     turn_kind: TranslationTurnKind | None = None
     parent_output_count: int = 1
+    context_texts: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.outcome == "translated" and self.translation is None:

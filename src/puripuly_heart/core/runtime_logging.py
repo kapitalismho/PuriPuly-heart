@@ -8,7 +8,7 @@ import queue
 import re
 import time
 from collections import deque
-from collections.abc import Awaitable, Mapping
+from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import dataclass
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 from pathlib import Path
@@ -80,6 +80,7 @@ _QUEUE_HANDLER_REFCOUNT_ATTR = "_puripuly_heart_queue_refcount"
 _QUEUE_HANDLER_QUEUE_ATTR = "_puripuly_heart_queue"
 _CONTENT_CATEGORY_ATTR = "_puripuly_heart_content_category"
 _CONVERSATION_CATEGORY = "accepted_conversation"
+_CONTEXT_CATEGORY = "request_context"
 _LIVE_AUDIENCE_ATTR = LIVE_AUDIENCE_RECORD_ATTRIBUTE
 _LIVE_AUDIENCE_BASIC = LIVE_AUDIENCE_BASIC
 _TERMINAL_RECORD_ATTR = "_puripuly_heart_terminal_record"
@@ -235,7 +236,7 @@ class _DiagnosticRedactionFilter(logging.Filter):
         with contextlib.suppress(Exception):
             message = record.getMessage()
             category = getattr(record, _CONTENT_CATEGORY_ATTR, None)
-            if category == _CONVERSATION_CATEGORY:
+            if category in {_CONVERSATION_CATEGORY, _CONTEXT_CATEGORY}:
                 safe_message = message
             elif (
                 self.sink == DIAGNOSTIC_SINK_BASIC_LOGS
@@ -670,6 +671,8 @@ class SessionRuntimeLoggingService:
         self._conversation_record_order: deque[tuple[str, str, int | None, int | None, str]] = (
             deque()
         )
+        self._request_context_keys: set[tuple[str, int | None]] = set()
+        self._request_context_order: deque[tuple[str, int | None]] = deque()
 
         file_output_handler = (
             getattr(self._sinks, "file_queue_handler", None) or self._sinks.file_handler
@@ -956,6 +959,53 @@ class SessionRuntimeLoggingService:
             lambda sink: sink.record_conversation(record),
         )
 
+    def record_request_context(
+        self,
+        *,
+        utterance_id: str,
+        context_texts: Sequence[str],
+        segment_index: int | None = None,
+    ) -> None:
+        if self._closed:
+            return
+        key = (utterance_id, segment_index)
+        if key in self._request_context_keys:
+            return
+        self._remember_request_context_key(key)
+        if _message_is_definitely_oversized(utterance_id):
+            _note_oversized_rejection(self._sinks)
+            return
+        safe_texts: list[str] = []
+        omission = False
+        for text in context_texts:
+            safe_text, redacted = _safe_conversation_text(text)
+            if safe_text is None:
+                continue
+            safe_texts.append(safe_text)
+            omission = omission or redacted
+        line = _format_request_context(
+            utterance_id=utterance_id,
+            texts=safe_texts,
+            omission=omission,
+        )
+        if _message_is_definitely_oversized(line):
+            _note_oversized_rejection(self._sinks)
+            return
+        record = self._session_logger.makeRecord(
+            self._session_logger.name,
+            logging.INFO,
+            fn="",
+            lno=0,
+            msg=line,
+            args=(),
+            exc_info=None,
+            extra={_CONTENT_CATEGORY_ATTR: _CONTEXT_CATEGORY},
+        )
+        file_output_handler = (
+            getattr(self._sinks, "file_queue_handler", None) or self._sinks.file_handler
+        )
+        file_output_handler.handle(record)
+
     def _remember_conversation_key(
         self,
         key: tuple[str, str, int | None, int | None, str],
@@ -965,6 +1015,13 @@ class SessionRuntimeLoggingService:
         while len(self._conversation_record_order) > 4096:
             expired = self._conversation_record_order.popleft()
             self._conversation_record_keys.discard(expired)
+
+    def _remember_request_context_key(self, key: tuple[str, int | None]) -> None:
+        self._request_context_keys.add(key)
+        self._request_context_order.append(key)
+        while len(self._request_context_order) > 4096:
+            expired = self._request_context_order.popleft()
+            self._request_context_keys.discard(expired)
 
     def _append_realtime_conversation(
         self,
@@ -1225,6 +1282,24 @@ def _format_conversation_record(
     if omission != "none":
         parts.append("Content redacted")
     return " · ".join(parts)
+
+
+def _format_request_context(
+    *,
+    utterance_id: str,
+    texts: Sequence[str],
+    omission: bool,
+) -> str:
+    parts = [
+        "[Context]",
+        f"utterance_id={utterance_id}",
+        f"context_count={len(texts)}",
+    ]
+    if texts:
+        parts.append(f"texts={json.dumps(list(texts), ensure_ascii=False)}")
+    if omission:
+        parts.append("Content redacted")
+    return " ".join(parts)
 
 
 def _language_display_name(code: str | None) -> str:

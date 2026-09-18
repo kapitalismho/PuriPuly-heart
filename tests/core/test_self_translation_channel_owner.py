@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -12,6 +13,8 @@ from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry, _Merg
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
+from puripuly_heart.core.orchestrator.translation_request import PreparedTranslationRequest
+from puripuly_heart.core.orchestrator.translation_turn import TranslationOutputSubmission
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
@@ -32,6 +35,42 @@ from tests.helpers.translation_owners import (
     compose_translation_test_harness,
     make_speculative_attempt,
 )
+
+
+def test_self_waiting_output_attaches_admitted_context_texts() -> None:
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
+    child_id = uuid4()
+    harness.self_owner._admitted_requests[child_id] = PreparedTranslationRequest(
+        system_prompt="prompt",
+        context="",
+        requested_at=1.0,
+        applied_context_mode="integrated",
+        source_language="ko",
+        target_language="en",
+        context_texts=("어제 뭐 했어",),
+    )
+    submission = TranslationOutputSubmission(
+        parent_utterance_id=uuid4(),
+        child_utterance_id=child_id,
+        sequence=0,
+        channel="self",
+        source="Mic",
+        source_text="오늘 뭐 해",
+        source_language="ko",
+        target_language="en",
+        outcome="source_only",
+        config_snapshot=harness.configuration.snapshot(),
+        failure_code="translation_timeout",
+        turn_generation=0,
+        turn_order=0,
+        turn_kind="self",
+    )
+
+    filled = harness.self_owner._with_prepared_context(submission)
+    already = harness.self_owner._with_prepared_context(replace(submission, context_texts=()))
+
+    assert filled.context_texts == ("어제 뭐 했어",)
+    assert already.context_texts == ()
 
 
 @pytest.mark.asyncio
