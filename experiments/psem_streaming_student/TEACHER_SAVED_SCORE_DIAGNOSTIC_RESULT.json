@@ -1,0 +1,3582 @@
+{
+  "schema": "PSEM-TEACHER-SAVED-SCORE-DIAGNOSTIC-1",
+  "status": "Frozen methods for a model-free diagnostic on retained native teacher scores; not an adoption, FIT teacher pass, KD execution or issue164 disposition",
+  "authority_id": "AUTONOMY-2",
+  "experiment_id": "TEACHER-SAVED-SCORE-1",
+  "decision_question": "On exact shared support-complete frames of two already-exposed DEV prefixes, does retained native F16 teacher provide stronger source-global speaker information than actual BCE-selected 390 and contrast-selected 780?",
+  "methods": {
+    "identity_first": "Prefix/PCM identity uses retained cost receipts plus exact int16/32768 sample equality against prepared waveforms; file names are insufficient.",
+    "teacher_decode": "Little-endian float32 row-major diar.probs.f32 is the score tensor. Native events must cover the same rows with contiguous emit_start_frame/count. JSON decimal probs are checked within 1e-6 and are not used for scores. Metadata/dump are asserted strict 0<p<1, then float64 log(p)-log1p(-p) with no clip or temperature.",
+    "common_mask": "Intersect GT activity validity with emitted teacher rows whose recorded chunk raw_support_end_sample lies within both n_visible and the prefix. Missing, tail and support-incomplete rows are excluded and counted. The same retained frame indices are used for every arm.",
+    "association": "Raw column indices are an explicitly unverified-index diagnostic. Primary comparison uses one fixed source-global 24-permutation oracle maximizing balanced argmax accuracy with lexicographic tie-break, applied to mapped conditional and activity diagnostics. Not causal association, per-chunk remapping, checkpoint selection or training targets.",
+    "activity": "Independent BCE/Brier on common-valid fractional GT. At fixed 0.5, predicted active-count distribution on common-valid frames and correctly mapped single-active fraction on strict-solo GT.",
+    "baselines": "Same-seed retained untrained logits, constant FIT occupancy prior, and uniform four-slot logits, rescored on the common mask. No FIT teacher common-logit control exists.",
+    "horizon": "Teacher has chunk-level future support and interior last-bin excess 9056 samples. Student has zero target-relative future. Not matched-causality, live 80ms, admission or speed evidence.",
+    "numerics": "CPU float64; no bootstrap, significance, generalization or fitted teacher temperature/clipping."
+  },
+  "arms": [
+    "native_teacher",
+    "same_seed_untrained",
+    "original_BCE_selected390",
+    "contrast_selected780",
+    "constant_FIT_prior",
+    "uniform"
+  ],
+  "limitations": [
+    "Correlated 80ms frames and two already-exposed DEV prefixes do not support statistical generalization or significance claims.",
+    "Oracle mapping is not proof that FIT teacher association is valid and is not a human-slot identity.",
+    "Teacher future horizon differs from the causal student; this is not matched-causality or admission evidence.",
+    "No FIT teacher scores exist; none were fitted on DEV.",
+    "This diagnostic does not authorize a FIT teacher pass, KD execution or production-policy change."
+  ],
+  "provenance": {
+    "contract_sha256": "f59f69248f14e3ed3659eacd6ebe74b31c54d478b47d0921f4df80f945b75220",
+    "analyzer_sha256": "b8880483ebd3528fb31627913124f8755720e11e1c821537ffdfbb5dcb3f360d",
+    "driver_sha256": "8a5ed310f4068bd80fad14b53e0b60ed274c51b1cc1cfbdaa0bde5eae33be613",
+    "input_manifest_sha256": "82b6f94a58ec847ffc51be0037ff4a93abddd7412ee784fe6eb85642a9f095d3",
+    "probe_receipt_sha256": "c1822ffb906fa9dd762a16bee5d1ef952a42efa2799c6a89c1121da82a754dda",
+    "pre_math_receipt_sha256": "750b6bd4a4d7b289f288deca7dd818bf969f8fc231ea3837ffed3e911c1702c5",
+    "prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+    "original_manifest_sha256": "49f272ab990a534491fc0f72d000e0bc4f1cff6bf74f7cb38c75317bb8f0d13a",
+    "contrast_manifest_sha256": "8cbf5079aa2070128fb5bb5f5f5e8f4fade4886a2c85ec49d72b4183f3df7ea9",
+    "cost_rerun_config_sha256": "13ef051d6243c8c2d0ece46580cb46a5407e08a61bccbf06f56345fca5a53c20",
+    "original_student_checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+    "contrast_checkpoint_sha256": "125d8d8ecd5f9434d5d13153fd3e2608720f5bd9777ed09dbe0601d0e11a1c2c",
+    "fit_only_occupancy_prior": [
+      0.26317110657691956,
+      0.10770361125469208,
+      0.11625641584396362,
+      0.06539624184370041
+    ],
+    "command": [
+      "experiments/psem_streaming_student/.stage-control/issue-164-teacher-saved-score-1/measure_teacher_saved_score.py",
+      "analyze"
+    ],
+    "python": "3.12.10",
+    "torch": "2.13.0+cpu",
+    "numpy": "2.5.1",
+    "device": "cpu"
+  },
+  "logic_probes": {
+    "schema": "PSEM-TEACHER-SAVED-SCORE-PROBE-RECEIPT-1",
+    "passed": true,
+    "imported_logic_probes": {
+      "perfect_auc": 1.0,
+      "reversed_auc": 0.0,
+      "tied_auc": 0.5,
+      "absent_class_auc_null": true,
+      "unused_head_predictions_reduce_observed_recall": true,
+      "observed_balanced_accuracy": 0.75,
+      "softmax_shift_invariant": true,
+      "common_logit_no_within_source_ranking_variation": true,
+      "global_permutation_lexicographic": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "global_permutation_cannot_use_per_chunk_maps": true,
+      "per_chunk_remap_not_used": true,
+      "empty_and_absent_nulls": true,
+      "model_object_created": false
+    },
+    "driver_probes": {
+      "analyzer_bound": "b8880483ebd3528fb31627913124f8755720e11e1c821537ffdfbb5dcb3f360d",
+      "unclipped_teacher_logit": true,
+      "reviewed_clip_helper_not_used_for_teacher": true,
+      "zero_probability_rejected": true,
+      "oracle_not_per_chunk": true,
+      "model_object_created": false
+    },
+    "model_instantiation_or_forward": 0,
+    "optimizer_updates": 0,
+    "teacher_passes": 0,
+    "gpu_use": false,
+    "torch": "2.13.0+cpu",
+    "numpy": "2.5.1",
+    "wall_seconds": 0.0072534999999334104
+  },
+  "pcm_identity": {
+    "ami_ES2009d": {
+      "prefix_samples": 3136000,
+      "wav_frames": 3136000,
+      "scale": 32768,
+      "exact_int16_div_scale_equal": true,
+      "max_abs_delta": 0.0,
+      "ami_wav_sha256": "b5ef423361ce67c804042ec479c6aeaf2cb8c19f73a779d61fabb7501e9e9b10",
+      "projection_sha256": "5ec38e33f8dcf10ed2e244bcb5b513738c371d65a50c45c9e4b32f5fe192330f",
+      "generation": "ES2009d:continuous-source-zero",
+      "native_exit": 0
+    },
+    "ami_EN2009d": {
+      "prefix_samples": 774400,
+      "wav_frames": 774400,
+      "scale": 32768,
+      "exact_int16_div_scale_equal": true,
+      "max_abs_delta": 0.0,
+      "ami_wav_sha256": "eeb4a5ff47cadba8c75bdf32213b9264805027faa943c7f55eec0423c6ea4312",
+      "projection_sha256": "44cdf330e7d33d7e7052ebd8235b0074e98366358b39cd776c77915a413f1b71",
+      "generation": "EN2009d:continuous-source-zero",
+      "native_exit": 0
+    }
+  },
+  "identities": {
+    "ami_ES2009d": {
+      "role": "DEV",
+      "prefix_samples": 3136000,
+      "frames": 2450,
+      "valid_bins": 2447,
+      "slots": [
+        "FEE036",
+        "MEE035",
+        "MEE033",
+        "MEE034"
+      ],
+      "frontiers_start": 1280,
+      "frontiers_end": 3136000
+    },
+    "ami_EN2009d": {
+      "role": "DEV",
+      "prefix_samples": 774400,
+      "frames": 605,
+      "valid_bins": 602,
+      "slots": [
+        "FEE096",
+        "FEE083",
+        null,
+        null
+      ],
+      "frontiers_start": 1280,
+      "frontiers_end": 774400
+    }
+  },
+  "per_source": {
+    "ami_ES2009d": {
+      "role": "DEV",
+      "slots": [
+        "FEE036",
+        "MEE035",
+        "MEE033",
+        "MEE034"
+      ],
+      "identities": {
+        "role": "DEV",
+        "prefix_samples": 3136000,
+        "frames": 2450,
+        "valid_bins": 2447,
+        "slots": [
+          "FEE036",
+          "MEE035",
+          "MEE033",
+          "MEE034"
+        ],
+        "frontiers_start": 1280,
+        "frontiers_end": 3136000
+      },
+      "pcm_identity": {
+        "prefix_samples": 3136000,
+        "wav_frames": 3136000,
+        "scale": 32768,
+        "exact_int16_div_scale_equal": true,
+        "max_abs_delta": 0.0,
+        "ami_wav_sha256": "b5ef423361ce67c804042ec479c6aeaf2cb8c19f73a779d61fabb7501e9e9b10",
+        "projection_sha256": "5ec38e33f8dcf10ed2e244bcb5b513738c371d65a50c45c9e4b32f5fe192330f",
+        "generation": "ES2009d:continuous-source-zero",
+        "native_exit": 0
+      },
+      "teacher_decode": {
+        "json_vs_dump_max_abs": 4.997863789490964e-09,
+        "dump_min": 6.063864077532344e-08,
+        "dump_max": 0.9981630444526672,
+        "n_chunks": 408,
+        "used_dump_not_json_probs_for_scores": true,
+        "unclipped_logit": true,
+        "dump_sha256": "0a2e3d23f1afe17f995c74fa6fe31b643c5f2041cbc317952349e22fe7097815",
+        "events_sha256": "342f83cd28ea4025309b38e72498b3922e277ab100777e3531bee5866e5e6656"
+      },
+      "support": {
+        "student_frames": 2450,
+        "teacher_emitted_rows": 2448,
+        "gt_valid_full_prefix": 2447,
+        "gt_invalid_indices": [
+          0,
+          1,
+          2
+        ],
+        "not_emitted_frames": [
+          2448,
+          2449
+        ],
+        "not_emitted_count": 2,
+        "not_emitted_and_gt_valid": 2,
+        "support_incomplete_frames": [
+          2442,
+          2443,
+          2444,
+          2445,
+          2446,
+          2447
+        ],
+        "support_incomplete_count": 6,
+        "support_incomplete_and_gt_valid": 6,
+        "support_gt_visible_rows": 6,
+        "support_gt_prefix_rows": 6,
+        "common_valid_count": 2439,
+        "common_solo_count": 1271,
+        "common_frame_index_min": 3,
+        "common_frame_index_max": 2441,
+        "common_frame_indices_sha256": "b2595535283404ca6387c888d91900479afc9eba165df521be0103e6f6018a03",
+        "same_indices_all_arms": true,
+        "recorded_raw_support_rule": "chunk raw_support_end_sample <= n_visible and <= prefix; applied to every emitted row in that chunk"
+      },
+      "horizon": {
+        "teacher_chunk_level_future_support": true,
+        "interior_last_bin_excess_samples": 9056,
+        "earlier_bins_in_same_emission_have_more_future": true,
+        "student_target_relative_future_samples": 0,
+        "not_matched_causality": true,
+        "not_live_80ms_admission_or_speed_evidence": true,
+        "source_support_completeness_is_not_timeliness_at_admission": true
+      },
+      "bin_counts": {
+        "activity_valid": 2439,
+        "solo_known_complete": 1271,
+        "excluded_from_solo_diagnostic": 1168,
+        "all_zero": 1025,
+        "two_or_more_full_ones": 15,
+        "any_fractional_occupancy": 128,
+        "other_nonzero_incomplete": 0
+      },
+      "scores": {
+        "native_teacher": {
+          "arm": "native_teacher",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              3,
+              1,
+              2
+            ],
+            "balanced_accuracy": 0.7278364213478998,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                59,
+                0,
+                0,
+                0
+              ],
+              [
+                1,
+                10,
+                0,
+                0
+              ],
+              [
+                2,
+                1176,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                21,
+                2
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.9090909090909091,
+              0.0,
+              0.08695652173913043
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.4990118577075099,
+            "ordinary_conditional_log_loss": 8.213632606139242,
+            "class_balanced_conditional_log_loss": 3.563184307757433,
+            "ovr_auc": [
+              0.9999860155507077,
+              0.08217893217893218,
+              0.46861821567446194,
+              0.9818840579710145
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.9999860155507077,
+              "ordinary_binary_log_loss": 0.011888840015034966,
+              "class_balanced_binary_log_loss": 0.008335755493443162
+            },
+            "independent_activity_valid_bce": 1.1700044042447137,
+            "independent_activity_valid_brier": 0.24870522379597457,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 1119,
+                "1": 1315,
+                "2": 5,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.952006294256491,
+              "correct_single_active_fraction_on_strict_solo": 0.043273013375295044,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              0,
+              3,
+              1,
+              2
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                59,
+                0,
+                0,
+                0
+              ],
+              [
+                1,
+                0,
+                10,
+                0
+              ],
+              [
+                2,
+                0,
+                1176,
+                0
+              ],
+              [
+                0,
+                2,
+                0,
+                21
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.0,
+              0.99830220713073,
+              0.9130434782608695
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.7278364213478998,
+            "ordinary_conditional_log_loss": 0.08409440364222188,
+            "class_balanced_conditional_log_loss": 1.9825391752523556,
+            "ovr_auc": [
+              0.9999860155507077,
+              0.949062049062049,
+              0.9978275553608267,
+              0.9991290412486065
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.9999860155507077,
+              "ordinary_binary_log_loss": 0.011888840015034978,
+              "class_balanced_binary_log_loss": 0.008335755493443165
+            },
+            "independent_activity_valid_bce": 0.05957861056683682,
+            "independent_activity_valid_brier": 0.01151188684162051,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 1119,
+                "1": 1315,
+                "2": 5,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.952006294256491,
+              "correct_single_active_fraction_on_strict_solo": 0.9496459480723839,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 2439,
+            "solo_known_complete": 1271,
+            "excluded_from_solo_diagnostic": 1168,
+            "all_zero": 1025,
+            "two_or_more_full_ones": 15,
+            "any_fractional_occupancy": 128,
+            "other_nonzero_incomplete": 0
+          }
+        },
+        "same_seed_untrained": {
+          "arm": "same_seed_untrained",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                0,
+                0,
+                0,
+                59
+              ],
+              [
+                0,
+                0,
+                0,
+                11
+              ],
+              [
+                0,
+                0,
+                0,
+                1178
+              ],
+              [
+                0,
+                0,
+                0,
+                23
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.25,
+            "ordinary_conditional_log_loss": 1.4380625757874252,
+            "class_balanced_conditional_log_loss": 1.3874420807848842,
+            "ovr_auc": [
+              0.2861218325222353,
+              0.3570707070707071,
+              0.27070668346203697,
+              0.4988503344481605
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.2861218325222353,
+              "ordinary_binary_log_loss": 0.3418806134400423,
+              "class_balanced_binary_log_loss": 0.8335273668833271
+            },
+            "independent_activity_valid_bce": 0.6976752635653415,
+            "independent_activity_valid_brier": 0.25000004444709045,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 0,
+                "1": 0,
+                "2": 2439,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                0,
+                0,
+                0,
+                59
+              ],
+              [
+                0,
+                0,
+                0,
+                11
+              ],
+              [
+                0,
+                0,
+                0,
+                1178
+              ],
+              [
+                0,
+                0,
+                0,
+                23
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.25,
+            "ordinary_conditional_log_loss": 1.4380625757874252,
+            "class_balanced_conditional_log_loss": 1.3874420807848842,
+            "ovr_auc": [
+              0.2861218325222353,
+              0.3570707070707071,
+              0.27070668346203697,
+              0.4988503344481605
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.2861218325222353,
+              "ordinary_binary_log_loss": 0.3418806134400423,
+              "class_balanced_binary_log_loss": 0.8335273668833271
+            },
+            "independent_activity_valid_bce": 0.6976752635653415,
+            "independent_activity_valid_brier": 0.25000004444709045,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 0,
+                "1": 0,
+                "2": 2439,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 2439,
+            "solo_known_complete": 1271,
+            "excluded_from_solo_diagnostic": 1168,
+            "all_zero": 1025,
+            "two_or_more_full_ones": 15,
+            "any_fractional_occupancy": 128,
+            "other_nonzero_incomplete": 0
+          }
+        },
+        "original_BCE_selected390": {
+          "arm": "original_BCE_selected390",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              2,
+              3,
+              1
+            ],
+            "balanced_accuracy": 0.4244657332350774,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                54,
+                5,
+                0,
+                0
+              ],
+              [
+                6,
+                5,
+                0,
+                0
+              ],
+              [
+                637,
+                541,
+                0,
+                0
+              ],
+              [
+                5,
+                18,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.9152542372881356,
+              0.45454545454545453,
+              0.0,
+              0.0
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.34244992295839755,
+            "ordinary_conditional_log_loss": 1.5493777084573284,
+            "class_balanced_conditional_log_loss": 1.375520140259577,
+            "ovr_auc": [
+              0.7752139620741735,
+              0.4608946608946609,
+              0.5272650930134911,
+              0.606814381270903
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.7752139620741735,
+              "ordinary_binary_log_loss": 0.4961369088850807,
+              "class_balanced_binary_log_loss": 0.5857500797568087
+            },
+            "independent_activity_valid_bce": 0.39467147481248727,
+            "independent_activity_valid_brier": 0.1250277349331401,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 2421,
+                "1": 18,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.012588512981904013,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              0,
+              2,
+              3,
+              1
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                54,
+                0,
+                0,
+                5
+              ],
+              [
+                6,
+                0,
+                0,
+                5
+              ],
+              [
+                637,
+                0,
+                0,
+                541
+              ],
+              [
+                5,
+                0,
+                0,
+                18
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.9152542372881356,
+              0.0,
+              0.0,
+              0.782608695652174
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.4244657332350774,
+            "ordinary_conditional_log_loss": 2.1099910244465194,
+            "class_balanced_conditional_log_loss": 1.4009167233497277,
+            "ovr_auc": [
+              0.7752139620741735,
+              0.6028138528138528,
+              0.6729101630246271,
+              0.6311663879598662
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.7752139620741735,
+              "ordinary_binary_log_loss": 0.4961369088850806,
+              "class_balanced_binary_log_loss": 0.5857500797568087
+            },
+            "independent_activity_valid_bce": 0.4709803430348292,
+            "independent_activity_valid_brier": 0.13909323483089353,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 2421,
+                "1": 18,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.012588512981904013,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 2439,
+            "solo_known_complete": 1271,
+            "excluded_from_solo_diagnostic": 1168,
+            "all_zero": 1025,
+            "two_or_more_full_ones": 15,
+            "any_fractional_occupancy": 128,
+            "other_nonzero_incomplete": 0
+          }
+        },
+        "contrast_selected780": {
+          "arm": "contrast_selected780",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              2,
+              3,
+              1
+            ],
+            "balanced_accuracy": 0.4264700120097775,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                36,
+                15,
+                8,
+                0
+              ],
+              [
+                1,
+                8,
+                2,
+                0
+              ],
+              [
+                156,
+                943,
+                78,
+                1
+              ],
+              [
+                2,
+                21,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.6101694915254238,
+              0.7272727272727273,
+              0.06621392190152801,
+              0.0
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.35091403517491976,
+            "ordinary_conditional_log_loss": 1.3844868156898347,
+            "class_balanced_conditional_log_loss": 1.3222247086341463,
+            "ovr_auc": [
+              0.8558343122447838,
+              0.43997113997113996,
+              0.3213209923873158,
+              0.5319467670011149
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.8558343122447838,
+              "ordinary_binary_log_loss": 0.2416083451988622,
+              "class_balanced_binary_log_loss": 0.7224557250985988
+            },
+            "independent_activity_valid_bce": 0.3659553969643219,
+            "independent_activity_valid_brier": 0.11307137682524156,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 2439,
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              0,
+              2,
+              3,
+              1
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                36,
+                8,
+                0,
+                15
+              ],
+              [
+                1,
+                2,
+                0,
+                8
+              ],
+              [
+                156,
+                78,
+                1,
+                943
+              ],
+              [
+                2,
+                0,
+                0,
+                21
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.6101694915254238,
+              0.18181818181818182,
+              0.0008488964346349745,
+              0.9130434782608695
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.4264700120097775,
+            "ordinary_conditional_log_loss": 1.6079973076058256,
+            "class_balanced_conditional_log_loss": 1.2746106331134583,
+            "ovr_auc": [
+              0.8558343122447838,
+              0.7044011544011544,
+              0.7465359548715702,
+              0.5899526198439242
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.8558343122447838,
+              "ordinary_binary_log_loss": 0.2416083451988622,
+              "class_balanced_binary_log_loss": 0.7224557250985988
+            },
+            "independent_activity_valid_bce": 0.3950552996866449,
+            "independent_activity_valid_brier": 0.12023410032706414,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 2439,
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 2439,
+            "solo_known_complete": 1271,
+            "excluded_from_solo_diagnostic": 1168,
+            "all_zero": 1025,
+            "two_or_more_full_ones": 15,
+            "any_fractional_occupancy": 128,
+            "other_nonzero_incomplete": 0
+          }
+        },
+        "constant_FIT_prior": {
+          "arm": "constant_FIT_prior",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                59,
+                0,
+                0,
+                0
+              ],
+              [
+                11,
+                0,
+                0,
+                0
+              ],
+              [
+                1178,
+                0,
+                0,
+                0
+              ],
+              [
+                23,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.25,
+            "ordinary_conditional_log_loss": 1.6076166585145635,
+            "class_balanced_conditional_log_loss": 1.571442958488925,
+            "ovr_auc": [
+              0.5,
+              0.5,
+              0.5,
+              0.5
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.5,
+              "ordinary_binary_log_loss": 0.74116795327202,
+              "class_balanced_binary_log_loss": 0.6944714591046748
+            },
+            "independent_activity_valid_bce": 0.43483856963275513,
+            "independent_activity_valid_brier": 0.1291385968561445,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 2439,
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                59,
+                0,
+                0,
+                0
+              ],
+              [
+                11,
+                0,
+                0,
+                0
+              ],
+              [
+                1178,
+                0,
+                0,
+                0
+              ],
+              [
+                23,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.25,
+            "ordinary_conditional_log_loss": 1.6076166585145635,
+            "class_balanced_conditional_log_loss": 1.571442958488925,
+            "ovr_auc": [
+              0.5,
+              0.5,
+              0.5,
+              0.5
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.5,
+              "ordinary_binary_log_loss": 0.74116795327202,
+              "class_balanced_binary_log_loss": 0.6944714591046748
+            },
+            "independent_activity_valid_bce": 0.43483856963275513,
+            "independent_activity_valid_brier": 0.1291385968561445,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 2439,
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 2439,
+            "solo_known_complete": 1271,
+            "excluded_from_solo_diagnostic": 1168,
+            "all_zero": 1025,
+            "two_or_more_full_ones": 15,
+            "any_fractional_occupancy": 128,
+            "other_nonzero_incomplete": 0
+          }
+        },
+        "uniform": {
+          "arm": "uniform",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.25,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                59,
+                0,
+                0,
+                0
+              ],
+              [
+                11,
+                0,
+                0,
+                0
+              ],
+              [
+                1178,
+                0,
+                0,
+                0
+              ],
+              [
+                23,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.25,
+            "ordinary_conditional_log_loss": 1.3862943611198906,
+            "class_balanced_conditional_log_loss": 1.3862943611198906,
+            "ovr_auc": [
+              0.5,
+              0.5,
+              0.5,
+              0.5
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.5,
+              "ordinary_binary_log_loss": 0.3386798104780739,
+              "class_balanced_binary_log_loss": 0.8369882167858358
+            },
+            "independent_activity_valid_bce": 0.6931471805599453,
+            "independent_activity_valid_brier": 0.24773660120375565,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 0,
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 2439
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 1271,
+            "class_counts": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "observed_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "absent_slots": [],
+            "confusion": [
+              [
+                59,
+                0,
+                0,
+                0
+              ],
+              [
+                11,
+                0,
+                0,
+                0
+              ],
+              [
+                1178,
+                0,
+                0,
+                0
+              ],
+              [
+                23,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "recall_denominators": [
+              59,
+              11,
+              1178,
+              23
+            ],
+            "balanced_accuracy": 0.25,
+            "ordinary_conditional_log_loss": 1.3862943611198906,
+            "class_balanced_conditional_log_loss": 1.3862943611198906,
+            "ovr_auc": [
+              0.5,
+              0.5,
+              0.5,
+              0.5
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 59,
+                "negative": 1212
+              },
+              {
+                "positive": 11,
+                "negative": 1260
+              },
+              {
+                "positive": 1178,
+                "negative": 93
+              },
+              {
+                "positive": 23,
+                "negative": 1248
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 59,
+              "n_rest": 1212,
+              "auc": 0.5,
+              "ordinary_binary_log_loss": 0.3386798104780739,
+              "class_balanced_binary_log_loss": 0.8369882167858358
+            },
+            "independent_activity_valid_bce": 0.6931471805599453,
+            "independent_activity_valid_brier": 0.24773660120375565,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 0,
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 2439
+              },
+              "common_valid_denominator": 2439,
+              "strict_solo_denominator": 1271,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 2439,
+            "solo_known_complete": 1271,
+            "excluded_from_solo_diagnostic": 1168,
+            "all_zero": 1025,
+            "two_or_more_full_ones": 15,
+            "any_fractional_occupancy": 128,
+            "other_nonzero_incomplete": 0
+          }
+        }
+      }
+    },
+    "ami_EN2009d": {
+      "role": "DEV",
+      "slots": [
+        "FEE096",
+        "FEE083",
+        null,
+        null
+      ],
+      "identities": {
+        "role": "DEV",
+        "prefix_samples": 774400,
+        "frames": 605,
+        "valid_bins": 602,
+        "slots": [
+          "FEE096",
+          "FEE083",
+          null,
+          null
+        ],
+        "frontiers_start": 1280,
+        "frontiers_end": 774400
+      },
+      "pcm_identity": {
+        "prefix_samples": 774400,
+        "wav_frames": 774400,
+        "scale": 32768,
+        "exact_int16_div_scale_equal": true,
+        "max_abs_delta": 0.0,
+        "ami_wav_sha256": "eeb4a5ff47cadba8c75bdf32213b9264805027faa943c7f55eec0423c6ea4312",
+        "projection_sha256": "44cdf330e7d33d7e7052ebd8235b0074e98366358b39cd776c77915a413f1b71",
+        "generation": "EN2009d:continuous-source-zero",
+        "native_exit": 0
+      },
+      "teacher_decode": {
+        "json_vs_dump_max_abs": 4.994049063178352e-09,
+        "dump_min": 4.722541291357629e-08,
+        "dump_max": 0.9999172687530518,
+        "n_chunks": 100,
+        "used_dump_not_json_probs_for_scores": true,
+        "unclipped_logit": true,
+        "dump_sha256": "c960162899ac6c3f2b5adeba121686e227daa0b361dabf95a3530e81bcf09a8f",
+        "events_sha256": "2210adb95988a2c520706ae053ec921a943ef78f2ba385c17b36f7ace26d7a88"
+      },
+      "support": {
+        "student_frames": 605,
+        "teacher_emitted_rows": 600,
+        "gt_valid_full_prefix": 602,
+        "gt_invalid_indices": [
+          0,
+          1,
+          2
+        ],
+        "not_emitted_frames": [
+          600,
+          601,
+          602,
+          603,
+          604
+        ],
+        "not_emitted_count": 5,
+        "not_emitted_and_gt_valid": 5,
+        "support_incomplete_frames": [
+          594,
+          595,
+          596,
+          597,
+          598,
+          599
+        ],
+        "support_incomplete_count": 6,
+        "support_incomplete_and_gt_valid": 6,
+        "support_gt_visible_rows": 6,
+        "support_gt_prefix_rows": 6,
+        "common_valid_count": 591,
+        "common_solo_count": 357,
+        "common_frame_index_min": 3,
+        "common_frame_index_max": 593,
+        "common_frame_indices_sha256": "1768d85753a9de6327de139218c573b50c88771592a8e3d1968ab86aadb17303",
+        "same_indices_all_arms": true,
+        "recorded_raw_support_rule": "chunk raw_support_end_sample <= n_visible and <= prefix; applied to every emitted row in that chunk"
+      },
+      "horizon": {
+        "teacher_chunk_level_future_support": true,
+        "interior_last_bin_excess_samples": 9056,
+        "earlier_bins_in_same_emission_have_more_future": true,
+        "student_target_relative_future_samples": 0,
+        "not_matched_causality": true,
+        "not_live_80ms_admission_or_speed_evidence": true,
+        "source_support_completeness_is_not_timeliness_at_admission": true
+      },
+      "bin_counts": {
+        "activity_valid": 591,
+        "solo_known_complete": 357,
+        "excluded_from_solo_diagnostic": 234,
+        "all_zero": 128,
+        "two_or_more_full_ones": 48,
+        "any_fractional_occupancy": 58,
+        "other_nonzero_incomplete": 0
+      },
+      "scores": {
+        "native_teacher": {
+          "arm": "native_teacher",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.9964912280701754,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                72,
+                0,
+                0,
+                0
+              ],
+              [
+                2,
+                283,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.9929824561403509,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.9964912280701754,
+            "ordinary_conditional_log_loss": 0.03813245413394834,
+            "class_balanced_conditional_log_loss": 0.02396803751411816,
+            "ovr_auc": [
+              0.998391812865497,
+              0.998391812865497,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.998391812865497,
+              "ordinary_binary_log_loss": 0.037735329723813306,
+              "class_balanced_binary_log_loss": 0.023719312225665153
+            },
+            "independent_activity_valid_bce": 0.06424345801984652,
+            "independent_activity_valid_brier": 0.012191822573324435,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 145,
+                "1": 390,
+                "2": 56,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.9775910364145658,
+              "correct_single_active_fraction_on_strict_solo": 0.9747899159663865,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                72,
+                0,
+                0,
+                0
+              ],
+              [
+                2,
+                283,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.9929824561403509,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.9964912280701754,
+            "ordinary_conditional_log_loss": 0.03813245413394834,
+            "class_balanced_conditional_log_loss": 0.02396803751411816,
+            "ovr_auc": [
+              0.998391812865497,
+              0.998391812865497,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.998391812865497,
+              "ordinary_binary_log_loss": 0.037735329723813306,
+              "class_balanced_binary_log_loss": 0.023719312225665153
+            },
+            "independent_activity_valid_bce": 0.06424345801984652,
+            "independent_activity_valid_brier": 0.012191822573324435,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 145,
+                "1": 390,
+                "2": 56,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.9775910364145658,
+              "correct_single_active_fraction_on_strict_solo": 0.9747899159663865,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 591,
+            "solo_known_complete": 357,
+            "excluded_from_solo_diagnostic": 234,
+            "all_zero": 128,
+            "two_or_more_full_ones": 48,
+            "any_fractional_occupancy": 58,
+            "other_nonzero_incomplete": 0
+          }
+        },
+        "same_seed_untrained": {
+          "arm": "same_seed_untrained",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              3,
+              1,
+              2
+            ],
+            "balanced_accuracy": 0.5,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                0,
+                0,
+                0,
+                72
+              ],
+              [
+                0,
+                0,
+                0,
+                285
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.0,
+              0.0,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.0,
+            "ordinary_conditional_log_loss": 1.392058451191951,
+            "class_balanced_conditional_log_loss": 1.384923876666893,
+            "ovr_auc": [
+              0.46764132553606236,
+              0.39044834307992204,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.46764132553606236,
+              "ordinary_binary_log_loss": 0.5101693946250038,
+              "class_balanced_binary_log_loss": 0.8325828359749629
+            },
+            "independent_activity_valid_bce": 0.6921232642352859,
+            "independent_activity_valid_brier": 0.24528611148757717,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 0,
+                "1": 0,
+                "2": 591,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              0,
+              3,
+              1,
+              2
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                0,
+                72,
+                0,
+                0
+              ],
+              [
+                0,
+                285,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.0,
+              1.0,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.5,
+            "ordinary_conditional_log_loss": 1.3432222613088969,
+            "class_balanced_conditional_log_loss": 1.3543369998454011,
+            "ovr_auc": [
+              0.46764132553606236,
+              0.615448343079922,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.46764132553606236,
+              "ordinary_binary_log_loss": 0.5101693946250038,
+              "class_balanced_binary_log_loss": 0.832582835974963
+            },
+            "independent_activity_valid_bce": 0.6828025812603167,
+            "independent_activity_valid_brier": 0.24062638017516672,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 0,
+                "1": 0,
+                "2": 591,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 591,
+            "solo_known_complete": 357,
+            "excluded_from_solo_diagnostic": 234,
+            "all_zero": 128,
+            "two_or_more_full_ones": 48,
+            "any_fractional_occupancy": 58,
+            "other_nonzero_incomplete": 0
+          }
+        },
+        "original_BCE_selected390": {
+          "arm": "original_BCE_selected390",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              1,
+              0,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.5878654970760233,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                26,
+                46,
+                0,
+                0
+              ],
+              [
+                153,
+                132,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.3611111111111111,
+              0.4631578947368421,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.4121345029239766,
+            "ordinary_conditional_log_loss": 1.3632040642576553,
+            "class_balanced_conditional_log_loss": 1.383879198523395,
+            "ovr_auc": [
+              0.3672514619883041,
+              0.39273879142300194,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.3672514619883041,
+              "ordinary_binary_log_loss": 0.7063720756216095,
+              "class_balanced_binary_log_loss": 0.9724949530092399
+            },
+            "independent_activity_valid_bce": 0.4810551115831519,
+            "independent_activity_valid_brier": 0.15404438601154566,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 543,
+                "1": 44,
+                "2": 4,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.09243697478991597,
+              "correct_single_active_fraction_on_strict_solo": 0.0784313725490196,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              1,
+              0,
+              2,
+              3
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                46,
+                26,
+                0,
+                0
+              ],
+              [
+                132,
+                153,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.6388888888888888,
+              0.5368421052631579,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.5878654970760233,
+            "ordinary_conditional_log_loss": 1.1515304696951256,
+            "class_balanced_conditional_log_loss": 1.1657305729093823,
+            "ovr_auc": [
+              0.6072612085769981,
+              0.632748538011696,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.6072612085769981,
+              "ordinary_binary_log_loss": 0.5022610840144394,
+              "class_balanced_binary_log_loss": 0.7590829050356895
+            },
+            "independent_activity_valid_bce": 0.4466221678376943,
+            "independent_activity_valid_brier": 0.14435642841015195,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 543,
+                "1": 44,
+                "2": 4,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.09243697478991597,
+              "correct_single_active_fraction_on_strict_solo": 0.014005602240896359,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 591,
+            "solo_known_complete": 357,
+            "excluded_from_solo_diagnostic": 234,
+            "all_zero": 128,
+            "two_or_more_full_ones": 48,
+            "any_fractional_occupancy": 58,
+            "other_nonzero_incomplete": 0
+          }
+        },
+        "contrast_selected780": {
+          "arm": "contrast_selected780",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              1,
+              0,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.568859649122807,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                4,
+                66,
+                2,
+                0
+              ],
+              [
+                63,
+                180,
+                42,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.05555555555555555,
+              0.631578947368421,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.3435672514619883,
+            "ordinary_conditional_log_loss": 1.2469775858000014,
+            "class_balanced_conditional_log_loss": 1.527179009560558,
+            "ovr_auc": [
+              0.39220272904483433,
+              0.409551656920078,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.39220272904483433,
+              "ordinary_binary_log_loss": 0.5827082243563552,
+              "class_balanced_binary_log_loss": 1.1111366200248005
+            },
+            "independent_activity_valid_bce": 0.4799584798010254,
+            "independent_activity_valid_brier": 0.1476268499863642,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 589,
+                "1": 2,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0056022408963585435,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              1,
+              0,
+              2,
+              3
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                66,
+                4,
+                2,
+                0
+              ],
+              [
+                180,
+                63,
+                42,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              0.9166666666666666,
+              0.22105263157894736,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.568859649122807,
+            "ordinary_conditional_log_loss": 1.6123747854805346,
+            "class_balanced_conditional_log_loss": 1.3674280732870723,
+            "ovr_auc": [
+              0.590448343079922,
+              0.6077972709551657,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.590448343079922,
+              "ordinary_binary_log_loss": 0.5576161957864554,
+              "class_balanced_binary_log_loss": 0.7068161144786755
+            },
+            "independent_activity_valid_bce": 0.5368856920942013,
+            "independent_activity_valid_brier": 0.1669910582673286,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 589,
+                "1": 2,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0056022408963585435,
+              "correct_single_active_fraction_on_strict_solo": 0.0056022408963585435,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 591,
+            "solo_known_complete": 357,
+            "excluded_from_solo_diagnostic": 234,
+            "all_zero": 128,
+            "two_or_more_full_ones": 48,
+            "any_fractional_occupancy": 58,
+            "other_nonzero_incomplete": 0
+          }
+        },
+        "constant_FIT_prior": {
+          "arm": "constant_FIT_prior",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.5,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                72,
+                0,
+                0,
+                0
+              ],
+              [
+                285,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.0,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.5,
+            "ordinary_conditional_log_loss": 1.509063828409397,
+            "class_balanced_conditional_log_loss": 1.1854279428086856,
+            "ovr_auc": [
+              0.5,
+              0.5,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.5,
+              "ordinary_binary_log_loss": 0.7251837283777834,
+              "class_balanced_binary_log_loss": 0.6944714591046749
+            },
+            "independent_activity_valid_bce": 0.5349159546442102,
+            "independent_activity_valid_brier": 0.16739902070551685,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 591,
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                72,
+                0,
+                0,
+                0
+              ],
+              [
+                285,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.0,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.5,
+            "ordinary_conditional_log_loss": 1.509063828409397,
+            "class_balanced_conditional_log_loss": 1.1854279428086856,
+            "ovr_auc": [
+              0.5,
+              0.5,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.5,
+              "ordinary_binary_log_loss": 0.7251837283777834,
+              "class_balanced_binary_log_loss": 0.6944714591046749
+            },
+            "independent_activity_valid_bce": 0.5349159546442102,
+            "independent_activity_valid_brier": 0.16739902070551685,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 591,
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 0
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 591,
+            "solo_known_complete": 357,
+            "excluded_from_solo_diagnostic": 234,
+            "all_zero": 128,
+            "two_or_more_full_ones": 48,
+            "any_fractional_occupancy": 58,
+            "other_nonzero_incomplete": 0
+          }
+        },
+        "uniform": {
+          "arm": "uniform",
+          "raw_column_indices_are_not_established_human_or_gt_identities": true,
+          "oracle_permutation": {
+            "role": "source_global_oracle_diagnostic_only",
+            "not_used_for_inference_or_selection": true,
+            "not_per_chunk_remapping": true,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "balanced_accuracy": 0.5,
+            "permutation_count": 24
+          },
+          "raw_index_assumption": {
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                72,
+                0,
+                0,
+                0
+              ],
+              [
+                285,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.0,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.5,
+            "ordinary_conditional_log_loss": 1.3862943611198906,
+            "class_balanced_conditional_log_loss": 1.3862943611198908,
+            "ovr_auc": [
+              0.5,
+              0.5,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.5,
+              "ordinary_binary_log_loss": 0.5092509373932483,
+              "class_balanced_binary_log_loss": 0.8369882167858357
+            },
+            "independent_activity_valid_bce": 0.6931471805599453,
+            "independent_activity_valid_brier": 0.2457973773174371,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "unverified_raw_column_index_assumption",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 0,
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 591
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "mapped_source_global_oracle": {
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "applied_to_conditional_and_activity": true,
+            "not_per_chunk_remapping": true,
+            "not_inference_or_training_target": true,
+            "solo_bins": 357,
+            "class_counts": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "observed_slots": [
+              0,
+              1
+            ],
+            "absent_slots": [
+              2,
+              3
+            ],
+            "confusion": [
+              [
+                72,
+                0,
+                0,
+                0
+              ],
+              [
+                285,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0
+              ]
+            ],
+            "per_observed_slot_recall": [
+              1.0,
+              0.0,
+              null,
+              null
+            ],
+            "recall_denominators": [
+              72,
+              285,
+              0,
+              0
+            ],
+            "balanced_accuracy": 0.5,
+            "ordinary_conditional_log_loss": 1.3862943611198906,
+            "class_balanced_conditional_log_loss": 1.3862943611198908,
+            "ovr_auc": [
+              0.5,
+              0.5,
+              null,
+              null
+            ],
+            "ovr_auc_denominators": [
+              {
+                "positive": 72,
+                "negative": 285
+              },
+              {
+                "positive": 285,
+                "negative": 72
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              },
+              {
+                "positive": 0,
+                "negative": 357
+              }
+            ],
+            "first_slot0_vs_rest": {
+              "n_slot0": 72,
+              "n_rest": 285,
+              "auc": 0.5,
+              "ordinary_binary_log_loss": 0.5092509373932483,
+              "class_balanced_binary_log_loss": 0.8369882167858357
+            },
+            "independent_activity_valid_bce": 0.6931471805599453,
+            "independent_activity_valid_brier": 0.2457973773174371,
+            "threshold_0_5": {
+              "threshold": 0.5,
+              "role": "mapped_gt_slots",
+              "predicted_active_count_distribution_on_common_valid": {
+                "0": 0,
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 591
+              },
+              "common_valid_denominator": 591,
+              "strict_solo_denominator": 357,
+              "predicted_exactly_one_active_fraction_on_strict_solo": 0.0,
+              "correct_single_active_fraction_on_strict_solo": 0.0,
+              "not_physical_overlap_inference": true
+            }
+          },
+          "common_logit_control": null,
+          "fit_teacher_control": null,
+          "bin_counts": {
+            "activity_valid": 591,
+            "solo_known_complete": 357,
+            "excluded_from_solo_diagnostic": 234,
+            "all_zero": 128,
+            "two_or_more_full_ones": 48,
+            "any_fractional_occupancy": 58,
+            "other_nonzero_incomplete": 0
+          }
+        }
+      }
+    }
+  },
+  "comparisons": {
+    "ami_ES2009d": {
+      "common_valid_count": 2439,
+      "common_solo_count": 1271,
+      "common_frame_indices_sha256": "b2595535283404ca6387c888d91900479afc9eba165df521be0103e6f6018a03",
+      "arms": {
+        "native_teacher": {
+          "raw_balanced_accuracy": 0.4990118577075099,
+          "mapped_balanced_accuracy": 0.7278364213478998,
+          "mapped_ordinary_conditional_log_loss": 0.08409440364222188,
+          "mapped_class_balanced_conditional_log_loss": 1.9825391752523556,
+          "mapped_independent_activity_valid_bce": 0.05957861056683682,
+          "mapped_independent_activity_valid_brier": 0.01151188684162051,
+          "mapped_correct_single_active_fraction_0_5": 0.9496459480723839,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.952006294256491,
+          "oracle_permutation": [
+            0,
+            3,
+            1,
+            2
+          ]
+        },
+        "same_seed_untrained": {
+          "raw_balanced_accuracy": 0.25,
+          "mapped_balanced_accuracy": 0.25,
+          "mapped_ordinary_conditional_log_loss": 1.4380625757874252,
+          "mapped_class_balanced_conditional_log_loss": 1.3874420807848842,
+          "mapped_independent_activity_valid_bce": 0.6976752635653415,
+          "mapped_independent_activity_valid_brier": 0.25000004444709045,
+          "mapped_correct_single_active_fraction_0_5": 0.0,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.0,
+          "oracle_permutation": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "original_BCE_selected390": {
+          "raw_balanced_accuracy": 0.34244992295839755,
+          "mapped_balanced_accuracy": 0.4244657332350774,
+          "mapped_ordinary_conditional_log_loss": 2.1099910244465194,
+          "mapped_class_balanced_conditional_log_loss": 1.4009167233497277,
+          "mapped_independent_activity_valid_bce": 0.4709803430348292,
+          "mapped_independent_activity_valid_brier": 0.13909323483089353,
+          "mapped_correct_single_active_fraction_0_5": 0.0,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.012588512981904013,
+          "oracle_permutation": [
+            0,
+            2,
+            3,
+            1
+          ]
+        },
+        "contrast_selected780": {
+          "raw_balanced_accuracy": 0.35091403517491976,
+          "mapped_balanced_accuracy": 0.4264700120097775,
+          "mapped_ordinary_conditional_log_loss": 1.6079973076058256,
+          "mapped_class_balanced_conditional_log_loss": 1.2746106331134583,
+          "mapped_independent_activity_valid_bce": 0.3950552996866449,
+          "mapped_independent_activity_valid_brier": 0.12023410032706414,
+          "mapped_correct_single_active_fraction_0_5": 0.0,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.0,
+          "oracle_permutation": [
+            0,
+            2,
+            3,
+            1
+          ]
+        },
+        "constant_FIT_prior": {
+          "raw_balanced_accuracy": 0.25,
+          "mapped_balanced_accuracy": 0.25,
+          "mapped_ordinary_conditional_log_loss": 1.6076166585145635,
+          "mapped_class_balanced_conditional_log_loss": 1.571442958488925,
+          "mapped_independent_activity_valid_bce": 0.43483856963275513,
+          "mapped_independent_activity_valid_brier": 0.1291385968561445,
+          "mapped_correct_single_active_fraction_0_5": 0.0,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.0,
+          "oracle_permutation": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "uniform": {
+          "raw_balanced_accuracy": 0.25,
+          "mapped_balanced_accuracy": 0.25,
+          "mapped_ordinary_conditional_log_loss": 1.3862943611198906,
+          "mapped_class_balanced_conditional_log_loss": 1.3862943611198906,
+          "mapped_independent_activity_valid_bce": 0.6931471805599453,
+          "mapped_independent_activity_valid_brier": 0.24773660120375565,
+          "mapped_correct_single_active_fraction_0_5": 0.0,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.0,
+          "oracle_permutation": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    "ami_EN2009d": {
+      "common_valid_count": 591,
+      "common_solo_count": 357,
+      "common_frame_indices_sha256": "1768d85753a9de6327de139218c573b50c88771592a8e3d1968ab86aadb17303",
+      "arms": {
+        "native_teacher": {
+          "raw_balanced_accuracy": 0.9964912280701754,
+          "mapped_balanced_accuracy": 0.9964912280701754,
+          "mapped_ordinary_conditional_log_loss": 0.03813245413394834,
+          "mapped_class_balanced_conditional_log_loss": 0.02396803751411816,
+          "mapped_independent_activity_valid_bce": 0.06424345801984652,
+          "mapped_independent_activity_valid_brier": 0.012191822573324435,
+          "mapped_correct_single_active_fraction_0_5": 0.9747899159663865,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.9775910364145658,
+          "oracle_permutation": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "same_seed_untrained": {
+          "raw_balanced_accuracy": 0.0,
+          "mapped_balanced_accuracy": 0.5,
+          "mapped_ordinary_conditional_log_loss": 1.3432222613088969,
+          "mapped_class_balanced_conditional_log_loss": 1.3543369998454011,
+          "mapped_independent_activity_valid_bce": 0.6828025812603167,
+          "mapped_independent_activity_valid_brier": 0.24062638017516672,
+          "mapped_correct_single_active_fraction_0_5": 0.0,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.0,
+          "oracle_permutation": [
+            0,
+            3,
+            1,
+            2
+          ]
+        },
+        "original_BCE_selected390": {
+          "raw_balanced_accuracy": 0.4121345029239766,
+          "mapped_balanced_accuracy": 0.5878654970760233,
+          "mapped_ordinary_conditional_log_loss": 1.1515304696951256,
+          "mapped_class_balanced_conditional_log_loss": 1.1657305729093823,
+          "mapped_independent_activity_valid_bce": 0.4466221678376943,
+          "mapped_independent_activity_valid_brier": 0.14435642841015195,
+          "mapped_correct_single_active_fraction_0_5": 0.014005602240896359,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.09243697478991597,
+          "oracle_permutation": [
+            1,
+            0,
+            2,
+            3
+          ]
+        },
+        "contrast_selected780": {
+          "raw_balanced_accuracy": 0.3435672514619883,
+          "mapped_balanced_accuracy": 0.568859649122807,
+          "mapped_ordinary_conditional_log_loss": 1.6123747854805346,
+          "mapped_class_balanced_conditional_log_loss": 1.3674280732870723,
+          "mapped_independent_activity_valid_bce": 0.5368856920942013,
+          "mapped_independent_activity_valid_brier": 0.1669910582673286,
+          "mapped_correct_single_active_fraction_0_5": 0.0056022408963585435,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.0056022408963585435,
+          "oracle_permutation": [
+            1,
+            0,
+            2,
+            3
+          ]
+        },
+        "constant_FIT_prior": {
+          "raw_balanced_accuracy": 0.5,
+          "mapped_balanced_accuracy": 0.5,
+          "mapped_ordinary_conditional_log_loss": 1.509063828409397,
+          "mapped_class_balanced_conditional_log_loss": 1.1854279428086856,
+          "mapped_independent_activity_valid_bce": 0.5349159546442102,
+          "mapped_independent_activity_valid_brier": 0.16739902070551685,
+          "mapped_correct_single_active_fraction_0_5": 0.0,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.0,
+          "oracle_permutation": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "uniform": {
+          "raw_balanced_accuracy": 0.5,
+          "mapped_balanced_accuracy": 0.5,
+          "mapped_ordinary_conditional_log_loss": 1.3862943611198906,
+          "mapped_class_balanced_conditional_log_loss": 1.3862943611198908,
+          "mapped_independent_activity_valid_bce": 0.6931471805599453,
+          "mapped_independent_activity_valid_brier": 0.2457973773174371,
+          "mapped_correct_single_active_fraction_0_5": 0.0,
+          "mapped_predicted_exactly_one_active_fraction_0_5": 0.0,
+          "oracle_permutation": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      }
+    }
+  },
+  "accounting": {
+    "model_instantiation_or_forward": 0,
+    "new_waveform_model_exposure": 0,
+    "backward_calls": 0,
+    "optimizer_updates": 0,
+    "teacher_passes": 0,
+    "gpu_use": false,
+    "cumulative_optimizer_updates_remain": 1583,
+    "source_passes": 0,
+    "wall_seconds": 0.7750019000013708,
+    "external_cost": 0
+  },
+  "remaining_uncertainty": [
+    "Speaker-sensitive scores may still be confounded by occupancy, channel, source or non-identity temporal structure.",
+    "Native columns are not established human identities even after a source-global oracle permutation.",
+    "DEV evidence is two already-exposed prefixes only."
+  ],
+  "adoption_or_next_experiment_decision": null
+}
