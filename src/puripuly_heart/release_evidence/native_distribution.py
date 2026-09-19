@@ -34,6 +34,9 @@ _REQUIRED_DISTRIBUTIONS = frozenset(
 _FORBIDDEN_DISTRIBUTIONS = frozenset({"flet-desktop", "flet-cli", "pyinstaller"})
 _FORCED_WINDOWS_REQUIREMENTS = frozenset({"proc-tap", "psutil"})
 _FORBIDDEN_PTH = frozenset({"a1_coverage.pth", "distutils-precedence.pth"})
+_SOUNDDEVICE_RUNTIME_ROOT = PurePosixPath("_sounddevice_data/portaudio-binaries")
+_SOUNDDEVICE_STANDARD_DLL = _SOUNDDEVICE_RUNTIME_ROOT / "libportaudio64bit.dll"
+_SOUNDDEVICE_ASIO_DLL = _SOUNDDEVICE_RUNTIME_ROOT / "libportaudio64bit-asio.dll"
 
 
 def _canonical_name(value: str) -> str:
@@ -327,6 +330,35 @@ def verify_installed_soxr_record(site_packages: Path) -> dict[str, str]:
     return identities
 
 
+def verify_sounddevice_portaudio_runtime(site_packages: Path) -> dict[str, str]:
+    standard = site_packages.joinpath(*_SOUNDDEVICE_STANDARD_DLL.parts)
+    asio = site_packages.joinpath(*_SOUNDDEVICE_ASIO_DLL.parts)
+    if not standard.is_file():
+        raise ValueError("native artifact lacks the standard sounddevice PortAudio runtime")
+    if asio.exists():
+        raise ValueError("native artifact includes the unsupported sounddevice ASIO runtime")
+    return {str(_SOUNDDEVICE_STANDARD_DLL): _sha256(standard)}
+
+
+
+
+def stage_sounddevice_portaudio_runtime(site_packages: Path) -> dict[str, dict[str, str]]:
+    standard = site_packages.joinpath(*_SOUNDDEVICE_STANDARD_DLL.parts)
+    asio = site_packages.joinpath(*_SOUNDDEVICE_ASIO_DLL.parts)
+    if not standard.is_file():
+        raise ValueError("native artifact lacks the standard sounddevice PortAudio runtime")
+    excluded: dict[str, str] = {}
+    if asio.exists():
+        excluded[str(_SOUNDDEVICE_ASIO_DLL)] = _sha256(asio)
+        asio.unlink()
+    return {
+        "retained": verify_sounddevice_portaudio_runtime(site_packages),
+        "excluded": excluded,
+    }
+
+
+
+
 def _distribution_names(site_packages: Path) -> set[str]:
     names: set[str] = set()
     for distribution in importlib.metadata.distributions(path=[str(site_packages)]):
@@ -386,6 +418,7 @@ def validate_target(
     if bad_pth:
         raise ValueError(f"native dependency closure contains build-only path hooks: {bad_pth}")
     soxr_runtime = verify_installed_soxr_record(site_packages)
+    portaudio_runtime = verify_sounddevice_portaudio_runtime(site_packages)
     python_digest = _sha256(required_paths["python_executable"])
     if python_digest != "4942b86a6597e5aee0128daa00050ed79bc21f6e709a78eb19cbfeb0c2f39ac9":
         raise ValueError("native python.exe is not the pinned official CPython executable")
@@ -397,6 +430,7 @@ def validate_target(
         "distributions": sorted(names),
         "python_executable_sha256": python_digest,
         "soxr_runtime": soxr_runtime,
+        "portaudio_runtime": portaudio_runtime,
         "paths": {
             key: str(value.relative_to(target_root)) for key, value in required_paths.items()
         },
@@ -695,6 +729,9 @@ def _parser() -> argparse.ArgumentParser:
     metadata.add_argument("--site-packages", type=Path, required=True)
     metadata.add_argument("--pyproject", type=Path, required=True)
     metadata.add_argument("--output", type=Path)
+    sounddevice = commands.add_parser("stage-sounddevice-runtime")
+    sounddevice.add_argument("--site-packages", type=Path, required=True)
+    sounddevice.add_argument("--output", type=Path)
     wheel = commands.add_parser("finalize-soxr-wheel")
     wheel.add_argument("--wheel", type=Path, required=True)
     wheel.add_argument("--dll", type=Path, required=True)
@@ -737,6 +774,11 @@ def main(argv: list[str] | None = None) -> int:
         _write_json(
             args.output,
             stage_product_metadata(args.site_packages, args.pyproject),
+        )
+    elif args.command == "stage-sounddevice-runtime":
+        _write_json(
+            args.output,
+            stage_sounddevice_portaudio_runtime(args.site_packages),
         )
     elif args.command == "finalize-soxr-wheel":
         _write_json(None, finalize_soxr_wheel(args.wheel, args.dll, args.output))

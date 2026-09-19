@@ -8,13 +8,17 @@ import sys
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from puripuly_heart.release_evidence.native_distribution import (
     NativeArtifactLayout,
     compile_application,
     filter_requirements,
     finalize_soxr_wheel,
     stage_product_metadata,
+    stage_sounddevice_portaudio_runtime,
     verify_installed_soxr_record,
+    verify_sounddevice_portaudio_runtime,
     verify_wheel_record,
 )
 
@@ -100,6 +104,55 @@ def test_finalized_soxr_wheel_owns_both_native_runtime_files(tmp_path: Path) -> 
     with zipfile.ZipFile(destination) as archive:
         assert archive.read("soxr/soxr_ext.pyd") == pyd
         assert archive.read("soxr/soxr.dll") == b"runtime-dll"
+
+def test_sounddevice_staging_excludes_asio_and_retains_standard_runtime(
+    tmp_path: Path,
+) -> None:
+    runtime = tmp_path / "_sounddevice_data" / "portaudio-binaries"
+    runtime.mkdir(parents=True)
+    standard = runtime / "libportaudio64bit.dll"
+    asio = runtime / "libportaudio64bit-asio.dll"
+    standard.write_bytes(b"standard-portaudio")
+    asio.write_bytes(b"unsupported-asio")
+
+    result = stage_sounddevice_portaudio_runtime(tmp_path)
+
+    assert standard.read_bytes() == b"standard-portaudio"
+    assert not asio.exists()
+    assert result["retained"] == {
+        "_sounddevice_data/portaudio-binaries/libportaudio64bit.dll": hashlib.sha256(
+            b"standard-portaudio"
+        ).hexdigest()
+    }
+    assert result["excluded"] == {
+        "_sounddevice_data/portaudio-binaries/libportaudio64bit-asio.dll": hashlib.sha256(
+            b"unsupported-asio"
+        ).hexdigest()
+    }
+    assert stage_sounddevice_portaudio_runtime(tmp_path) == {
+        "retained": result["retained"],
+        "excluded": {},
+    }
+
+
+def test_sounddevice_validation_rejects_asio_and_requires_standard_runtime(
+    tmp_path: Path,
+) -> None:
+    runtime = tmp_path / "_sounddevice_data" / "portaudio-binaries"
+    runtime.mkdir(parents=True)
+    standard = runtime / "libportaudio64bit.dll"
+    asio = runtime / "libportaudio64bit-asio.dll"
+    standard.write_bytes(b"standard-portaudio")
+    asio.write_bytes(b"unsupported-asio")
+
+    with pytest.raises(ValueError):
+        verify_sounddevice_portaudio_runtime(tmp_path)
+
+    asio.unlink()
+    standard.unlink()
+    with pytest.raises(ValueError):
+        verify_sounddevice_portaudio_runtime(tmp_path)
+
 
 
 def test_product_metadata_is_non_editable_and_record_owned(tmp_path: Path) -> None:

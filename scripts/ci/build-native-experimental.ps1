@@ -266,6 +266,13 @@ company = "salee"
         "--target", (Join-Path $artifactRoot "site-packages"),
         "--requirements", $requirementsPath
     ) -WorkingDirectory $repoRoot
+    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
+        "-m", "puripuly_heart.release_evidence.native_distribution",
+        "stage-sounddevice-runtime",
+        "--site-packages", (Join-Path $artifactRoot "site-packages"),
+        "--output", (Join-Path $evidenceRoot "sounddevice-runtime.json")
+    ) -WorkingDirectory $repoRoot
+
 
     $previousProjectEnvironment = $env:UV_PROJECT_ENVIRONMENT
     $env:UV_PROJECT_ENVIRONMENT = $SoxrBuildEnvironmentPath
