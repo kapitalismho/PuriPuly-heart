@@ -1,5 +1,7 @@
 # Issue 177 — Outcome C and source/PyInstaller boundary checkpoint
 
+Historical checkpoint record. Under [issue #177](https://github.com/kapitalismho/PuriPuly-heart/issues/177) amendment **NATIVE-ONLY-1**, upgraded C completion and matched C-versus-D comparison are no longer delivery requirements. The results below remain bound to their recorded candidates; unfinished C qualification is superseded/unmet, not passed. Current native obligations and readiness are tracked in `status.md`.
+
 ## Result
 
 **Ready for committed independent review, but not blanket issue/release approval.** The final Windows CPython 3.14.7 candidate passes the assigned software, native-runtime, packaged CPU/GPU/Xet, GUI, release-identity, and isolated installer gates. The remaining gaps require external hardware/services or a safe published-upgrade environment: physical microphone/loopback, HMD/OpenVR, VRChat, cloud-provider credentials/endpoints, and upgrade of an actual published installer identity.
