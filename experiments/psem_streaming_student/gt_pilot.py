@@ -118,7 +118,7 @@ def bind_pilot_config(config_path: Path, run_root: Path) -> Path:
     return frozen
 
 
-def load_pilot_config(path: Path) -> dict[str, Any]:
+def parse_pilot_config(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if value.get("schema") != SCHEMA:
         raise RuntimeError("unexpected GT-pilot config schema")
@@ -126,11 +126,6 @@ def load_pilot_config(path: Path) -> dict[str, Any]:
         "prior_failed_gt_optimizer_steps" in value.get("budget", {})
     ):
         raise RuntimeError("old GT-probe step budgets are not authorization for this run")
-    root = Path(__file__).resolve().parent
-    for relative, expected in value["implementation_sha256"].items():
-        actual = sha256_file(root / relative)
-        if actual != expected:
-            raise RuntimeError(f"implementation identity mismatch for {relative}: {actual}")
     training = value["training"]
     budget = value["budget"]
     if training["seed"] != 20260915:
@@ -150,6 +145,22 @@ def load_pilot_config(path: Path) -> dict[str, Any]:
         raise RuntimeError("automatic retry after unknown partial updates is forbidden")
     if training["student_parameter_count"] != 5940740:
         raise RuntimeError("student parameter count must remain 5940740")
+    if "objective" in training:
+        validate_training_objective(value)
+    return value
+
+
+def verify_current_implementation(config: dict[str, Any]) -> None:
+    root = Path(__file__).resolve().parent
+    for relative, expected in config["implementation_sha256"].items():
+        actual = sha256_file(root / relative)
+        if actual != expected:
+            raise RuntimeError(f"implementation identity mismatch for {relative}: {actual}")
+
+
+def load_pilot_config(path: Path) -> dict[str, Any]:
+    value = parse_pilot_config(path)
+    verify_current_implementation(value)
     validate_training_objective(value)
     return value
 
@@ -2474,20 +2485,111 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
 
 
 
+def bind_frozen_pilot_config(config_path: Path, run_root: Path) -> Path:
+    frozen = run_root / "frozen_config.json"
+    if not frozen.is_file():
+        raise RuntimeError("report requires frozen_config.json from completed material stages")
+    if frozen.read_bytes() != config_path.read_bytes():
+        raise RuntimeError("requested config differs from the frozen GT-pilot config")
+    return frozen
+
+
+def read_required_run_json(run_root: Path, name: str) -> Any:
+    path = run_root / name
+    if not path.is_file():
+        raise RuntimeError(f"report requires {name} from completed pipeline stages")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def current_implementation_sha256(config: dict[str, Any]) -> dict[str, str]:
+    root = Path(__file__).resolve().parent
+    return {name: sha256_file(root / name) for name in config["implementation_sha256"]}
+
+
+def reporter_runtime(frozen_config_path: Path, config: dict[str, Any]) -> dict[str, object]:
+    return {
+        "contract": "cpu_metadata_aggregation",
+        "gpu_or_model_work": False,
+        "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
+        "hip_visible_devices": os.environ.get("HIP_VISIBLE_DEVICES", ""),
+        "python": platform.python_version(),
+        "config_sha256": sha256_file(frozen_config_path),
+        "implementation_base_commit": config["implementation_base_commit"],
+        "executed_implementation_sha256": dict(config["implementation_sha256"]),
+        "reporter_implementation_sha256": current_implementation_sha256(config),
+    }
+
+
+def validate_prepare_receipt_for_report(
+    prepare: dict[str, Any], config: dict[str, Any], frozen_sha256: str
+) -> None:
+    runtime = prepare.get("runtime") or {}
+    if runtime.get("config_sha256") != frozen_sha256:
+        raise RuntimeError("prepare receipt config identity differs from frozen config")
+    if "identities" not in prepare or "prepared_sha256" not in prepare:
+        raise RuntimeError("prepare receipt missing identities or prepared hash")
+    stage = prepare.get("stage")
+    if stage == "import_prepared":
+        spec = config.get("prepared_import")
+        if not isinstance(spec, dict):
+            raise RuntimeError("imported prepared receipt requires prepared_import")
+        if prepare.get("origin_prepared_sha256") != prepare["prepared_sha256"]:
+            raise RuntimeError("imported prepared hash does not match origin prepared hash")
+        if prepare["origin_prepared_sha256"] != spec["origin_prepared_sha256"]:
+            raise RuntimeError("imported prepared hash does not match config origin")
+        if prepare.get("origin_config_sha256") != spec["origin_frozen_config_sha256"]:
+            raise RuntimeError("imported origin config hash does not match")
+    elif stage != "prepare":
+        raise RuntimeError("unknown prepared receipt stage")
+    elif "prepared_import" in config:
+        raise RuntimeError("ordinary prepare receipt cannot use prepared_import config")
+
+
+def retained_execution_device_provenance(*docs: tuple[str, dict[str, Any]]) -> dict[str, Any]:
+    for source, doc in docs:
+        cost = doc.get("inference_cost")
+        if isinstance(cost, dict) and isinstance(cost.get("device"), dict):
+            return {"present": True, "source": source, "device": dict(cost["device"])}
+    return {
+        "present": False,
+        "limit": "no retained inference_cost.device in eval receipts",
+    }
+
+
+
 def report_stage(config_path: Path, run_root: Path) -> None:
-    config_path = bind_pilot_config(config_path, run_root)
-    config = load_pilot_config(config_path)
-    require_authorization()
-    check = json.loads((run_root / "check_receipt.json").read_text(encoding="utf-8"))
-    prepare = json.loads((run_root / "prepare_receipt.json").read_text(encoding="utf-8"))
-    initial = json.loads((run_root / "initial_eval.json").read_text(encoding="utf-8"))
-    accounting = json.loads((run_root / "accounting.json").read_text(encoding="utf-8"))
-    selection = json.loads((run_root / "cal_selection.json").read_text(encoding="utf-8"))
-    final = json.loads((run_root / "final_eval.json").read_text(encoding="utf-8"))
+    frozen_path = bind_frozen_pilot_config(config_path, run_root)
+    config = parse_pilot_config(frozen_path)
+    frozen_sha256 = sha256_file(frozen_path)
+    prepare = read_required_run_json(run_root, "prepare_receipt.json")
+    validate_prepare_receipt_for_report(prepare, config, frozen_sha256)
+    initial = read_required_run_json(run_root, "initial_eval.json")
+    accounting = read_required_run_json(run_root, "accounting.json")
+    selection = read_required_run_json(run_root, "cal_selection.json")
+    final = read_required_run_json(run_root, "final_eval.json")
     resume = None
     resume_path = run_root / "resume_witness.json"
-    if resume_path.exists():
+    if resume_path.is_file():
         resume = json.loads(resume_path.read_text(encoding="utf-8"))
+    check_path = run_root / "check_receipt.json"
+    if check_path.is_file():
+        check_proof: dict[str, Any] = {"present": True, "sha256": sha256_file(check_path)}
+    else:
+        check_proof = {
+            "present": False,
+            "limit": "check_receipt.json is not a stage of this recipe; identities come from prepare_receipt.json",
+        }
+    execution_identity = None
+    execution_identity_path = run_root / "execution_identity.json"
+    if execution_identity_path.is_file():
+        execution_identity = json.loads(execution_identity_path.read_text(encoding="utf-8"))
+        if execution_identity.get("config_sha256") != frozen_sha256:
+            raise RuntimeError("execution_identity config hash differs from frozen config")
+        executed_gt_pilot = (prepare.get("runtime") or {}).get("implementation_sha256", {}).get(
+            "gt_pilot.py"
+        )
+        if executed_gt_pilot and execution_identity.get("gt_pilot_sha256") != executed_gt_pilot:
+            raise RuntimeError("execution_identity gt_pilot hash differs from prepare receipt")
     hashes = {
         name: sha256_file(run_root / name)
         for name in (
@@ -2496,17 +2598,48 @@ def report_stage(config_path: Path, run_root: Path) -> None:
             "checkpoint_step_390.pt",
             "checkpoint_step_780.pt",
         )
-        if (run_root / name).exists()
+        if (run_root / name).is_file()
     }
-    result = {
+    prepare_summary: dict[str, Any] = {
+        "stage": prepare["stage"],
+        "prepared_sha256": prepare["prepared_sha256"],
+        "fit_constant_prior": prepare["fit_constant_prior"],
+    }
+    if prepare["stage"] == "import_prepared":
+        prepare_summary.update(
+            {
+                "origin_prepared_sha256": prepare["origin_prepared_sha256"],
+                "origin_config_sha256": prepare["origin_config_sha256"],
+                "new_waveform_preparation": prepare.get("new_waveform_preparation", False),
+                "hardlink": prepare.get("hardlink", False),
+            }
+        )
+    limitations = [
+        "80ms frame-grid event proxies cannot resolve sub-frame admission timing",
+        "source-global permutation scoring is oracle diagnostic only",
+        "DEV prefixes are already-exposed directional diagnosis, not a generalization claim",
+        "no live 80ms or matched teacher speedup claim",
+        "report is CPU metadata aggregation of existing receipts; it is not a material model stage",
+        "executed implementation identity is recorded separately from the current reporter",
+        "independent contrast analysis may consume retained logits and accounting without this result.json",
+    ]
+    if not check_proof["present"]:
+        limitations.append(
+            "check_stage synthetic metric probes, slot projections, and checkpoint identity probes were not produced by this run"
+        )
+    executed_runtime = dict(prepare["runtime"])
+    executed_device = retained_execution_device_provenance(
+        ("final_eval.inference_cost.device", final),
+        ("cal_selection.inference_cost.device", selection),
+        ("initial_eval.inference_cost.device", initial),
+    )
+    reporter = reporter_runtime(frozen_path, config)
+    result: dict[str, Any] = {
         "schema": "PSEM-ISSUE-164-GT-PILOT-RESULT-1",
         "status": "completed",
         "scope": "bounded multi-source GT learning decision pilot; not issue164 completion, generalization, KD, or production evidence",
-        "identities": check["identities"],
-        "prepare": {
-            "prepared_sha256": prepare["prepared_sha256"],
-            "fit_constant_prior": prepare["fit_constant_prior"],
-        },
+        "identities": prepare["identities"],
+        "prepare": prepare_summary,
         "initial": initial,
         "accounting": accounting,
         "resume_witness": resume,
@@ -2520,21 +2653,31 @@ def report_stage(config_path: Path, run_root: Path) -> None:
             + accounting["completed_updates"],
             "maximum_cumulative": config["budget"]["maximum_cumulative_optimizer_updates"],
         },
-        "limitations": [
-            "80ms frame-grid event proxies cannot resolve sub-frame admission timing",
-            "source-global permutation scoring is oracle diagnostic only",
-            "DEV prefixes are already-exposed directional diagnosis, not a generalization claim",
-            "no live 80ms or matched teacher speedup claim",
-        ],
-        "runtime": pilot_runtime(config_path),
+        "pipeline_proofs": {
+            "frozen_config_sha256": frozen_sha256,
+            "prepare_receipt_stage": prepare["stage"],
+            "check_receipt": check_proof,
+            "execution_identity_present": execution_identity is not None,
+        },
+        "limitations": limitations,
+        "runtime": executed_runtime,
+        "executed_device_provenance": executed_device,
+        "reporter": reporter,
     }
+    if execution_identity is not None:
+        result["execution_identity"] = execution_identity
     atomic_json(run_root / "result.json", result)
     atomic_json(
         run_root / "report_receipt.json",
         {
             "stage": "report",
+            "contract": "cpu_metadata_aggregation",
+            "material_authorization_required": False,
+            "gpu_or_model_work": False,
             "result_sha256": sha256_file(run_root / "result.json"),
-            "runtime": pilot_runtime(config_path),
+            "executed_runtime": executed_runtime,
+            "executed_device_provenance": executed_device,
+            "reporter": reporter,
         },
     )
 

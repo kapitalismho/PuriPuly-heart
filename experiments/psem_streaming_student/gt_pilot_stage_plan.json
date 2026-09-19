@@ -163,8 +163,7 @@
         "{workflow_root_wsl}/run_gt_pilot.sh",
         "report",
         "{workflow_root_wsl}/gt_pilot_config.json",
-        "{run_root_wsl}",
-        "--authorize-material"
+        "{run_root_wsl}"
       ],
       "timeout_seconds": 600,
       "required_outputs": [
