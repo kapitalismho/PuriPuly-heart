@@ -35,6 +35,8 @@ from PyInstaller.utils.hooks import (
     get_module_file_attribute,
 )
 
+os.environ["HF_HUB_OFFLINE"] = "1"
+
 # Add src to path for imports
 src_path = Path("src").resolve()
 sys.path.insert(0, str(src_path))
