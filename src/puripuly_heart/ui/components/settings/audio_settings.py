@@ -422,7 +422,7 @@ class AudioSettings(ft.Column):
     ) -> float:
         try:
             parsed = float(raw_value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             parsed = fallback
         if parsed < minimum:
             parsed = minimum
@@ -439,7 +439,7 @@ class AudioSettings(ft.Column):
     ) -> int:
         try:
             parsed = int(raw_value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             parsed = fallback
         return max(minimum, parsed)
 

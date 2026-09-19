@@ -62,7 +62,7 @@ def list_llama_vulkan_devices(
             timeout=max(0.1, float(timeout_s)),
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except OSError, subprocess.TimeoutExpired:
         return ()
     return parse_llama_list_devices("\n".join((completed.stdout, completed.stderr)))
 

@@ -40,7 +40,9 @@ def _clickable_button_style() -> ft.ButtonStyle:
     )
 
 
-def text_field_outline_border(*, border_radius: int | float) -> dict[ft.ControlState, ft.InputBorder]:
+def text_field_outline_border(
+    *, border_radius: int | float
+) -> dict[ft.ControlState, ft.InputBorder]:
     def outline(color: str, width: int) -> ft.OutlineInputBorder:
         return ft.OutlineInputBorder(
             border_radius=border_radius,

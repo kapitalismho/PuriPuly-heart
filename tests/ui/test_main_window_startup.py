@@ -53,7 +53,6 @@ async def test_prepare_and_show_main_window_awaits_center_before_showing() -> No
     assert page.visibility_updates == [False, True]
 
 
-
 @pytest.mark.asyncio
 async def test_prepare_and_show_main_window_shows_after_readiness_failure() -> None:
     async def wait_until_ready_to_show() -> None:

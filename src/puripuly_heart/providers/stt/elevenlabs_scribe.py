@@ -370,7 +370,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
     def _on_committed(self, data: Any) -> None:
         try:
             text = self._committed_text(data)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self._protocol_failure("scribe_committed_transcript_missing_text")
             return
         if self._event_projection.is_legacy:

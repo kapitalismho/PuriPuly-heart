@@ -1258,7 +1258,7 @@ class OutputRuntime:
                                 supports_wait_observer = (
                                     "on_wait" in inspect.signature(paced_emit).parameters
                                 )
-                            except (TypeError, ValueError):
+                            except TypeError, ValueError:
                                 supports_wait_observer = False
                             if supports_wait_observer:
                                 receipt = await paced_emit(event, on_wait=observe_pacing_wait)

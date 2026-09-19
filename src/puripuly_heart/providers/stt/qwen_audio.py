@@ -467,7 +467,7 @@ class _QwenAudioSession(STTBackendSession):
             return None
         try:
             value = json.loads(message)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return dict(value) if isinstance(value, Mapping) else None
 

@@ -99,7 +99,7 @@ def load_or_detect_thread_profile(
                 threads_batch=int(raw["threads_batch"]),
                 draft_threads=int(raw["draft_threads"]),
             )
-        except (OSError, KeyError, TypeError, ValueError):
+        except OSError, KeyError, TypeError, ValueError:
             pass
     detected = derive_thread_profile(
         physical_cores if physical_cores is not None else _physical_cores(),

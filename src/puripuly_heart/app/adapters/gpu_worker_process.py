@@ -736,7 +736,7 @@ async def _close_writer(writer: asyncio.StreamWriter) -> None:
     writer.close()
     try:
         await writer.wait_closed()
-    except (ConnectionError, OSError):
+    except ConnectionError, OSError:
         pass
 
 

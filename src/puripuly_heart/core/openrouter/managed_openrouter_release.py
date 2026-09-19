@@ -1955,7 +1955,7 @@ def _parse_qq_status_auth_secret(value: object) -> tuple[str, str, str | None] |
         return None
     try:
         payload = json.loads(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not isinstance(payload, dict):
         return None

@@ -420,7 +420,9 @@ async def test_lifecycle_callbacks_diagnostics_and_logging_stay_behind_boundary(
 
 
 @pytest.mark.asyncio
-async def test_frozen_boundary_rejects_mutating_intents_but_keeps_stall_diagnostic_callable() -> None:
+async def test_frozen_boundary_rejects_mutating_intents_but_keeps_stall_diagnostic_callable() -> (
+    None
+):
     backend = RecordingBackend()
     boundary = UiApplicationBoundary(backend)
     freeze_started = asyncio.Event()

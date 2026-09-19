@@ -166,7 +166,7 @@ def load_required_audio_wav(
     audio_path = require_test_audio_path(path)
     try:
         samples, sample_rate = load_audio_wav(audio_path)
-    except (OSError, EOFError, wave.Error):
+    except OSError, EOFError, wave.Error:
         pytest.skip("test audio is unavailable")
     require_supported_audio_sample_rate(
         sample_rate,
@@ -243,7 +243,7 @@ def require_local_qwen_model_assets(model_dir: str | Path | None = None) -> Path
 
     try:
         validate_local_stt_runtime_ready(resolved)
-    except (LocalSTTManifestInvalidError, LocalSTTModelMissingError):
+    except LocalSTTManifestInvalidError, LocalSTTModelMissingError:
         pytest.skip("local Qwen STT model assets are unavailable")
     return resolved
 

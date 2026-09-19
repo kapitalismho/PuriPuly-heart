@@ -136,8 +136,9 @@ class ApplicationShutdownCoordinator:
         diagnostics_sink: ApplicationShutdownDiagnosticsSink | None = None,
         diagnostics_timeout_seconds: float = DEFAULT_APPLICATION_SHUTDOWN_DIAGNOSTIC_TIMEOUT_SECONDS,
         task_settle_timeout_seconds: float = DEFAULT_APPLICATION_SHUTDOWN_TASK_SETTLE_TIMEOUT_SECONDS,
-        runtime_state_supplier: Callable[[], Sequence[ApplicationShutdownRuntimeState]]
-        | None = None,
+        runtime_state_supplier: (
+            Callable[[], Sequence[ApplicationShutdownRuntimeState]] | None
+        ) = None,
     ) -> None:
         if diagnostics_timeout_seconds <= 0:
             raise ValueError("Application shutdown diagnostics_timeout_seconds must be positive")

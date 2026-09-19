@@ -133,7 +133,7 @@ async def _prepare_and_show_main_window(page: ft.Page) -> None:
 def _callable_accepts_keyword(callable_obj: object, keyword: str) -> bool:
     try:
         parameters = inspect.signature(callable_obj).parameters
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return True
     return keyword in parameters or any(
         parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
@@ -670,7 +670,7 @@ class TranslatorApp:
         update_kwargs = {"log_diagnostic": self._log_diagnostic}
         try:
             update_parameters = inspect.signature(_check_and_notify_update).parameters
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             update_parameters = {}
         if "load_update_info" in update_parameters or any(
             parameter.kind == inspect.Parameter.VAR_KEYWORD

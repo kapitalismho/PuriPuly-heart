@@ -101,7 +101,7 @@ def _get_macos_raw_hardware_fingerprint() -> str:
 def _read_non_empty_text_file(path: Path) -> str | None:
     try:
         return _normalize_optional_text(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError):
+    except OSError, UnicodeDecodeError:
         return None
 
 

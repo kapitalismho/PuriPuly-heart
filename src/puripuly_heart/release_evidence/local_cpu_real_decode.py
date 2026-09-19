@@ -235,9 +235,7 @@ async def run_evidence(
                     "selected_source": installed.selected_source,
                     "selected_revision": installed.selected_revision,
                     "file_count": len(manifest.files),
-                    "expected_total_bytes": sum(
-                        item.size_bytes or 0 for item in manifest.files
-                    ),
+                    "expected_total_bytes": sum(item.size_bytes or 0 for item in manifest.files),
                 }
             )
         decodes = [

@@ -36,8 +36,6 @@ def test_resolve_local_qwen_runtime_dir_uses_declared_native_layout(
     )
 
 
-
-
 def test_ensure_local_qwen_windows_runtime_rejects_missing_required_dlls(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

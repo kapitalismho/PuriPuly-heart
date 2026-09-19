@@ -76,7 +76,7 @@ class GemmaPrefixCache:
             return []
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        except OSError, UnicodeDecodeError, json.JSONDecodeError:
             return []
         items = raw.get("entries") if isinstance(raw, dict) else None
         if not isinstance(items, list):

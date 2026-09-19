@@ -219,7 +219,7 @@ def _gpu_inventory() -> list[dict[str, str]] | str:
         if completed.returncode != 0 or not completed.stdout.strip():
             return "unknown"
         parsed = json.loads(completed.stdout)
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+    except OSError, subprocess.SubprocessError, json.JSONDecodeError:
         return "unknown"
     rows = parsed if isinstance(parsed, list) else [parsed]
     result: list[dict[str, str]] = []

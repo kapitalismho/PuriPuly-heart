@@ -323,7 +323,7 @@ class _SonioxSession(STTBackendSession):
             message = message.decode("utf-8", errors="ignore")
         try:
             data = json.loads(message)
-        except (json.JSONDecodeError, UnicodeDecodeError):
+        except json.JSONDecodeError, UnicodeDecodeError:
             if self._event_projection.is_scoped:
                 self._scoped_transport_failure("soniox_protocol_ambiguity", orderly=False)
             return

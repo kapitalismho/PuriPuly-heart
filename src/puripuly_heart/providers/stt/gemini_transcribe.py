@@ -325,13 +325,13 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         except BaseException:
             try:
                 await self._teardown()
-            except (asyncio.CancelledError, Exception):
+            except asyncio.CancelledError, Exception:
                 pass
             raise
         if self._stopped:
             try:
                 await self._teardown()
-            except (asyncio.CancelledError, Exception):
+            except asyncio.CancelledError, Exception:
                 pass
             raise RuntimeError("Gemini Transcribe Live session closed during setup")
         self._client_resources = resources
@@ -344,7 +344,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         except BaseException:
             try:
                 await self._teardown()
-            except (asyncio.CancelledError, Exception):
+            except asyncio.CancelledError, Exception:
                 pass
             raise
         self._live_context = live_context
@@ -355,14 +355,14 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         except BaseException:
             try:
                 await self._teardown()
-            except (asyncio.CancelledError, Exception):
+            except asyncio.CancelledError, Exception:
                 pass
             raise
         self._handshake_task = None
         if self._stopped:
             try:
                 await self._teardown()
-            except (asyncio.CancelledError, Exception):
+            except asyncio.CancelledError, Exception:
                 pass
             raise RuntimeError("Gemini Transcribe Live session closed during connect")
         self._live_session = live_session
@@ -994,7 +994,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         current_task = asyncio.current_task()
         try:
             await self._teardown()
-        except (asyncio.CancelledError, Exception):
+        except asyncio.CancelledError, Exception:
             pass
         self._event_projection.close()
         if current_task is not None and current_task.cancelling():

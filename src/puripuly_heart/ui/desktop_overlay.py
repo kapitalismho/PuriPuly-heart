@@ -3197,9 +3197,7 @@ class DesktopOverlayRenderer:
             outcome = (
                 "committed"
                 if snapshot is committed_snapshot
-                else "superseded"
-                if disposition == "accepted"
-                else disposition
+                else "superseded" if disposition == "accepted" else disposition
             )
             await self._emit_renderer_diagnostic(
                 event_type="receipt",

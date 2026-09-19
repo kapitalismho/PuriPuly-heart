@@ -278,7 +278,7 @@ def _enum_value(current: object, value: str) -> object:
     enum_type = type(current)
     try:
         return enum_type(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return value
 
 

@@ -278,7 +278,7 @@ class FletUiPresentationAdapter:
                 peer_source_mode,
                 secondary_target_language,
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
         else:
             set_languages(
@@ -304,7 +304,7 @@ class FletUiPresentationAdapter:
                 peer_target_language,
                 peer_source_mode,
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             set_languages(
                 source_language,
                 target_language,
@@ -428,7 +428,7 @@ class FletUiPresentationAdapter:
                     referral_id=referral_id,
                     pass_status=pass_status,
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 setter(
                     visible=visible,
                     remaining_percent=remaining_percent,

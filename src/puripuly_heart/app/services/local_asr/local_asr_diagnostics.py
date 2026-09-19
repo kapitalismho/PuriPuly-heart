@@ -49,7 +49,7 @@ def _finite_nonnegative_seconds(value: object) -> float | None:
         return None
     try:
         seconds = float(value)
-    except (OverflowError, ValueError):
+    except OverflowError, ValueError:
         return None
     return seconds if math.isfinite(seconds) and seconds >= 0 else None
 

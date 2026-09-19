@@ -124,7 +124,7 @@ def compose_github_star_prompt_owner(
             return raw_connection
         try:
             return TranslationConnection(raw_connection)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     def has_user_owned_cloud_connection(value: object | None) -> bool:

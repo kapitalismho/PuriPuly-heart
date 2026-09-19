@@ -333,7 +333,7 @@ class OscConnectionModal:
         try:
             send_port = int((send_field.value or "").strip())
             receive_port = int((receive_field.value or "").strip())
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self._show_port_error()
             return False
         if not (1 <= send_port <= 65535 and 1 <= receive_port <= 65535):

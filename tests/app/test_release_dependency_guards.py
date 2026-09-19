@@ -178,6 +178,7 @@ def test_release_workflow_pins_innosetup_and_builds_with_blocking_artifact_smoke
     assert "--allow-downgrade" in workflow
     assert "--force" in workflow
 
+
 def test_vendored_openvr_bundle_files_exist_and_sha256_line_is_exact() -> None:
     dll_path = ROOT / OPENVR_VENDOR_DLL_RELATIVE_PATH
     sha256_path = ROOT / OPENVR_VENDOR_SHA256_RELATIVE_PATH
