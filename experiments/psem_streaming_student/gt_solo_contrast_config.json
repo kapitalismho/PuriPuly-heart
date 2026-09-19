@@ -6,14 +6,14 @@
     "issue": 164,
     "paid_or_cloud_calls": 0,
     "production_mutation": false,
-    "scope": "first bounded multi-source GT learning decision pilot; not full issue164 completion",
+    "scope": "one controlled FIT-balanced solo-CE contrast on the unchanged student; not full issue164 completion",
     "teacher_passes": 0
   },
   "budget": {
     "automatic_retry_after_unknown_partial_update": false,
-    "maximum_cumulative_optimizer_updates": 803,
+    "maximum_cumulative_optimizer_updates": 1583,
     "maximum_optimizer_updates": 780,
-    "prior_cumulative_optimizer_updates": 23,
+    "prior_cumulative_optimizer_updates": 803,
     "repeated_fit_training_seconds": 11856,
     "unique_fit_seconds": 1185.6
   },
@@ -23,11 +23,13 @@
       390,
       780
     ],
+    "eval_logits_manifest": "eval_logits_manifest.json",
+    "init_logit_match_tolerance": 1e-06,
     "no_threshold_sweep": true,
     "operating_point": 0.5,
     "resume_logit_tolerance": 0.0001
   },
-  "implementation_base_commit": "3cb7f405b681c496df1520400d2f95b370f079fd",
+  "implementation_base_commit": "f162d99e404c546c7e2d3599e2ce2c7e7ea06b92",
   "implementation_sha256": {
     "gt_pilot.py": "bc1fb5aabc4ec38c1dde51efec575e054710344f610d80edf1b2dce134bf91be",
     "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
@@ -78,38 +80,27 @@
       "ami_TS3007a"
     ]
   },
-  "metric_repair": {
-    "activity_bce_agreement": 1e-06,
-    "bounds": {
-      "external_cost": 0,
-      "max_gpu_allocator_reserved_bytes": 2147483648,
-      "max_new_artifact_storage_bytes": 2147483648,
-      "wall_seconds": 900
-    },
-    "checkpoint_sha256": {
-      "390": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
-      "78": "c9a3d69554f3c2cdb74512e83dd137bdf47d4b5148a52a0f4af53473b4465d72",
-      "780": "c44fd8f621867ab75971b79d041e76ba30beddf104ec205cb53730e5363d4ec1"
-    },
-    "frozen_selected_step": 390,
-    "maximum_forward_stream_chunk_calls_at_original_partition": 266,
-    "maximum_replayed_audio_seconds": 4015.2,
-    "maximum_source_passes": 16,
-    "origin_config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
-    "origin_execution_commit": "e16a93c067baacc1d6eadcf296996b00a915527b",
-    "origin_prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
-    "origin_run_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1",
-    "retain_raw_float32_logits": true
-  },
   "persistence": {
-    "planned_clean_pause_after_update": 2
+    "planned_clean_pause_after_update": 2,
+    "run_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1"
+  },
+  "prepared_import": {
+    "origin_frozen_config_path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/frozen_config.json",
+    "origin_frozen_config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+    "origin_prepared_path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/prepared_sources.pt",
+    "origin_prepared_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b"
   },
   "resource_guard": {
     "max_gpu_allocator_reserved_bytes": 4294967296,
-    "max_new_artifact_storage_bytes": 8589934592,
+    "max_new_artifact_storage_bytes": 2147483648,
     "maximum_expected_peak_bytes": 4294967296,
     "minimum_free_gpu_bytes": 4294967296,
     "per_run_wall_seconds": 7200
+  },
+  "same_initialization": {
+    "max_abs_delta_tolerance": 1e-06,
+    "origin_logits_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-metric-repair-1/replay_logits",
+    "weight_id": "untrained_seed20260915"
   },
   "schema": "PSEM-ISSUE-164-GT-PILOT-1",
   "sources": {
@@ -277,9 +268,23 @@
     "frames_per_update": 190,
     "fresh_initialization": true,
     "objective": {
+      "FIT_solo_class_counts": [
+        3446,
+        1351,
+        1417,
+        865
+      ],
+      "FIT_solo_total": 7079,
       "activity_bce_coefficient": 1.0,
-      "name": "activity_bce",
-      "solo_ce_coefficient": 0.0
+      "class_weight_formula": "w[k] = 7079 / (4 * FIT_solo_class_counts[k])",
+      "class_weights_float64": [
+        0.5135664538595474,
+        1.3099555884529979,
+        1.2489414255469302,
+        2.0459537572254334
+      ],
+      "name": "activity_bce_plus_fit_balanced_solo_ce",
+      "solo_ce_coefficient": 1.0
     },
     "optimizer": {
       "gradient_clip_norm": 5.0,

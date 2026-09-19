@@ -7,6 +7,7 @@ import json
 import math
 import os
 import platform
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -43,6 +44,20 @@ from experiments.psem_relative_occupancy_gate.evaluate import (
 SCHEMA = "PSEM-ISSUE-164-GT-PILOT-1"
 HISTORICAL_CHECKPOINT_SCHEMA = "PSEM-ISSUE-164-GT-PILOT-CHECKPOINT-1"
 CURRENT_CHECKPOINT_SCHEMA = "PSEM-ISSUE-164-GT-PILOT-CHECKPOINT-2"
+EVAL_LOGITS_SCHEMA = "PSEM-ISSUE-164-GT-PILOT-EVAL-LOGITS-1"
+EVAL_MANIFEST_SCHEMA = "PSEM-ISSUE-164-GT-PILOT-EVAL-MANIFEST-1"
+EVAL_LOGITS_MANIFEST_NAME = "eval_logits_manifest.json"
+OBJECTIVE_ACTIVITY_BCE = "activity_bce"
+OBJECTIVE_SOLO_CONTRAST = "activity_bce_plus_fit_balanced_solo_ce"
+INIT_LOGIT_MATCH_TOLERANCE = 1.0e-6
+FIT_SOLO_CLASS_COUNTS = (3446, 1351, 1417, 865)
+FIT_SOLO_TOTAL = 7079
+FIT_SOLO_CLASS_WEIGHTS = (
+    0.5135664538595474,
+    1.3099555884529979,
+    1.2489414255469302,
+    2.0459537572254334,
+)
 OUTPUT_SLOTS = 4
 HOP = StreamingStudent.output_hop_samples
 SAMPLE_RATE = StreamingStudent.sample_rate
@@ -50,6 +65,38 @@ RESUME_LOGIT_TOLERANCE = 1.0e-4
 COLLARS_MS = (100, 250, 500)
 ABA_MAX_SECONDS = 1.0
 MATERIAL_AUTHORIZED = False
+
+
+def validate_training_objective(config: dict[str, Any]) -> dict[str, Any]:
+    objective = config["training"].get("objective")
+    if not isinstance(objective, dict) or "name" not in objective:
+        raise RuntimeError("training.objective.name is required")
+    name = objective["name"]
+    if name == OBJECTIVE_ACTIVITY_BCE:
+        if float(objective.get("activity_bce_coefficient", 1.0)) != 1.0:
+            raise RuntimeError("activity BCE coefficient must remain 1.0")
+        if float(objective.get("solo_ce_coefficient", 0.0)) != 0.0:
+            raise RuntimeError("activity-BCE control must not add solo CE")
+        return objective
+    if name != OBJECTIVE_SOLO_CONTRAST:
+        raise RuntimeError(f"unsupported training objective {name}")
+    if float(objective["activity_bce_coefficient"]) != 1.0:
+        raise RuntimeError("activity BCE coefficient must remain 1.0")
+    if float(objective["solo_ce_coefficient"]) != 1.0:
+        raise RuntimeError("solo CE coefficient must remain 1.0")
+    counts = tuple(int(value) for value in objective["FIT_solo_class_counts"])
+    total = int(objective["FIT_solo_total"])
+    if counts != FIT_SOLO_CLASS_COUNTS or total != FIT_SOLO_TOTAL:
+        raise RuntimeError("FIT solo class counts must remain the frozen diagnostic totals")
+    if sum(counts) != total:
+        raise RuntimeError("FIT solo total does not match class counts")
+    stored = [float(value) for value in objective["class_weights_float64"]]
+    computed = [total / (4.0 * count) for count in counts]
+    if any(abs(left - right) > 1.0e-15 for left, right in zip(stored, computed)):
+        raise RuntimeError("class_weights_float64 do not match 7079/(4*Nk)")
+    if stored != list(FIT_SOLO_CLASS_WEIGHTS):
+        raise RuntimeError("class_weights_float64 must match the frozen contract values")
+    return objective
 
 
 def bind_pilot_config(config_path: Path, run_root: Path) -> Path:
@@ -90,16 +137,20 @@ def load_pilot_config(path: Path) -> dict[str, Any]:
         raise RuntimeError("pilot seed must be 20260915")
     if training["epochs"] != 10 or training["steps_per_epoch"] != 78:
         raise RuntimeError("pilot must use 10 epochs of 78 chronological chunks")
-    if budget["maximum_optimizer_updates"] != 780:
+    prior = int(budget["prior_cumulative_optimizer_updates"])
+    this_run = int(budget["maximum_optimizer_updates"])
+    cumulative = int(budget["maximum_cumulative_optimizer_updates"])
+    if this_run != 780:
         raise RuntimeError("pilot optimizer cap must be 780")
-    if budget["prior_cumulative_optimizer_updates"] != 23:
-        raise RuntimeError("prior consumed optimizer updates must remain 23")
-    if budget["maximum_cumulative_optimizer_updates"] != 803:
-        raise RuntimeError("cumulative optimizer cap must be 803")
+    if prior < 0:
+        raise RuntimeError("prior consumed optimizer updates must be non-negative")
+    if cumulative != prior + this_run:
+        raise RuntimeError("cumulative optimizer cap must equal prior plus this run")
     if budget["automatic_retry_after_unknown_partial_update"] is not False:
         raise RuntimeError("automatic retry after unknown partial updates is forbidden")
     if training["student_parameter_count"] != 5940740:
         raise RuntimeError("student parameter count must remain 5940740")
+    validate_training_objective(value)
     return value
 
 
@@ -521,6 +572,71 @@ def permutation_oracle(
         "best": best,
         "permutation_count": math.factorial(OUTPUT_SLOTS),
     }
+
+def solo_class_weight_tensor(
+    objective: dict[str, Any], device: torch.device | None = None
+) -> Tensor:
+    return torch.tensor(
+        objective["class_weights_float64"], dtype=torch.float32, device=device
+    )
+
+
+def stable_solo_mask(targets: Tensor, validity: Tensor) -> Tensor:
+    ones = targets == 1.0
+    zeros = targets == 0.0
+    return validity & (ones.sum(dim=-1) == 1) & (zeros.sum(dim=-1) == OUTPUT_SLOTS - 1)
+
+
+def training_objective_terms(
+    logits: Tensor,
+    targets: Tensor,
+    validity: Tensor,
+    *,
+    objective: dict[str, Any],
+    class_weights: Tensor | None,
+) -> dict[str, Tensor]:
+    if not bool(validity.any()):
+        raise RuntimeError("training chunk has no valid bins")
+    activity_bce = nn.functional.binary_cross_entropy_with_logits(
+        logits[validity], targets[validity]
+    )
+    if objective["name"] == OBJECTIVE_ACTIVITY_BCE:
+        zero = activity_bce * 0
+        return {
+            "activity_bce": activity_bce,
+            "solo_ce": zero,
+            "total_objective": activity_bce,
+        }
+    n_valid = validity.to(dtype=logits.dtype).sum()
+    solo = stable_solo_mask(targets, validity)
+    if class_weights is None:
+        raise RuntimeError("solo contrast requires frozen class weights")
+    if bool(solo.any()):
+        slots = (targets[solo] == 1.0).to(dtype=torch.int64).argmax(dim=-1)
+        ce = nn.functional.cross_entropy(logits[solo], slots, reduction="none")
+        solo_ce = (class_weights[slots] * ce).sum() / n_valid
+    else:
+        solo_ce = logits.new_zeros(())
+    total = activity_bce + float(objective["solo_ce_coefficient"]) * solo_ce
+    return {
+        "activity_bce": activity_bce,
+        "solo_ce": solo_ce,
+        "total_objective": total,
+    }
+
+
+def fit_solo_class_counts(prepared: dict[str, Any], source_ids: list[str]) -> list[int]:
+    counts = [0] * OUTPUT_SLOTS
+    for source_id in source_ids:
+        payload = prepared["sources"][source_id]
+        solo = stable_solo_mask(payload["targets"], payload["validity"])
+        if not bool(solo.any()):
+            continue
+        slots = (payload["targets"][solo] == 1.0).to(dtype=torch.int64).argmax(dim=-1)
+        for slot in range(OUTPUT_SLOTS):
+            counts[slot] += int((slots == slot).sum().item())
+    return counts
+
 
 
 def score_outputs(
@@ -957,7 +1073,7 @@ def check_stage(config_path: Path, run_root: Path) -> None:
 def require_authorization() -> None:
     if not MATERIAL_AUTHORIZED:
         raise RuntimeError(
-            "material prepare/train/evaluate is blocked until Director GO passes --authorize-material"
+            "material prepare/import-prepared/train/evaluate is blocked until Director GO passes --authorize-material"
         )
 
 
@@ -970,6 +1086,8 @@ def prepare_stage(config_path: Path, run_root: Path) -> None:
     config_path = bind_pilot_config(config_path, run_root)
     config = load_pilot_config(config_path)
     require_authorization()
+    if "prepared_import" in config:
+        raise RuntimeError("this config reuses origin prepared; use import-prepared")
     identities = verify_pilot_identities(config)
     prepared: dict[str, Any] = {"sources": {}, "identities": identities}
     fit_targets = []
@@ -1022,14 +1140,202 @@ def prepare_stage(config_path: Path, run_root: Path) -> None:
     )
 
 
+def import_prepared_stage(config_path: Path, run_root: Path) -> None:
+    config_path = bind_pilot_config(config_path, run_root)
+    config = load_pilot_config(config_path)
+    require_authorization()
+    spec = config.get("prepared_import")
+    if not isinstance(spec, dict):
+        raise RuntimeError("import-prepared requires prepared_import")
+    repo = Path(__file__).resolve().parent.parent.parent
+    origin_prepared = (repo / spec["origin_prepared_path"]).resolve()
+    origin_config = (repo / spec["origin_frozen_config_path"]).resolve()
+    if sha256_file(origin_prepared) != spec["origin_prepared_sha256"]:
+        raise RuntimeError("origin prepared identity mismatch")
+    if sha256_file(origin_config) != spec["origin_frozen_config_sha256"]:
+        raise RuntimeError("origin frozen config identity mismatch")
+    dest = run_root / "prepared_sources.pt"
+    if dest.exists():
+        raise RuntimeError("refusing to overwrite existing prepared_sources.pt")
+    identities = verify_pilot_identities(config)
+    shutil.copyfile(origin_prepared, dest)
+    if sha256_file(dest) != spec["origin_prepared_sha256"]:
+        raise RuntimeError("imported prepared identity mismatch")
+    prepared = torch.load(dest, map_location="cpu", weights_only=False)
+    catalog = catalog_sources(config)
+    if set(prepared["sources"]) != set(catalog):
+        raise RuntimeError("imported prepared sources differ from config")
+    for source_id, source in catalog.items():
+        payload = prepared["sources"][source_id]
+        if int(payload["waveform"].numel()) != int(source["prefix_samples"]):
+            raise RuntimeError(f"{source_id} imported prefix length differs")
+        if tuple(payload["targets"].shape[-1:]) != (OUTPUT_SLOTS,):
+            raise RuntimeError(f"{source_id} imported target slots differ")
+    atomic_json(
+        run_root / "prepare_receipt.json",
+        {
+            "stage": "import_prepared",
+            "optimizer_steps": 0,
+            "prepared_sha256": spec["origin_prepared_sha256"],
+            "origin_prepared_sha256": spec["origin_prepared_sha256"],
+            "origin_config_sha256": spec["origin_frozen_config_sha256"],
+            "origin_prepared_path": spec["origin_prepared_path"],
+            "origin_frozen_config_path": spec["origin_frozen_config_path"],
+            "identities": identities,
+            "fit_constant_prior": prepared["fit_constant_prior"],
+            "source_ids": sorted(prepared["sources"]),
+            "runtime": pilot_runtime(config_path),
+            "new_waveform_preparation": False,
+            "hardlink": False,
+        },
+    )
+
+
 def load_prepared(run_root: Path, config_path: Path) -> dict[str, Any]:
     prepared_path = run_root / "prepared_sources.pt"
     receipt = json.loads((run_root / "prepare_receipt.json").read_text(encoding="utf-8"))
+    config = load_pilot_config(config_path)
     if receipt["runtime"]["config_sha256"] != sha256_file(config_path):
         raise RuntimeError("prepared inputs were created under a different frozen config")
     if sha256_file(prepared_path) != receipt["prepared_sha256"]:
         raise RuntimeError("prepared input identity mismatch")
+    if receipt.get("stage") == "import_prepared":
+        spec = config.get("prepared_import")
+        if not isinstance(spec, dict):
+            raise RuntimeError("imported prepared receipt requires prepared_import")
+        if receipt["origin_prepared_sha256"] != receipt["prepared_sha256"]:
+            raise RuntimeError("imported prepared hash does not match origin prepared hash")
+        if receipt["origin_prepared_sha256"] != spec["origin_prepared_sha256"]:
+            raise RuntimeError("imported prepared hash does not match config origin")
+        if receipt["origin_config_sha256"] != spec["origin_frozen_config_sha256"]:
+            raise RuntimeError("imported origin config hash does not match")
+    elif receipt.get("stage") != "prepare":
+        raise RuntimeError("unknown prepared receipt stage")
     return torch.load(prepared_path, map_location="cpu", weights_only=False)
+
+
+def run_root_posix_relative(run_root: Path, path: Path) -> str:
+    return path.resolve().relative_to(run_root.resolve()).as_posix()
+
+
+def upsert_eval_logit_manifest(
+    run_root: Path,
+    config_sha256: str,
+    prepared_sha256: str,
+    entry: dict[str, Any],
+) -> None:
+    path = run_root / EVAL_LOGITS_MANIFEST_NAME
+    if path.exists():
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        if manifest.get("schema") != EVAL_MANIFEST_SCHEMA:
+            raise RuntimeError("unexpected eval logit manifest schema")
+        if manifest.get("config_sha256") != config_sha256:
+            raise RuntimeError("eval logit manifest config identity differs")
+        if manifest.get("prepared_sha256") != prepared_sha256:
+            raise RuntimeError("eval logit manifest prepared identity differs")
+        entries = [
+            row
+            for row in manifest["entries"]
+            if not (
+                row["source_id"] == entry["source_id"]
+                and row["weight_id"] == entry["weight_id"]
+            )
+        ]
+    else:
+        manifest = {
+            "schema": EVAL_MANIFEST_SCHEMA,
+            "config_sha256": config_sha256,
+            "prepared_sha256": prepared_sha256,
+            "entries": [],
+        }
+        entries = []
+    entries.append(entry)
+    manifest["entries"] = entries
+    atomic_json(path, manifest)
+
+
+def retain_eval_logits(
+    run_root: Path,
+    *,
+    config_sha256: str,
+    prepared_sha256: str,
+    source_id: str,
+    weight_id: str,
+    checkpoint_sha256: str | None,
+    logits: Tensor,
+    frontiers: Tensor,
+) -> None:
+    relative = Path("eval_logits") / f"{weight_id}_{source_id}.pt"
+    path = run_root / relative
+    atomic_torch_save(
+        path,
+        {
+            "schema": EVAL_LOGITS_SCHEMA,
+            "source_id": source_id,
+            "weight_id": weight_id,
+            "checkpoint_sha256": checkpoint_sha256,
+            "prepared_sha256": prepared_sha256,
+            "config_sha256": config_sha256,
+            "logits": logits.to(dtype=torch.float32).contiguous(),
+            "frontiers": frontiers.contiguous(),
+        },
+    )
+    upsert_eval_logit_manifest(
+        run_root,
+        config_sha256,
+        prepared_sha256,
+        {
+            "path": run_root_posix_relative(run_root, path),
+            "sha256": sha256_file(path),
+            "source_id": source_id,
+            "weight_id": weight_id,
+            "checkpoint_sha256": checkpoint_sha256,
+        },
+    )
+
+
+def compare_same_seed_initial_logits(
+    run_root: Path,
+    config: dict[str, Any],
+    source_ids: list[str],
+) -> dict[str, Any] | None:
+    spec = config.get("same_initialization")
+    if spec is None:
+        return None
+    repo = Path(__file__).resolve().parent.parent.parent
+    origin_root = (repo / spec["origin_logits_root"]).resolve()
+    weight_id = spec["weight_id"]
+    tolerance = float(spec["max_abs_delta_tolerance"])
+    if tolerance != INIT_LOGIT_MATCH_TOLERANCE:
+        raise RuntimeError("same-seed initial logit tolerance must remain 1e-6")
+    per_source = []
+    maxima = []
+    for source_id in source_ids:
+        ours_path = run_root / "eval_logits" / f"{weight_id}_{source_id}.pt"
+        origin_path = origin_root / f"{weight_id}_{source_id}.pt"
+        ours = torch.load(ours_path, map_location="cpu", weights_only=False)
+        origin = torch.load(origin_path, map_location="cpu", weights_only=False)
+        delta = float((ours["logits"] - origin["logits"]).abs().max())
+        maxima.append(delta)
+        per_source.append({"source_id": source_id, "max_abs_delta": delta})
+    global_max = max(maxima)
+    matched = global_max <= tolerance
+    report = {
+        "max_abs_delta": global_max,
+        "tolerance": tolerance,
+        "matched_init": matched,
+        "per_source": per_source,
+        "weight_id": weight_id,
+        "origin_logits_root": spec["origin_logits_root"],
+        "extra_model_forward": False,
+    }
+    atomic_json(run_root / "same_initialization.json", report)
+    if not matched:
+        raise RuntimeError(
+            f"same-seed initial logits max abs delta {global_max} exceeds {tolerance}"
+        )
+    return report
+
 
 
 def stream_source(
@@ -1058,6 +1364,12 @@ def evaluate_model_on_sources(
     chunk_samples: int,
     threshold: float,
     label: str,
+    *,
+    run_root: Path | None = None,
+    config_sha256: str | None = None,
+    prepared_sha256: str | None = None,
+    weight_id: str | None = None,
+    checkpoint_sha256: str | None = None,
 ) -> dict[str, Any]:
     model.eval()
     results = {}
@@ -1069,6 +1381,19 @@ def evaluate_model_on_sources(
             )
             if not torch.equal(frontiers, payload["frontiers"]):
                 raise RuntimeError(f"{source_id} evaluation frontiers differ")
+            if weight_id is not None:
+                if run_root is None or config_sha256 is None or prepared_sha256 is None:
+                    raise RuntimeError("eval logit retention requires run root identities")
+                retain_eval_logits(
+                    run_root,
+                    config_sha256=config_sha256,
+                    prepared_sha256=prepared_sha256,
+                    source_id=source_id,
+                    weight_id=weight_id,
+                    checkpoint_sha256=checkpoint_sha256,
+                    logits=logits,
+                    frontiers=frontiers,
+                )
             results[source_id] = {
                 "label": label,
                 "slots": payload["slots"],
@@ -1111,9 +1436,22 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
         fit_ids = [source["source_id"] for source in config["sources"]["FIT"]]
         cal_ids = [source["source_id"] for source in config["sources"]["CAL"]]
         dev_ids = [source["source_id"] for source in config["sources"]["DEV"]]
+        initial_ids = fit_ids + cal_ids + dev_ids
         untrained = evaluate_model_on_sources(
-            model, prepared, fit_ids + cal_ids + dev_ids, device, chunk, threshold, "untrained"
+            model,
+            prepared,
+            initial_ids,
+            device,
+            chunk,
+            threshold,
+            "untrained",
+            run_root=run_root,
+            config_sha256=config_sha256,
+            prepared_sha256=prepared_sha256,
+            weight_id="untrained_seed20260915",
+            checkpoint_sha256=None,
         )
+        same_init = compare_same_seed_initial_logits(run_root, config, initial_ids)
         prior_rows = {}
         means = torch.tensor(prepared["fit_constant_prior"], dtype=torch.float32)
         probability = means.clamp(1.0e-6, 1.0 - 1.0e-6)
@@ -1141,6 +1479,7 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
                 "stage": "evaluate_initial",
                 "untrained": untrained,
                 "fit_constant_prior": prior_rows,
+                "same_initialization": same_init,
                 "runtime": pilot_runtime(config_path),
             },
         )
@@ -1159,8 +1498,9 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
             )
             model = StreamingStudent().to(device)
             model.load_state_dict(payload["model"])
+            checkpoint_sha256 = sha256_file(path)
             rows[str(step)] = {
-                "checkpoint_sha256": sha256_file(path),
+                "checkpoint_sha256": checkpoint_sha256,
                 "cal": evaluate_model_on_sources(
                     model,
                     prepared,
@@ -1169,6 +1509,11 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
                     chunk,
                     threshold,
                     f"cal_step_{step}",
+                    run_root=run_root,
+                    config_sha256=config_sha256,
+                    prepared_sha256=prepared_sha256,
+                    weight_id=f"checkpoint_{step}",
+                    checkpoint_sha256=checkpoint_sha256,
                 ),
             }
         selected = None
@@ -1216,7 +1561,18 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
         torch.cuda.synchronize(device)
         started = time.perf_counter()
         scored = evaluate_model_on_sources(
-            model, prepared, fit_ids + dev_ids, device, chunk, threshold, "selected_final"
+            model,
+            prepared,
+            fit_ids + dev_ids,
+            device,
+            chunk,
+            threshold,
+            "selected_final",
+            run_root=run_root,
+            config_sha256=config_sha256,
+            prepared_sha256=prepared_sha256,
+            weight_id=f"checkpoint_{step}",
+            checkpoint_sha256=selection["selected"]["checkpoint_sha256"],
         )
         torch.cuda.synchronize(device)
         elapsed = time.perf_counter() - started
@@ -1809,6 +2165,10 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
     deadline = float(config["resource_guard"]["per_run_wall_seconds"])
     max_reserved = int(config["resource_guard"]["max_gpu_allocator_reserved_bytes"])
     chunk = int(config["training"]["chunk_samples"])
+    objective = config["training"]["objective"]
+    class_weights = None
+    if objective["name"] == OBJECTIVE_SOLO_CONTRAST:
+        class_weights = solo_class_weight_tensor(objective, device)
     if resume:
         if not latest_path.exists():
             raise RuntimeError("resume requested without checkpoint_latest.pt")
@@ -1940,9 +2300,14 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
             validity = payload["validity"][frame_left:frame_right].to(device)
             if not bool(validity.any()):
                 raise RuntimeError(f"update {row['update_index']} has no valid bins")
-            loss = nn.functional.binary_cross_entropy_with_logits(
-                logits.squeeze(0)[validity], targets[validity]
+            terms = training_objective_terms(
+                logits.squeeze(0),
+                targets,
+                validity,
+                objective=objective,
+                class_weights=class_weights,
             )
+            loss = terms["total_objective"]
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             grad_norm = torch.nn.utils.clip_grad_norm_(
@@ -1950,8 +2315,13 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
                 float(config["training"]["optimizer"]["gradient_clip_norm"]),
             )
             loss_value = float(loss.detach().cpu())
+            activity_bce_value = float(terms["activity_bce"].detach().cpu())
+            solo_ce_value = float(terms["solo_ce"].detach().cpu())
             grad_value = float(grad_norm.detach().cpu())
-            if not math.isfinite(loss_value) or not math.isfinite(grad_value):
+            if not all(
+                math.isfinite(value)
+                for value in (loss_value, activity_bce_value, solo_ce_value, grad_value)
+            ):
                 raise RuntimeError(f"update {row['update_index']} is non-finite")
             optimizer.step()
             torch.cuda.synchronize(device)
@@ -1978,6 +2348,9 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
                 "epoch": row["epoch"],
                 "chunk_index": row["chunk_index"],
                 "loss": loss_value,
+                "total_objective": loss_value,
+                "activity_bce": activity_bce_value,
+                "solo_ce": solo_ce_value,
                 "gradient_norm_before_clip": grad_value,
                 "valid_bins": int(validity.cpu().sum()),
             },
@@ -1992,6 +2365,9 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
             {
                 "update_index": completed,
                 "loss": loss_value,
+                "total_objective": loss_value,
+                "activity_bce": activity_bce_value,
+                "solo_ce": solo_ce_value,
                 "gradient_norm_before_clip": grad_value,
                 "valid_bins": int(validity.cpu().sum()),
                 "source_id": row["source_id"],
@@ -2158,6 +2534,216 @@ def report_stage(config_path: Path, run_root: Path) -> None:
         {
             "stage": "report",
             "result_sha256": sha256_file(run_root / "result.json"),
+            "runtime": pilot_runtime(config_path),
+        },
+    )
+
+
+def loss_probe_stage(config_path: Path, run_root: Path) -> None:
+    started = time.perf_counter()
+    config_path = bind_pilot_config(config_path, run_root)
+    config = load_pilot_config(config_path)
+    objective = config["training"]["objective"]
+    if objective["name"] != OBJECTIVE_SOLO_CONTRAST:
+        raise RuntimeError("loss-probe requires the solo contrast objective")
+    weights = solo_class_weight_tensor(objective)
+    graphs: list[dict[str, Any]] = []
+    vjps = 0
+
+    def run_graph(
+        name: str,
+        logits: Tensor,
+        targets: Tensor,
+        validity: Tensor,
+        *,
+        expected_solo: float | None = None,
+        expect_zero_solo: bool = False,
+    ) -> dict[str, Tensor]:
+        nonlocal vjps
+        if int(logits.numel()) > 32:
+            raise RuntimeError("toy logit graph exceeds 32 logits")
+        terms = training_objective_terms(
+            logits,
+            targets,
+            validity,
+            objective=objective,
+            class_weights=weights,
+        )
+        solo_value = float(terms["solo_ce"].detach())
+        if expect_zero_solo and solo_value != 0.0:
+            raise RuntimeError(f"{name} solo_ce is not zero")
+        if expected_solo is not None and abs(solo_value - expected_solo) > 1.0e-6:
+            raise RuntimeError(f"{name} solo_ce {solo_value} != {expected_solo}")
+        terms["total_objective"].backward()
+        vjps += 1
+        if logits.grad is None or not bool(torch.isfinite(logits.grad).all()):
+            raise RuntimeError(f"{name} toy VJP is not finite")
+        graphs.append(
+            {
+                "name": name,
+                "activity_bce": float(terms["activity_bce"].detach()),
+                "solo_ce": solo_value,
+                "total_objective": float(terms["total_objective"].detach()),
+                "solo_bins": int(stable_solo_mask(targets, validity).sum().item()),
+                "valid_bins": int(validity.sum().item()),
+                "logit_count": int(logits.numel()),
+                "grad_finite": True,
+                "synthetic_logit_autograd_vjp": True,
+            }
+        )
+        return terms
+
+    silence_logits = torch.zeros(4, 4, requires_grad=True)
+    run_graph(
+        "empty_solo_silence",
+        silence_logits,
+        torch.zeros(4, 4),
+        torch.ones(4, dtype=torch.bool),
+        expect_zero_solo=True,
+    )
+    fractional_logits = torch.zeros(2, 4, requires_grad=True)
+    run_graph(
+        "fractional_overlap_not_solo",
+        fractional_logits,
+        torch.tensor([[0.5, 0.5, 0.0, 0.0], [0.25, 0.25, 0.25, 0.25]]),
+        torch.ones(2, dtype=torch.bool),
+        expect_zero_solo=True,
+    )
+    single_logits = torch.tensor([[2.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]], requires_grad=True)
+    single_ce = float(
+        nn.functional.cross_entropy(
+            torch.tensor([[2.0, 0.0, 0.0, 0.0]]), torch.tensor([0])
+        )
+    )
+    weight0 = float(weights[0])
+    single_expected = (weight0 * single_ce) / 2.0
+    if abs(single_expected - single_ce) <= 1.0e-6:
+        raise RuntimeError("single-class case does not distinguish sum/valid from weighted mean")
+    run_graph(
+        "single_class_plus_silence",
+        single_logits,
+        torch.tensor([[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]),
+        torch.tensor([True, True]),
+        expected_solo=single_expected,
+    )
+    invalid_logits = torch.tensor(
+        [[2.0, 0.0, 0.0, 0.0], [2.0, 0.0, 0.0, 0.0]], requires_grad=True
+    )
+    invalid_expected = weight0 * single_ce
+    run_graph(
+        "invalid_excluded_from_denominator",
+        invalid_logits,
+        torch.tensor([[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]]),
+        torch.tensor([True, False]),
+        expected_solo=invalid_expected,
+    )
+    two_logits = torch.tensor(
+        [[3.0, 0.0, 0.0, 0.0], [0.0, 3.0, 0.0, 0.0]], requires_grad=True
+    )
+    two_ce0 = float(
+        nn.functional.cross_entropy(
+            torch.tensor([[3.0, 0.0, 0.0, 0.0]]), torch.tensor([0])
+        )
+    )
+    two_ce1 = float(
+        nn.functional.cross_entropy(
+            torch.tensor([[0.0, 3.0, 0.0, 0.0]]), torch.tensor([1])
+        )
+    )
+    two_expected = (weight0 * two_ce0 + float(weights[1]) * two_ce1) / 2.0
+    run_graph(
+        "two_class_solo",
+        two_logits,
+        torch.tensor([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]]),
+        torch.ones(2, dtype=torch.bool),
+        expected_solo=two_expected,
+    )
+    all_solo_logits = torch.tensor(
+        [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], requires_grad=True
+    )
+    all_solo_ce = float(
+        nn.functional.cross_entropy(
+            torch.tensor([[1.0, 0.0, 0.0, 0.0]]), torch.tensor([0])
+        )
+    )
+    all_solo_expected = weight0 * all_solo_ce
+    if abs(all_solo_expected - all_solo_ce) <= 1.0e-6:
+        raise RuntimeError("all-solo one-class case cancels weights under a weighted mean")
+    run_graph(
+        "all_solo_one_class_weight_not_cancelled",
+        all_solo_logits,
+        torch.tensor([[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]]),
+        torch.ones(2, dtype=torch.bool),
+        expected_solo=all_solo_expected,
+    )
+    overlap_logits = torch.zeros(1, 4, requires_grad=True)
+    run_graph(
+        "two_full_ones_not_solo",
+        overlap_logits,
+        torch.tensor([[1.0, 1.0, 0.0, 0.0]]),
+        torch.ones(1, dtype=torch.bool),
+        expect_zero_solo=True,
+    )
+    mixed_logits = torch.zeros(4, 4, requires_grad=True)
+    mixed_targets = torch.tensor(
+        [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0],
+            [0.5, 0.5, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0],
+        ]
+    )
+    mixed_validity = torch.tensor([True, True, True, False])
+    mixed_ce = float(
+        nn.functional.cross_entropy(
+            torch.zeros(1, 4), torch.tensor([0])
+        )
+    )
+    mixed_expected = (weight0 * mixed_ce) / 3.0
+    run_graph(
+        "mixed_solo_silence_fractional_invalid",
+        mixed_logits,
+        mixed_targets,
+        mixed_validity,
+        expected_solo=mixed_expected,
+    )
+    if len(graphs) > 8 or vjps > 8:
+        raise RuntimeError("loss-probe exceeded toy graph/VJP caps")
+    repo = Path(__file__).resolve().parent.parent.parent
+    origin_prepared = repo / config["prepared_import"]["origin_prepared_path"]
+    if sha256_file(origin_prepared) != config["prepared_import"]["origin_prepared_sha256"]:
+        raise RuntimeError("origin prepared identity mismatch during loss-probe")
+    prepared = torch.load(origin_prepared, map_location="cpu", weights_only=False)
+    fit_ids = [source["source_id"] for source in config["sources"]["FIT"]]
+    counted = fit_solo_class_counts(prepared, fit_ids)
+    if counted != list(FIT_SOLO_CLASS_COUNTS):
+        raise RuntimeError(f"FIT solo counts {counted} != {list(FIT_SOLO_CLASS_COUNTS)}")
+    posix_path = run_root_posix_relative(
+        run_root, run_root / "eval_logits" / "untrained_seed20260915_ami_ES2005a.pt"
+    )
+    if posix_path != "eval_logits/untrained_seed20260915_ami_ES2005a.pt":
+        raise RuntimeError("eval logit entry.path is not POSIX-relative to the run root")
+    elapsed = time.perf_counter() - started
+    if elapsed > 120:
+        raise RuntimeError("loss-probe exceeded 120s CPU wall")
+    atomic_json(
+        run_root / "loss_probe_receipt.json",
+        {
+            "stage": "loss-probe",
+            "optimizer_steps": 0,
+            "student_constructors": 0,
+            "model_forward": 0,
+            "model_backward": 0,
+            "synthetic_logit_graphs": len(graphs),
+            "synthetic_logit_autograd_vjp_calls": vjps,
+            "maximum_logits_per_graph": max(row["logit_count"] for row in graphs),
+            "graphs": graphs,
+            "fit_solo_class_counts": counted,
+            "class_weights_float64": list(FIT_SOLO_CLASS_WEIGHTS),
+            "eval_logits_manifest": EVAL_LOGITS_MANIFEST_NAME,
+            "eval_logits_entry_path_example": posix_path,
+            "init_logit_match_tolerance": INIT_LOGIT_MATCH_TOLERANCE,
+            "elapsed_seconds": elapsed,
             "runtime": pilot_runtime(config_path),
         },
     )
@@ -2357,7 +2943,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "stage",
-        choices=("check", "prepare", "train", "evaluate", "report", "probe", "repair-evaluate"),
+        choices=(
+            "check",
+            "prepare",
+            "import-prepared",
+            "train",
+            "evaluate",
+            "report",
+            "probe",
+            "loss-probe",
+            "repair-evaluate",
+        ),
     )
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--run-root", type=Path, required=True)
@@ -2375,6 +2971,8 @@ def main() -> int:
         check_stage(args.config.resolve(), args.run_root.resolve())
     elif args.stage == "prepare":
         prepare_stage(args.config.resolve(), args.run_root.resolve())
+    elif args.stage == "import-prepared":
+        import_prepared_stage(args.config.resolve(), args.run_root.resolve())
     elif args.stage == "train":
         train_stage(
             args.config.resolve(),
@@ -2386,10 +2984,14 @@ def main() -> int:
         evaluate_stage(args.config.resolve(), args.run_root.resolve(), args.which)
     elif args.stage == "probe":
         probe_stage(args.config.resolve(), args.run_root.resolve())
+    elif args.stage == "loss-probe":
+        loss_probe_stage(args.config.resolve(), args.run_root.resolve())
     elif args.stage == "repair-evaluate":
         repair_evaluate_stage(args.config.resolve(), args.run_root.resolve())
-    else:
+    elif args.stage == "report":
         report_stage(args.config.resolve(), args.run_root.resolve())
+    else:
+        raise RuntimeError(f"unknown stage {args.stage}")
     return 0
 
 
