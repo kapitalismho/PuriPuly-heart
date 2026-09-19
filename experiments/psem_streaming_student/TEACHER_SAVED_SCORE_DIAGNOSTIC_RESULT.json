@@ -7,11 +7,11 @@
   "methods": {
     "identity_first": "Prefix/PCM identity uses retained cost receipts plus exact int16/32768 sample equality against prepared waveforms; file names are insufficient.",
     "teacher_decode": "Little-endian float32 row-major diar.probs.f32 is the score tensor. Native events must cover the same rows with contiguous emit_start_frame/count. JSON decimal probs are checked within 1e-6 and are not used for scores. Metadata/dump are asserted strict 0<p<1, then float64 log(p)-log1p(-p) with no clip or temperature.",
-    "common_mask": "Intersect GT activity validity with emitted teacher rows whose recorded chunk raw_support_end_sample lies within both n_visible and the prefix. Missing, tail and support-incomplete rows are excluded and counted. The same retained frame indices are used for every arm.",
-    "association": "Raw column indices are an explicitly unverified-index diagnostic. Primary comparison uses one fixed source-global 24-permutation oracle maximizing balanced argmax accuracy with lexicographic tie-break, applied to mapped conditional and activity diagnostics. Not causal association, per-chunk remapping, checkpoint selection or training targets.",
+    "common_mask": "Intersect GT activity validity with emitted teacher rows whose recorded chunk raw_support_end_sample lies within both n_visible and the prefix. Missing, tail and support-incomplete rows are excluded and counted. One shared common-valid mask is constructed once per source and reused for every arm. Activity BCE/Brier and 0.5 counts use this common support-complete mask; full-prefix GT-valid counts are reported separately and are not that denominator.",
+    "association": "Raw column indices are an explicitly unverified-index diagnostic. Primary comparison uses one fixed source-global 24-permutation oracle per arm, maximizing that arm's balanced argmax accuracy with lexicographic tie-break, then reused only for that same arm's mapped conditional and independent-activity scores. A teacher permutation is not shared onto independent student heads. Not causal association, per-chunk remapping, checkpoint selection or training targets.",
     "activity": "Independent BCE/Brier on common-valid fractional GT. At fixed 0.5, predicted active-count distribution on common-valid frames and correctly mapped single-active fraction on strict-solo GT.",
     "baselines": "Same-seed retained untrained logits, constant FIT occupancy prior, and uniform four-slot logits, rescored on the common mask. No FIT teacher common-logit control exists.",
-    "horizon": "Teacher has chunk-level future support and interior last-bin excess 9056 samples. Student has zero target-relative future. Not matched-causality, live 80ms, admission or speed evidence.",
+    "horizon": "Teacher has chunk-level future support. 9056 is the conservative chunk-level interior last-bin support excess, not exact per-row lookahead; earlier bins in the same emission have more future. Student has zero target-relative future. Not matched-causality, live 80ms, admission or speed evidence.",
     "numerics": "CPU float64; no bootstrap, significance, generalization or fitted teacher temperature/clipping."
   },
   "arms": [
@@ -24,24 +24,29 @@
   ],
   "limitations": [
     "Correlated 80ms frames and two already-exposed DEV prefixes do not support statistical generalization or significance claims.",
-    "Oracle mapping is not proof that FIT teacher association is valid and is not a human-slot identity.",
-    "Teacher future horizon differs from the causal student; this is not matched-causality or admission evidence.",
+    "Oracle mapping is one source-global permutation per arm, not a shared teacher-to-student column identity, not proof that FIT teacher association is valid, and not a human-slot identity.",
+    "Teacher future horizon differs from the causal student; 9056 is conservative chunk support, not per-row lookahead, and this is not matched-causality or admission evidence.",
     "No FIT teacher scores exist; none were fitted on DEV.",
-    "This diagnostic does not authorize a FIT teacher pass, KD execution or production-policy change."
+    "This diagnostic does not authorize a FIT teacher pass, KD execution or production-policy change.",
+    "ES native_teacher mapped class-balanced conditional NLL is worse than uniform on the same common mask, and the 11-frame observed class has recall 0. That is contrary rare-class evidence, not a reason to dismiss class-balanced scoring. EN teacher class-balanced NLL is much better. No universal teacher-quality claim."
   ],
   "provenance": {
     "contract_sha256": "f59f69248f14e3ed3659eacd6ebe74b31c54d478b47d0921f4df80f945b75220",
     "analyzer_sha256": "b8880483ebd3528fb31627913124f8755720e11e1c821537ffdfbb5dcb3f360d",
-    "driver_sha256": "8a5ed310f4068bd80fad14b53e0b60ed274c51b1cc1cfbdaa0bde5eae33be613",
+    "driver_sha256": "51deea35c20c0aeb7f75c00f181c87224de1bc8c83f0234e5dc787d6637393a2",
+    "original_driver_sha256": "8a5ed310f4068bd80fad14b53e0b60ed274c51b1cc1cfbdaa0bde5eae33be613",
     "input_manifest_sha256": "82b6f94a58ec847ffc51be0037ff4a93abddd7412ee784fe6eb85642a9f095d3",
-    "probe_receipt_sha256": "c1822ffb906fa9dd762a16bee5d1ef952a42efa2799c6a89c1121da82a754dda",
-    "pre_math_receipt_sha256": "750b6bd4a4d7b289f288deca7dd818bf969f8fc231ea3837ffed3e911c1702c5",
+    "probe_receipt_sha256": "02a69bc20adf7b154b561511707fd65fa339fe7e90bf3b76093d2351cf071b1a",
+    "pre_math_receipt_sha256": "cb2c6c3c907062c19f7d48e11e0446460966197192090beb9a91c61848dff6e4",
     "prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
     "original_manifest_sha256": "49f272ab990a534491fc0f72d000e0bc4f1cff6bf74f7cb38c75317bb8f0d13a",
     "contrast_manifest_sha256": "8cbf5079aa2070128fb5bb5f5f5e8f4fade4886a2c85ec49d72b4183f3df7ea9",
     "cost_rerun_config_sha256": "13ef051d6243c8c2d0ece46580cb46a5407e08a61bccbf06f56345fca5a53c20",
     "original_student_checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
     "contrast_checkpoint_sha256": "125d8d8ecd5f9434d5d13153fd3e2608720f5bd9777ed09dbe0601d0e11a1c2c",
+    "original_result_sha256": "cdfa0798978118173c017c2f1ae553b1206a34ea2baafcc90875ad07392b0ff7",
+    "original_support_root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-saved-score-1",
+    "repair_root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-saved-score-repair-1",
     "fit_only_occupancy_prior": [
       0.26317110657691956,
       0.10770361125469208,
@@ -49,7 +54,7 @@
       0.06539624184370041
     ],
     "command": [
-      "experiments/psem_streaming_student/.stage-control/issue-164-teacher-saved-score-1/measure_teacher_saved_score.py",
+      "experiments/psem_streaming_student/.stage-control/issue-164-teacher-saved-score-repair-1/measure_teacher_saved_score.py",
       "analyze"
     ],
     "python": "3.12.10",
@@ -86,6 +91,8 @@
       "reviewed_clip_helper_not_used_for_teacher": true,
       "zero_probability_rejected": true,
       "oracle_not_per_chunk": true,
+      "original_support_driver_unchanged": true,
+      "original_support_result_unchanged": true,
       "model_object_created": false
     },
     "model_instantiation_or_forward": 0,
@@ -94,7 +101,7 @@
     "gpu_use": false,
     "torch": "2.13.0+cpu",
     "numpy": "2.5.1",
-    "wall_seconds": 0.0072534999999334104
+    "wall_seconds": 0.004951800001435913
   },
   "pcm_identity": {
     "ami_ES2009d": {
@@ -3570,13 +3577,14 @@
     "gpu_use": false,
     "cumulative_optimizer_updates_remain": 1583,
     "source_passes": 0,
-    "wall_seconds": 0.7750019000013708,
+    "wall_seconds": 0.7850968000002467,
     "external_cost": 0
   },
   "remaining_uncertainty": [
     "Speaker-sensitive scores may still be confounded by occupancy, channel, source or non-identity temporal structure.",
-    "Native columns are not established human identities even after a source-global oracle permutation.",
-    "DEV evidence is two already-exposed prefixes only."
+    "Native columns are not established human identities even after a per-arm source-global oracle permutation.",
+    "DEV evidence is two already-exposed prefixes only.",
+    "ES class-balanced teacher NLL being worse than uniform is retained contrary evidence on the rare class; it does not overturn the common-mask construction or authorize a quality claim."
   ],
   "adoption_or_next_experiment_decision": null
 }

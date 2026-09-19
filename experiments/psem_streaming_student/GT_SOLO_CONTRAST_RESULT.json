@@ -24,7 +24,9 @@
     "adjudication_sha256": "7ba8b108a449813467eeae41e35cd79f946fc404ef48044b5f8ce3a696211ba2",
     "seed": 20260915,
     "student_parameters": 5940740,
-    "objective": "activity_bce_plus_fit_balanced_solo_ce"
+    "objective": "activity_bce_plus_fit_balanced_solo_ce",
+    "comparison_review_adjudication_path": "experiments/psem_streaming_student/.stage-control/autonomous-research/comparison-review-adjudication.json",
+    "comparison_review_adjudication_sha256": "4d5436563eb41a7ddf9bb79ad661c2f223e9aaf61fcb7a6ad3fa3ba9c7289da8"
   },
   "optimizer_step_accounting": {
     "this_run_actual_updates": 780,
@@ -79,10 +81,47 @@
   },
   "cost": {
     "training": {
-      "elapsed_seconds_synchronized": 75.194705648,
-      "peak_reserved_bytes": 320864256,
-      "peak_allocated_bytes": 292840448,
-      "scope": "wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through final checkpoint, including host/device transfers and optimizer updates; excludes that pre-timer setup. Allocator peak reset is after resume restore/witness or after the initial zero-update checkpoint on a fresh train."
+      "no_single_in_process_timer_for_all_780_updates": true,
+      "pause_after_2": {
+        "completed_updates": 2,
+        "source": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_03_train-pause-after-2.json",
+        "hub_uptime_s": 15.2,
+        "hub_uptime_scope": "actual hub process lifetime for stage_03 train --pause-after 2",
+        "actor_start_utc": "2026-09-19T22:29:27Z",
+        "actor_end_utc": "2026-09-19T22:30:02Z",
+        "actor_management_window_s": 35,
+        "actor_management_window_scope": "UTC start/end around the stage actor; NOT exact process duration and NOT synchronized training wall",
+        "in_process_training_elapsed_seconds_synchronized": null,
+        "in_process_timer_status": "unavailable; not present on stage_03 receipt or accounting.json; quoted 6.75728485s from execution-worker recollection has no retained source",
+        "peak_reserved_bytes": 320864256,
+        "latest_checkpoint_sha256_on_stage_receipt": "2c5b8b2c7c2ae691d8946782dc14c9db2d410671bbd36f2fb6cd87c8df40292b"
+      },
+      "resume_updates_3_through_780": {
+        "fresh_process": true,
+        "source": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_04_train-resume.json",
+        "accounting_source": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/accounting.json",
+        "accounting_records": 778,
+        "accounting_update_index_range": [
+          3,
+          780
+        ],
+        "absolute_completed_updates_counter": 780,
+        "current_process_record_count": 778,
+        "counter_vs_records": "absolute completed_updates 780 is the lifetime counter after resume; this process wrote 778 accounting records for update_index 3..780 inclusive (780-3+1=778)",
+        "elapsed_seconds_synchronized": 75.194705648,
+        "elapsed_scope": "resume process in-process timer covering updates 3..780 only; not pause updates 1..2; not an all-780 aggregate",
+        "hub_uptime_s": 89,
+        "hub_uptime_scope": "actual hub process lifetime for stage_04 train --resume",
+        "actor_start_utc": "2026-09-19T22:30:02Z",
+        "actor_end_utc": "2026-09-19T22:32:28Z",
+        "actor_management_window_s": 146,
+        "actor_management_window_scope": "UTC start/end around the stage actor; NOT exact process duration and NOT synchronized training wall",
+        "peak_reserved_bytes": 320864256,
+        "peak_allocated_bytes": 292840448,
+        "ledger_intent": 780,
+        "ledger_completed": 780,
+        "timing_scope_from_accounting": "wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through final checkpoint, including host/device transfers and optimizer updates; excludes that pre-timer setup. Allocator peak reset is after resume restore/witness or after the initial zero-update checkpoint on a fresh train."
+      }
     },
     "final_inference": {
       "elapsed_seconds_synchronized": 13.938406131000022,
@@ -139,14 +178,30 @@
         "id": "train-pause-after-2",
         "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_03_train-pause-after-2.json",
         "exit": 0,
-        "completed_updates": 2
+        "completed_updates": 2,
+        "hub_uptime_s": 15.2,
+        "hub_uptime_scope": "actual hub process lifetime",
+        "actor_management_window_s": 35,
+        "actor_management_window_scope": "UTC 22:29:27Z-22:30:02Z; not synchronized training wall",
+        "in_process_training_elapsed_seconds_synchronized": null
       },
       {
         "id": "train-resume-780",
         "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_04_train-resume.json",
         "exit": 0,
         "completed_updates": 780,
-        "uncertain_updates": 0
+        "uncertain_updates": 0,
+        "fresh_process": true,
+        "accounting_records_this_process": 778,
+        "update_index_range_this_process": [
+          3,
+          780
+        ],
+        "absolute_completed_updates_counter": 780,
+        "training_elapsed_seconds_synchronized": 75.194705648,
+        "elapsed_scope": "updates 3..780 only",
+        "hub_uptime_s": 89,
+        "actor_management_window_s": 146
       },
       {
         "id": "evaluate-cal",
@@ -256,6 +311,23 @@
       "checkpoint_step_78.pt": "89afa989b244bb1fe6fbf143cf5e9dc6805f781e6cdd6e565291807a7337a0d2",
       "checkpoint_step_390.pt": "f615f35c7a98ca8f40e1ba174ebb125e0eba13c956f2ef1080de6b9742beaa5f",
       "checkpoint_step_780.pt": "125d8d8ecd5f9434d5d13153fd3e2608720f5bd9777ed09dbe0601d0e11a1c2c"
+    },
+    "update_ledger.jsonl": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/update_ledger.jsonl",
+      "sha256": "bbb1f76cfe03f23903525de219fce0c029a36c036f824de3d1e3c674308bb36e",
+      "bytes": 289132,
+      "lines": 1560,
+      "intent_rows": 780,
+      "completed_rows": 780,
+      "update_index_range": [
+        1,
+        780
+      ]
+    },
+    "checkpoint_pause_update2.pt": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/checkpoint_pause_update2.pt",
+      "sha256": "349555b2848cbf7d880479388c8c8e89d5746dfe1cf3c49ad35de663eccc96f4",
+      "bytes": 71401301
     }
   },
   "no_extra_model_work": {
@@ -276,6 +348,14 @@
     "independent contrast analysis may consume retained logits and accounting without this result.json",
     "check_stage synthetic metric probes, slot projections, and checkpoint identity probes were not produced by this run",
     "original seven-stage recipe report failed; a later CPU report is a separate attempt, not evidence that all seven original commands exited 0",
-    "this contrast is not issue164 completion, production evidence, or an adoption/branch decision"
-  ]
+    "this contrast is not issue164 completion, production evidence, or an adoption/branch decision",
+    "pause in-process training wall for updates 1..2 is unavailable from retained receipts; 75.194705648s is resume updates 3..780 only; do not add actor UTC windows or unrecalled 6.75728485s into an all-780 timer"
+  ],
+  "historical_original_public_result": {
+    "commit": "d45653bfd9e88b676dddd7b13c4362b8493c1482",
+    "path": "experiments/psem_streaming_student/GT_SOLO_CONTRAST_RESULT.json",
+    "sha256": "bd63cf55b8ad8c3f04ab15e80385c70ccb3b6b2a7f4a391ca29aca80f4dbc1b0",
+    "bytes": 14515,
+    "note": "git object at d456 is the original CPU-report public result; this working-tree file is the comparison-review correction. report_only_attempt.json remains the CPU report attempt truth and is not rewritten."
+  }
 }
