@@ -340,8 +340,6 @@ def verify_sounddevice_portaudio_runtime(site_packages: Path) -> dict[str, str]:
     return {str(_SOUNDDEVICE_STANDARD_DLL): _sha256(standard)}
 
 
-
-
 def stage_sounddevice_portaudio_runtime(site_packages: Path) -> dict[str, dict[str, str]]:
     standard = site_packages.joinpath(*_SOUNDDEVICE_STANDARD_DLL.parts)
     asio = site_packages.joinpath(*_SOUNDDEVICE_ASIO_DLL.parts)
@@ -355,8 +353,6 @@ def stage_sounddevice_portaudio_runtime(site_packages: Path) -> dict[str, dict[s
         "retained": verify_sounddevice_portaudio_runtime(site_packages),
         "excluded": excluded,
     }
-
-
 
 
 def _distribution_names(site_packages: Path) -> set[str]:

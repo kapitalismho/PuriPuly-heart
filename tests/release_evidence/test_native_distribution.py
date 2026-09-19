@@ -105,6 +105,7 @@ def test_finalized_soxr_wheel_owns_both_native_runtime_files(tmp_path: Path) -> 
         assert archive.read("soxr/soxr_ext.pyd") == pyd
         assert archive.read("soxr/soxr.dll") == b"runtime-dll"
 
+
 def test_sounddevice_staging_excludes_asio_and_retains_standard_runtime(
     tmp_path: Path,
 ) -> None:
@@ -152,7 +153,6 @@ def test_sounddevice_validation_rejects_asio_and_requires_standard_runtime(
     standard.unlink()
     with pytest.raises(ValueError):
         verify_sounddevice_portaudio_runtime(tmp_path)
-
 
 
 def test_product_metadata_is_non_editable_and_record_owned(tmp_path: Path) -> None:
