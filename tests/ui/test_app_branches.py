@@ -1987,7 +1987,7 @@ def test_debug_preview_founder_letter_opens_dialog_with_readme_action(
 
     assert app._founder_letter_dialog is not None
     assert opened_urls == [
-        "https://github.com/kapitalismho/PuriPuly-heart/blob/main/README.ko.md#자신의-api-키-사용하기"
+        "https://github.com/kapitalismho/PuriPuly-heart/blob/main/docs/readme/README.ko.md#자신의-api-키-사용하기"
     ]
 
 
@@ -1996,13 +1996,13 @@ def test_founder_readme_url_for_locale_uses_origin_readme_pages() -> None:
 
     assert callable(resolver)
     assert resolver("ko") == (
-        "https://github.com/kapitalismho/PuriPuly-heart/blob/main/README.ko.md#자신의-api-키-사용하기"
+        "https://github.com/kapitalismho/PuriPuly-heart/blob/main/docs/readme/README.ko.md#자신의-api-키-사용하기"
     )
     assert resolver("zh-CN") == (
-        "https://github.com/kapitalismho/PuriPuly-heart/blob/main/README.zh-CN.md#使用您自己的-api-密钥"
+        "https://github.com/kapitalismho/PuriPuly-heart/blob/main/docs/readme/README.zh-CN.md#使用您自己的-api-密钥"
     )
     assert resolver("ja") == (
-        "https://github.com/kapitalismho/PuriPuly-heart/blob/main/README.ja.md#自分のapiキーを使う"
+        "https://github.com/kapitalismho/PuriPuly-heart/blob/main/docs/readme/README.ja.md#自分のapiキーを使う"
     )
     assert resolver("en") == (
         "https://github.com/kapitalismho/PuriPuly-heart/blob/main/README.md#using-your-own-api-keys"
@@ -4429,7 +4429,7 @@ def test_show_founder_letter_dialog_opens_with_locale_readme_action(
 
     assert pkce_calls == []
     assert opened_urls == [
-        "https://github.com/kapitalismho/PuriPuly-heart/blob/main/README.ko.md#자신의-api-키-사용하기"
+        "https://github.com/kapitalismho/PuriPuly-heart/blob/main/docs/readme/README.ko.md#자신의-api-키-사용하기"
     ]
 
 

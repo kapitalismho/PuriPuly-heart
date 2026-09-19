@@ -15,10 +15,10 @@
 
 <h2 align="center">
   🇺🇸 English ·
-  <a href="README.ko.md">🇰🇷 한국어</a> ·
-  <a href="README.ja.md">🇯🇵 日本語</a> ·
-  <a href="README.zh-CN.md">🇨🇳 简体中文</a> ·
-  <a href="README.ru.md">🇷🇺 Русский</a>
+  <a href="docs/readme/README.ko.md">🇰🇷 한국어</a> ·
+  <a href="docs/readme/README.ja.md">🇯🇵 日本語</a> ·
+  <a href="docs/readme/README.zh-CN.md">🇨🇳 简体中文</a> ·
+  <a href="docs/readme/README.ru.md">🇷🇺 Русский</a>
 </h2>
 
 ---
@@ -410,7 +410,7 @@ The tier transition may take a moment.
 
 ![PuriPuly Heart hexagonal architecture: core runtimes surrounded by eight port adapters](docs/architecture-light.png)
 
-See [`ARCHITECTURE.md`](ARCHITECTURE.md).
+See [`docs/architecture.md`](docs/architecture.md).
 
 ## Roadmap
 
@@ -450,12 +450,6 @@ pip install -e ".[dev]"
 
 ```powershell
 uv sync --dev
-```
-
-Install the repository hooks:
-
-```powershell
-pre-commit install
 ```
 
 For Linux or WSL work, use `.venv-wsl` when it is available.

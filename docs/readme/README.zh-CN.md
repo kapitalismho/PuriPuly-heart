@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — VRChat 实时双向语音翻译工具" width="128" />
+  <img src="../../src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — VRChat 实时双向语音翻译工具" width="128" />
 </p>
 
 <h1 align="center">PuriPuly<br>
@@ -14,7 +14,7 @@
 </p>
 
 <h2 align="center">
-  <a href="README.md">🇺🇸 English</a> ·
+  <a href="../../README.md">🇺🇸 English</a> ·
   <a href="README.ko.md">🇰🇷 한국어</a> ·
   <a href="README.ja.md">🇯🇵 日本語</a> ·
   🇨🇳 简体中文 ·
@@ -25,7 +25,7 @@
 
 ## 演示
 
-![PuriPuly（Deepgram + Qwen 3.8 Flash）与 VRCT（Google Web Speech + Google Translate）的翻译对比。PuriPuly 语音识别：“집에굴러다니는게손잡이빠진것까지합치면열개는넘을걸.”，翻译：“（家里散落的伞，加上那把没把手的，估计都超过十把了呢。）” | VRCT 语音识别：“집에 굴러다니는게 손잡이 빠진 것까지 합치면 10개는 넘을 걸”，翻译：“房子周围肯定有超过 10 个，包括那些没有把手的。”](docs/images/performance/2.png)
+![PuriPuly（Deepgram + Qwen 3.8 Flash）与 VRCT（Google Web Speech + Google Translate）的翻译对比。PuriPuly 语音识别：“집에굴러다니는게손잡이빠진것까지합치면열개는넘을걸.”，翻译：“（家里散落的伞，加上那把没把手的，估计都超过十把了呢。）” | VRCT 语音识别：“집에 굴러다니는게 손잡이 빠진 것까지 합치면 10개는 넘을 걸”，翻译：“房子周围肯定有超过 10 个，包括那些没有把手的。”](../images/performance/2.png)
 
 ---
 
@@ -87,7 +87,7 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 ---
 
 ## 翻译比较
-![韩语→英语/日语/中文（简体）翻译的每句平均错误惩罚图表。216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是 PuriPuly 中可用的模型：第 1 名 Gemma 4 31B (0.353)，第 2 名 Gemma 4 26B A4B (0.387)，第 3 名 DeepSeek-V4 Flash 0731 (0.571)，第 4 名 Gemma 4 12B QAT Q4 (0.855)，第 5 名 Gemma 4 E4B QAT Q4 (1.577)。橙色柱状图是外部基线：Hy-MT-7B (1.863)、Papago (2.699)、Gemini 3.5 Live Translate (2.991)、MiLMMT 46-4B (3.087)、DeepL (3.914)、Google Cloud Translation Basic (5.731)。](docs/images/performance/2.png)
+![韩语→英语/日语/中文（简体）翻译的每句平均错误惩罚图表。216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是 PuriPuly 中可用的模型：第 1 名 Gemma 4 31B (0.353)，第 2 名 Gemma 4 26B A4B (0.387)，第 3 名 DeepSeek-V4 Flash 0731 (0.571)，第 4 名 Gemma 4 12B QAT Q4 (0.855)，第 5 名 Gemma 4 E4B QAT Q4 (1.577)。橙色柱状图是外部基线：Hy-MT-7B (1.863)、Papago (2.699)、Gemini 3.5 Live Translate (2.991)、MiLMMT 46-4B (3.087)、DeepL (3.914)、Google Cloud Translation Basic (5.731)。](../images/performance/2.png)
 
 - 蓝色柱状图是PuriPuly中可用的模型。
 - 我们使用微软的 Gemba MQM 框架进行实验。
@@ -230,22 +230,22 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 <summary><h3>OpenRouter</h3></summary>
 
 1. 请按下方截图所示设置红色圆圈内的选项。
-   ![step0](docs/images/openrouter/0.png)
+   ![step0](../images/openrouter/0.png)
 
 2. 在应用中点击红色圆圈内的按钮。
-   ![step1](docs/images/openrouter/1.png)
+   ![step1](../images/openrouter/1.png)
 
 3. 在 OpenRouter 中登录。
-   ![step2](docs/images/openrouter/2.png)
+   ![step2](../images/openrouter/2.png)
 
 4. 点击红色圆圈内的按钮以退出付款窗口。
-   ![step3](docs/images/openrouter/3.png)
+   ![step3](../images/openrouter/3.png)
 
 5. 点击 **Authorize** 按钮。
-   ![step4](docs/images/openrouter/4.png)
+   ![step4](../images/openrouter/4.png)
 
 6. 按需充值预付金。
-   ![step5](docs/images/openrouter/5.png)
+   ![step5](../images/openrouter/5.png)
 
 <details>
 <summary><h3>点击 Authorize 后仍未完成认证</h3></summary>
@@ -253,13 +253,13 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 如果点击 Authorize 后仍未通过认证，请重试，或按下方步骤手动申请 API 密钥并粘贴。
 
 6. 点击右上角账户后，进入左侧的 API Keys 标签，再点击中央的 Create 按钮。
-   ![step6](docs/images/openrouter/6.png)
+   ![step6](../images/openrouter/6.png)
 
 7. 点击 Create 按钮。
-   ![step7](docs/images/openrouter/7.png)
+   ![step7](../images/openrouter/7.png)
 
 8. 点击按钮复制 API 密钥，然后粘贴到翻译器的 API 标签中。
-   ![step8](docs/images/openrouter/8.png)
+   ![step8](../images/openrouter/8.png)
 
 </details>
 
@@ -269,22 +269,22 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 <summary><h3>DeepSeek</h3></summary>
 
 1. 请按下方截图所示设置红色圆圈内的选项。
-   ![step0](docs/images/deepseek/0.png)
+   ![step0](../images/deepseek/0.png)
 
 2. 访问 [DeepSeek 官网](https://www.deepseek.com/en/) 并点击 **Access API** 按钮。
-   ![step1](docs/images/deepseek/1.png)
+   ![step1](../images/deepseek/1.png)
 
 3. 在主页登录。
-   ![step2](docs/images/deepseek/2.png)
+   ![step2](../images/deepseek/2.png)
 
 4. 切换到 API Keys 标签后，点击 **Create new API Keys**。
-   ![step3](docs/images/deepseek/3.png)
+   ![step3](../images/deepseek/3.png)
 
 5. 点击按钮复制 API 密钥后，粘贴到翻译器的 API 标签中。
-   ![step4](docs/images/deepseek/4.png)
+   ![step4](../images/deepseek/4.png)
 
 6. 切换到 Top Up 标签，按需充值预付金。
-   ![step5](docs/images/deepseek/5.png)
+   ![step5](../images/deepseek/5.png)
 
 </details>
 
@@ -292,22 +292,22 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 <summary><h3>Deepgram</h3></summary>
 
 1. 访问并登录 [Deepgram Console](https://console.deepgram.com/)。
-   ![step1](docs/images/deepgram/1.png)
+   ![step1](../images/deepgram/1.png)
 
 2. 当出现欢迎信息或调查问卷时，请点击 **Skip** 跳过。
-   ![step2](docs/images/deepgram/2.png)
+   ![step2](../images/deepgram/2.png)
 
 3. 在服务选择界面中，选择 **STT (Speech-to-Text)**。
-   ![step3](docs/images/deepgram/3.png)
+   ![step3](../images/deepgram/3.png)
 
 4. 在 API Keys 菜单中，点击 **Create a New API Key**。
-   ![step4](docs/images/deepgram/4.png)
+   ![step4](../images/deepgram/4.png)
 
 5. 输入密钥名称（例如：`puripuly`）并生成。
-   ![step5](docs/images/deepgram/5.png)
+   ![step5](../images/deepgram/5.png)
 
 6. 复制生成的密钥并粘贴到 PuriPuly 设置中。
-   ![step6](docs/images/deepgram/6.png)
+   ![step6](../images/deepgram/6.png)
 
 </details>
 
@@ -315,35 +315,35 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 <summary><h3>Gemini</h3></summary>
 
 1. 访问 [Google AI Studio](https://aistudio.google.com/apikey) 并点击 **Get API key** 按钮。
-   ![step1](docs/images/gemini/1.png)
+   ![step1](../images/gemini/1.png)
 
 2. 创建一个新项目。
-   ![step2](docs/images/gemini/2.png)
+   ![step2](../images/gemini/2.png)
 
 3. 随意起一个名字。
-   ![step3](docs/images/gemini/3.png)
+   ![step3](../images/gemini/3.png)
 
 4. 选择创建好的项目并点击 **Create key**。
-   ![step4](docs/images/gemini/4.png)
+   ![step4](../images/gemini/4.png)
 
 5. 点击圆圈标记的地方。
-   ![step5](docs/images/gemini/5.png)
+   ![step5](../images/gemini/5.png)
 
 6. 点击圆圈标记的地方并复制密钥。
-   ![step6](docs/images/gemini/6.png)
+   ![step6](../images/gemini/6.png)
 
 7. （推荐）点击黄色高亮的 **Set Up Billing** 按钮，升级并切换到付费方案。
 切换方案可能需要一些时间。
-   ![step7](docs/images/gemini/7.png)
+   ![step7](../images/gemini/7.png)
 
 <details>
 <summary><h3>Gemini 付费订阅用户</h3></summary>
 
 8. 前往 [Google Developer Program](https://developers.google.com/program/my-benefits) 并加入该计划。
-   ![step8](docs/images/gemini/8.png)
+   ![step8](../images/gemini/8.png)
 
 9. 选择您在第 7 步中设置的付费方案项目。
-   ![step9](docs/images/gemini/9.png)
+   ![step9](../images/gemini/9.png)
 
 </details>
 
@@ -357,22 +357,22 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
    - [中国大陆以外的地区](https://bailian.console.alibabacloud.com)
 
 2. 在访问的地址中登录。请准确选择您希望申请 API 密钥的区域（Region）。（例如：Beijing）
-   ![step2](docs/images/qwen/1.png)
+   ![step2](../images/qwen/1.png)
 
 3. 点击右上角的 **齿轮图标**。
-   ![step3](docs/images/qwen/2.png)
+   ![step3](../images/qwen/2.png)
 
 4. 创建一个工作空间（Workspace），然后进入 **API-KEY** 页面。
-   ![step4](docs/images/qwen/3.png)
+   ![step4](../images/qwen/3.png)
 
 5. 点击 **Create API Key**。
-   ![step5](docs/images/qwen/4.png)
+   ![step5](../images/qwen/4.png)
 
 6. 分配账号和工作空间，然后点击 OK 按钮。
-   ![step6](docs/images/qwen/5.png)
+   ![step6](../images/qwen/5.png)
 
 7. 点击圆圈标记的地方以复制密钥。
-   ![step7](docs/images/qwen/6.png)
+   ![step7](../images/qwen/6.png)
 
 </details>
 
@@ -380,22 +380,22 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 <summary><h3>Soniox</h3></summary>
 
 1. 登录 [Soniox Console](https://console.soniox.com/)。
-   ![step1](docs/images/soniox/1.png)
+   ![step1](../images/soniox/1.png)
 
 2. 随意填写一个组织名称。
-   ![step2](docs/images/soniox/2.png)
+   ![step2](../images/soniox/2.png)
 
 3. 点击 **Add Funds** 按钮以绑定支付方式。
-   ![step3](docs/images/soniox/3.png)
+   ![step3](../images/soniox/3.png)
 
 4. Soniox 需要预先充值余额。充值完成后，请前往 **API Keys** 菜单。
-   ![step4](docs/images/soniox/4.png)
+   ![step4](../images/soniox/4.png)
 
 5. 创建一个新的 API Key。
-   ![step5](docs/images/soniox/5.png)
+   ![step5](../images/soniox/5.png)
 
 6. 复制生成的密钥并粘贴到 PuriPuly 设置中。
-   ![step6](docs/images/soniox/6.png)
+   ![step6](../images/soniox/6.png)
 
 </details>
 
@@ -404,9 +404,9 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 
 ## 架构
 
-![PuriPuly Heart 六边形架构图](docs/architecture-light.png)
+![PuriPuly Heart 六边形架构图](../architecture-light.png)
 
-参见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+参见 [`docs/architecture.md`](../architecture.md)。
 
 ## 路线图
 
@@ -421,8 +421,8 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 | 领域 | 推荐环境 | 文档 |
 |---|---|---|
 | Python 桌面应用 | Windows | 本节 |
-| Broker 服务 | Linux | [`broker/README.md`](broker/README.md) |
-| 原生 VR 浮层 | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
+| Broker 服务 | Linux | [`broker/README.md`](../../broker/README.md) |
+| 原生 VR 浮层 | Windows | [`native/overlay/README.md`](../../native/overlay/README.md) |
 
 ### Python 环境
 
@@ -446,12 +446,6 @@ pip install -e ".[dev]"
 
 ```powershell
 uv sync --dev
-```
-
-安装仓库钩子：
-
-```powershell
-pre-commit install
 ```
 
 在 Linux 或 WSL 中工作时，请使用 `.venv-wsl`（如果可用）。
@@ -520,13 +514,13 @@ python -m pytest tests/path/to/test_file.py
 
 ### 其他领域
 
-Broker 文档维护于 [`broker/README.md`](broker/README.md)。
+Broker 文档维护于 [`broker/README.md`](../../broker/README.md)。
 
-原生 VR 浮层文档维护于 [`native/overlay/README.md`](native/overlay/README.md)。
+原生 VR 浮层文档维护于 [`native/overlay/README.md`](../../native/overlay/README.md)。
 
-自定义 HTTP API 扩展文档维护于 [`docs/http-extensions.md`](docs/http-extensions.md)。连接所需的 JSON Schema 请参阅 [`docs/http-extension.schema.json`](docs/http-extension.schema.json)。
+自定义 HTTP API 扩展文档维护于 [`docs/http-extensions.md`](../http-extensions.md)。连接所需的 JSON Schema 请参阅 [`docs/http-extension.schema.json`](../http-extension.schema.json)。
 
-VRChat OSC 控制请参阅 [`docs/vrchat-osc.md`](docs/vrchat-osc.md)。
+VRChat OSC 控制请参阅 [`docs/vrchat-osc.md`](../vrchat-osc.md)。
 
 ---
 
@@ -551,13 +545,13 @@ SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han �
 
 ## 政策
 
-- [Code signing policy](CODE_SIGNING.md)
-- [隐私政策](PRIVACY.md)
+- [Code signing policy](../../CODE_SIGNING.md)
+- [隐私政策](../../PRIVACY.md)
 
 ---
 
 ## 许可证
 
-[AGPL-3.0-or-later](LICENSE)
+[AGPL-3.0-or-later](../../LICENSE)
 
 第三方许可证与声明：`src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt`

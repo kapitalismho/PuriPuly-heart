@@ -244,19 +244,7 @@ refactoring/
 !/scripts/release/huggingface-xet-frozen-smoke.py
 .codex/
 .agent/
-.agents/*
-!.agents/specs/
-.agents/specs/*
-!.agents/specs/prd/
-.agents/specs/prd/*
-!.agents/specs/prd/*.md
-docs/plans/
-docs/superpowers
-!docs/superpowers/
-docs/superpowers/*
-!docs/superpowers/specs/
-docs/superpowers/specs/*
-!docs/superpowers/specs/2026-04-28-peer-burst-as-product-permanent.md
+.agents/
 .worktrees/
 .superpowers/
 /settings.json
@@ -266,3 +254,4 @@ opencode.json
 .opencode/
 .impeccable.md
 /temp/
+.flet/

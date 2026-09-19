@@ -18,108 +18,33 @@ HOSTED_ORIGIN = "github-hosted"
 _SHA40 = re.compile(r"[0-9a-f]{40}")
 _SHA64 = re.compile(r"[0-9a-f]{64}")
 
-PACKAGED_LICENSE_PAYLOADS = (
-    (
-        "puripuly_heart/data/licenses/SCIPY-1.18.0-LICENSE.txt",
-        "f0f5c56b298ec9795df1199edc328a987242716d14a1bde6813112e22dc15f99",
-    ),
-    (
-        "puripuly_heart/data/licenses/PYTHON-3.14.7-LICENSE.txt",
-        "935cf13e19f8c31b497d20b05d73623431a226b230c3599bc30fa3348979bc68",
-    ),
-    (
-        "scipy/_lib/_uarray/LICENSE",
-        "e4c4acc31e8287066d7c995d26e3ef902ca1977ee187b260b11c278366503811",
-    ),
-    (
-        "scipy/fft/_duccfft/LICENSE.md",
-        "c04661685cff9d8035fe1c4c3ab357e7f7633cafc06a73e9d90c3c5fede8a86a",
-    ),
-    (
-        "scipy/integrate/LICENSE_DOP",
-        "6cc2ed6e35b8f376ff3d8f86aeef4e0c34c2309bd6f4a0565936d577839ba023",
-    ),
-    (
-        "scipy/spatial/qhull_src/COPYING_QHULL.txt",
-        "2a6ebb495e26dd5f88cbc40c593733da6edb27b64936f70409cd5a1acafb1c32",
-    ),
-    (
-        "zeroconf-0.150.0.dist-info/licenses/COPYING",
-        "9c35fa0c7991bb24076471ac2abb0ca6b8a26d393bb7a004193d18f71e5714a0",
-    ),
-    ("onnxruntime/LICENSE", "c250d6278f0b47a6439fb7592b08b58a55eb9f535aa49a1db63211c3f982b674"),
-    (
-        "onnxruntime/ThirdPartyNotices.txt",
-        "fb0af774b4d7cffc5b9d046f2aaeade2f37df2f80abf8033c95dfffcc77a8866",
-    ),
-    (
-        "aiohttp-3.13.2.dist-info/licenses/LICENSE.txt",
-        "c1493e9f10d59d1fba9f9df28008e1557e33cf9fbac8ce1263aa3393982803de",
-    ),
-    (
-        "aiohttp-3.13.2.dist-info/licenses/vendor/llhttp/LICENSE",
-        "6ddfa628db76d2d87b8968bafbad60f51c4ec88100dd7bb96f97216d88af0808",
-    ),
-    (
-        "sherpa_onnx-1.13.4.dist-info/licenses/LICENSE",
-        "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
-    ),
-    (
-        "sounddevice-0.5.5.dist-info/licenses/LICENSE",
-        "b6eea21bbafbaf7a2177e492f1be6b5efc6f4e708b1980773de51cdaa52f8211",
-    ),
-    (
-        "charset_normalizer-3.4.4.dist-info/licenses/LICENSE",
-        "18577485d3704f1a479ded8e573c0976cfed315fd2fd17983fa988da4c2f70d1",
-    ),
-    (
-        "cffi-2.0.0.dist-info/licenses/AUTHORS",
-        "2a67a60bbfb33759d67d645ff131b8e6d6bc4cafc232d751fcac3eda4d314cc8",
-    ),
-    (
-        "cffi-2.0.0.dist-info/licenses/LICENSE",
-        "5ba24ddc57067f9249add644c3afc41a5d6dc37e23433ef759d95df370b0af63",
-    ),
-    (
-        "pyaudiowpatch-0.2.12.8.dist-info/licenses/LICENSE.txt",
-        "2b94fbbfe7259b16c5426692398ac816c520b8d0e9d234330df05ac75331f0a6",
-    ),
-    (
-        "frozenlist-1.8.0.dist-info/licenses/LICENSE",
-        "6fd5243e92dd7f98ec69c7ac377728e74905709ff527a5bf98d6d0263c04f5b6",
-    ),
-    (
-        "msgpack-1.2.1.dist-info/licenses/COPYING",
-        "4fbdff42eba4593c16f7a7ea7078883b2b734870a1e2b636284ce2dce62bf4f7",
-    ),
-    (
-        "multidict-6.7.0.dist-info/licenses/LICENSE",
-        "93d11a968e2f0f36373c40811ff6d20e173f58c3cab5884cd6617bbfd795492a",
-    ),
-    (
-        "propcache-0.4.1.dist-info/licenses/LICENSE",
-        "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-    ),
-    (
-        "propcache-0.4.1.dist-info/licenses/NOTICE",
-        "56d6ac6c8105c0a51304c21db060e361af9a8ea0af9a75c239c28b5d13693838",
-    ),
-    (
-        "psutil-7.2.2.dist-info/LICENSE",
-        "c7adc4d5d1337a548b967421f1fbe258b93033a0417708fd6f4e38f8ecbceb80",
-    ),
-    (
-        "pyyaml-6.0.3.dist-info/licenses/LICENSE",
-        "8d3928f9dc4490fd635707cb88eb26bd764102a7282954307d3e5167a577e8a4",
-    ),
-    (
-        "yarl-1.22.0.dist-info/licenses/LICENSE",
-        "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-    ),
-    (
-        "yarl-1.22.0.dist-info/licenses/NOTICE",
-        "56d6ac6c8105c0a51304c21db060e361af9a8ea0af9a75c239c28b5d13693838",
-    ),
+PACKAGED_LICENSE_PATHS = (
+    "puripuly_heart/data/licenses/SCIPY-1.18.0-LICENSE.txt",
+    "puripuly_heart/data/licenses/PYTHON-3.14.7-LICENSE.txt",
+    "scipy/_lib/_uarray/LICENSE",
+    "scipy/fft/_duccfft/LICENSE.md",
+    "scipy/integrate/LICENSE_DOP",
+    "scipy/spatial/qhull_src/COPYING_QHULL.txt",
+    "zeroconf-0.150.0.dist-info/licenses/COPYING",
+    "onnxruntime/LICENSE",
+    "onnxruntime/ThirdPartyNotices.txt",
+    "aiohttp-3.13.2.dist-info/licenses/LICENSE.txt",
+    "aiohttp-3.13.2.dist-info/licenses/vendor/llhttp/LICENSE",
+    "sherpa_onnx-1.13.4.dist-info/licenses/LICENSE",
+    "sounddevice-0.5.5.dist-info/licenses/LICENSE",
+    "charset_normalizer-3.4.4.dist-info/licenses/LICENSE",
+    "cffi-2.0.0.dist-info/licenses/AUTHORS",
+    "cffi-2.0.0.dist-info/licenses/LICENSE",
+    "pyaudiowpatch-0.2.12.8.dist-info/licenses/LICENSE.txt",
+    "frozenlist-1.8.0.dist-info/licenses/LICENSE",
+    "msgpack-1.2.1.dist-info/licenses/COPYING",
+    "multidict-6.7.0.dist-info/licenses/LICENSE",
+    "propcache-0.4.1.dist-info/licenses/LICENSE",
+    "propcache-0.4.1.dist-info/licenses/NOTICE",
+    "psutil-7.2.2.dist-info/LICENSE",
+    "pyyaml-6.0.3.dist-info/licenses/LICENSE",
+    "yarl-1.22.0.dist-info/licenses/LICENSE",
+    "yarl-1.22.0.dist-info/licenses/NOTICE",
 )
 SOXR_LICENSE_SOURCE_PARTS = ("src", "puripuly_heart", "data", "licenses", "COPYING.LGPL-2.1.txt")
 SOXR_MANIFEST_PARTS = ("build", "soxr-release-inputs", "manifest.json")
@@ -459,17 +384,23 @@ def verify_packaged_license_payloads(package_dir: Path) -> list[dict[str, object
     if not root.is_dir():
         raise RuntimeError(f"packaged application directory not found: {package_dir}")
     verified: list[dict[str, object]] = []
-    for relative, expected in PACKAGED_LICENSE_PAYLOADS:
+    for relative in PACKAGED_LICENSE_PATHS:
         path = _package_relative(root, relative)
-        if not path.is_file():
+        try:
+            resolved = path.resolve(strict=True)
+            resolved.relative_to(root)
+        except (OSError, ValueError):
+            raise RuntimeError(f"packaged upstream license payload not found: {relative}") from None
+        if not resolved.is_file() or path.is_symlink():
             raise RuntimeError(f"packaged upstream license payload not found: {relative}")
-        actual = _sha256(path)
-        if actual.lower() != expected.lower():
-            raise RuntimeError(f"packaged upstream license payload sha256 mismatch: {relative}")
+        payload = resolved.read_bytes()
+        if not payload.strip():
+            raise RuntimeError(f"packaged upstream license payload is empty: {relative}")
+        actual = hashlib.sha256(payload).hexdigest()
         verified.append(
             {
                 "path": relative.replace("\\", "/"),
-                "size": path.stat().st_size,
+                "size": len(payload),
                 "sha256": actual,
             }
         )

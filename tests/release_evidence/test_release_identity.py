@@ -244,11 +244,8 @@ def test_verify_packaged_licenses_accepts_matching_tree_and_bundle(tmp_path, mon
     second.write_bytes(b"second-license")
     monkeypatch.setattr(
         identity,
-        "PACKAGED_LICENSE_PAYLOADS",
-        (
-            ("nested\\FIRST.txt", hashlib.sha256(b"first-license").hexdigest()),
-            ("SECOND.txt", hashlib.sha256(b"second-license").hexdigest()),
-        ),
+        "PACKAGED_LICENSE_PATHS",
+        ("nested\\FIRST.txt", "SECOND.txt"),
     )
     _write_soxr_fixture(repo, package)
 
@@ -264,26 +261,60 @@ def test_verify_packaged_licenses_accepts_matching_tree_and_bundle(tmp_path, mon
     }
 
 
-def test_verify_packaged_licenses_rejects_tampered_or_missing_payload(
-    tmp_path, monkeypatch
-) -> None:
+def test_verify_packaged_licenses_rejects_missing_or_empty_payload(tmp_path, monkeypatch) -> None:
     package = tmp_path / "package"
     package.mkdir()
     (package / "KEPT.txt").write_bytes(b"kept-license")
     monkeypatch.setattr(
         identity,
-        "PACKAGED_LICENSE_PAYLOADS",
-        (
-            ("KEPT.txt", hashlib.sha256(b"kept-license").hexdigest()),
-            ("MISSING.txt", hashlib.sha256(b"absent-license").hexdigest()),
-        ),
+        "PACKAGED_LICENSE_PATHS",
+        ("KEPT.txt", "MISSING.txt"),
     )
 
     with pytest.raises(RuntimeError, match="not found"):
         identity.verify_packaged_license_payloads(package)
 
-    (package / "MISSING.txt").write_bytes(b"tampered-license")
-    with pytest.raises(RuntimeError, match="sha256 mismatch"):
+    (package / "MISSING.txt").write_bytes(b" \r\n\t")
+    with pytest.raises(RuntimeError, match="is empty"):
+        identity.verify_packaged_license_payloads(package)
+
+
+def test_verify_packaged_licenses_reports_identity_without_pinning_content(
+    tmp_path, monkeypatch
+) -> None:
+    package = tmp_path / "package"
+    package.mkdir()
+    license_path = package / "LICENSE.txt"
+    license_path.write_bytes(b"updated-license\r\n")
+    monkeypatch.setattr(identity, "PACKAGED_LICENSE_PATHS", ("LICENSE.txt",))
+
+    payloads = identity.verify_packaged_license_payloads(package)
+
+    assert payloads == [
+        {
+            "path": "LICENSE.txt",
+            "size": license_path.stat().st_size,
+            "sha256": hashlib.sha256(license_path.read_bytes()).hexdigest(),
+        }
+    ]
+
+
+def test_verify_packaged_licenses_rejects_path_resolving_outside_package(
+    tmp_path, monkeypatch
+) -> None:
+    package = tmp_path / "package"
+    package.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "LICENSE.txt").write_bytes(b"outside-license")
+    linked = package / "linked"
+    try:
+        linked.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("directory symlinks are unavailable")
+    monkeypatch.setattr(identity, "PACKAGED_LICENSE_PATHS", ("linked/LICENSE.txt",))
+
+    with pytest.raises(RuntimeError, match="not found"):
         identity.verify_packaged_license_payloads(package)
 
 
