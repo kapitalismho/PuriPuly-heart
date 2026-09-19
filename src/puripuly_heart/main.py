@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -331,7 +332,23 @@ def _settings_config_path(args: argparse.Namespace) -> tuple[Path, bool]:
     return default_settings_path(), False
 
 
+def _installer_preference_failure_category(status: object) -> str:
+    value = getattr(status, "value", status)
+    category = str(value).rsplit(".", maxsplit=1)[-1].lower()
+    if category in {
+        "parse_failed",
+        "migration_failed",
+        "backup_failed",
+        "save_failed",
+    }:
+        return category
+    return "unexpected_error"
+
+
 def _run_installer_telemetry_preference(path: Path, action: str) -> int:
+    from puripuly_heart.app.ports.canonical_settings_persistence import (
+        CanonicalSettingsPersistenceError,
+    )
     from puripuly_heart.app.services.installer_telemetry_preference import (
         persist_installer_telemetry_preference,
     )
@@ -339,8 +356,16 @@ def _run_installer_telemetry_preference(path: Path, action: str) -> int:
     try:
         persist_installer_telemetry_preference(path, action == "enable")
         return 0
+    except CanonicalSettingsPersistenceError as exc:
+        category = _installer_preference_failure_category(exc.status)
     except Exception:
-        return 23
+        category = "unexpected_error"
+    print(
+        f"installer_telemetry_preference operation={action} "
+        f"status=failure failure_category={category}",
+        file=sys.stderr,
+    )
+    return 23
 
 
 def main(argv: list[str] | None = None) -> int:
