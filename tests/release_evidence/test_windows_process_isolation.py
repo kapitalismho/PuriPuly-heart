@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import ntpath
+import subprocess
 import sys
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from puripuly_heart.release_evidence.windows_process_isolation import (
     FixtureMessage,
     IsolationThresholds,
     _worker_command,
+    _worker_environment,
     build_blocked_evidence,
     build_fixture_capture_target,
     build_gui_process_retry_action,
@@ -34,6 +36,7 @@ from puripuly_heart.release_evidence.windows_process_isolation import (
     run,
     validate_direct_child_topology,
 )
+from puripuly_heart.runtime_layout import RuntimeLayout
 
 THRESHOLDS = IsolationThresholds(
     target_present_amplitude_min=0.05,
@@ -78,6 +81,60 @@ def test_worker_command_uses_stable_module_name_in_nested_root_process() -> None
     assert command[1:] == ["-m", WORKER_MODULE, "--worker", "target_child"]
     assert Path(command[0]) == Path(getattr(sys, "_base_executable", sys.executable)).resolve()
     assert "__main__" not in command
+
+
+def test_native_worker_environment_supports_nested_runtime_layout_under_isolated_profile(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile = tmp_path / "profile"
+    appdata = profile / "AppData" / "Roaming"
+    localappdata = profile / "AppData" / "Local"
+    layout = RuntimeLayout(
+        host_kind="native",
+        app_resource_root=Path(__file__).resolve().parents[2] / "src",
+        native_runtime_root=Path(sys.base_prefix),
+        host_executable=tmp_path / "PuriPulyHeart.exe",
+        python_executable=Path(sys.executable),
+        user_data_root=localappdata / "puripuly-heart",
+        model_cache_root=localappdata / "puripuly-heart" / "models",
+        log_root=localappdata / "puripuly-heart" / "logs",
+    )
+    monkeypatch.setenv("USERPROFILE", str(profile))
+    monkeypatch.setenv("HOME", str(profile))
+    monkeypatch.setenv("APPDATA", str(appdata))
+    monkeypatch.setenv("LOCALAPPDATA", str(localappdata))
+    monkeypatch.setattr(
+        "puripuly_heart.release_evidence.windows_process_isolation.current_runtime_layout",
+        lambda: layout,
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import json;"
+                "from pathlib import Path;"
+                "from puripuly_heart.runtime_layout import current_runtime_layout;"
+                "layout=current_runtime_layout();"
+                "print(json.dumps({'host_kind':layout.host_kind,"
+                "'home':str(Path.home()),'user_data_root':str(layout.user_data_root)}))"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        env=_worker_environment(tmp_path / "worker"),
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "host_kind": "native",
+        "home": str(profile),
+        "user_data_root": str(localappdata / "puripuly-heart"),
+    }
+
 
 
 def test_topology_contract_rejects_intermediate_launcher() -> None:

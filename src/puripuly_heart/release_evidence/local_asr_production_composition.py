@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import ctypes
 import dataclasses
 import hashlib
 import json
 import os
 import signal
-import subprocess
 import sys
 import time
 import traceback
@@ -39,6 +39,7 @@ from puripuly_heart.core.runtime.local_asr_provider_runtime import (
 )
 from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 
 def _read_audio(path: Path) -> np.ndarray:
@@ -120,13 +121,35 @@ def _snapshot_fact(owner: LocalASRProviderRuntimeOwner) -> dict[str, object]:
 
 
 def _process_present(pid: int) -> bool:
-    result = subprocess.run(
-        ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    return f'"{pid}"' in result.stdout
+    from ctypes import wintypes
+
+    synchronize = 0x00100000
+    wait_object_0 = 0x00000000
+    wait_timeout = 0x00000102
+    error_invalid_parameter = 87
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    handle = kernel32.OpenProcess(synchronize, False, pid)
+    if not handle:
+        error = ctypes.get_last_error()
+        if error == error_invalid_parameter:
+            return False
+        raise ctypes.WinError(error)
+    try:
+        wait_result = kernel32.WaitForSingleObject(handle, 0)
+        if wait_result == wait_timeout:
+            return True
+        if wait_result == wait_object_0:
+            return False
+        raise ctypes.WinError(ctypes.get_last_error())
+    finally:
+        kernel32.CloseHandle(handle)
 
 
 async def _wait_until(predicate, *, timeout: float) -> None:
@@ -438,7 +461,8 @@ async def _execute(
         compose_local_asr_production_evidence
     ),
 ) -> dict[str, object]:
-    if os.name != "nt" or not getattr(sys, "frozen", False):
+    runtime_layout = current_runtime_layout()
+    if os.name != "nt" or runtime_layout.host_kind == "source":
         raise RuntimeError("production composition evidence requires the packaged Windows app")
     model_path = local_gpu_model_path()
     if not model_path.is_file() or not audio_path.is_file():
@@ -471,7 +495,8 @@ async def _execute(
         "status": "running",
         "candidate": candidate,
         "packaged": True,
-        "executable": sys.executable,
+        "host_kind": runtime_layout.host_kind,
+        "executable": str(runtime_layout.host_executable),
         "config_path": str(application.config_path),
         "model": str(model_path),
         "model_sha256": _sha256(model_path),

@@ -92,6 +92,11 @@ function Test-PathWithin {
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $BuildRoot = [System.IO.Path]::GetFullPath($BuildRoot)
+$SoxrBuildEnvironmentPath = if ([System.IO.Path]::IsPathRooted($SoxrBuildEnvironment)) {
+    [System.IO.Path]::GetFullPath($SoxrBuildEnvironment)
+} else {
+    [System.IO.Path]::GetFullPath((Join-Path $repoRoot $SoxrBuildEnvironment))
+}
 $OutputDir = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $OutputDir))
 $allowedBuildRoot = [System.IO.Path]::GetFullPath("C:\d177\native-integration")
 $allowedScratchRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot ".tmp\issue-177-native-integration"))
@@ -102,7 +107,7 @@ if (-not ((Test-PathWithin -Candidate $BuildRoot -Root $allowedBuildRoot) -or (T
 if (-not (Test-PathWithin -Candidate $OutputDir -Root $allowedOutputRoot)) {
     throw "OutputDir must be below $allowedOutputRoot"
 }
-foreach ($required in @($ToolPython, $PinnedInputRoot, $PythonEmbedArchive)) {
+foreach ($required in @($ToolPython, $PinnedInputRoot, $PythonEmbedArchive, $SoxrBuildEnvironmentPath)) {
     if (-not (Test-Path -LiteralPath $required)) {
         throw "Required native build input not found: $required"
     }
@@ -263,7 +268,7 @@ company = "salee"
     ) -WorkingDirectory $repoRoot
 
     $previousProjectEnvironment = $env:UV_PROJECT_ENVIRONMENT
-    $env:UV_PROJECT_ENVIRONMENT = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $SoxrBuildEnvironment))
+    $env:UV_PROJECT_ENVIRONMENT = $SoxrBuildEnvironmentPath
     try {
         & (Join-Path $repoRoot "scripts\ci\prepare-soxr-release-inputs.ps1") -OutputRoot $soxrRoot -PackagedRuntimeRelativeDir "site-packages/soxr"
     } finally {

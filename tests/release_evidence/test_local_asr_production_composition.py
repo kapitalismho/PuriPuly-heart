@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -24,6 +26,18 @@ from puripuly_heart.core.stt.backend import (
 from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.release_evidence import local_asr_production_composition as evidence
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Win32 process handles are required")
+def test_process_present_observes_live_and_exited_process() -> None:
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        assert evidence._process_present(process.pid)
+    finally:
+        process.terminate()
+        process.wait(timeout=10)
+
+    assert not evidence._process_present(process.pid)
 
 
 def _terminal(*, text: str = "transcript", outcome: str = "final") -> STTProviderTurnTerminal:
@@ -222,7 +236,11 @@ def test_runner_rejects_non_packaged_execution_with_report(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    monkeypatch.delattr(evidence.sys, "frozen", raising=False)
+    monkeypatch.setattr(
+        evidence,
+        "current_runtime_layout",
+        lambda: SimpleNamespace(host_kind="source"),
+    )
     report_path = tmp_path / "report.json"
 
     result = evidence.run_local_asr_production_composition(
@@ -238,6 +256,33 @@ def test_runner_rejects_non_packaged_execution_with_report(
     assert report["candidate"] == "candidate-sha"
     assert report["failure_type"] == "RuntimeError"
     assert "packaged Windows app" in report["failure"]
+
+def test_runner_accepts_native_runtime_layout_before_validating_assets(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    report_path = tmp_path / "report.json"
+    monkeypatch.setattr(evidence, "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(
+        evidence,
+        "current_runtime_layout",
+        lambda: SimpleNamespace(
+            host_kind="native",
+            host_executable=tmp_path / "PuriPulyHeart.exe",
+        ),
+    )
+    monkeypatch.setattr(evidence, "local_gpu_model_path", lambda: tmp_path / "missing-model")
+
+    result = evidence.run_local_asr_production_composition(
+        audio_path=tmp_path / "missing-speech.wav",
+        report_path=report_path,
+        candidate="candidate-sha",
+        expected_gpu_name="RX 7900 XTX",
+    )
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert result == 1
+    assert report["failure_type"] == "FileNotFoundError"
 
 
 def test_execute_defaults_to_the_package_evidence_composition_factory() -> None:

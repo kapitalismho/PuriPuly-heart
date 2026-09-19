@@ -472,6 +472,10 @@ def _worker_environment(runtime_dir: Path) -> dict[str, str]:
     }
     layout = current_runtime_layout()
     if layout.host_kind == "native":
+        for name in ("USERPROFILE", "HOME", "APPDATA", "LOCALAPPDATA"):
+            value = os.environ.get(name)
+            if value:
+                environment[name] = value
         return layout.python_child_environment(environment)
     source_root = str(Path(__file__).resolve().parents[2])
     environment["PYTHONPATH"] = os.pathsep.join((source_root, sysconfig.get_paths()["purelib"]))
