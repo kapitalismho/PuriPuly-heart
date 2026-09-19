@@ -235,6 +235,7 @@ class OverlayGenerationStartOwner:
                 ),
                 "bridge_url": bridge.url,
                 "bridge_messages": bridge.messages,
+                "bridge_messages_authenticated": True,
                 "session_token": bridge.session_token,
                 "locale": effects.locale(),
                 "log_dir": effects.log_dir(),

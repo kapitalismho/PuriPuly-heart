@@ -494,9 +494,20 @@ Future<String?> runPython({
   required Map<String, String> environmentVariables,
   required List<String> args,
 }) async {
+  var encodedProductArgs =
+      environmentVariables.remove("PURIPULY_HEART_NATIVE_ARGV_JSON");
+  if (encodedProductArgs == null) {
+    throw StateError("Native product argv transport is missing");
+  }
+  var decodedProductArgs = jsonDecode(encodedProductArgs);
+  if (decodedProductArgs is! List ||
+      decodedProductArgs.any((value) => value is! String)) {
+    throw const FormatException("Invalid native product argv payload");
+  }
+  var productArgs = decodedProductArgs.cast<String>();
   var script = pythonScript
       .replaceAll('{module_name}', jsonEncode(moduleName))
-      .replaceAll('{argv}', jsonEncode(["PuriPulyHeart", ...args]))
+      .replaceAll('{argv}', jsonEncode(productArgs))
       .replaceAll('{host_executable}', jsonEncode(Platform.resolvedExecutable))
       .replaceAll('{error_exit_code}', errorExitCode.toString());
   var completer = Completer<String?>();

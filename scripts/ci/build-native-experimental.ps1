@@ -283,6 +283,7 @@ company = "salee"
     ) -WorkingDirectory $repoRoot
 
     Copy-Tree -Source (Join-Path $repoRoot "src\puripuly_heart") -Destination (Join-Path $artifactRoot "app\puripuly_heart")
+    Copy-Tree -Source (Join-Path $repoRoot "prompts") -Destination (Join-Path $artifactRoot "app\prompts")
     Get-ChildItem -LiteralPath (Join-Path $artifactRoot "app") -Directory -Filter "__pycache__" -Recurse | Remove-Item -Recurse -Force
     Get-ChildItem -LiteralPath (Join-Path $artifactRoot "app") -File -Filter "*.pyc" -Recurse | Remove-Item -Force
     Copy-Item -LiteralPath (Join-Path $repoRoot "native\windows_host\product_bootstrap.py") -Destination (Join-Path $artifactRoot "app\product_bootstrap.py") -Force

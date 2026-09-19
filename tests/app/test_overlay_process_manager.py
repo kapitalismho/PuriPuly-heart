@@ -2185,10 +2185,45 @@ async def test_overlay_process_manager_does_not_accept_overlay_ready_from_bridge
 
 
 @pytest.mark.asyncio
-async def test_lifecycle_events_retain_process_pipe_trust_origin() -> None:
+async def test_authenticated_bridge_shutdown_ack_requires_process_exit_for_completion() -> None:
+    process = FakeOverlayManagedProcess()
+    bridge_messages: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+
+    async def request_shutdown() -> None:
+        await bridge_messages.put(
+            {
+                "type": "shutdown_ack",
+                "overlay_instance_id": manager.overlay_instance_id,
+            }
+        )
+        process._exit_future.set_result(0)
+
+    manager = OverlayProcessManager(
+        bridge_messages=bridge_messages,
+        bridge_messages_authenticated=True,
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=0.2,
+        selected_target="desktop",
+    )
+    manager.state = "connected"
+    manager._process = process
+
+    await manager.stop()
+
+    receipt = manager.shutdown_receipt()
+    assert receipt["acknowledged"] is True
+    assert receipt["exit_confirmed"] is True
+    assert receipt["graceful_completed"] is True
+    assert receipt["forced"] is False
+    assert receipt["cleanup_succeeded"] is True
+    assert manager.state == "off"
+
+
+@pytest.mark.asyncio
+async def test_lifecycle_events_distinguish_authenticated_and_untrusted_origins() -> None:
     manager = OverlayProcessManager(overlay_instance_id="overlay-current")
     payload = {
-        "type": "shutdown_complete",
+        "type": "shutdown_ack",
         "overlay_instance_id": "overlay-current",
     }
 
@@ -2200,6 +2235,17 @@ async def test_lifecycle_events_retain_process_pipe_trust_origin() -> None:
         allow_ready=False,
     )
     assert manager.shutdown_receipt()["acknowledged"] is False
+
+    await manager._handle_lifecycle_event(
+        OverlayProcessEvent(
+            payload=payload,
+            trust_origin="authenticated_bridge_reverse",
+        ),
+        allow_ready=False,
+    )
+    assert manager.shutdown_receipt()["acknowledged"] is True
+
+    manager._shutdown_acknowledged = False
 
     await manager._handle_lifecycle_event(
         OverlayProcessEvent(

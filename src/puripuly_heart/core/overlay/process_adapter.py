@@ -44,11 +44,11 @@ _KNOWN_PROCESS_EVENT_TYPES = (
 @dataclass(frozen=True, slots=True)
 class OverlayProcessEvent:
     payload: object
-    trust_origin: Literal["process_pipe", "bridge_reverse"]
+    trust_origin: Literal["process_pipe", "bridge_reverse", "authenticated_bridge_reverse"]
 
     @property
     def trusted_process_event(self) -> bool:
-        return self.trust_origin == "process_pipe"
+        return self.trust_origin in {"process_pipe", "authenticated_bridge_reverse"}
 
 
 class _BoundedProcessEventQueue:

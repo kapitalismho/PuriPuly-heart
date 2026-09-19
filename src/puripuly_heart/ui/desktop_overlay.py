@@ -996,6 +996,12 @@ class FletDesktopRendererWindow:
             if not ready_task.done():
                 ready_task.cancel()
             await asyncio.gather(ready_task, return_exceptions=True)
+        if self._preview_catalog is not None and self._page is not None:
+            await asyncio.wait_for(
+                invoke_control_method(self._page.window, "wait_until_ready_to_show"),
+                timeout=self._wait_until_ready_timeout_s,
+            )
+            await self._show_configured_window()
 
     async def run_until_closed(self) -> None:
         task = self._app_task
@@ -2921,6 +2927,13 @@ class DesktopOverlayRenderer:
             if self._shutdown_complete:
                 return
             self._shutdown_event.set()
+            with contextlib.suppress(Exception):
+                await self._emit_lifecycle(
+                    {
+                        "type": "shutdown_ack",
+                        "overlay_instance_id": self.manifest.overlay_instance_id,
+                    }
+                )
 
             window_closed = False
             try:
@@ -2930,12 +2943,13 @@ class DesktopOverlayRenderer:
             else:
                 window_closed = True
             if window_closed:
-                await self._emit_lifecycle(
-                    {
-                        "type": "shutdown_complete",
-                        "overlay_instance_id": self.manifest.overlay_instance_id,
-                    }
-                )
+                with contextlib.suppress(Exception):
+                    await self._emit_lifecycle(
+                        {
+                            "type": "shutdown_complete",
+                            "overlay_instance_id": self.manifest.overlay_instance_id,
+                        }
+                    )
 
             websocket = self._websocket
             self._websocket = None

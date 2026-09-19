@@ -5741,6 +5741,91 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
 
 
 @pytest.mark.asyncio
+async def test_desktop_overlay_acknowledges_shutdown_before_destroying_window() -> None:
+    sequence: list[str] = []
+
+    class OrderedLifecycleSink(RecordingLifecycleSink):
+        async def emit(self, event: dict[str, object]) -> None:
+            sequence.append(str(event["type"]))
+            await super().emit(event)
+
+    class OrderedRendererWindow(FakeRendererWindow):
+        async def close(self) -> None:
+            sequence.append("window_close")
+            await super().close()
+
+    sink = OrderedLifecycleSink()
+    window = OrderedRendererWindow()
+    renderer = desktop_overlay.DesktopOverlayRenderer(
+        _manifest(),
+        window=window,
+        lifecycle_sink=sink,
+        parent_monitor=FakeParentMonitor(),
+    )
+
+    await renderer.shutdown()
+
+    assert sequence == ["shutdown_ack", "window_close", "shutdown_complete"]
+    assert sink.events == [
+        {
+            "type": "shutdown_ack",
+            "overlay_instance_id": "desktop-overlay-test",
+        },
+        {
+            "type": "shutdown_complete",
+            "overlay_instance_id": "desktop-overlay-test",
+        },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_lifecycle_transport_failures_do_not_bypass_cleanup() -> None:
+    class FailingLifecycleSink:
+        def __init__(self) -> None:
+            self.attempts: list[str] = []
+
+        async def emit(self, event: dict[str, object]) -> None:
+            self.attempts.append(str(event["type"]))
+            raise ConnectionError("lifecycle sink is unavailable")
+
+    class BrokenWebsocket:
+        def __init__(self) -> None:
+            self.send_calls = 0
+            self.close_calls = 0
+
+        async def send(self, _payload: str) -> None:
+            self.send_calls += 1
+            raise ConnectionError("websocket is unavailable")
+
+        async def close(self) -> None:
+            self.close_calls += 1
+
+    sink = FailingLifecycleSink()
+    websocket = BrokenWebsocket()
+    window = FakeRendererWindow()
+    diagnostic_port = RecordingRendererDiagnosticPort()
+    parent_monitor = ClosableFakeParentMonitor()
+    renderer = desktop_overlay.DesktopOverlayRenderer(
+        _manifest(),
+        window=window,
+        lifecycle_sink=sink,
+        parent_monitor=parent_monitor,
+        diagnostic_port=diagnostic_port,
+    )
+    renderer._websocket = websocket
+
+    await renderer.shutdown()
+
+    assert sink.attempts == ["shutdown_ack", "shutdown_complete"]
+    assert websocket.send_calls == 2
+    assert websocket.close_calls == 1
+    assert window.close_calls == 1
+    assert diagnostic_port.closed is True
+    assert parent_monitor.close_calls == 1
+    assert renderer.is_shutdown is True
+
+
+@pytest.mark.asyncio
 async def test_desktop_overlay_parent_monitor_loss_reports_error_and_shutdown_is_idempotent() -> (
     None
 ):
