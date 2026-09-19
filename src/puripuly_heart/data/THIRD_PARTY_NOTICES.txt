@@ -21,9 +21,9 @@ Runtime/bundled notice-sensitive components:
 - soxr / libsoxr: LGPL-2.1-or-later. Windows releases include the LGPL compliance bundle described below. The source-tree license text is `src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt`; installed releases stage it under the soxr compliance bundle.
 - python-zeroconf 0.150.0 and its Windows native extension modules: LGPL-2.1-or-later. The exact PyPI source distribution is included in the installed LGPL source bundle described below.
 - certifi: MPL-2.0.
-- NumPy and SciPy binary wheels bundle OpenBLAS, LAPACK, and compiler runtime notices. NumPy carries its wheel-provided notices in the packaged distribution; SciPy's exact wheel-provided license bundle is included under `puripuly_heart\data\licenses\SCIPY-1.18.0-LICENSE.txt`.
+- NumPy and SciPy binary wheels bundle OpenBLAS, LAPACK, and compiler runtime notices. NumPy carries its wheel-provided notices in the packaged distribution; SciPy's wheel-provided license bundle is included under `puripuly_heart\data\licenses\SCIPY-1.18.0-LICENSE.txt`.
 - CPython 3.12.10: the official distribution LICENSE.txt is packaged under `puripuly_heart\data\licenses\PYTHON-3.12.10-LICENSE.txt`.
-- Native Python wheels: their exact locked LICENSE, COPYING, NOTICE, AUTHORS, and third-party notice payloads are retained under their upstream package or `.dist-info` paths as detailed below.
+- Native Python wheels: LICENSE, COPYING, NOTICE, AUTHORS, and third-party notice payloads from the locked distributions are retained under their upstream package or `.dist-info` paths as detailed below.
 - sounddevice 0.5.5: releases retain its standard PortAudio runtime and upstream license metadata, but intentionally omit the ASIO-only DLL. `SD_ENABLE_ASIO=1` is unsupported in this distribution.
 - OpenVR runtime DLL: BSD-3-Clause.
 - llama.cpp CPU and Vulkan runtime: MIT.
@@ -223,14 +223,13 @@ SciPy 1.18.0, OpenBLAS, LAPACK, and GCC runtime
 Wheel: https://files.pythonhosted.org/packages/2b/54/9a9edb45345bd6744da5ddfb6628e5d5185920494c6a67ec45b6381004cb/scipy-1.18.0-cp312-cp312-win_amd64.whl
 Wheel SHA-256: 71ccc8faa2dd16ac310233203474a8b5cb67f10dedd54a3116d34943f4b19132
 License member: scipy-1.18.0.dist-info/LICENSE.txt
-License member SHA-256: f0f5c56b298ec9795df1199edc328a987242716d14a1bde6813112e22dc15f99
 Packaged license path: puripuly_heart\data\licenses\SCIPY-1.18.0-LICENSE.txt
 
 The packaged SciPy native modules and
 scipy.libs\libscipy_openblas-197ee2fc9b4d071f7e048078cac74115.dll
-come from the exact CPython 3.12 Windows wheel pinned in uv.lock. The
-packaged license file is the wheel's complete LICENSE.txt member, preserved
-verbatim. It includes the notices and full license text the wheel supplies for
+come from the CPython 3.12 Windows wheel pinned in uv.lock. The packaged
+license file contains the wheel's complete LICENSE.txt member. It includes
+the notices and full license text the wheel supplies for
 SciPy and, depending on the wheel build, its bundled OpenBLAS, LAPACK, and GCC
 runtime components, including the GCC Runtime Library Exception. The wheel's
 additional component-specific license files under `scipy\_lib`,
@@ -243,12 +242,11 @@ CPython 3.12.10 runtime
 Distribution archive: https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip
 Distribution archive SHA-256: 4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3
 License member: LICENSE.txt
-License member SHA-256: e502c6b880ff58d614901495a9009c136539cd0b1e2a2abb8fc00b934c203419
 Packaged license path: puripuly_heart\data\licenses\PYTHON-3.12.10-LICENSE.txt
 
-The official embedded distribution's runtime members are byte-identical to
-the CPython 3.12.10 runtime files collected by the Windows build. Its complete
-LICENSE.txt is preserved verbatim at the packaged path above.
+The Windows build collects the CPython 3.12.10 runtime members from the
+official embedded distribution. Its complete LICENSE.txt is included at the
+packaged path above.
 
 ----
 
@@ -278,7 +276,7 @@ NOTICE, and AUTHORS payloads at the original `.dist-info` paths:
 
 ONNX Runtime 1.28.0 supplies its license payloads in the package directory
 rather than `.dist-info`. Packaging therefore also retains
-`onnxruntime\LICENSE` and `onnxruntime\ThirdPartyNotices.txt` verbatim.
+`onnxruntime\LICENSE` and `onnxruntime\ThirdPartyNotices.txt`.
 
 The standard sounddevice runtime
 `_sounddevice_data\portaudio-binaries\libportaudio64bit.dll` is retained.

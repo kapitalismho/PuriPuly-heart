@@ -32,10 +32,12 @@ RELEASE_URL = f"https://github.com/ggml-org/llama.cpp/releases/tag/{LLAMA_CPP_BU
 DOWNLOAD_BASE_URL = f"https://github.com/ggml-org/llama.cpp/releases/download/{LLAMA_CPP_BUILD}"
 PACKAGED_RUNTIME_RELATIVE_DIR = Path("_runtime") / LLAMA_CPP_RUNTIME_DIRNAME
 PROVENANCE_RELATIVE_DIR = Path("third_party") / "llama.cpp"
-LICENSE_SHA256 = "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
-LICENSE_SIZE = 1078
-README_SHA256 = "330ed9a36deb19c7bc8cef37b0d471e9fa73b597b6687d3d9a6131fe2c4acf01"
-README_SIZE = 495
+PROVENANCE_FILENAMES = ("LICENSE", "README.md")
+LICENSE_REQUIRED_MARKERS = (
+    "MIT License",
+    "Permission is hereby granted, free of charge",
+    'THE SOFTWARE IS PROVIDED "AS IS"',
+)
 KNOWN_MODEL_FILENAMES = {
     "gemma-4-e4b-it-qat-ud-q4_k_xl.gguf",
     "mtp-gemma-4-e4b-it.gguf",
@@ -325,17 +327,64 @@ def _validate_runtime_tree(manifest_path: Path, runtime_root: Path) -> dict[str,
     return manifest
 
 
-def _fixed_provenance() -> dict[str, dict[str, int | str]]:
-    return {
-        "LICENSE": {"size": LICENSE_SIZE, "sha256": LICENSE_SHA256},
-        "README.md": {"size": README_SIZE, "sha256": README_SHA256},
-    }
+def _read_provenance_text(path: Path, *, label: str) -> str:
+    if not path.is_file() or path.is_symlink():
+        raise RuntimeError(f"{label} not found: {path}")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RuntimeError(f"{label} is not readable UTF-8 text: {path}") from exc
+    if not text.strip():
+        raise RuntimeError(f"{label} is empty: {path}")
+    return text
+
+
+def _validate_provenance_content(provenance_root: Path) -> None:
+    license_text = _read_provenance_text(
+        provenance_root / "LICENSE",
+        label="llama.cpp license",
+    )
+    for marker in LICENSE_REQUIRED_MARKERS:
+        if marker not in license_text:
+            raise RuntimeError(f"llama.cpp license is missing required text: {marker}")
+    readme = _read_provenance_text(
+        provenance_root / "README.md",
+        label="llama.cpp provenance README",
+    )
+    for expected in (LLAMA_CPP_BUILD, LLAMA_CPP_COMMIT, RELEASE_URL):
+        if expected not in readme:
+            raise RuntimeError(f"llama.cpp provenance README is missing identity: {expected}")
+
+
+def _provenance_identity(provenance_root: Path) -> dict[str, dict[str, int | str]]:
+    return {name: _file_identity(provenance_root / name) for name in PROVENANCE_FILENAMES}
+
+
+def _manifest_provenance(manifest: dict[str, object]) -> dict[str, dict[str, int | str]]:
+    provenance = manifest.get("provenance")
+    if not isinstance(provenance, dict) or set(provenance) != set(PROVENANCE_FILENAMES):
+        raise RuntimeError("llama.cpp package manifest provenance identity mismatch")
+    normalized: dict[str, dict[str, int | str]] = {}
+    for name in PROVENANCE_FILENAMES:
+        identity = provenance.get(name)
+        if not isinstance(identity, dict) or set(identity) != {"size", "sha256"}:
+            raise RuntimeError("llama.cpp package manifest provenance identity mismatch")
+        size = identity.get("size")
+        sha256 = identity.get("sha256")
+        if (
+            isinstance(size, bool)
+            or not isinstance(size, int)
+            or size <= 0
+            or not isinstance(sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", sha256) is None
+        ):
+            raise RuntimeError("llama.cpp package manifest provenance identity mismatch")
+        normalized[name] = {"size": size, "sha256": sha256}
+    return normalized
 
 
 def _validate_packaged_provenance(manifest: dict[str, object], provenance_root: Path) -> None:
-    expected = _fixed_provenance()
-    if manifest.get("provenance") != expected:
-        raise RuntimeError("llama.cpp package manifest provenance identity mismatch")
+    expected = _manifest_provenance(manifest)
     actual_entries = list(provenance_root.iterdir()) if provenance_root.is_dir() else []
     if {path.name for path in actual_entries} != set(expected) or any(
         not path.is_file() or path.is_symlink() for path in actual_entries
@@ -348,29 +397,13 @@ def _validate_packaged_provenance(manifest: dict[str, object], provenance_root: 
             sha256=str(identity["sha256"]),
             label=f"packaged llama.cpp provenance {name}",
         )
+    _validate_provenance_content(provenance_root)
 
 
 def _validate_provenance(repo_root: Path) -> dict[str, dict[str, int | str]]:
     provenance_root = repo_root / PROVENANCE_RELATIVE_DIR
-    license_path = provenance_root / "LICENSE"
-    readme_path = provenance_root / "README.md"
-    _validate_identity(
-        license_path,
-        size=LICENSE_SIZE,
-        sha256=LICENSE_SHA256,
-        label="llama.cpp license",
-    )
-    _validate_identity(
-        readme_path,
-        size=README_SIZE,
-        sha256=README_SHA256,
-        label="llama.cpp provenance README",
-    )
-    readme = readme_path.read_text(encoding="utf-8")
-    for expected in (LLAMA_CPP_BUILD, LLAMA_CPP_COMMIT, RELEASE_URL):
-        if expected not in readme:
-            raise RuntimeError(f"llama.cpp provenance README is missing identity: {expected}")
-    return _fixed_provenance()
+    _validate_provenance_content(provenance_root)
+    return _provenance_identity(provenance_root)
 
 
 def prepare_runtime(repo_root: Path, cache_dir: Path, output_root: Path) -> dict[str, object]:

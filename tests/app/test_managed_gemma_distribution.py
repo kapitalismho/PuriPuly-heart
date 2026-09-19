@@ -64,6 +64,17 @@ def _write_package(package_root: Path) -> None:
     )
 
 
+def _refresh_manifest_provenance(package_root: Path) -> None:
+    runtime_root = package_root / distribution.PACKAGED_RUNTIME_RELATIVE_DIR
+    manifest_path = runtime_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    provenance_root = package_root / distribution.PROVENANCE_RELATIVE_DIR
+    manifest["provenance"] = {
+        name: _identity(provenance_root / name) for name in distribution.PROVENANCE_FILENAMES
+    }
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def test_runtime_archive_stages_only_server_dependency_closure(tmp_path: Path) -> None:
     contract = distribution.ArchiveContract(
         backend="cpu",
@@ -166,13 +177,13 @@ def test_package_verifier_rejects_model_anywhere_in_installed_tree(tmp_path: Pat
         {},
         {
             "../../LICENSE": {
-                "size": distribution.LICENSE_SIZE,
-                "sha256": distribution.LICENSE_SHA256,
+                "size": 1,
+                "sha256": "0" * 64,
             }
         },
     ],
 )
-def test_package_verifier_requires_fixed_provenance(
+def test_package_verifier_requires_valid_provenance_manifest(
     tmp_path: Path, provenance: dict[str, object]
 ) -> None:
     _write_package(tmp_path)
@@ -182,6 +193,29 @@ def test_package_verifier_requires_fixed_provenance(
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(RuntimeError, match="provenance identity mismatch"):
+        distribution.verify_package(tmp_path)
+
+
+def test_package_verifier_accepts_provenance_line_ending_changes(tmp_path: Path) -> None:
+    _write_package(tmp_path)
+    provenance_root = tmp_path / distribution.PROVENANCE_RELATIVE_DIR
+    for name in distribution.PROVENANCE_FILENAMES:
+        path = provenance_root / name
+        path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+    _refresh_manifest_provenance(tmp_path)
+
+    result = distribution.verify_package(tmp_path)
+
+    assert result["backends"] == ["cpu", "vulkan"]
+
+
+def test_package_verifier_rejects_license_without_required_text(tmp_path: Path) -> None:
+    _write_package(tmp_path)
+    license_path = tmp_path / distribution.PROVENANCE_RELATIVE_DIR / "LICENSE"
+    license_path.write_text("MIT License\n", encoding="utf-8")
+    _refresh_manifest_provenance(tmp_path)
+
+    with pytest.raises(RuntimeError, match="license is missing required text"):
         distribution.verify_package(tmp_path)
 
 
@@ -367,14 +401,15 @@ def test_release_paths_prepare_verify_and_install_pinned_runtime_without_gemma_d
         assert forbidden not in installer
 
 
-def test_llama_cpp_license_and_notice_are_shipped_from_pinned_provenance() -> None:
+def test_llama_cpp_license_and_notice_have_required_provenance() -> None:
     license_path = ROOT / distribution.PROVENANCE_RELATIVE_DIR / "LICENSE"
     notice = (ROOT / "src" / "puripuly_heart" / "data" / "THIRD_PARTY_NOTICES.txt").read_text(
         encoding="utf-8"
     )
 
-    license_bytes = license_path.read_bytes()
-    assert b"\r\n" not in license_bytes
-    assert hashlib.sha256(license_bytes).hexdigest() == distribution.LICENSE_SHA256
+    provenance = distribution._validate_provenance(ROOT)
+    license_text = license_path.read_text(encoding="utf-8")
+    assert set(provenance) == set(distribution.PROVENANCE_FILENAMES)
+    assert all(marker in license_text for marker in distribution.LICENSE_REQUIRED_MARKERS)
     assert "llama.cpp CPU and Vulkan runtime" in notice
     assert distribution.LLAMA_CPP_COMMIT in notice
