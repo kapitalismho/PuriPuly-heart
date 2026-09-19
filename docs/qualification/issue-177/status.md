@@ -63,6 +63,8 @@ The authorized integration incorporates `dev@5ae8fb9e07aa5c73cf923838982dc27b803
 
 Merged-source focused release-identity, llama.cpp distribution, overlay/layout and UI tests passed (two integration skips). The actual merged license CLI passed against the retained C package and its original soxr staging inputs: 26 license payloads, source bundle SHA-256 `159af704190e6c0f604e3d0c11f0b6a92f3ef082caf103cc8a187156dd42d50e`. This checks the new verifier against an identified existing package; it does not claim that package was rebuilt from the merged source.
 
+The integrated candidate `e04cc2b6dce21bad20b2004668bcfc81aa87cc6f` passed the full suite with 6,051 passed, 37 skipped, zero failures/errors (6,088 collected; 196.079 seconds). The run used explicit isolated profile/app-data/temp roots under `C:/c177/merge-validation`. JUnit: `.tmp/issue-177-merge/e04cc2b6-suite.xml`, SHA-256 `46cc739d518d46f2ced6316086764b0fe835a0a3e234707194860e0681d20837`. Native product-host experiments proceed only in separate ignored scratch while the committed repair/integration candidate is reviewed.
+
 ## Architecture and release disposition
 
 The application/core/provider owners, native workers, protocols and Inno authority remain in place. The intended architectural change is a small immutable execution/layout boundary, plus on-demand shutdown diagnostics on the existing shutdown owner. No backend service, global process supervisor, settings-schema migration, user-data relocation or native packaging cutover is authorized by this record. Independent review must assess implementation against that boundary.
