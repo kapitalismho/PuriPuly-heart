@@ -1,0 +1,281 @@
+{
+  "schema": "PSEM-ISSUE-164-GT-SOLO-CONTRAST-RESULT-1",
+  "status": "material_stages_1_6_complete_original_report_failed_cpu_report_repaired",
+  "scope": "One controlled FIT-balanced solo-CE contrast on the unchanged student. Not issue164 completion, not production, not KD, not architecture verdict, not generalization, not an adoption or branch decision.",
+  "adoption": null,
+  "branch_decision": null,
+  "issue164_open": true,
+  "summary": "Material stages import-prepared, initial, train pause-2, train resume-780, CAL, and final completed at executed commit 1495ff155a811bc1d0958ca27846c6b9091d98b2 with frozen config e904b17d21d7fd39f09052bc94cc4c7068b4496cd70f32db9c879c33fe706064 and gt_pilot.py bc1fb5aabc4ec38c1dde51efec575e054710344f610d80edf1b2dce134bf91be. This run performed 780 optimizer updates with 0 uncertain updates. Prior cumulative 803 plus this run 780 equals cumulative 1583, which is not 780. The original stage-7 report command omitted --authorize-material and the then-current reporter required it plus an absent check_receipt; that attempt remains exit 1 and was not retried. A separately authorized CPU metadata report at reporter commit b11e3414109b3bb4a7e788f5a8a5fc4e7a5e3715 / gt_pilot.py 89577e61a758788dafba7822b861502422d9c672d21206b1208dee3a6a97c14a then aggregated existing receipts using RUNROOT/frozen_config.json with HIP_VISIBLE_DEVICES=-1 and empty CUDA_VISIBLE_DEVICES, exit 0. CAL selected checkpoint step 780 (not 390). Independent contrast analysis may use retained logits and accounting without this result.json. No claim that all seven original recipe commands exited 0.",
+  "identity": {
+    "authority_id": "AUTONOMY-2",
+    "experiment_id": "GT-SOLO-CONTRAST-1",
+    "material_release_id": "GT-SOLO-CONTRAST-1-GO",
+    "report_release_id": "GT-SOLO-CONTRAST-REPORT-1-GO",
+    "run_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1",
+    "executed_commit": "1495ff155a811bc1d0958ca27846c6b9091d98b2",
+    "executed_gt_pilot_sha256": "bc1fb5aabc4ec38c1dde51efec575e054710344f610d80edf1b2dce134bf91be",
+    "reporter_commit": "b11e3414109b3bb4a7e788f5a8a5fc4e7a5e3715",
+    "reporter_gt_pilot_sha256": "89577e61a758788dafba7822b861502422d9c672d21206b1208dee3a6a97c14a",
+    "frozen_config_sha256": "e904b17d21d7fd39f09052bc94cc4c7068b4496cd70f32db9c879c33fe706064",
+    "student_py_sha256": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d",
+    "contract_path": "experiments/psem_streaming_student/.stage-control/autonomous-research/gt-solo-contrast-contract.json",
+    "contract_sha256": "7fbd4cad03a30c9baf1efe9045a5f7b532b1c557fa6d5cd9a3f08c5354a0de18",
+    "adjudication_path": "experiments/psem_streaming_student/.stage-control/autonomous-research/gt-solo-contrast-report-adjudication.json",
+    "adjudication_sha256": "7ba8b108a449813467eeae41e35cd79f946fc404ef48044b5f8ce3a696211ba2",
+    "seed": 20260915,
+    "student_parameters": 5940740,
+    "objective": "activity_bce_plus_fit_balanced_solo_ce"
+  },
+  "optimizer_step_accounting": {
+    "this_run_actual_updates": 780,
+    "uncertain_updates": 0,
+    "prior_cumulative": 803,
+    "cumulative": 1583,
+    "maximum_cumulative": 1583,
+    "distinct_from_this_run": "cumulative 1583 is prior 803 plus this run 780; do not treat 780 as the lifetime total"
+  },
+  "selection": {
+    "rule": "lowest canonical masked BCE on CAL only; earliest step on exact ties",
+    "selected_step": 780,
+    "selected_cal_masked_bce": 0.3130510449409485,
+    "selected_checkpoint_sha256": "125d8d8ecd5f9434d5d13153fd3e2608720f5bd9777ed09dbe0601d0e11a1c2c",
+    "candidate_cal_masked_bce": {
+      "78": 0.49421024322509766,
+      "390": 0.32248979806900024,
+      "780": 0.3130510449409485
+    },
+    "note": "Selected step is 780, not the original BCE-control selected 390."
+  },
+  "prepare": {
+    "stage": "import_prepared",
+    "prepared_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+    "origin_prepared_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+    "origin_config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+    "new_waveform_preparation": false,
+    "hardlink": false,
+    "check_receipt_present": false
+  },
+  "same_initialization": {
+    "matched_init": true,
+    "max_abs_delta": 0.0,
+    "extra_model_forward": false,
+    "tolerance": 1e-06
+  },
+  "resume_witness": {
+    "completed_updates": 2,
+    "extra_optimizer_updates": 0,
+    "max_abs_logit_delta": 0.0,
+    "tolerance": 0.0001,
+    "precision": "float32"
+  },
+  "selected_final_canonical_masked_bce": {
+    "ami_ES2005a": 0.442709743976593,
+    "ami_ES2006a": 0.41357332468032837,
+    "ami_ES2007a": 0.2379762828350067,
+    "ami_ES2008a": 0.33405470848083496,
+    "ami_ES2009d": 0.3671422600746155,
+    "ami_EN2009d": 0.4750925898551941,
+    "raw": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/final_eval.json"
+  },
+  "cost": {
+    "training": {
+      "elapsed_seconds_synchronized": 75.194705648,
+      "peak_reserved_bytes": 320864256,
+      "peak_allocated_bytes": 292840448,
+      "scope": "wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through final checkpoint, including host/device transfers and optimizer updates; excludes that pre-timer setup. Allocator peak reset is after resume restore/witness or after the initial zero-update checkpoint on a fresh train."
+    },
+    "final_inference": {
+      "elapsed_seconds_synchronized": 13.938406131000022,
+      "peak_reserved_bytes": 153092096,
+      "peak_allocated_bytes": 130274816,
+      "scope": "selected-checkpoint source-zero prefix replay over FIT+DEV after model load; timer starts after load, peak reset, and device synchronize; first streamed prefixes are included; not a warmup pass; excludes training; not live 80ms admission or matched teacher cost",
+      "device_source": "final_eval.inference_cost.device",
+      "device": {
+        "backend": "PyTorch ROCm through torch.cuda API",
+        "device": "cuda:0",
+        "name": "AMD Radeon RX 7900 XTX",
+        "total_memory_bytes": 25725259776
+      }
+    },
+    "cpu_report_repair": {
+      "wall_seconds": 8.04,
+      "model_constructors": 0,
+      "model_forwards": 0,
+      "backwards": 0,
+      "optimizer_updates": 0,
+      "GPU_use": false,
+      "scope": "WSL metadata aggregation of existing JSON/checkpoint hashes with HIP_VISIBLE_DEVICES=-1 and empty CUDA_VISIBLE_DEVICES; not material evaluation"
+    },
+    "not_claimed": [
+      "live 80ms admission",
+      "matched teacher speedup",
+      "production cost"
+    ]
+  },
+  "stages": {
+    "material_exits": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "original_report_exit": 1,
+    "cpu_report_repair_exit": 0,
+    "do_not_claim_all_seven_original_exits_zero": true,
+    "rows": [
+      {
+        "id": "import-prepared",
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_01_import-prepared.json",
+        "exit": 0
+      },
+      {
+        "id": "evaluate-initial",
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_02_evaluate-initial.json",
+        "exit": 0
+      },
+      {
+        "id": "train-pause-after-2",
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_03_train-pause-after-2.json",
+        "exit": 0,
+        "completed_updates": 2
+      },
+      {
+        "id": "train-resume-780",
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_04_train-resume.json",
+        "exit": 0,
+        "completed_updates": 780,
+        "uncertain_updates": 0
+      },
+      {
+        "id": "evaluate-cal",
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_05_evaluate-cal.json",
+        "exit": 0,
+        "selected_step": 780
+      },
+      {
+        "id": "evaluate-final",
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_06_evaluate-final.json",
+        "exit": 0,
+        "eval_logits_manifest_entries": 16
+      },
+      {
+        "id": "original-report",
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_07_report.json",
+        "exit": 1,
+        "error": "RuntimeError: material prepare/import-prepared/train/evaluate is blocked until Director GO passes --authorize-material",
+        "result_json_written": false,
+        "preserved": true,
+        "sha256": "1d236577b06dca52fe82320ee7931cb2e2ff81b423798b41ad5840671f406e7e"
+      },
+      {
+        "id": "cpu-report-repair",
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/report_only_attempt.json",
+        "exit": 0,
+        "release": "GT-SOLO-CONTRAST-REPORT-1-GO",
+        "not_a_retry_of_material_learning": true
+      }
+    ]
+  },
+  "artifacts": {
+    "result.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/result.json",
+      "sha256": "3a6eafc32452a99a84a9777cfdb39bffb09a88d3c64a4fb866c74ce930a03281",
+      "bytes": 513963
+    },
+    "report_receipt.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/report_receipt.json",
+      "sha256": "c16bf2829097562fb4885c730c07950553a4541d6734e47f9d14f454d1f63b83",
+      "bytes": 2363
+    },
+    "report_only_attempt.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/report_only_attempt.json",
+      "sha256": "6943a47f9747e6f18237f96a1cee7335f2f62731b7a43ee96d0f04c9b674fd16",
+      "bytes": 2602
+    },
+    "report_only_release.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/report_only_release.json",
+      "sha256": "1aa64310881c08477be19c4208f7b115df1d328f4a7d84c41b5116b5382c0906",
+      "bytes": 1358
+    },
+    "frozen_config.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/frozen_config.json",
+      "sha256": "e904b17d21d7fd39f09052bc94cc4c7068b4496cd70f32db9c879c33fe706064",
+      "bytes": 15854
+    },
+    "prepare_receipt.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/prepare_receipt.json",
+      "sha256": "f805127505fbe0e3c4a6088bad0f756853837d1ebe9b3c9a19ec9254a9654fd8",
+      "bytes": 9467
+    },
+    "accounting.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/accounting.json",
+      "sha256": "0b235c75f82ab9b1a1dd2ae7b3adaed37b8098f1dc1ad944b423e5a23036f43a",
+      "bytes": 255786
+    },
+    "cal_selection.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/cal_selection.json",
+      "sha256": "0eb119b8ba54d21f06afdfe29f75643d33aea0484ea4d607daf75b41b5944a33",
+      "bytes": 36825
+    },
+    "final_eval.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/final_eval.json",
+      "sha256": "9bb9c0c8aa53c21d4b56432a0283a15362036cba0f02f1efdaa25be58419f6e8",
+      "bytes": 63698
+    },
+    "initial_eval.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/initial_eval.json",
+      "sha256": "ae7e5a066f0b85a42d3e6cf78585194ba53bbcf9197cdd66f09b92a460d044a7",
+      "bytes": 149307
+    },
+    "eval_logits_manifest.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/eval_logits_manifest.json",
+      "sha256": "8cbf5079aa2070128fb5bb5f5f5e8f4fade4886a2c85ec49d72b4183f3df7ea9",
+      "bytes": 5065,
+      "entries": 16
+    },
+    "execution_identity.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/execution_identity.json",
+      "sha256": "08909fd0ab21c9e364d7d5fa02396c58265e5f521b129ee7ae62d81f1e936ee8",
+      "bytes": 1548
+    },
+    "resume_witness.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/resume_witness.json",
+      "sha256": "eb04228b0a8c0e83773450ce64b58964d85ff8730cb48ce9d449b339320d55d6",
+      "bytes": 140
+    },
+    "stage_07_report.json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1/stage_07_report.json",
+      "sha256": "1d236577b06dca52fe82320ee7931cb2e2ff81b423798b41ad5840671f406e7e",
+      "bytes": 1421,
+      "exit": 1
+    },
+    "checkpoint_sha256": {
+      "checkpoint_latest.pt": "f1394b9c2c83b06d9a6ced50f7f927a0d07e3874359b6317a0107c1756b8a5e3",
+      "checkpoint_step_78.pt": "89afa989b244bb1fe6fbf143cf5e9dc6805f781e6cdd6e565291807a7337a0d2",
+      "checkpoint_step_390.pt": "f615f35c7a98ca8f40e1ba174ebb125e0eba13c956f2ef1080de6b9742beaa5f",
+      "checkpoint_step_780.pt": "125d8d8ecd5f9434d5d13153fd3e2608720f5bd9777ed09dbe0601d0e11a1c2c"
+    }
+  },
+  "no_extra_model_work": {
+    "cpu_report_gpu_or_model_work": false,
+    "HIP_VISIBLE_DEVICES": "-1",
+    "CUDA_VISIBLE_DEVICES": "",
+    "authorize_material": false,
+    "report_receipt_contract": "cpu_metadata_aggregation",
+    "proof": "report_receipt.json gpu_or_model_work false; reporter hip_visible_devices -1; wall 8.04s; no --authorize-material; original failed report not replayed as material"
+  },
+  "limitations": [
+    "80ms frame-grid event proxies cannot resolve sub-frame admission timing",
+    "source-global permutation scoring is oracle diagnostic only",
+    "DEV prefixes are already-exposed directional diagnosis, not a generalization claim",
+    "no live 80ms or matched teacher speedup claim",
+    "report is CPU metadata aggregation of existing receipts; it is not a material model stage",
+    "executed implementation identity is recorded separately from the current reporter",
+    "independent contrast analysis may consume retained logits and accounting without this result.json",
+    "check_stage synthetic metric probes, slot projections, and checkpoint identity probes were not produced by this run",
+    "original seven-stage recipe report failed; a later CPU report is a separate attempt, not evidence that all seven original commands exited 0",
+    "this contrast is not issue164 completion, production evidence, or an adoption/branch decision"
+  ]
+}
