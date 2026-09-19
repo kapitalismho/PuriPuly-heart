@@ -1505,27 +1505,25 @@ class OverlayProcessManager:
     async def _next_shutdown_lifecycle_event(
         self,
         process: OverlayManagedProcess,
-    ) -> object:
+    ) -> tuple[object, ...]:
         if not self.bridge_messages_authenticated or self.bridge_messages is None:
-            return await process.next_event()
+            return (await process.next_event(),)
         process_task = asyncio.create_task(process.next_event())
-        bridge_task = (
-            asyncio.create_task(self.bridge_messages.get())
-            if self.bridge_messages_authenticated and self.bridge_messages is not None
-            else None
-        )
-        tasks = {process_task}
-        if bridge_task is not None:
-            tasks.add(bridge_task)
-        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-        for task in pending:
-            task.cancel()
-        if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
-        if process_task in done:
-            return process_task.result()
-        assert bridge_task is not None
-        return self._bridge_process_event(bridge_task.result())
+        bridge_task = asyncio.create_task(self.bridge_messages.get())
+        tasks = {process_task, bridge_task}
+        try:
+            done, _pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            events: list[object] = []
+            if process_task in done:
+                events.append(process_task.result())
+            if bridge_task in done:
+                events.append(self._bridge_process_event(bridge_task.result()))
+            return tuple(events)
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _request_graceful_shutdown_before_terminate(
         self,
@@ -1638,10 +1636,11 @@ class OverlayProcessManager:
                     break
                 if ack_task is not None and ack_task in done:
                     try:
-                        event = ack_task.result()
+                        events = ack_task.result()
                     except Exception:
                         break
-                    await self._record_shutdown_lifecycle_event(event)
+                    for event in events:
+                        await self._record_shutdown_lifecycle_event(event)
                     acknowledged = self._shutdown_acknowledged
                     ack_task = None
                     if not acknowledged:
@@ -1919,9 +1918,12 @@ class OverlayProcessManager:
         if not event_task.done():
             event_task.cancel()
         results = await asyncio.gather(event_task, return_exceptions=True)
-        event = results[0]
-        if not isinstance(event, BaseException):
-            await self._record_shutdown_lifecycle_event(event)
+        events = results[0]
+        if not isinstance(events, BaseException):
+            if not isinstance(events, tuple):
+                events = (events,)
+            for event in events:
+                await self._record_shutdown_lifecycle_event(event)
         await self._drain_process_events(process)
 
     async def _finish_process_readers(self, process: OverlayManagedProcess) -> None:

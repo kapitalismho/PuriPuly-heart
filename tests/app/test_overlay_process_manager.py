@@ -2220,6 +2220,62 @@ async def test_authenticated_bridge_shutdown_ack_requires_process_exit_for_compl
 
 
 @pytest.mark.asyncio
+async def test_shutdown_lifecycle_wait_preserves_simultaneously_ready_pipe_and_bridge_events() -> (
+    None
+):
+    process = FakeOverlayManagedProcess()
+    bridge_messages: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+    manager = OverlayProcessManager(
+        bridge_messages=bridge_messages,
+        bridge_messages_authenticated=True,
+        overlay_instance_id="overlay-current",
+    )
+    process._events.put_nowait(
+        {
+            "type": "shutdown_complete",
+            "overlay_instance_id": "overlay-current",
+        }
+    )
+    bridge_messages.put_nowait(
+        {
+            "type": "shutdown_ack",
+            "overlay_instance_id": "overlay-current",
+        }
+    )
+
+    events = await manager._next_shutdown_lifecycle_event(process)
+    for event in events:
+        await manager._record_shutdown_lifecycle_event(event)
+
+    assert [event["type"] for event in manager.shutdown_receipt()["stdout_events"]] == [
+        "shutdown_complete",
+        "shutdown_ack",
+    ]
+    assert manager.shutdown_receipt()["acknowledged"] is True
+
+
+@pytest.mark.asyncio
+async def test_cancelled_shutdown_lifecycle_wait_does_not_consume_later_events() -> None:
+    process = FakeOverlayManagedProcess()
+    bridge_messages: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+    manager = OverlayProcessManager(
+        bridge_messages=bridge_messages,
+        bridge_messages_authenticated=True,
+    )
+    waiter = asyncio.create_task(manager._next_shutdown_lifecycle_event(process))
+    await asyncio.sleep(0)
+
+    waiter.cancel()
+    await asyncio.gather(waiter, return_exceptions=True)
+    process._events.put_nowait({"type": "process-later"})
+    bridge_messages.put_nowait({"type": "bridge-later"})
+    await asyncio.sleep(0)
+
+    assert process._events.get_nowait() == {"type": "process-later"}
+    assert bridge_messages.get_nowait() == {"type": "bridge-later"}
+
+
+@pytest.mark.asyncio
 async def test_lifecycle_events_distinguish_authenticated_and_untrusted_origins() -> None:
     manager = OverlayProcessManager(overlay_instance_id="overlay-current")
     payload = {

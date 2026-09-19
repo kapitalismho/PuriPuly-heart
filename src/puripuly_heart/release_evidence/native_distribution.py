@@ -482,10 +482,64 @@ def render_template(
     (lib_root / "python.dart").write_text(dart_bootstrap, encoding="utf-8", newline="\n")
 
     runtime_path = lib_root / "native_runtime.dart"
-    runtime = runtime_path.read_text(encoding="utf-8")
+    runtime = runtime_path.read_text(encoding="utf-8").replace(
+        "import 'dart:io';",
+        "import 'dart:ffi';\nimport 'dart:io';",
+        1,
+    )
     start = runtime.index("Future<String?> runPython({")
     end = runtime.index("\n}\n", start) + 3
-    replacement = """const int errorExitCode = 255;
+    replacement = """typedef _SetEnvironmentVariableWNative = Int32 Function(
+  Pointer<Uint16>,
+  Pointer<Uint16>,
+);
+typedef _SetEnvironmentVariableWDart = int Function(
+  Pointer<Uint16>,
+  Pointer<Uint16>,
+);
+typedef _MallocNative = Pointer<Void> Function(IntPtr);
+typedef _MallocDart = Pointer<Void> Function(int);
+typedef _FreeNative = Void Function(Pointer<Void>);
+typedef _FreeDart = void Function(Pointer<Void>);
+
+void _clearNativeProductArgumentsTransport() {
+  const name = "PURIPULY_HEART_NATIVE_ARGV_JSON";
+  var runtime = DynamicLibrary.open("ucrtbase.dll");
+  var malloc = runtime.lookupFunction<_MallocNative, _MallocDart>("malloc");
+  var free = runtime.lookupFunction<_FreeNative, _FreeDart>("free");
+  var allocation = malloc((name.length + 2) * 2);
+  if (allocation.address == 0) {
+    throw StateError("Could not allocate native argv transport cleanup buffer");
+  }
+  try {
+    var nameBuffer = allocation.cast<Uint16>();
+    var units = nameBuffer.asTypedList(name.length + 2);
+    units.setRange(0, name.length, name.codeUnits);
+    units[name.length] = 0;
+    units[name.length + 1] = 0;
+    var setEnvironmentVariable = DynamicLibrary.open("kernel32.dll")
+        .lookupFunction<
+          _SetEnvironmentVariableWNative,
+          _SetEnvironmentVariableWDart
+        >("SetEnvironmentVariableW");
+    if (setEnvironmentVariable(nameBuffer, nullptr) == 0) {
+      throw StateError("Could not clear native product argv transport");
+    }
+    var emptyBuffer = nameBuffer.elementAt(name.length + 1);
+    var clearRuntimeEnvironment =
+        runtime.lookupFunction<
+          _SetEnvironmentVariableWNative,
+          _SetEnvironmentVariableWDart
+        >("_wputenv_s");
+    if (clearRuntimeEnvironment(nameBuffer, emptyBuffer) != 0) {
+      throw StateError("Could not clear native product argv runtime cache");
+    }
+  } finally {
+    free(allocation);
+  }
+}
+
+const int errorExitCode = 255;
 
 Future<String?> runPython({
   required String moduleName,
@@ -505,6 +559,7 @@ Future<String?> runPython({
     throw const FormatException("Invalid native product argv payload");
   }
   var productArgs = decodedProductArgs.cast<String>();
+  _clearNativeProductArgumentsTransport();
   var script = pythonScript
       .replaceAll('{module_name}', jsonEncode(moduleName))
       .replaceAll('{argv}', jsonEncode(productArgs))
