@@ -32,16 +32,17 @@ Outlined text fields now use `InputBorder` state maps. Normal, focused, error, a
 
 ## Source and visual qualification
 
-All real-window checks ran from an unrelated working directory with isolated configuration roots. Source main UI, source overlay preview, the packaged onedir main UI, the packaged overlay preview, and the installed Unicode-path main UI each opened a real Flet desktop window. Captures showed the application chrome, fonts, icons, Korean dashboard content, debug marker, overlay controls and sample caption. Each owned window was closed through `WM_CLOSE`; its supervised root exited 0. No B-owned process survived. Pre-existing A-owned Flet 0.86 processes were identified separately and left untouched.
+All real-window checks ran from an unrelated working directory with isolated configuration roots. Source main UI, source overlay preview, packaged onedir main UI, and packaged overlay preview each opened a real Flet desktop window. Captures showed the application chrome, fonts, icons, Korean dashboard content, debug marker, overlay controls, and sample caption. Each owned window was closed through `WM_CLOSE`; its supervised root exited 0. No B-owned process survived. The concurrently running production host PID 13440 / Flet PID 3424 was never A-owned and was not touched or used as B evidence. A first-installer A orphan, Flet PID 6900, was separately discovered and closed by the installer owner.
 
-A real Flet 1.0 probe rendered the product border helper in normal, focused, error, and disabled states. The capture showed the normal outline, width-emphasized focused outline, error outline plus error message, and muted disabled outline. Evidence captures and throwaway capture/probe scripts remain outside the repository under `%TEMP%\PuriPulyHeart-B-Flet\`:
+A real Flet 1.0 probe rendered the product border helper in normal, focused, error, and disabled states. The capture showed the normal outline, width-emphasized focused outline, error outline plus error message, and muted disabled outline. Source/package captures and throwaway capture/probe scripts remain outside the repository under `%TEMP%\PuriPulyHeart-B-Flet\`:
 
 - `source-main.png`
 - `overlay-preview.png`
 - `border-states.png`
 - `packaged-main.png`
 - `packaged-overlay.png`
-- `installed-main.png`
+
+The earlier `installed-main.png` was title-selected while another `PuriPuly <3` window existed; it is not used to attribute installed behavior. The replacement installed capture and machine-readable ownership record are `%TEMP%\PuriPulyHeart-B177-VisualRepair\installed-main-path-bound.png` and `installed-main-path-bound.json`.
 
 ## Tests and build
 
@@ -65,9 +66,19 @@ The onedir contains 1,146 files totaling 582,100,047 bytes. Artifact identities:
 
 The production installer and occupied production/smoke identities were never executed or changed. For installed qualification, unchanged `installer.iss` was compiled again with a fresh AppId `{C633B26F-721B-489C-9230-9CBBB5D82643}`, distinct app-data/group/directory names, a distinct `/O` output, and `/DSkipLocalSttProvisioning=1`. The resulting isolated installer is 185,660,909 bytes with SHA-256 `2dc537da6c0074e3e35cb436be3525ab139d155922d75a491824e3a624032a16`.
 
-A current-user very-silent install into Unicode path `...\Programs\PuriPulyHeart-B177-설치-c633b26f` passed and logged the intentional local-model provisioning skip. From `C:\Windows\Temp`, installed `--version` returned `2.7.0`; `gui-startup-check`, `hf-xet-runtime-check`, `local-qwen-runtime-check`, and `soxr-runtime-check` returned 0, with runtime paths resolving inside the Unicode install. The installed real GUI rendered correctly, closed through `WM_CLOSE`, returned 0, and left no B-owned survivor.
+A current-user very-silent install into Unicode path `...\Programs\PuriPulyHeart-B177-설치-c633b26f` passed and logged the intentional local-model provisioning skip. From `C:\Windows\Temp`, installed `--version` returned `2.7.0`; `gui-startup-check`, `hf-xet-runtime-check`, `local-qwen-runtime-check`, and `soxr-runtime-check` returned 0, with runtime paths resolving inside the Unicode install. Those command results remain applicable. Its title-only GUI capture is superseded by the path-bound visual repair below.
 
 Installed telemetry was set OFF through the product command. The owned installed `soxr.dll` was then truncated, the isolated installer was rerun to the same directory, and reinstall restored its exact SHA-256 `f5b759d52304f6d33da18394ed3741288abf0e2ee1b30adad2a8732775f82552` while preserving telemetry OFF. Silent uninstall removed the install directory, isolated app-data root, and fresh AppId registry key; all three tested absent afterward.
+
+### Path-bound installed visual repair
+
+The retained B payload was not rebuilt: `C:\b177\dist\PuriPulyHeart\PuriPulyHeart.exe` still had SHA-256 `ff39bb024ee1604b8bab6bc8f973b27298789a48e2a8b8e644c4b2bc59e56342`. Unchanged `installer.iss` was compiled against that exact payload with fresh AppId `{E60E72D2-157D-4496-B88E-E4E34AC1F131}`, distinct profile/directory/output names, and the same intentional model-download skip. The repair installer is 185,660,886 bytes with SHA-256 `c2d7ccf1ab376c95ae1898703dacf0c7f1dfa7281a97c26f4b5f0af4ade7a509`.
+
+The fresh Unicode install root was `...\Programs\PuriPulyHeart-B177-검증-e60e72d2`. The captured HWND `2034784` belonged exclusively to Flet PID `25108`, image `C:\Users\salee\.flet\client\flet-desktop-full-1.0.0-758f21506fbb\flet\flet.exe`. Its recorded command line names the fresh install's `puripuly_heart\data` directory, and its direct parent was installed host PID `27548`, whose exact image was `...\PuriPulyHeart-B177-검증-e60e72d2\PuriPulyHeart.exe` and whose SHA-256 matched the retained candidate. The verified parent chain is `25108 -> 27548`; no title-only process selection was used.
+
+Before capture, that exact HWND was moved to `(80,100)` to distinguish the run. The inspected 1136x850 PNG is 32,443 bytes with SHA-256 `8f1624c5afca3ce589cdcac810fd56717161a83c3311c791527f000242cc7952`. It visibly shows the full coral four-tile dashboard, material icons and fonts, `DBG`, `Zzz...`, the Korean message prompt, and both Korean-to-English and English-to-Korean rows without clipping or rendering corruption.
+
+After inspection, `WM_CLOSE` was posted to that exact HWND. Flet PID 25108 and installed host PID 27548 both exited normally; the app and capture supervisors returned 0. An earlier repair-probe tree owned by the same fresh install (host PID 6824 / Flet PID 6864) was also closed by its exact verified HWND, and both processes exited. A path/profile-scoped survivor query found none; it showed only the unrelated production Flet PID 3424. Silent uninstall then removed only the fresh repair install directory, app-data root, and E60E72D2 registry identity; the uninstall log reported success and `Removed all? Yes`. All three owned paths/identities tested absent afterward, while the production registry identity remained present.
 
 This isolated lifecycle intentionally skipped local model downloads. It does not claim a published-version upgrade, real microphone/audio continuity, cloud credentials, model accuracy, or VR presentation. Those are outside the Flet-only B checkpoint. Real Windows UI, build, packaged, installed, reinstall, and uninstall behavior are qualified here on the baseline machine (Windows 11 Education x64, Ryzen 7 9800X3D, Radeon RX 7900 XTX).
 

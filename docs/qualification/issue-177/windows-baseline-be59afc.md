@@ -19,7 +19,9 @@ Executed on 2026-09-19. This is an engineering baseline, not release approval an
 - Isolated GUI profiles were under `%TEMP%`; no existing application configuration, credentials, conversation audio, or private model contents were read. No cloud or paid calls were made. No microphone or private audio was recorded.
 - Build outputs are ignored local artifacts under `build/`, `dist/`, and `installer_output/`. No artifact was published or released.
 
-## Status summary
+## Initial execution status (historical)
+
+The rows below preserve the first execution's results. The installer continuation below and [native workload reference](native-workload-reference.md) record later attempts, resolved prerequisites, and newly observed failures; the initial blocked rows are not the final evidence inventory.
 
 | Area | Status | Executed result |
 | --- | --- | --- |
@@ -45,7 +47,7 @@ Executed on 2026-09-19. This is an engineering baseline, not release approval an
 | VRChat/SteamVR/HMD sustained workload | not run | No authorized live VRChat/SteamVR/HMD session was established. |
 | Upgrade, rollback and uninstall | blocked | Requires an owned isolated installer identity; the configured alternate identity was already occupied. |
 
-Outcome A remains evidence-incomplete for real capture/audio, full local ASR/GPU decode, and sustained VR/HMD behavior. The original occupied-AppId installer lifecycle blocker was later resolved on a new AppId (see continuation). Those remaining absences do not invalidate the frozen source/packaged reference and do not prohibit isolated Outcome B compatibility work.
+Outcome A remains incomplete. The installer continuation resolves the occupied-AppId obstacle for an isolated install/reinstall/uninstall, and the native workload reference supplies public models, real CPU decode, download cancellation/restart, and isolated process-capture evidence. Packaged CPU/GPU evidence commands failed, published-version upgrade and physical-device/VR evidence remain unperformed, and the first installer probe exposed an orphaned viewer after host termination. These limits do not invalidate the recorded source/packaged reference for isolated B work.
 
 Continuation 2026-09-19 (new AppId, production installer not executed): isolated install/maintenance/GUI/unrelated-CWD/Unicode path/reinstall/rollback/uninstall evidence is recorded in [Continuation: isolated installer lifecycle](#continuation-isolated-installer-lifecycle). Occupied `{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}` and production `{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}` were left untouched. This is still not release approval.
 
@@ -283,7 +285,7 @@ Frozen A payload hashes were re-checked before compile and after compile; produc
 | Isolated install | passed | `/CURRENTUSER /VERYSILENT` into Unicode `{localappdata}\Programs\PuriPulyHeart-A177-설치-20260919T084410Z-d3b00fb4`. Installed exe SHA-256 matched frozen A. Log marker `Local STT provisioning skipped for isolated installer smoke.` Fresh settings telemetry enabled. |
 | Maintenance | passed | Installed `--version` from `C:\Windows\Temp` printed `2.7.0`. `installer-telemetry-preference disable` returned 0 and persisted canonical OFF. `soxr-runtime-check` returned 0. |
 | GUI startup check / unrelated CWD | passed | Installed `gui-startup-check` from `C:\Windows\Temp` returned 0. |
-| Installed GUI / Unicode CWD | passed with limit | Later owned install at `...\PuriPulyHeart-A177-설치2-...\` launched with `--config` from Unicode CWD `...\PuriPulyHeart-A177-cwd2-한글-...\`. Owned visible window title `PuriPuly <3` on in-tree `flet.exe`; `WM_CLOSE` exit 0; no owned survivors. PrintWindow screenshot failed (`OverflowError` on hwnd). First GUI attempt used image-path matching only and missed the Flet child. |
+| Installed GUI / Unicode CWD | passed with limit | Later owned install at `...\PuriPulyHeart-A177-설치2-...\` launched with `--config` from Unicode CWD `...\PuriPulyHeart-A177-cwd2-한글-...\`. Its Flet PID 26728 showed `PuriPuly <3`; `WM_CLOSE` returned 0 with no survivors in that launch tree. PrintWindow failed (`OverflowError` on hwnd), so no installed visual-parity claim is made. The first probe missed orphaned Flet PID 6900; see reconciliation below. |
 | Reinstall | passed | Mutated owned `soxr\soxr.dll`, re-ran the smoke installer to the same Unicode dir; bundled soxr hash restored; telemetry opt-out preserved; STT skip marker present. |
 | Rollback | passed | Silent retry into the first leftover Unicode dir hit RestartManager in-use Flet, aborted (exit 5), logged `Rolling back changes` and `Uninstallation process succeeded`; new AppId registry stayed absent. An earlier post-install telemetry exception did **not** undo copied files (silent CurStepChanged exception, exit 0); that path is not claimed as rollback. Production Flet was not closed. |
 | Uninstall | passed | Owned `unins000.exe /VERYSILENT` on the second Unicode install removed that dir, the isolated AppData root `puripuly-heart-a177-20260919T084410Z-d3b00fb4`, and `{D3B00FB4-4E73-4801-8E66-EBF7C53D11FE}_is1`. C2E4 and production identities unchanged. |
@@ -305,3 +307,11 @@ ISCC command (working directory = this worktree):
 ```
 
 Owned leftover not blanket-deleted: `C:\Users\salee\AppData\Local\Programs\PuriPulyHeart-A177-설치-20260919T084410Z-d3b00fb4\dbghelp.dll` remained after the first uninstall (access denied). The second Unicode install dir was fully removed. Product owner approval for release/deployment is not granted here.
+
+### First-launch process reconciliation
+
+The first installer GUI probe terminated its host and incorrectly reported an empty survivor set after matching only executable paths. Flet PID 6900 outlived parent PID 17060 and retained the first isolated install's `dbghelp.dll`. Its creation time and loaded-module path bound it to that probe. This is failed abrupt-host viewer containment/accounting evidence, not a passed shutdown case.
+
+The separately owned production host PID 13440 and Flet PID 3424 predated this installer probe and were never A-owned. They were left untouched. The later isolated GUI PID 26728 had already exited normally.
+
+For the verified orphan's window, `WM_CLOSE`, `SC_CLOSE`, and Alt+F4 had no effect. `WM_QUIT` to its verified thread ended PID 6900 within 0.5 seconds. Final inspection found no surviving A-owned host/viewer or A-install module mapping; only the pre-existing production tree remained. The leftover `dbghelp.dll` became readable and was not deleted. Manual recovery does not convert abrupt-host containment into a pass.

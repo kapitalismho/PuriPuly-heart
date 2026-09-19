@@ -11,7 +11,7 @@ This document lists the major open-source software components directly used by P
 | 5 | **ONNX Runtime** | 1.28.0 | MIT | https://github.com/microsoft/onnxruntime | ONNX model inference / used as a runtime library |
 | 6 | **llama.cpp** | b10423 (`a94d563ed801d1da1b8c2432946de07d0231bb3d`) | MIT | https://github.com/ggml-org/llama.cpp | Local translation model inference / bundled as a local CPU and Vulkan runtime |
 | 7 | **sherpa-onnx + sherpa-onnx-core** | 1.13.4 | Apache-2.0 | https://github.com/k2-fsa/sherpa-onnx | Local speech recognition / used as runtime libraries |
-| 8 | **Flet + flet-desktop** | 0.86.1 | Apache-2.0 | https://github.com/flet-dev/flet | Desktop user interface / used as the application UI framework |
+| 8 | **Flet + flet-desktop** | 1.0.0 | Apache-2.0 | https://github.com/flet-dev/flet | Desktop user interface / used as the application UI framework |
 | 9 | **transcribe-cpp** | 0.1.3 | MIT | https://github.com/FluidInference/transcribe-rs | GPU speech transcription / used as a Rust library with the Vulkan backend |
 | 10 | **Hono** | 4.12.12 | MIT | https://github.com/honojs/hono | Broker HTTP service / used as the web framework |
 | 11 | **OpenVR Runtime** | v2.15.6 | BSD-3-Clause | https://github.com/ValveSoftware/openvr | SteamVR integration / bundled as the OpenVR client runtime |
