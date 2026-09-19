@@ -444,6 +444,8 @@ Stop ingress before draining or cancelling owned work. Close external resources 
 
 The application shutdown adapter coordinates teardown across capture, translation, output, child processes, and application services.
 
+The UI foundation tracks window-close orchestration separately from ordinary cancel-on-close page jobs. That orchestration awaits the existing shutdown coordinator without being cancelled by its ordinary UI-task cleanup; window destruction follows the ordered close.
+
 Implementation: `app/adapters/application_runtime_shutdown.py`. Use shutdown code and lifecycle tests for exact ordering.
 
 `ApplicationShutdownCoordinator.capture_stall_diagnostic()` is an on-demand snapshot exposed by `UiApplicationPort`. The composed `ApplicationRuntimeShutdownAdapter` supplies live Self/Peer capture generations, Local ASR channel generations and native phases, GPU worker PID/active channels, and active model-download/helper-child state. A shutdown callback timeout captures this snapshot before cancellation and sends it through runtime logging with coordinator state, terminal flag, failure count, the active owner/callback, bounded named-task await graphs, and `native_stack_available=false`. This is not always-on tracing. The projection uses only explicitly selected lifecycle fields; it must not serialize arbitrary owner objects, transcripts, credentials, settings, or native stack claims.
