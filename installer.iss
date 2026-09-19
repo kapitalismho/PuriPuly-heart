@@ -45,10 +45,17 @@
 #ifndef MyStagedOverlayDir
   #define MyStagedOverlayDir "build\overlay"
 #endif
-#define NotoCjkFontRelativePath "puripuly_heart\data\fonts\NotoSansCJK-Medium.ttc"
-#define LocalSttManifestRelativePath "puripuly_heart\data\models\qwen3-asr-0.6b-int8-sherpa.manifest.json"
-#define ParakeetV3ManifestRelativePath "puripuly_heart\data\models\parakeet-tdt-0.6b-v3-int8-sherpa.manifest.json"
-#define ParakeetJapaneseManifestRelativePath "puripuly_heart\data\models\parakeet-tdt-ctc-0.6b-ja-int8-sherpa.manifest.json"
+#ifdef NativeExperimental
+  #define PackagedApplicationRoot "app\"
+  #define PackagedSoxrRoot "site-packages\soxr"
+#else
+  #define PackagedApplicationRoot ""
+  #define PackagedSoxrRoot "soxr"
+#endif
+#define NotoCjkFontRelativePath PackagedApplicationRoot + "puripuly_heart\data\fonts\NotoSansCJK-Medium.ttc"
+#define LocalSttManifestRelativePath PackagedApplicationRoot + "puripuly_heart\data\models\qwen3-asr-0.6b-int8-sherpa.manifest.json"
+#define ParakeetV3ManifestRelativePath PackagedApplicationRoot + "puripuly_heart\data\models\parakeet-tdt-0.6b-v3-int8-sherpa.manifest.json"
+#define ParakeetJapaneseManifestRelativePath PackagedApplicationRoot + "puripuly_heart\data\models\parakeet-tdt-ctc-0.6b-ja-int8-sherpa.manifest.json"
 
 #define InstallerPrivacyDir "installer\privacy"
 #define CanonicalSettingsVersion 46
@@ -214,7 +221,7 @@ Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"
 [InstallDelete]
 ; Remove stale legacy soxr runtime names before laying down the current packaged tree.
 Type: files; Name: "{app}\soxr.dll"
-Type: files; Name: "{app}\soxr\libsoxr.dll"
+Type: files; Name: "{app}\{#PackagedSoxrRoot}\libsoxr.dll"
 
 [UninstallDelete]
 ; Clean up user config on uninstall (optional)
@@ -1305,6 +1312,9 @@ begin
   if ResolveInstallerTelemetryConfigPath() <> '' then begin
     Parameters := '--config "' + ResolveInstallerTelemetryConfigPath() + '" ' + Parameters;
   end;
+#ifdef NativeExperimental
+  Parameters := '--headless ' + Parameters;
+#endif
   if not ExecAsOriginalUser(
     ExpandConstant('{app}\{#MyAppExeName}'),
     Parameters,

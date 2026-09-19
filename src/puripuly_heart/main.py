@@ -6,6 +6,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from puripuly_heart.runtime_layout import current_runtime_layout
+
 if TYPE_CHECKING:
     from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
     from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
@@ -211,13 +213,19 @@ def _run_gui(
     ft, vrchat_osc_presence_adapter, compose_ui_application, main_gui, assets_dir = (
         _load_gui_runtime()
     )
-    from puripuly_heart.ui.flet_desktop_runtime import (
-        FletDesktopViewProcessOwner,
-        patch_hidden_view_launcher,
-    )
+    native_embedded = current_runtime_layout().host_kind == "native"
+    view_process_owner = None
+    patch_hidden_view_launcher = None
+    if not native_embedded:
+        from puripuly_heart.ui.flet_desktop_runtime import (
+            FletDesktopViewProcessOwner,
+        )
+        from puripuly_heart.ui.flet_desktop_runtime import (
+            patch_hidden_view_launcher as desktop_view_launcher,
+        )
 
-    view_process_owner = FletDesktopViewProcessOwner()
-
+        view_process_owner = FletDesktopViewProcessOwner()
+        patch_hidden_view_launcher = desktop_view_launcher
     vrchat_osc_presence = vrchat_osc_presence_adapter()
 
     async def _target(page: ft.Page):
@@ -242,12 +250,20 @@ def _run_gui(
             raise
 
     try:
-        with patch_hidden_view_launcher(process_owner=view_process_owner):
+        if native_embedded:
             ft.run(
                 main=_target,
                 assets_dir=str(assets_dir()),
                 view=ft.AppView.FLET_APP_HIDDEN,
             )
+        else:
+            assert patch_hidden_view_launcher is not None
+            with patch_hidden_view_launcher(process_owner=view_process_owner):
+                ft.run(
+                    main=_target,
+                    assets_dir=str(assets_dir()),
+                    view=ft.AppView.FLET_APP_HIDDEN,
+                )
     except Exception as exc:
         from puripuly_heart.core.runtime_logging import emit_basic_log
 
@@ -257,12 +273,14 @@ def _run_gui(
             type(exc).__name__,
             level=logging.ERROR,
         )
-        try:
-            asyncio.run(view_process_owner.close())
-        except Exception:
-            logger.exception("The Flet desktop view cleanup also failed")
+        if view_process_owner is not None:
+            try:
+                asyncio.run(view_process_owner.close())
+            except Exception:
+                logger.exception("The Flet desktop view cleanup also failed")
         raise
-    asyncio.run(view_process_owner.close())
+    if view_process_owner is not None:
+        asyncio.run(view_process_owner.close())
     return 0
 
 

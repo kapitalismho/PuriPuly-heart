@@ -28,6 +28,38 @@ class RuntimeLayout:
     def native(self, *parts: str) -> Path:
         return self.native_runtime_root.joinpath(*parts)
 
+    def python_child_environment(
+        self,
+        base: dict[str, str] | None = None,
+    ) -> dict[str, str]:
+        environment = dict(os.environ if base is None else base)
+        if self.host_kind != "native":
+            return environment
+        root = self.native_runtime_root
+        site_packages = root / "site-packages"
+        dlls = root / "DLLs"
+        system_root = Path(environment.get("SystemRoot", r"C:\Windows"))
+        environment.update(
+            {
+                "PYTHONHOME": str(root),
+                "PYTHONPATH": os.pathsep.join((str(self.app_resource_root), str(site_packages))),
+                "PATH": os.pathsep.join(
+                    (str(root), str(dlls), str(site_packages), str(system_root / "System32"))
+                ),
+                "PYTHONNOUSERSITE": "1",
+                "PYTHONSAFEPATH": "1",
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONOPTIMIZE": "0",
+                _NATIVE_RESOURCE_ROOT_ENV: str(self.app_resource_root),
+                _NATIVE_RUNTIME_ROOT_ENV: str(root),
+                _NATIVE_HOST_EXECUTABLE_ENV: str(self.host_executable),
+                _NATIVE_PYTHON_EXECUTABLE_ENV: str(self.python_executable),
+            }
+        )
+        environment.pop("FLET_DART_BRIDGE_PORT", None)
+        environment.pop("FLET_DART_BRIDGE_EXIT_PORT", None)
+        return environment
+
 
 _NATIVE_RESOURCE_ROOT_ENV = "PURIPULY_HEART_NATIVE_RESOURCE_ROOT"
 _NATIVE_RUNTIME_ROOT_ENV = "PURIPULY_HEART_NATIVE_RUNTIME_ROOT"
@@ -41,12 +73,8 @@ def current_runtime_layout() -> RuntimeLayout:
     if native_resource_root:
         resource_root = Path(native_resource_root).resolve()
         runtime_root = Path(os.getenv(_NATIVE_RUNTIME_ROOT_ENV, native_resource_root)).resolve()
-        host_executable = Path(
-            os.getenv(_NATIVE_HOST_EXECUTABLE_ENV, sys.executable)
-        ).resolve()
-        python_executable = Path(
-            os.getenv(_NATIVE_PYTHON_EXECUTABLE_ENV, sys.executable)
-        ).resolve()
+        host_executable = Path(os.getenv(_NATIVE_HOST_EXECUTABLE_ENV, sys.executable)).resolve()
+        python_executable = Path(os.getenv(_NATIVE_PYTHON_EXECUTABLE_ENV, sys.executable)).resolve()
         host_kind: RuntimeHostKind = "native"
     elif bool(getattr(sys, "frozen", False)):
         host_executable = Path(sys.executable).resolve()

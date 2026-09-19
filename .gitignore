@@ -233,6 +233,7 @@ refactoring/
 !/scripts/ci/
 /scripts/ci/*
 !/scripts/ci/build-release-artifacts.ps1
+!/scripts/ci/build-native-experimental.ps1
 !/scripts/ci/prepare-soxr-release-inputs.ps1
 !/scripts/ci/read-project-version.py
 !/scripts/installer/

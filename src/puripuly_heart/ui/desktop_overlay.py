@@ -67,6 +67,7 @@ from puripuly_heart.core.overlay.protocol import (
 from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationSnapshot,
 )
+from puripuly_heart.runtime_layout import current_runtime_layout
 from puripuly_heart.ui.desktop_overlay_startup import (
     DesktopOverlayStartupCoordinator,
     DesktopOverlayStartupPhase,
@@ -410,10 +411,6 @@ from puripuly_heart.ui.desktop_window_zorder import (
     _window_bounds_close,
     create_window_z_order_port,
 )
-from puripuly_heart.ui.flet_desktop_runtime import (
-    FletDesktopViewProcessOwner,
-    patch_hidden_view_launcher,
-)
 from puripuly_heart.ui.flet_runtime import invoke_control_method
 from puripuly_heart.ui.fonts import assets_dir, register_fonts
 from puripuly_heart.ui.i18n import t_for_locale
@@ -740,9 +737,11 @@ async def _default_flet_app_runner(
     target: Callable[[Any], object],
     *,
     on_process_started: Callable[[int, str | None], None] | None = None,
-    process_owner: FletDesktopViewProcessOwner | None = None,
+    process_owner: Any | None = None,
 ) -> None:
     import flet as ft
+
+    from puripuly_heart.ui.flet_desktop_runtime import patch_hidden_view_launcher
 
     with patch_hidden_view_launcher(
         on_process_started=on_process_started,
@@ -784,7 +783,7 @@ class FletDesktopRendererWindow:
         preview_catalog: DesktopOverlayPreviewCatalog | None = None,
         window_z_order_port: WindowZOrderPort | None = None,
         window_process_info_provider: FletProcessInfoProvider | None = None,
-        view_process_owner: FletDesktopViewProcessOwner | None = None,
+        view_process_owner: Any | None = None,
         overlay_instance_id: str | None = None,
     ) -> None:
         if (
@@ -806,7 +805,9 @@ class FletDesktopRendererWindow:
             app_runner is None and preview_catalog is None and os.name == "nt"
         )
         self._structured_lifecycle_trace_enabled = app_runner is None and preview_catalog is None
-        if app_runner is None:
+        if app_runner is None and current_runtime_layout().host_kind != "native":
+            from puripuly_heart.ui.flet_desktop_runtime import FletDesktopViewProcessOwner
+
             self._view_process_owner = view_process_owner or FletDesktopViewProcessOwner(
                 trace_sink=self._record_process_lifecycle,
             )
@@ -819,6 +820,25 @@ class FletDesktopRendererWindow:
                 )
 
             self._app_runner = run_default_app
+        elif app_runner is None:
+
+            async def run_embedded_app(target: Callable[[Any], object]) -> None:
+                import flet as ft
+
+                await ft.run_async(
+                    main=target,
+                    view=ft.AppView.FLET_APP_HIDDEN,
+                    assets_dir=str(assets_dir()),
+                )
+
+            self._app_runner = run_embedded_app
+            self._view_process_owner = None
+            if window_process_info_provider is None:
+
+                def embedded_process_info() -> tuple[int, None]:
+                    return (os.getpid(), None)
+
+                window_process_info_provider = embedded_process_info
         else:
             self._app_runner = app_runner
             self._view_process_owner = view_process_owner
@@ -1499,7 +1519,6 @@ class FletDesktopRendererWindow:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-
             if self._window_z_order_required:
                 logger.warning(
                     "[DesktopOverlay] Desktop overlay window bounds confirmation failed: "
@@ -1555,7 +1574,6 @@ class FletDesktopRendererWindow:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-
             if self._window_z_order_required:
                 logger.warning(
                     "[DesktopOverlay] Desktop overlay window visibility confirmation failed: "
@@ -2213,12 +2231,10 @@ class FletDesktopRendererWindow:
             return
         coordinator = self._startup_coordinator
         if coordinator is None or not coordinator.ready:
-
             return
         generation = coordinator.generation
 
         if self._interaction_mode != _DESKTOP_INTERACTION_MODE_EDIT:
-
             return
 
         async def schedule_bounds_sample() -> None:
@@ -2253,17 +2269,13 @@ class FletDesktopRendererWindow:
             return
         bounds = _sample_page_window_bounds(self._page)
         if bounds is None:
-
             return
         signature = _bounds_signature(bounds)
         if self._is_programmatic_bounds_echo(signature, generation):
-
             return
         if self._interaction_mode != _DESKTOP_INTERACTION_MODE_EDIT:
-
             return
         if signature == self._last_reported_bounds:
-
             return
         self._last_reported_bounds = signature
 
@@ -2506,7 +2518,7 @@ def _canonical_bounds_vector(
             int(round(float(bounds["width"]))),
             int(round(float(bounds["height"]))),
         )
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         return None
     if vector[2] <= 0 or vector[3] <= 0:
         return None
@@ -2782,9 +2794,10 @@ class DesktopOverlayRenderer:
                 )
             )
             unexpected_startup_failure_reason = "renderer_init_failed"
-            initial_snapshot, initial_runtime_controls = (
-                await self._receive_initial_snapshot_and_runtime_controls(websocket)
-            )
+            (
+                initial_snapshot,
+                initial_runtime_controls,
+            ) = await self._receive_initial_snapshot_and_runtime_controls(websocket)
             unexpected_startup_failure_reason = "window_configuration_failed"
             prime_startup_runtime_controls = getattr(
                 self.window,
@@ -3170,7 +3183,9 @@ class DesktopOverlayRenderer:
             outcome = (
                 "committed"
                 if snapshot is committed_snapshot
-                else "superseded" if disposition == "accepted" else disposition
+                else "superseded"
+                if disposition == "accepted"
+                else disposition
             )
             await self._emit_renderer_diagnostic(
                 event_type="receipt",

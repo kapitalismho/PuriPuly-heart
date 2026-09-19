@@ -406,6 +406,12 @@ Implementation: `core/runtime_logging.py`, `app/services/application_runtime_log
 
 PyInstaller remains the release host. The native-host layout is an experimental input contract only; it does not select a native package, fake PyInstaller state, or change native worker ownership.
 
+The experimental Windows host consumes `native/windows_host/artifact-layout.json` as the single versioned relative-path contract used by staging, generated C++, Python child environments, validation, installer compilation, and artifact inventory. The root contains the canonical `PuriPulyHeart.exe`, one official `python.exe` sharing the embedded runtime DLL and standard library, `app/`, `site-packages/`, `Lib/`, and `DLLs/`. The native dependency closure excludes the prebuilt `flet-desktop` viewer and build-only extras; embedded main and renderer surfaces use the already-running Flutter host.
+
+The native GUI bootstrap does not create a second normal-runtime logging service or tee ordinary stdout into a plain file. `SessionRuntimeLoggingService` continues to own normal application logging and accepted-conversation privacy. Before product execution, the bootstrap only prepares interpreter/runtime policy. On an uncaught bootstrap exception, it restores the original streams, constructs a byte-bounded diagnostic retaining exception identity and useful frames, attempts one error-only write under `RuntimeLayout.log_root`, and independently returns the same bounded diagnostic over the native exit bridge.
+
+`scripts/ci/build-native-experimental.ps1` is an explicit experimental entry point and is not part of the PyInstaller release workflow. It verifies the pinned Flet/Flutter/Dart/Serious Python/bridge/Python inputs, renders the maintained native template, installs the locked runtime-only dependency closure, stages compliance and native workers, compiles application bytecode with optimization level zero and checked-hash invalidation, and emits a hashed artifact manifest. PyInstaller remains the default release build.
+
 ## Lifecycle
 
 Every owner of a task, process, source, or provider session must define:

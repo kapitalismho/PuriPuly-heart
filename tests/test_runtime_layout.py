@@ -60,3 +60,49 @@ def test_native_layout_keeps_host_python_resources_and_writable_roots_distinct(
     assert layout.python_executable == python.resolve()
     assert layout.host_executable != layout.python_executable
     assert not os.path.commonpath((layout.user_data_root, resources)) == str(resources)
+
+
+def test_native_python_child_environment_is_installed_only_and_non_recursive(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    install_root = tmp_path / "설치 경로 with spaces"
+    resources = install_root / "app"
+    resources.mkdir(parents=True)
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(resources))
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RUNTIME_ROOT", str(install_root))
+    monkeypatch.setenv(
+        "PURIPULY_HEART_NATIVE_HOST_EXECUTABLE",
+        str(install_root / "PuriPulyHeart.exe"),
+    )
+    monkeypatch.setenv(
+        "PURIPULY_HEART_NATIVE_PYTHON_EXECUTABLE",
+        str(install_root / "python.exe"),
+    )
+    layout = current_runtime_layout()
+
+    environment = layout.python_child_environment(
+        {
+            "SystemRoot": r"C:\Windows",
+            "PATH": "poisoned",
+            "PYTHONPATH": "poisoned",
+            "FLET_DART_BRIDGE_PORT": "41",
+            "FLET_DART_BRIDGE_EXIT_PORT": "42",
+        }
+    )
+
+    assert environment["PYTHONHOME"] == str(install_root.resolve())
+    assert environment["PYTHONPATH"].split(os.pathsep) == [
+        str(resources.resolve()),
+        str(install_root.resolve() / "site-packages"),
+    ]
+    assert environment["PATH"].split(os.pathsep) == [
+        str(install_root.resolve()),
+        str(install_root.resolve() / "DLLs"),
+        str(install_root.resolve() / "site-packages"),
+        r"C:\Windows\System32",
+    ]
+    assert environment["PYTHONDONTWRITEBYTECODE"] == "1"
+    assert environment["PYTHONOPTIMIZE"] == "0"
+    assert "FLET_DART_BRIDGE_PORT" not in environment
+    assert "FLET_DART_BRIDGE_EXIT_PORT" not in environment

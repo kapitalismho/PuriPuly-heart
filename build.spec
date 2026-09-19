@@ -108,6 +108,9 @@ block_cipher = None
 SOXR_RELEASE_INPUTS_MANIFEST_PATH = Path("build/soxr-release-inputs/manifest.json").resolve()
 SOXR_PACKAGED_RUNTIME_RELATIVE_DIR = Path("soxr")
 FLET_WINDOWS_RUNTIME_ARCHIVE_PATH = Path("build/flet/flet-windows.zip").resolve()
+FLET_WINDOWS_RUNTIME_SIDECAR_PATH = Path(
+    str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH) + ".sha256"
+)
 FLET_WINDOWS_RUNTIME_SHA256 = "758f21506fbb9ad180bd93c7460a2ca55630401c6026a9bc9e2273444014491d"
 NOTO_CJK_SOURCE_FONT_PATH = src_path / "puripuly_heart" / "data" / "fonts" / "NotoSansCJK-Medium.ttc"
 NOTO_CJK_PROVENANCE_DIR = Path("third_party/noto-sans-cjk").resolve()
@@ -160,6 +163,10 @@ if flet_windows_runtime_sha256 != FLET_WINDOWS_RUNTIME_SHA256:
         "Pinned Flet Windows runtime checksum mismatch: expected "
         f"{FLET_WINDOWS_RUNTIME_SHA256}, found {flet_windows_runtime_sha256}"
     )
+FLET_WINDOWS_RUNTIME_SIDECAR_PATH.write_text(
+    f"{flet_windows_runtime_sha256} {FLET_WINDOWS_RUNTIME_ARCHIVE_PATH.stat().st_size}",
+    encoding="ascii",
+)
 flet_pyinstaller_hook_config.temp_bin_dir = str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH.parent)
 
 
@@ -271,6 +278,10 @@ datas = [
     ("LICENSE", "."),
     # VAD model and data files
     (str(src_path / "puripuly_heart" / "data"), "puripuly_heart/data"),
+    (
+        str(FLET_WINDOWS_RUNTIME_SIDECAR_PATH),
+        "flet_desktop/app",
+    ),
     # Prompt templates
     ("prompts", "prompts"),
     (

@@ -93,6 +93,39 @@ def _block(
     )
 
 
+def test_native_renderer_uses_embedded_flet_without_viewer_owner(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    class ForbiddenOwner:
+        def __init__(self, **_kwargs) -> None:
+            raise AssertionError("native renderer must not construct the desktop viewer owner")
+
+    async def fake_run_async(**kwargs) -> None:
+        calls.append(kwargs)
+
+    monkeypatch.setattr(flet_desktop_runtime, "FletDesktopViewProcessOwner", ForbiddenOwner)
+    monkeypatch.setattr(
+        desktop_overlay,
+        "current_runtime_layout",
+        lambda: type("Layout", (), {"host_kind": "native"})(),
+    )
+    monkeypatch.setattr(ft, "run_async", fake_run_async)
+    window = desktop_overlay.FletDesktopRendererWindow(
+        window_z_order_port=desktop_window_zorder.NoopWindowZOrderPort(),
+    )
+
+    def target(_page) -> None:
+        pass
+
+    asyncio.run(window._app_runner(target))
+
+    assert len(calls) == 1
+    assert calls[0]["main"] is target
+    assert calls[0]["view"] is ft.AppView.FLET_APP_HIDDEN
+    assert window._view_process_owner is None
+    assert window._window_process_info_provider() == (os.getpid(), None)
+
+
 def test_desktop_overlay_snapshot_mapping_table_covers_block_contract_and_emitted_lines() -> None:
     rows = {
         (row.snapshot_field, row.block_type, row.slot): row

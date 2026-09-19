@@ -139,7 +139,7 @@ def read_pe_product_metadata(exe_path: Path) -> dict[str, str]:
                 f"{fixed.ProductVersionMS >> 16}.{fixed.ProductVersionMS & 0xFFFF}."
                 f"{fixed.ProductVersionLS >> 16}.{fixed.ProductVersionLS & 0xFFFF}"
             )
-        except (AttributeError, IndexError):
+        except AttributeError, IndexError:
             filevers = ""
             prodvers = ""
         result["__FileVersionBinary"] = filevers
@@ -208,8 +208,7 @@ def verify_release_surface(
     expected_installer = f"PuriPulyHeart-Setup-{expected_version}.exe"
     if installer_exe.strip() != expected_installer:
         raise RuntimeError(
-            f"installer filename mismatch: expected {expected_installer!r}, "
-            f"found {installer_exe!r}"
+            f"installer filename mismatch: expected {expected_installer!r}, found {installer_exe!r}"
         )
     if PLACEHOLDER in body_text:
         raise RuntimeError(
@@ -379,27 +378,39 @@ def _package_relative(package_dir: Path, relative: str) -> Path:
     return package_dir.joinpath(*parts)
 
 
-def verify_packaged_license_payloads(package_dir: Path) -> list[dict[str, object]]:
+def verify_packaged_license_payloads(
+    package_dir: Path,
+    *,
+    application_root: str = "",
+    dependency_root: str = "",
+    license_paths: Sequence[str] | None = None,
+) -> list[dict[str, object]]:
     root = Path(package_dir).resolve()
     if not root.is_dir():
         raise RuntimeError(f"packaged application directory not found: {package_dir}")
+    if license_paths is None:
+        license_paths = PACKAGED_LICENSE_PATHS
     verified: list[dict[str, object]] = []
-    for relative in PACKAGED_LICENSE_PATHS:
-        path = _package_relative(root, relative)
+    for relative in license_paths:
+        area_root = application_root if relative.startswith("puripuly_heart/") else dependency_root
+        located_relative = "/".join(part for part in (area_root, relative) if part)
+        path = _package_relative(root, located_relative)
         try:
             resolved = path.resolve(strict=True)
             resolved.relative_to(root)
-        except (OSError, ValueError):
-            raise RuntimeError(f"packaged upstream license payload not found: {relative}") from None
+        except OSError, ValueError:
+            raise RuntimeError(
+                f"packaged upstream license payload not found: {located_relative}"
+            ) from None
         if not resolved.is_file() or path.is_symlink():
-            raise RuntimeError(f"packaged upstream license payload not found: {relative}")
+            raise RuntimeError(f"packaged upstream license payload not found: {located_relative}")
         payload = resolved.read_bytes()
         if not payload.strip():
-            raise RuntimeError(f"packaged upstream license payload is empty: {relative}")
+            raise RuntimeError(f"packaged upstream license payload is empty: {located_relative}")
         actual = hashlib.sha256(payload).hexdigest()
         verified.append(
             {
-                "path": relative.replace("\\", "/"),
+                "path": located_relative.replace("\\", "/"),
                 "size": len(payload),
                 "sha256": actual,
             }
@@ -482,8 +493,7 @@ def verify_soxr_packaging(
             ]
             if len(matches) != 1:
                 raise RuntimeError(
-                    f"soxr third-party source bundle manifest must describe "
-                    f"{filename} exactly once"
+                    f"soxr third-party source bundle manifest must describe {filename} exactly once"
                 )
             expected = str(matches[0].get("sha256", "")).strip().lower()
             if not _SHA64.fullmatch(expected):
