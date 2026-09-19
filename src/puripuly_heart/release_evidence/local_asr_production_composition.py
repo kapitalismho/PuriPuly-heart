@@ -58,6 +58,7 @@ def _sha256(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest().upper()
 
+
 def _console_safe(text: str, *, encoding: str | None) -> str:
     selected = encoding or "utf-8"
     return text.encode(selected, errors="backslashreplace").decode(selected)
@@ -157,6 +158,7 @@ async def _wait_until(predicate, *, timeout: float) -> None:
         while not predicate():
             await asyncio.sleep(0.05)
 
+
 def _task_wait_fact(task: asyncio.Task[object]) -> dict[str, object]:
     return {
         "name": task.get_name(),
@@ -186,8 +188,7 @@ async def _run_stage(
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
         raise RuntimeError(
-            f"production composition stage {stage!r} exceeded {timeout:.1f}s; "
-            f"wait={wait_fact}"
+            f"production composition stage {stage!r} exceeded {timeout:.1f}s; " f"wait={wait_fact}"
         )
     result = task.result()
     report["active_stage"] = None
@@ -214,6 +215,7 @@ def _channel_pending_handoff(owner: LocalASRProviderRuntimeOwner, channel: str) 
 
 def _channel_model_id(owner: LocalASRProviderRuntimeOwner, channel: str) -> str | None:
     return next(item.model_id for item in owner.snapshot.channels if item.channel == channel)
+
 
 def _channel_request(
     owner: LocalASRProviderRuntimeOwner,
@@ -274,6 +276,7 @@ def _require_gpu_session(
         if self_model is None or self_model != peer_model:
             raise RuntimeError("production Self and Peer did not share one model")
     return int(pid)
+
 
 def _require_activation_device(
     owner: LocalASRProviderRuntimeOwner,
@@ -388,6 +391,7 @@ async def _send_utterance(
     )
     return await _wait_final(events, start)
 
+
 async def _send_utterance_staged(
     *,
     report: dict[str, object],
@@ -420,10 +424,6 @@ async def _send_utterance_staged(
         f"{stage}_terminal",
         _wait_final(events, start),
     )
-
-
-
-
 
 
 def _attach_event_evidence(
@@ -694,7 +694,6 @@ async def _execute(
             ),
             "snapshot": _snapshot_fact(owner),
         }
-
 
         failed_pid = owner.snapshot.gpu.worker_pid
         if failed_pid is None:

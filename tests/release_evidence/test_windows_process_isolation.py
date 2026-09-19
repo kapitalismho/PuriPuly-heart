@@ -136,7 +136,6 @@ def test_native_worker_environment_supports_nested_runtime_layout_under_isolated
     }
 
 
-
 def test_topology_contract_rejects_intermediate_launcher() -> None:
     assert validate_direct_child_topology(
         root_pid=10,
