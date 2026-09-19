@@ -24,8 +24,8 @@ PACKAGED_LICENSE_PAYLOADS = (
         "f0f5c56b298ec9795df1199edc328a987242716d14a1bde6813112e22dc15f99",
     ),
     (
-        "puripuly_heart/data/licenses/PYTHON-3.12.10-LICENSE.txt",
-        "e502c6b880ff58d614901495a9009c136539cd0b1e2a2abb8fc00b934c203419",
+        "puripuly_heart/data/licenses/PYTHON-3.14.7-LICENSE.txt",
+        "935cf13e19f8c31b497d20b05d73623431a226b230c3599bc30fa3348979bc68",
     ),
     (
         "scipy/_lib/_uarray/LICENSE",

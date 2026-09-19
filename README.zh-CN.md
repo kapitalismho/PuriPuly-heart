@@ -9,7 +9,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.7.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
-  <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
+  <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
@@ -426,7 +426,7 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 
 ### Python 环境
 
-Python 应用需要 Python 3.12 或 3.13。
+Python 应用需要 Windows x64 上启用常规 GIL 的 CPython 3.14。
 
 创建并激活 Windows 环境：
 

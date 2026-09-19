@@ -20,42 +20,22 @@ def _load_runtime_module():
         pytest.fail(f"{MODULE_NAME} is missing: {exc}")
 
 
-def test_resolve_local_qwen_runtime_dir_uses_packaged_dir_for_frozen_windows(
+def test_resolve_local_qwen_runtime_dir_uses_declared_native_layout(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runtime_module = _load_runtime_module()
-    executable = tmp_path / "dist" / "PuriPulyHeart.exe"
-    executable.parent.mkdir(parents=True)
-    executable.write_bytes(b"")
-
+    runtime_root = tmp_path / "installed runtime"
+    runtime_root.mkdir()
     monkeypatch.setattr(runtime_module.sys, "platform", "win32")
-    monkeypatch.setattr(runtime_module.sys, "frozen", True, raising=False)
-    monkeypatch.setattr(runtime_module.sys, "executable", str(executable))
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(tmp_path / "resources"))
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RUNTIME_ROOT", str(runtime_root))
 
     assert runtime_module.resolve_local_qwen_runtime_dir() == (
-        executable.parent / runtime_module.LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR
+        runtime_root / runtime_module.LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR
     )
 
 
-def test_resolve_local_qwen_runtime_dir_falls_back_to_internal_packaged_dir_for_pyinstaller_layout(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    runtime_module = _load_runtime_module()
-    executable = tmp_path / "dist" / "PuriPulyHeart.exe"
-    executable.parent.mkdir(parents=True)
-    executable.write_bytes(b"")
-    fallback_runtime_dir = (
-        executable.parent / "_internal" / runtime_module.LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR
-    )
-    fallback_runtime_dir.mkdir(parents=True)
-
-    monkeypatch.setattr(runtime_module.sys, "platform", "win32")
-    monkeypatch.setattr(runtime_module.sys, "frozen", True, raising=False)
-    monkeypatch.setattr(runtime_module.sys, "executable", str(executable))
-
-    assert runtime_module.resolve_local_qwen_runtime_dir() == fallback_runtime_dir
 
 
 def test_ensure_local_qwen_windows_runtime_rejects_missing_required_dlls(

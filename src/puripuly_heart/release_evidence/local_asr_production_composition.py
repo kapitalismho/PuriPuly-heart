@@ -13,7 +13,6 @@ import traceback
 import wave
 from dataclasses import replace
 from pathlib import Path
-from typing import cast
 from uuid import uuid4
 
 import numpy as np
@@ -35,9 +34,6 @@ from puripuly_heart.core.audio.ownership import (
 )
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
-from puripuly_heart.core.orchestrator.peer_translation_channel import (
-    PeerTranslationChannelOwner,
-)
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
@@ -61,8 +57,26 @@ def _sha256(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest().upper()
 
+def _console_safe(text: str, *, encoding: str | None) -> str:
+    selected = encoding or "utf-8"
+    return text.encode(selected, errors="backslashreplace").decode(selected)
+
 
 def _event_fact(event: object) -> dict[str, object]:
+    if isinstance(event, STTProviderTurnTerminal):
+        return {
+            "type": type(event).__name__,
+            "text": event.text,
+            "is_final": event.outcome == "final",
+            "channel": None,
+            "outcome": event.outcome,
+            "text_authority": event.text_authority,
+            "failure_reason": event.failure_reason,
+            "final_language_runs": [
+                dataclasses.asdict(item) if dataclasses.is_dataclass(item) else repr(item)
+                for item in event.final_language_runs
+            ],
+        }
     transcript = getattr(event, "transcript", event)
     return {
         "type": type(event).__name__,
@@ -77,6 +91,8 @@ def _event_fact(event: object) -> dict[str, object]:
 
 
 def _is_final(event: object) -> bool:
+    if isinstance(event, STTProviderTurnTerminal):
+        return event.outcome == "final"
     return bool(getattr(getattr(event, "transcript", event), "is_final", False))
 
 
@@ -84,10 +100,12 @@ def _require_final(event: object, *, channel: str, stage: str) -> dict[str, obje
     fact = _event_fact(event)
     if not fact["is_final"]:
         raise RuntimeError(f"{stage} did not return a final transcript")
-    if fact["channel"] != channel:
-        raise RuntimeError(f"{stage} returned channel {fact['channel']!r}, expected {channel!r}")
+    observed_channel = fact["channel"]
+    if observed_channel is not None and observed_channel != channel:
+        raise RuntimeError(f"{stage} returned channel {observed_channel!r}, expected {channel!r}")
     if not str(fact["text"] or "").strip():
         raise RuntimeError(f"{stage} returned empty text")
+    fact["channel"] = channel
     return fact
 
 
@@ -116,6 +134,44 @@ async def _wait_until(predicate, *, timeout: float) -> None:
         while not predicate():
             await asyncio.sleep(0.05)
 
+def _task_wait_fact(task: asyncio.Task[object]) -> dict[str, object]:
+    return {
+        "name": task.get_name(),
+        "done": task.done(),
+        "cancelled": task.cancelled(),
+        "stack": [
+            f"{frame.f_code.co_filename}:{frame.f_lineno}:{frame.f_code.co_name}"
+            for frame in task.get_stack()
+        ],
+    }
+
+
+async def _run_stage(
+    report: dict[str, object],
+    stage: str,
+    awaitable,
+    *,
+    timeout: float = 60.0,
+) -> object:
+    report["active_stage"] = stage
+    print(f"[NativeEvidence] stage={stage} state=started", flush=True)
+    task = asyncio.ensure_future(awaitable)
+    done, _pending = await asyncio.wait({task}, timeout=timeout)
+    if task not in done:
+        wait_fact = _task_wait_fact(task)
+        report["stage_timeout"] = wait_fact
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        raise RuntimeError(
+            f"production composition stage {stage!r} exceeded {timeout:.1f}s; "
+            f"wait={wait_fact}"
+        )
+    result = task.result()
+    report["active_stage"] = None
+    report["last_completed_stage"] = stage
+    print(f"[NativeEvidence] stage={stage} state=completed", flush=True)
+    return result
+
 
 async def _wait_final(events: list[object], start: int) -> object:
     await _wait_until(
@@ -125,13 +181,30 @@ async def _wait_final(events: list[object], start: int) -> object:
     return next(event for event in events[start:] if _is_final(event))
 
 
-def _peer_generation(owner: LocalASRProviderRuntimeOwner) -> int:
-    return next(item.generation for item in owner.snapshot.channels if item.channel == "peer")
+def _channel_generation(owner: LocalASRProviderRuntimeOwner, channel: str) -> int:
+    return next(item.generation for item in owner.snapshot.channels if item.channel == channel)
 
 
-def _peer_segment_settings(request: ProviderRuntimeBuildRequest) -> AudioSegmentSettingsSnapshot:
+def _channel_pending_handoff(owner: LocalASRProviderRuntimeOwner, channel: str) -> bool:
+    return next(item.pending_handoff for item in owner.snapshot.channels if item.channel == channel)
+
+
+def _channel_model_id(owner: LocalASRProviderRuntimeOwner, channel: str) -> str | None:
+    return next(item.model_id for item in owner.snapshot.channels if item.channel == channel)
+
+def _channel_request(
+    owner: LocalASRProviderRuntimeOwner,
+    channel: str,
+) -> ProviderRuntimeBuildRequest:
+    request = owner._last_requests.get(channel)
+    if request is None:
+        raise RuntimeError(f"production {channel} request is unavailable")
+    return request
+
+
+def _segment_settings(request: ProviderRuntimeBuildRequest) -> AudioSegmentSettingsSnapshot:
     if request.provider_signature is None or request.runtime_signature is None:
-        raise RuntimeError("production Peer request is missing its scoped settings identity")
+        raise RuntimeError("production request is missing its scoped settings identity")
     config = request.config
     options = request.session_options
     source_language = options.source_language if options is not None else config.source_language
@@ -150,52 +223,59 @@ def _peer_segment_settings(request: ProviderRuntimeBuildRequest) -> AudioSegment
     )
 
 
-async def _wait_peer_terminal(
-    events: list[object],
-    start: int,
+def _require_gpu_session(
+    owner: LocalASRProviderRuntimeOwner,
     *,
-    segment_id,
-) -> STTProviderTurnTerminal:
-    await _wait_until(
-        lambda: any(
-            isinstance(event, STTProviderTurnTerminal)
-            and event.identity.segment.segment_id == segment_id
-            for event in events[start:]
-        ),
-        timeout=240.0,
-    )
-    return next(
-        event
-        for event in events[start:]
-        if isinstance(event, STTProviderTurnTerminal)
-        and event.identity.segment.segment_id == segment_id
-    )
-
-
-async def _send_utterance(
-    *,
-    application,
     channel: str,
+    expected_device_id: str,
+    expected_pid: int | None = None,
+    stage: str,
+) -> int:
+    gpu = owner.snapshot.gpu
+    pid = gpu.worker_pid
+    if pid is None:
+        raise RuntimeError(f"{stage} did not start the GPU worker")
+    if expected_pid is not None and pid != expected_pid:
+        raise RuntimeError("production Self and Peer did not share one worker")
+    if channel not in gpu.active_channels:
+        raise RuntimeError(f"{stage} did not activate GPU channel {channel!r}")
+    if expected_pid is not None and gpu.active_channels != frozenset({"self", "peer"}):
+        raise RuntimeError("production Self and Peer residency was not shared")
+    if gpu.configured_device_id != expected_device_id:
+        raise RuntimeError(f"{stage} GPU device identity mismatch")
+    if not gpu.model_resident:
+        raise RuntimeError(f"{stage} GPU model was not resident")
+    if expected_pid is not None:
+        self_model = _channel_model_id(owner, "self")
+        peer_model = _channel_model_id(owner, "peer")
+        if self_model is None or self_model != peer_model:
+            raise RuntimeError("production Self and Peer did not share one model")
+    return int(pid)
+
+def _require_activation_device(
+    owner: LocalASRProviderRuntimeOwner,
+    *,
+    diagnostics_start: int,
+    expected_device_id: str,
+    stage: str,
+) -> dict[str, object]:
+    matches = [
+        diagnostic
+        for diagnostic in owner.diagnostics[diagnostics_start:]
+        if diagnostic.event == "activation_ready"
+    ]
+    if not matches or matches[-1].device_id != expected_device_id:
+        raise RuntimeError(f"{stage} resolved GPU device identity mismatch")
+    return dataclasses.asdict(matches[-1])
+
+
+def _owned_speech_pair(
+    *,
     samples: np.ndarray,
-    events: list[object],
-    peer_request: ProviderRuntimeBuildRequest | None = None,
-    activation_generation: int | None = None,
-) -> object:
-    start = len(events)
+    request: ProviderRuntimeBuildRequest,
+    activation_generation: int,
+) -> tuple[object, object]:
     utterance_id = uuid4()
-    if channel == "self":
-        await application.self_vad.handle_vad_event(
-            SpeechStart(
-                utterance_id=utterance_id,
-                pre_roll=np.empty(0, np.float32),
-                chunk=samples,
-            )
-        )
-        await application.self_vad.handle_vad_event(SpeechEnd(utterance_id=utterance_id))
-        return await _wait_final(events, start)
-    if peer_request is None or activation_generation is None:
-        raise RuntimeError("production Peer inference requires a scoped provider request")
-    peer_runtime = cast(PeerTranslationChannelOwner, application.peer_vad)
     captured_at = time.monotonic()
     duration_s = samples.size / 16_000.0
     capture = AudioCaptureSpan(
@@ -212,7 +292,7 @@ async def _send_utterance(
     )
     ledger = PeerAudioSegmentLedger(
         activation_generation=activation_generation,
-        settings=_peer_segment_settings(peer_request),
+        settings=_segment_settings(request),
     )
     owned_start = ledger.observe_vad_event(
         SpeechStart(
@@ -223,26 +303,104 @@ async def _send_utterance(
         ),
         now_monotonic_s=captured_at,
     )
-    await peer_runtime.handle_peer_owned_vad_event(owned_start)
     owned_end = ledger.observe_vad_event(
         SpeechEnd(utterance_id=utterance_id),
         now_monotonic_s=time.monotonic(),
     )
-    await peer_runtime.handle_peer_owned_vad_event(owned_end)
-    terminal = await _wait_peer_terminal(events, start, segment_id=utterance_id)
-    receipt = ledger.terminalize(
-        utterance_id,
-        outcome=terminal.outcome,
-        now_monotonic_s=time.monotonic(),
-        provider_epoch_id=terminal.identity.provider_epoch_id,
-        provider_turn_id=terminal.identity.provider_turn_id,
-        text_authority=terminal.text_authority,
-        failure_reason=terminal.failure_reason,
+    return owned_start, owned_end
+
+
+async def _emit_owned_vad(*, application, channel: str, owned: object) -> None:
+    if channel == "self":
+        await application.self_vad.handle_vad_event(owned)
+        return
+    await application.peer_vad.handle_peer_owned_vad_event(owned)
+
+
+async def _dispatch_owned_utterance(
+    *,
+    application,
+    channel: str,
+    samples: np.ndarray,
+    request: ProviderRuntimeBuildRequest,
+    activation_generation: int,
+) -> None:
+    owned_start, owned_end = _owned_speech_pair(
+        samples=samples,
+        request=request,
+        activation_generation=activation_generation,
     )
-    final = await peer_runtime.handle_provider_turn_terminal(receipt, terminal)
-    if final is None:
-        raise RuntimeError("production Peer scoped terminal did not admit a final transcript")
-    return final
+    await _emit_owned_vad(application=application, channel=channel, owned=owned_start)
+    await _emit_owned_vad(application=application, channel=channel, owned=owned_end)
+
+
+async def _wait_final_any(*groups: tuple[list[object], int]) -> object:
+    def found() -> bool:
+        return any(any(_is_final(event) for event in events[start:]) for events, start in groups)
+
+    await _wait_until(found, timeout=240.0)
+    for events, start in groups:
+        for event in events[start:]:
+            if _is_final(event):
+                return event
+    raise RuntimeError("scoped terminal was not observed")
+
+
+async def _send_utterance(
+    *,
+    application,
+    channel: str,
+    samples: np.ndarray,
+    events: list[object],
+    request: ProviderRuntimeBuildRequest,
+    activation_generation: int,
+) -> object:
+    start = len(events)
+    await _dispatch_owned_utterance(
+        application=application,
+        channel=channel,
+        samples=samples,
+        request=request,
+        activation_generation=activation_generation,
+    )
+    return await _wait_final(events, start)
+
+async def _send_utterance_staged(
+    *,
+    report: dict[str, object],
+    stage: str,
+    application,
+    channel: str,
+    samples: np.ndarray,
+    events: list[object],
+    request: ProviderRuntimeBuildRequest,
+    activation_generation: int,
+) -> object:
+    start = len(events)
+    owned_start, owned_end = _owned_speech_pair(
+        samples=samples,
+        request=request,
+        activation_generation=activation_generation,
+    )
+    await _run_stage(
+        report,
+        f"{stage}_speech_start",
+        _emit_owned_vad(application=application, channel=channel, owned=owned_start),
+    )
+    await _run_stage(
+        report,
+        f"{stage}_speech_end",
+        _emit_owned_vad(application=application, channel=channel, owned=owned_end),
+    )
+    return await _run_stage(
+        report,
+        f"{stage}_terminal",
+        _wait_final(events, start),
+    )
+
+
+
+
 
 
 def _attach_event_evidence(
@@ -359,7 +517,6 @@ async def _execute(
         self_result = await owner.replace_provider(self_request, start=True)
         if self_result.status != "applied":
             raise RuntimeError("production Self GPU activation failed")
-        self_pid = owner.snapshot.gpu.worker_pid
 
         peer_request = application.build_peer_provider_request(settings, warmup=True)
         await application.channel_reset.reset_provider_channel("peer")
@@ -370,27 +527,45 @@ async def _execute(
         )
         if peer_result.status != "applied":
             raise RuntimeError("production Peer GPU activation failed")
-        shared_pid = owner.snapshot.gpu.worker_pid
-        if self_pid is None or shared_pid != self_pid:
-            raise RuntimeError("production Self and Peer did not share one worker")
-        if owner.snapshot.gpu.active_channels != frozenset({"self", "peer"}):
-            raise RuntimeError("production Self and Peer residency was not shared")
-        report["shared_residency"] = _snapshot_fact(owner)
 
-        self_final = await _send_utterance(
-            application=application,
+        self_final = await _run_stage(
+            report,
+            "initial_self_utterance",
+            _send_utterance(
+                application=application,
+                channel="self",
+                samples=samples,
+                events=self_events,
+                request=self_request,
+                activation_generation=_channel_generation(owner, "self"),
+            ),
+        )
+        self_pid = _require_gpu_session(
+            owner,
             channel="self",
-            samples=samples,
-            events=self_events,
+            expected_device_id=physical.device_id,
+            stage="production Self inference",
         )
-        peer_final = await _send_utterance(
-            application=application,
+        peer_final = await _run_stage(
+            report,
+            "initial_peer_utterance",
+            _send_utterance(
+                application=application,
+                channel="peer",
+                samples=samples,
+                events=peer_events,
+                request=peer_request,
+                activation_generation=_channel_generation(owner, "peer"),
+            ),
+        )
+        shared_pid = _require_gpu_session(
+            owner,
             channel="peer",
-            samples=samples,
-            events=peer_events,
-            peer_request=peer_request,
-            activation_generation=_peer_generation(owner),
+            expected_device_id=physical.device_id,
+            expected_pid=self_pid,
+            stage="production Peer inference",
         )
+        report["shared_residency"] = _snapshot_fact(owner)
         report["initial_inference"] = {
             "self": _require_final(
                 self_final,
@@ -404,37 +579,89 @@ async def _execute(
             ),
         }
 
+        handoff_generation = _channel_generation(owner, "self")
         retired_start = len(retired_events)
-        utterance_id = uuid4()
-        await application.self_vad.handle_vad_event(
-            SpeechStart(
-                utterance_id=utterance_id,
-                pre_roll=np.empty(0, np.float32),
-                chunk=samples,
+        current_start = len(self_events)
+        owned_start, owned_end = _owned_speech_pair(
+            samples=samples,
+            request=self_request,
+            activation_generation=handoff_generation,
+        )
+        await _run_stage(
+            report,
+            "handoff_self_speech_start",
+            _emit_owned_vad(application=application, channel="self", owned=owned_start),
+        )
+        handoff_task = asyncio.create_task(
+            owner.handoff_provider(
+                application.build_self_provider_request(settings, warmup=False),
+                start=True,
             )
         )
-        await application.self_vad.handle_vad_event(SpeechEnd(utterance_id=utterance_id))
-        handoff = await owner.handoff_provider(
-            application.build_self_provider_request(settings, warmup=False),
-            start=True,
-        )
+        try:
+            await _run_stage(
+                report,
+                "handoff_pending_boundary",
+                _wait_until(
+                    lambda: _channel_pending_handoff(owner, "self") or handoff_task.done(),
+                    timeout=60.0,
+                ),
+            )
+            await _run_stage(
+                report,
+                "handoff_in_flight_speech_end",
+                _emit_owned_vad(application=application, channel="self", owned=owned_end),
+            )
+            handoff = await _run_stage(
+                report,
+                "handoff_commit",
+                handoff_task,
+            )
+        except BaseException:
+            if not handoff_task.done():
+                handoff_task.cancel()
+                await asyncio.gather(handoff_task, return_exceptions=True)
+            raise
         if handoff.status != "applied":
             raise RuntimeError("production Self handoff failed")
-        retired_final = await _wait_final(retired_events, retired_start)
-        replacement_final = await _send_utterance(
-            application=application,
-            channel="self",
-            samples=samples,
-            events=self_events,
+        in_flight_final = await _run_stage(
+            report,
+            "handoff_terminal",
+            _wait_final_any(
+                (retired_events, retired_start),
+                (self_events, current_start),
+            ),
+        )
+        in_flight_sink = (
+            "retired"
+            if any(_is_final(event) for event in retired_events[retired_start:])
+            else "current"
+        )
+        if _channel_generation(owner, "self") == handoff_generation:
+            raise RuntimeError("production Self handoff did not advance generation")
+        replacement_final = await _run_stage(
+            report,
+            "handoff_replacement_utterance",
+            _send_utterance(
+                application=application,
+                channel="self",
+                samples=samples,
+                events=self_events,
+                request=self_request,
+                activation_generation=_channel_generation(owner, "self"),
+            ),
         )
         if owner.snapshot.gpu.worker_pid != shared_pid:
             raise RuntimeError("production handoff replaced the shared worker")
+        in_flight_fact = _require_final(
+            in_flight_final,
+            channel="self",
+            stage="production in-flight handoff",
+        )
         report["handoff"] = {
-            "retired_terminal_final": _require_final(
-                retired_final,
-                channel="self",
-                stage="production retired handoff",
-            ),
+            "in_flight_sink": in_flight_sink,
+            "in_flight_terminal_final": in_flight_fact,
+            "retired_terminal_final": in_flight_fact if in_flight_sink == "retired" else None,
             "replacement_final": _require_final(
                 replacement_final,
                 channel="self",
@@ -443,51 +670,88 @@ async def _execute(
             "snapshot": _snapshot_fact(owner),
         }
 
+
         failed_pid = owner.snapshot.gpu.worker_pid
         if failed_pid is None:
             raise RuntimeError("production worker PID missing before failure probe")
         os.kill(failed_pid, signal.SIGTERM)
         await _wait_until(lambda: owner.snapshot.gpu.retry_required, timeout=30.0)
         failed_snapshot = _snapshot_fact(owner)
-        await application.retry_gpu_activation()
+        recovery_diagnostics_start = len(owner.diagnostics)
+        await _run_stage(
+            report,
+            "worker_failure_controller_recovery",
+            application.retry_gpu_activation(),
+        )
         controller_recovery = _snapshot_fact(owner)
-        controller_recovered_pid = owner.snapshot.gpu.worker_pid
-        if controller_recovered_pid is None or controller_recovered_pid == failed_pid:
-            raise RuntimeError("production Controller recovery did not start a fresh worker")
-        await owner.start_channel("self")
-        peer_reactivation_status = "retained"
-        if "peer" not in owner.snapshot.gpu.active_channels:
-            await application.channel_reset.reset_provider_channel("peer")
-            peer_reactivation = await owner.replace_provider(
-                peer_request,
-                start=True,
-                on_terminal_failure=None,
-            )
-            peer_reactivation_status = peer_reactivation.status
-            if peer_reactivation.status != "applied":
-                raise RuntimeError("production Peer reactivation after recovery failed")
-        else:
-            await owner.start_channel("peer")
-        recovered_pid = owner.snapshot.gpu.worker_pid
-        if recovered_pid != controller_recovered_pid:
-            raise RuntimeError("production Peer reactivation replaced the recovered worker")
-        recovered_final = await _send_utterance(
+        if owner.snapshot.gpu.worker_pid is not None:
+            raise RuntimeError("production Controller recovery eagerly started a GPU worker")
+        await _run_stage(
+            report,
+            "worker_failure_channel_restart",
+            asyncio.gather(
+                owner.start_channel("self"),
+                owner.start_channel("peer"),
+            ),
+        )
+        recovery_self_request = _channel_request(owner, "self")
+        recovery_peer_request = _channel_request(owner, "peer")
+        recovered_peer_final = await _send_utterance_staged(
+            report=report,
+            stage="worker_failure_peer_reactivation",
             application=application,
             channel="peer",
             samples=samples,
             events=peer_events,
-            peer_request=peer_request,
-            activation_generation=_peer_generation(owner),
+            request=recovery_peer_request,
+            activation_generation=_channel_generation(owner, "peer"),
+        )
+        recovered_pid = _require_gpu_session(
+            owner,
+            channel="peer",
+            expected_device_id=recovery_peer_request.gpu_device_id,
+            stage="production recovered Peer inference",
+        )
+        recovered_activation = _require_activation_device(
+            owner,
+            diagnostics_start=recovery_diagnostics_start,
+            expected_device_id=physical.device_id,
+            stage="production recovered Peer inference",
+        )
+        if recovered_pid == failed_pid:
+            raise RuntimeError("production Controller recovery reused the failed worker")
+        recovery_self_final = await _send_utterance_staged(
+            report=report,
+            stage="worker_failure_self_reactivation",
+            application=application,
+            channel="self",
+            samples=samples,
+            events=self_events,
+            request=recovery_self_request,
+            activation_generation=_channel_generation(owner, "self"),
+        )
+        _require_gpu_session(
+            owner,
+            channel="self",
+            expected_device_id=recovery_self_request.gpu_device_id,
+            expected_pid=recovered_pid,
+            stage="production recovered Self inference",
         )
         report["worker_failure_recovery"] = {
             "failed_pid": failed_pid,
             "failed_pid_present_after_detection": _process_present(failed_pid),
             "failed_snapshot": failed_snapshot,
-            "recovered_pid": recovered_pid,
             "controller_recovery": controller_recovery,
-            "peer_reactivation_status": peer_reactivation_status,
-            "recovered_final": _require_final(
-                recovered_final,
+            "recovered_pid": recovered_pid,
+            "requested_device_id": recovery_peer_request.gpu_device_id,
+            "resolved_activation": recovered_activation,
+            "recovered_self_final": _require_final(
+                recovery_self_final,
+                channel="self",
+                stage="production recovered Self inference",
+            ),
+            "recovered_peer_final": _require_final(
+                recovered_peer_final,
                 channel="peer",
                 stage="production recovered Peer inference",
             ),
@@ -600,5 +864,5 @@ def run_local_asr_production_composition(
     report_path.parent.mkdir(parents=True, exist_ok=True)
     rendered = json.dumps(report, ensure_ascii=False, indent=2, default=str)
     report_path.write_text(rendered, encoding="utf-8")
-    print(rendered)
+    print(_console_safe(rendered, encoding=getattr(sys.stdout, "encoding", None)))
     return exit_code

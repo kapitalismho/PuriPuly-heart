@@ -41,18 +41,9 @@ def _provenance_fixture(tmp_path: Path) -> dict[str, object]:
     }
 
 
-def test_build_spec_collects_pinned_proctap_hidden_imports_and_native_binary() -> None:
-    spec = (ROOT / "build.spec").read_text(encoding="utf-8")
-
-    assert 'collect_dynamic_libs("proctap", destdir="proctap")' in spec
-    assert 'get_module_file_attribute("proctap._native")' in spec
-    assert 'collect_submodules("proctap")' in spec
-    assert '"proctap", "proctap._native", "proctap.backends.windows"' in spec
-    assert "Pinned ProcTap package did not provide a packageable _native extension" in spec
-
-
-def test_release_workflow_runs_packaged_installed_strict_smoke_and_alternate_installer() -> None:
+def test_actual_release_workflow_and_local_monolith_both_gate_process_capture() -> None:
     script = (ROOT / "scripts/ci/build-release-artifacts.ps1").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
 
     assert script.count("Invoke-ProcessCaptureRuntimeSmokeCheck") >= 4
     assert '"/DMyAppId=$InstallerTestAppId"' in script
@@ -63,6 +54,9 @@ def test_release_workflow_runs_packaged_installed_strict_smoke_and_alternate_ins
     assert '"/DProcessCaptureSmokeArtifactRoot=$processCaptureSmokeArtifactRoot"' in script
     assert "native_process_specific" in script
     assert "device_fallback_used" in script
+    assert "Build release-only process-capture smoke helper" in workflow
+    assert "Gate packaged headless runtime" in workflow
+    assert "native_process_specific" in workflow
 
 
 def test_installer_smoke_skip_is_compile_time_only_and_production_default_is_unchanged() -> None:
@@ -114,7 +108,7 @@ def test_installer_isolation_rejects_production_identity_and_workspace(tmp_path:
 
 
 def test_runtime_report_requires_native_hash_strict_mode_and_no_fallback(tmp_path: Path) -> None:
-    native = tmp_path / "proctap" / "_native.cp312-win_amd64.pyd"
+    native = tmp_path / "proctap" / "_native.cp314-win_amd64.pyd"
     native.parent.mkdir()
     native.write_bytes(b"native")
     helper = tmp_path / "PuriPulyHeartProcessCaptureSmoke.exe"

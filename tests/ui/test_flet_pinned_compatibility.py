@@ -49,10 +49,10 @@ def test_flet_runtime_and_lock_use_one_exact_100_protocol() -> None:
     assert version("flet-desktop") == FLET_VERSION
 
 
-def test_gate_b_windows_runtime_uses_python_312() -> None:
+def test_gate_c_windows_runtime_uses_python_314() -> None:
     if sys.platform != "win32":
-        pytest.skip("Gate B runtime version is verified on Windows")
-    assert sys.version_info[:2] == (3, 12)
+        pytest.skip("Gate C runtime version is verified on Windows")
+    assert sys.version_info[:2] == (3, 14)
 
 
 def test_ui_uses_flet_100_dialog_api() -> None:

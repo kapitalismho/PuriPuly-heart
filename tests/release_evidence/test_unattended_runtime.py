@@ -52,14 +52,14 @@ def _native_pass() -> dict[str, object]:
         "supported_target": {
             "system": "Windows",
             "implementation": "CPython",
-            "python": "3.12",
+            "python": "3.14",
             "machine": "AMD64",
             "minimum_windows_build": 19041,
         },
         "host": {
             "system": "Windows",
             "implementation": "CPython",
-            "python": "3.12",
+            "python": "3.14",
             "machine": "AMD64",
             "windows_build": 22631,
         },

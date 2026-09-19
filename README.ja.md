@@ -9,7 +9,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.7.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
-  <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
+  <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
@@ -428,7 +428,7 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 
 ### Python 環境
 
-Python アプリには Python 3.12 または 3.13 が必要です。
+Python アプリには通常の GIL 有効 CPython 3.14（Windows x64）が必要です。
 
 Windows 環境を作成して有効化します:
 

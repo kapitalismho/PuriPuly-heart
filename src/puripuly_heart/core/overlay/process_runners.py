@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from puripuly_heart.runtime_layout import current_runtime_layout
+
 from . import openvr_vendor
 from .manifest import OverlayLaunchManifest
 from .process_adapter import OverlayManagedProcess, _AsyncioOverlayProcess
@@ -120,6 +122,13 @@ class DefaultOverlayProcessRunner:
         sys_executable: Path | None = None,
         repo_root: Path | None = None,
     ) -> tuple[Path, Path]:
+        if sys_executable is None and repo_root is None:
+            layout = current_runtime_layout()
+            if layout.host_kind == "source":
+                executable = layout.native("overlay", OVERLAY_EXECUTABLE_NAME)
+            else:
+                executable = layout.native(OVERLAY_EXECUTABLE_NAME)
+            return executable, executable
         executable = (sys_executable or Path(sys.executable)).resolve()
         root = repo_root or Path(__file__).resolve().parents[4]
         return executable.with_name(OVERLAY_EXECUTABLE_NAME), root / "build" / "overlay" / (
@@ -292,6 +301,24 @@ class DesktopFletOverlayRunner:
         executable_path: Path | None = None,
     ) -> tuple[str, ...]:
         launcher = executable_path or self._launcher_executable()
+        layout = current_runtime_layout()
+        if self.frozen is None and self.python_executable is None and self.app_executable is None:
+            if layout.host_kind == "source":
+                return (
+                    str(layout.python_executable),
+                    "-m",
+                    self.module_name,
+                    "--config",
+                    str(manifest_path),
+                )
+            native_prefix = ("--headless",) if layout.host_kind == "native" else ()
+            return (
+                str(layout.host_executable),
+                *native_prefix,
+                "run-desktop-overlay",
+                "--config",
+                str(manifest_path),
+            )
         if self._is_frozen():
             return (str(launcher), "run-desktop-overlay", "--config", str(manifest_path))
         return (str(launcher), "-m", self.module_name, "--config", str(manifest_path))
@@ -317,9 +344,10 @@ class DesktopFletOverlayRunner:
     def _is_frozen(self) -> bool:
         if self.frozen is not None:
             return self.frozen
-        return bool(getattr(sys, "frozen", False))
+        return current_runtime_layout().host_kind != "source"
 
     def _launcher_executable(self) -> Path:
+        layout = current_runtime_layout()
         if self._is_frozen():
-            return self.app_executable or Path(sys.executable)
-        return self.python_executable or Path(sys.executable)
+            return self.app_executable or layout.host_executable
+        return self.python_executable or layout.python_executable

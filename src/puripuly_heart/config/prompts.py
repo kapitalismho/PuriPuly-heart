@@ -6,11 +6,12 @@ Loads system prompts from files in the prompts/ directory.
 from __future__ import annotations
 
 import os
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping
+
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 TRANSLATION_PROMPT_NAME = "translation_prompt"
 UNSPECIFIED_SOURCE_TEXT_REF = "<input>"
@@ -72,42 +73,8 @@ def get_prompts_dir() -> Path:
     """Get the prompts directory path."""
     env_dir = os.getenv("PURIPULY_HEART_PROMPTS_DIR")
     if env_dir:
-        env_path = Path(env_dir)
-        if env_path.exists():
-            return env_path
-
-    # PyInstaller frozen app: use _MEIPASS
-    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-        meipass_prompts = Path(sys._MEIPASS) / "prompts"
-        if meipass_prompts.exists():
-            return meipass_prompts
-
-    # Try relative to the project root first
-    candidates = [
-        Path(__file__).parent.parent.parent.parent
-        / "prompts",  # src/puripuly_heart.../config -> project root
-        Path.cwd() / "prompts",
-        Path(__file__).parent / "prompts",
-    ]
-
-    for path in candidates:
-        if path.exists():
-            return path
-
-    # Walk up from cwd to find project root (pyproject.toml) with prompts/
-    for parent in [Path.cwd().resolve(), *Path.cwd().resolve().parents]:
-        candidate = parent / "prompts"
-        if (parent / "pyproject.toml").exists() and candidate.exists():
-            return candidate
-
-    # Walk up from cwd to find any prompts/ directory (e.g., when running from .venv)
-    for parent in [Path.cwd().resolve(), *Path.cwd().resolve().parents]:
-        candidate = parent / "prompts"
-        if candidate.exists():
-            return candidate
-
-    # Default: relative to cwd
-    return Path.cwd() / "prompts"
+        return Path(env_dir).resolve()
+    return current_runtime_layout().resource("prompts")
 
 
 def list_prompts() -> list[str]:

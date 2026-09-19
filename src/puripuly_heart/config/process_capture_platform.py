@@ -39,7 +39,7 @@ def evaluate_process_capture_platform(
         return ProcessCapturePlatformAvailability(
             available=False, reason="unsupported_implementation"
         )
-    if python_version != (3, 12):
+    if python_version != (3, 14):
         return ProcessCapturePlatformAvailability(available=False, reason="unsupported_python")
     if machine.casefold() != "amd64":
         return ProcessCapturePlatformAvailability(available=False, reason="unsupported_machine")

@@ -9,6 +9,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownCoordinator,
     ApplicationShutdownRegistrationError,
+    ApplicationShutdownRuntimeState,
     application_shutdown_callback,
 )
 from puripuly_heart.core.lifecycle import (
@@ -256,6 +257,59 @@ async def test_terminal_waits_for_repeated_cancellation_suppression_to_settle() 
     assert coordinator.snapshot.state == "completed_with_failures"
     assert coordinator.snapshot.terminal is True
     assert coordinator.snapshot.outstanding_task_names == ()
+
+@pytest.mark.asyncio
+async def test_on_demand_stall_diagnostic_reports_owner_await_graph_and_retained_native_work() -> None:
+    entered = asyncio.Event()
+    release_native = asyncio.Event()
+
+    async def close_owner() -> None:
+        entered.set()
+        await release_native.wait()
+
+    coordinator = ApplicationShutdownCoordinator(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="PeerCaptureSessionOwner",
+                callback_name="close",
+                callback=close_owner,
+            ),
+        ),
+        runtime_state_supplier=lambda: (
+            ApplicationShutdownRuntimeState(
+                owner_name="PeerCaptureSessionOwner",
+                generation=7,
+                active_native_operations=("proctap-stop",),
+                child_states=("capture-helper:stopping",),
+            ),
+        ),
+    )
+
+    first_close = asyncio.create_task(coordinator.shutdown(), name="first-close-request")
+    repeated_close = asyncio.create_task(coordinator.shutdown(), name="repeated-close-request")
+    await entered.wait()
+
+    diagnostic = coordinator.capture_stall_diagnostic()
+
+    assert diagnostic.phase == SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL
+    assert diagnostic.active_owner_name == "PeerCaptureSessionOwner"
+    assert diagnostic.active_callback_name == "close"
+    assert diagnostic.runtime_states[0].generation == 7
+    assert diagnostic.runtime_states[0].active_native_operations == ("proctap-stop",)
+    assert diagnostic.runtime_states[0].child_states == ("capture-helper:stopping",)
+    assert diagnostic.native_stack_available is False
+    callback_task_name = (
+        f"application-shutdown:{SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL}:"
+        "PeerCaptureSessionOwner:close"
+    )
+    assert callback_task_name in diagnostic.task_await_graphs
+    assert "release_native" not in repr(diagnostic.runtime_states)
+
+    release_native.set()
+    first_snapshot, repeated_snapshot = await asyncio.gather(first_close, repeated_close)
+    assert first_snapshot == repeated_snapshot
+    assert first_snapshot.terminal is True
 
 
 @pytest.mark.asyncio

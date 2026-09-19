@@ -312,7 +312,7 @@ def _build_empty_evidence(
         "supported_target": {
             "system": "Windows",
             "implementation": "CPython",
-            "python": "3.12",
+            "python": "3.14",
             "machine": "AMD64",
             "minimum_windows_build": PROCESS_CAPTURE_MIN_WINDOWS_BUILD,
         },
@@ -979,7 +979,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
             "supported_target": {
                 "system": "Windows",
                 "implementation": "CPython",
-                "python": "3.12",
+                "python": "3.14",
                 "machine": "AMD64",
                 "minimum_windows_build": PROCESS_CAPTURE_MIN_WINDOWS_BUILD,
             },

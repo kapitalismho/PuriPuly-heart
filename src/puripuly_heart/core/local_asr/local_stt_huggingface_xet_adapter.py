@@ -5,12 +5,13 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import threading
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 from .local_stt_download_port import (
     HuggingFaceDownloadProgress,
@@ -33,9 +34,12 @@ def _default_worker_command(
     request_path: Path,
     event_path: Path,
 ) -> Sequence[str]:
-    command = [sys.executable]
-    if not getattr(sys, "frozen", False):
+    layout = current_runtime_layout()
+    command = [str(layout.host_executable)]
+    if layout.host_kind == "source":
         command.extend(["-m", "puripuly_heart.main"])
+    elif layout.host_kind == "native":
+        command.append("--headless")
     command.extend(
         [
             "hf-xet-download-worker",

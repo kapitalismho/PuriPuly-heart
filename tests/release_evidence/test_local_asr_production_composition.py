@@ -5,13 +5,17 @@ import inspect
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 import numpy as np
 import pytest
+from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
 from puripuly_heart.composition.local_asr_production_evidence import (
     compose_local_asr_production_evidence,
 )
+from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
+from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
@@ -19,40 +23,198 @@ from puripuly_heart.core.stt.backend import (
 )
 from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
-from puripuly_heart.domain.events import STTFinalEvent
-from puripuly_heart.domain.models import Transcript
 from puripuly_heart.release_evidence import local_asr_production_composition as evidence
 
 
-def _final_event(*, channel: str, text: str = "transcript") -> object:
+def _terminal(*, text: str = "transcript", outcome: str = "final") -> STTProviderTurnTerminal:
+    return STTProviderTurnTerminal(
+        identity=STTProviderTurnIdentity(
+            segment=AudioSegmentIdentity(
+                activation_generation=1,
+                segment_order=1,
+                segment_id=uuid4(),
+                capture_epoch=1,
+            ),
+            provider_epoch_id="epoch",
+            provider_turn_id="turn",
+        ),
+        outcome=outcome,
+        text=text,
+        text_authority="authoritative" if outcome == "final" else "none",
+    )
+
+
+def _owner_snapshot(
+    *,
+    worker_pid: int | None,
+    active_channels: frozenset[str],
+    configured_device_id: str = "vulkan-index-0",
+    model_resident: bool = True,
+    self_model: str | None = "qwen3-asr-1.7b",
+    peer_model: str | None = "qwen3-asr-1.7b",
+) -> SimpleNamespace:
     return SimpleNamespace(
-        transcript=SimpleNamespace(
-            text=text,
-            is_final=True,
-            channel=channel,
-            final_language_runs=(),
+        snapshot=SimpleNamespace(
+            gpu=SimpleNamespace(
+                worker_pid=worker_pid,
+                active_channels=active_channels,
+                configured_device_id=configured_device_id,
+                model_resident=model_resident,
+            ),
+            channels=(
+                SimpleNamespace(channel="self", model_id=self_model),
+                SimpleNamespace(channel="peer", model_id=peer_model),
+            ),
         )
     )
 
 
-def test_require_final_preserves_channel_evidence() -> None:
+def test_require_final_preserves_scoped_terminal_evidence() -> None:
     fact = evidence._require_final(
-        _final_event(channel="peer"),
+        _terminal(text="heard speech"),
         channel="peer",
         stage="peer inference",
     )
 
-    assert fact["text"] == "transcript"
+    assert fact["text"] == "heard speech"
     assert fact["is_final"] is True
     assert fact["channel"] == "peer"
+    assert fact["outcome"] == "final"
 
 
-def test_require_final_rejects_cross_channel_result() -> None:
+def test_require_final_rejects_empty_or_non_final_terminal() -> None:
+    with pytest.raises(RuntimeError):
+        evidence._require_final(
+            _terminal(text="", outcome="final"),
+            channel="self",
+            stage="self inference",
+        )
+    with pytest.raises(RuntimeError):
+        evidence._require_final(
+            _terminal(text="heard", outcome="failed"),
+            channel="self",
+            stage="self inference",
+        )
+
+
+def test_require_final_rejects_cross_channel_domain_result() -> None:
     with pytest.raises(RuntimeError, match="expected 'peer'"):
         evidence._require_final(
-            _final_event(channel="self"),
+            SimpleNamespace(
+                transcript=SimpleNamespace(
+                    text="transcript",
+                    is_final=True,
+                    channel="self",
+                    final_language_runs=(),
+                )
+            ),
             channel="peer",
             stage="peer inference",
+        )
+
+
+@pytest.mark.asyncio
+async def test_wait_final_any_prefers_retired_then_current() -> None:
+    retired = [_terminal(text="retired")]
+    current = [_terminal(text="current")]
+    preferred = await evidence._wait_final_any((retired, 0), (current, 0))
+    assert preferred.text == "retired"
+
+    only_current = await evidence._wait_final_any(([], 0), (current, 0))
+    assert only_current.text == "current"
+
+
+def test_console_safe_preserves_report_and_escapes_unencodable_text() -> None:
+    rendered = '{"transcript": "Käse"}'
+
+    assert evidence._console_safe(rendered, encoding="cp949") == (
+        '{"transcript": "K\\xe4se"}'
+    )
+
+
+@pytest.mark.asyncio
+async def test_run_stage_reports_and_cancels_a_blocked_production_operation() -> None:
+    report: dict[str, object] = {}
+    never = asyncio.Event()
+
+    with pytest.raises(RuntimeError, match="blocked_operation.*exceeded"):
+        await evidence._run_stage(
+            report,
+            "blocked_operation",
+            never.wait(),
+            timeout=0.01,
+        )
+
+    assert report["active_stage"] == "blocked_operation"
+    assert report["stage_timeout"]["stack"]
+
+def test_recovered_activation_requires_new_resolved_physical_device() -> None:
+    owner = SimpleNamespace(
+        diagnostics=(
+            ProviderRuntimeDiagnostic(event="activation_ready", device_id="old-device"),
+            ProviderRuntimeDiagnostic(event="gpu_recovery", outcome="applied"),
+            ProviderRuntimeDiagnostic(
+                event="activation_ready",
+                device_id="vulkan-index-0",
+            ),
+        )
+    )
+
+    fact = evidence._require_activation_device(
+        owner,
+        diagnostics_start=1,
+        expected_device_id="vulkan-index-0",
+        stage="recovered inference",
+    )
+
+    assert fact["device_id"] == "vulkan-index-0"
+
+def test_require_gpu_session_rejects_worker_before_channel_open() -> None:
+    owner = _owner_snapshot(worker_pid=None, active_channels=frozenset(), model_resident=False)
+    with pytest.raises(RuntimeError):
+        evidence._require_gpu_session(
+            owner,
+            channel="self",
+            expected_device_id="vulkan-index-0",
+            stage="production Self inference",
+        )
+
+
+def test_require_gpu_session_requires_shared_pid_and_both_channels() -> None:
+    after_self = _owner_snapshot(worker_pid=4242, active_channels=frozenset({"self"}))
+    pid = evidence._require_gpu_session(
+        after_self,
+        channel="self",
+        expected_device_id="vulkan-index-0",
+        stage="production Self inference",
+    )
+    assert pid == 4242
+
+    after_peer = _owner_snapshot(worker_pid=4242, active_channels=frozenset({"self", "peer"}))
+    shared = evidence._require_gpu_session(
+        after_peer,
+        channel="peer",
+        expected_device_id="vulkan-index-0",
+        expected_pid=4242,
+        stage="production Peer inference",
+    )
+    assert shared == 4242
+
+    with pytest.raises(RuntimeError):
+        evidence._require_gpu_session(
+            _owner_snapshot(worker_pid=99, active_channels=frozenset({"self", "peer"})),
+            channel="peer",
+            expected_device_id="vulkan-index-0",
+            expected_pid=4242,
+            stage="production Peer inference",
+        )
+    with pytest.raises(RuntimeError):
+        evidence._require_gpu_session(
+            _owner_snapshot(worker_pid=4242, active_channels=frozenset({"peer"})),
+            channel="peer",
+            expected_device_id="vulkan-index-0",
+            expected_pid=4242,
+            stage="production Peer inference",
         )
 
 
@@ -84,54 +246,52 @@ def test_execute_defaults_to_the_package_evidence_composition_factory() -> None:
     assert parameter.default is compose_local_asr_production_evidence
 
 
-@pytest.mark.asyncio
-async def test_peer_production_probe_uses_owned_scoped_recognition_path() -> None:
-    events: list[object] = []
+class _ScopedSession:
+    def __init__(self) -> None:
+        self.buffer = STTProviderEventBuffer()
+        self.audio = bytearray()
 
-    class Session:
-        def __init__(self) -> None:
-            self.buffer = STTProviderEventBuffer()
-            self.audio = bytearray()
+    async def begin_turn(self, _request: STTProviderTurnRequest) -> None:
+        return None
 
-        async def begin_turn(self, _request: STTProviderTurnRequest) -> None:
-            return None
+    async def send_turn_audio(
+        self,
+        _identity: STTProviderTurnIdentity,
+        pcm16le: bytes,
+        **_kwargs,
+    ) -> None:
+        self.audio.extend(pcm16le)
 
-        async def send_turn_audio(
-            self,
-            _identity: STTProviderTurnIdentity,
-            pcm16le: bytes,
-            **_kwargs,
-        ) -> None:
-            self.audio.extend(pcm16le)
-
-        async def seal_turn(
-            self,
-            identity: STTProviderTurnIdentity,
-            **_kwargs,
-        ) -> None:
-            self.buffer.put(
-                STTProviderTurnTerminal(
-                    identity=identity,
-                    outcome="final",
-                    text="scoped transcript",
-                    text_authority="authoritative",
-                )
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        **_kwargs,
+    ) -> None:
+        self.buffer.put(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome="final",
+                text="scoped transcript",
+                text_authority="authoritative",
             )
+        )
 
-        async def abort_turn(self, _identity: STTProviderTurnIdentity, **_kwargs) -> None:
-            return None
+    async def abort_turn(self, _identity: STTProviderTurnIdentity, **_kwargs) -> None:
+        return None
 
-        async def turn_events(self):
-            async for event in self.buffer.events():
-                yield event
+    async def turn_events(self):
+        async for event in self.buffer.events():
+            yield event
 
-        async def stop(self) -> None:
-            return None
+    async def stop(self) -> None:
+        return None
 
-        async def close(self) -> None:
-            self.buffer.close()
+    async def close(self) -> None:
+        self.buffer.close()
 
-    request = SimpleNamespace(
+
+def _scoped_request() -> SimpleNamespace:
+    return SimpleNamespace(
         provider_id="fake-scoped",
         provider_signature=("fake-scoped",),
         runtime_signature=("fake-scoped", "runtime"),
@@ -145,8 +305,15 @@ async def test_peer_production_probe_uses_owned_scoped_recognition_path() -> Non
             vad_pre_roll_ms=500,
         ),
     )
-    session = Session()
+
+
+@pytest.mark.asyncio
+async def test_peer_production_probe_uses_owned_scoped_recognition_path() -> None:
+    events: list[object] = []
+    request = _scoped_request()
+    session = _ScopedSession()
     engine = ScopedRecognitionEngine(
+        channel="peer",
         session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
         event_sink=events.append,
         accepted_settings_scope=(
@@ -157,39 +324,107 @@ async def test_peer_production_probe_uses_owned_scoped_recognition_path() -> Non
     )
 
     class PeerRuntime:
-        def __init__(self) -> None:
-            self.receipts = []
-
         async def handle_peer_owned_vad_event(self, owned: object) -> None:
             await engine.handle_owned_vad_event(owned)
 
-        async def handle_provider_turn_terminal(self, receipt, terminal):
-            self.receipts.append(receipt)
-            transcript = Transcript(
-                utterance_id=receipt.identity.segment_id,
-                text=terminal.text,
-                is_final=True,
-                channel="peer",
-                publication_generation=receipt.identity.activation_generation,
-                source_order=receipt.identity.segment_order,
-            )
-            return STTFinalEvent(receipt.identity.segment_id, transcript)
-
-    peer_runtime = PeerRuntime()
     samples = np.linspace(-0.5, 0.5, 160, dtype=np.float32)
     try:
         final = await evidence._send_utterance(
-            application=SimpleNamespace(peer_vad=peer_runtime),
+            application=SimpleNamespace(peer_vad=PeerRuntime()),
             channel="peer",
             samples=samples,
             events=events,
-            peer_request=request,
+            request=request,
             activation_generation=7,
         )
     finally:
         await engine.close()
 
-    assert final.transcript.text == "scoped transcript"
-    assert final.transcript.publication_generation == 7
-    assert peer_runtime.receipts[0].segment.content_sample_count == samples.size
+    assert isinstance(final, STTProviderTurnTerminal)
+    assert final.outcome == "final"
+    assert final.text == "scoped transcript"
+    assert final.identity.segment.activation_generation == 7
     assert len(session.audio) == samples.size * 2
+
+
+@pytest.mark.asyncio
+async def test_self_production_probe_uses_owned_scoped_recognition_path() -> None:
+    events: list[object] = []
+    request = _scoped_request()
+    session = _ScopedSession()
+    engine = ScopedRecognitionEngine(
+        channel="self",
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        event_sink=events.append,
+        accepted_settings_scope=(
+            request.provider_id,
+            request.provider_signature,
+            request.runtime_signature,
+        ),
+    )
+
+    class SelfRuntime:
+        async def handle_vad_event(self, owned: object) -> None:
+            await engine.handle_owned_vad_event(owned)
+
+    samples = np.linspace(-0.5, 0.5, 160, dtype=np.float32)
+    try:
+        final = await evidence._send_utterance(
+            application=SimpleNamespace(self_vad=SelfRuntime()),
+            channel="self",
+            samples=samples,
+            events=events,
+            request=request,
+            activation_generation=3,
+        )
+    finally:
+        await engine.close()
+
+    assert isinstance(final, STTProviderTurnTerminal)
+    assert final.outcome == "final"
+    assert final.text == "scoped transcript"
+    assert final.identity.segment.activation_generation == 3
+    assert len(session.audio) == samples.size * 2
+
+
+@pytest.mark.asyncio
+async def test_recovered_ready_provider_delivers_after_channel_restart() -> None:
+    events: list[object] = []
+    request = _scoped_request()
+    session = _ScopedSession()
+    engine = ScopedRecognitionEngine(
+        channel="self",
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        accepted_settings_scope=(
+            request.provider_id,
+            request.provider_signature,
+            request.runtime_signature,
+        ),
+    )
+    handle = ProviderRuntimeHandle(
+        name="recovered_self",
+        event_handler=events.append,
+    )
+    await handle.replace_provider(engine, start=False)
+    assert await handle.start_if_provider(engine)
+
+    class SelfRuntime:
+        async def handle_vad_event(self, owned: object) -> None:
+            await engine.handle_owned_vad_event(owned)
+
+    try:
+        final = await evidence._send_utterance_staged(
+            report={},
+            stage="recovered_self",
+            application=SimpleNamespace(self_vad=SelfRuntime()),
+            channel="self",
+            samples=np.linspace(-0.5, 0.5, 160, dtype=np.float32),
+            events=events,
+            request=request,
+            activation_generation=4,
+        )
+    finally:
+        await handle.close()
+
+    assert isinstance(final, STTProviderTurnTerminal)
+    assert final.outcome == "final"

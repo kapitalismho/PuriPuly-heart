@@ -305,6 +305,7 @@ runtime_binaries += proctap_runtime_binaries
 runtime_binaries += collect_staged_soxr_runtime_binaries()
 runtime_binaries += collect_vendored_openvr_runtime_binaries()
 runtime_binaries += [(str(gpu_worker_staged_path), ".")]
+runtime_binaries += [(str(overlay_staged_path), ".")]
 hf_xet_native_extension = Path(get_module_file_attribute("hf_xet.hf_xet")).resolve()
 if not hf_xet_native_extension.is_file() or hf_xet_native_extension.name.lower() != "hf_xet.pyd":
     raise SystemExit("Pinned hf_xet package did not provide the Windows hf_xet.pyd extension")
@@ -347,7 +348,10 @@ hiddenimports = [
     "puripuly_heart.core.local_asr.local_qwen_runtime",
     "puripuly_heart.config.process_capture_platform",
     "puripuly_heart.core.audio.process_source",
-] + moved_module_hiddenimports + collect_submodules("proctap") + collect_submodules("huggingface_hub")
+    "proctap",
+    "proctap._native",
+    "proctap.backends.windows",
+] + moved_module_hiddenimports + collect_submodules("huggingface_hub")
 
 required_proctap_hiddenimports = {"proctap", "proctap._native", "proctap.backends.windows"}
 if not required_proctap_hiddenimports.issubset(set(hiddenimports)):
@@ -366,7 +370,7 @@ if release_smoke:
         "proctap.backends.windows",
         "puripuly_heart.config.process_capture_platform",
         "puripuly_heart.core.audio.process_source",
-    ] + collect_submodules("proctap")
+    ]
 
 a = Analysis(
     [str(entry_script)],
@@ -381,6 +385,13 @@ a = Analysis(
         "soxr.soxr_ext",
         "tkinter",
         "unittest",
+        # Build/test tooling is present in the packaging environment, but must
+        # never become part of the shipped runtime through dependency hooks.
+        "PyInstaller",
+        "flet_cli",
+        "pytest",
+        "_pytest",
+        "py",
         "pydoc",
         "doctest",
     ],

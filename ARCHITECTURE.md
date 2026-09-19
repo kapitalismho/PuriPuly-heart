@@ -396,6 +396,12 @@ Basic-audience records are the only records delivered live to the console and Lo
 
 The 2,048-record queue reserves 64 slots for warning/error/terminal evidence and discards lower-priority diagnostics first without blocking producers. Ordinary root and child prose is reduced to bounded metadata unless it satisfies the selected diagnostic format; accepted conversation retains its separate secret-protected path. A timed-out close keeps writer ownership until the listener can finish and close its stream, preventing a replacement writer from racing the old one. A stalled operating-system write can still prevent complete shutdown.
 
+## Runtime Layout Boundary
+
+`runtime_layout.py` is the immutable bootstrap boundary for source, PyInstaller, and experimental native-host layouts. It distinguishes the host executable from the Python interpreter and exposes read-only application resources, native runtimes, and the existing writable user-data/model/log roots. Feature code resolves prompts and native executables through this boundary rather than inspecting frozen flags, `_MEIPASS`, or the working directory. Explicit prompt, llama.cpp, and native-host bootstrap overrides remain supported.
+
+PyInstaller remains the release host. The native-host layout is an experimental input contract only; it does not select a native package, fake PyInstaller state, or change native worker ownership.
+
 ## Lifecycle
 
 Every owner of a task, process, source, or provider session must define:
@@ -440,6 +446,8 @@ Retired work must not mutate current state or publish user-visible output.
 7. Release remaining services.
 
 Use shutdown code and lifecycle tests for exact ordering.
+
+`ApplicationShutdownCoordinator.capture_stall_diagnostic()` is an on-demand snapshot. It reports the active shutdown owner/callback, named asyncio await graphs, and owner-supplied generation/native-operation/child state. It is not always-on tracing and does not claim native stack visibility.
 
 ## Async Event Model
 

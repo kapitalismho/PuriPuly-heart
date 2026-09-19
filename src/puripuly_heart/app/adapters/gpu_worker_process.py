@@ -27,6 +27,7 @@ from puripuly_heart.app.ports.gpu_worker import (
     GpuWorkerTranscription,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 GPU_WORKER_CONTRACT_VERSION = 2
 GPU_WORKER_EXECUTABLE_NAME = "PuriPulyHeartGpuWorker.exe"
@@ -214,6 +215,13 @@ class DefaultGpuWorkerProcessFactory(GpuWorkerProcessFactoryPort):
         sys_executable: Path | None = None,
         repo_root: Path | None = None,
     ) -> tuple[Path, Path]:
+        if sys_executable is None and repo_root is None:
+            layout = current_runtime_layout()
+            if layout.host_kind == "source":
+                executable = layout.native("gpu_worker", GPU_WORKER_EXECUTABLE_NAME)
+            else:
+                executable = layout.native(GPU_WORKER_EXECUTABLE_NAME)
+            return executable, executable
         executable = (sys_executable or Path(sys.executable)).resolve()
         root = repo_root or Path(__file__).resolve().parents[4]
         return (
