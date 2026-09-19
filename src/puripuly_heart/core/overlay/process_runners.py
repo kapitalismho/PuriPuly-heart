@@ -311,10 +311,8 @@ class DesktopFletOverlayRunner:
                     "--config",
                     str(manifest_path),
                 )
-            native_prefix = ("--headless",) if layout.host_kind == "native" else ()
             return (
                 str(layout.host_executable),
-                *native_prefix,
                 "run-desktop-overlay",
                 "--config",
                 str(manifest_path),
