@@ -17,6 +17,7 @@ from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
     COLOR_PRIMARY_CONTAINER,
     COLOR_SECONDARY,
+    text_field_outline_border,
 )
 
 _CHIP_TERM_WIDTH = 220
@@ -70,9 +71,7 @@ class CustomVocabularyTagEditor(ft.Column):
             multiline=False,
             max_lines=1,
             width=FILL_PARENT_WIDTH,
-            border_radius=_INPUT_FIELD_RADIUS,
-            border_color=COLOR_DIVIDER,
-            focused_border_color=COLOR_PRIMARY,
+            border=text_field_outline_border(border_radius=_INPUT_FIELD_RADIUS),
             text_size=28,
             color=COLOR_NEUTRAL_DARK,
             on_change=self._handle_input_change,

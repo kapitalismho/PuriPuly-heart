@@ -97,17 +97,23 @@ def test_input_uses_native_focus_styling_without_outer_token_field() -> None:
     editor = _make_editor()
 
     assert not hasattr(editor, "_token_field")
-    assert editor._input_field.border != ft.InputBorder.NONE  # noqa: SLF001
+    assert not isinstance(editor._input_field.border, ft.NoInputBorder)  # noqa: SLF001
     assert editor._input_field.focus_color != ft.Colors.TRANSPARENT  # noqa: SLF001
     assert editor._input_field.focused_bgcolor != ft.Colors.TRANSPARENT  # noqa: SLF001
-    assert editor._input_field.focused_border_color != ft.Colors.TRANSPARENT  # noqa: SLF001
+    assert (
+        editor._input_field.border[ft.ControlState.FOCUSED].side.color
+        == _editor_module().COLOR_PRIMARY
+    )  # noqa: SLF001
 
 
 def test_input_size_matches_api_key_fields() -> None:
     editor = _make_editor()
     module = _editor_module()
 
-    assert editor._input_field.border_radius == module._INPUT_FIELD_RADIUS  # noqa: SLF001
+    assert (
+        editor._input_field.border[ft.ControlState.DEFAULT].border_radius
+        == module._INPUT_FIELD_RADIUS
+    )  # noqa: SLF001
     assert editor._input_field.dense is not True  # noqa: SLF001
     assert editor._input_field.content_padding is None  # noqa: SLF001
 

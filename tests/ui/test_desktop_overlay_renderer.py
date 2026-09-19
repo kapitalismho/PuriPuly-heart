@@ -3894,7 +3894,7 @@ async def test_desktop_overlay_shipping_surface_has_no_overlay_local_controls() 
             desktop_overlay.t_for_locale("en", "settings.overlay.desktop.empty_state.action.lock")
         ]
         assert not any(
-            isinstance(item, ft.ElevatedButton)
+            isinstance(item, ft.Button)
             for control in app.page.controls
             for item in _walk_control_tree(control)
         )

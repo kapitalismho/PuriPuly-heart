@@ -118,15 +118,8 @@ async def _prepare_and_show_main_window(page: ft.Page) -> None:
     try:
         page.update()
 
-        wait_until_ready = getattr(page.window, "wait_until_ready_to_show", None)
-        if callable(wait_until_ready):
-            ready_result = wait_until_ready()
-            if inspect.isawaitable(ready_result):
-                await ready_result
-
-        center_result = page.window.center()
-        if inspect.isawaitable(center_result):
-            await center_result
+        await page.window.wait_until_ready_to_show()
+        await page.window.center()
     except Exception:
         logger.warning(
             "Failed to center the main window before showing it",
@@ -801,14 +794,9 @@ class TranslatorApp:
         )
 
     def _close_github_star_prompt_snackbar(self, snackbar: ft.SnackBar) -> None:
-        pop_dialog = getattr(self.page, "pop_dialog", None)
-        if callable(pop_dialog):
-            with contextlib.suppress(Exception):
-                pop_dialog()
-        else:
-            snackbar.open = False
-            with contextlib.suppress(Exception):
-                self.page.update()
+        _ = snackbar
+        with contextlib.suppress(Exception):
+            self.page.pop_dialog()
 
     def _preview_github_star_snackbar(self) -> None:
         snackbar = None
@@ -1010,11 +998,8 @@ class TranslatorApp:
             microphone_test_dialog.close(notify=True)
             return
 
-        pop_dialog = getattr(self.page, "pop_dialog", None)
-        if not callable(pop_dialog):
-            return
         try:
-            pop_dialog()
+            self.page.pop_dialog()
         except Exception:
             logger.exception("Failed to close dialog during navigation")
 

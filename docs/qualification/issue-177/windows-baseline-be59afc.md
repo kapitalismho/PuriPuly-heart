@@ -45,7 +45,9 @@ Executed on 2026-09-19. This is an engineering baseline, not release approval an
 | VRChat/SteamVR/HMD sustained workload | not run | No authorized live VRChat/SteamVR/HMD session was established. |
 | Upgrade, rollback and uninstall | blocked | Requires an owned isolated installer identity; the configured alternate identity was already occupied. |
 
-Outcome A remains evidence-incomplete for installed lifecycle, real capture/audio, full local ASR/GPU decode, and sustained VR/HMD behavior. Those absences do not invalidate the frozen source/packaged reference and do not prohibit isolated Outcome B compatibility work.
+Outcome A remains evidence-incomplete for real capture/audio, full local ASR/GPU decode, and sustained VR/HMD behavior. The original occupied-AppId installer lifecycle blocker was later resolved on a new AppId (see continuation). Those remaining absences do not invalidate the frozen source/packaged reference and do not prohibit isolated Outcome B compatibility work.
+
+Continuation 2026-09-19 (new AppId, production installer not executed): isolated install/maintenance/GUI/unrelated-CWD/Unicode path/reinstall/rollback/uninstall evidence is recorded in [Continuation: isolated installer lifecycle](#continuation-isolated-installer-lifecycle). Occupied `{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}` and production `{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}` were left untouched. This is still not release approval.
 
 ## Toolchain and dependency inventory
 
@@ -231,6 +233,75 @@ pwsh -NoProfile -File scripts/ci/build-release-artifacts.ps1 `
 & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
 ```
 
-## Source mutation barrier
+## Source mutation and candidate-reuse barrier
 
-The baseline reference is frozen sufficiently for a separate owner to begin isolated Outcome B compatibility implementation: exact source, environment, GUI/process behavior, command/path contracts, selected native-library identities, build artifacts, packaged smokes, measurements, and blockers are recorded above. This is not acceptance of Outcome A as complete. B must not overwrite these ignored artifacts or `.venv-win` while an A comparison needs them, and must compare against the exact artifact identities or rebuild the unchanged commit with an equivalent short-path setup.
+Outcome A is frozen and remains blocked, not accepted. No further baseline build or product execution should use or mutate `.venv-win`, `build/`, `dist/`, `installer_output/`, or `%TEMP%\PuriPulyHeart-A-ReleaseBuild`. Do not remove the occupied installer-smoke registry key and do not delete either local environment.
+
+The baseline reference is sufficiently recorded for a separate owner to begin isolated Outcome B compatibility implementation: exact source, environment, GUI/process behavior, command/path contracts, selected native-library identities, build artifacts, packaged smokes, measurements, and blockers are recorded above.
+
+Outcome B must use a new `.venv-b` environment and separate build/output roots. At minimum, set:
+
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = ".venv-b"
+$env:PURIPULY_HEART_RELEASE_BUILD_ROOT = Join-Path $env:TEMP "PuriPulyHeart-B-ReleaseBuild"
+```
+
+Because `build.spec`, `prepare-soxr-release-inputs.ps1`, `prepare-flet-runtime.ps1`, and `installer.iss` still use repository-relative `build/`, `dist/`, and `installer_output/`, merely changing `PURIPULY_HEART_RELEASE_BUILD_ROOT` does not isolate every output. The B owner must either use a separate worktree or first adapt/invoke those existing scripts with candidate-specific repository-relative output directories; B must not overwrite A's ignored artifacts in this worktree.
+
+Useful unchanged baseline commands and required inputs for comparison are:
+
+```powershell
+# Dedicated A environment; reference only, now frozen.
+$env:UV_PROJECT_ENVIRONMENT = ".venv-win"
+
+# The custom soxr preparation required a short checkout path on this machine.
+pwsh -NoProfile -File scripts/ci/prepare-soxr-release-inputs.ps1
+
+# Release qualification inputs.
+$env:PURIPULY_HEART_RELEASE_BUILD_ROOT = Join-Path $env:TEMP "PuriPulyHeart-A-ReleaseBuild"
+pwsh -NoProfile -File scripts/ci/build-release-artifacts.ps1 `
+  -AppVersion 2.7.0 -InnoSetupVersion 6.6.1
+
+# Installer compilation only; this does not install.
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
+```
+
+The required local tool inputs were CPython 3.12.10, uv 0.9.17, VS Build Tools 2022 17.14.36804.6 with MSVC 14.44.35207 and Windows SDK 10.0.26100.0, Vulkan SDK 1.4.350.0, Rust/Cargo 1.97.1, CMake 4.4.0, and Inno Setup 6.6.1. The comparison authority is the artifact identity table above, not reuse of a mutable path. If an exact A artifact is unavailable, rebuild the unchanged commit in a separate short-path worktree and record the new hashes rather than treating a different hash as the same candidate.
+
+## Continuation: isolated installer lifecycle
+
+Executed later on 2026-09-19 without rebuilding A, without executing `installer_output/PuriPulyHeart-Setup-2.7.0.exe`, and without modifying `installer.iss`, product source, or shared envs. Throwaway scripts and logs live under `%TEMP%\PuriPulyHeart-A177-InstallerEvidence\` and `%TEMP%\PuriPulyHeart-A177-InstallerSmoke\20260919T084410Z-d3b00fb4\`.
+
+Frozen A payload hashes were re-checked before compile and after compile; production setup remained `b1f6c781381f65c55ad6eaa57916aebb0d7e8be84e2f725cfc59889c4a851b44`.
+
+| Area | Status | Executed result |
+| --- | --- | --- |
+| Occupied C2E4 smoke AppId | passed | `HKCU\...\Uninstall\{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}_is1` still `PuriPuly <3 2.6.1` at `...\PuriPulyHeart-Korean-Privacy-Validation\`. Left untouched. |
+| Production AppId | passed | `HKCU\...\Uninstall\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}_is1` still `PuriPuly <3 2.7.0` at `...\Programs\PuriPulyHeart\`. Left untouched. Production installer was not executed. |
+| New AppId preflight | passed | `{D3B00FB4-4E73-4801-8E66-EBF7C53D11FE}` was unoccupied before first execute. |
+| Distinct smoke compile | passed | Unchanged `installer.iss` + exact A `dist\PuriPulyHeart` and `build\overlay`, Inno 6.6.1, `/O` override, `/DSkipLocalSttProvisioning=1`. Output `C:\Users\salee\AppData\Local\Temp\PuriPulyHeart-A177-InstallerSmoke\20260919T084410Z-d3b00fb4\PuriPulyHeart-Setup-2.7.0.exe` size 180486536, SHA-256 `cb986e6b5fcdfc51a1bb983976316764124c0ec332625a82e366abdf4307d000`. |
+| Isolated install | passed | `/CURRENTUSER /VERYSILENT` into Unicode `{localappdata}\Programs\PuriPulyHeart-A177-설치-20260919T084410Z-d3b00fb4`. Installed exe SHA-256 matched frozen A. Log marker `Local STT provisioning skipped for isolated installer smoke.` Fresh settings telemetry enabled. |
+| Maintenance | passed | Installed `--version` from `C:\Windows\Temp` printed `2.7.0`. `installer-telemetry-preference disable` returned 0 and persisted canonical OFF. `soxr-runtime-check` returned 0. |
+| GUI startup check / unrelated CWD | passed | Installed `gui-startup-check` from `C:\Windows\Temp` returned 0. |
+| Installed GUI / Unicode CWD | passed with limit | Later owned install at `...\PuriPulyHeart-A177-설치2-...\` launched with `--config` from Unicode CWD `...\PuriPulyHeart-A177-cwd2-한글-...\`. Owned visible window title `PuriPuly <3` on in-tree `flet.exe`; `WM_CLOSE` exit 0; no owned survivors. PrintWindow screenshot failed (`OverflowError` on hwnd). First GUI attempt used image-path matching only and missed the Flet child. |
+| Reinstall | passed | Mutated owned `soxr\soxr.dll`, re-ran the smoke installer to the same Unicode dir; bundled soxr hash restored; telemetry opt-out preserved; STT skip marker present. |
+| Rollback | passed | Silent retry into the first leftover Unicode dir hit RestartManager in-use Flet, aborted (exit 5), logged `Rolling back changes` and `Uninstallation process succeeded`; new AppId registry stayed absent. An earlier post-install telemetry exception did **not** undo copied files (silent CurStepChanged exception, exit 0); that path is not claimed as rollback. Production Flet was not closed. |
+| Uninstall | passed | Owned `unins000.exe /VERYSILENT` on the second Unicode install removed that dir, the isolated AppData root `puripuly-heart-a177-20260919T084410Z-d3b00fb4`, and `{D3B00FB4-4E73-4801-8E66-EBF7C53D11FE}_is1`. C2E4 and production identities unchanged. |
+| Published v2.7 upgrade | not run | `Downloads\PuriPulyHeart-Setup-2.7.0.exe` SHA-256 `10218a4e08b14a3fb5bde3106553fb446c9a06f59da6e14f5f1e64328c56bf15` uses occupied production AppId. Same-build reinstall is not an upgrade. |
+| Process-capture helper in installer | not run | Not part of the frozen A payload compile; `/DProcessCaptureSmokeArtifactRoot` omitted. |
+
+ISCC command (working directory = this worktree):
+
+```text
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+  /DMyAppId={{D3B00FB4-4E73-4801-8E66-EBF7C53D11FE}
+  /DMyAppDataDirName=puripuly-heart-a177-20260919T084410Z-d3b00fb4
+  /DInstallerSmokeAppDataRoot=C:/Users/salee/AppData/Local/puripuly-heart-a177-20260919T084410Z-d3b00fb4
+  /DMyAppGroupName=PuriPulyHeart-A177-20260919T084410Z-d3b00fb4
+  /DMyAppDirName=PuriPulyHeart-A177-20260919T084410Z-d3b00fb4
+  /DSkipLocalSttProvisioning=1
+  /OC:\Users\salee\AppData\Local\Temp\PuriPulyHeart-A177-InstallerSmoke\20260919T084410Z-d3b00fb4
+  installer.iss
+```
+
+Owned leftover not blanket-deleted: `C:\Users\salee\AppData\Local\Programs\PuriPulyHeart-A177-설치-20260919T084410Z-d3b00fb4\dbghelp.dll` remained after the first uninstall (access denied). The second Unicode install dir was fully removed. Product owner approval for release/deployment is not granted here.

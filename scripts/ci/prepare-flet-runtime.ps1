@@ -7,8 +7,8 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$FletVersion = "0.86.1"
-$ExpectedSha256 = "2cf0865b31bd0e394a24a6c2d270e084cf9dad9c711e0b5d0cf9fa9bfac31e14"
+$FletVersion = "1.0.0"
+$ExpectedSha256 = "758f21506fbb9ad180bd93c7460a2ca55630401c6026a9bc9e2273444014491d"
 $DownloadUrl = "https://github.com/flet-dev/flet/releases/download/v$FletVersion/flet-windows.zip"
 $ResolvedOutputPath = [System.IO.Path]::GetFullPath((Join-Path $PWD $OutputPath))
 $OutputDirectory = Split-Path -Parent $ResolvedOutputPath

@@ -527,7 +527,7 @@ wheels = [
 
 [[package]]
 name = "flet"
-version = "0.86.1"
+version = "1.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx", marker = "sys_platform != 'emscripten'" },
@@ -535,41 +535,54 @@ dependencies = [
     { name = "oauthlib", marker = "sys_platform != 'emscripten'" },
     { name = "repath" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c0/f4/37192884aca2587eaf4cf33f24977f0c5d8abf24d4934a951f4e94bf1c32/flet-0.86.1.tar.gz", hash = "sha256:7eb12d86bd7ea699800d185941171218adc01458c9e3f1f79a85d21df32e1592", size = 540871, upload-time = "2026-07-17T15:59:50.861Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/36/5d/bd3f4b41f7aa16d7e6802a28a2b31878a94c3e91c67d866b02c7f94b702d/flet-1.0.0.tar.gz", hash = "sha256:7d867d4832b03b380864d751dfec6a43ec8391b3db9f7f9d0ab93219a6ce2281", size = 560856, upload-time = "2026-09-14T23:00:41.599Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ee/75/5d3d8b12cf819fcd27cdf973a3f72f5f5af0d3dcaa38de19948a8ada8cc1/flet-0.86.1-py3-none-any.whl", hash = "sha256:3d866a2b565be99044b166c1e257d22434aedcdd32d40124cece81c4c80455b6", size = 620233, upload-time = "2026-07-17T15:59:49.591Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/6a/80aee6450ec44d11fbfcdd2b539bfcf6516442e561cb82dc0af0c1543c5e/flet-1.0.0-py3-none-any.whl", hash = "sha256:7e61fffc7f2ee70de1d0729ee39177b838897f10258fb92d534e4a0ef8564f48", size = 631615, upload-time = "2026-09-14T23:00:39.906Z" },
 ]
 
 [[package]]
 name = "flet-cli"
-version = "0.86.1"
+version = "1.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "binaryornot" },
     { name = "chardet" },
     { name = "cookiecutter" },
     { name = "flet" },
+    { name = "flet-platform-assets" },
     { name = "packaging" },
     { name = "qrcode" },
     { name = "rich" },
     { name = "watchdog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/fe/39c7930853d7926666dfad5011cf6553c2762e5413f7bdfd9c0652eb8d44/flet_cli-0.86.1.tar.gz", hash = "sha256:757819498e6255b56b835b355c6421ff7b45bc422988137d77d30c4ea01d22ea", size = 82035, upload-time = "2026-07-17T15:59:53.555Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/32/32e6241e859c3262ee34141b22ae9bc727915dfda6a7f686d5e6ae35c766/flet_cli-1.0.0.tar.gz", hash = "sha256:96155821b16ab7cc8cea3c243307f7294dc76b1d9b6477f37f3b474f885345d6", size = 163754, upload-time = "2026-09-14T23:00:46.251Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cd/2e/1d58b115a4f735a205ca7feb0017bc67efa609c80bf662b8bcffdabe8823/flet_cli-0.86.1-py3-none-any.whl", hash = "sha256:bd4ad9129f55dc8c18305c24923227c2f0ebb5d09bb9f7fdde559a96da74ae88", size = 96495, upload-time = "2026-07-17T15:59:52.654Z" },
+    { url = "https://files.pythonhosted.org/packages/58/fb/c965ba665d56aa968c97616a7bbf35e089951b9bfac768e164326415b8a2/flet_cli-1.0.0-py3-none-any.whl", hash = "sha256:d23c1a9c7d67e9838f3d34dd2c942a852d455ba7c7f6e9b5357ead30d486929f", size = 139643, upload-time = "2026-09-14T23:00:45.034Z" },
 ]
 
 [[package]]
 name = "flet-desktop"
-version = "0.86.1"
+version = "1.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "flet" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/30/62/7d394f88295b7b5b7f3da16474557122d2d67e3a9648e4345b875a18fdaa/flet_desktop-0.86.1.tar.gz", hash = "sha256:a37261ee9ce990f8b9cb68a77f68ccaa8e1faea2416e5a10a5e7dabfa3c416d2", size = 6322, upload-time = "2026-07-17T15:59:56.039Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/11/03/a8b3566a9c83fc99433e56838dd7d8da9ea24a9c86024ac420d4e9c3918e/flet_desktop-1.0.0.tar.gz", hash = "sha256:fb193450501e35079ea525cc159efc349dc1383cb4837ae39317f3d25d3ddc56", size = 12716, upload-time = "2026-09-14T23:00:49.676Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/e9/861a958120d203d4323199a7af2512baf97145745e6b3a8adf6b081e4c0f/flet_desktop-0.86.1-py3-none-any.whl", hash = "sha256:e7f3c61ed56b1457298415d2f9698323805835bff7b57f9bb6c6090b13451779", size = 6419, upload-time = "2026-07-17T15:59:54.954Z" },
+    { url = "https://files.pythonhosted.org/packages/af/f8/76493acd53179cc58338d6338ec34059cbbb69e16fe7bb3a14b9e4837932/flet_desktop-1.0.0-py3-none-any.whl", hash = "sha256:be5d7de55bb917740b5d659c9f8c11aa958782b53a0cf1bd5a33ded18cfce26e", size = 13145, upload-time = "2026-09-14T23:00:48.776Z" },
+]
+
+[[package]]
+name = "flet-platform-assets"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/78/4b/24173bc95d2224b8103bb7739cec2bdbfadd4c56dda8517a5676c9683be3/flet_platform_assets-1.0.0.tar.gz", hash = "sha256:d4d3931dec8c279310e35a18f19eb824cda810bb689b6cf4ce5fe07e9fb47d04", size = 35625, upload-time = "2026-09-14T23:00:53.553Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/28/c8/b8a39b25d11c9a4f1add2e795e99613867cb04c022e6cceb6a2da93748d1/flet_platform_assets-1.0.0-py3-none-any.whl", hash = "sha256:de06ce4861addb03adc56162641fff0d080199eeee997fb9e02f7612120cec91", size = 25561, upload-time = "2026-09-14T23:00:52.429Z" },
 ]
 
 [[package]]
@@ -1187,6 +1200,35 @@ wheels = [
 ]
 
 [[package]]
+name = "pillow"
+version = "12.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/3d/bb7fca845737cf9d7dbde16ed1843984665ff2e0a518f5db43e77ec540b9/pillow-12.3.0.tar.gz", hash = "sha256:3b8182a766685eaa002637e28b4ec8d6b18819a0c71f579bf0dbaa5830297cce", size = 47025035, upload-time = "2026-07-01T11:56:38.965Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/37/bf/fb3ebff8ddcb76aac5a01389251bbbb9519922a9b520d8247c1ca864a25d/pillow-12.3.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:ba09209fbe443b4acccebe845d8a138b89a8f4fbaeedd44953490b5315d5e965", size = 5345969, upload-time = "2026-07-01T11:54:06.397Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/66/9a386a92561f402389a4fc70c18838bf6d35eb5eb5c6850b4b2dc64f5048/pillow-12.3.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:ffd0c5368496f41b0944be820fcb7a838aa6e623d250b01acf2643939c3f99d7", size = 4780323, upload-time = "2026-07-01T11:54:09.351Z" },
+    { url = "https://files.pythonhosted.org/packages/25/27/ac8f99618ffd3dde21db0f4d4b1d2ab00c0880595bfd17df103f7f39fd0c/pillow-12.3.0-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:d9c7f76c0673154f044e9d78c8655fb4213f6ca31a836df48b40fe5d187717b9", size = 6266838, upload-time = "2026-07-01T11:54:11.71Z" },
+    { url = "https://files.pythonhosted.org/packages/84/21/a35af28dcc61f37ed850a2d64c65c701321dfbf25085e469d5559360cbbf/pillow-12.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:78cb2c6865a35ab8ff8b75fd122f6033b92a62c82801110e48ddd6c936a45d91", size = 6940830, upload-time = "2026-07-01T11:54:13.732Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/51/8b08617af3ad95e33ce6d7dd2c99ed6c8298f7fb131636303956be022e25/pillow-12.3.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:e491916b378fba47242221bb9ead245211b70d504f495d105d17b14a24b4907c", size = 6344383, upload-time = "2026-07-01T11:54:15.756Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/72/cf78ac9780bb93c28328f408973845a309d4d145041665f734572ced1b52/pillow-12.3.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:0dd2064cbc55aaec028ef5fbb60fa47bb6c3e7918e07ff17935284b227a9d2df", size = 7052934, upload-time = "2026-07-01T11:54:17.721Z" },
+    { url = "https://files.pythonhosted.org/packages/20/20/25e0f4dc178a6bc0696793720055519a0de89e7661dae886992decbd2f81/pillow-12.3.0-cp312-cp312-win32.whl", hash = "sha256:dbce0b29841537a2fa4a214c2bbf14de3587c9680caa9b4e217568472490b28f", size = 6472684, upload-time = "2026-07-01T11:54:19.839Z" },
+    { url = "https://files.pythonhosted.org/packages/45/89/da2f7971a317f83d807fdd4065c0af40208e59e692cc43d315a71a0e96d1/pillow-12.3.0-cp312-cp312-win_amd64.whl", hash = "sha256:a2b55dd6b2a4c4b7d87ffa56bdb33fdc5fdb9a462173861a7bc097f17d91cb09", size = 7227137, upload-time = "2026-07-01T11:54:22.025Z" },
+    { url = "https://files.pythonhosted.org/packages/de/47/4845a0a6c0dbf1db8456bd9fc791f13c5ced7ced20606d08a0aacfd25b49/pillow-12.3.0-cp312-cp312-win_arm64.whl", hash = "sha256:331b624368d4f1d069149002f25f44bc61c8919ce8ddb3c45bdad8f6e2d89510", size = 2568267, upload-time = "2026-07-01T11:54:24.051Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/ac/31fb64e1e7efb5a4b50cd3d92049ba89ac6e4d8d3bb6a74e15048ca3353e/pillow-12.3.0-cp313-cp313-ios_13_0_arm64_iphoneos.whl", hash = "sha256:21900ce7ba264168cd50defae43cd75d25c833ad4ad6e73ffc5596d12e25ac89", size = 4161684, upload-time = "2026-07-01T11:54:25.934Z" },
+    { url = "https://files.pythonhosted.org/packages/87/b4/9805e23d2b4d77842b468513841fda254ee42f0289d25088340e4ff46e2d/pillow-12.3.0-cp313-cp313-ios_13_0_arm64_iphonesimulator.whl", hash = "sha256:4e8c2a84d977f50b9daed6eeaf3baef67d00d5d74d932288f02cb94518ee3ace", size = 4255487, upload-time = "2026-07-01T11:54:27.935Z" },
+    { url = "https://files.pythonhosted.org/packages/df/39/ecf519435a200c693fe053a6ee4d835b41cf963a4dfc2551c4e637cb2a71/pillow-12.3.0-cp313-cp313-ios_13_0_x86_64_iphonesimulator.whl", hash = "sha256:ae26d61dfa7a47befdc7572b521024e8745f3d809bd95ca9505a7bba9ef849ec", size = 3696433, upload-time = "2026-07-01T11:54:29.813Z" },
+    { url = "https://files.pythonhosted.org/packages/42/92/2fc3ffad878ae8dd5469ec1bc8eb83b71f48e13efdf68f02709003982a32/pillow-12.3.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:7a743ff716f746fc19a9557f60dab1600d4613255f8a7aeb3cdde4db7eb15a66", size = 5345889, upload-time = "2026-07-01T11:54:31.97Z" },
+    { url = "https://files.pythonhosted.org/packages/10/76/8803c13605b763d33d156c4678fc77f8443389c0c51c8aef707bb02015f4/pillow-12.3.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:d69141514cc30b774ceea5e3ed3a6635c8d8a96edf664689b890f4089111fb35", size = 4780109, upload-time = "2026-07-01T11:54:34.026Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/01/e18aff37cb0b4aac47ac90f016d347a49aca667ef97f190b06ac2aabc928/pillow-12.3.0-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:f7401aebd7f581d7f83a439d87d474999317ee099218e5ad25d125290990ba65", size = 6263736, upload-time = "2026-07-01T11:54:36.131Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/62/de5bdd77d935331f4f802edc11e4d82950f642caad6cb2f949837b8560e2/pillow-12.3.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0847a763afefb695bc912d7c131e7e0632d4edc1d8698f58ddabec8e46b8b6d3", size = 6937129, upload-time = "2026-07-01T11:54:38.216Z" },
+    { url = "https://files.pythonhosted.org/packages/70/4d/105627a13300c5e0df1d174230b32fd1273062c96f7745fd552b945d1e1d/pillow-12.3.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:571b9fcb07b97ef3a492028fb3d2dc0993ca23a06138b0315286566d29ef718a", size = 6339562, upload-time = "2026-07-01T11:54:40.354Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/1d/f13de01a553988ab895ba1c722e06cf3144d4f57656fd5b81b6d881f1179/pillow-12.3.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:756c768d0c9c2955feb7a56c37ea24aea2e369f8d36a88da270b6a9f19e62b5e", size = 7049439, upload-time = "2026-07-01T11:54:42.489Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/f9/066794cca041b969964f779ee5fa66a9498bbf34248ac39c5d7954e4198f/pillow-12.3.0-cp313-cp313-win32.whl", hash = "sha256:a876864214e136f0eb367788dbd7df045f4806801518e2cfe9e13229cfe06d8f", size = 6473287, upload-time = "2026-07-01T11:54:44.9Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/9b/7a58e61d62be561da3a356fe2384d4059a6345fc130e23ef1c36a5b81d24/pillow-12.3.0-cp313-cp313-win_amd64.whl", hash = "sha256:1cca606cd25738df4ed873d5ad46bbdb3d83b5cbca291f6b4ff13a4df6b0bbe8", size = 7239691, upload-time = "2026-07-01T11:54:47.141Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/b0/c4ed4f0ef8f8fa5ee8351537db6650bb8189f7e118842978dd6589065692/pillow-12.3.0-cp313-cp313-win_arm64.whl", hash = "sha256:b629de27fda84b42cde7edef0d85f13b958b47f6e9bbcbba9b673c562a89bd8b", size = 2568185, upload-time = "2026-07-01T11:54:49.137Z" },
+]
+
+[[package]]
 name = "platformdirs"
 version = "4.5.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1372,9 +1414,9 @@ requires-dist = [
     { name = "dashscope", specifier = "==1.26.4" },
     { name = "deepgram-sdk", specifier = ">=5.3.4,<6.0.0" },
     { name = "elevenlabs", specifier = ">=2.60.0,<3.0.0" },
-    { name = "flet", specifier = "==0.86.1" },
-    { name = "flet-cli", marker = "extra == 'build'", specifier = "==0.86.1" },
-    { name = "flet-desktop", specifier = "==0.86.1" },
+    { name = "flet", specifier = "==1.0.0" },
+    { name = "flet-cli", marker = "extra == 'build'", specifier = "==1.0.0" },
+    { name = "flet-desktop", specifier = "==1.0.0" },
     { name = "google-genai", specifier = ">=2.21.0,<3.0.0" },
     { name = "hf-xet", specifier = "==1.5.2" },
     { name = "httpx", specifier = ">=0.27" },

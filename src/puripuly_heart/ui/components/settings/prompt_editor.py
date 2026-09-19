@@ -6,7 +6,10 @@ import flet as ft
 
 from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.ui.flet_runtime import FILL_PARENT_WIDTH, update_control_if_mounted
-from puripuly_heart.ui.theme import COLOR_DIVIDER, COLOR_NEUTRAL_DARK, COLOR_PRIMARY
+from puripuly_heart.ui.theme import (
+    COLOR_NEUTRAL_DARK,
+    text_field_outline_border,
+)
 
 PROMPT_FIELD_CONTENT_PADDING = ft.Padding.symmetric(horizontal=8, vertical=16)
 
@@ -30,9 +33,7 @@ class PromptEditor(ft.Column):
             on_blur=self._handle_blur,
             width=FILL_PARENT_WIDTH,
             content_padding=PROMPT_FIELD_CONTENT_PADDING,
-            border_radius=12,
-            border_color=COLOR_DIVIDER,
-            focused_border_color=COLOR_PRIMARY,
+            border=text_field_outline_border(border_radius=12),
             text_size=16,
             color=COLOR_NEUTRAL_DARK,
         )

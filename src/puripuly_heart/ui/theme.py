@@ -40,6 +40,21 @@ def _clickable_button_style() -> ft.ButtonStyle:
     )
 
 
+def text_field_outline_border(*, border_radius: int | float) -> dict[ft.ControlState, ft.InputBorder]:
+    def outline(color: str, width: int) -> ft.OutlineInputBorder:
+        return ft.OutlineInputBorder(
+            border_radius=border_radius,
+            side=ft.BorderSide(width=width, color=color),
+        )
+
+    return {
+        ft.ControlState.DEFAULT: outline(COLOR_DIVIDER, 1),
+        ft.ControlState.FOCUSED: outline(COLOR_PRIMARY, 2),
+        ft.ControlState.ERROR: outline(COLOR_ERROR, 1),
+        ft.ControlState.DISABLED: outline(COLOR_DIVIDER, 1),
+    }
+
+
 def get_app_theme(
     font_family: str | None = None,
     body_letter_spacing: float | None = None,

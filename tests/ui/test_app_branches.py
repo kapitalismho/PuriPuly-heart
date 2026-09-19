@@ -176,6 +176,11 @@ class DummyPage:
             self.window.destroy_calls += 1
 
         self.opened: list[object] = []
+        async def wait_until_ready_to_show() -> None:
+            return None
+
+        async def center_window() -> None:
+            self.window.center_calls += 1
         self.closed: list[object] = []
         self.tasks: list[object] = []
         self.title: str = ""
@@ -203,10 +208,8 @@ class DummyPage:
             icon="",
             center_calls=0,
             visible=False,
-            center=lambda: None,
-        )
-        self.window.center = lambda: setattr(
-            self.window, "center_calls", self.window.center_calls + 1
+            center=center_window,
+            wait_until_ready_to_show=wait_until_ready_to_show,
         )
         self.dialog = None
 

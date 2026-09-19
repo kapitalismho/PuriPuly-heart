@@ -16,10 +16,9 @@ from puripuly_heart.ui.components.warm_document_dialog import (
 from puripuly_heart.ui.flet_runtime import FILL_PARENT_WIDTH
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
-    COLOR_DIVIDER,
     COLOR_ON_BACKGROUND,
-    COLOR_PRIMARY,
     COLOR_WARNING,
+    text_field_outline_border,
 )
 
 _QQ_CREDENTIAL_PATTERN = re.compile(r"\A[0-9a-f]{64}\Z")
@@ -201,9 +200,7 @@ class QqManagedAuthDialog:
             value="",
             helper=t(helper_key),
             dense=False,
-            border_radius=14,
-            border_color=COLOR_DIVIDER,
-            focused_border_color=COLOR_PRIMARY,
+            border=text_field_outline_border(border_radius=14),
             content_padding=ft.Padding.symmetric(horizontal=16, vertical=20),
             text_size=22,
             color=COLOR_ON_BACKGROUND,

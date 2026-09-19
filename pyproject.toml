@@ -33,8 +33,8 @@ dependencies = [
   "sherpa-onnx>=1.13.4",
   "sherpa-onnx-core==1.13.4",
   "keyring>=25.0",
-  "flet==0.86.1",
-  "flet-desktop==0.86.1",
+  "flet==1.0.0",
+  "flet-desktop==1.0.0",
   "httpx>=0.27",
   "huggingface-hub==1.26.0",
   "hf-xet==1.5.2",
@@ -52,7 +52,7 @@ dev = [
 ]
 build = [
   "cmake>=3.31",
-  "flet-cli==0.86.1",
+  "flet-cli==1.0.0",
   "libclang>=18.1",
   "pyinstaller>=6.0",
   "scikit-build-core>=0.10",

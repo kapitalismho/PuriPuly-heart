@@ -765,7 +765,7 @@ _REAL_DEFAULT_PREVIEW_APP_RUNNER = _default_preview_app_runner
 
 
 class FletDesktopRendererWindow:
-    """Flet 0.86.1 transparent desktop overlay window boundary.
+    """Flet 1.0.0 transparent desktop overlay window boundary.
 
     The renderer remains persistence-free: this class only applies runtime
     controls to the Flet page/window and emits renderer-originated overlay
@@ -1885,7 +1885,7 @@ class FletDesktopRendererWindow:
     ) -> Any:
         buttons = []
         for value, text, selected in items:
-            button = ft.ElevatedButton(
+            button = ft.Button(
                 content=text,
                 on_click=lambda _event, selected_value=value: self._select_preview(
                     selected_value,

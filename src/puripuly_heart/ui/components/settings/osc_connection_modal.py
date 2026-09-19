@@ -176,7 +176,15 @@ class OscConnectionModal:
             dense=True,
             height=_PORT_FIELD_HEIGHT,
             width=FILL_PARENT_WIDTH,
-            border=ft.InputBorder.NONE,
+            border={
+                state: ft.NoInputBorder()
+                for state in (
+                    ft.ControlState.DEFAULT,
+                    ft.ControlState.FOCUSED,
+                    ft.ControlState.ERROR,
+                    ft.ControlState.DISABLED,
+                )
+            },
             filled=False,
             bgcolor=ft.Colors.TRANSPARENT,
             color=COLOR_PRIMARY,

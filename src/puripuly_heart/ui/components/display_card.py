@@ -126,7 +126,15 @@ class DisplayCard(ft.Container):
 
         self._input_field = ft.TextField(
             hint_text=t("display.input_hint"),
-            border=ft.InputBorder.NONE,
+            border={
+                state: ft.NoInputBorder()
+                for state in (
+                    ft.ControlState.DEFAULT,
+                    ft.ControlState.FOCUSED,
+                    ft.ControlState.ERROR,
+                    ft.ControlState.DISABLED,
+                )
+            },
             text_size=20,
             color=COLOR_NEUTRAL_DARK,
             hint_style=ft.TextStyle(color=COLOR_SECONDARY, italic=True),
