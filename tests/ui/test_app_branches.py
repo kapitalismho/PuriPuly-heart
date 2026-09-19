@@ -1034,6 +1034,63 @@ async def test_window_close_awaits_application_shutdown_before_destroy(
 
 
 @pytest.mark.asyncio
+async def test_window_close_orchestration_survives_owned_page_task_cancellation() -> None:
+    events: list[str] = []
+
+    class ConcurrentPage:
+        def __init__(self) -> None:
+            self.tasks: list[asyncio.Task[object]] = []
+
+            async def destroy() -> None:
+                events.append("destroy")
+
+            self.window = SimpleNamespace(destroy=destroy)
+
+        def run_task(self, coroutine, *args):
+            task = asyncio.create_task(coroutine(*args))
+            self.tasks.append(task)
+            return task
+
+    class Controller:
+        async def stop(self) -> None:
+            events.append("critical-start")
+            await asyncio.sleep(0)
+            events.append("critical-finished")
+
+    async def ordinary_ui_job() -> None:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            events.append("ordinary-cancelled")
+
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = ConcurrentPage()
+    app._ui_application = _application_boundary_with_stop(Controller())
+    app._shutting_down = False
+    app._shutdown_complete = False
+    app._window_close_requested = False
+    app._settings_mutation_queue = [object()]
+
+    ordinary_task = app._run_page_task(ordinary_ui_job)
+    await asyncio.sleep(0)
+    app._on_window_event(SimpleNamespace(type=ft.WindowEventType.CLOSE))
+    app._on_window_event(SimpleNamespace(type=ft.WindowEventType.CLOSE))
+
+    close_task = app.page.tasks[-1]
+    await asyncio.wait_for(close_task, timeout=1.0)
+
+    assert ordinary_task.cancelled()
+    assert app._get_application_lifecycle().snapshot.terminal is True
+    assert events == [
+        "ordinary-cancelled",
+        "critical-start",
+        "critical-finished",
+        "destroy",
+    ]
+    assert len(app.page.tasks) == 2
+
+
+@pytest.mark.asyncio
 async def test_main_gui_constructs_the_real_application_and_presentation_boundaries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

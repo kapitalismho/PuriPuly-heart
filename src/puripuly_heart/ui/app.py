@@ -418,7 +418,9 @@ class TranslatorApp:
         if self._window_close_requested:
             return
         self._window_close_requested = True
-        self._run_page_task(self._close_after_window_request)
+        self._ensure_foundation_runtime().run_application_shutdown_task(
+            self._close_after_window_request
+        )
 
     async def _close_after_window_request(self) -> None:
         try:

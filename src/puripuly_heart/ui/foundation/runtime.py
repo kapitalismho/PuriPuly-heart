@@ -43,6 +43,7 @@ class FletFoundationRuntime:
         self._resources = resources
         self._application_lifecycle: ApplicationShutdownCoordinator | None = None
         self._tracked_tasks: set[object] = set()
+        self._application_shutdown_tasks: set[object] = set()
         self._close_completed = False
 
     @property
@@ -105,6 +106,22 @@ class FletFoundationRuntime:
         add_done_callback = getattr(task, "add_done_callback", None)
         if callable(add_done_callback):
             add_done_callback(self._tracked_tasks.discard)
+        return task
+
+    def run_application_shutdown_task(
+        self,
+        coroutine: Any,
+        *args: object,
+    ) -> object | None:
+        if self._application_lifecycle is None:
+            raise RuntimeError("Flet foundation runtime lifecycle is not bound")
+        task = self._page.run_task(coroutine, *args)
+        if task is None:
+            return None
+        self._application_shutdown_tasks.add(task)
+        add_done_callback = getattr(task, "add_done_callback", None)
+        if callable(add_done_callback):
+            add_done_callback(self._application_shutdown_tasks.discard)
         return task
 
     async def close(self) -> None:
