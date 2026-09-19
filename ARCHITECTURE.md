@@ -11,7 +11,9 @@ Use this document to locate:
 - lifecycle boundaries,
 - relevant source files.
 
-For detailed behavior, read the referenced code and tests.
+For detailed behavior, runtime policy values, and migration rules, read the referenced code and tests.
+
+Python source paths are relative to `src/puripuly_heart/`. Paths beginning with `src/`, `native/`, or `tests/` are relative to the repository root.
 
 ## Architecture Model
 
@@ -57,7 +59,7 @@ Broker is a control-plane dependency, not part of the normal utterance data path
 | ----------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
 | UI application boundary | UI-facing application operations                           | `app/services/ui_application.py`                 |
 | Settings owner          | Canonical settings, persistence, projection, rollback      | `app/services/canonical_settings_persistence.py` |
-| Runtime pipeline        | Active runtime component set                               | `app/wiring_runtime_pipeline.py`                    |
+| Runtime pipeline        | Active runtime component set                               | `app/wiring/wiring_runtime_pipeline.py`                    |
 | Self capture owner      | Microphone source and capture lifecycle                    | `core/runtime/self_capture.py`                       |
 | Self translation owner  | Self STT events, turns, state, output projection           | `core/orchestrator/self_translation_channel.py`      |
 | Peer capture owner      | Target, source, VAD, task, provider attachment, generation | `core/runtime/peer_channel.py`                       |
@@ -65,8 +67,8 @@ Broker is a control-plane dependency, not part of the normal utterance data path
 | Managed local translation | Gemma provisioning, readiness, backend, prefix, and process lifecycle | `app/services/managed_gemma_translation.py` and `core/local_translation/runtime.py` |
 | Translation turn owner  | Request lifecycle, cancellation, stale-result rejection    | `core/orchestrator/translation_turn.py`                 |
 | Output runtime          | Routing, delivery tasks, destinations, delivery history    | `core/runtime/output.py`                              |
-| Overlay owners          | Overlay selection, process lifecycle, state, calibration   | `app/services/overlay_application.py`            |
-| Managed-account runtime | Authentication, entitlement, usage, credential release     | `app/wiring_managed_account.py`                      |
+| Overlay owners          | Overlay selection, process lifecycle, state, calibration   | `app/services/overlay/overlay_application.py`            |
+| Managed-account runtime | Authentication, entitlement, usage, credential release     | `app/wiring/wiring_managed_account.py`                      |
 | OSC control runtime   | Receiver lifecycle, routing, state publication, restart    | `app/services/osc/control_runtime.py`                        |
 | OSCQuery service      | Zeroconf discovery, receiver advertisement, OSCQuery tree | `core/osc/oscquery.py`                                        |
 | Shutdown adapter        | Ordered application teardown                               | `app/adapters/application_runtime_shutdown.py`      |
@@ -124,7 +126,7 @@ Peer output must not reach the VRChat chatbox.
 ### Audio ownership
 
 - Capture preserves source order and timing. Audio loss is explicit, not silence.
-- Capture owners retain generation-bound segment ledgers (`core/audio/ownership.py`). Segments freeze provider and endpoint settings and follow `open → sealed → terminal`.
+- Capture owners retain generation-bound segment ledgers and freeze provider and endpoint settings for admitted segments (`core/audio/ownership.py`).
 - `OwnedVadEvent` carries segment identity into recognition. Only scoped recognition terminals retire source slots or admit final transcripts.
 - `ListenDeliveryController` owns peer segmentation independently of provider readiness (`core/audio/listen_delivery.py`).
 - Self and peer share `VadGating` but retain separate onset and endpoint policies. Delivery rollover preserves acoustic continuity.
@@ -154,8 +156,8 @@ VRChat process lifetime
 ```
 
 - Owner shared across pipeline rebuilds; no audio, VAD, or OSC dependency.
-- Count includes the local user; only `ready` snapshots expose it. Names and raw logs remain local.
-- Rendered as sanitized `<scene>` prefix in the translation user message; absent equals no scene.
+- Only trusted population context crosses into translation requests. Names and raw logs remain local.
+- Request preparation projects snapshots into sanitized LLM scene context.
 - Custom HTTP extensions never receive scene data.
 
 ## Ports and Adapters
@@ -235,7 +237,7 @@ Do not retain references across replacement unless the API explicitly allows it.
 
 - Canonical schema: `AppSettingsVNext`
 - Owner: canonical settings persistence service
-- Persistence: `config/settings_vnext/compat.py` (first-run, current load, recognized vNext-to-vNext migration, R00 archive-then-reset)
+- Persistence and migration: `config/settings_vnext/compat.py`
 - Desktop overlay defaults, limits, presets, ordering, and visual values: `config/desktop_overlay_values.py`
 - Provider selection enums and normalization values: `config/provider_values.py`
 - Translation model and connection values: `config/translation_values.py`
@@ -257,7 +259,7 @@ Includes:
 - credential source,
 - defaults and capability constraints.
 
-Runtime owners should consume resolved configuration.
+Runtime owners should consume resolved configuration (`config/resolved.py`, `config/runtime_resolution.py`).
 
 ### Runtime state
 
@@ -274,7 +276,9 @@ Examples:
 
 Runtime state belongs to its lifecycle owner and is not persisted settings.
 
-When a settings draft exits, the typed intent is persisted and then passed through the provider-apply boundary. For active Self or Peer capture, provider application must converge both the capture owner and its Local ASR channel to the requested live runtime signature before the applied signature cache is updated. A stale active Peer remains eligible for refresh even when the requested signature matches the cache. Idle or disabled capture never forces preparation for an unrelated apply, but an explicit Self STT selection may still prepare the dormant provider without committing a live handoff. A smooth active handoff keeps the current provider and frozen endpoint settings until the owning translation channel completes the utterance at `SpeechEnd` and commits the pending handoff. Already-admitted segments retain their original provider scope; failed, cancelled, or non-converged application leaves the previous cache truth intact.
+Settings persistence owns user intent; runtime owners own its application to active resources. The provider-apply boundary coordinates capture and Local ASR owners. Failed or incomplete application must not be represented as successfully applied runtime state.
+
+Implementation: `app/services/provider/provider_runtime_apply.py`. Behavior tests: `tests/app/test_stt_provider_apply_vertical.py`.
 
 ## Provider Boundaries
 
@@ -295,8 +299,6 @@ Execution options:
 
 Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
-Controlled adapter/source tests do not certify live service conformance or latency improvement. Live acceptance requires credentials, model access and explicit paid-call permission. Retained Soniox stream duration, including post-speech protection, remains billable.
-
 GPU worker split:
 
 - Python adapter: process launch, authentication, requests, heartbeat, cancellation, shutdown.
@@ -314,9 +316,9 @@ Provider adapters own:
 - response normalization,
 - provider errors.
 
-The managed local Gemma adapter remains behind `LLMProvider`; its application/runtime owners handle model installation, llama.cpp process health, CPU/Vulkan profile selection, language-pair prefix readiness, and shutdown.
+The managed local Gemma adapter remains behind `LLMProvider`; its application/runtime owners handle model provisioning, backend readiness, and process lifecycle.
 
-Cloud translation hedging is resolved runtime policy, not persisted user intent. Eligible primaries receive a second attempt with the same model, connection, credential, and routing after 1300 ms or a primary error. OpenRouter primaries retain the additional Gemma 31B ModelRun emergency attempt after 4400 ms. Custom HTTP, managed local Gemma, and local LLM primaries remain single-attempt. Settings schema 45 discards retired fallback selections; neither the settings UI nor OSC exposes a fallback selector.
+Cloud translation may use bounded hedged attempts according to resolved runtime policy, not persisted fallback selections (`config/runtime_resolution.py`, `core/llm/fallback_racing.py`).
 
 Translation owners retain:
 
@@ -325,17 +327,13 @@ Translation owners retain:
 - stale-result rejection,
 - publication handoff.
 
-`TranslationTurnLifecycleOwner` admits peer turns in source order. Self and peer speech have separate bounded queues with expiry; child translations share their parent slot.
+`TranslationTurnLifecycleOwner` owns bounded Self and Peer admission and the lifecycle of parent turns and child translations. `TranslationRequestOwner` owns request preparation and provider-generation authority.
 
-The turn owner segments LISTEN transcripts by language and speaker. In the serialized parent-admission boundary, `TranslationRequestOwner.admit_peer` prepares each segment before recording the parent's source history once. Preparation precedes suspendable output admission, so provider replacement cannot reorder source context. Multi-segment LLM requests share a current-turn reference with parent-local speaker aliases and return plain translated text for one segment; custom HTTP payloads remain unchanged.
+Peer translations may execute concurrently, but source-context preparation and publication preserve source order. Channel execution limits remain separate from provider-wide admission shared by Self and Peer.
 
-Peer parents and segments execute concurrently under a Peer-wide captured translation concurrency limit, with provider-wide admission still shared with Self. Waiting for an execution slot does not consume the child watchdog or exempt a parent from waiting-queue expiry. Completed segments publish incrementally in parent and child source order; a failed segment retires only its own output slot. A separate bounded active-parent count limits retained results during output stalls without holding execution capacity. Prepared requests retain provider generation authority, and cancellation drains queued and active child work before retiring the parent.
+Self speculative selection remains in the Self owner. Once a turn is admitted, the turn lifecycle owns subsequent translation and publication.
 
-Interrupted parent admission retires the unstarted parent. Waiting-parent retirement closes its lifecycle even if its source-only output has already been evicted or output submission fails.
-
-Manual self turns share the ordered lifecycle but are not subject to speech eviction, expiry, or TALK OFF cancellation.
-
-Self merge commit returns after parent admission for both single- and dual-target output. The turn lifecycle owns subsequent translation and publication; speculative selection and finalize-grace policy remain in the Self owner.
+Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/translation_request.py`. Behavior tests: `tests/core/test_translation_turn_owner.py`, `tests/core/test_translation_request_owner.py`, `tests/core/test_hedged_attempts.py`.
 
 ## Output
 
@@ -351,13 +349,12 @@ Self merge commit returns after parent admission for both single- and dual-targe
 Delivery boundaries:
 
 - Peer UI and overlay destinations have independent bounded queues and writers.
-- When the visible window is full, a new Peer subtitle waits until at least 1.5 seconds after the most recent new occupant before replacing a row. Filling a free slot or updating an already visible subtitle does not incur this pacing delay.
-- Self chatbox speech has bounded pending delivery and expiry. Manual messages are exempt from speech eviction and expiry.
+- Self chatbox delivery owns its bounded admission and expiry policy.
 - Output handoff releases translation ordering without waiting for display. Sink failure does not replay recognition or translation.
 - Peer publications retain activation generation and source order through output. Retiring an activation cancels its deliveries and rejects late work.
 - Destination admission and presenter application receipts are explicit; neither is a remote display acknowledgement.
 
-Caption and overlay settings control destinations, not peer capture. Explicit LISTEN OFF aborts capture and publication. Conversation errors share publication identity; runtime session status uses a separate path.
+Caption and overlay settings control destinations, not peer capture. Conversation errors share publication identity; runtime session status uses a separate path.
 
 
 | Publication       | UI               | Chatbox             | Overlay          |
@@ -372,6 +369,8 @@ Destination adapters must not bypass routing policy.
 Each destination has independent admission and delivery state. Replacing one
 destination must not block or retire work for the others.
 
+Implementation: `core/runtime/output.py`. Behavior tests: `tests/core/runtime/test_output_runtime.py`.
+
 ### Overlays
 
 | Owner | Responsibility |
@@ -382,7 +381,9 @@ destination must not block or retire work for the others.
 
 Each generation owns its tasks and shutdown. Python owns caption lifetime; native owns presentation retries.
 
-`OverlayPresenter` owns provider-independent LISTEN admission and pacing; output retains waiting work within its existing bounded batches.
+`OverlayPresenter` owns provider-independent Peer subtitle admission and pacing (`core/overlay/presenter.py`); output retains bounded waiting work.
+
+Behavior tests: `tests/core/test_overlay_presenter.py`.
 
 ## Runtime Logging
 
@@ -392,9 +393,12 @@ Each generation owns its tasks and shutdown. Python owns caption lifetime; nativ
 | Translation owners | Accepted SELF/PEER source and target records |
 | Overlay owners | Bounded failure evidence and reliable lifecycle warnings |
 
-Basic-audience records are the only records delivered live to the console and Logs view. Accepted SELF/PEER conversation records, concise valid recognition RTF, VAD/SmartTurn activity, and useful latency outcomes are Basic. Selected technical diagnostics are file-only and metadata-only. The UTF-8 runtime file is written by one bounded-queue owner in batches, rotates at a 20 MiB record boundary with one backup, and flushes priority records promptly. A record larger than the file cap is rejected before file formatting when possible and counted in terminal loss evidence; queue pressure, failed or stalled I/O, forced termination, and ordinary buffered writes can also prevent complete persistence. File flush does not imply `fsync`.
+- `SessionRuntimeLoggingService` owns bounded asynchronous file delivery. Producers must not block on file I/O.
+- Basic-audience records reach the console and Logs view. Selected technical diagnostics are file-only and metadata-only; accepted conversation uses a separate secret-protected path.
+- Queue pressure prioritizes warning, error, and terminal evidence. Logging does not guarantee complete persistence.
+- The writer retains ownership through stream closure; replacement must not race a retiring writer.
 
-The 2,048-record queue reserves 64 slots for warning/error/terminal evidence and discards lower-priority diagnostics first without blocking producers. Ordinary root and child prose is reduced to bounded metadata unless it satisfies the selected diagnostic format; accepted conversation retains its separate secret-protected path. A timed-out close keeps writer ownership until the listener can finish and close its stream, preventing a replacement writer from racing the old one. A stalled operating-system write can still prevent complete shutdown.
+Implementation: `core/runtime_logging.py`, `app/services/application_runtime_logging.py`. Behavior tests: `tests/core/test_runtime_logging.py`, `tests/core/test_file_logging.py`.
 
 ## Lifecycle
 
@@ -419,27 +423,22 @@ Used mechanisms include:
 
 Retired work must not mutate current state or publish user-visible output.
 
-### Replacement sequence
+### Replacement
 
-1. Stop or freeze ingress.
-2. Invalidate previous generation.
-3. Cancel or detach active work.
-4. Construct replacement.
-5. Install replacement.
-6. Resume ingress.
-7. Release retired resources.
+- The owner controls ingress and decides whether admitted work drains or is cancelled.
+- Admitted work retains its provider scope and frozen settings during a graceful handoff.
+- Replacement must revoke retired work's authority before it can affect the current runtime.
+- Retired resources remain owned until cleanup completes.
+
+Exact handoff and cleanup ordering belongs to each owner's implementation and lifecycle tests.
 
 ### Shutdown direction
 
-1. Stop application ingress.
-2. Stop capture.
-3. Cancel translation and provider work.
-4. Close output and UI bridges.
-5. Terminate child processes.
-6. Close managed authentication.
-7. Release remaining services.
+Stop ingress before draining or cancelling owned work. Close external resources before clearing runtime references.
 
-Use shutdown code and lifecycle tests for exact ordering.
+The application shutdown adapter coordinates teardown across capture, translation, output, child processes, and application services.
+
+Implementation: `app/adapters/application_runtime_shutdown.py`. Use shutdown code and lifecycle tests for exact ordering.
 
 ## Async Event Model
 
@@ -449,7 +448,4 @@ Use shutdown code and lifecycle tests for exact ordering.
 - Capture, STT, translation, UI, and child-process events cross owner boundaries through ports, callbacks, or owned queues.
 - Callbacks must delegate to the receiving owner; they must not mutate another owner's private runtime state.
 - Ordering is local to the owning channel or queue. Do not assume global ordering across self, peer, UI, and provider events.
-- Runtime replacement may leave old work in flight. Validate generations, attachment tokens, request IDs, or current-owner identity before applying results.
-- Late or retired work must not mutate current state or publish user-visible output.
 - Blocking model, device, or native work must not block the application event loop; use the established worker, executor, or child-process boundary.
-- Shutdown order is: stop ingress, cancel or drain owned work, close external resources, then clear runtime references.
