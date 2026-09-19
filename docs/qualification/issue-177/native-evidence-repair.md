@@ -13,6 +13,7 @@ The harness now:
 - measures load and decode timing with `perf_counter`
 - records model/provider/CPU identity, fixture hashes, `text_length`, and RTF
 - does not parse logs or store transcript text
+- writes `status=failed`, failure type/message/traceback, and returns exit 1 when model validation, fixture input, backend readiness, or decode fails before a success report can be assembled
 
 Obsolete log-format fixture tests were deleted.
 
@@ -39,7 +40,7 @@ The harness now:
 - applies Self and Peer through `replace_provider(..., start=True)` and opens sessions only through the production owned scoped path (`PeerAudioSegmentLedger` plus the Self/Peer VAD owners)
 - gives each blocking production stage a finite error with the active task stack, cancels a timed-out operation, and emits stage progress without parsing log wording
 - asserts initial shared PID, `{self, peer}` residency, configured physical device, model residency, and matching model identities only after both sessions exist
-- starts handoff after Self `SpeechStart`, commits at `SpeechEnd`, accepts the in-flight terminal from the current or retired scoped sink, and proves the replacement terminal without interrupting Peer
+- starts handoff after Self `SpeechStart`, commits at `SpeechEnd`, and accepts the in-flight terminal from the current or retired scoped sink. The definitive real run observed the valid current-sink branch (`in_flight_sink=current`, `retired_terminal_final=null`); the retired-sink acceptance branch is covered by the focused behavior test, not claimed as a second real-run observation
 - kills the shared worker, observes `retry_required`, runs Controller recovery, restarts the recovered ready channel handles, and dispatches Peer then Self with the canonical post-recovery request scopes
 - requires the recovered runtime's requested `auto` identity and a post-failure `activation_ready` resolving the exact selected `vulkan-index-0` physical device
 - requires nonempty final `STTProviderTurnTerminal` results, a fresh shared recovered PID, Self release retaining Peer, last release removing the worker, and close leaving no named owned task
@@ -60,4 +61,4 @@ The bound packaged executable SHA-256 was `40b31d85497755447ed7b81f7bb678d768f48
 C:/c177/source/.venv-c/Scripts/python.exe -m pytest tests/release_evidence/test_local_cpu_real_decode.py tests/release_evidence/test_local_asr_production_composition.py
 ```
 
-CPython 3.14.7 result: `19 passed`. Targeted Ruff check of the repaired module and its test passed.
+CPython 3.14.7 result after the review repairs: `20 passed`. Targeted Ruff check of both repaired modules and their tests passed.

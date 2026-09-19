@@ -797,7 +797,6 @@ Invoke-External -FilePath $pythonCommand -ArgumentList @(
 
 $packagedOverlayPath = Join-Path $PWD "dist/PuriPulyHeart/PuriPulyHeartOverlay.exe"
 $packagedGpuWorkerPath = Join-Path $PWD "dist/PuriPulyHeart/PuriPulyHeartGpuWorker.exe"
-Copy-Item -Path $overlayStagedPath -Destination $packagedOverlayPath -Force
 
 if (-not (Test-Path $packagedOverlayPath)) {
     throw "Packaged overlay executable not found: $packagedOverlayPath"
@@ -808,6 +807,7 @@ if (-not (Test-Path $packagedGpuWorkerPath)) {
 if (-not (Test-Path $packagedOverlayDllPath)) {
     throw "Packaged OpenVR runtime DLL not found: $packagedOverlayDllPath"
 }
+Assert-FileSha256Equals -Path $packagedOverlayPath -ExpectedSha256 (Get-FileSha256 -Path $overlayStagedPath) -Label "Packaged overlay executable"
 Assert-FileSha256Equals -Path $packagedOverlayDllPath -ExpectedSha256 $PinnedOpenVrVendorDllSha256 -Label "Packaged OpenVR runtime DLL"
 
 Remove-Item -Recurse -Force $soxrRuntimeReportDir -ErrorAction SilentlyContinue
@@ -1066,9 +1066,6 @@ try {
         throw "Installer not found: $installerPath"
     }
 
-    if (-not (Test-Path $packagedOverlayPath)) {
-        Copy-Item -Path $overlayStagedPath -Destination $packagedOverlayPath -Force
-    }
 
     if (-not (Test-Path $packagedOverlayPath)) {
         throw "Packaged overlay executable not found after installer build: $packagedOverlayPath"

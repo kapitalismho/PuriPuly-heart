@@ -9,6 +9,7 @@ from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownContext,
     ApplicationShutdownDiagnostic,
+    ApplicationShutdownStallDiagnostic,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope
 from puripuly_heart.core.runtime.logging import emit_safe_fallback_log
@@ -205,6 +206,44 @@ class ApplicationRuntimeLoggingOwner:
             cleanup_failures=context.cleanup_exceptions,
         )
 
+    def emit_shutdown_stall_diagnostic(
+        self,
+        diagnostic: ApplicationShutdownStallDiagnostic,
+    ) -> None:
+        service = self._service
+        emit_persisted = getattr(service, "emit_persisted", None) if service is not None else None
+        messages = [
+            "[Lifecycle][Shutdown] stall "
+            f"state={diagnostic.coordinator_state} "
+            f"terminal={str(diagnostic.coordinator_terminal).lower()} "
+            f"failure_count={diagnostic.coordinator_failure_count} "
+            f"phase={diagnostic.phase or 'none'} "
+            f"owner={diagnostic.active_owner_name or 'none'} "
+            f"callback={diagnostic.active_callback_name or 'none'} "
+            f"native_stack_available={str(diagnostic.native_stack_available).lower()}"
+        ]
+        messages.extend(
+            "[Lifecycle][Shutdown] runtime_state "
+            f"owner={_safe_diagnostic_token(state.owner_name)} "
+            f"generation={state.generation if state.generation is not None else 'none'} "
+            "native_operations="
+            f"{','.join(_safe_diagnostic_token(item) for item in state.active_native_operations) or 'none'} "
+            "children="
+            f"{','.join(_safe_diagnostic_token(item) for item in state.child_states) or 'none'}"
+            for state in diagnostic.runtime_states
+        )
+        messages.extend(
+            "[Lifecycle][Shutdown] await_graph "
+            f"task={_safe_diagnostic_token(task_name)} "
+            f"graph={_safe_diagnostic_graph(graph)}"
+            for task_name, graph in sorted(diagnostic.task_await_graphs.items())
+        )
+        for message in messages:
+            if callable(emit_persisted):
+                emit_persisted(message, level=logging.ERROR)
+            else:
+                self.fallback_logger.error(message)
+
     def emit_shutdown_diagnostic(
         self,
         diagnostic: ApplicationShutdownDiagnostic,
@@ -218,9 +257,21 @@ class ApplicationRuntimeLoggingOwner:
             f"timed_out={str(diagnostic.timed_out).lower()}"
         )
         service = self._service
-        if service is not None:
-            emit_persisted = getattr(service, "emit_persisted", None)
-            if callable(emit_persisted):
-                emit_persisted(message, level=logging.ERROR)
-                return
-        self.fallback_logger.error(message)
+        emit_persisted = getattr(service, "emit_persisted", None) if service is not None else None
+        if callable(emit_persisted):
+            emit_persisted(message, level=logging.ERROR)
+        else:
+            self.fallback_logger.error(message)
+        if diagnostic.stall_diagnostic is not None:
+            self.emit_shutdown_stall_diagnostic(diagnostic.stall_diagnostic)
+
+
+def _safe_diagnostic_token(value: str) -> str:
+    return "".join(
+        character if character.isalnum() or character in "._:-=," else "_"
+        for character in value[:256]
+    )
+
+
+def _safe_diagnostic_graph(value: str) -> str:
+    return " ".join(value.split())[:4096]

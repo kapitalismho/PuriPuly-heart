@@ -9,6 +9,7 @@ import json
 import platform
 import sys
 import time
+import traceback
 import wave
 from dataclasses import dataclass
 from pathlib import Path
@@ -212,68 +213,92 @@ async def run_evidence(
     resolved_report_path = report_path.resolve()
     executable = Path(sys.executable).resolve()
     started_at = time.time()
-    validation_started = time.perf_counter()
-    snapshot = inspect_required_cpu_model_installs(
-        resolved_model_root,
-        verify_checksums=True,
-    )
-    validation_seconds = time.perf_counter() - validation_started
-    if not snapshot.cpu_auto_available:
-        raise RuntimeError("strict validation did not accept all required CPU models")
-    installs: list[dict[str, object]] = []
-    for model in snapshot.models:
-        manifest = load_local_stt_asset_manifest(model.model_id)
-        installed = model.state.installed_manifest
-        if installed is None:
-            raise RuntimeError("strict validation returned no installed manifest")
-        installs.append(
-            {
-                "model_id": model.model_id,
-                "status": model.state.status,
-                "selected_source": installed.selected_source,
-                "selected_revision": installed.selected_revision,
-                "file_count": len(manifest.files),
-                "expected_total_bytes": sum(item.size_bytes or 0 for item in manifest.files),
-            }
+    try:
+        validation_started = time.perf_counter()
+        snapshot = inspect_required_cpu_model_installs(
+            resolved_model_root,
+            verify_checksums=True,
         )
-    decodes = [
-        await _decode_case(
-            case,
-            model_root=resolved_model_root,
-            audio_root=resolved_audio_root,
-        )
-        for case in DECODE_CASES
-    ]
-    report = {
-        "schema": REPORT_SCHEMA,
-        "status": "passed",
-        "started_unix_seconds": started_at,
-        "completed_unix_seconds": time.time(),
-        "application": {
-            "version": __version__,
-            "executable": str(executable),
-            "executable_sha256": _sha256(executable),
-            "frozen": bool(getattr(sys, "frozen", False)),
-            "python": platform.python_version(),
-            "platform": platform.platform(),
-        },
-        "runtime_modules": [
-            _runtime_module_identity("sherpa_onnx"),
-            _runtime_module_identity("onnxruntime"),
-            _runtime_module_identity("soxr"),
-        ],
-        "model_root": str(resolved_model_root),
-        "strict_validation_seconds": validation_seconds,
-        "cpu_auto_available": snapshot.cpu_auto_available,
-        "model_installs": installs,
-        "decodes": decodes,
-    }
+        validation_seconds = time.perf_counter() - validation_started
+        if not snapshot.cpu_auto_available:
+            raise RuntimeError("strict validation did not accept all required CPU models")
+        installs: list[dict[str, object]] = []
+        for model in snapshot.models:
+            manifest = load_local_stt_asset_manifest(model.model_id)
+            installed = model.state.installed_manifest
+            if installed is None:
+                raise RuntimeError("strict validation returned no installed manifest")
+            installs.append(
+                {
+                    "model_id": model.model_id,
+                    "status": model.state.status,
+                    "selected_source": installed.selected_source,
+                    "selected_revision": installed.selected_revision,
+                    "file_count": len(manifest.files),
+                    "expected_total_bytes": sum(
+                        item.size_bytes or 0 for item in manifest.files
+                    ),
+                }
+            )
+        decodes = [
+            await _decode_case(
+                case,
+                model_root=resolved_model_root,
+                audio_root=resolved_audio_root,
+            )
+            for case in DECODE_CASES
+        ]
+        report = {
+            "schema": REPORT_SCHEMA,
+            "status": "passed",
+            "started_unix_seconds": started_at,
+            "completed_unix_seconds": time.time(),
+            "application": {
+                "version": __version__,
+                "executable": str(executable),
+                "executable_sha256": _sha256(executable),
+                "frozen": bool(getattr(sys, "frozen", False)),
+                "python": platform.python_version(),
+                "platform": platform.platform(),
+            },
+            "runtime_modules": [
+                _runtime_module_identity("sherpa_onnx"),
+                _runtime_module_identity("onnxruntime"),
+                _runtime_module_identity("soxr"),
+            ],
+            "model_root": str(resolved_model_root),
+            "strict_validation_seconds": validation_seconds,
+            "cpu_auto_available": snapshot.cpu_auto_available,
+            "model_installs": installs,
+            "decodes": decodes,
+        }
+        exit_code = 0
+    except Exception as exc:
+        report = {
+            "schema": REPORT_SCHEMA,
+            "status": "failed",
+            "started_unix_seconds": started_at,
+            "completed_unix_seconds": time.time(),
+            "application": {
+                "version": __version__,
+                "executable": str(executable),
+                "frozen": bool(getattr(sys, "frozen", False)),
+                "python": platform.python_version(),
+                "platform": platform.platform(),
+            },
+            "model_root": str(resolved_model_root),
+            "audio_root": str(resolved_audio_root),
+            "failure_type": type(exc).__name__,
+            "failure": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+        exit_code = 1
     resolved_report_path.parent.mkdir(parents=True, exist_ok=True)
     resolved_report_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    return 0
+    return exit_code
 
 
 def main(argv: Sequence[str] | None = None) -> int:

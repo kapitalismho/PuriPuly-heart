@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -210,6 +211,12 @@ def _run_gui(
     ft, vrchat_osc_presence_adapter, compose_ui_application, main_gui, assets_dir = (
         _load_gui_runtime()
     )
+    from puripuly_heart.ui.flet_desktop_runtime import (
+        FletDesktopViewProcessOwner,
+        patch_hidden_view_launcher,
+    )
+
+    view_process_owner = FletDesktopViewProcessOwner()
 
     vrchat_osc_presence = vrchat_osc_presence_adapter()
 
@@ -235,11 +242,12 @@ def _run_gui(
             raise
 
     try:
-        ft.run(
-            main=_target,
-            assets_dir=str(assets_dir()),
-            view=ft.AppView.FLET_APP_HIDDEN,
-        )
+        with patch_hidden_view_launcher(process_owner=view_process_owner):
+            ft.run(
+                main=_target,
+                assets_dir=str(assets_dir()),
+                view=ft.AppView.FLET_APP_HIDDEN,
+            )
     except Exception as exc:
         from puripuly_heart.core.runtime_logging import emit_basic_log
 
@@ -249,7 +257,12 @@ def _run_gui(
             type(exc).__name__,
             level=logging.ERROR,
         )
+        try:
+            asyncio.run(view_process_owner.close())
+        except Exception:
+            logger.exception("The Flet desktop view cleanup also failed")
         raise
+    asyncio.run(view_process_owner.close())
     return 0
 
 

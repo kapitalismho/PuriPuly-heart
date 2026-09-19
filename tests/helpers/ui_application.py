@@ -356,6 +356,10 @@ class UiApplicationStateRuntimeStub:
 
 
 class ApplicationRuntimeShutdownStub:
+    def application_shutdown_runtime_states(self) -> tuple[object, ...]:
+        states = getattr(self._backend, "application_shutdown_runtime_states", None)
+        return tuple(states()) if callable(states) else ()
+
     def __init__(self, backend: object) -> None:
         self._backend = backend
 

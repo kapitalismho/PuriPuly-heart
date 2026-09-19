@@ -447,7 +447,9 @@ Retired work must not mutate current state or publish user-visible output.
 
 Use shutdown code and lifecycle tests for exact ordering.
 
-`ApplicationShutdownCoordinator.capture_stall_diagnostic()` is an on-demand snapshot. It reports the active shutdown owner/callback, named asyncio await graphs, and owner-supplied generation/native-operation/child state. It is not always-on tracing and does not claim native stack visibility.
+`ApplicationShutdownCoordinator.capture_stall_diagnostic()` is an on-demand snapshot exposed by `UiApplicationPort`. The composed `ApplicationRuntimeShutdownAdapter` supplies live Self/Peer capture generations, Local ASR channel generations and native phases, GPU worker PID/active channels, and active model-download/helper-child state. A shutdown callback timeout captures this snapshot before cancellation and sends it through runtime logging with coordinator state, terminal flag, failure count, the active owner/callback, bounded named-task await graphs, and `native_stack_available=false`. This is not always-on tracing. The projection uses only explicitly selected lifecycle fields; it must not serialize arbitrary owner objects, transcripts, credentials, settings, or native stack claims.
+
+The source and PyInstaller GUI paths retain the Flet desktop viewer for checkpoint C. Both the main GUI launcher and desktop-overlay renderer wrap that child in the existing Windows kill-on-close Job Object boundary. Application-level shutdown remains authoritative for normal close; Job Object containment is the abrupt-main-host-loss fallback, not evidence of graceful cleanup.
 
 ## Async Event Model
 

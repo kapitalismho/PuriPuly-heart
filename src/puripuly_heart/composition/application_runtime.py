@@ -2083,6 +2083,7 @@ def compose_application_runtime(
         clipboard=lambda: clipboard,
         microphone=lambda: microphone,
         close_managed_gemma_owner=managed_gemma.close,
+        local_asr_provisioning=lambda: provisioning,
     )
 
     overlay_owner = require_overlay()

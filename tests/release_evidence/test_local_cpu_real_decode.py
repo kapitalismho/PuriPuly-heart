@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import wave
 from pathlib import Path
 
@@ -135,3 +136,31 @@ async def test_decode_case_fails_when_backend_returns_empty_final(
             model_root=tmp_path / "models",
             audio_root=tmp_path,
         )
+
+
+@pytest.mark.asyncio
+async def test_run_evidence_writes_failed_report_for_missing_models(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def missing_models(*_args, **_kwargs):
+        raise FileNotFoundError("required CPU model root is missing")
+
+    monkeypatch.setattr(
+        evidence,
+        "inspect_required_cpu_model_installs",
+        missing_models,
+    )
+    report_path = tmp_path / "reports" / "cpu-failure.json"
+
+    exit_code = await evidence.run_evidence(
+        model_root=tmp_path / "missing-models",
+        audio_root=tmp_path / "missing-audio",
+        report_path=report_path,
+    )
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert exit_code == 1
+    assert report["status"] == "failed"
+    assert report["failure_type"] == "FileNotFoundError"
+    assert report["failure"] == "required CPU model root is missing"

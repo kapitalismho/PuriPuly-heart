@@ -390,6 +390,12 @@ async def test_self_production_probe_uses_owned_scoped_recognition_path() -> Non
 @pytest.mark.asyncio
 async def test_recovered_ready_provider_delivers_after_channel_restart() -> None:
     events: list[object] = []
+    dispatch_completed = asyncio.Event()
+
+    async def event_handler(event: object) -> None:
+        events.append(event)
+        await asyncio.sleep(0)
+        dispatch_completed.set()
     request = _scoped_request()
     session = _ScopedSession()
     engine = ScopedRecognitionEngine(
@@ -403,7 +409,7 @@ async def test_recovered_ready_provider_delivers_after_channel_restart() -> None
     )
     handle = ProviderRuntimeHandle(
         name="recovered_self",
-        event_handler=events.append,
+        event_handler=event_handler,
     )
     await handle.replace_provider(engine, start=False)
     assert await handle.start_if_provider(engine)
@@ -423,6 +429,7 @@ async def test_recovered_ready_provider_delivers_after_channel_restart() -> None
             request=request,
             activation_generation=4,
         )
+        await asyncio.wait_for(dispatch_completed.wait(), timeout=1.0)
     finally:
         await handle.close()
 

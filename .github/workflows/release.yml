@@ -353,7 +353,7 @@ jobs:
             --run-attempt "${{ github.run_attempt }}" `
             --main-exe "dist/PuriPulyHeart/PuriPulyHeart.exe" `
             --gpu-worker-exe "dist/PuriPulyHeart/PuriPulyHeartGpuWorker.exe" `
-            --overlay-exe "build/overlay/PuriPulyHeartOverlay.exe" `
+            --overlay-exe "dist/PuriPulyHeart/PuriPulyHeartOverlay.exe" `
             --installer "installer_output/PuriPulyHeart-Setup-$env:APP_VERSION.exe" `
             --soxr-bundle "build/soxr-release-inputs/PuriPulyHeart-soxr-third-party-source-bundle.zip" `
             --provenance-out "installer_output/release-provenance-$env:APP_VERSION.json"

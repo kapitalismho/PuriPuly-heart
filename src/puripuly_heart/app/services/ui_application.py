@@ -47,6 +47,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownCoordinator,
     ApplicationShutdownDiagnostic,
+    ApplicationShutdownStallDiagnostic,
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
@@ -251,9 +252,15 @@ class UiApplicationBoundary:
                     *self._owned_application_shutdown_callbacks,
                 ),
                 diagnostics_sink=self._runtime_shutdown.emit_application_shutdown_diagnostic,
+                runtime_state_supplier=(self._runtime_shutdown.application_shutdown_runtime_states),
             )
             self._application_lifecycle = lifecycle
         return lifecycle
+
+    def capture_application_shutdown_stall_diagnostic(
+        self,
+    ) -> ApplicationShutdownStallDiagnostic:
+        return self.application_lifecycle().capture_stall_diagnostic()
 
     def register_application_shutdown_callbacks(
         self,
@@ -712,7 +719,7 @@ for _intent_method_name in UI_APPLICATION_USER_INTENT_METHODS:
 def _accepts_keyword(callable_obj: object, keyword: str) -> bool:
     try:
         parameters = inspect.signature(callable_obj).parameters
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return True
     return keyword in parameters or any(
         parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()

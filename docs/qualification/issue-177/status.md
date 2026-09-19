@@ -32,7 +32,7 @@ The original issue planning baseline was `9da5badeffde193bb26445bc18633284ab22a5
 - Published-release upgrade and rollback need a disposable Windows installation with the original AppId. The current machine's production AppId is occupied. Windows Sandbox, VirtualBox, VMware execution tools, `Get-VM`, and the Hyper-V management service were not found in the inspected installed locations/commands. An alternate-AppId same-build reinstall is not a published-version upgrade.
 - Physical microphone/device-loopback and sustained VRChat/SteamVR/HMD behavior require a controlled lawful session. Public recorded speech, generated process-isolated tones and model inference provide narrower evidence only.
 - Live cloud qualification requires existing authorized credentials and any necessary paid-call approval. None was accessed or solicited during this work.
-- R5 adversarial close/host-loss coverage and the C-specific download lifecycle must be assessed against the actual recorded scenarios, not inferred from normal `WM_CLOSE`, import checks, or A's Python 3.12 evidence.
+- R5 source shutdown repair and locally executable adversarial evidence are recorded in `shutdown-qualification.md`: live composed owner/generation/native/download-child diagnostics, repeated real-application close, active initialization/download close, child hang, and PID/image/ancestry-bound host-loss containment passed. The pre-repair package does not satisfy these checks; final rebuilt-C packaged normal/repeated close and host-loss accounting remain pending.
 - Native product GUI/headless shared-distribution integration, overlay, shutdown, provenance, installer lifecycle and matched resource/performance comparison remain unqualified. The small experiments add no new production service or bridge fork.
 
 ## Evidence and test disposition
@@ -42,6 +42,7 @@ The original issue planning baseline was `9da5badeffde193bb26445bc18633284ab22a5
 - Obsolete Flet test doubles were migrated to the supported API. Intentionally sync/async application callbacks remain supported.
 - The obsolete ProcTap source-text collection assertion was removed; runtime payload and native-process capture results are retained.
 - Workflow-level packaged headless/process-capture gates now run in `release.yml`; separate installer/native/manual evidence is not credited to that workflow merely because a script exists.
+- Shutdown timeout diagnostics now traverse the production UI/application boundary and existing runtime logger; the report is bounded, excludes arbitrary owner data, and records coordinator state/terminal/failure count plus `native_stack_available=false`.
 - Scratch probes, large model/audio fixtures, build outputs and isolated environments are not production scaffolding. They remain outside tracked product code for reproducibility; no worktree/environment cleanup was authorized.
 
 ## Architecture and release disposition

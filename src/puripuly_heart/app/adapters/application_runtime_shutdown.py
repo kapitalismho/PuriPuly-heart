@@ -11,6 +11,7 @@ from puripuly_heart.app.services.application_runtime_logging import (
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownContext,
     ApplicationShutdownDiagnostic,
+    ApplicationShutdownRuntimeState,
 )
 from puripuly_heart.app.services.clipboard_auto_translation import (
     ClipboardAutoTranslationOwner,
@@ -50,6 +51,96 @@ class ApplicationRuntimeShutdownAdapter:
     clipboard: Callable[[], ClipboardAutoTranslationOwner | None]
     microphone: Callable[[], MicrophoneTestRuntime | None]
     close_managed_gemma_owner: Callable[[], Awaitable[None]] | None = None
+    local_asr_provisioning: Callable[[], object | None] | None = None
+
+    def application_shutdown_runtime_states(
+        self,
+    ) -> tuple[ApplicationShutdownRuntimeState, ...]:
+        states: list[ApplicationShutdownRuntimeState] = []
+        self_capture = self.pipeline.self_capture
+        if self_capture is not None:
+            snapshot = self_capture.snapshot
+            states.append(
+                ApplicationShutdownRuntimeState(
+                    owner_name="SelfCaptureSessionOwner",
+                    generation=snapshot.generation,
+                    active_native_operations=(("capture-loop",) if snapshot.has_loop_task else ()),
+                    child_states=tuple(
+                        name
+                        for present, name in (
+                            (snapshot.has_source, "capture-source:owned"),
+                            (snapshot.has_vad, "vad:owned"),
+                            (snapshot.cleanup_debt > 0, f"cleanup-debt:{snapshot.cleanup_debt}"),
+                        )
+                        if present
+                    ),
+                )
+            )
+        peer_owner = self.peer()
+        peer_capture = peer_owner.runtime if peer_owner is not None else None
+        if peer_capture is not None:
+            snapshot = peer_capture.snapshot
+            states.append(
+                ApplicationShutdownRuntimeState(
+                    owner_name="PeerCaptureSessionOwner",
+                    generation=snapshot.generation,
+                    active_native_operations=(("capture-loop",) if snapshot.has_loop_task else ()),
+                    child_states=tuple(
+                        name
+                        for present, name in (
+                            (snapshot.has_source, "capture-source:owned"),
+                            (snapshot.has_vad, "vad:owned"),
+                            (snapshot.cleanup_debt > 0, f"cleanup-debt:{snapshot.cleanup_debt}"),
+                        )
+                        if present
+                    ),
+                )
+            )
+        local_asr = self.pipeline.local_asr_runtime
+        if local_asr is not None:
+            snapshot = local_asr.snapshot
+            gpu = snapshot.gpu
+            gpu_child_states = (
+                (
+                    (
+                        "gpu-worker:"
+                        f"pid={gpu.worker_pid}:phase={gpu.phase}:"
+                        f"active_channels={','.join(sorted(gpu.active_channels)) or 'none'}"
+                    ),
+                )
+                if gpu.worker_pid is not None
+                else ()
+            )
+            for channel in snapshot.channels:
+                operations = []
+                if channel.phase not in {"inactive", "closed"}:
+                    operations.append(f"provider:{channel.phase}")
+                if channel.pending_handoff:
+                    operations.append("provider-handoff")
+                states.append(
+                    ApplicationShutdownRuntimeState(
+                        owner_name=f"LocalASRProviderRuntimeOwner:{channel.channel}",
+                        generation=channel.generation,
+                        active_native_operations=tuple(operations),
+                        child_states=gpu_child_states,
+                    )
+                )
+        provisioning = (
+            self.local_asr_provisioning() if self.local_asr_provisioning is not None else None
+        )
+        if provisioning is not None:
+            snapshot = provisioning.snapshot
+            child_states = tuple(getattr(provisioning, "child_states", ()))
+            for activity in snapshot.activities:
+                states.append(
+                    ApplicationShutdownRuntimeState(
+                        owner_name=f"LocalASRProvisioningOwner:{activity.backend}",
+                        generation=activity.generation,
+                        active_native_operations=("model-download",),
+                        child_states=child_states,
+                    )
+                )
+        return tuple(states)
 
     def effective_osc_ports(self) -> tuple[int | None, int | None]:
         owner = self.vrc_mic_sync()

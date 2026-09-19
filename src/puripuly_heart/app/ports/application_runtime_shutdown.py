@@ -5,11 +5,15 @@ from typing import Protocol
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownContext,
     ApplicationShutdownDiagnostic,
+    ApplicationShutdownRuntimeState,
 )
 
 
 class ApplicationRuntimeShutdownPort(Protocol):
     def effective_osc_ports(self) -> tuple[int | None, int | None]: ...
+    def application_shutdown_runtime_states(
+        self,
+    ) -> tuple[ApplicationShutdownRuntimeState, ...]: ...
 
     def freeze_application_ingress(self) -> None: ...
 
