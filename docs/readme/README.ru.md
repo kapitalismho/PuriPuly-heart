@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — двусторонний голосовой переводчик для VRChat в реальном времени" width="128" />
+  <img src="../../src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — двусторонний голосовой переводчик для VRChat в реальном времени" width="128" />
 </p>
 
 <h1 align="center">PuriPuly<br>
@@ -14,7 +14,7 @@
 </p>
 
 <h2 align="center">
-  <a href="README.md">🇺🇸 English</a> ·
+  <a href="../../README.md">🇺🇸 English</a> ·
   <a href="README.ko.md">🇰🇷 한국어</a> ·
   <a href="README.ja.md">🇯🇵 日本語</a> ·
   <a href="README.zh-CN.md">🇨🇳 简体中文</a> ·
@@ -25,7 +25,7 @@
 
 ## Демо
 
-![Сравнение результатов перевода между PuriPuly (Deepgram + Gemini 3 Flash) и VRCT (Google Web Speech + Google Translate). PuriPuly распознавание: «아역시혼자기대하면안된다니깐», перевод: «(See, I knew I shouldn't have gotten my hopes up.)» | VRCT распознавание: «아 역시 혼자 기대하면 안 된다니까», перевод: «Oh, I guess you shouldn't expect it alone.»](docs/images/demo/ko-en_screenshot.png)
+![Сравнение результатов перевода между PuriPuly (Deepgram + Gemini 3 Flash) и VRCT (Google Web Speech + Google Translate). PuriPuly распознавание: «아역시혼자기대하면안된다니깐», перевод: «(See, I knew I shouldn't have gotten my hopes up.)» | VRCT распознавание: «아 역시 혼자 기대하면 안 된다니까», перевод: «Oh, I guess you shouldn't expect it alone.»](../images/demo/ko-en_screenshot.png)
 
 ---
 
@@ -88,7 +88,7 @@ PuriPuly — двусторонний голосовой переводчик д
 
 ## Сравнение перевода
 
-![Диаграмма среднего штрафа за предложение при переводе с корейского на EN / JA / ZH-Hans: 216 многоходовых примеров, оценка Gemba MQM, чем ниже — тем лучше. Синие столбцы — модели, доступные в PuriPuly: 1-е место Gemma 4 31B (0.353), 2-е Gemma 4 26B A4B (0.387), 3-е DeepSeek-V4 Flash 0731 (0.571), 4-е Gemma 4 12B QAT Q4 (0.855), 5-е Gemma 4 E4B QAT Q4 (1.577). Оранжевые столбцы — внешние базовые показатели: Hy-MT-7B (1.863), Papago (2.699), Gemini 3.5 Live Translate (2.991), MiLMMT 46-4B (3.087), DeepL (3.914), Google Cloud Translation Basic (5.731).](docs/images/performance/2.png)
+![Диаграмма среднего штрафа за предложение при переводе с корейского на EN / JA / ZH-Hans: 216 многоходовых примеров, оценка Gemba MQM, чем ниже — тем лучше. Синие столбцы — модели, доступные в PuriPuly: 1-е место Gemma 4 31B (0.353), 2-е Gemma 4 26B A4B (0.387), 3-е DeepSeek-V4 Flash 0731 (0.571), 4-е Gemma 4 12B QAT Q4 (0.855), 5-е Gemma 4 E4B QAT Q4 (1.577). Оранжевые столбцы — внешние базовые показатели: Hy-MT-7B (1.863), Papago (2.699), Gemini 3.5 Live Translate (2.991), MiLMMT 46-4B (3.087), DeepL (3.914), Google Cloud Translation Basic (5.731).](../images/performance/2.png)
 
 - Синие столбцы — модели, доступные в PuriPuly.
 - Для эксперимента использован фреймворк Microsoft Gemba MQM.
@@ -233,22 +233,22 @@ PuriPuly работает лучше всего с облачным STT.
 <summary><h3>OpenRouter</h3></summary>
 
 1. Установите параметры, обведённые красным, как на скриншоте.
-   ![step0](docs/images/openrouter/0.png)
+   ![step0](../images/openrouter/0.png)
 
 2. В приложении нажмите кнопку, обведённую красным.
-   ![step1](docs/images/openrouter/1.png)
+   ![step1](../images/openrouter/1.png)
 
 3. Войдите в OpenRouter.
-   ![step2](docs/images/openrouter/2.png)
+   ![step2](../images/openrouter/2.png)
 
 4. Нажмите обведённую кнопку, чтобы выйти из экрана оплаты.
-   ![step3](docs/images/openrouter/3.png)
+   ![step3](../images/openrouter/3.png)
 
 5. Нажмите **Authorize**.
-   ![step4](docs/images/openrouter/4.png)
+   ![step4](../images/openrouter/4.png)
 
 6. Пополните баланс на нужную сумму.
-   ![step5](docs/images/openrouter/5.png)
+   ![step5](../images/openrouter/5.png)
 
 <details>
 <summary><h3>Если кнопка Authorize не сработала</h3></summary>
@@ -256,13 +256,13 @@ PuriPuly работает лучше всего с облачным STT.
 Попробуйте ещё раз или создайте API-ключ вручную:
 
 6. Нажмите на аккаунт в правом верхнем углу → вкладка API Keys → кнопка Create.
-   ![step6](docs/images/openrouter/6.png)
+   ![step6](../images/openrouter/6.png)
 
 7. Нажмите Create.
-   ![step7](docs/images/openrouter/7.png)
+   ![step7](../images/openrouter/7.png)
 
 8. Скопируйте API-ключ и вставьте его на вкладку API переводчика.
-   ![step8](docs/images/openrouter/8.png)
+   ![step8](../images/openrouter/8.png)
 
 </details>
 
@@ -272,22 +272,22 @@ PuriPuly работает лучше всего с облачным STT.
 <summary><h3>DeepSeek</h3></summary>
 
 1. Установите параметры, обведённые красным, как на скриншоте.
-   ![step0](docs/images/deepseek/0.png)
+   ![step0](../images/deepseek/0.png)
 
 2. Перейдите на [официальный сайт DeepSeek](https://www.deepseek.com/en/) и нажмите **Access API**.
-   ![step1](docs/images/deepseek/1.png)
+   ![step1](../images/deepseek/1.png)
 
 3. Войдите на сайт.
-   ![step2](docs/images/deepseek/2.png)
+   ![step2](../images/deepseek/2.png)
 
 4. Перейдите на вкладку API Keys → **Create new API Keys**.
-   ![step3](docs/images/deepseek/3.png)
+   ![step3](../images/deepseek/3.png)
 
 5. Скопируйте API-ключ и вставьте его на вкладку API переводчика.
-   ![step4](docs/images/deepseek/4.png)
+   ![step4](../images/deepseek/4.png)
 
 6. Перейдите на вкладку Top Up и пополните баланс.
-   ![step5](docs/images/deepseek/5.png)
+   ![step5](../images/deepseek/5.png)
 
 </details>
 
@@ -295,22 +295,22 @@ PuriPuly работает лучше всего с облачным STT.
 <summary><h3>Deepgram</h3></summary>
 
 1. Войдите в [Deepgram Console](https://console.deepgram.com/).
-   ![step1](docs/images/deepgram/1.png)
+   ![step1](../images/deepgram/1.png)
 
 2. Если видите приветствие — нажмите **Skip**.
-   ![step2](docs/images/deepgram/2.png)
+   ![step2](../images/deepgram/2.png)
 
 3. Выберите **STT (Speech-to-Text)**.
-   ![step3](docs/images/deepgram/3.png)
+   ![step3](../images/deepgram/3.png)
 
 4. В меню API Keys нажмите **Create a New API Key**.
-   ![step4](docs/images/deepgram/4.png)
+   ![step4](../images/deepgram/4.png)
 
 5. Введите имя ключа (например, `puripuly`) и создайте.
-   ![step5](docs/images/deepgram/5.png)
+   ![step5](../images/deepgram/5.png)
 
 6. Скопируйте ключ и вставьте в настройки PuriPuly.
-   ![step6](docs/images/deepgram/6.png)
+   ![step6](../images/deepgram/6.png)
 
 </details>
 
@@ -318,35 +318,35 @@ PuriPuly работает лучше всего с облачным STT.
 <summary><h3>Gemini</h3></summary>
 
 1. Перейдите в [Google AI Studio](https://aistudio.google.com/apikey) → **Get API key**.
-   ![step1](docs/images/gemini/1.png)
+   ![step1](../images/gemini/1.png)
 
 2. Создайте новый проект.
-   ![step2](docs/images/gemini/2.png)
+   ![step2](../images/gemini/2.png)
 
 3. Введите любое имя.
-   ![step3](docs/images/gemini/3.png)
+   ![step3](../images/gemini/3.png)
 
 4. Выберите проект → **Create key**.
-   ![step4](docs/images/gemini/4.png)
+   ![step4](../images/gemini/4.png)
 
 5. Нажмите на обведённую область.
-   ![step5](docs/images/gemini/5.png)
+   ![step5](../images/gemini/5.png)
 
 6. Скопируйте ключ.
-   ![step6](docs/images/gemini/6.png)
+   ![step6](../images/gemini/6.png)
 
 7. *(Рекомендуется)* Нажмите жёлтую кнопку **Set Up Billing** для перехода на платный тариф.
    Переход на платный тариф может занять некоторое время.
-   ![step7](docs/images/gemini/7.png)
+   ![step7](../images/gemini/7.png)
 
 <details>
 <summary><h3>Для платных подписчиков Gemini</h3></summary>
 
 8. Перейдите в [Google Developer Program](https://developers.google.com/program/my-benefits) и присоединитесь.
-   ![step8](docs/images/gemini/8.png)
+   ![step8](../images/gemini/8.png)
 
 9. Выберите проект с платным тарифом из шага 7.
-   ![step9](docs/images/gemini/9.png)
+   ![step9](../images/gemini/9.png)
 
 </details>
 
@@ -360,22 +360,22 @@ PuriPuly работает лучше всего с облачным STT.
    - [Остальной мир](https://bailian.console.alibabacloud.com)
 
 2. Войдите. Убедитесь, что выбран правильный регион (например, Пекин).
-   ![step2](docs/images/qwen/1.png)
+   ![step2](../images/qwen/1.png)
 
 3. Нажмите **значок шестерёнки** в правом верхнем углу.
-   ![step3](docs/images/qwen/2.png)
+   ![step3](../images/qwen/2.png)
 
 4. Создайте рабочее пространство → страница **API-KEY**.
-   ![step4](docs/images/qwen/3.png)
+   ![step4](../images/qwen/3.png)
 
 5. **Create API Key**.
-   ![step5](docs/images/qwen/4.png)
+   ![step5](../images/qwen/4.png)
 
 6. Назначьте аккаунт и рабочее пространство → OK.
-   ![step6](docs/images/qwen/5.png)
+   ![step6](../images/qwen/5.png)
 
 7. Скопируйте ключ.
-   ![step7](docs/images/qwen/6.png)
+   ![step7](../images/qwen/6.png)
 
 </details>
 
@@ -383,22 +383,22 @@ PuriPuly работает лучше всего с облачным STT.
 <summary><h3>Soniox</h3></summary>
 
 1. Войдите в [Soniox Console](https://console.soniox.com/).
-   ![step1](docs/images/soniox/1.png)
+   ![step1](../images/soniox/1.png)
 
 2. Введите название организации.
-   ![step2](docs/images/soniox/2.png)
+   ![step2](../images/soniox/2.png)
 
 3. Нажмите **Add Funds** для привязки оплаты.
-   ![step3](docs/images/soniox/3.png)
+   ![step3](../images/soniox/3.png)
 
 4. Soniox требует предоплаты. После пополнения перейдите в **API Keys**.
-   ![step4](docs/images/soniox/4.png)
+   ![step4](../images/soniox/4.png)
 
 5. Создайте новый API Key.
-   ![step5](docs/images/soniox/5.png)
+   ![step5](../images/soniox/5.png)
 
 6. Скопируйте ключ и вставьте в настройки PuriPuly.
-   ![step6](docs/images/soniox/6.png)
+   ![step6](../images/soniox/6.png)
 
 </details>
 
@@ -407,9 +407,9 @@ PuriPuly работает лучше всего с облачным STT.
 
 ## Архитектура
 
-![Гексагональная архитектура PuriPuly Heart](docs/architecture-light.png)
+![Гексагональная архитектура PuriPuly Heart](../architecture-light.png)
 
-См. [`ARCHITECTURE.md`](ARCHITECTURE.md).
+См. [`docs/architecture.md`](../architecture.md).
 
 ## Дорожная карта
 
@@ -424,8 +424,8 @@ PuriPuly работает лучше всего с облачным STT.
 | Область | Рекомендуемое окружение | Документация |
 |---|---|---|
 | Python-приложение для рабочего стола | Windows | Этот раздел |
-| Сервис-брокер | Linux | [`broker/README.md`](broker/README.md) |
-| Нативный VR-оверлей | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
+| Сервис-брокер | Linux | [`broker/README.md`](../../broker/README.md) |
+| Нативный VR-оверлей | Windows | [`native/overlay/README.md`](../../native/overlay/README.md) |
 
 ### Python-окружение
 
@@ -523,13 +523,13 @@ python -m pytest tests/path/to/test_file.py
 
 ### Прочие области
 
-Документация брокера ведётся в [`broker/README.md`](broker/README.md).
+Документация брокера ведётся в [`broker/README.md`](../../broker/README.md).
 
-Документация нативного VR-оверлея ведётся в [`native/overlay/README.md`](native/overlay/README.md).
+Документация нативного VR-оверлея ведётся в [`native/overlay/README.md`](../../native/overlay/README.md).
 
-Документация пользовательского HTTP API-расширения ведётся в [`docs/http-extensions.md`](docs/http-extensions.md). Необходимую для подключения JSON Schema см. в [`docs/http-extension.schema.json`](docs/http-extension.schema.json).
+Документация пользовательского HTTP API-расширения ведётся в [`docs/http-extensions.md`](../http-extensions.md). Необходимую для подключения JSON Schema см. в [`docs/http-extension.schema.json`](../http-extension.schema.json).
 
-Управление VRChat через OSC см. в [`docs/vrchat-osc.md`](docs/vrchat-osc.md).
+Управление VRChat через OSC см. в [`docs/vrchat-osc.md`](../vrchat-osc.md).
 
 ---
 
@@ -554,13 +554,13 @@ SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han �
 
 ## Политики
 
-- [Code signing policy](CODE_SIGNING.md)
-- [Политика конфиденциальности](PRIVACY.md)
+- [Code signing policy](../../CODE_SIGNING.md)
+- [Политика конфиденциальности](../../PRIVACY.md)
 
 ---
 
 ## Лицензия
 
-[AGPL-3.0-or-later](LICENSE)
+[AGPL-3.0-or-later](../../LICENSE)
 
 Сторонние лицензии и уведомления: `src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt`

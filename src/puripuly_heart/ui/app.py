@@ -98,9 +98,9 @@ APP_CONTENT_PADDING = FOUNDATION_DESIGN_TOKENS.spacing.page
 FOUNDER_CONTACT_URL = "https://x.com/kapitalismho"
 FOUNDER_README_BASE_URL = "https://github.com/kapitalismho/PuriPuly-heart/blob/main"
 FOUNDER_README_PATH_BY_LOCALE = {
-    "ko": "README.ko.md",
-    "zh-CN": "README.zh-CN.md",
-    "ja": "README.ja.md",
+    "ko": "docs/readme/README.ko.md",
+    "zh-CN": "docs/readme/README.zh-CN.md",
+    "ja": "docs/readme/README.ja.md",
 }
 FOUNDER_README_API_KEYS_ANCHOR_BY_LOCALE = {
     "ko": "자신의-api-키-사용하기",

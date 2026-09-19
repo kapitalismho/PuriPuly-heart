@@ -4,7 +4,7 @@ Thanks for taking an interest in this project.
 
 ## How to Get Started
 
-1. Follow the Development section in the [README](README.md).
+1. Follow the Development section in the [README](../README.md).
 2. Find something to work on, e.g., issues labeled `good first issue`.
 3. See [Making a Change](#making-a-change) below.
 

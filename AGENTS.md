@@ -2,7 +2,7 @@
 
 - Code comments are added only when explicitly requested.
 - Merge, push, publish, deployment, release, and worktree cleanup proceed only with explicit approval.
-- Use `ARCHITECTURE.md` as the system map when a task requires reasoning about how the system fits together.
+- Use `docs/architecture.md` as the system map when a task requires reasoning about how the system fits together.
 - Report suspected architecture drift introduced by your changes to the user.
 
 ## Test
@@ -13,4 +13,3 @@
 
 - Treat experiments as engineering probes, using the minimum validation needed to support the immediate engineering decision.
 - Expand an experiment when a plausible result could change the engineering decision, stating the remaining uncertainty and the decision it could affect.
-
