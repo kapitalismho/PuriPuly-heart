@@ -66,9 +66,11 @@ A cold-cache reproduction used a recording/rejecting HTTP boundary inside the ac
 
 The post-edit check started without the offline flag, executed the compiled assignment from the actual spec, and then ran the real SDK collection in the guarded isolated child. It observed the inherited flag and SDK constant enabled, no network attempt, and the unchanged module set. This exercises the changed policy and collection path, not the complete spec, `Analysis`, `EXE`, `COLLECT`, or a new package rebuild.
 
-Final evidence record: `.tmp/issue-177-build-isolation/final-evidence/record.json`, byte SHA-256 `2b6441df020b283e681b246096962a3696e3c3223be37c85526f9d10ad74b39b`. Its external `SHA256SUMS.txt` has byte SHA-256 `46f243e9c0427424ca560c0d526a6177406e1dc9c3a0c18e11f478501fff7290`. These bind the exact witness scripts, original reports and edited `build.spec` bytes (`0d07711cfc2a10c4b4d36afd39d2e2daaffe21f770a65309d07ee9cf1c251cf0`).
+Current evidence record: `.tmp/issue-177-build-isolation/final-evidence-v2/record.json`, byte SHA-256 `53bc4b8f95db85ea51874b50ebd3735648d4c0b8980a6f5ff24de431dbe6f602`. Its external `SHA256SUMS.txt` has byte SHA-256 `007bf5397f603fe7887dce256a9e04bb35d517a7c4efdf6a99de9d0787909c23`. These bind the exact witness scripts, original reports, previous evidence projection and edited `build.spec` bytes (`0d07711cfc2a10c4b4d36afd39d2e2daaffe21f770a65309d07ee9cf1c251cf0`).
 
 The original baseline and post-edit reports remain unchanged, with actual byte hashes `dc1386a1452f42b575cf6c5d6423e4ac9afac701f108bbc66697db50e18cd67c` and `32f16327337a952820faf0de22eb8cf902d6a1ff82dfa800a996c4b9eb3b0a51`. Their internal self-digest fields were calculated before those fields were inserted and are not final-file identities; the separate final evidence record corrects that metadata ambiguity without rewriting observations or claiming another execution. No full-build network-free claim follows from this focused repair.
+
+Independent review identified `zero_real_egress` as a literal constraint in the legacy witness dictionaries rather than a measured result. The current projection excludes it from its proof set and pass claims. It retains the derived attempt counts, inherited flag/SDK state and module-set equality, and separately records the process-local HTTP/socket/DNS guard mechanism. No OS-level egress monitor ran. Historical reports and the previous projection remain unchanged; this correction changes evidence metadata, not the execution history.
 
 ## External gaps retained
 
