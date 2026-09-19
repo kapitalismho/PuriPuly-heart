@@ -79,6 +79,50 @@ async def _emit(
         await result
 
 
+def _remove_owned_staging(staging_dir: Path) -> None:
+    try:
+        shutil.rmtree(staging_dir)
+    except FileNotFoundError:
+        pass
+
+
+async def _await_download_cleanup(
+    download: Awaitable[Path],
+    *,
+    cancel_event: threading.Event | None,
+) -> Path:
+    task = asyncio.create_task(download)
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError as cancellation:
+        current = asyncio.current_task()
+        if current is None or not current.cancelling():
+            raise
+        if cancel_event is not None:
+            cancel_event.set()
+        else:
+            task.cancel()
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                continue
+            except BaseException:
+                if task.done():
+                    break
+                raise
+        try:
+            task.result()
+        except asyncio.CancelledError, LocalSTTDownloadPortCancelled:
+            pass
+        except BaseException as cleanup_failure:
+            raise BaseExceptionGroup(
+                "Gemma download cancellation and cleanup failed",
+                (cancellation, cleanup_failure),
+            ) from None
+        raise cancellation
+
+
 async def _download_asset(
     *,
     downloader: HuggingFaceDownloadPort,
@@ -138,16 +182,19 @@ async def _download_asset(
         return tuple(result for result in results if isinstance(result, BaseException))
 
     try:
-        downloaded_path = await downloader.download(
-            HuggingFaceDownloadRequest(
-                repo_id=spec.repo_id,
-                revision=spec.revision,
-                remote_path=asset.filename,
-                local_dir=staging_dir,
-                expected_size_bytes=asset.size_bytes,
+        downloaded_path = await _await_download_cleanup(
+            downloader.download(
+                HuggingFaceDownloadRequest(
+                    repo_id=spec.repo_id,
+                    revision=spec.revision,
+                    remote_path=asset.filename,
+                    local_dir=staging_dir,
+                    expected_size_bytes=asset.size_bytes,
+                ),
+                cancel_event=cancel_event,
+                on_progress=on_progress,
             ),
             cancel_event=cancel_event,
-            on_progress=on_progress,
         )
     except BaseException as download_failure:
         progress_failures = await drain_progress()
@@ -250,7 +297,6 @@ async def _ensure_gemma_installed_with_lease(
         downloader = HuggingFaceXetDownloadAdapter()
 
     staging_dir = resolved.with_name(f"{resolved.name}.staging-{uuid4().hex}")
-    shutil.rmtree(staging_dir, ignore_errors=True)
     staging_dir.mkdir(parents=True, exist_ok=False)
     completed_bytes = 0
     try:
@@ -295,16 +341,16 @@ async def _ensure_gemma_installed_with_lease(
         )
         return manifest
     except asyncio.CancelledError:
-        shutil.rmtree(staging_dir, ignore_errors=True)
+        _remove_owned_staging(staging_dir)
         raise
     except LocalSTTDownloadPortCancelled as exc:
-        shutil.rmtree(staging_dir, ignore_errors=True)
+        _remove_owned_staging(staging_dir)
         raise GemmaProvisioningCancelled("Gemma model provisioning cancelled") from exc
     except GemmaProvisioningCancelled:
-        shutil.rmtree(staging_dir, ignore_errors=True)
+        _remove_owned_staging(staging_dir)
         raise
     except Exception as exc:
-        shutil.rmtree(staging_dir, ignore_errors=True)
+        _remove_owned_staging(staging_dir)
         await _emit(
             on_status,
             state="failed",
@@ -315,7 +361,7 @@ async def _ensure_gemma_installed_with_lease(
             raise
         raise GemmaProvisioningError(f"Gemma model provisioning failed: {exc}") from exc
     except BaseExceptionGroup:
-        shutil.rmtree(staging_dir, ignore_errors=True)
+        _remove_owned_staging(staging_dir)
         raise
 
 
