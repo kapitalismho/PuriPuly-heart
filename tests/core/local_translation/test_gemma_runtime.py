@@ -23,9 +23,21 @@ from puripuly_heart.core.local_translation.runtime_profile import GemmaRuntimePa
 
 class FakeProcess:
     def __init__(self) -> None:
-        self.returncode = None
+        self._returncode: int | None = None
+        self._exit = asyncio.Event()
         self.terminated = False
         self.killed = False
+        self.cwd: Path | None = None
+
+    @property
+    def returncode(self) -> int | None:
+        return self._returncode
+
+    @returncode.setter
+    def returncode(self, value: int | None) -> None:
+        self._returncode = value
+        if value is not None:
+            self._exit.set()
 
     def terminate(self) -> None:
         self.terminated = True
@@ -36,7 +48,9 @@ class FakeProcess:
         self.returncode = -9
 
     async def wait(self) -> int:
-        return self.returncode or 0
+        await self._exit.wait()
+        assert self.returncode is not None
+        return self.returncode
 
 
 class FakeTransport:
@@ -93,6 +107,18 @@ class FakeTransport:
 
     async def close(self) -> None:
         self.closed = True
+
+
+class NeverReadyTransport(FakeTransport):
+    async def wait_until_ready(self, *, timeout_s: float) -> None:
+        self.ready_calls.append(timeout_s)
+        await asyncio.Event().wait()
+
+
+class ImmediateExitProcess(FakeProcess):
+    def __init__(self) -> None:
+        super().__init__()
+        self.returncode = 23
 
 
 class HangingTransport(FakeTransport):
@@ -195,11 +221,12 @@ def _runtime(
     async def provisioner(**kwargs):
         provision_calls.append(kwargs)
 
-    async def process_factory(command):
+    async def process_factory(command, cwd):
         commands.append(command)
         if fail_gpu and command[0] == str(gpu):
             raise RuntimeError("Vulkan unavailable")
         process = process_builder() if process_builder is not None else FakeProcess()
+        process.cwd = cwd
         processes.append(process)
         return process
 
@@ -288,6 +315,37 @@ async def test_gpu_start_failure_falls_back_internally_to_cpu(tmp_path: Path) ->
     assert "--spec-draft-model" in commands[1]
     assert transports[0].prefixes == ["translate"]
     assert any("backend_fallback requested=gpu effective=cpu" in message for message, _ in logs)
+
+
+@pytest.mark.asyncio
+async def test_startup_reports_child_exit_and_falls_back_without_waiting_for_timeout(
+    tmp_path: Path,
+) -> None:
+    owner, commands, _processes, _transports, _provision_calls, logs = _runtime(
+        tmp_path,
+        transport_builder=NeverReadyTransport,
+        process_builder=ImmediateExitProcess,
+    )
+
+    with pytest.raises(
+        ManagedGemmaRuntimeError,
+        match="managed Gemma cpu process exited during startup with exit code 23",
+    ):
+        await asyncio.wait_for(
+            owner.prepare(
+                backend="gpu",
+                source_language="ko",
+                target_language="en",
+                system_prompt="translate",
+            ),
+            timeout=0.5,
+        )
+
+    assert len(commands) == 2
+    assert [message for message, _level in logs if "process_exit phase=startup" in message] == [
+        "[ManagedGemma] process_exit phase=startup backend=gpu exit_code=23",
+        "[ManagedGemma] process_exit phase=startup backend=cpu exit_code=23",
+    ]
 
 
 @pytest.mark.asyncio
@@ -712,7 +770,11 @@ async def test_failed_cleanup_retains_resources_for_retry(tmp_path: Path) -> Non
 
 
 @pytest.mark.asyncio
-async def test_prefix_cache_restore_skips_prefill_after_process_restart(tmp_path: Path) -> None:
+@pytest.mark.parametrize("backend", ["cpu", "gpu"])
+async def test_prefix_cache_restore_skips_prefill_after_process_restart(
+    tmp_path: Path,
+    backend: str,
+) -> None:
     from puripuly_heart.core.local_translation.prefix_cache import GemmaPrefixCache
 
     cache = GemmaPrefixCache(tmp_path / "prefix-cache")
@@ -723,13 +785,13 @@ async def test_prefix_cache_restore_skips_prefill_after_process_restart(tmp_path
         transport.restore_hits = restore_hits
         return transport
 
-    owner, commands, _processes, transports, _provision_calls, _logs = _runtime(
+    owner, commands, processes, transports, _provision_calls, _logs = _runtime(
         tmp_path,
         transport_builder=transport_builder,
         prefix_cache=cache,
     )
     first = await owner.prepare(
-        backend="cpu",
+        backend=backend,
         source_language="ko",
         target_language="en",
         system_prompt="translate",
@@ -743,14 +805,15 @@ async def test_prefix_cache_restore_skips_prefill_after_process_restart(tmp_path
     await owner.release()
 
     second = await owner.prepare(
-        backend="cpu",
+        backend=backend,
         source_language="ko",
         target_language="en",
         system_prompt="translate",
     )
 
     assert first.prefix_identity == second.prefix_identity
-    assert "--slot-save-path" in commands[0]
+    assert commands[0][commands[0].index("--slot-save-path") + 1] == "."
+    assert processes[0].cwd == cache.cache_dir.resolve()
     assert transports[-1].restores == [filename]
     assert transports[-1].restore_slots == [0]
     assert transports[-1].prefixes == []

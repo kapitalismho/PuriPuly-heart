@@ -94,7 +94,7 @@ class _CapturedRuntimeProcess:
 def _captured_process_factory(
     captures: list[_CapturedRuntimeProcess],
 ):
-    async def factory(command: tuple[str, ...]) -> _CapturedRuntimeProcess:
+    async def factory(command: tuple[str, ...], cwd: Path) -> _CapturedRuntimeProcess:
         observed_command = command + ("--verbosity", "4")
         process = await asyncio.create_subprocess_exec(
             observed_command[0],
@@ -102,6 +102,7 @@ def _captured_process_factory(
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
+            cwd=cwd,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         stdout = process.stdout

@@ -73,7 +73,7 @@ class ManagedGemmaTransport(Protocol):
 
 
 ManagedGemmaProcessFactory = Callable[
-    [tuple[str, ...]],
+    [tuple[str, ...], Path],
     Awaitable[ManagedGemmaRuntimeProcess],
 ]
 ManagedGemmaTransportFactory = Callable[[str], ManagedGemmaTransport]
@@ -116,6 +116,7 @@ def _allocate_loopback_port() -> int:
 
 async def _default_process_factory(
     command: tuple[str, ...],
+    cwd: Path,
 ) -> ManagedGemmaRuntimeProcess:
     return await asyncio.create_subprocess_exec(
         command[0],
@@ -123,6 +124,7 @@ async def _default_process_factory(
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
+        cwd=cwd,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
 
@@ -536,6 +538,39 @@ class ManagedGemmaRuntimeOwner:
         if process is None or process.returncode is not None:
             raise ManagedGemmaRuntimeError("managed Gemma process exited before readiness")
 
+    async def _wait_for_startup(
+        self,
+        *,
+        process: ManagedGemmaRuntimeProcess,
+        transport: ManagedGemmaTransport,
+        backend: GemmaBackend,
+    ) -> None:
+        readiness = asyncio.create_task(
+            transport.wait_until_ready(timeout_s=self._startup_timeout_s)
+        )
+        process_exit = asyncio.create_task(process.wait())
+        try:
+            done, _pending = await asyncio.wait(
+                (readiness, process_exit),
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if process_exit in done:
+                exit_code = process_exit.result()
+                self._emit(
+                    f"[ManagedGemma] process_exit phase=startup backend={backend} exit_code={exit_code}",
+                    logging.ERROR,
+                )
+                raise ManagedGemmaRuntimeError(
+                    f"managed Gemma {backend} process exited during startup "
+                    f"with exit code {exit_code}"
+                )
+            await readiness
+        finally:
+            for task in (readiness, process_exit):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(readiness, process_exit, return_exceptions=True)
+
     async def _start_locked(
         self,
         *,
@@ -551,10 +586,12 @@ class ManagedGemmaRuntimeOwner:
         if not executable.is_file():
             raise ManagedGemmaRuntimeError(f"managed llama.cpp server is missing: {executable}")
         port = self._port_allocator()
+        process_cwd = self._install_dir
         slot_save_path = None
         if self._prefix_cache is not None:
             self._prefix_cache.cache_dir.mkdir(parents=True, exist_ok=True)
-            slot_save_path = self._prefix_cache.cache_dir
+            process_cwd = self._prefix_cache.cache_dir.resolve()
+            slot_save_path = Path(".")
         command = build_gemma_server_command(
             executable=executable,
             install_dir=self._install_dir,
@@ -564,13 +601,17 @@ class ManagedGemmaRuntimeOwner:
             slot_save_path=slot_save_path,
             spec=spec,
         )
-        process = await self._process_factory(command)
+        process = await self._process_factory(command, process_cwd)
         self._process = process
         try:
             transport = self._transport_factory(f"http://127.0.0.1:{port}")
             self._transport = transport
             self._effective_backend = "vulkan" if backend == "gpu" else "cpu"
-            await transport.wait_until_ready(timeout_s=self._startup_timeout_s)
+            await self._wait_for_startup(
+                process=process,
+                transport=transport,
+                backend=backend,
+            )
         except BaseException:
             await self._stop_locked()
             raise
