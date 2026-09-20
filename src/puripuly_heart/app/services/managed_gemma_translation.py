@@ -154,6 +154,21 @@ class ManagedGemmaTranslationOwner:
             except GemmaProvisioningCancelled:
                 self._publish("cancelled", backend=backend, progress_percent=None)
                 raise
+            except BaseExceptionGroup as exc:
+                failure = _failure_metadata(exc)
+                self._publish(
+                    "failed",
+                    backend=backend,
+                    progress_percent=None,
+                    error_type=type(exc).__name__,
+                    failure_phase=failure["phase"],
+                    failure_code=failure["code"],
+                    cause_type=failure["cause_type"],
+                    worker_exit_code=failure["worker_exit_code"],
+                    status_code=failure["status_code"],
+                    os_error_code=failure["os_error_code"],
+                )
+                raise
             except Exception as exc:
                 failure = _failure_metadata(exc)
                 self._publish(
@@ -334,19 +349,37 @@ class ManagedGemmaTranslationOwner:
                 self._status_sink(snapshot)
 
 
-def _exception_chain(exception: BaseException) -> tuple[BaseException, ...]:
-    chain: list[BaseException] = []
+def _exception_tree(exception: BaseException) -> tuple[BaseException, ...]:
+    found: list[BaseException] = []
+    pending = [exception]
     seen: set[int] = set()
-    current: BaseException | None = exception
-    while current is not None and id(current) not in seen:
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
         seen.add(id(current))
-        chain.append(current)
-        current = current.__cause__ or current.__context__
-    return tuple(chain)
+        found.append(current)
+        if isinstance(current, BaseExceptionGroup):
+            pending.extend(reversed(current.exceptions))
+        linked = current.__cause__ or current.__context__
+        if linked is not None:
+            pending.append(linked)
+    return tuple(found)
 
 
 def _failure_metadata(exception: BaseException) -> dict[str, str | int | None]:
-    chain = _exception_chain(exception)
+    chain = _exception_tree(exception)
+    filesystem_failure = next((item for item in chain if isinstance(item, OSError)), None)
+    if isinstance(exception, BaseExceptionGroup) and filesystem_failure is not None:
+        return {
+            "phase": "provisioning",
+            "code": "filesystem_failed",
+            "cause_type": type(filesystem_failure).__name__,
+            "worker_exit_code": None,
+            "status_code": None,
+            "os_error_code": getattr(filesystem_failure, "winerror", None)
+            or filesystem_failure.errno,
+        }
     download_failure = next(
         (item for item in chain if isinstance(item, LocalSTTDownloadPortError)),
         None,

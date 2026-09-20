@@ -79,11 +79,20 @@ async def _emit(
         await result
 
 
-def _remove_owned_staging(staging_dir: Path) -> None:
+def _remove_owned_staging(
+    staging_dir: Path,
+    *,
+    primary_failure: BaseException,
+) -> None:
     try:
         shutil.rmtree(staging_dir)
     except FileNotFoundError:
         pass
+    except BaseException as cleanup_failure:
+        raise BaseExceptionGroup(
+            "Gemma provisioning and staging cleanup failed",
+            (primary_failure, cleanup_failure),
+        ) from primary_failure
 
 
 async def _await_download_cleanup(
@@ -339,28 +348,35 @@ async def _ensure_gemma_installed_with_lease(
             total_bytes=total_bytes,
         )
         return manifest
-    except asyncio.CancelledError:
-        _remove_owned_staging(staging_dir)
+    except asyncio.CancelledError as exc:
+        _remove_owned_staging(staging_dir, primary_failure=exc)
         raise
     except LocalSTTDownloadPortCancelled as exc:
-        _remove_owned_staging(staging_dir)
-        raise GemmaProvisioningCancelled("Gemma model provisioning cancelled") from exc
-    except GemmaProvisioningCancelled:
-        _remove_owned_staging(staging_dir)
+        cancellation = GemmaProvisioningCancelled("Gemma model provisioning cancelled")
+        cancellation.__cause__ = exc
+        _remove_owned_staging(staging_dir, primary_failure=cancellation)
+        raise cancellation
+    except GemmaProvisioningCancelled as exc:
+        _remove_owned_staging(staging_dir, primary_failure=exc)
         raise
     except Exception as exc:
-        _remove_owned_staging(staging_dir)
+        failure = (
+            exc
+            if isinstance(exc, GemmaProvisioningError)
+            else GemmaProvisioningError(f"Gemma model provisioning failed: {exc}")
+        )
+        if failure is not exc:
+            failure.__cause__ = exc
+        _remove_owned_staging(staging_dir, primary_failure=failure)
         await _emit(
             on_status,
             state="failed",
             downloaded_bytes=completed_bytes,
             total_bytes=total_bytes,
         )
-        if isinstance(exc, GemmaProvisioningError):
-            raise
-        raise GemmaProvisioningError(f"Gemma model provisioning failed: {exc}") from exc
-    except BaseExceptionGroup:
-        _remove_owned_staging(staging_dir)
+        raise failure
+    except BaseExceptionGroup as exc:
+        _remove_owned_staging(staging_dir, primary_failure=exc)
         raise
 
 

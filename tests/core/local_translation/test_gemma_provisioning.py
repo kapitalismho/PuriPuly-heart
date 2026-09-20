@@ -315,6 +315,55 @@ async def test_repeated_task_cancellation_waits_for_owned_downloader_cleanup(
 
 
 @pytest.mark.asyncio
+async def test_staging_cleanup_failure_preserves_cancellation_and_never_publishes_ready(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    contents = _pin_small_assets(monkeypatch)
+    downloader = CooperativeCancellationDownloader(contents)
+    cancel_event = threading.Event()
+    install_dir = tmp_path / "gemma"
+    statuses = []
+    real_rmtree = provisioning.shutil.rmtree
+
+    def fail_staging_cleanup(path, *args, **kwargs):
+        if ".staging-" in path.name:
+            raise PermissionError(5, "denied")
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(provisioning.shutil, "rmtree", fail_staging_cleanup)
+    operation = asyncio.create_task(
+        provisioning.ensure_gemma_installed(
+            downloader=downloader,
+            install_dir=install_dir,
+            cancel_event=cancel_event,
+            on_status=statuses.append,
+        )
+    )
+    await downloader.started.wait()
+
+    cancel_event.set()
+    operation.cancel()
+    await downloader.cleanup_started.wait()
+    downloader.allow_cleanup.set()
+    with pytest.raises(BaseExceptionGroup) as caught:
+        await operation
+
+    pending = [caught.value]
+    leaves = []
+    while pending:
+        exception = pending.pop()
+        if isinstance(exception, BaseExceptionGroup):
+            pending.extend(exception.exceptions)
+        else:
+            leaves.append(exception)
+    assert any(isinstance(exception, asyncio.CancelledError) for exception in leaves)
+    assert any(isinstance(exception, PermissionError) for exception in leaves)
+    assert not install_dir.exists()
+    assert all(status.state != "ready" for status in statuses)
+
+
+@pytest.mark.asyncio
 async def test_cancellation_during_initial_status_removes_staging(tmp_path, monkeypatch) -> None:
     contents = _pin_small_assets(monkeypatch)
     downloader = FakeDownloader(contents)
