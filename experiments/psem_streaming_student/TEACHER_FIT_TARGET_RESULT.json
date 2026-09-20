@@ -1,5 +1,4 @@
 {
-  "cumulative_optimizer_updates_unchanged": 1583,
   "experiment_id": "TEACHER-FIT-TARGETS-1",
   "findings": [
     "Teacher support validity is stored separately from GT validity.",
@@ -7,21 +6,11 @@
     "Raw sidecar probabilities are unclipped and not softmax-normalized.",
     "Association used existing 1e-12 logit clipping and disclosed clip counts.",
     "Permutation is a FIT task projection, not a human-identity guarantee.",
-    "Native model-load count is successful decoded trajectories only, not launch intent."
+    "Native model-load count is successful decoded trajectories only, not launch intent.",
+    "Class-conditioned 4x4 raw-native and mapped probability means are grouped by existing strict-solo GT labels on the common-valid mask inside each fixed quarter; absent classes are null, not zero.",
+    "Source-global min independent-activity-BCE permutation was not refit per quarter.",
+    "Original DUMP_DIR default exported incidental hidden and logits; those bytes are pinned and unused for learning. Future material must set EXPORT=logits."
   ],
-  "identities": {
-    "config": "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea",
-    "contract": "d651165b1d3229048376b7cefb02008648bf589c9eba800d2c892702af3d35c1",
-    "executed_config_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-fit-targets-1\\frozen_config.json",
-    "gt_pilot.py": "89577e61a758788dafba7822b861502422d9c672d21206b1208dee3a6a97c14a",
-    "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
-    "native_prerequisites": "73cd5b4d56749b389ba3ab369782280c17cd23b1ef4f35c69ccc968a4a27ef8d",
-    "original_config": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
-    "prepared_sources": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
-    "run_baseline.py": "3f7ee8a924bdb5e7ad848d2e1549df7e4f3ec06b2ef1c22e61213e5a3e9ee8c9",
-    "speaker_score_diagnostic.py": "b8880483ebd3528fb31627913124f8755720e11e1c821537ffdfbb5dcb3f360d",
-    "teacher_fit.py": "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c"
-  },
   "identities_bound": [
     {
       "component_id": "component-9bde89b69d0e4b542ec46d0132128e14ec230a5f90ae0965fce7ab19567b707c",
@@ -68,139 +57,500 @@
       "waveform_sha256": "65fcfc924e9bdb0388cbc3242a17bda88291ebc638f486e39a9ede78e92cb1e6"
     }
   ],
-  "manifest": {
-    "config_sha256": "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea",
-    "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
-    "gt_remains_in_prepared_artifact": true,
-    "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
-    "original_config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
-    "prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
-    "schema": "PSEM-TEACHER-FIT-MANIFEST-1",
-    "sources": [
+  "incidental_dump_inventory": [
+    {
+      "dump": {
+        "hidden_bytes": 2772705,
+        "incidental_bytes": 2830687,
+        "incidental_hidden_and_logits": [
+          {
+            "bytes": 2772480,
+            "name": "diar.hidden.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2005a/dump/diar.hidden.f32",
+            "sha256": "781bde0a82940f598356cdf4427dc3e8f18b373164f9217390d245c8c850335b"
+          },
+          {
+            "bytes": 225,
+            "name": "diar.hidden.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2005a/dump/diar.hidden.json",
+            "sha256": "a335abbef7a33c3c7117a1e2aec3b4b301bd918a15814733df39583465ae7cbc"
+          },
+          {
+            "bytes": 57760,
+            "name": "diar.logits.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2005a/dump/diar.logits.f32",
+            "sha256": "a436ea3174fd7131313b82e51c5b8b3d8145e1fa9370266aaefd87638f3f8cc6"
+          },
+          {
+            "bytes": 222,
+            "name": "diar.logits.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2005a/dump/diar.logits.json",
+            "sha256": "0e97fd1ede884b837223081f8fbe684f6b51977be0779623a7b8e1ba4d816c4a"
+          }
+        ],
+        "logits_bytes": 57982,
+        "required_probs_trace": [
+          {
+            "bytes": 57760,
+            "name": "diar.probs.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2005a/dump/diar.probs.f32",
+            "sha256": "5af4cdb65ee96e1e9baafbf44600998a9b36a6517c86159da9b8c759a5cb53eb"
+          },
+          {
+            "bytes": 225,
+            "name": "diar.probs.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2005a/dump/diar.probs.json",
+            "sha256": "15e9406c1a3efcfeef5aec8c73c6950e915047eb503989b8be4c322c317b7aff"
+          },
+          {
+            "bytes": 282406,
+            "name": "diar.trace.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2005a/dump/diar.trace.json",
+            "sha256": "24d3935b44d39ed7ee8eff7d36affa38acab156bf6ef7d80cc31f5d88a2548b1"
+          }
+        ]
+      },
+      "sidecar": {
+        "bytes": 184365,
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2005a/teacher_sidecar.pt",
+        "sha256": "e012af625c334f3b47abd0b468abcd8246258b0dc3d8d36c8d6a5afc747f8d45"
+      },
+      "source_id": "ami_ES2005a"
+    },
+    {
+      "dump": {
+        "hidden_bytes": 3064546,
+        "incidental_bytes": 3128609,
+        "incidental_hidden_and_logits": [
+          {
+            "bytes": 3064320,
+            "name": "diar.hidden.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2006a/dump/diar.hidden.f32",
+            "sha256": "3c204ea38146bcf3d31643821499de784be00781c4284bacd84e1e0f579408f5"
+          },
+          {
+            "bytes": 226,
+            "name": "diar.hidden.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2006a/dump/diar.hidden.json",
+            "sha256": "517d2cba0e7d373787e273ff21cd273ef0f434242087296c314b75f282cb5bdc"
+          },
+          {
+            "bytes": 63840,
+            "name": "diar.logits.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2006a/dump/diar.logits.f32",
+            "sha256": "1a4390e5fb774400235193d274e5736f19f2343b4fa8c45f5ff5e60248fcdeb6"
+          },
+          {
+            "bytes": 223,
+            "name": "diar.logits.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2006a/dump/diar.logits.json",
+            "sha256": "5023927298695d9655e4423522161b04550f37e6f5173bf45dfd351ac89205ed"
+          }
+        ],
+        "logits_bytes": 64063,
+        "required_probs_trace": [
+          {
+            "bytes": 63840,
+            "name": "diar.probs.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2006a/dump/diar.probs.f32",
+            "sha256": "470836f7e076a510677e58c1a1149cc425164782db91d3e8368188c218c5f6e2"
+          },
+          {
+            "bytes": 226,
+            "name": "diar.probs.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2006a/dump/diar.probs.json",
+            "sha256": "d45310f2df97cbef14c365b2a05041d5001164dd345a542dfd2d90b4f464aa60"
+          },
+          {
+            "bytes": 312199,
+            "name": "diar.trace.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2006a/dump/diar.trace.json",
+            "sha256": "1b4ff623faa82485bae98b1485dbb8475684402bc8cbe22b664ea65104ac2742"
+          }
+        ]
+      },
+      "sidecar": {
+        "bytes": 203437,
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2006a/teacher_sidecar.pt",
+        "sha256": "41fbf46b209dffd70aae043544a982de2e15351bccab0a8ab41ca06bdcfb8320"
+      },
+      "source_id": "ami_ES2006a"
+    },
+    {
+      "dump": {
+        "hidden_bytes": 2772704,
+        "incidental_bytes": 2830687,
+        "incidental_hidden_and_logits": [
+          {
+            "bytes": 2772480,
+            "name": "diar.hidden.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2007a/dump/diar.hidden.f32",
+            "sha256": "a9f1bf8756204a85f3547cf6911702209ff7e61fbf43340321fcb125c25aa60c"
+          },
+          {
+            "bytes": 224,
+            "name": "diar.hidden.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2007a/dump/diar.hidden.json",
+            "sha256": "7902db5f1306dc0c6aeb85599f9fd2e7e47f8060c4ad35b8f38ddc2d82ca059c"
+          },
+          {
+            "bytes": 57760,
+            "name": "diar.logits.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2007a/dump/diar.logits.f32",
+            "sha256": "3b7573ab59f85e7a1bd6bb46fef9a56ad7947364f7d84428a5c8431044e47e58"
+          },
+          {
+            "bytes": 223,
+            "name": "diar.logits.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2007a/dump/diar.logits.json",
+            "sha256": "c177f9762faf46bbff5cee2651bace467a815ce0d1ab76fae7f55c714eb43488"
+          }
+        ],
+        "logits_bytes": 57983,
+        "required_probs_trace": [
+          {
+            "bytes": 57760,
+            "name": "diar.probs.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2007a/dump/diar.probs.f32",
+            "sha256": "fc6b39c3437a81543f59e585ea2b5408834f2cce264a3fd49ab3e4b972f79aee"
+          },
+          {
+            "bytes": 227,
+            "name": "diar.probs.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2007a/dump/diar.probs.json",
+            "sha256": "158c616748e31219cf03054d1f05dd4fc392589b1b99b0ca2d11f9b9906c24d5"
+          },
+          {
+            "bytes": 282392,
+            "name": "diar.trace.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2007a/dump/diar.trace.json",
+            "sha256": "858a3faab19efe03090512879e4ff08ac7cefbc7208d186e981bbd4c9e333341"
+          }
+        ]
+      },
+      "sidecar": {
+        "bytes": 184365,
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2007a/teacher_sidecar.pt",
+        "sha256": "e3831753283cbb8140bc64d61049825124419a377b7eb45432ec5ee290167f74"
+      },
+      "source_id": "ami_ES2007a"
+    },
+    {
+      "dump": {
+        "hidden_bytes": 2772705,
+        "incidental_bytes": 2830687,
+        "incidental_hidden_and_logits": [
+          {
+            "bytes": 2772480,
+            "name": "diar.hidden.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2008a/dump/diar.hidden.f32",
+            "sha256": "ef1b5e1a4a5edc6eba9bc46b0474a0961567ab5375879bc35f8133201a8ffd8b"
+          },
+          {
+            "bytes": 225,
+            "name": "diar.hidden.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2008a/dump/diar.hidden.json",
+            "sha256": "c8f3e22a4bba0b413396cc90265a03d8dd612ed6a7465e9832201700836d7f70"
+          },
+          {
+            "bytes": 57760,
+            "name": "diar.logits.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2008a/dump/diar.logits.f32",
+            "sha256": "93ce7dc687e1f3a21767627bddefd41229d0cdbdc5ad29deeecd21a368edb903"
+          },
+          {
+            "bytes": 222,
+            "name": "diar.logits.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2008a/dump/diar.logits.json",
+            "sha256": "0ca2ff957c50598fa742c50b811f2a23bc178eed632e81bd881e0f976bac3efc"
+          }
+        ],
+        "logits_bytes": 57982,
+        "required_probs_trace": [
+          {
+            "bytes": 57760,
+            "name": "diar.probs.f32",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2008a/dump/diar.probs.f32",
+            "sha256": "1f73053a2542b9109a7c8e0b211ff594abcc4c28f63b5b1433e9cd288c7b9591"
+          },
+          {
+            "bytes": 225,
+            "name": "diar.probs.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2008a/dump/diar.probs.json",
+            "sha256": "3fb9575526284d34a183ebcdf3437d4c9dcc397579c9890715ee47cf6516454a"
+          },
+          {
+            "bytes": 282392,
+            "name": "diar.trace.json",
+            "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2008a/dump/diar.trace.json",
+            "sha256": "876635623b80c41c05d67884a384159724d1c5802e05a48a2afdc11a655076c0"
+          }
+        ]
+      },
+      "sidecar": {
+        "bytes": 184365,
+        "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2008a/teacher_sidecar.pt",
+        "sha256": "e7b47eef6340cac512629f74865391fb14504548eabbdd2c3fa0f55fd61558b1"
+      },
+      "source_id": "ami_ES2008a"
+    }
+  ],
+  "original_execution": {
+    "cumulative_optimizer_updates_unchanged": 1583,
+    "frozen_config_sha256": "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea",
+    "frozen_config_unchanged": true,
+    "identities": {
+      "config": "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea",
+      "contract": "d651165b1d3229048376b7cefb02008648bf589c9eba800d2c892702af3d35c1",
+      "executed_config_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-fit-targets-1\\frozen_config.json",
+      "gt_pilot.py": "89577e61a758788dafba7822b861502422d9c672d21206b1208dee3a6a97c14a",
+      "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
+      "native_prerequisites": "73cd5b4d56749b389ba3ab369782280c17cd23b1ef4f35c69ccc968a4a27ef8d",
+      "original_config": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+      "prepared_sources": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+      "run_baseline.py": "3f7ee8a924bdb5e7ad848d2e1549df7e4f3ec06b2ef1c22e61213e5a3e9ee8c9",
+      "speaker_score_diagnostic.py": "b8880483ebd3528fb31627913124f8755720e11e1c821537ffdfbb5dcb3f360d",
+      "teacher_fit.py": "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c"
+    },
+    "manifest": {
+      "config_sha256": "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea",
+      "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+      "gt_remains_in_prepared_artifact": true,
+      "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+      "original_config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+      "prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+      "schema": "PSEM-TEACHER-FIT-MANIFEST-1",
+      "sources": [
+        {
+          "permutation": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "sidecar_sha256": "e012af625c334f3b47abd0b468abcd8246258b0dc3d8d36c8d6a5afc747f8d45",
+          "source_id": "ami_ES2005a",
+          "support_incomplete_count": 10,
+          "used_n": 3610
+        },
+        {
+          "permutation": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "sidecar_sha256": "41fbf46b209dffd70aae043544a982de2e15351bccab0a8ab41ca06bdcfb8320",
+          "source_id": "ami_ES2006a",
+          "support_incomplete_count": 12,
+          "used_n": 3990
+        },
+        {
+          "permutation": [
+            0,
+            2,
+            1,
+            3
+          ],
+          "sidecar_sha256": "e3831753283cbb8140bc64d61049825124419a377b7eb45432ec5ee290167f74",
+          "source_id": "ami_ES2007a",
+          "support_incomplete_count": 10,
+          "used_n": 3610
+        },
+        {
+          "permutation": [
+            2,
+            0,
+            1,
+            3
+          ],
+          "sidecar_sha256": "e7b47eef6340cac512629f74865391fb14504548eabbdd2c3fa0f55fd61558b1",
+          "source_id": "ami_ES2008a",
+          "support_incomplete_count": 10,
+          "used_n": 3610
+        }
+      ],
+      "teacher_fit_sha256": "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c",
+      "teacher_support_distinct_from_gt_validity": true
+    },
+    "manifest_sha256": "1c40adaabc8c5e63112d8d0e179bd27ca6d391c9a9a685ba56d348935b7ef968",
+    "manifest_unchanged": true,
+    "native": {
+      "backend": "vulkan",
+      "executable": "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+      "executable_bytes": 77073408,
+      "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+      "model": "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+      "model_bytes": 236606560,
+      "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99"
+    },
+    "native_material_reexecuted": false,
+    "native_model_loads": {
+      "failed_intent_is_not_a_known_successful_load": true,
+      "max_trajectories": 4,
+      "successful_decoded_loads": 4,
+      "uncertain_or_failed_launches_not_counted_as_loads": 0
+    },
+    "optimizer_updates": 0,
+    "orchestrator_pytorch_model_construction": 0,
+    "orchestrator_wall_s": 377.80058290000125,
+    "preserved_original_public": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-report-repair-1/original_TEACHER_FIT_TARGET_RESULT.json",
+    "public_sha256": "e3992cea36d3d7a74b019dcff1ffce82042de4e5e9824f9581edb297461dde28",
+    "release": {
+      "authority_id": "AUTONOMY-2",
+      "automatic_retry": false,
+      "bounds": {
+        "cumulative_optimizer_updates_unchanged": 1583,
+        "expected_native_chunks": 2471,
+        "external_cost": 0,
+        "max_emitted_frames": 14820,
+        "max_new_artifact_bytes": 536870912,
+        "max_observed_GPU_dedicated_bytes": 4294967296,
+        "max_observed_paired_host_working_set_bytes": 4294967296,
+        "max_unique_source_seconds": 1185.6,
+        "new_native_source_trajectories": 4,
+        "optimizer_updates": 0,
+        "per_source_wall_seconds": 900,
+        "source_ids": [
+          "ami_ES2005a",
+          "ami_ES2006a",
+          "ami_ES2007a",
+          "ami_ES2008a"
+        ],
+        "whole_run_wall_seconds": 3600
+      },
+      "candidate_commit": "7928200e5ada036acfc217684247bcdc39ef8a83",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-B",
+        "experiments/psem_streaming_student/teacher_fit.py",
+        "execute",
+        "--config",
+        "experiments/psem_streaming_student/teacher_fit_config.json",
+        "--run-root",
+        "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1",
+        "--authorize-material"
+      ],
+      "config_sha256": "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea",
+      "contract_sha256": "d651165b1d3229048376b7cefb02008648bf589c9eba800d2c892702af3d35c1",
+      "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+      "execution_rules": [
+        "Run the single execute command once. Sequential fresh native source-zero streaming process per exact FIT prefix; no whole-clip offline forward or optional hidden exports.",
+        "Use the reviewed effective environment and approved profile. Preserve all input/code/config/native hashes, durable intents, outputs and cost/failure receipts.",
+        "On any failure or uncertainty, stop and retain partials; no retry, source advance, scope adjustment, code/config repair or extra material execution without another Director decision.",
+        "No student forward/backward/optimizer run, no KD training, no CAL/DEV/locked target generation, no new corpus, no paid APIs, no installs or production changes.",
+        "Worker may retain only this run's outputs and its declared public result. Do not edit Director authority/release/adjudication records, shared GT/helper files or unrelated user work. No commit/push/merge/publication."
+      ],
+      "experiment_id": "TEACHER-FIT-TARGETS-1",
+      "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+      "next_gate": "Report actual supported rows/frontiers, source-global association diagnostics, resource/exposure ledger and readable limits. Director plus independent review decide KD eligibility; this release grants no further branch.",
+      "preparation_acceptance": "experiments/psem_streaming_student/.stage-control/autonomous-research/teacher-fit-preparation-acceptance.json",
+      "prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+      "runtime": ".venv/Scripts/python.exe -B on Windows, Torch CPU orchestrator, direct Windows native Vulkan child processes",
+      "schema": "PSEM-DIRECTOR-MATERIAL-RELEASE-1",
+      "status": "GO",
+      "teacher_fit_sha256": "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c"
+    },
+    "sidecars_unchanged": true,
+    "teacher_fit_sha256": "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c"
+  },
+  "report_repair": {
+    "dump_default_disclosure": {
+      "DUMP_DIR_default": "want_h=true, want_l=true",
+      "EXPORT_absent_empty_unrecognized": "falls back to both hidden and logits",
+      "EXPORT_logits": "disables hidden; retains required probs and logits",
+      "bounded_artifact_deviation_accepted_under_AUTONOMY-2": true,
+      "files_not_deleted": true,
+      "incidental_bytes": 11620670,
+      "learning_use_forbidden": true,
+      "lines": "498-512",
+      "model_cpp_after_sha256": "32ce450091abc4579b2d2354174e654c0600b69e491ddc43f813b195f7df6d60",
+      "not_retroactive_compliance": true,
+      "original_no_hidden_expectation_was_not_met": true
+    },
+    "existing_association_metrics_unchanged": [
       {
+        "common_valid_bins": 3597,
+        "existing_metrics_unchanged": true,
+        "mapped_activity_bce": 0.07300720808874324,
         "permutation": [
           0,
           1,
           2,
           3
         ],
-        "sidecar_sha256": "e012af625c334f3b47abd0b468abcd8246258b0dc3d8d36c8d6a5afc747f8d45",
-        "source_id": "ami_ES2005a",
-        "support_incomplete_count": 10,
-        "used_n": 3610
+        "raw_index_activity_bce": 0.07300720808874324,
+        "source_id": "ami_ES2005a"
       },
       {
+        "common_valid_bins": 3975,
+        "existing_metrics_unchanged": true,
+        "mapped_activity_bce": 0.05682754421292173,
         "permutation": [
           0,
           1,
           2,
           3
         ],
-        "sidecar_sha256": "41fbf46b209dffd70aae043544a982de2e15351bccab0a8ab41ca06bdcfb8320",
-        "source_id": "ami_ES2006a",
-        "support_incomplete_count": 12,
-        "used_n": 3990
+        "raw_index_activity_bce": 0.05682754421292173,
+        "source_id": "ami_ES2006a"
       },
       {
+        "common_valid_bins": 3597,
+        "existing_metrics_unchanged": true,
+        "mapped_activity_bce": 0.07988718248723019,
         "permutation": [
           0,
           2,
           1,
           3
         ],
-        "sidecar_sha256": "e3831753283cbb8140bc64d61049825124419a377b7eb45432ec5ee290167f74",
-        "source_id": "ami_ES2007a",
-        "support_incomplete_count": 10,
-        "used_n": 3610
+        "raw_index_activity_bce": 0.12171405138640082,
+        "source_id": "ami_ES2007a"
       },
       {
+        "common_valid_bins": 3597,
+        "existing_metrics_unchanged": true,
+        "mapped_activity_bce": 0.09683193063241619,
         "permutation": [
           2,
           0,
           1,
           3
         ],
-        "sidecar_sha256": "e7b47eef6340cac512629f74865391fb14504548eabbdd2c3fa0f55fd61558b1",
-        "source_id": "ami_ES2008a",
-        "support_incomplete_count": 10,
-        "used_n": 3610
+        "raw_index_activity_bce": 0.8168088622682104,
+        "source_id": "ami_ES2008a"
       }
     ],
-    "teacher_fit_sha256": "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c",
-    "teacher_support_distinct_from_gt_validity": true
-  },
-  "native": {
-    "backend": "vulkan",
-    "executable": "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
-    "executable_bytes": 77073408,
-    "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
-    "model": "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
-    "model_bytes": 236606560,
-    "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99"
-  },
-  "native_model_loads": {
-    "failed_intent_is_not_a_known_successful_load": true,
-    "max_trajectories": 4,
-    "successful_decoded_loads": 4,
-    "uncertain_or_failed_launches_not_counted_as_loads": 0
-  },
-  "optimizer_updates": 0,
-  "orchestrator_pytorch_model_construction": 0,
-  "orchestrator_wall_s": 377.80058290000125,
-  "release": {
-    "authority_id": "AUTONOMY-2",
-    "automatic_retry": false,
-    "bounds": {
-      "cumulative_optimizer_updates_unchanged": 1583,
-      "expected_native_chunks": 2471,
-      "external_cost": 0,
-      "max_emitted_frames": 14820,
-      "max_new_artifact_bytes": 536870912,
-      "max_observed_GPU_dedicated_bytes": 4294967296,
-      "max_observed_paired_host_working_set_bytes": 4294967296,
-      "max_unique_source_seconds": 1185.6,
-      "new_native_source_trajectories": 4,
-      "optimizer_updates": 0,
-      "per_source_wall_seconds": 900,
-      "source_ids": [
-        "ami_ES2005a",
-        "ami_ES2006a",
-        "ami_ES2007a",
-        "ami_ES2008a"
+    "future_config_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\teacher_fit_config.json",
+    "future_config_sha256": "60e0cc508fd7fd1875d6be3cad68657b29b58fa64a3c520ba1e24a5066bceb9c",
+    "future_export": {
+      "TRANSCRIBE_SORTFORMER_EXPORT": "logits",
+      "cpu_environment_verified_not_exercised_native": true,
+      "forbidden_files": [
+        "diar.hidden.f32",
+        "diar.hidden.json"
       ],
-      "whole_run_wall_seconds": 3600
+      "required_files": [
+        "diar.probs.f32",
+        "diar.probs.json",
+        "diar.logits.f32",
+        "diar.logits.json",
+        "diar.trace.json"
+      ]
     },
-    "candidate_commit": "7928200e5ada036acfc217684247bcdc39ef8a83",
-    "command": [
-      ".venv/Scripts/python.exe",
-      "-B",
-      "experiments/psem_streaming_student/teacher_fit.py",
-      "execute",
-      "--config",
-      "experiments/psem_streaming_student/teacher_fit_config.json",
-      "--run-root",
-      "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1",
-      "--authorize-material"
-    ],
-    "config_sha256": "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea",
-    "contract_sha256": "d651165b1d3229048376b7cefb02008648bf589c9eba800d2c892702af3d35c1",
-    "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
-    "execution_rules": [
-      "Run the single execute command once. Sequential fresh native source-zero streaming process per exact FIT prefix; no whole-clip offline forward or optional hidden exports.",
-      "Use the reviewed effective environment and approved profile. Preserve all input/code/config/native hashes, durable intents, outputs and cost/failure receipts.",
-      "On any failure or uncertainty, stop and retain partials; no retry, source advance, scope adjustment, code/config repair or extra material execution without another Director decision.",
-      "No student forward/backward/optimizer run, no KD training, no CAL/DEV/locked target generation, no new corpus, no paid APIs, no installs or production changes.",
-      "Worker may retain only this run's outputs and its declared public result. Do not edit Director authority/release/adjudication records, shared GT/helper files or unrelated user work. No commit/push/merge/publication."
-    ],
-    "experiment_id": "TEACHER-FIT-TARGETS-1",
-    "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
-    "next_gate": "Report actual supported rows/frontiers, source-global association diagnostics, resource/exposure ledger and readable limits. Director plus independent review decide KD eligibility; this release grants no further branch.",
-    "preparation_acceptance": "experiments/psem_streaming_student/.stage-control/autonomous-research/teacher-fit-preparation-acceptance.json",
-    "prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
-    "runtime": ".venv/Scripts/python.exe -B on Windows, Torch CPU orchestrator, direct Windows native Vulkan child processes",
-    "schema": "PSEM-DIRECTOR-MATERIAL-RELEASE-1",
-    "status": "GO",
-    "teacher_fit_sha256": "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c"
+    "helpers": {
+      "gt_pilot.py": "89577e61a758788dafba7822b861502422d9c672d21206b1208dee3a6a97c14a",
+      "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
+      "run_baseline.py": "3f7ee8a924bdb5e7ad848d2e1549df7e4f3ec06b2ef1c22e61213e5a3e9ee8c9",
+      "speaker_score_diagnostic.py": "b8880483ebd3528fb31627913124f8755720e11e1c821537ffdfbb5dcb3f360d"
+    },
+    "model_forward": false,
+    "native_material_executed": false,
+    "orchestrator_pytorch_model_construction": 0,
+    "repair_root": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-report-repair-1",
+    "repaired_teacher_fit_sha256": "59b0953dac575ed18fd326845006d426ebd01293856097abda7eae7a7df64e14",
+    "schema": "PSEM-TEACHER-FIT-REPORT-REPAIR-1"
   },
   "schema": "PSEM-TEACHER-FIT-TARGET-RESULT-1",
   "sources": [
@@ -448,6 +798,67 @@
         },
         "chronological_quarters": [
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 206,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.9720065476535593,
+                    0.01747674428092404,
+                    0.014212777495955484,
+                    0.0009591896208929347
+                  ],
+                  "mean_raw_native_probability": [
+                    0.9720065476535593,
+                    0.01747674428092404,
+                    0.014212777495955484,
+                    0.0009591896208929347
+                  ]
+                },
+                {
+                  "denominator": 86,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.022721821595464566,
+                    0.9103619576713373,
+                    0.01443154373572365,
+                    0.003964787455811876
+                  ],
+                  "mean_raw_native_probability": [
+                    0.022721821595464566,
+                    0.9103619576713373,
+                    0.01443154373572365,
+                    0.003964787455811876
+                  ]
+                },
+                {
+                  "denominator": 273,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.006941582242399198,
+                    0.00706296528782525,
+                    0.9462956189290508,
+                    0.009488297478831459
+                  ],
+                  "mean_raw_native_probability": [
+                    0.006941582242399198,
+                    0.00706296528782525,
+                    0.9462956189290508,
+                    0.009488297478831459
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 899,
             "frame_end": 902,
             "frame_start": 0,
@@ -464,9 +875,81 @@
               86,
               273,
               0
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 28,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.8846586687224252,
+                    0.02393968138910298,
+                    0.008619755014868653,
+                    0.0037639382992763004
+                  ],
+                  "mean_raw_native_probability": [
+                    0.8846586687224252,
+                    0.02393968138910298,
+                    0.008619755014868653,
+                    0.0037639382992763004
+                  ]
+                },
+                {
+                  "denominator": 21,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.07370248207423304,
+                    0.9355521429152716,
+                    0.0041184495092325265,
+                    0.002053550457016432
+                  ],
+                  "mean_raw_native_probability": [
+                    0.07370248207423304,
+                    0.9355521429152716,
+                    0.0041184495092325265,
+                    0.002053550457016432
+                  ]
+                },
+                {
+                  "denominator": 15,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.05643928350958352,
+                    0.03469142774119973,
+                    0.9403127272923787,
+                    0.08159850238201519
+                  ],
+                  "mean_raw_native_probability": [
+                    0.05643928350958352,
+                    0.03469142774119973,
+                    0.9403127272923787,
+                    0.08159850238201519
+                  ]
+                },
+                {
+                  "denominator": 564,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": [
+                    0.002737762406365186,
+                    0.005528175521597385,
+                    0.013372573495432999,
+                    0.9824991129893572
+                  ],
+                  "mean_raw_native_probability": [
+                    0.002737762406365186,
+                    0.005528175521597385,
+                    0.013372573495432999,
+                    0.9824991129893572
+                  ]
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 903,
             "frame_end": 1805,
             "frame_start": 902,
@@ -483,9 +966,81 @@
               21,
               15,
               564
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 391,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.9517481094464431,
+                    0.002274713843813106,
+                    0.01130699446588309,
+                    0.0021010408370391027
+                  ],
+                  "mean_raw_native_probability": [
+                    0.9517481094464431,
+                    0.002274713843813106,
+                    0.01130699446588309,
+                    0.0021010408370391027
+                  ]
+                },
+                {
+                  "denominator": 83,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.006739790225962558,
+                    0.9809427426522037,
+                    0.0071886069076809,
+                    0.0011526292423312328
+                  ],
+                  "mean_raw_native_probability": [
+                    0.006739790225962558,
+                    0.9809427426522037,
+                    0.0071886069076809,
+                    0.0011526292423312328
+                  ]
+                },
+                {
+                  "denominator": 86,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.04080926393277857,
+                    0.011868450815009689,
+                    0.9756336596816085,
+                    0.0039378206129185855
+                  ],
+                  "mean_raw_native_probability": [
+                    0.04080926393277857,
+                    0.011868450815009689,
+                    0.9756336596816085,
+                    0.0039378206129185855
+                  ]
+                },
+                {
+                  "denominator": 2,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": [
+                    0.03826857730746269,
+                    0.009099372196942568,
+                    0.009514948818832636,
+                    0.9676958918571472
+                  ],
+                  "mean_raw_native_probability": [
+                    0.03826857730746269,
+                    0.009099372196942568,
+                    0.009514948818832636,
+                    0.9676958918571472
+                  ]
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 902,
             "frame_end": 2707,
             "frame_start": 1805,
@@ -502,9 +1057,81 @@
               83,
               86,
               2
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 129,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.9171171313108399,
+                    0.0031322716534960757,
+                    0.017666690740938518,
+                    0.006129097585545783
+                  ],
+                  "mean_raw_native_probability": [
+                    0.9171171313108399,
+                    0.0031322716534960757,
+                    0.017666690740938518,
+                    0.006129097585545783
+                  ]
+                },
+                {
+                  "denominator": 18,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.03646833876175353,
+                    0.4713374961655872,
+                    0.005843007651189207,
+                    0.0024968675523445606
+                  ],
+                  "mean_raw_native_probability": [
+                    0.03646833876175353,
+                    0.4713374961655872,
+                    0.005843007651189207,
+                    0.0024968675523445606
+                  ]
+                },
+                {
+                  "denominator": 29,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.04164866283375385,
+                    0.005149928714421674,
+                    0.9304688953120133,
+                    0.007966379554749563
+                  ],
+                  "mean_raw_native_probability": [
+                    0.04164866283375385,
+                    0.005149928714421674,
+                    0.9304688953120133,
+                    0.007966379554749563
+                  ]
+                },
+                {
+                  "denominator": 4,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": [
+                    0.0027643374050967395,
+                    0.003840401768684387,
+                    0.0064085915219038725,
+                    0.9356319010257721
+                  ],
+                  "mean_raw_native_probability": [
+                    0.0027643374050967395,
+                    0.003840401768684387,
+                    0.0064085915219038725,
+                    0.9356319010257721
+                  ]
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 893,
             "frame_end": 3610,
             "frame_start": 2707,
@@ -521,7 +1148,8 @@
               18,
               29,
               4
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           }
         ],
         "collapse_flag": false,
@@ -662,6 +1290,7 @@
           3
         ],
         "permutation_semantics": "gt_column_g_receives_native_column_permutation[g]",
+        "quarter_means_repaired_from_retained_raw": true,
         "raw_index_activity_bce": 0.07300720808874324,
         "second_best_margin_bce": 0.4674026593565941,
         "slots": [
@@ -1054,6 +1683,67 @@
         },
         "chronological_quarters": [
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 574,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.9675217637701369,
+                    0.002730899668315749,
+                    9.420797730118253e-05,
+                    1.0885189459521015e-05
+                  ],
+                  "mean_raw_native_probability": [
+                    0.9675217637701369,
+                    0.002730899668315749,
+                    9.420797730118253e-05,
+                    1.0885189459521015e-05
+                  ]
+                },
+                {
+                  "denominator": 14,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.005768021622705939,
+                    0.8203383471284594,
+                    0.003729720466903278,
+                    0.0002824567434020407
+                  ],
+                  "mean_raw_native_probability": [
+                    0.005768021622705939,
+                    0.8203383471284594,
+                    0.003729720466903278,
+                    0.0002824567434020407
+                  ]
+                },
+                {
+                  "denominator": 2,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.00018307108257431537,
+                    0.0019817400607280433,
+                    0.5887980759143829,
+                    0.003985091228969395
+                  ],
+                  "mean_raw_native_probability": [
+                    0.00018307108257431537,
+                    0.0019817400607280433,
+                    0.5887980759143829,
+                    0.003985091228969395
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 994,
             "frame_end": 997,
             "frame_start": 0,
@@ -1070,9 +1760,61 @@
               14,
               2,
               0
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 390,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.9841415387697708,
+                    0.0008507702352056721,
+                    0.000631451146287896,
+                    2.1261145699159628e-05
+                  ],
+                  "mean_raw_native_probability": [
+                    0.9841415387697708,
+                    0.0008507702352056721,
+                    0.000631451146287896,
+                    2.1261145699159628e-05
+                  ]
+                },
+                {
+                  "denominator": 1,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.01616757921874523,
+                    0.6244276762008667,
+                    0.0018823075806722045,
+                    0.00016800973389763385
+                  ],
+                  "mean_raw_native_probability": [
+                    0.01616757921874523,
+                    0.6244276762008667,
+                    0.0018823075806722045,
+                    0.00016800973389763385
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 998,
             "frame_end": 1995,
             "frame_start": 997,
@@ -1089,9 +1831,61 @@
               1,
               0,
               0
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 435,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.9683084131229198,
+                    0.00100970753066221,
+                    0.004824918489556245,
+                    6.43734325330992e-05
+                  ],
+                  "mean_raw_native_probability": [
+                    0.9683084131229198,
+                    0.00100970753066221,
+                    0.004824918489556245,
+                    6.43734325330992e-05
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                },
+                {
+                  "denominator": 229,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.0003456482712680669,
+                    0.0012175886031122285,
+                    0.9728124876990589,
+                    0.00106376883516385
+                  ],
+                  "mean_raw_native_probability": [
+                    0.0003456482712680669,
+                    0.0012175886031122285,
+                    0.9728124876990589,
+                    0.00106376883516385
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 997,
             "frame_end": 2992,
             "frame_start": 1995,
@@ -1108,9 +1902,71 @@
               0,
               229,
               0
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 508,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.9722920148120093,
+                    0.0008655423868523625,
+                    0.003275919469650833,
+                    0.0072175736791197
+                  ],
+                  "mean_raw_native_probability": [
+                    0.9722920148120093,
+                    0.0008655423868523625,
+                    0.003275919469650833,
+                    0.0072175736791197
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                },
+                {
+                  "denominator": 39,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.00016309714649254695,
+                    0.0005481581126029292,
+                    0.9881806419445918,
+                    0.00047000784961244045
+                  ],
+                  "mean_raw_native_probability": [
+                    0.00016309714649254695,
+                    0.0005481581126029292,
+                    0.9881806419445918,
+                    0.00047000784961244045
+                  ]
+                },
+                {
+                  "denominator": 52,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": [
+                    0.01998770140142789,
+                    0.007547994898721719,
+                    0.005699076407696479,
+                    0.9488035801511544
+                  ],
+                  "mean_raw_native_probability": [
+                    0.01998770140142789,
+                    0.007547994898721719,
+                    0.005699076407696479,
+                    0.9488035801511544
+                  ]
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 986,
             "frame_end": 3990,
             "frame_start": 2992,
@@ -1127,7 +1983,8 @@
               0,
               39,
               52
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           }
         ],
         "collapse_flag": false,
@@ -1268,6 +2125,7 @@
           3
         ],
         "permutation_semantics": "gt_column_g_receives_native_column_permutation[g]",
+        "quarter_means_repaired_from_retained_raw": true,
         "raw_index_activity_bce": 0.05682754421292173,
         "second_best_margin_bce": 0.05858801677823067,
         "slots": [
@@ -1664,6 +2522,67 @@
         },
         "chronological_quarters": [
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 9,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.4988066189818912,
+                    0.003107823095180922,
+                    0.29141900191704434,
+                    0.00041564758349623944
+                  ],
+                  "mean_raw_native_probability": [
+                    0.4988066189818912,
+                    0.29141900191704434,
+                    0.003107823095180922,
+                    0.00041564758349623944
+                  ]
+                },
+                {
+                  "denominator": 46,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.0044384742871878425,
+                    0.5975334547945986,
+                    0.3058583506423494,
+                    0.0342123705195263
+                  ],
+                  "mean_raw_native_probability": [
+                    0.0044384742871878425,
+                    0.3058583506423494,
+                    0.5975334547945986,
+                    0.0342123705195263
+                  ]
+                },
+                {
+                  "denominator": 42,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.0054265117200668015,
+                    0.06906523497863895,
+                    0.42904746991449166,
+                    0.3179160436349256
+                  ],
+                  "mean_raw_native_probability": [
+                    0.0054265117200668015,
+                    0.42904746991449166,
+                    0.06906523497863895,
+                    0.3179160436349256
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 899,
             "frame_end": 902,
             "frame_start": 0,
@@ -1680,9 +2599,71 @@
               46,
               42,
               0
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 82,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.7758304380823109,
+                    0.016124682016486144,
+                    0.019787718715300932,
+                    0.03405597196642037
+                  ],
+                  "mean_raw_native_probability": [
+                    0.7758304380823109,
+                    0.019787718715300932,
+                    0.016124682016486144,
+                    0.03405597196642037
+                  ]
+                },
+                {
+                  "denominator": 29,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.03125461643754408,
+                    0.8947591658296257,
+                    0.03457546690157775,
+                    0.021952558308839798
+                  ],
+                  "mean_raw_native_probability": [
+                    0.03125461643754408,
+                    0.03457546690157775,
+                    0.8947591658296257,
+                    0.021952558308839798
+                  ]
+                },
+                {
+                  "denominator": 10,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.031487718888092785,
+                    0.04544222876429558,
+                    0.3329982291907072,
+                    0.689879858493805
+                  ],
+                  "mean_raw_native_probability": [
+                    0.031487718888092785,
+                    0.3329982291907072,
+                    0.04544222876429558,
+                    0.689879858493805
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 903,
             "frame_end": 1805,
             "frame_start": 902,
@@ -1699,9 +2680,71 @@
               29,
               10,
               0
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 404,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.9499771464823533,
+                    0.005675724804504089,
+                    0.004963236731390959,
+                    0.0058667408178850996
+                  ],
+                  "mean_raw_native_probability": [
+                    0.9499771464823533,
+                    0.004963236731390959,
+                    0.005675724804504089,
+                    0.0058667408178850996
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                },
+                {
+                  "denominator": 13,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.008179280056188313,
+                    0.05036437368163696,
+                    0.38704795848864776,
+                    0.44433723046229434
+                  ],
+                  "mean_raw_native_probability": [
+                    0.008179280056188313,
+                    0.38704795848864776,
+                    0.05036437368163696,
+                    0.44433723046229434
+                  ]
+                },
+                {
+                  "denominator": 1,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": [
+                    0.0013080700300633907,
+                    0.020834453403949738,
+                    0.21168550848960876,
+                    0.14947916567325592
+                  ],
+                  "mean_raw_native_probability": [
+                    0.0013080700300633907,
+                    0.21168550848960876,
+                    0.020834453403949738,
+                    0.14947916567325592
+                  ]
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 902,
             "frame_end": 2707,
             "frame_start": 1805,
@@ -1718,9 +2761,81 @@
               0,
               13,
               1
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 245,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.9575390808426832,
+                    0.010113069416339776,
+                    0.027911086168320734,
+                    0.012685610547130785
+                  ],
+                  "mean_raw_native_probability": [
+                    0.9575390808426832,
+                    0.027911086168320734,
+                    0.010113069416339776,
+                    0.012685610547130785
+                  ]
+                },
+                {
+                  "denominator": 101,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.0006555871682529427,
+                    0.4533324852299941,
+                    0.3726841235287847,
+                    0.09459156420665082
+                  ],
+                  "mean_raw_native_probability": [
+                    0.0006555871682529427,
+                    0.3726841235287847,
+                    0.4533324852299941,
+                    0.09459156420665082
+                  ]
+                },
+                {
+                  "denominator": 56,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.010216957649455643,
+                    0.12280534495948814,
+                    0.3484862447782819,
+                    0.3325814209362891
+                  ],
+                  "mean_raw_native_probability": [
+                    0.010216957649455643,
+                    0.3484862447782819,
+                    0.12280534495948814,
+                    0.3325814209362891
+                  ]
+                },
+                {
+                  "denominator": 13,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": [
+                    0.0028249403023017715,
+                    0.10929384053899692,
+                    0.5141989474113171,
+                    0.4251612963584753
+                  ],
+                  "mean_raw_native_probability": [
+                    0.0028249403023017715,
+                    0.5141989474113171,
+                    0.10929384053899692,
+                    0.4251612963584753
+                  ]
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 893,
             "frame_end": 3610,
             "frame_start": 2707,
@@ -1737,7 +2852,8 @@
               101,
               56,
               13
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           }
         ],
         "collapse_flag": false,
@@ -1878,6 +2994,7 @@
           3
         ],
         "permutation_semantics": "gt_column_g_receives_native_column_permutation[g]",
+        "quarter_means_repaired_from_retained_raw": true,
         "raw_index_activity_bce": 0.12171405138640082,
         "second_best_margin_bce": 0.000513717532157898,
         "slots": [
@@ -2274,6 +3391,57 @@
         },
         "chronological_quarters": [
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 4,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.0017290947143919766,
+                    0.7454176992177963,
+                    0.06170203350484371,
+                    0.00042460438271518797
+                  ],
+                  "mean_raw_native_probability": [
+                    0.7454176992177963,
+                    0.06170203350484371,
+                    0.0017290947143919766,
+                    0.00042460438271518797
+                  ]
+                },
+                {
+                  "denominator": 391,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.0021538166519935787,
+                    0.6581358183607044,
+                    0.3843146841577262,
+                    0.00015416965910633357
+                  ],
+                  "mean_raw_native_probability": [
+                    0.6581358183607044,
+                    0.3843146841577262,
+                    0.0021538166519935787,
+                    0.00015416965910633357
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 899,
             "frame_end": 902,
             "frame_start": 0,
@@ -2290,9 +3458,61 @@
               391,
               0,
               0
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 0,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                },
+                {
+                  "denominator": 473,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.0018149961484128887,
+                    0.8844136789315095,
+                    0.11893824792856421,
+                    0.0004934335344489874
+                  ],
+                  "mean_raw_native_probability": [
+                    0.8844136789315095,
+                    0.11893824792856421,
+                    0.0018149961484128887,
+                    0.0004934335344489874
+                  ]
+                },
+                {
+                  "denominator": 154,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.01686453009886038,
+                    0.04526844374323717,
+                    0.8850724227641794,
+                    0.0013017829289617715
+                  ],
+                  "mean_raw_native_probability": [
+                    0.04526844374323717,
+                    0.8850724227641794,
+                    0.01686453009886038,
+                    0.0013017829289617715
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 903,
             "frame_end": 1805,
             "frame_start": 902,
@@ -2309,9 +3529,71 @@
               473,
               154,
               0
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 5,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.8930551052093506,
+                    0.005834496859461069,
+                    0.0009641930810175836,
+                    0.04018182083964348
+                  ],
+                  "mean_raw_native_probability": [
+                    0.005834496859461069,
+                    0.0009641930810175836,
+                    0.8930551052093506,
+                    0.04018182083964348
+                  ]
+                },
+                {
+                  "denominator": 43,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.006333684968964473,
+                    0.8417020593444968,
+                    0.054037444763898115,
+                    0.0009508861430731486
+                  ],
+                  "mean_raw_native_probability": [
+                    0.8417020593444968,
+                    0.054037444763898115,
+                    0.006333684968964473,
+                    0.0009508861430731486
+                  ]
+                },
+                {
+                  "denominator": 452,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.009338480440186106,
+                    0.019889058083651184,
+                    0.9102732395209564,
+                    0.0008948145000559671
+                  ],
+                  "mean_raw_native_probability": [
+                    0.019889058083651184,
+                    0.9102732395209564,
+                    0.009338480440186106,
+                    0.0008948145000559671
+                  ]
+                },
+                {
+                  "denominator": 0,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": null,
+                  "mean_raw_native_probability": null
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 902,
             "frame_end": 2707,
             "frame_start": 1805,
@@ -2328,9 +3610,81 @@
               43,
               452,
               0
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           },
           {
+            "class_conditioned_strict_solo_means": {
+              "absent_class_is_null_not_zero": true,
+              "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+              "rows": [
+                {
+                  "denominator": 24,
+                  "gt_slot": 0,
+                  "mean_mapped_native_probability": [
+                    0.7956351599035164,
+                    0.23033459247866025,
+                    0.18796829514515898,
+                    0.11072482141510893
+                  ],
+                  "mean_raw_native_probability": [
+                    0.23033459247866025,
+                    0.18796829514515898,
+                    0.7956351599035164,
+                    0.11072482141510893
+                  ]
+                },
+                {
+                  "denominator": 45,
+                  "gt_slot": 1,
+                  "mean_mapped_native_probability": [
+                    0.02159863527502037,
+                    0.7879201962716049,
+                    0.021457328991447058,
+                    0.13301417232594556
+                  ],
+                  "mean_raw_native_probability": [
+                    0.7879201962716049,
+                    0.021457328991447058,
+                    0.02159863527502037,
+                    0.13301417232594556
+                  ]
+                },
+                {
+                  "denominator": 16,
+                  "gt_slot": 2,
+                  "mean_mapped_native_probability": [
+                    0.020308183011366054,
+                    0.03418781320215203,
+                    0.8850534148514271,
+                    0.06903661108663073
+                  ],
+                  "mean_raw_native_probability": [
+                    0.03418781320215203,
+                    0.8850534148514271,
+                    0.020308183011366054,
+                    0.06903661108663073
+                  ]
+                },
+                {
+                  "denominator": 214,
+                  "gt_slot": 3,
+                  "mean_mapped_native_probability": [
+                    0.009905503726581756,
+                    0.004354309183480131,
+                    0.002817545884698749,
+                    0.8892517815404963
+                  ],
+                  "mean_raw_native_probability": [
+                    0.004354309183480131,
+                    0.002817545884698749,
+                    0.009905503726581756,
+                    0.8892517815404963
+                  ]
+                }
+              ],
+              "source_global_min_independent_bce_permutation_not_refit": true
+            },
             "common_valid_bins": 893,
             "frame_end": 3610,
             "frame_start": 2707,
@@ -2347,7 +3701,8 @@
               45,
               16,
               214
-            ]
+            ],
+            "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned"
           }
         ],
         "collapse_flag": false,
@@ -2488,6 +3843,7 @@
           3
         ],
         "permutation_semantics": "gt_column_g_receives_native_column_permutation[g]",
+        "quarter_means_repaired_from_retained_raw": true,
         "raw_index_activity_bce": 0.8168088622682104,
         "second_best_margin_bce": 0.13757026195526123,
         "slots": [
@@ -2641,5 +3997,5 @@
       }
     }
   ],
-  "status": "completed"
+  "status": "completed_with_report_repair"
 }

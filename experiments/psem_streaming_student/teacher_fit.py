@@ -98,6 +98,9 @@ def load_teacher_config(path: Path) -> dict[str, Any]:
     require(int(config["geometry"]["source_start_sample"]) == 0, "source_start_sample must be 0")
     require(config["native"]["mode"] == "unpaced_source_zero_streaming", "only unpaced streaming is authorized")
     require("TRANSCRIBE_SORTFORMER_OFFLINE_DUMP" in config["native"]["absent_environment"], "OFFLINE_DUMP must stay absent")
+    require(config["native"]["required_environment"].get("TRANSCRIBE_SORTFORMER_EXPORT") == "logits", "future EXPORT must be logits")
+    require("TRANSCRIBE_DUMP_HIDDEN" in config["native"]["absent_environment"], "DUMP_HIDDEN must stay absent")
+    require("TRANSCRIBE_SORTFORMER_COMPRESS" in config["native"]["absent_environment"], "COMPRESS must stay absent")
     require(float(config["association"]["logit_clip"]) == LOGIT_CLIP, "association clip must remain 1e-12")
     require(config["association"]["raw_kd_probabilities_clipped"] is False, "KD probabilities must not be clipped")
     require(config["association"]["raw_kd_probabilities_softmaxed"] is False, "KD probabilities must not be softmaxed")
@@ -300,6 +303,10 @@ def describe_environment(env: dict[str, str]) -> dict[str, Any]:
             "TRANSCRIBE_PSEM_PACE_UNTIL_SAMPLE",
             "TRANSCRIBE_PSEM_EVENTS_TCP",
             "TRANSCRIBE_SORTFORMER_OFFLINE_DUMP",
+            "TRANSCRIBE_DUMP_HIDDEN",
+            "TRANSCRIBE_EXPORT_EMBED",
+            "TRANSCRIBE_EXPORT_EMBEDDING",
+            "TRANSCRIBE_SORTFORMER_COMPRESS",
         )},
     }
 
@@ -446,6 +453,60 @@ def clip_counts(probability: np.ndarray, mask: np.ndarray) -> dict[str, int]:
     }
 
 
+def class_conditioned_strict_solo_means(
+    raw: np.ndarray,
+    mapped: np.ndarray,
+    qsolo: dict[str, Any],
+) -> dict[str, Any]:
+    rows = []
+    for gt_slot in range(OUTPUT_SLOTS):
+        class_mask = qsolo["solo_mask"] & (qsolo["true_slot"] == gt_slot)
+        n = int(class_mask.sum())
+        if n == 0:
+            rows.append(
+                {
+                    "gt_slot": gt_slot,
+                    "denominator": 0,
+                    "mean_raw_native_probability": None,
+                    "mean_mapped_native_probability": None,
+                }
+            )
+            continue
+        rows.append(
+            {
+                "gt_slot": gt_slot,
+                "denominator": n,
+                "mean_raw_native_probability": [float(value) for value in np.mean(raw[class_mask], axis=0)],
+                "mean_mapped_native_probability": [float(value) for value in np.mean(mapped[class_mask], axis=0)],
+            }
+        )
+    return {
+        "grouped_by": "existing_strict_solo_gt_label_and_common_valid_and_fixed_quarter",
+        "source_global_min_independent_bce_permutation_not_refit": True,
+        "absent_class_is_null_not_zero": True,
+        "rows": rows,
+    }
+
+
+def existing_association_view(association: dict[str, Any]) -> dict[str, Any]:
+    skip = {"gt_ordered_probabilities", "common_mask"}
+    view = {key: value for key, value in association.items() if key not in skip}
+    quarters = []
+    for quarter in view["chronological_quarters"]:
+        quarters.append(
+            {
+                "quarter": quarter["quarter"],
+                "frame_start": quarter["frame_start"],
+                "frame_end": quarter["frame_end"],
+                "common_valid_bins": quarter["common_valid_bins"],
+                "strict_solo_counts": quarter["strict_solo_counts"],
+                "mean_mapped_native_probability": quarter["mean_mapped_native_probability"],
+                "mapping_not_refit_per_quarter": quarter["mapping_not_refit_per_quarter"],
+            }
+        )
+    view["chronological_quarters"] = quarters
+    return json.loads(json.dumps(ssd.json_safe(view)))
+
 def permutation_costs(logits: torch.Tensor, targets: torch.Tensor, validity: torch.Tensor) -> list[dict[str, Any]]:
     rows = []
     for permutation in itertools.permutations(range(OUTPUT_SLOTS)):
@@ -529,7 +590,9 @@ def associate_source(
                     int((qsolo["solo_mask"] & (qsolo["true_slot"] == slot)).sum()) for slot in range(OUTPUT_SLOTS)
                 ],
                 "mean_mapped_native_probability": mean_probs,
+                "unconditional_occupancy_population": "all_common_valid_bins_in_quarter_not_class_conditioned",
                 "mapping_not_refit_per_quarter": True,
+                "class_conditioned_strict_solo_means": class_conditioned_strict_solo_means(raw, mapped_raw, qsolo),
             }
         )
     gt_ordered = np.where(np.isfinite(mapped_raw), mapped_raw, np.nan).astype(np.float32)
@@ -750,6 +813,13 @@ def synthetic_geometry_probes() -> dict[str, Any]:
     require(clipped["association_clip_counts_on_common_valid"]["clipped_low"] == 1, "zero probability was not counted as clip-low")
     require(clipped["association_clip_counts_on_common_valid"]["clipped_high"] == 1, "one probability was not counted as clip-high")
     require(float(clip_teacher["raw_probabilities"][0, 0]) == 0.0, "raw sidecar probability was clipped")
+    for quarter in tied["chronological_quarters"]:
+        for row in quarter["class_conditioned_strict_solo_means"]["rows"]:
+            require(row["mean_raw_native_probability"] is None and row["mean_mapped_native_probability"] is None, "absent strict-solo class must emit null, not zero")
+            require(row["denominator"] == 0, "tied fractional GT is not strict-solo")
+    swap_rows = associated["chronological_quarters"][0]["class_conditioned_strict_solo_means"]["rows"]
+    require(swap_rows[0]["denominator"] > 0 and swap_rows[0]["mean_raw_native_probability"] is not None, "present GT class must publish a mean")
+    require(swap_rows[1]["mean_raw_native_probability"] is None, "absent GT class leaked a zero mean")
     return {
         "missing_tail_invalid": True,
         "incomplete_support_tail_invalid": True,
@@ -874,6 +944,7 @@ def environment_isolation_probes(config: dict[str, Any]) -> dict[str, Any]:
         "TRANSCRIBE_SORTFORMER_OFFLINE_DUMP": "1",
         "TRANSCRIBE_PSEM_PACE_16KHZ": "1",
         "TRANSCRIBE_PSEM_EVENTS_TCP": "127.0.0.1:1",
+        "TRANSCRIBE_SORTFORMER_EXPORT": "hidden",
     }
     prior = {key: os.environ.get(key) for key in injected}
     dump = Path("cpu-env-probe-dump")
@@ -882,10 +953,15 @@ def environment_isolation_probes(config: dict[str, Any]) -> dict[str, Any]:
         env = native_environment(config, dump)
         described = describe_environment(env)
         for key in injected:
+            if key == "TRANSCRIBE_SORTFORMER_EXPORT":
+                continue
             require(key not in env, f"injected {key} survived native environment construction")
         for key, value in config["native"]["required_environment"].items():
             require(env.get(key) == str(value), f"approved {key} was not set")
         require(env.get("TRANSCRIBE_DUMP_DIR") == str(dump), "DUMP_DIR was not the run-local dump")
+        require(env.get("TRANSCRIBE_SORTFORMER_EXPORT") == "logits", "future EXPORT was not forced to logits")
+        require(env.get("TRANSCRIBE_SORTFORMER_EXPORT") != "hidden", "injected hidden EXPORT survived")
+        require("TRANSCRIBE_DUMP_HIDDEN" not in env, "injected DUMP_HIDDEN survived")
         require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_STREAM_CHUNK_LEN") == "6", "chunk_len")
         require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_STREAM_LC") == "1", "left context")
         require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_STREAM_RC") == "7", "right context")
@@ -895,7 +971,8 @@ def environment_isolation_probes(config: dict[str, Any]) -> dict[str, Any]:
         require(described["effective_transcribe"].get("TRANSCRIBE_PSEM_CAUSAL_FRONTEND") == "1", "causal frontend")
         require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_F32_HEAD") == "1", "F32 head")
         require(described["effective_transcribe"].get("TRANSCRIBE_VK_NO_MUL_MAT_VEC") == "1", "VK_NO_MUL_MAT_VEC")
-        require(all(described["absent"].values()), "pace/TCP/offline keys must stay absent")
+        require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_EXPORT") == "logits", "effective EXPORT")
+        require(all(described["absent"].values()), "pace/TCP/offline/hidden extras must stay absent")
     finally:
         for key, value in prior.items():
             if value is None:
@@ -906,6 +983,8 @@ def environment_isolation_probes(config: dict[str, Any]) -> dict[str, Any]:
         "injected_preset_hidden_export_absent": True,
         "approved_profile_present": True,
         "offline_pace_tcp_absent": True,
+        "future_export_explicit_logits": True,
+        "future_hidden_export_forbidden": True,
         "effective_transcribe": described["effective_transcribe"],
         "other_inherited_backend_flags_not_exhaustive_os_environment": True,
     }
@@ -1350,9 +1429,207 @@ def execute_stage(config_path: Path, run_root: Path) -> dict[str, Any]:
     return public
 
 
+ORIGINAL_PUBLIC_SHA256 = "e3992cea36d3d7a74b019dcff1ffce82042de4e5e9824f9581edb297461dde28"
+ORIGINAL_MANIFEST_SHA256 = "1c40adaabc8c5e63112d8d0e179bd27ca6d391c9a9a685ba56d348935b7ef968"
+ORIGINAL_FROZEN_SHA256 = "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea"
+ORIGINAL_TEACHER_FIT_SHA256 = "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c"
+MODEL_CPP_AFTER_SHA256 = "32ce450091abc4579b2d2354174e654c0600b69e491ddc43f813b195f7df6d60"
+INCIDENTAL_DUMP_NAMES = ("diar.hidden.f32", "diar.hidden.json", "diar.logits.f32", "diar.logits.json")
+
+
+def pin_path(path: Path) -> dict[str, Any]:
+    relative = str(path.relative_to(ROOT).as_posix()) if path.is_relative_to(ROOT) else str(path)
+    return {"path": relative, "bytes": path.stat().st_size, "sha256": digest_file(path)}
+
+
+def inventory_source_dump(dump_dir: Path) -> dict[str, Any]:
+    incidental = []
+    required = []
+    for child in sorted(dump_dir.iterdir(), key=lambda item: item.name):
+        if not child.is_file():
+            continue
+        item = pin_path(child)
+        item["name"] = child.name
+        if child.name in INCIDENTAL_DUMP_NAMES:
+            incidental.append(item)
+        else:
+            required.append(item)
+    return {
+        "required_probs_trace": required,
+        "incidental_hidden_and_logits": incidental,
+        "incidental_bytes": sum(row["bytes"] for row in incidental),
+        "hidden_bytes": sum(row["bytes"] for row in incidental if str(row["name"]).startswith("diar.hidden.")),
+        "logits_bytes": sum(row["bytes"] for row in incidental if str(row["name"]).startswith("diar.logits.")),
+    }
+
+
+def preserve_original_public(public_path: Path, preserved: Path) -> str:
+    current = digest_file(public_path)
+    if current == ORIGINAL_PUBLIC_SHA256:
+        preserved.write_bytes(public_path.read_bytes())
+    require(preserved.is_file(), "original public result was not preserved")
+    require(digest_file(preserved) == ORIGINAL_PUBLIC_SHA256, "preserved original public digest mismatch")
+    return ORIGINAL_PUBLIC_SHA256
+
+
+def repair_report_stage(config_path: Path, run_root: Path) -> dict[str, Any]:
+    require(not MATERIAL_AUTHORIZED, "report repair must not authorize native material")
+    run_root.mkdir(parents=True, exist_ok=True)
+    config = load_teacher_config(config_path)
+    hashes = verify_pinned_files(config, config_path)
+    require(hashes["config"] != ORIGINAL_FROZEN_SHA256, "future config must not overwrite the executed frozen bytes")
+    original_root = repo_path(config["outputs"]["run_root"])
+    frozen = original_root / "frozen_config.json"
+    manifest_path = original_root / "teacher_targets_manifest.json"
+    public_path = repo_path(config["outputs"]["public_result"])
+    require(digest_file(frozen) == ORIGINAL_FROZEN_SHA256, "executed frozen config was mutated")
+    require(digest_file(manifest_path) == ORIGINAL_MANIFEST_SHA256, "original manifest was mutated")
+    preserved = run_root / "original_TEACHER_FIT_TARGET_RESULT.json"
+    preserve_original_public(public_path, preserved)
+    original = load_json(preserved)
+    prepared = load_prepared(config)
+    origin = load_origin_config(config)
+    catalog = gt_pilot.catalog_sources(origin)
+    repaired_sources = []
+    inventory = []
+    unchanged = []
+    for index, row in enumerate(config["sources"]):
+        source_id = row["source_id"]
+        original_source = original["sources"][index]
+        require(original_source["source_id"] == source_id, "original source order mismatch")
+        sidecar_path = original_root / "sources" / source_id / "teacher_sidecar.pt"
+        sidecar_sha = digest_file(sidecar_path)
+        require(sidecar_sha == original_source["teacher"]["sidecar_sha256"], "sidecar mutated")
+        require(sidecar_sha == original["manifest"]["sources"][index]["sidecar_sha256"], "manifest sidecar mismatch")
+        payload = torch.load(sidecar_path, map_location="cpu", weights_only=False)
+        prepared_payload = prepared["sources"][source_id]
+        teacher = {
+            "emitted_mask": ssd.as_numpy(payload["emitted_mask"]).astype(bool),
+            "support_valid_mask": ssd.as_numpy(payload["support_valid_mask"]).astype(bool),
+            "raw_probabilities": ssd.as_numpy(payload["raw_probabilities"]),
+        }
+        association = associate_source(
+            teacher,
+            prepared_payload["targets"],
+            prepared_payload["validity"],
+            prepared_payload["frontiers"],
+            list(prepared_payload["slots"]),
+        )
+        original_view = existing_association_view(original_source["association"])
+        repaired_view = existing_association_view(association)
+        for view in (original_view, repaired_view):
+            for quarter in view["chronological_quarters"]:
+                quarter.pop("mean_mapped_native_probability", None)
+        require(repaired_view == original_view, f"existing association metrics changed for {source_id}")
+        dump_inventory = inventory_source_dump(original_root / "sources" / source_id / "dump")
+        inventory.append({"source_id": source_id, "sidecar": pin_path(sidecar_path), "dump": dump_inventory})
+        repaired_source = json.loads(json.dumps(original_source))
+        merged_quarters = []
+        for original_quarter, repaired_quarter in zip(
+            original_source["association"]["chronological_quarters"],
+            association["chronological_quarters"],
+        ):
+            merged = json.loads(json.dumps(original_quarter))
+            merged["unconditional_occupancy_population"] = repaired_quarter["unconditional_occupancy_population"]
+            merged["class_conditioned_strict_solo_means"] = json.loads(
+                json.dumps(ssd.json_safe(repaired_quarter["class_conditioned_strict_solo_means"]))
+            )
+            merged["mapping_not_refit_per_quarter"] = True
+            merged_quarters.append(merged)
+        repaired_source["association"]["chronological_quarters"] = merged_quarters
+        repaired_source["association"]["quarter_means_repaired_from_retained_raw"] = True
+        repaired_sources.append(repaired_source)
+        unchanged.append(
+            {
+                "source_id": source_id,
+                "permutation": association["permutation"],
+                "mapped_activity_bce": association["mapped_activity_bce"],
+                "raw_index_activity_bce": association["raw_index_activity_bce"],
+                "common_valid_bins": association["common_valid_bins"],
+                "existing_metrics_unchanged": True,
+            }
+        )
+    incidental_total = sum(row["dump"]["incidental_bytes"] for row in inventory)
+    public = {
+        "schema": RESULT_SCHEMA,
+        "status": "completed_with_report_repair",
+        "experiment_id": "TEACHER-FIT-TARGETS-1",
+        "original_execution": {
+            "public_sha256": ORIGINAL_PUBLIC_SHA256,
+            "preserved_original_public": str(preserved.relative_to(ROOT).as_posix()),
+            "teacher_fit_sha256": ORIGINAL_TEACHER_FIT_SHA256,
+            "frozen_config_sha256": ORIGINAL_FROZEN_SHA256,
+            "manifest_sha256": ORIGINAL_MANIFEST_SHA256,
+            "identities": original["identities"],
+            "native": original["native"],
+            "release": original["release"],
+            "manifest": original["manifest"],
+            "orchestrator_wall_s": original["orchestrator_wall_s"],
+            "optimizer_updates": original["optimizer_updates"],
+            "cumulative_optimizer_updates_unchanged": original["cumulative_optimizer_updates_unchanged"],
+            "orchestrator_pytorch_model_construction": original["orchestrator_pytorch_model_construction"],
+            "native_model_loads": original["native_model_loads"],
+            "native_material_reexecuted": False,
+            "sidecars_unchanged": True,
+            "manifest_unchanged": True,
+            "frozen_config_unchanged": True,
+        },
+        "report_repair": {
+            "schema": "PSEM-TEACHER-FIT-REPORT-REPAIR-1",
+            "native_material_executed": False,
+            "model_forward": False,
+            "orchestrator_pytorch_model_construction": 0,
+            "repaired_teacher_fit_sha256": hashes["teacher_fit.py"],
+            "future_config_sha256": hashes["config"],
+            "future_config_path": str(config_path),
+            "repair_root": str(run_root.relative_to(ROOT).as_posix()),
+            "helpers": {name: hashes[name] for name in ("speaker_score_diagnostic.py", "gt_pilot.py", "run_baseline.py", "gt_probe.py")},
+            "existing_association_metrics_unchanged": unchanged,
+            "dump_default_disclosure": {
+                "model_cpp_after_sha256": MODEL_CPP_AFTER_SHA256,
+                "lines": "498-512",
+                "DUMP_DIR_default": "want_h=true, want_l=true",
+                "EXPORT_absent_empty_unrecognized": "falls back to both hidden and logits",
+                "EXPORT_logits": "disables hidden; retains required probs and logits",
+                "original_no_hidden_expectation_was_not_met": True,
+                "incidental_bytes": incidental_total,
+                "learning_use_forbidden": True,
+                "files_not_deleted": True,
+                "bounded_artifact_deviation_accepted_under_AUTONOMY-2": True,
+                "not_retroactive_compliance": True,
+            },
+            "future_export": {
+                "TRANSCRIBE_SORTFORMER_EXPORT": "logits",
+                "required_files": ["diar.probs.f32", "diar.probs.json", "diar.logits.f32", "diar.logits.json", "diar.trace.json"],
+                "forbidden_files": ["diar.hidden.f32", "diar.hidden.json"],
+                "cpu_environment_verified_not_exercised_native": True,
+            },
+        },
+        "incidental_dump_inventory": inventory,
+        "identities_bound": original["identities_bound"],
+        "sources": repaired_sources,
+        "findings": list(original.get("findings", [])) + [
+            "Class-conditioned 4x4 raw-native and mapped probability means are grouped by existing strict-solo GT labels on the common-valid mask inside each fixed quarter; absent classes are null, not zero.",
+            "Source-global min independent-activity-BCE permutation was not refit per quarter.",
+            "Original DUMP_DIR default exported incidental hidden and logits; those bytes are pinned and unused for learning. Future material must set EXPORT=logits.",
+        ],
+    }
+    publish_json(run_root / "artifact_inventory.json", inventory)
+    publish_json(run_root / "metric_unchanged_proof.json", unchanged)
+    publish_json(run_root / "REPAIR_RESULT.json", public)
+    publish_json(public_path, public)
+    return {
+        "status": "completed_with_report_repair",
+        "original_public_sha256": ORIGINAL_PUBLIC_SHA256,
+        "incidental_bytes": incidental_total,
+        "future_config_sha256": hashes["config"],
+        "repaired_teacher_fit_sha256": hashes["teacher_fit.py"],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("stage", choices=("smoke", "bind", "execute"))
+    parser.add_argument("stage", choices=("smoke", "bind", "execute", "repair-report"))
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--run-root", type=Path, required=True)
     parser.add_argument("--authorize-material", action="store_true")
@@ -1365,6 +1642,8 @@ def main() -> int:
         value = smoke_stage(config_path, run_root)
     elif args.stage == "bind":
         value = bind_stage(config_path, run_root)
+    elif args.stage == "repair-report":
+        value = repair_report_stage(config_path, run_root)
     else:
         value = execute_stage(config_path, run_root)
     print(json.dumps({"status": value.get("status"), "stage": args.stage}, ensure_ascii=False))

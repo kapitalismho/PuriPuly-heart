@@ -62,15 +62,28 @@
       "TRANSCRIBE_SORTFORMER_STREAM_UPDATE_PERIOD": "144",
       "TRANSCRIBE_PSEM_CAUSAL_FRONTEND": "1",
       "TRANSCRIBE_SORTFORMER_F32_HEAD": "1",
-      "TRANSCRIBE_VK_NO_MUL_MAT_VEC": "1"
+      "TRANSCRIBE_VK_NO_MUL_MAT_VEC": "1",
+      "TRANSCRIBE_SORTFORMER_EXPORT": "logits"
     },
     "absent_environment": [
       "TRANSCRIBE_PSEM_PACE_16KHZ",
       "TRANSCRIBE_PSEM_PACE_FROM_SAMPLE",
       "TRANSCRIBE_PSEM_PACE_UNTIL_SAMPLE",
       "TRANSCRIBE_PSEM_EVENTS_TCP",
-      "TRANSCRIBE_SORTFORMER_OFFLINE_DUMP"
-    ]
+      "TRANSCRIBE_SORTFORMER_OFFLINE_DUMP",
+      "TRANSCRIBE_DUMP_HIDDEN",
+      "TRANSCRIBE_EXPORT_EMBED",
+      "TRANSCRIBE_EXPORT_EMBEDDING",
+      "TRANSCRIBE_SORTFORMER_COMPRESS"
+    ],
+    "dump_policy": {
+      "role": "future_material_path_not_exercised_by_cpu_repair",
+      "TRANSCRIBE_SORTFORMER_EXPORT": "logits",
+      "required_files": ["diar.probs.f32", "diar.probs.json", "diar.logits.f32", "diar.logits.json", "diar.trace.json"],
+      "forbidden_files": ["diar.hidden.f32", "diar.hidden.json"],
+      "original_DUMP_DIR_default": "want_h=true,want_l=true; EXPORT absent/empty/unrecognized falls back to both",
+      "original_no_hidden_expectation_was_not_met": true
+    }
   },
   "association": {
     "criterion": "one_source_global_bijection_minimizing_independent_activity_bce",
