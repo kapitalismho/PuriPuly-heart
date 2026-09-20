@@ -95,7 +95,7 @@ async def _await_download_cleanup(
     settled = asyncio.Event()
     task.add_done_callback(lambda _task: settled.set())
     try:
-        return await asyncio.shield(task)
+        await settled.wait()
     except asyncio.CancelledError as cancellation:
         current = asyncio.current_task()
         if current is None or not current.cancelling():
@@ -119,6 +119,7 @@ async def _await_download_cleanup(
                 (cancellation, cleanup_failure),
             ) from None
         raise cancellation
+    return task.result()
 
 
 async def _download_asset(
