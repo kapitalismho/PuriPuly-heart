@@ -1,0 +1,1308 @@
+{
+  "agreement": {
+    "infer_proof_en": {
+      "chunk_forwards": 4,
+      "matched_ordinary_selected_en": true,
+      "max_abs_logit_delta": 0.0,
+      "selected_step": 390,
+      "source_id": "ami_EN2009d",
+      "teacher_assets_opened": false,
+      "tolerance": 0.0001
+    },
+    "initial_same_seed": {
+      "extra_model_forward": false,
+      "matched": true,
+      "max_abs_delta": 0.0,
+      "tolerance": 1e-06
+    },
+    "resume_witness": {
+      "completed_updates": 2,
+      "extra_optimizer_updates": 0,
+      "max_abs_logit_delta": 0.0,
+      "precision": "float32",
+      "tolerance": 0.0001
+    }
+  },
+  "cal_selection": {
+    "candidates": {
+      "390": {
+        "canonical_masked_bce": 0.26631,
+        "checkpoint_sha256": "978a29565f810857c6ee61573d60f4798e75c0ce7d6b62726f822cf0cd283512"
+      },
+      "78": {
+        "canonical_masked_bce": 0.408429,
+        "checkpoint_sha256": "8932df6c70de31cf01406aaed68df36de25c6777243ed0d4c286894c19c365ab"
+      },
+      "780": {
+        "canonical_masked_bce": 0.274088,
+        "checkpoint_sha256": "52b85fbeb7982e4badde3c582dad5f9c9fca4cc00f9dbc74a5c65d293974d1bc"
+      }
+    },
+    "original_gt_candidates": {
+      "390": 0.26682,
+      "78": 0.410047,
+      "780": 0.286027
+    },
+    "original_gt_selected": {
+      "cal_masked_bce": 0.26682,
+      "step": 390
+    },
+    "rule": "lowest canonical masked BCE on CAL only; earliest step on exact ties",
+    "selected": {
+      "cal_masked_bce": 0.26631027460098267,
+      "checkpoint_sha256": "978a29565f810857c6ee61573d60f4798e75c0ce7d6b62726f822cf0cd283512",
+      "rule": "lowest canonical masked BCE on CAL only; earliest step on exact ties",
+      "step": 390
+    }
+  },
+  "executed_code_vs_reporter": {
+    "executed": {
+      "config_sha256": "29293ca79296566f4003e442619d0f1552e1500dd3e2393b4735545ccb3348fb",
+      "implementation_base_commit": "07c706366f167ba63b072018664f5ef20cc2b387",
+      "implementation_sha256": {
+        "gt_pilot.py": "f88d190bd3817bee2d6118978bfe2f02f46b0a7d571d1c5717dadea90e7e44a2",
+        "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
+        "run_gt_pilot.sh": "526e7a33ff295cd4d2b66f2dbb967f18091b2b763c469e4bb7ebc455945f9654",
+        "student.py": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d"
+      },
+      "python": "3.12.3",
+      "torch": "2.13.0+rocm10.0.0",
+      "torch_hip": "7.15.26333"
+    },
+    "note": "Published reporter performed CPU metadata aggregation only; executed implementation identity is recorded separately in executed fields.",
+    "reporter": {
+      "config_sha256": "29293ca79296566f4003e442619d0f1552e1500dd3e2393b4735545ccb3348fb",
+      "contract": "cpu_metadata_aggregation",
+      "cuda_visible_devices": "",
+      "executed_implementation_sha256": {
+        "gt_pilot.py": "f88d190bd3817bee2d6118978bfe2f02f46b0a7d571d1c5717dadea90e7e44a2",
+        "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
+        "run_gt_pilot.sh": "526e7a33ff295cd4d2b66f2dbb967f18091b2b763c469e4bb7ebc455945f9654",
+        "student.py": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d"
+      },
+      "gpu_or_model_work": false,
+      "hip_visible_devices": "",
+      "implementation_base_commit": "07c706366f167ba63b072018664f5ef20cc2b387",
+      "python": "3.12.3",
+      "reporter_implementation_sha256": {
+        "gt_pilot.py": "f88d190bd3817bee2d6118978bfe2f02f46b0a7d571d1c5717dadea90e7e44a2",
+        "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
+        "run_gt_pilot.sh": "526e7a33ff295cd4d2b66f2dbb967f18091b2b763c469e4bb7ebc455945f9654",
+        "student.py": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d"
+      }
+    }
+  },
+  "forward_exposure": {
+    "per_phase": {
+      "evaluate_cal": {
+        "chunk_forwards": 57,
+        "elapsed_seconds_synchronized": 9.438209267000019,
+        "input_samples": 13862400,
+        "scope": "CAL-only prefix replay of calibration checkpoints 78/390/780 after each load; timer starts before the first load, peak reset, and device synchronize; first streamed prefixes are included; not a warmup pass; excludes training; not live 80ms admission or matched teacher cost"
+      },
+      "evaluate_final": {
+        "chunk_forwards": 95,
+        "elapsed_seconds_synchronized": 13.881701592000013,
+        "input_samples": 22880000,
+        "scope": "selected-checkpoint source-zero prefix replay over FIT+DEV after model load; timer starts after load, peak reset, and device synchronize; first streamed prefixes are included; not a warmup pass; excludes training; not live 80ms admission or matched teacher cost"
+      },
+      "evaluate_initial": {
+        "chunk_forwards": 114,
+        "elapsed_seconds_synchronized": 16.130273887999998,
+        "input_samples": 27500800,
+        "scope": "untrained source-zero prefix replay over FIT+CAL+DEV after model construction; timer starts after load, peak reset, and device synchronize; first streamed prefixes are included; not a warmup pass; excludes constant-prior CPU scoring and training; not live 80ms admission or matched teacher cost"
+      },
+      "infer_proof": {
+        "chunk_forwards": 4,
+        "elapsed_seconds_synchronized": 3.3009471229999576,
+        "input_samples": 774400,
+        "scope": "selected-checkpoint source-zero prefix replay of EN2009d after model load; timer starts after load, peak reset, and device synchronize; first streamed prefixes are included; not a warmup pass; excludes training; not live 80ms admission or matched teacher cost"
+      },
+      "train_pause2": {
+        "chunk_forwards": 3,
+        "input_samples": 729600,
+        "optimizer_updates": 2,
+        "scope": "pause-process wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through pause checkpoint, covering this process's optimizer updates only; excludes pre-timer setup and the later resume process.",
+        "training_elapsed_seconds_synchronized": 7.611729929999996
+      },
+      "train_resume778": {
+        "chunk_forwards": 779,
+        "input_samples": 189452800,
+        "optimizer_updates": 778,
+        "scope": "resume-process wall covering restore/witness and remaining updates after pause; not pause updates and not an all-780 aggregate",
+        "training_elapsed_seconds_synchronized": 77.98935025399999
+      }
+    },
+    "total": {
+      "chunk_forwards": 1052,
+      "input_samples": 255200000,
+      "model_audio_seconds": 15950.0,
+      "within_caps": true
+    }
+  },
+  "incomparable_cost_metrics": "unavailable: original public result reports only final-inference elapsed 13.0926s with the same allocator peaks; per-phase training/CAL/initial timings from the original run are not published in comparable fields, so no original per-phase comparison is made.",
+  "inference_costs_allocator_peaks": {
+    "allocator_cap_bytes": 4294967296,
+    "device": {
+      "backend": "PyTorch ROCm through torch.cuda API",
+      "device": "cuda:0",
+      "name": "AMD Radeon RX 7900 XTX",
+      "total_memory_bytes": 25725259776
+    },
+    "evaluate_cal": {
+      "peak_allocated_bytes": 130328064,
+      "peak_reserved_bytes": 153092096
+    },
+    "evaluate_final": {
+      "peak_allocated_bytes": 130274816,
+      "peak_reserved_bytes": 153092096
+    },
+    "evaluate_initial": {
+      "peak_allocated_bytes": 130274816,
+      "peak_reserved_bytes": 153092096
+    },
+    "infer_proof": {
+      "peak_allocated_bytes": 162078208,
+      "peak_reserved_bytes": 169869312
+    },
+    "not_claimed": [
+      "live 80ms RTF",
+      "matched teacher speedup",
+      "mean step latency as admission cost"
+    ],
+    "train_pause2": {
+      "peak_allocated_bytes": 292311552,
+      "peak_reserved_bytes": 320864256
+    },
+    "train_resume": {
+      "peak_allocated_bytes": 292844032,
+      "peak_reserved_bytes": 318767104
+    }
+  },
+  "model_unchanged": {
+    "gt_pilot_py": "f88d190bd3817bee2d6118978bfe2f02f46b0a7d571d1c5717dadea90e7e44a2",
+    "parameter_count": 5940740,
+    "precision": "float32",
+    "seed": 20260915,
+    "student": "Unchanged StreamingStudent"
+  },
+  "optimizer_updates": {
+    "cumulative": 2363,
+    "ledger": {
+      "completed": 780,
+      "intent": 780,
+      "uncertain": 0
+    },
+    "prior_cumulative": 1583,
+    "this_run_new": 780,
+    "uncertain": 0
+  },
+  "per_source": {
+    "ami_EN2009d": {
+      "activity": {
+        "canonical_brier": {
+          "kd_selected390": 0.155407,
+          "original_gt_selected390": 0.152398
+        },
+        "canonical_masked_bce": {
+          "fit_constant_prior": 0.530818,
+          "kd_selected390": 0.485143,
+          "original_gt_selected390": 0.47654,
+          "untrained": 0.692101
+        },
+        "denominators_match_original": true,
+        "relation_masks_do_not_erase_activity_targets": true,
+        "valid_bins": 602
+      },
+      "fixed_threshold_0_5": {
+        "all_silence_valid_fraction": 0.968439,
+        "note": "KD per-slot average_precision and solo recall are not the original per-slot f1/recall; reported side by side, not converted.",
+        "one_slot_collapse": false,
+        "original solo BA/silence/collapse": [
+          0.0490506329113924,
+          0.920266,
+          false
+        ],
+        "original_per_slot_f1_recall": [
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 131,
+            "recall": 0.0,
+            "slot": 0
+          },
+          {
+            "f1": 0.177885,
+            "positive_valid_bins": 368,
+            "recall": 0.100543,
+            "slot": 1
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 0,
+            "recall": 0.0,
+            "slot": 2
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 0,
+            "recall": 0.0,
+            "slot": 3
+          }
+        ],
+        "per_slot_average_precision": [
+          0.218978,
+          0.742594,
+          null,
+          null
+        ],
+        "solo_per_slot_recall": [
+          0.0,
+          0.022152,
+          null,
+          null
+        ],
+        "solo_speaker_balanced_accuracy": 0.011076
+      },
+      "source_global_oracle_diagnostic_only": {
+        "aligned_masked_bce": 0.442953,
+        "best_permutation": [
+          1,
+          0,
+          2,
+          3
+        ],
+        "not_used_for_inference_or_selection": true,
+        "original_aligned_masked_bce": 0.441424
+      },
+      "temporal_event_proxy": {
+        "collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": 0.666667,
+            "matched": 4,
+            "missed_rate": 0.933333
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": 0.5,
+            "matched": 6,
+            "missed_rate": 0.9
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": 0.416667,
+            "matched": 7,
+            "missed_rate": 0.883333
+          }
+        ],
+        "continuity_solo_aba_interruptions_le_1s": {
+          "kd": {
+            "predicted": 0,
+            "reference": 0
+          },
+          "original": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "geometry": "80ms frame-grid active-set transitions; one-to-one matching at 100/250/500ms; relation masks; not fixed156-policy admission",
+        "original_collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": 0.75,
+            "matched": 5,
+            "missed_rate": 0.916667
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": 0.6,
+            "matched": 8,
+            "missed_rate": 0.866667
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": 0.45,
+            "matched": 11,
+            "missed_rate": 0.816667
+          }
+        ],
+        "original_predicted_events": 20,
+        "overlap_confusion": {
+          "fn": 59.0,
+          "fp": 3.0,
+          "tn": 540.0,
+          "tp": 0.0
+        },
+        "overlap_physical_bins": 59,
+        "predicted_events": 12,
+        "reference_events": 60
+      }
+    },
+    "ami_ES2005a": {
+      "activity": {
+        "canonical_brier": {
+          "kd_selected390": 0.131764,
+          "original_gt_selected390": 0.132445
+        },
+        "canonical_masked_bce": {
+          "fit_constant_prior": 0.467212,
+          "kd_selected390": 0.424573,
+          "original_gt_selected390": 0.427382,
+          "untrained": 0.690335
+        },
+        "denominators_match_original": true,
+        "relation_masks_do_not_erase_activity_targets": true,
+        "valid_bins": 3607
+      },
+      "fixed_threshold_0_5": {
+        "all_silence_valid_fraction": 0.990851,
+        "note": "KD per-slot average_precision and solo recall are not the original per-slot f1/recall; reported side by side, not converted.",
+        "one_slot_collapse": false,
+        "original solo BA/silence/collapse": [
+          0.0,
+          0.975603,
+          false
+        ],
+        "original_per_slot_f1_recall": [
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 996,
+            "recall": 0.0,
+            "slot": 0
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 341,
+            "recall": 0.0,
+            "slot": 1
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 568,
+            "recall": 0.0,
+            "slot": 2
+          },
+          {
+            "f1": 0.009631,
+            "positive_valid_bins": 620,
+            "recall": 0.004839,
+            "slot": 3
+          }
+        ],
+        "per_slot_average_precision": [
+          0.422206,
+          0.109688,
+          0.178227,
+          0.627824
+        ],
+        "solo_per_slot_recall": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "solo_speaker_balanced_accuracy": 0.0
+      },
+      "source_global_oracle_diagnostic_only": {
+        "aligned_masked_bce": 0.419668,
+        "best_permutation": [
+          0,
+          3,
+          2,
+          1
+        ],
+        "not_used_for_inference_or_selection": true,
+        "original_aligned_masked_bce": 0.42158
+      },
+      "temporal_event_proxy": {
+        "collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": 0.9,
+            "matched": 2,
+            "missed_rate": 0.993197
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": 0.85,
+            "matched": 3,
+            "missed_rate": 0.989796
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": 0.75,
+            "matched": 5,
+            "missed_rate": 0.982993
+          }
+        ],
+        "continuity_solo_aba_interruptions_le_1s": {
+          "kd": {
+            "predicted": 0,
+            "reference": 0
+          },
+          "original": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "geometry": "80ms frame-grid active-set transitions; one-to-one matching at 100/250/500ms; relation masks; not fixed156-policy admission",
+        "original_collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": 0.934783,
+            "matched": 3,
+            "missed_rate": 0.989796
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": 0.869565,
+            "matched": 6,
+            "missed_rate": 0.979592
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": 0.73913,
+            "matched": 12,
+            "missed_rate": 0.959184
+          }
+        ],
+        "original_predicted_events": 46,
+        "overlap_confusion": {
+          "fn": 259.0,
+          "fp": 2.0,
+          "tn": 3346.0,
+          "tp": 0.0
+        },
+        "overlap_physical_bins": 259,
+        "predicted_events": 20,
+        "reference_events": 294
+      }
+    },
+    "ami_ES2006a": {
+      "activity": {
+        "canonical_brier": {
+          "kd_selected390": 0.107406,
+          "original_gt_selected390": 0.109377
+        },
+        "canonical_masked_bce": {
+          "fit_constant_prior": 0.341412,
+          "kd_selected390": 0.352999,
+          "original_gt_selected390": 0.360265,
+          "untrained": 0.690119
+        },
+        "denominators_match_original": true,
+        "relation_masks_do_not_erase_activity_targets": true,
+        "valid_bins": 3987
+      },
+      "fixed_threshold_0_5": {
+        "all_silence_valid_fraction": 0.999749,
+        "note": "KD per-slot average_precision and solo recall are not the original per-slot f1/recall; reported side by side, not converted.",
+        "one_slot_collapse": true,
+        "original solo BA/silence/collapse": [
+          0.0,
+          1.0,
+          false
+        ],
+        "original_per_slot_f1_recall": [
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 2061,
+            "recall": 0.0,
+            "slot": 0
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 42,
+            "recall": 0.0,
+            "slot": 1
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 311,
+            "recall": 0.0,
+            "slot": 2
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 65,
+            "recall": 0.0,
+            "slot": 3
+          }
+        ],
+        "per_slot_average_precision": [
+          0.72841,
+          0.039756,
+          0.303397,
+          0.041141
+        ],
+        "solo_per_slot_recall": [
+          0.000497,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "solo_speaker_balanced_accuracy": 0.000124
+      },
+      "source_global_oracle_diagnostic_only": {
+        "aligned_masked_bce": 0.349893,
+        "best_permutation": [
+          0,
+          3,
+          1,
+          2
+        ],
+        "not_used_for_inference_or_selection": true,
+        "original_aligned_masked_bce": 0.355421
+      },
+      "temporal_event_proxy": {
+        "collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": 1.0,
+            "matched": 0,
+            "missed_rate": 1.0
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": 1.0,
+            "matched": 0,
+            "missed_rate": 1.0
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": 1.0,
+            "matched": 0,
+            "missed_rate": 1.0
+          }
+        ],
+        "continuity_solo_aba_interruptions_le_1s": {
+          "kd": {
+            "predicted": 0,
+            "reference": 0
+          },
+          "original": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "geometry": "80ms frame-grid active-set transitions; one-to-one matching at 100/250/500ms; relation masks; not fixed156-policy admission",
+        "original_collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": null,
+            "matched": 0,
+            "missed_rate": 1.0
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": null,
+            "matched": 0,
+            "missed_rate": 1.0
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": null,
+            "matched": 0,
+            "missed_rate": 1.0
+          }
+        ],
+        "original_predicted_events": 0,
+        "overlap_confusion": {
+          "fn": 61.0,
+          "fp": 0.0,
+          "tn": 3926.0,
+          "tp": 0.0
+        },
+        "overlap_physical_bins": 61,
+        "predicted_events": 2,
+        "reference_events": 244
+      }
+    },
+    "ami_ES2007a": {
+      "activity": {
+        "canonical_brier": {
+          "kd_selected390": 0.058507,
+          "original_gt_selected390": 0.058636
+        },
+        "canonical_masked_bce": {
+          "fit_constant_prior": 0.26291,
+          "kd_selected390": 0.205441,
+          "original_gt_selected390": 0.205661,
+          "untrained": 0.690336
+        },
+        "denominators_match_original": true,
+        "relation_masks_do_not_erase_activity_targets": true,
+        "valid_bins": 3607
+      },
+      "fixed_threshold_0_5": {
+        "all_silence_valid_fraction": 1.0,
+        "note": "KD per-slot average_precision and solo recall are not the original per-slot f1/recall; reported side by side, not converted.",
+        "one_slot_collapse": false,
+        "original solo BA/silence/collapse": [
+          0.0,
+          0.997782,
+          true
+        ],
+        "original_per_slot_f1_recall": [
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 796,
+            "recall": 0.0,
+            "slot": 0
+          },
+          {
+            "f1": 0.028169,
+            "positive_valid_bins": 205,
+            "recall": 0.014634,
+            "slot": 1
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 148,
+            "recall": 0.0,
+            "slot": 2
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 16,
+            "recall": 0.0,
+            "slot": 3
+          }
+        ],
+        "per_slot_average_precision": [
+          0.608013,
+          0.112171,
+          0.09665,
+          0.025647
+        ],
+        "solo_per_slot_recall": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "solo_speaker_balanced_accuracy": 0.0
+      },
+      "source_global_oracle_diagnostic_only": {
+        "aligned_masked_bce": 0.205441,
+        "best_permutation": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "not_used_for_inference_or_selection": true,
+        "original_aligned_masked_bce": 0.205661
+      },
+      "temporal_event_proxy": {
+        "collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": null,
+            "matched": 0,
+            "missed_rate": 1.0
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": null,
+            "matched": 0,
+            "missed_rate": 1.0
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": null,
+            "matched": 0,
+            "missed_rate": 1.0
+          }
+        ],
+        "continuity_solo_aba_interruptions_le_1s": {
+          "kd": {
+            "predicted": 0,
+            "reference": 1
+          },
+          "original": {
+            "predicted": 0,
+            "reference": 1
+          }
+        },
+        "geometry": "80ms frame-grid active-set transitions; one-to-one matching at 100/250/500ms; relation masks; not fixed156-policy admission",
+        "original_collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": 0.666667,
+            "matched": 2,
+            "missed_rate": 0.9875
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": 0.333333,
+            "matched": 4,
+            "missed_rate": 0.975
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": 0.0,
+            "matched": 6,
+            "missed_rate": 0.9625
+          }
+        ],
+        "original_predicted_events": 6,
+        "overlap_confusion": {
+          "fn": 15.0,
+          "fp": 0.0,
+          "tn": 3592.0,
+          "tp": 0.0
+        },
+        "overlap_physical_bins": 15,
+        "predicted_events": 0,
+        "reference_events": 160
+      }
+    },
+    "ami_ES2008a": {
+      "activity": {
+        "canonical_brier": {
+          "kd_selected390": 0.113584,
+          "original_gt_selected390": 0.112622
+        },
+        "canonical_masked_bce": {
+          "fit_constant_prior": 0.451503,
+          "kd_selected390": 0.384767,
+          "original_gt_selected390": 0.383525,
+          "untrained": 0.692684
+        },
+        "denominators_match_original": true,
+        "relation_masks_do_not_erase_activity_targets": true,
+        "valid_bins": 3607
+      },
+      "fixed_threshold_0_5": {
+        "all_silence_valid_fraction": 0.998891,
+        "note": "KD per-slot average_precision and solo recall are not the original per-slot f1/recall; reported side by side, not converted.",
+        "one_slot_collapse": true,
+        "original solo BA/silence/collapse": [
+          0.006559031281533804,
+          0.990851,
+          true
+        ],
+        "original_per_slot_f1_recall": [
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 43,
+            "recall": 0.0,
+            "slot": 0
+          },
+          {
+            "f1": 0.05,
+            "positive_valid_bins": 1007,
+            "recall": 0.025819,
+            "slot": 1
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 703,
+            "recall": 0.0,
+            "slot": 2
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 273,
+            "recall": 0.0,
+            "slot": 3
+          }
+        ],
+        "per_slot_average_precision": [
+          0.013442,
+          0.695903,
+          0.293539,
+          0.058542
+        ],
+        "solo_per_slot_recall": [
+          0.0,
+          0.002018,
+          0.0,
+          0.0
+        ],
+        "solo_speaker_balanced_accuracy": 0.000505
+      },
+      "source_global_oracle_diagnostic_only": {
+        "aligned_masked_bce": 0.344357,
+        "best_permutation": [
+          3,
+          1,
+          0,
+          2
+        ],
+        "not_used_for_inference_or_selection": true,
+        "original_aligned_masked_bce": 0.341794
+      },
+      "temporal_event_proxy": {
+        "collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": 1.0,
+            "matched": 0,
+            "missed_rate": 1.0
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": 0.75,
+            "matched": 1,
+            "missed_rate": 0.994624
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": 0.75,
+            "matched": 1,
+            "missed_rate": 0.994624
+          }
+        ],
+        "continuity_solo_aba_interruptions_le_1s": {
+          "kd": {
+            "predicted": 0,
+            "reference": 0
+          },
+          "original": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "geometry": "80ms frame-grid active-set transitions; one-to-one matching at 100/250/500ms; relation masks; not fixed156-policy admission",
+        "original_collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": 0.928571,
+            "matched": 2,
+            "missed_rate": 0.989247
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": 0.821429,
+            "matched": 5,
+            "missed_rate": 0.973118
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": 0.714286,
+            "matched": 8,
+            "missed_rate": 0.956989
+          }
+        ],
+        "original_predicted_events": 28,
+        "overlap_confusion": {
+          "fn": 54.0,
+          "fp": 0.0,
+          "tn": 3553.0,
+          "tp": 0.0
+        },
+        "overlap_physical_bins": 54,
+        "predicted_events": 4,
+        "reference_events": 186
+      }
+    },
+    "ami_ES2009d": {
+      "activity": {
+        "canonical_brier": {
+          "kd_selected390": 0.123548,
+          "original_gt_selected390": 0.125497
+        },
+        "canonical_masked_bce": {
+          "fit_constant_prior": 0.43609,
+          "kd_selected390": 0.391162,
+          "original_gt_selected390": 0.396516,
+          "untrained": 0.697611
+        },
+        "denominators_match_original": true,
+        "relation_masks_do_not_erase_activity_targets": true,
+        "valid_bins": 2447
+      },
+      "fixed_threshold_0_5": {
+        "all_silence_valid_fraction": 1.0,
+        "note": "KD per-slot average_precision and solo recall are not the original per-slot f1/recall; reported side by side, not converted.",
+        "one_slot_collapse": false,
+        "original solo BA/silence/collapse": [
+          0.0,
+          0.992644,
+          true
+        ],
+        "original_per_slot_f1_recall": [
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 68,
+            "recall": 0.0,
+            "slot": 0
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 14,
+            "recall": 0.0,
+            "slot": 1
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 1254,
+            "recall": 0.0,
+            "slot": 2
+          },
+          {
+            "f1": 0.0,
+            "positive_valid_bins": 51,
+            "recall": 0.0,
+            "slot": 3
+          }
+        ],
+        "per_slot_average_precision": [
+          0.054848,
+          0.00804,
+          0.879171,
+          0.038064
+        ],
+        "solo_per_slot_recall": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "solo_speaker_balanced_accuracy": 0.0
+      },
+      "source_global_oracle_diagnostic_only": {
+        "aligned_masked_bce": 0.33987,
+        "best_permutation": [
+          2,
+          3,
+          0,
+          1
+        ],
+        "not_used_for_inference_or_selection": true,
+        "original_aligned_masked_bce": 0.340702
+      },
+      "temporal_event_proxy": {
+        "collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": null,
+            "matched": 0,
+            "missed_rate": 1.0
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": null,
+            "matched": 0,
+            "missed_rate": 1.0
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": null,
+            "matched": 0,
+            "missed_rate": 1.0
+          }
+        ],
+        "continuity_solo_aba_interruptions_le_1s": {
+          "kd": {
+            "predicted": 0,
+            "reference": 0
+          },
+          "original": {
+            "predicted": 0,
+            "reference": 0
+          }
+        },
+        "geometry": "80ms frame-grid active-set transitions; one-to-one matching at 100/250/500ms; relation masks; not fixed156-policy admission",
+        "original_collars": [
+          {
+            "collar_ms": 100,
+            "false_rate": 0.944444,
+            "matched": 1,
+            "missed_rate": 0.991736
+          },
+          {
+            "collar_ms": 250,
+            "false_rate": 0.888889,
+            "matched": 2,
+            "missed_rate": 0.983471
+          },
+          {
+            "collar_ms": 500,
+            "false_rate": 0.888889,
+            "matched": 2,
+            "missed_rate": 0.983471
+          }
+        ],
+        "original_predicted_events": 18,
+        "overlap_confusion": {
+          "fn": 24.0,
+          "fp": 0.0,
+          "tn": 2423.0,
+          "tp": 0.0
+        },
+        "overlap_physical_bins": 24,
+        "predicted_events": 0,
+        "reference_events": 121
+      }
+    }
+  },
+  "release_id": "GT-KD-RETAINED-CPU-1",
+  "retrieval": {
+    "cal_selection": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/cal_selection.json",
+      "sha256": "46334e579973a39e19ffe245c87a53354d74e036f44a34c8a34cc02a2e40e0ea"
+    },
+    "checkpoints": {
+      "step_390": "978a29565f810857c6ee61573d60f4798e75c0ce7d6b62726f822cf0cd283512",
+      "step_78": "8932df6c70de31cf01406aaed68df36de25c6777243ed0d4c286894c19c365ab",
+      "step_780": "52b85fbeb7982e4badde3c582dad5f9c9fca4cc00f9dbc74a5c65d293974d1bc"
+    },
+    "eval_logits_manifest": {
+      "entries": 16,
+      "note": "All sixteen ordinary float32 logits retained; concrete tensors load from eval_logits/<weight>_<source>.pt listed in the manifest.",
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/eval_logits_manifest.json",
+      "sha256": "81ae6cc5211b1ee2b6cf0a3a7813bc656c673cd461ff36e6206efe35ecf62042"
+    },
+    "execution_identity": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/execution_identity.json",
+      "sha256": "a3101be8119b1b459741282f3e319f95d32a6478c87fdb99f33ffae96b479710"
+    },
+    "frozen_config": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/frozen_config.json",
+      "sha256": "29293ca79296566f4003e442619d0f1552e1500dd3e2393b4735545ccb3348fb"
+    },
+    "infer_proof": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/infer_proof.json",
+      "sha256": "2933f709da11a1a0b7f2f566213229016b69bb8ef8a84a76c63767dfc68f28dc"
+    },
+    "original_public_gt_pilot_result": {
+      "frozen_read_only": true,
+      "path": "experiments/psem_streaming_student/GT_PILOT_RESULT.json",
+      "sha256": "716604cbe1ff4cf404a2499bcab55785649a67d74be66a828c01d9463a9bfbc3"
+    },
+    "result_json": {
+      "path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/result.json",
+      "sha256": "85780812972fedebfb39293a131832ed5d9945442fd36cb935b6798522d25bed"
+    },
+    "run_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1",
+    "stage_intents_receipts": [
+      "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_01_import-prepared.json",
+      "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_02_evaluate-initial.json",
+      "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_03_train-pause-after-2.json",
+      "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_04_train-resume.json",
+      "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_05_evaluate-cal.json",
+      "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_06_evaluate-final.json",
+      "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_07_infer-proof.json",
+      "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_08_report.json"
+    ],
+    "stage_intents_receipts_note": "Each receipt holds the exact argv, intent hashes, exit, and evidence hashes; see stages[].command_template for the portable form."
+  },
+  "run_failures": "none",
+  "schema": "PSEM-GT-KD-RESULT-1",
+  "scope": "CPU-only readable execution report from immutable GT-KD-1 evidence. Bounded GT BCE plus fixed 0.25 teacher BCE on the unchanged student; not issue164 completion, generalization, production, teacher quality certification, live timing, or a terminal quality/adoption decision before parallel score diagnosis.",
+  "stages": [
+    {
+      "command_note": "Exact argv is retained in the stage receipt; absolute worktree prefix redacted here as <worktree>/<worktree-wsl>.",
+      "command_template": [
+        "wsl.exe",
+        "-d",
+        "Ubuntu",
+        "--exec",
+        "/usr/bin/bash",
+        "<worktree-wsl>/experiments/psem_streaming_student/run_gt_pilot.sh",
+        "import-prepared",
+        "<worktree-wsl>/experiments/psem_streaming_student/gt_kd_config.json",
+        "<worktree-wsl>/experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1",
+        "--authorize-material"
+      ],
+      "end_utc": "2026-09-20T02:24:05Z",
+      "exit": 0,
+      "hub_name": "gt-kd-1-import",
+      "id": "import-prepared",
+      "receipt": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_01_import-prepared.json",
+      "stage": "import-prepared",
+      "start_utc": "2026-09-20T02:23:42Z",
+      "status": "completed"
+    },
+    {
+      "command_note": "Exact argv is retained in the stage receipt; absolute worktree prefix redacted here as <worktree>/<worktree-wsl>.",
+      "command_template": [
+        "wsl.exe",
+        "-d",
+        "Ubuntu",
+        "--exec",
+        "/usr/bin/bash",
+        "<worktree-wsl>/experiments/psem_streaming_student/run_gt_pilot.sh",
+        "evaluate",
+        "<worktree-wsl>/experiments/psem_streaming_student/gt_kd_config.json",
+        "<worktree-wsl>/experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1",
+        "--which",
+        "initial",
+        "--authorize-material"
+      ],
+      "end_utc": "2026-09-20T02:24:59Z",
+      "exit": 0,
+      "hub_name": "gt-kd-1-initial",
+      "id": "initial",
+      "receipt": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_02_evaluate-initial.json",
+      "stage": "evaluate --which initial",
+      "start_utc": "2026-09-20T02:24:14Z",
+      "status": "completed"
+    },
+    {
+      "command_note": "Exact argv is retained in the stage receipt; absolute worktree prefix redacted here as <worktree>/<worktree-wsl>.",
+      "command_template": [
+        "wsl.exe",
+        "-d",
+        "Ubuntu",
+        "--exec",
+        "/usr/bin/bash",
+        "<worktree-wsl>/experiments/psem_streaming_student/run_gt_pilot.sh",
+        "train",
+        "<worktree-wsl>/experiments/psem_streaming_student/gt_kd_config.json",
+        "<worktree-wsl>/experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1",
+        "--pause-after",
+        "2",
+        "--authorize-material"
+      ],
+      "end_utc": "2026-09-20T02:25:52Z",
+      "exit": 0,
+      "hub_name": "gt-kd-1-train-pause2",
+      "id": "pause2",
+      "receipt": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_03_train-pause-after-2.json",
+      "stage": "train --pause-after 2 --authorize-material",
+      "start_utc": "2026-09-20T02:25:07Z",
+      "status": "completed"
+    },
+    {
+      "command_note": "Exact argv is retained in the stage receipt; absolute worktree prefix redacted here as <worktree>/<worktree-wsl>.",
+      "command_template": [
+        "wsl.exe",
+        "-d",
+        "Ubuntu",
+        "--exec",
+        "/usr/bin/bash",
+        "<worktree-wsl>/experiments/psem_streaming_student/run_gt_pilot.sh",
+        "train",
+        "<worktree-wsl>/experiments/psem_streaming_student/gt_kd_config.json",
+        "<worktree-wsl>/experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1",
+        "--resume",
+        "--authorize-material"
+      ],
+      "end_utc": "2026-09-20T02:27:39Z",
+      "exit": 0,
+      "hub_name": "gt-kd-1-train-resume",
+      "id": "resume780",
+      "receipt": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_04_train-resume.json",
+      "stage": "train --resume --authorize-material",
+      "start_utc": "2026-09-20T02:25:57Z",
+      "status": "completed"
+    },
+    {
+      "command_note": "Exact argv is retained in the stage receipt; absolute worktree prefix redacted here as <worktree>/<worktree-wsl>.",
+      "command_template": [
+        "wsl.exe",
+        "-d",
+        "Ubuntu",
+        "--exec",
+        "/usr/bin/bash",
+        "<worktree-wsl>/experiments/psem_streaming_student/run_gt_pilot.sh",
+        "evaluate",
+        "<worktree-wsl>/experiments/psem_streaming_student/gt_kd_config.json",
+        "<worktree-wsl>/experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1",
+        "--which",
+        "cal",
+        "--authorize-material"
+      ],
+      "end_utc": "2026-09-20T02:28:14Z",
+      "exit": 0,
+      "hub_name": "gt-kd-1-eval-cal",
+      "id": "cal",
+      "receipt": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_05_evaluate-cal.json",
+      "stage": "evaluate --which cal",
+      "start_utc": "2026-09-20T02:27:46Z",
+      "status": "completed"
+    },
+    {
+      "command_note": "Exact argv is retained in the stage receipt; absolute worktree prefix redacted here as <worktree>/<worktree-wsl>.",
+      "command_template": [
+        "wsl.exe",
+        "-d",
+        "Ubuntu",
+        "--exec",
+        "/usr/bin/bash",
+        "<worktree-wsl>/experiments/psem_streaming_student/run_gt_pilot.sh",
+        "evaluate",
+        "<worktree-wsl>/experiments/psem_streaming_student/gt_kd_config.json",
+        "<worktree-wsl>/experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1",
+        "--which",
+        "final",
+        "--authorize-material"
+      ],
+      "end_utc": "2026-09-20T02:28:55Z",
+      "exit": 0,
+      "hub_name": "gt-kd-1-eval-final",
+      "id": "final",
+      "receipt": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_06_evaluate-final.json",
+      "stage": "evaluate --which final",
+      "start_utc": "2026-09-20T02:28:21Z",
+      "status": "completed"
+    },
+    {
+      "command_note": "Exact argv is retained in the stage receipt; absolute worktree prefix redacted here as <worktree>/<worktree-wsl>.",
+      "command_template": [
+        "wsl.exe",
+        "-d",
+        "Ubuntu",
+        "--exec",
+        "/usr/bin/bash",
+        "<worktree-wsl>/experiments/psem_streaming_student/run_gt_pilot.sh",
+        "infer-proof",
+        "<worktree-wsl>/experiments/psem_streaming_student/gt_kd_config.json",
+        "<worktree-wsl>/experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1",
+        "--authorize-material"
+      ],
+      "end_utc": "2026-09-20T02:29:23Z",
+      "exit": 0,
+      "hub_name": "gt-kd-1-infer-proof",
+      "id": "infer-proof",
+      "receipt": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_07_infer-proof.json",
+      "stage": "infer-proof",
+      "start_utc": "2026-09-20T02:29:01Z",
+      "status": "completed"
+    },
+    {
+      "command_note": "Exact argv is retained in the stage receipt; absolute worktree prefix redacted here as <worktree>/<worktree-wsl>.",
+      "command_template": [
+        "wsl.exe",
+        "-d",
+        "Ubuntu",
+        "--exec",
+        "/usr/bin/bash",
+        "<worktree-wsl>/experiments/psem_streaming_student/run_gt_pilot.sh",
+        "report",
+        "<worktree-wsl>/experiments/psem_streaming_student/gt_kd_config.json",
+        "<worktree-wsl>/experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1"
+      ],
+      "end_utc": "2026-09-20T02:29:40Z",
+      "exit": 0,
+      "hub_name": "gt-kd-1-report",
+      "id": "report",
+      "receipt": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1/stage_08_report.json",
+      "stage": "report (CPU metadata aggregation)",
+      "start_utc": "2026-09-20T02:29:28Z",
+      "status": "completed"
+    }
+  ],
+  "status": "completed",
+  "teacher": {
+    "future": "Retained-score diagnosis reuses saved student logits; teacher quality certification is out of scope.",
+    "history": "Teacher sidecars were consumed only as fixed FIT targets during training with weight 0.25; no teacher fine-tuning, no teacher forward at inference.",
+    "no_teacher_inputs_at_inference": true,
+    "noise": "Raw KD probabilities were used as emitted without clipping or softmax; association treated independently per source.",
+    "provenance": {
+      "objective_name": "activity_bce_plus_fixed_teacher_bce",
+      "teacher_manifest_sha256": "1c40adaabc8c5e63112d8d0e179bd27ca6d391c9a9a685ba56d348935b7ef968",
+      "teacher_sidecar_sha256": {
+        "ami_ES2005a": "e012af625c334f3b47abd0b468abcd8246258b0dc3d8d36c8d6a5afc747f8d45",
+        "ami_ES2006a": "41fbf46b209dffd70aae043544a982de2e15351bccab0a8ab41ca06bdcfb8320",
+        "ami_ES2007a": "e3831753283cbb8140bc64d61049825124419a377b7eb45432ec5ee290167f74",
+        "ami_ES2008a": "e7b47eef6340cac512629f74865391fb14504548eabbdd2c3fa0f55fd61558b1"
+      },
+      "teacher_weight": 0.25
+    }
+  }
+}
