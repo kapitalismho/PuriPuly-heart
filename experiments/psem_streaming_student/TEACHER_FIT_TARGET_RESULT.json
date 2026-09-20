@@ -1,0 +1,2645 @@
+{
+  "cumulative_optimizer_updates_unchanged": 1583,
+  "experiment_id": "TEACHER-FIT-TARGETS-1",
+  "findings": [
+    "Teacher support validity is stored separately from GT validity.",
+    "One source-global permutation was fit on common-valid independent activity BCE only.",
+    "Raw sidecar probabilities are unclipped and not softmax-normalized.",
+    "Association used existing 1e-12 logit clipping and disclosed clip counts.",
+    "Permutation is a FIT task projection, not a human-identity guarantee.",
+    "Native model-load count is successful decoded trajectories only, not launch intent."
+  ],
+  "identities": {
+    "config": "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea",
+    "contract": "d651165b1d3229048376b7cefb02008648bf589c9eba800d2c892702af3d35c1",
+    "executed_config_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-fit-targets-1\\frozen_config.json",
+    "gt_pilot.py": "89577e61a758788dafba7822b861502422d9c672d21206b1208dee3a6a97c14a",
+    "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
+    "native_prerequisites": "73cd5b4d56749b389ba3ab369782280c17cd23b1ef4f35c69ccc968a4a27ef8d",
+    "original_config": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+    "prepared_sources": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+    "run_baseline.py": "3f7ee8a924bdb5e7ad848d2e1549df7e4f3ec06b2ef1c22e61213e5a3e9ee8c9",
+    "speaker_score_diagnostic.py": "b8880483ebd3528fb31627913124f8755720e11e1c821537ffdfbb5dcb3f360d",
+    "teacher_fit.py": "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c"
+  },
+  "identities_bound": [
+    {
+      "component_id": "component-9bde89b69d0e4b542ec46d0132128e14ec230a5f90ae0965fce7ab19567b707c",
+      "meeting": "ES2005a",
+      "nominal_frames": 3610,
+      "pilot_role": "FIT",
+      "prefix_samples": 4620800,
+      "slots_pending_prepared": true,
+      "source_id": "ami_ES2005a",
+      "waveform": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2005a\\ES2005a.Mix-Headset.wav",
+      "waveform_sha256": "ac33e7b18ae72931e65dc279af4b129370ad62ca6ed64299b9e35f356e3f8ed8"
+    },
+    {
+      "component_id": "component-897638f99176a183210cea1eddb59800761daedeb83673d66bc2a4611271ff7c",
+      "meeting": "ES2006a",
+      "nominal_frames": 3990,
+      "pilot_role": "FIT",
+      "prefix_samples": 5107200,
+      "slots_pending_prepared": true,
+      "source_id": "ami_ES2006a",
+      "waveform": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2006a\\ES2006a.Mix-Headset.wav",
+      "waveform_sha256": "1b1a0b273f2f589abc8788b6f9a2ba5ae343c2aa71fc425f48c8b79ce1406eef"
+    },
+    {
+      "component_id": "component-dc39eec1ecb832f93577981a68253ba52e133a6677ad3b896f36d97f6dd5ebc9",
+      "meeting": "ES2007a",
+      "nominal_frames": 3610,
+      "pilot_role": "FIT",
+      "prefix_samples": 4620800,
+      "slots_pending_prepared": true,
+      "source_id": "ami_ES2007a",
+      "waveform": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2007a\\ES2007a.Mix-Headset.wav",
+      "waveform_sha256": "57a4e0015ca37f9d6fa5c7ce91e78538b772a80234ed774009e8c7c3e89908a1"
+    },
+    {
+      "component_id": "component-d450792174beac24ff37c65abbb0be659775ec55ae8ed3aa82922bf3da7c7a3e",
+      "meeting": "ES2008a",
+      "nominal_frames": 3610,
+      "pilot_role": "FIT",
+      "prefix_samples": 4620800,
+      "slots_pending_prepared": true,
+      "source_id": "ami_ES2008a",
+      "waveform": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2008a\\ES2008a.Mix-Headset.wav",
+      "waveform_sha256": "65fcfc924e9bdb0388cbc3242a17bda88291ebc638f486e39a9ede78e92cb1e6"
+    }
+  ],
+  "manifest": {
+    "config_sha256": "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea",
+    "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+    "gt_remains_in_prepared_artifact": true,
+    "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+    "original_config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+    "prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+    "schema": "PSEM-TEACHER-FIT-MANIFEST-1",
+    "sources": [
+      {
+        "permutation": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "sidecar_sha256": "e012af625c334f3b47abd0b468abcd8246258b0dc3d8d36c8d6a5afc747f8d45",
+        "source_id": "ami_ES2005a",
+        "support_incomplete_count": 10,
+        "used_n": 3610
+      },
+      {
+        "permutation": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "sidecar_sha256": "41fbf46b209dffd70aae043544a982de2e15351bccab0a8ab41ca06bdcfb8320",
+        "source_id": "ami_ES2006a",
+        "support_incomplete_count": 12,
+        "used_n": 3990
+      },
+      {
+        "permutation": [
+          0,
+          2,
+          1,
+          3
+        ],
+        "sidecar_sha256": "e3831753283cbb8140bc64d61049825124419a377b7eb45432ec5ee290167f74",
+        "source_id": "ami_ES2007a",
+        "support_incomplete_count": 10,
+        "used_n": 3610
+      },
+      {
+        "permutation": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "sidecar_sha256": "e7b47eef6340cac512629f74865391fb14504548eabbdd2c3fa0f55fd61558b1",
+        "source_id": "ami_ES2008a",
+        "support_incomplete_count": 10,
+        "used_n": 3610
+      }
+    ],
+    "teacher_fit_sha256": "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c",
+    "teacher_support_distinct_from_gt_validity": true
+  },
+  "native": {
+    "backend": "vulkan",
+    "executable": "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+    "executable_bytes": 77073408,
+    "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+    "model": "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "model_bytes": 236606560,
+    "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99"
+  },
+  "native_model_loads": {
+    "failed_intent_is_not_a_known_successful_load": true,
+    "max_trajectories": 4,
+    "successful_decoded_loads": 4,
+    "uncertain_or_failed_launches_not_counted_as_loads": 0
+  },
+  "optimizer_updates": 0,
+  "orchestrator_pytorch_model_construction": 0,
+  "orchestrator_wall_s": 377.80058290000125,
+  "release": {
+    "authority_id": "AUTONOMY-2",
+    "automatic_retry": false,
+    "bounds": {
+      "cumulative_optimizer_updates_unchanged": 1583,
+      "expected_native_chunks": 2471,
+      "external_cost": 0,
+      "max_emitted_frames": 14820,
+      "max_new_artifact_bytes": 536870912,
+      "max_observed_GPU_dedicated_bytes": 4294967296,
+      "max_observed_paired_host_working_set_bytes": 4294967296,
+      "max_unique_source_seconds": 1185.6,
+      "new_native_source_trajectories": 4,
+      "optimizer_updates": 0,
+      "per_source_wall_seconds": 900,
+      "source_ids": [
+        "ami_ES2005a",
+        "ami_ES2006a",
+        "ami_ES2007a",
+        "ami_ES2008a"
+      ],
+      "whole_run_wall_seconds": 3600
+    },
+    "candidate_commit": "7928200e5ada036acfc217684247bcdc39ef8a83",
+    "command": [
+      ".venv/Scripts/python.exe",
+      "-B",
+      "experiments/psem_streaming_student/teacher_fit.py",
+      "execute",
+      "--config",
+      "experiments/psem_streaming_student/teacher_fit_config.json",
+      "--run-root",
+      "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1",
+      "--authorize-material"
+    ],
+    "config_sha256": "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea",
+    "contract_sha256": "d651165b1d3229048376b7cefb02008648bf589c9eba800d2c892702af3d35c1",
+    "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+    "execution_rules": [
+      "Run the single execute command once. Sequential fresh native source-zero streaming process per exact FIT prefix; no whole-clip offline forward or optional hidden exports.",
+      "Use the reviewed effective environment and approved profile. Preserve all input/code/config/native hashes, durable intents, outputs and cost/failure receipts.",
+      "On any failure or uncertainty, stop and retain partials; no retry, source advance, scope adjustment, code/config repair or extra material execution without another Director decision.",
+      "No student forward/backward/optimizer run, no KD training, no CAL/DEV/locked target generation, no new corpus, no paid APIs, no installs or production changes.",
+      "Worker may retain only this run's outputs and its declared public result. Do not edit Director authority/release/adjudication records, shared GT/helper files or unrelated user work. No commit/push/merge/publication."
+    ],
+    "experiment_id": "TEACHER-FIT-TARGETS-1",
+    "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+    "next_gate": "Report actual supported rows/frontiers, source-global association diagnostics, resource/exposure ledger and readable limits. Director plus independent review decide KD eligibility; this release grants no further branch.",
+    "preparation_acceptance": "experiments/psem_streaming_student/.stage-control/autonomous-research/teacher-fit-preparation-acceptance.json",
+    "prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+    "runtime": ".venv/Scripts/python.exe -B on Windows, Torch CPU orchestrator, direct Windows native Vulkan child processes",
+    "schema": "PSEM-DIRECTOR-MATERIAL-RELEASE-1",
+    "status": "GO",
+    "teacher_fit_sha256": "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c"
+  },
+  "schema": "PSEM-TEACHER-FIT-TARGET-RESULT-1",
+  "sources": [
+    {
+      "artifacts": {
+        "dump_probs": {
+          "sha256": "5af4cdb65ee96e1e9baafbf44600998a9b36a6517c86159da9b8c759a5cb53eb"
+        },
+        "dump_trace": {
+          "sha256": "24d3935b44d39ed7ee8eff7d36affa38acab156bf6ef7d80cc31f5d88a2548b1"
+        },
+        "projection": {
+          "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2005a/input.wav",
+          "sha256": "0b7de903353ba6f6d0860a507bd4d2fb6fc3ae5bd591bbb6843d2cc339753b2b"
+        },
+        "sidecar": {
+          "path": "C:/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2005a/teacher_sidecar.pt",
+          "sha256": "e012af625c334f3b47abd0b468abcd8246258b0dc3d8d36c8d6a5afc747f8d45"
+        }
+      },
+      "association": {
+        "all_permutation_costs": [
+          {
+            "masked_bce": 0.07300720363855362,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.8191715478897095,
+            "permutation": [
+              0,
+              1,
+              3,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.5404098629951477,
+            "permutation": [
+              0,
+              2,
+              1,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.9656979441642761,
+            "permutation": [
+              0,
+              2,
+              3,
+              1
+            ]
+          },
+          {
+            "masked_bce": 1.005073070526123,
+            "permutation": [
+              0,
+              3,
+              1,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.6841968894004822,
+            "permutation": [
+              0,
+              3,
+              2,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.8297179341316223,
+            "permutation": [
+              1,
+              0,
+              2,
+              3
+            ]
+          },
+          {
+            "masked_bce": 1.5758821964263916,
+            "permutation": [
+              1,
+              0,
+              3,
+              2
+            ]
+          },
+          {
+            "masked_bce": 1.1600009202957153,
+            "permutation": [
+              1,
+              2,
+              0,
+              3
+            ]
+          },
+          {
+            "masked_bce": 1.6214889287948608,
+            "permutation": [
+              1,
+              2,
+              3,
+              0
+            ]
+          },
+          {
+            "masked_bce": 1.6246641874313354,
+            "permutation": [
+              1,
+              3,
+              0,
+              2
+            ]
+          },
+          {
+            "masked_bce": 1.3399877548217773,
+            "permutation": [
+              1,
+              3,
+              2,
+              0
+            ]
+          },
+          {
+            "masked_bce": 1.1679766178131104,
+            "permutation": [
+              2,
+              0,
+              1,
+              3
+            ]
+          },
+          {
+            "masked_bce": 1.5932646989822388,
+            "permutation": [
+              2,
+              0,
+              3,
+              1
+            ]
+          },
+          {
+            "masked_bce": 1.0308568477630615,
+            "permutation": [
+              2,
+              1,
+              0,
+              3
+            ]
+          },
+          {
+            "masked_bce": 1.4923447370529175,
+            "permutation": [
+              2,
+              1,
+              3,
+              0
+            ]
+          },
+          {
+            "masked_bce": 1.642046570777893,
+            "permutation": [
+              2,
+              3,
+              0,
+              1
+            ]
+          },
+          {
+            "masked_bce": 1.6782463788986206,
+            "permutation": [
+              2,
+              3,
+              1,
+              0
+            ]
+          },
+          {
+            "masked_bce": 1.680068850517273,
+            "permutation": [
+              3,
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "masked_bce": 1.3591926097869873,
+            "permutation": [
+              3,
+              0,
+              2,
+              1
+            ]
+          },
+          {
+            "masked_bce": 1.5429491996765137,
+            "permutation": [
+              3,
+              1,
+              0,
+              2
+            ]
+          },
+          {
+            "masked_bce": 1.2582727670669556,
+            "permutation": [
+              3,
+              1,
+              2,
+              0
+            ]
+          },
+          {
+            "masked_bce": 1.6894755363464355,
+            "permutation": [
+              3,
+              2,
+              0,
+              1
+            ]
+          },
+          {
+            "masked_bce": 1.725675344467163,
+            "permutation": [
+              3,
+              2,
+              1,
+              0
+            ]
+          }
+        ],
+        "association_clip_counts_on_common_valid": {
+          "clip": 1e-12,
+          "clipped_high": 0,
+          "clipped_low": 0,
+          "values": 14388
+        },
+        "chronological_quarters": [
+          {
+            "common_valid_bins": 899,
+            "frame_end": 902,
+            "frame_start": 0,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.3297685384750366,
+              0.16660301387310028,
+              0.3693702220916748,
+              0.006547808181494474
+            ],
+            "quarter": 0,
+            "strict_solo_counts": [
+              206,
+              86,
+              273,
+              0
+            ]
+          },
+          {
+            "common_valid_bins": 903,
+            "frame_end": 1805,
+            "frame_start": 902,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.07798099517822266,
+              0.049684908241033554,
+              0.06054861098527908,
+              0.6694981455802917
+            ],
+            "quarter": 1,
+            "strict_solo_counts": [
+              28,
+              21,
+              15,
+              564
+            ]
+          },
+          {
+            "common_valid_bins": 902,
+            "frame_end": 2707,
+            "frame_start": 1805,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.4775228500366211,
+              0.12487120181322098,
+              0.15059012174606323,
+              0.008215542882680893
+            ],
+            "quarter": 2,
+            "strict_solo_counts": [
+              391,
+              83,
+              86,
+              2
+            ]
+          },
+          {
+            "common_valid_bins": 893,
+            "frame_end": 3610,
+            "frame_start": 2707,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.1978025734424591,
+              0.01937112584710121,
+              0.05898306146264076,
+              0.01229885034263134
+            ],
+            "quarter": 3,
+            "strict_solo_counts": [
+              129,
+              18,
+              29,
+              4
+            ]
+          }
+        ],
+        "collapse_flag": false,
+        "common_strict_solo_counts": [
+          754,
+          208,
+          403,
+          570
+        ],
+        "common_strict_solo_counts_uncertainty": "report_only_no_quality_threshold",
+        "common_valid_bins": 3597,
+        "emitted_clip_counts": {
+          "clip": 1e-12,
+          "clipped_high": 0,
+          "clipped_low": 0,
+          "values": 14440
+        },
+        "gt_activity_valid_bins": 3607,
+        "gt_strict_solo_counts": [
+          764,
+          208,
+          403,
+          570
+        ],
+        "logit_clip": 1e-12,
+        "logit_clip_applied_to_raw_targets": false,
+        "mapped_activity_bce": 0.07300720808874324,
+        "mapped_activity_brier": 0.015335899321622284,
+        "mapped_solo": {
+          "absent_slots": [],
+          "balanced_accuracy": 0.9980961752374433,
+          "class_balanced_conditional_log_loss": 0.0060406859531001314,
+          "class_counts": [
+            754,
+            208,
+            403,
+            570
+          ],
+          "confusion": [
+            [
+              752,
+              0,
+              2,
+              0
+            ],
+            [
+              0,
+              208,
+              0,
+              0
+            ],
+            [
+              1,
+              1,
+              401,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              570
+            ]
+          ],
+          "first_slot0_vs_rest": {
+            "auc": 0.999992139018096,
+            "class_balanced_binary_log_loss": 0.004697341467329989,
+            "n_rest": 1181,
+            "n_slot0": 754,
+            "ordinary_binary_log_loss": 0.004184357267862328
+          },
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "ordinary_conditional_log_loss": 0.005701031476997245,
+          "ovr_auc": [
+            0.999992139018096,
+            1.0,
+            0.9999870423520723,
+            1.0
+          ],
+          "ovr_auc_denominators": [
+            {
+              "negative": 1181,
+              "positive": 754
+            },
+            {
+              "negative": 1727,
+              "positive": 208
+            },
+            {
+              "negative": 1532,
+              "positive": 403
+            },
+            {
+              "negative": 1365,
+              "positive": 570
+            }
+          ],
+          "per_observed_slot_recall": [
+            0.9973474801061007,
+            1.0,
+            0.9950372208436724,
+            1.0
+          ],
+          "recall_denominators": [
+            754,
+            208,
+            403,
+            570
+          ],
+          "solo_bins": 1935
+        },
+        "missing_or_nonemitted_bins": 0,
+        "not_human_identity_guarantee": true,
+        "not_per_chunk_remapping": true,
+        "oracle": {
+          "best": {
+            "masked_bce": 0.07300720363855362,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ]
+          },
+          "not_used_for_inference_or_selection": true,
+          "permutation_count": 24,
+          "role": "source_global_oracle_diagnostic_only"
+        },
+        "permutation": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "permutation_semantics": "gt_column_g_receives_native_column_permutation[g]",
+        "raw_index_activity_bce": 0.07300720808874324,
+        "second_best_margin_bce": 0.4674026593565941,
+        "slots": [
+          "MEE017",
+          "MEE018",
+          "FEE019",
+          "MEO020"
+        ],
+        "teacher_emitted_bins": 3610,
+        "teacher_support_valid_bins": 3600,
+        "threshold_0_5_on_raw_mapped_probabilities": {
+          "correct_single_active_fraction_on_strict_solo": 0.9695090439276486,
+          "not_physical_overlap_inference": true,
+          "predicted_active_count_distribution_on_common_valid": {
+            "0": 1291,
+            "1": 2140,
+            "2": 163,
+            "3": 3,
+            "4": 0
+          },
+          "predicted_exactly_one_active_fraction_on_strict_solo": 0.9700258397932816,
+          "threshold": 0.5
+        },
+        "tie_count": 1,
+        "tie_permutations": [
+          [
+            0,
+            1,
+            2,
+            3
+          ]
+        ]
+      },
+      "clock": {
+        "kind": "Windows QueryPerformanceCounter",
+        "orchestrator_perf_counter_s": 93.85824479999974,
+        "process_elapsed_s": 93.8235385,
+        "process_finish_qpc": 145445760350,
+        "process_start_qpc": 144507524965,
+        "qpf": 10000000
+      },
+      "command": [
+        "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+        "-m",
+        "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+        "--backend",
+        "vulkan",
+        "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-fit-targets-1\\sources\\ami_ES2005a\\input.wav"
+      ],
+      "cost": {
+        "gpu_memory": {
+          "reason": "typeperf produced no counter file",
+          "status": "unavailable"
+        },
+        "mel_full_diagnostic_us": 317921,
+        "memory_samples": 1859,
+        "native_peak_working_set_bytes_observed": 177102848,
+        "native_process_cpu_s": 6.375,
+        "native_trace_timing_us": {
+          "frontend_us": {
+            "max_us": 2260,
+            "median_us": 1637,
+            "min_us": 588,
+            "samples": 602,
+            "sum_us": 1003501
+          },
+          "graph_a_us": {
+            "max_us": 368630,
+            "median_us": 2754,
+            "min_us": 2474,
+            "samples": 602,
+            "sum_us": 2102795
+          },
+          "graph_b_us": {
+            "max_us": 884416,
+            "median_us": 148435,
+            "min_us": 28201,
+            "samples": 602,
+            "sum_us": 88252565
+          },
+          "host_us": {
+            "max_us": 2689,
+            "median_us": 1451,
+            "min_us": 513,
+            "samples": 602,
+            "sum_us": 877101
+          },
+          "service_us": {
+            "max_us": 1255142,
+            "median_us": 154344,
+            "min_us": 33249,
+            "samples": 602,
+            "sum_us": 92316362
+          }
+        },
+        "paired_peak_working_set_bytes_observed": 504397824,
+        "unpaced_not_live_availability": true,
+        "wrapper_cpu_s": 0.234375
+      },
+      "environment": {
+        "absent": {
+          "TRANSCRIBE_PSEM_EVENTS_TCP": true,
+          "TRANSCRIBE_PSEM_PACE_16KHZ": true,
+          "TRANSCRIBE_PSEM_PACE_FROM_SAMPLE": true,
+          "TRANSCRIBE_PSEM_PACE_UNTIL_SAMPLE": true,
+          "TRANSCRIBE_SORTFORMER_OFFLINE_DUMP": true
+        },
+        "effective_transcribe": {
+          "TRANSCRIBE_DUMP_DIR": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-fit-targets-1\\sources\\ami_ES2005a\\dump",
+          "TRANSCRIBE_PSEM_CAUSAL_FRONTEND": "1",
+          "TRANSCRIBE_SORTFORMER_F32_HEAD": "1",
+          "TRANSCRIBE_SORTFORMER_STREAM_CHUNK_LEN": "6",
+          "TRANSCRIBE_SORTFORMER_STREAM_FIFO_LEN": "188",
+          "TRANSCRIBE_SORTFORMER_STREAM_LC": "1",
+          "TRANSCRIBE_SORTFORMER_STREAM_RC": "7",
+          "TRANSCRIBE_SORTFORMER_STREAM_SPKCACHE_LEN": "188",
+          "TRANSCRIBE_SORTFORMER_STREAM_UPDATE_PERIOD": "144",
+          "TRANSCRIBE_VK_NO_MUL_MAT_VEC": "1"
+        },
+        "other_inherited_backend_flags": {
+          "CUDA_VISIBLE_DEVICES": "",
+          "HIP_VISIBLE_DEVICES": "",
+          "VK_SDK_PATH": "C:\\VulkanSDK\\1.4.350.0"
+        },
+        "other_inherited_backend_flags_not_exhaustive_os_environment": true
+      },
+      "exit_code": 0,
+      "generation": "ami_ES2005a:unpaced-source-zero",
+      "prefix_export": {
+        "no_resampling_gain_or_renorm": true,
+        "pcm16_bit_exact": true,
+        "prefix_samples": 4620800,
+        "prepared_equals_pcm16_div_32768": true,
+        "source_channels": 1
+      },
+      "schema": "PSEM-TEACHER-FIT-SOURCE-RUN-1",
+      "source_id": "ami_ES2005a",
+      "teacher": {
+        "chunk_count": 602,
+        "missing_frames": 0,
+        "n_frames": 3610,
+        "probabilities_sha256": "5af4cdb65ee96e1e9baafbf44600998a9b36a6517c86159da9b8c759a5cb53eb",
+        "sidecar_sha256": "e012af625c334f3b47abd0b468abcd8246258b0dc3d8d36c8d6a5afc747f8d45",
+        "support_incomplete_count": 10,
+        "trace_sha256": "24d3935b44d39ed7ee8eff7d36affa38acab156bf6ef7d80cc31f5d88a2548b1",
+        "used_n": 3610
+      }
+    },
+    {
+      "artifacts": {
+        "dump_probs": {
+          "sha256": "470836f7e076a510677e58c1a1149cc425164782db91d3e8368188c218c5f6e2"
+        },
+        "dump_trace": {
+          "sha256": "1b4ff623faa82485bae98b1485dbb8475684402bc8cbe22b664ea65104ac2742"
+        },
+        "projection": {
+          "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2006a/input.wav",
+          "sha256": "dcf6bb2098fe7b31a025776e0bc795602239a2c1b7ecad95a350e7781e8af707"
+        },
+        "sidecar": {
+          "path": "C:/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2006a/teacher_sidecar.pt",
+          "sha256": "41fbf46b209dffd70aae043544a982de2e15351bccab0a8ab41ca06bdcfb8320"
+        }
+      },
+      "association": {
+        "all_permutation_costs": [
+          {
+            "masked_bce": 0.05682752653956413,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.3185192048549652,
+            "permutation": [
+              0,
+              1,
+              3,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.30511340498924255,
+            "permutation": [
+              0,
+              2,
+              1,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.3388758897781372,
+            "permutation": [
+              0,
+              2,
+              3,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.3433447480201721,
+            "permutation": [
+              0,
+              3,
+              1,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.1154155433177948,
+            "permutation": [
+              0,
+              3,
+              2,
+              1
+            ]
+          },
+          {
+            "masked_bce": 1.6840029954910278,
+            "permutation": [
+              1,
+              0,
+              2,
+              3
+            ]
+          },
+          {
+            "masked_bce": 1.9456950426101685,
+            "permutation": [
+              1,
+              0,
+              3,
+              2
+            ]
+          },
+          {
+            "masked_bce": 1.9250681400299072,
+            "permutation": [
+              1,
+              2,
+              0,
+              3
+            ]
+          },
+          {
+            "masked_bce": 1.9545692205429077,
+            "permutation": [
+              1,
+              2,
+              3,
+              0
+            ]
+          },
+          {
+            "masked_bce": 1.9632996320724487,
+            "permutation": [
+              1,
+              3,
+              0,
+              2
+            ]
+          },
+          {
+            "masked_bce": 1.7311087846755981,
+            "permutation": [
+              1,
+              3,
+              2,
+              0
+            ]
+          },
+          {
+            "masked_bce": 2.240255832672119,
+            "permutation": [
+              2,
+              0,
+              1,
+              3
+            ]
+          },
+          {
+            "masked_bce": 2.2740182876586914,
+            "permutation": [
+              2,
+              0,
+              3,
+              1
+            ]
+          },
+          {
+            "masked_bce": 2.23303484916687,
+            "permutation": [
+              2,
+              1,
+              0,
+              3
+            ]
+          },
+          {
+            "masked_bce": 2.262535810470581,
+            "permutation": [
+              2,
+              1,
+              3,
+              0
+            ]
+          },
+          {
+            "masked_bce": 2.2916228771209717,
+            "permutation": [
+              2,
+              3,
+              0,
+              1
+            ]
+          },
+          {
+            "masked_bce": 2.2873611450195312,
+            "permutation": [
+              2,
+              3,
+              1,
+              0
+            ]
+          },
+          {
+            "masked_bce": 2.55214262008667,
+            "permutation": [
+              3,
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "masked_bce": 2.3242132663726807,
+            "permutation": [
+              3,
+              0,
+              2,
+              1
+            ]
+          },
+          {
+            "masked_bce": 2.544921636581421,
+            "permutation": [
+              3,
+              1,
+              0,
+              2
+            ]
+          },
+          {
+            "masked_bce": 2.3127310276031494,
+            "permutation": [
+              3,
+              1,
+              2,
+              0
+            ]
+          },
+          {
+            "masked_bce": 2.5652785301208496,
+            "permutation": [
+              3,
+              2,
+              0,
+              1
+            ]
+          },
+          {
+            "masked_bce": 2.5610170364379883,
+            "permutation": [
+              3,
+              2,
+              1,
+              0
+            ]
+          }
+        ],
+        "association_clip_counts_on_common_valid": {
+          "clip": 1e-12,
+          "clipped_high": 0,
+          "clipped_low": 0,
+          "values": 15900
+        },
+        "chronological_quarters": [
+          {
+            "common_valid_bins": 994,
+            "frame_end": 997,
+            "frame_start": 0,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.6086447238922119,
+              0.027227655053138733,
+              0.0029943243134766817,
+              3.903939068550244e-05
+            ],
+            "quarter": 0,
+            "strict_solo_counts": [
+              574,
+              14,
+              2,
+              0
+            ]
+          },
+          {
+            "common_valid_bins": 998,
+            "frame_end": 1995,
+            "frame_start": 997,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.4468972384929657,
+              0.012631513178348541,
+              0.007745567709207535,
+              7.047948747640476e-05
+            ],
+            "quarter": 1,
+            "strict_solo_counts": [
+              390,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "common_valid_bins": 997,
+            "frame_end": 2992,
+            "frame_start": 1995,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.5112597346305847,
+              0.000937276694457978,
+              0.25949349999427795,
+              0.00033528078347444534
+            ],
+            "quarter": 2,
+            "strict_solo_counts": [
+              435,
+              0,
+              229,
+              0
+            ]
+          },
+          {
+            "common_valid_bins": 986,
+            "frame_end": 3990,
+            "frame_start": 2992,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.5464397668838501,
+              0.001660113106481731,
+              0.06469257175922394,
+              0.06318848580121994
+            ],
+            "quarter": 3,
+            "strict_solo_counts": [
+              508,
+              0,
+              39,
+              52
+            ]
+          }
+        ],
+        "collapse_flag": false,
+        "common_strict_solo_counts": [
+          1907,
+          15,
+          270,
+          52
+        ],
+        "common_strict_solo_counts_uncertainty": "report_only_no_quality_threshold",
+        "common_valid_bins": 3975,
+        "emitted_clip_counts": {
+          "clip": 1e-12,
+          "clipped_high": 0,
+          "clipped_low": 0,
+          "values": 15960
+        },
+        "gt_activity_valid_bins": 3987,
+        "gt_strict_solo_counts": [
+          1909,
+          15,
+          270,
+          57
+        ],
+        "logit_clip": 1e-12,
+        "logit_clip_applied_to_raw_targets": false,
+        "mapped_activity_bce": 0.05682754421292173,
+        "mapped_activity_brier": 0.011527121211570224,
+        "mapped_solo": {
+          "absent_slots": [],
+          "balanced_accuracy": 0.9998689040377556,
+          "class_balanced_conditional_log_loss": 0.0014620867555792676,
+          "class_counts": [
+            1907,
+            15,
+            270,
+            52
+          ],
+          "confusion": [
+            [
+              1906,
+              0,
+              0,
+              1
+            ],
+            [
+              0,
+              15,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              270,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              52
+            ]
+          ],
+          "first_slot0_vs_rest": {
+            "auc": 1.0,
+            "class_balanced_binary_log_loss": 0.0005745886625764832,
+            "n_rest": 337,
+            "n_slot0": 1907,
+            "ordinary_binary_log_loss": 0.0007262095446469466
+          },
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "ordinary_conditional_log_loss": 0.0007706375293143111,
+          "ovr_auc": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "ovr_auc_denominators": [
+            {
+              "negative": 337,
+              "positive": 1907
+            },
+            {
+              "negative": 2229,
+              "positive": 15
+            },
+            {
+              "negative": 1974,
+              "positive": 270
+            },
+            {
+              "negative": 2192,
+              "positive": 52
+            }
+          ],
+          "per_observed_slot_recall": [
+            0.9994756161510225,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "recall_denominators": [
+            1907,
+            15,
+            270,
+            52
+          ],
+          "solo_bins": 2244
+        },
+        "missing_or_nonemitted_bins": 0,
+        "not_human_identity_guarantee": true,
+        "not_per_chunk_remapping": true,
+        "oracle": {
+          "best": {
+            "masked_bce": 0.05682752653956413,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ]
+          },
+          "not_used_for_inference_or_selection": true,
+          "permutation_count": 24,
+          "role": "source_global_oracle_diagnostic_only"
+        },
+        "permutation": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "permutation_semantics": "gt_column_g_receives_native_column_permutation[g]",
+        "raw_index_activity_bce": 0.05682754421292173,
+        "second_best_margin_bce": 0.05858801677823067,
+        "slots": [
+          "FEE021",
+          "FEO023",
+          "MEO022",
+          "FEE024"
+        ],
+        "teacher_emitted_bins": 3990,
+        "teacher_support_valid_bins": 3978,
+        "threshold_0_5_on_raw_mapped_probabilities": {
+          "correct_single_active_fraction_on_strict_solo": 0.9812834224598931,
+          "not_physical_overlap_inference": true,
+          "predicted_active_count_distribution_on_common_valid": {
+            "0": 1484,
+            "1": 2446,
+            "2": 45,
+            "3": 0,
+            "4": 0
+          },
+          "predicted_exactly_one_active_fraction_on_strict_solo": 0.9812834224598931,
+          "threshold": 0.5
+        },
+        "tie_count": 1,
+        "tie_permutations": [
+          [
+            0,
+            1,
+            2,
+            3
+          ]
+        ]
+      },
+      "clock": {
+        "kind": "Windows QueryPerformanceCounter",
+        "orchestrator_perf_counter_s": 100.82263090000015,
+        "process_elapsed_s": 100.7766966,
+        "process_finish_qpc": 146454553201,
+        "process_start_qpc": 145446786235,
+        "qpf": 10000000
+      },
+      "command": [
+        "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+        "-m",
+        "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+        "--backend",
+        "vulkan",
+        "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-fit-targets-1\\sources\\ami_ES2006a\\input.wav"
+      ],
+      "cost": {
+        "gpu_memory": {
+          "counter": "GPU Process Memory(pid_NATIVE_*) Dedicated Usage",
+          "global_gpu_usage_used": false,
+          "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included.",
+          "peak_bytes": 376782848,
+          "samples": 99,
+          "status": "observed_process_counter"
+        },
+        "mel_full_diagnostic_us": 351631,
+        "memory_samples": 1997,
+        "native_peak_working_set_bytes_observed": 152199168,
+        "native_process_cpu_s": 5.421875,
+        "native_trace_timing_us": {
+          "frontend_us": {
+            "max_us": 2233,
+            "median_us": 1670,
+            "min_us": 806,
+            "samples": 665,
+            "sum_us": 1129615
+          },
+          "graph_a_us": {
+            "max_us": 7619,
+            "median_us": 2745,
+            "min_us": 2497,
+            "samples": 665,
+            "sum_us": 1821756
+          },
+          "graph_b_us": {
+            "max_us": 193106,
+            "median_us": 145338,
+            "min_us": 24574,
+            "samples": 665,
+            "sum_us": 96073678
+          },
+          "host_us": {
+            "max_us": 2682,
+            "median_us": 1457,
+            "min_us": 458,
+            "samples": 665,
+            "sum_us": 974875
+          },
+          "service_us": {
+            "max_us": 199777,
+            "median_us": 151444,
+            "min_us": 30901,
+            "samples": 665,
+            "sum_us": 100087100
+          }
+        },
+        "paired_peak_working_set_bytes_observed": 483450880,
+        "unpaced_not_live_availability": true,
+        "wrapper_cpu_s": 0.078125
+      },
+      "environment": {
+        "absent": {
+          "TRANSCRIBE_PSEM_EVENTS_TCP": true,
+          "TRANSCRIBE_PSEM_PACE_16KHZ": true,
+          "TRANSCRIBE_PSEM_PACE_FROM_SAMPLE": true,
+          "TRANSCRIBE_PSEM_PACE_UNTIL_SAMPLE": true,
+          "TRANSCRIBE_SORTFORMER_OFFLINE_DUMP": true
+        },
+        "effective_transcribe": {
+          "TRANSCRIBE_DUMP_DIR": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-fit-targets-1\\sources\\ami_ES2006a\\dump",
+          "TRANSCRIBE_PSEM_CAUSAL_FRONTEND": "1",
+          "TRANSCRIBE_SORTFORMER_F32_HEAD": "1",
+          "TRANSCRIBE_SORTFORMER_STREAM_CHUNK_LEN": "6",
+          "TRANSCRIBE_SORTFORMER_STREAM_FIFO_LEN": "188",
+          "TRANSCRIBE_SORTFORMER_STREAM_LC": "1",
+          "TRANSCRIBE_SORTFORMER_STREAM_RC": "7",
+          "TRANSCRIBE_SORTFORMER_STREAM_SPKCACHE_LEN": "188",
+          "TRANSCRIBE_SORTFORMER_STREAM_UPDATE_PERIOD": "144",
+          "TRANSCRIBE_VK_NO_MUL_MAT_VEC": "1"
+        },
+        "other_inherited_backend_flags": {
+          "CUDA_VISIBLE_DEVICES": "",
+          "HIP_VISIBLE_DEVICES": "",
+          "VK_SDK_PATH": "C:\\VulkanSDK\\1.4.350.0"
+        },
+        "other_inherited_backend_flags_not_exhaustive_os_environment": true
+      },
+      "exit_code": 0,
+      "generation": "ami_ES2006a:unpaced-source-zero",
+      "prefix_export": {
+        "no_resampling_gain_or_renorm": true,
+        "pcm16_bit_exact": true,
+        "prefix_samples": 5107200,
+        "prepared_equals_pcm16_div_32768": true,
+        "source_channels": 1
+      },
+      "schema": "PSEM-TEACHER-FIT-SOURCE-RUN-1",
+      "source_id": "ami_ES2006a",
+      "teacher": {
+        "chunk_count": 665,
+        "missing_frames": 0,
+        "n_frames": 3990,
+        "probabilities_sha256": "470836f7e076a510677e58c1a1149cc425164782db91d3e8368188c218c5f6e2",
+        "sidecar_sha256": "41fbf46b209dffd70aae043544a982de2e15351bccab0a8ab41ca06bdcfb8320",
+        "support_incomplete_count": 12,
+        "trace_sha256": "1b4ff623faa82485bae98b1485dbb8475684402bc8cbe22b664ea65104ac2742",
+        "used_n": 3990
+      }
+    },
+    {
+      "artifacts": {
+        "dump_probs": {
+          "sha256": "fc6b39c3437a81543f59e585ea2b5408834f2cce264a3fd49ab3e4b972f79aee"
+        },
+        "dump_trace": {
+          "sha256": "858a3faab19efe03090512879e4ff08ac7cefbc7208d186e981bbd4c9e333341"
+        },
+        "projection": {
+          "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2007a/input.wav",
+          "sha256": "6634cafdc1c913ddc4a478f27eb31e69ae2116f169382961757260f2b7e5ab0f"
+        },
+        "sidecar": {
+          "path": "C:/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2007a/teacher_sidecar.pt",
+          "sha256": "e3831753283cbb8140bc64d61049825124419a377b7eb45432ec5ee290167f74"
+        }
+      },
+      "association": {
+        "all_permutation_costs": [
+          {
+            "masked_bce": 0.1217140480875969,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.10553300380706787,
+            "permutation": [
+              0,
+              1,
+              3,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.07988718152046204,
+            "permutation": [
+              0,
+              2,
+              1,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.08040089905261993,
+            "permutation": [
+              0,
+              2,
+              3,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.12672074139118195,
+            "permutation": [
+              0,
+              3,
+              1,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.14341549575328827,
+            "permutation": [
+              0,
+              3,
+              2,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.6825202107429504,
+            "permutation": [
+              1,
+              0,
+              2,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.6663391590118408,
+            "permutation": [
+              1,
+              0,
+              3,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.6217237114906311,
+            "permutation": [
+              1,
+              2,
+              0,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.5824220180511475,
+            "permutation": [
+              1,
+              2,
+              3,
+              0
+            ]
+          },
+          {
+            "masked_bce": 0.6685572862625122,
+            "permutation": [
+              1,
+              3,
+              0,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.6454365849494934,
+            "permutation": [
+              1,
+              3,
+              2,
+              0
+            ]
+          },
+          {
+            "masked_bce": 0.6731681823730469,
+            "permutation": [
+              2,
+              0,
+              1,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.6736818552017212,
+            "permutation": [
+              2,
+              0,
+              3,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.6541985273361206,
+            "permutation": [
+              2,
+              1,
+              0,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.614896833896637,
+            "permutation": [
+              2,
+              1,
+              3,
+              0
+            ]
+          },
+          {
+            "masked_bce": 0.6758999824523926,
+            "permutation": [
+              2,
+              3,
+              0,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.6360845565795898,
+            "permutation": [
+              2,
+              3,
+              1,
+              0
+            ]
+          },
+          {
+            "masked_bce": 0.6702184677124023,
+            "permutation": [
+              3,
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.6869130730628967,
+            "permutation": [
+              3,
+              0,
+              2,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.6512488722801208,
+            "permutation": [
+              3,
+              1,
+              0,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.6281282305717468,
+            "permutation": [
+              3,
+              1,
+              2,
+              0
+            ]
+          },
+          {
+            "masked_bce": 0.6261166334152222,
+            "permutation": [
+              3,
+              2,
+              0,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.586301326751709,
+            "permutation": [
+              3,
+              2,
+              1,
+              0
+            ]
+          }
+        ],
+        "association_clip_counts_on_common_valid": {
+          "clip": 1e-12,
+          "clipped_high": 0,
+          "clipped_low": 0,
+          "values": 14388
+        },
+        "chronological_quarters": [
+          {
+            "common_valid_bins": 899,
+            "frame_end": 902,
+            "frame_start": 0,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.012938003055751324,
+              0.05143703520298004,
+              0.06132085993885994,
+              0.024271849542856216
+            ],
+            "quarter": 0,
+            "strict_solo_counts": [
+              9,
+              46,
+              42,
+              0
+            ]
+          },
+          {
+            "common_valid_bins": 903,
+            "frame_end": 1805,
+            "frame_start": 902,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.1237499788403511,
+              0.036332666873931885,
+              0.009445290081202984,
+              0.018649181351065636
+            ],
+            "quarter": 1,
+            "strict_solo_counts": [
+              82,
+              29,
+              10,
+              0
+            ]
+          },
+          {
+            "common_valid_bins": 902,
+            "frame_end": 2707,
+            "frame_start": 1805,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.4561353325843811,
+              0.0036637354642152786,
+              0.009351649321615696,
+              0.010742719285190105
+            ],
+            "quarter": 2,
+            "strict_solo_counts": [
+              404,
+              0,
+              13,
+              1
+            ]
+          },
+          {
+            "common_valid_bins": 893,
+            "frame_end": 3610,
+            "frame_start": 2707,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.28743278980255127,
+              0.07830759882926941,
+              0.10455387830734253,
+              0.05780084803700447
+            ],
+            "quarter": 3,
+            "strict_solo_counts": [
+              245,
+              101,
+              56,
+              13
+            ]
+          }
+        ],
+        "collapse_flag": false,
+        "common_strict_solo_counts": [
+          740,
+          176,
+          121,
+          14
+        ],
+        "common_strict_solo_counts_uncertainty": "report_only_no_quality_threshold",
+        "common_valid_bins": 3597,
+        "emitted_clip_counts": {
+          "clip": 1e-12,
+          "clipped_high": 0,
+          "clipped_low": 0,
+          "values": 14440
+        },
+        "gt_activity_valid_bins": 3607,
+        "gt_strict_solo_counts": [
+          740,
+          176,
+          122,
+          14
+        ],
+        "logit_clip": 1e-12,
+        "logit_clip_applied_to_raw_targets": false,
+        "mapped_activity_bce": 0.07988718248723019,
+        "mapped_activity_brier": 0.021808984158992812,
+        "mapped_solo": {
+          "absent_slots": [],
+          "balanced_accuracy": 0.6344093023070296,
+          "class_balanced_conditional_log_loss": 0.8505567750674496,
+          "class_counts": [
+            740,
+            176,
+            121,
+            14
+          ],
+          "confusion": [
+            [
+              737,
+              0,
+              3,
+              0
+            ],
+            [
+              0,
+              113,
+              63,
+              0
+            ],
+            [
+              1,
+              5,
+              57,
+              58
+            ],
+            [
+              0,
+              0,
+              8,
+              6
+            ]
+          ],
+          "first_slot0_vs_rest": {
+            "auc": 0.9998652993829843,
+            "class_balanced_binary_log_loss": 0.015191926272559605,
+            "n_rest": 311,
+            "n_slot0": 740,
+            "ordinary_binary_log_loss": 0.016510046528403467
+          },
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "ordinary_conditional_log_loss": 0.34607071881305923,
+          "ovr_auc": [
+            0.9998652993829843,
+            0.9617467532467533,
+            0.9200124411268106,
+            0.9362171097947376
+          ],
+          "ovr_auc_denominators": [
+            {
+              "negative": 311,
+              "positive": 740
+            },
+            {
+              "negative": 875,
+              "positive": 176
+            },
+            {
+              "negative": 930,
+              "positive": 121
+            },
+            {
+              "negative": 1037,
+              "positive": 14
+            }
+          ],
+          "per_observed_slot_recall": [
+            0.995945945945946,
+            0.6420454545454546,
+            0.47107438016528924,
+            0.42857142857142855
+          ],
+          "recall_denominators": [
+            740,
+            176,
+            121,
+            14
+          ],
+          "solo_bins": 1051
+        },
+        "missing_or_nonemitted_bins": 0,
+        "not_human_identity_guarantee": true,
+        "not_per_chunk_remapping": true,
+        "oracle": {
+          "best": {
+            "masked_bce": 0.07988718152046204,
+            "permutation": [
+              0,
+              2,
+              1,
+              3
+            ]
+          },
+          "not_used_for_inference_or_selection": true,
+          "permutation_count": 24,
+          "role": "source_global_oracle_diagnostic_only"
+        },
+        "permutation": [
+          0,
+          2,
+          1,
+          3
+        ],
+        "permutation_semantics": "gt_column_g_receives_native_column_permutation[g]",
+        "raw_index_activity_bce": 0.12171405138640082,
+        "second_best_margin_bce": 0.000513717532157898,
+        "slots": [
+          "MEE025",
+          "FEO026",
+          "FEE028",
+          "MEE027"
+        ],
+        "teacher_emitted_bins": 3610,
+        "teacher_support_valid_bins": 3600,
+        "threshold_0_5_on_raw_mapped_probabilities": {
+          "correct_single_active_fraction_on_strict_solo": 0.813510941960038,
+          "not_physical_overlap_inference": true,
+          "predicted_active_count_distribution_on_common_valid": {
+            "0": 2449,
+            "1": 1137,
+            "2": 11,
+            "3": 0,
+            "4": 0
+          },
+          "predicted_exactly_one_active_fraction_on_strict_solo": 0.9124643196955281,
+          "threshold": 0.5
+        },
+        "tie_count": 1,
+        "tie_permutations": [
+          [
+            0,
+            2,
+            1,
+            3
+          ]
+        ]
+      },
+      "clock": {
+        "kind": "Windows QueryPerformanceCounter",
+        "orchestrator_perf_counter_s": 91.40340199999991,
+        "process_elapsed_s": 91.3738636,
+        "process_finish_qpc": 147369376837,
+        "process_start_qpc": 146455638201,
+        "qpf": 10000000
+      },
+      "command": [
+        "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+        "-m",
+        "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+        "--backend",
+        "vulkan",
+        "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-fit-targets-1\\sources\\ami_ES2007a\\input.wav"
+      ],
+      "cost": {
+        "gpu_memory": {
+          "counter": "GPU Process Memory(pid_NATIVE_*) Dedicated Usage",
+          "global_gpu_usage_used": false,
+          "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included.",
+          "peak_bytes": 377044992,
+          "samples": 90,
+          "status": "observed_process_counter"
+        },
+        "mel_full_diagnostic_us": 317948,
+        "memory_samples": 1811,
+        "native_peak_working_set_bytes_observed": 141676544,
+        "native_process_cpu_s": 5.25,
+        "native_trace_timing_us": {
+          "frontend_us": {
+            "max_us": 2264,
+            "median_us": 1665,
+            "min_us": 602,
+            "samples": 602,
+            "sum_us": 1016832
+          },
+          "graph_a_us": {
+            "max_us": 7381,
+            "median_us": 2740,
+            "min_us": 2186,
+            "samples": 602,
+            "sum_us": 1649855
+          },
+          "graph_b_us": {
+            "max_us": 193669,
+            "median_us": 145685,
+            "min_us": 24516,
+            "samples": 602,
+            "sum_us": 87093986
+          },
+          "host_us": {
+            "max_us": 2457,
+            "median_us": 1472,
+            "min_us": 474,
+            "samples": 602,
+            "sum_us": 882888
+          },
+          "service_us": {
+            "max_us": 200426,
+            "median_us": 151832,
+            "min_us": 30882,
+            "samples": 602,
+            "sum_us": 90724495
+          }
+        },
+        "paired_peak_working_set_bytes_observed": 473395200,
+        "unpaced_not_live_availability": true,
+        "wrapper_cpu_s": 0.28125
+      },
+      "environment": {
+        "absent": {
+          "TRANSCRIBE_PSEM_EVENTS_TCP": true,
+          "TRANSCRIBE_PSEM_PACE_16KHZ": true,
+          "TRANSCRIBE_PSEM_PACE_FROM_SAMPLE": true,
+          "TRANSCRIBE_PSEM_PACE_UNTIL_SAMPLE": true,
+          "TRANSCRIBE_SORTFORMER_OFFLINE_DUMP": true
+        },
+        "effective_transcribe": {
+          "TRANSCRIBE_DUMP_DIR": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-fit-targets-1\\sources\\ami_ES2007a\\dump",
+          "TRANSCRIBE_PSEM_CAUSAL_FRONTEND": "1",
+          "TRANSCRIBE_SORTFORMER_F32_HEAD": "1",
+          "TRANSCRIBE_SORTFORMER_STREAM_CHUNK_LEN": "6",
+          "TRANSCRIBE_SORTFORMER_STREAM_FIFO_LEN": "188",
+          "TRANSCRIBE_SORTFORMER_STREAM_LC": "1",
+          "TRANSCRIBE_SORTFORMER_STREAM_RC": "7",
+          "TRANSCRIBE_SORTFORMER_STREAM_SPKCACHE_LEN": "188",
+          "TRANSCRIBE_SORTFORMER_STREAM_UPDATE_PERIOD": "144",
+          "TRANSCRIBE_VK_NO_MUL_MAT_VEC": "1"
+        },
+        "other_inherited_backend_flags": {
+          "CUDA_VISIBLE_DEVICES": "",
+          "HIP_VISIBLE_DEVICES": "",
+          "VK_SDK_PATH": "C:\\VulkanSDK\\1.4.350.0"
+        },
+        "other_inherited_backend_flags_not_exhaustive_os_environment": true
+      },
+      "exit_code": 0,
+      "generation": "ami_ES2007a:unpaced-source-zero",
+      "prefix_export": {
+        "no_resampling_gain_or_renorm": true,
+        "pcm16_bit_exact": true,
+        "prefix_samples": 4620800,
+        "prepared_equals_pcm16_div_32768": true,
+        "source_channels": 1
+      },
+      "schema": "PSEM-TEACHER-FIT-SOURCE-RUN-1",
+      "source_id": "ami_ES2007a",
+      "teacher": {
+        "chunk_count": 602,
+        "missing_frames": 0,
+        "n_frames": 3610,
+        "probabilities_sha256": "fc6b39c3437a81543f59e585ea2b5408834f2cce264a3fd49ab3e4b972f79aee",
+        "sidecar_sha256": "e3831753283cbb8140bc64d61049825124419a377b7eb45432ec5ee290167f74",
+        "support_incomplete_count": 10,
+        "trace_sha256": "858a3faab19efe03090512879e4ff08ac7cefbc7208d186e981bbd4c9e333341",
+        "used_n": 3610
+      }
+    },
+    {
+      "artifacts": {
+        "dump_probs": {
+          "sha256": "1f73053a2542b9109a7c8e0b211ff594abcc4c28f63b5b1433e9cd288c7b9591"
+        },
+        "dump_trace": {
+          "sha256": "876635623b80c41c05d67884a384159724d1c5802e05a48a2afdc11a655076c0"
+        },
+        "projection": {
+          "path": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2008a/input.wav",
+          "sha256": "daa19bc5ae687cdc28744aa1f943e86203be2e2525a76558786353891efc2595"
+        },
+        "sidecar": {
+          "path": "C:/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls/experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/sources/ami_ES2008a/teacher_sidecar.pt",
+          "sha256": "e7b47eef6340cac512629f74865391fb14504548eabbdd2c3fa0f55fd61558b1"
+        }
+      },
+      "association": {
+        "all_permutation_costs": [
+          {
+            "masked_bce": 0.8168088793754578,
+            "permutation": [
+              0,
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "masked_bce": 1.0584392547607422,
+            "permutation": [
+              0,
+              1,
+              3,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.7396434545516968,
+            "permutation": [
+              0,
+              2,
+              1,
+              3
+            ]
+          },
+          {
+            "masked_bce": 1.477853536605835,
+            "permutation": [
+              0,
+              2,
+              3,
+              1
+            ]
+          },
+          {
+            "masked_bce": 1.0528250932693481,
+            "permutation": [
+              0,
+              3,
+              1,
+              2
+            ]
+          },
+          {
+            "masked_bce": 1.5494050979614258,
+            "permutation": [
+              0,
+              3,
+              2,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.5743539333343506,
+            "permutation": [
+              1,
+              0,
+              2,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.815984308719635,
+            "permutation": [
+              1,
+              0,
+              3,
+              2
+            ]
+          },
+          {
+            "masked_bce": 1.1881076097488403,
+            "permutation": [
+              1,
+              2,
+              0,
+              3
+            ]
+          },
+          {
+            "masked_bce": 1.468091607093811,
+            "permutation": [
+              1,
+              2,
+              3,
+              0
+            ]
+          },
+          {
+            "masked_bce": 1.5012891292572021,
+            "permutation": [
+              1,
+              3,
+              0,
+              2
+            ]
+          },
+          {
+            "masked_bce": 1.5396429300308228,
+            "permutation": [
+              1,
+              3,
+              2,
+              0
+            ]
+          },
+          {
+            "masked_bce": 0.09683191776275635,
+            "permutation": [
+              2,
+              0,
+              1,
+              3
+            ]
+          },
+          {
+            "masked_bce": 0.8350421190261841,
+            "permutation": [
+              2,
+              0,
+              3,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.7877508997917175,
+            "permutation": [
+              2,
+              1,
+              0,
+              3
+            ]
+          },
+          {
+            "masked_bce": 1.0677348375320435,
+            "permutation": [
+              2,
+              1,
+              3,
+              0
+            ]
+          },
+          {
+            "masked_bce": 1.520346999168396,
+            "permutation": [
+              2,
+              3,
+              0,
+              1
+            ]
+          },
+          {
+            "masked_bce": 1.0621209144592285,
+            "permutation": [
+              2,
+              3,
+              1,
+              0
+            ]
+          },
+          {
+            "masked_bce": 0.23440217971801758,
+            "permutation": [
+              3,
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.7309819459915161,
+            "permutation": [
+              3,
+              0,
+              2,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.9253211617469788,
+            "permutation": [
+              3,
+              1,
+              0,
+              2
+            ]
+          },
+          {
+            "masked_bce": 0.963674783706665,
+            "permutation": [
+              3,
+              1,
+              2,
+              0
+            ]
+          },
+          {
+            "masked_bce": 1.3447355031967163,
+            "permutation": [
+              3,
+              2,
+              0,
+              1
+            ]
+          },
+          {
+            "masked_bce": 0.8865094184875488,
+            "permutation": [
+              3,
+              2,
+              1,
+              0
+            ]
+          }
+        ],
+        "association_clip_counts_on_common_valid": {
+          "clip": 1e-12,
+          "clipped_high": 0,
+          "clipped_low": 0,
+          "values": 14388
+        },
+        "chronological_quarters": [
+          {
+            "common_valid_bins": 899,
+            "frame_end": 902,
+            "frame_start": 0,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.001008650055155158,
+              0.3081236183643341,
+              0.1733831763267517,
+              8.820594666758552e-05
+            ],
+            "quarter": 0,
+            "strict_solo_counts": [
+              4,
+              391,
+              0,
+              0
+            ]
+          },
+          {
+            "common_valid_bins": 903,
+            "frame_end": 1805,
+            "frame_start": 902,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.004896036349236965,
+              0.5032628774642944,
+              0.23921102285385132,
+              0.0006997519521974027
+            ],
+            "quarter": 1,
+            "strict_solo_counts": [
+              0,
+              473,
+              154,
+              0
+            ]
+          },
+          {
+            "common_valid_bins": 902,
+            "frame_end": 2707,
+            "frame_start": 1805,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.015679731965065002,
+              0.05506397783756256,
+              0.499106228351593,
+              0.0008613973623141646
+            ],
+            "quarter": 2,
+            "strict_solo_counts": [
+              5,
+              43,
+              452,
+              0
+            ]
+          },
+          {
+            "common_valid_bins": 893,
+            "frame_end": 3610,
+            "frame_start": 2707,
+            "mapping_not_refit_per_quarter": true,
+            "mean_mapped_native_probability": [
+              0.03653809800744057,
+              0.06124763935804367,
+              0.053238436579704285,
+              0.28060612082481384
+            ],
+            "quarter": 3,
+            "strict_solo_counts": [
+              24,
+              45,
+              16,
+              214
+            ]
+          }
+        ],
+        "collapse_flag": false,
+        "common_strict_solo_counts": [
+          33,
+          952,
+          622,
+          214
+        ],
+        "common_strict_solo_counts_uncertainty": "report_only_no_quality_threshold",
+        "common_valid_bins": 3597,
+        "emitted_clip_counts": {
+          "clip": 1e-12,
+          "clipped_high": 0,
+          "clipped_low": 0,
+          "values": 14440
+        },
+        "gt_activity_valid_bins": 3607,
+        "gt_strict_solo_counts": [
+          33,
+          952,
+          622,
+          224
+        ],
+        "logit_clip": 1e-12,
+        "logit_clip_applied_to_raw_targets": false,
+        "mapped_activity_bce": 0.09683193063241619,
+        "mapped_activity_brier": 0.023371740212429347,
+        "mapped_solo": {
+          "absent_slots": [],
+          "balanced_accuracy": 0.9188498477438329,
+          "class_balanced_conditional_log_loss": 0.38574978640450325,
+          "class_counts": [
+            33,
+            952,
+            622,
+            214
+          ],
+          "confusion": [
+            [
+              26,
+              4,
+              3,
+              0
+            ],
+            [
+              0,
+              874,
+              72,
+              6
+            ],
+            [
+              1,
+              18,
+              603,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              214
+            ]
+          ],
+          "first_slot0_vs_rest": {
+            "auc": 0.9680360653515016,
+            "class_balanced_binary_log_loss": 0.5889568384180601,
+            "n_rest": 1788,
+            "n_slot0": 33,
+            "ordinary_binary_log_loss": 0.026224281037499426
+          },
+          "observed_slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "ordinary_conditional_log_loss": 0.1877230287772209,
+          "ovr_auc": [
+            0.9680360653515016,
+            0.9868546382879965,
+            0.9862747359133683,
+            0.999965105932573
+          ],
+          "ovr_auc_denominators": [
+            {
+              "negative": 1788,
+              "positive": 33
+            },
+            {
+              "negative": 869,
+              "positive": 952
+            },
+            {
+              "negative": 1199,
+              "positive": 622
+            },
+            {
+              "negative": 1607,
+              "positive": 214
+            }
+          ],
+          "per_observed_slot_recall": [
+            0.7878787878787878,
+            0.9180672268907563,
+            0.9694533762057878,
+            1.0
+          ],
+          "recall_denominators": [
+            33,
+            952,
+            622,
+            214
+          ],
+          "solo_bins": 1821
+        },
+        "missing_or_nonemitted_bins": 0,
+        "not_human_identity_guarantee": true,
+        "not_per_chunk_remapping": true,
+        "oracle": {
+          "best": {
+            "masked_bce": 0.09683191776275635,
+            "permutation": [
+              2,
+              0,
+              1,
+              3
+            ]
+          },
+          "not_used_for_inference_or_selection": true,
+          "permutation_count": 24,
+          "role": "source_global_oracle_diagnostic_only"
+        },
+        "permutation": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "permutation_semantics": "gt_column_g_receives_native_column_permutation[g]",
+        "raw_index_activity_bce": 0.8168088622682104,
+        "second_best_margin_bce": 0.13757026195526123,
+        "slots": [
+          "FEE032",
+          "FEE029",
+          "FEE030",
+          "MEE031"
+        ],
+        "teacher_emitted_bins": 3610,
+        "teacher_support_valid_bins": 3600,
+        "threshold_0_5_on_raw_mapped_probabilities": {
+          "correct_single_active_fraction_on_strict_solo": 0.9022515101592532,
+          "not_physical_overlap_inference": true,
+          "predicted_active_count_distribution_on_common_valid": {
+            "0": 1683,
+            "1": 1885,
+            "2": 29,
+            "3": 0,
+            "4": 0
+          },
+          "predicted_exactly_one_active_fraction_on_strict_solo": 0.9522240527182867,
+          "threshold": 0.5
+        },
+        "tie_count": 1,
+        "tie_permutations": [
+          [
+            2,
+            0,
+            1,
+            3
+          ]
+        ]
+      },
+      "clock": {
+        "kind": "Windows QueryPerformanceCounter",
+        "orchestrator_perf_counter_s": 91.45857749999959,
+        "process_elapsed_s": 91.4267988,
+        "process_finish_qpc": 148284572197,
+        "process_start_qpc": 147370304209,
+        "qpf": 10000000
+      },
+      "command": [
+        "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+        "-m",
+        "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+        "--backend",
+        "vulkan",
+        "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-fit-targets-1\\sources\\ami_ES2008a\\input.wav"
+      ],
+      "cost": {
+        "gpu_memory": {
+          "counter": "GPU Process Memory(pid_NATIVE_*) Dedicated Usage",
+          "global_gpu_usage_used": false,
+          "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included.",
+          "peak_bytes": 376782848,
+          "samples": 90,
+          "status": "observed_process_counter"
+        },
+        "mel_full_diagnostic_us": 317049,
+        "memory_samples": 1814,
+        "native_peak_working_set_bytes_observed": 141709312,
+        "native_process_cpu_s": 7.21875,
+        "native_trace_timing_us": {
+          "frontend_us": {
+            "max_us": 2426,
+            "median_us": 1721,
+            "min_us": 595,
+            "samples": 602,
+            "sum_us": 1048837
+          },
+          "graph_a_us": {
+            "max_us": 7228,
+            "median_us": 2753,
+            "min_us": 2215,
+            "samples": 602,
+            "sum_us": 1652330
+          },
+          "graph_b_us": {
+            "max_us": 194318,
+            "median_us": 146027,
+            "min_us": 24562,
+            "samples": 602,
+            "sum_us": 87087414
+          },
+          "host_us": {
+            "max_us": 2527,
+            "median_us": 1509,
+            "min_us": 492,
+            "samples": 602,
+            "sum_us": 910576
+          },
+          "service_us": {
+            "max_us": 201388,
+            "median_us": 152340,
+            "min_us": 31008,
+            "samples": 602,
+            "sum_us": 90779472
+          }
+        },
+        "paired_peak_working_set_bytes_observed": 473526272,
+        "unpaced_not_live_availability": true,
+        "wrapper_cpu_s": 0.03125
+      },
+      "environment": {
+        "absent": {
+          "TRANSCRIBE_PSEM_EVENTS_TCP": true,
+          "TRANSCRIBE_PSEM_PACE_16KHZ": true,
+          "TRANSCRIBE_PSEM_PACE_FROM_SAMPLE": true,
+          "TRANSCRIBE_PSEM_PACE_UNTIL_SAMPLE": true,
+          "TRANSCRIBE_SORTFORMER_OFFLINE_DUMP": true
+        },
+        "effective_transcribe": {
+          "TRANSCRIBE_DUMP_DIR": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_streaming_student\\.stage-control\\issue-164-teacher-fit-targets-1\\sources\\ami_ES2008a\\dump",
+          "TRANSCRIBE_PSEM_CAUSAL_FRONTEND": "1",
+          "TRANSCRIBE_SORTFORMER_F32_HEAD": "1",
+          "TRANSCRIBE_SORTFORMER_STREAM_CHUNK_LEN": "6",
+          "TRANSCRIBE_SORTFORMER_STREAM_FIFO_LEN": "188",
+          "TRANSCRIBE_SORTFORMER_STREAM_LC": "1",
+          "TRANSCRIBE_SORTFORMER_STREAM_RC": "7",
+          "TRANSCRIBE_SORTFORMER_STREAM_SPKCACHE_LEN": "188",
+          "TRANSCRIBE_SORTFORMER_STREAM_UPDATE_PERIOD": "144",
+          "TRANSCRIBE_VK_NO_MUL_MAT_VEC": "1"
+        },
+        "other_inherited_backend_flags": {
+          "CUDA_VISIBLE_DEVICES": "",
+          "HIP_VISIBLE_DEVICES": "",
+          "VK_SDK_PATH": "C:\\VulkanSDK\\1.4.350.0"
+        },
+        "other_inherited_backend_flags_not_exhaustive_os_environment": true
+      },
+      "exit_code": 0,
+      "generation": "ami_ES2008a:unpaced-source-zero",
+      "prefix_export": {
+        "no_resampling_gain_or_renorm": true,
+        "pcm16_bit_exact": true,
+        "prefix_samples": 4620800,
+        "prepared_equals_pcm16_div_32768": true,
+        "source_channels": 1
+      },
+      "schema": "PSEM-TEACHER-FIT-SOURCE-RUN-1",
+      "source_id": "ami_ES2008a",
+      "teacher": {
+        "chunk_count": 602,
+        "missing_frames": 0,
+        "n_frames": 3610,
+        "probabilities_sha256": "1f73053a2542b9109a7c8e0b211ff594abcc4c28f63b5b1433e9cd288c7b9591",
+        "sidecar_sha256": "e7b47eef6340cac512629f74865391fb14504548eabbdd2c3fa0f55fd61558b1",
+        "support_incomplete_count": 10,
+        "trace_sha256": "876635623b80c41c05d67884a384159724d1c5802e05a48a2afdc11a655076c0",
+        "used_n": 3610
+      }
+    }
+  ],
+  "status": "completed"
+}
