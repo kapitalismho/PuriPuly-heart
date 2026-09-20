@@ -6,8 +6,8 @@
     "publication_root": "experiments/psem_streaming_student",
     "tracked_files_before_cleanup": 99,
     "retained_result_files": 16,
-    "archived_removed_tracked_files": 82,
-    "public_files_after_cleanup": 18,
+    "archived_removed_tracked_files": 81,
+    "public_files_after_cleanup": 19,
     "no_history_rewrite": true,
     "past_blobs_remain_in_git_history": true,
     "no_git_index_write_commit_or_push": true,
@@ -115,6 +115,13 @@
     ],
     "root_infrastructure": [
       {
+        "path": ".gitattributes",
+        "sha256": "dbffc59a1d850e412a3b608436ed5968de832c4e7a333380c28b258d8aaf4661",
+        "bytes": 59,
+        "valid_json": null,
+        "unchanged": true
+      },
+      {
         "path": ".gitignore",
         "sha256": "a3dee005189383639b3043ab211586e6421ce5aa524cd3c7bdaddd6ddcb1ba1c",
         "bytes": 195,
@@ -123,30 +130,23 @@
     ],
     "publication_index": "PUBLICATION_INDEX.json",
     "retained_result_sha256_and_size_verified": true,
-    "retained_result_bytes_total": 1241614
+    "retained_result_bytes_total": 1241614,
+    "root_infrastructure_note": "Retain root .gitattributes byte-identically; its unused attribute extensions are harmless historical infrastructure and its unset-text rules preserve report bytes."
   },
   "archival": {
     "local_retrieval_directory": ".stage-control/publication-archive-4f1c0b07/tracked_files",
     "archive_is_private_local_ignored_state": true,
     "archive_is_uploaded": false,
-    "archived_removed_files_count": 82,
-    "archived_removed_bytes_total": 2261417,
+    "archived_removed_files_count": 81,
+    "archived_removed_bytes_total": 2261358,
     "category_counts": {
-      "configuration_or_plan": 17,
+      "configuration_or_plan": 16,
       "historical_report_or_verification": 13,
       "executable": 13,
       "raw_or_intermediate": 38,
       "historical_source_or_metadata": 1
     },
     "archived_tracked_files": [
-      {
-        "path": ".gitattributes",
-        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/.gitattributes",
-        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/.gitattributes",
-        "sha256": "dbffc59a1d850e412a3b608436ed5968de832c4e7a333380c28b258d8aaf4661",
-        "bytes": 59,
-        "category": "configuration_or_plan"
-      },
       {
         "path": "FINDINGS.json",
         "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/FINDINGS.json",
@@ -823,7 +823,6 @@
     ],
     "historical_source_config_raw_paths": {
       "all_removed_tracked_paths": [
-        ".gitattributes",
         "FINDINGS.json",
         "GT_CHECKPOINT_RESULT.json",
         "GT_PROBE_RESULT.json",
@@ -1131,6 +1130,10 @@
         "historical_source_config_raw_links": [],
         "private_stage_control_links_present": false
       }
+    ],
+    "current_infrastructure_files": [
+      ".gitattributes",
+      ".gitignore"
     ]
   },
   "interpretation": {
@@ -1169,6 +1172,7 @@
   },
   "postcleanup_inventory": {
     "public_files_expected": [
+      ".gitattributes",
       ".gitignore",
       "BASELINE.md",
       "GT_KD_DIAGNOSTIC_RESULT.json",
@@ -1210,6 +1214,15 @@
     "root_gitignore_byte_identical": true,
     "actual_archive_readback_probe_is_proof": true,
     "measured_results_changed": false,
-    "production_architecture_changed": false
+    "production_architecture_changed": false,
+    "root_gitattributes_byte_identical_restored": true,
+    "root_attributes_preserve_report_bytes": true,
+    "current_retained_and_index_eventual_git_blob_bytes_verified": true,
+    "eventual_git_blob_probe": {
+      "method": "git hash-object --no-filters compared with git hash-object --path=<repo-relative-path>",
+      "checked_files": 18,
+      "includes": "16 retained results, PUBLICATION_INDEX.json, and root .gitattributes",
+      "all_raw_and_attribute_clean_hashes_equal": true
+    }
   }
 }
