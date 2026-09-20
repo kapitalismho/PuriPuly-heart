@@ -92,6 +92,8 @@ async def _await_download_cleanup(
     cancel_event: threading.Event | None,
 ) -> Path:
     task = asyncio.create_task(download)
+    settled = asyncio.Event()
+    task.add_done_callback(lambda _task: settled.set())
     try:
         return await asyncio.shield(task)
     except asyncio.CancelledError as cancellation:
@@ -104,13 +106,9 @@ async def _await_download_cleanup(
             task.cancel()
         while not task.done():
             try:
-                await asyncio.shield(task)
+                await settled.wait()
             except asyncio.CancelledError:
                 continue
-            except BaseException:
-                if task.done():
-                    break
-                raise
         try:
             task.result()
         except asyncio.CancelledError, LocalSTTDownloadPortCancelled:
