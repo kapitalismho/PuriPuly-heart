@@ -1,0 +1,1215 @@
+{
+  "schema": "PSEM-ISSUE-164-PUBLICATION-INDEX-1",
+  "purpose": "Report-only archival cleanup for experiments/psem_streaming_student; measured results and production architecture are unchanged.",
+  "precleanup_commit": "4f1c0b070fd413a8bbafc64a8b821a3c3688e87c",
+  "scope": {
+    "publication_root": "experiments/psem_streaming_student",
+    "tracked_files_before_cleanup": 99,
+    "retained_result_files": 16,
+    "archived_removed_tracked_files": 82,
+    "public_files_after_cleanup": 18,
+    "no_history_rewrite": true,
+    "past_blobs_remain_in_git_history": true,
+    "no_git_index_write_commit_or_push": true,
+    "no_model_or_api_execution": true,
+    "no_test_suite_required": true
+  },
+  "report_inventory": {
+    "retained_results": [
+      {
+        "path": "BASELINE.md",
+        "sha256": "e752abd9b872e789003b64fb97b0f9a28fdb461d0cf060e5d3eb11f7267d69ad",
+        "bytes": 35052,
+        "valid_json": null
+      },
+      {
+        "path": "GT_KD_DIAGNOSTIC_RESULT.json",
+        "sha256": "60b8677a126f8e5e576f2006d6ead87efa489eb1dc104fef5bd636af1296d43a",
+        "bytes": 204644,
+        "valid_json": true
+      },
+      {
+        "path": "GT_KD_POLICY_SHADOW_RESULT.json",
+        "sha256": "c2e28329aa6194bf2ea46490025ba1926af2eb6b04b7c08d31e7d74989512890",
+        "bytes": 28008,
+        "valid_json": true
+      },
+      {
+        "path": "GT_KD_RESULT.json",
+        "sha256": "beb81d77a32a85913531c74ebebcc179bc38f884723d3d8730186924818a67f0",
+        "bytes": 49014,
+        "valid_json": true
+      },
+      {
+        "path": "GT_PILOT_RESULT.json",
+        "sha256": "716604cbe1ff4cf404a2499bcab55785649a67d74be66a828c01d9463a9bfbc3",
+        "bytes": 208231,
+        "valid_json": true
+      },
+      {
+        "path": "GT_SOLO_CONTRAST_DIAGNOSTIC_RESULT.json",
+        "sha256": "759bdfbafd286086d64cf3ec9e9db620fbbc430c8c7fea4a93d8c6d2e0694228",
+        "bytes": 202049,
+        "valid_json": true
+      },
+      {
+        "path": "GT_SOLO_CONTRAST_RESULT.json",
+        "sha256": "ad6dfacefe476dffc76baf64422abb096f970727d8eef38147c0eae8d0a78154",
+        "bytes": 19312,
+        "valid_json": true
+      },
+      {
+        "path": "RESEARCH_DECISION.json",
+        "sha256": "92b4f0058202e60b03f6aa0ed2288acfbafa22f560d1a3c22acae5b3fdb0979b",
+        "bytes": 9688,
+        "valid_json": true
+      },
+      {
+        "path": "SPEAKER_SCORE_DIAGNOSTIC_RESULT.json",
+        "sha256": "db7366e17ba2ad213ec812b3e05ae593a6a590c6f251fbf5cea83bd187b0a796",
+        "bytes": 171213,
+        "valid_json": true
+      },
+      {
+        "path": "TEACHER_FIT_TARGET_RESULT.json",
+        "sha256": "49cd36a2590786c361e58728549aafa9c95ccecba934037186bebc08b141c4e9",
+        "bytes": 132209,
+        "valid_json": true
+      },
+      {
+        "path": "TEACHER_SAVED_SCORE_DIAGNOSTIC_RESULT.json",
+        "sha256": "631d2cadf3fd03f70c082f5a95f63236148c418738ec5c92f7098be5c99ee04c",
+        "bytes": 110077,
+        "valid_json": true
+      },
+      {
+        "path": "cost_rerun/FINDINGS.json",
+        "sha256": "f7978671ec38353c0171238d4512a61ddf15fa509ade0ac87a6c518cbe9d8301",
+        "bytes": 24218,
+        "valid_json": true
+      },
+      {
+        "path": "cost_rerun/RESULT.json",
+        "sha256": "f0f032494ed0718c2edcd23357c0fd0d99fef3a390ba85181eb0d50638356656",
+        "bytes": 30461,
+        "valid_json": true
+      },
+      {
+        "path": "environment/ENVIRONMENT.json",
+        "sha256": "d1b901759487e340ed412d4d2eb3cf0d823cb416043d864a51d38f1d59be59e9",
+        "bytes": 6812,
+        "valid_json": true
+      },
+      {
+        "path": "environment/ROCM10_BACKWARD_RESULT.json",
+        "sha256": "05037558f275871cbd5c5f1f001b07b9a9b86ff238a859dc8029f115e54f737d",
+        "bytes": 7258,
+        "valid_json": true
+      },
+      {
+        "path": "environment/ROCM10_INFERENCE_RESULT.json",
+        "sha256": "97c61261e87592fd24083051fc8214de7dea944be51548d191cf6435c39d1a09",
+        "bytes": 3368,
+        "valid_json": true
+      }
+    ],
+    "root_infrastructure": [
+      {
+        "path": ".gitignore",
+        "sha256": "a3dee005189383639b3043ab211586e6421ce5aa524cd3c7bdaddd6ddcb1ba1c",
+        "bytes": 195,
+        "valid_json": null
+      }
+    ],
+    "publication_index": "PUBLICATION_INDEX.json",
+    "retained_result_sha256_and_size_verified": true,
+    "retained_result_bytes_total": 1241614
+  },
+  "archival": {
+    "local_retrieval_directory": ".stage-control/publication-archive-4f1c0b07/tracked_files",
+    "archive_is_private_local_ignored_state": true,
+    "archive_is_uploaded": false,
+    "archived_removed_files_count": 82,
+    "archived_removed_bytes_total": 2261417,
+    "category_counts": {
+      "configuration_or_plan": 17,
+      "historical_report_or_verification": 13,
+      "executable": 13,
+      "raw_or_intermediate": 38,
+      "historical_source_or_metadata": 1
+    },
+    "archived_tracked_files": [
+      {
+        "path": ".gitattributes",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/.gitattributes",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/.gitattributes",
+        "sha256": "dbffc59a1d850e412a3b608436ed5968de832c4e7a333380c28b258d8aaf4661",
+        "bytes": 59,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "FINDINGS.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/FINDINGS.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/FINDINGS.json",
+        "sha256": "474b13272db4fa3a9d9952136d1259835af1aa5bf5069fcb0fba5939e60ebab9",
+        "bytes": 20165,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "GT_CHECKPOINT_RESULT.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/GT_CHECKPOINT_RESULT.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/GT_CHECKPOINT_RESULT.json",
+        "sha256": "3a172eeb237c8b23fe91b343b0167dcaa11f642c4ee61a2f2d3fdecf12f4bfd8",
+        "bytes": 8489,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "GT_PROBE_RESULT.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/GT_PROBE_RESULT.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/GT_PROBE_RESULT.json",
+        "sha256": "2505245419ed1696afecca931ad97998b8168bae802fbcdbc8439863b059cfdd",
+        "bytes": 6258,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "INSTRUMENTATION_SMOKE.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/INSTRUMENTATION_SMOKE.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/INSTRUMENTATION_SMOKE.json",
+        "sha256": "b470e03343974386a0e980015fe374b3a76bae63dc08ac354844d6ec63c8c97a",
+        "bytes": 850,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "READINESS.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/READINESS.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/READINESS.json",
+        "sha256": "5102779b36cd6238cada64b85b3709da7bd29882df03c599de3e5682ed4bc538",
+        "bytes": 470,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "REPAIR_CHECKS.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/REPAIR_CHECKS.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/REPAIR_CHECKS.json",
+        "sha256": "8b27255e1c96a56b39009ed2f4103589417544fc5ad2db2c793a3b8c10707db8",
+        "bytes": 651,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "REPORTING_REPAIR_VERIFICATION.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/REPORTING_REPAIR_VERIFICATION.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/REPORTING_REPAIR_VERIFICATION.json",
+        "sha256": "11c0b472237f2823fea07279df25fbd50a6aa4256e87e30eaee534c74f5b7828",
+        "bytes": 1613,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "RESULT.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/RESULT.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/RESULT.json",
+        "sha256": "6842013d8bff6e81d4ad779b76750a5c0514f9d004ac57c95982162d36f84f88",
+        "bytes": 25864,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "STAGED_CONTROL_VERIFICATION.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/STAGED_CONTROL_VERIFICATION.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/STAGED_CONTROL_VERIFICATION.json",
+        "sha256": "6d15ac4e697df7ef5b11ec425018e2d020a8920109bbbbfbac72095175a0ff37",
+        "bytes": 5078,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "VERIFICATION.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/VERIFICATION.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/VERIFICATION.json",
+        "sha256": "0cc01e4d4f70ac3b522f0a1a57c74b5f488b5b6f1c92fd839fc61a622014dcdb",
+        "bytes": 1148,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "analyze_baseline.py",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/analyze_baseline.py",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/analyze_baseline.py",
+        "sha256": "5cd695d0ee7dda89cd90bcf26edc290d5e284f1cfe3b10462245b48f4cc50a44",
+        "bytes": 20827,
+        "category": "executable"
+      },
+      {
+        "path": "baseline_config.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/baseline_config.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/baseline_config.json",
+        "sha256": "74662984d0912f4cda350554f3a8b254dedca6862a6e33703d8c7469a81696c2",
+        "bytes": 2527,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "cost_rerun/PREEXECUTION_SMOKE.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/PREEXECUTION_SMOKE.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/PREEXECUTION_SMOKE.json",
+        "sha256": "39ea7fe76a2d36e510be747afc614c3dec88a8e2e278a1a3b26764de3d07e5a8",
+        "bytes": 1256,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "cost_rerun/READINESS.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/READINESS.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/READINESS.json",
+        "sha256": "74e668ded0efefd4c9164fc260861ab45ee1754eed654533b7d4f7671e54e1cf",
+        "bytes": 1507,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "cost_rerun/VERIFICATION.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/VERIFICATION.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/VERIFICATION.json",
+        "sha256": "15728326c2ed269c0f6248436bad0f071450e52692bcb4b00b4430e427631f6a",
+        "bytes": 1522,
+        "category": "historical_report_or_verification"
+      },
+      {
+        "path": "cost_rerun/runs/EN2009d/RESULT.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/EN2009d/RESULT.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/EN2009d/RESULT.json",
+        "sha256": "020b0821b93b4d2f817601975c7c6093d9f12556c47308127112b1add41f9792",
+        "bytes": 20524,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/EN2009d/dump/diar.hidden.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/EN2009d/dump/diar.hidden.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/EN2009d/dump/diar.hidden.json",
+        "sha256": "6e8f9249d51094439d8b62ae160e9f2aabcd4a5df070b5a98718a8865154c830",
+        "bytes": 225,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/EN2009d/dump/diar.logits.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/EN2009d/dump/diar.logits.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/EN2009d/dump/diar.logits.json",
+        "sha256": "3d9212af6f6449d5558ad2d8b109e7c66d2ce44809c6b0b4c9e3c0dfb2baea70",
+        "bytes": 220,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/EN2009d/dump/diar.probs.f32",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/EN2009d/dump/diar.probs.f32",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/EN2009d/dump/diar.probs.f32",
+        "sha256": "c960162899ac6c3f2b5adeba121686e227daa0b361dabf95a3530e81bcf09a8f",
+        "bytes": 9600,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/EN2009d/dump/diar.probs.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/EN2009d/dump/diar.probs.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/EN2009d/dump/diar.probs.json",
+        "sha256": "4d0f93f2c99789effc1d00a242d45b3539a47e65bedd39c4e08fcb2b030d975f",
+        "bytes": 225,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/EN2009d/dump/diar.trace.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/EN2009d/dump/diar.trace.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/EN2009d/dump/diar.trace.json",
+        "sha256": "e086d9d144ca5f748f09e94586658a4f9c4503344aadc1550cba782c3908880d",
+        "bytes": 46019,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/EN2009d/gpu-process-memory.csv",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/EN2009d/gpu-process-memory.csv",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/EN2009d/gpu-process-memory.csv",
+        "sha256": "50735aa93305f11bcb589299d2651528385a0b1689c431a5c83c8fbb37c70c89",
+        "bytes": 1991,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/EN2009d/native-events.jsonl.gz",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/EN2009d/native-events.jsonl.gz",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/EN2009d/native-events.jsonl.gz",
+        "sha256": "2210adb95988a2c520706ae053ec921a943ef78f2ba385c17b36f7ace26d7a88",
+        "bytes": 18465,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/EN2009d/process-memory-samples.csv",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/EN2009d/process-memory-samples.csv",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/EN2009d/process-memory-samples.csv",
+        "sha256": "e6ca75ff5af70fc523a7e8f26a822bc010c85025d5cdfe71a82daa53e09fd101",
+        "bytes": 155393,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/EN2009d/receiver-assignments.jsonl.gz",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/EN2009d/receiver-assignments.jsonl.gz",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/EN2009d/receiver-assignments.jsonl.gz",
+        "sha256": "7e88703893234b1cb0f108240a9352124624b3c17406afd1b697bf397ad894b4",
+        "bytes": 5517,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/ES2009d/RESULT.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/ES2009d/RESULT.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/ES2009d/RESULT.json",
+        "sha256": "08a06a2ce1d03111b5e4eefcde3518d322c68620e3bd433ebc65bd8e857c513d",
+        "bytes": 22919,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/ES2009d/dump/diar.hidden.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/ES2009d/dump/diar.hidden.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/ES2009d/dump/diar.hidden.json",
+        "sha256": "ff40216172f0c3e883699ac4013bda5eb2c23d16a5b1631c6cc281b23a943605",
+        "bytes": 226,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/ES2009d/dump/diar.logits.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/ES2009d/dump/diar.logits.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/ES2009d/dump/diar.logits.json",
+        "sha256": "f43444de3044c595eadc9eeb9d1629a692d7af7c88c9e529f9be75367cd2a32e",
+        "bytes": 222,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/ES2009d/dump/diar.probs.f32",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/ES2009d/dump/diar.probs.f32",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/ES2009d/dump/diar.probs.f32",
+        "sha256": "0a2e3d23f1afe17f995c74fa6fe31b643c5f2041cbc317952349e22fe7097815",
+        "bytes": 39168,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/ES2009d/dump/diar.probs.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/ES2009d/dump/diar.probs.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/ES2009d/dump/diar.probs.json",
+        "sha256": "982f48b2f1107a1db18c3a174075823881a480ad4b55f1514968558e5b115dea",
+        "bytes": 226,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/ES2009d/dump/diar.trace.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/ES2009d/dump/diar.trace.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/ES2009d/dump/diar.trace.json",
+        "sha256": "9c8b1bfc783c022e4f9b0165b883571b664bae47d085c259f8db6f4846c17e4e",
+        "bytes": 190637,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/ES2009d/gpu-process-memory.csv",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/ES2009d/gpu-process-memory.csv",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/ES2009d/gpu-process-memory.csv",
+        "sha256": "fd787cc299db7c202f1e4c343a9539caa714bde2b94f6707b1be62f45019c03e",
+        "bytes": 7685,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/ES2009d/native-events.jsonl.gz",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/ES2009d/native-events.jsonl.gz",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/ES2009d/native-events.jsonl.gz",
+        "sha256": "342f83cd28ea4025309b38e72498b3922e277ab100777e3531bee5866e5e6656",
+        "bytes": 69802,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/ES2009d/process-memory-samples.csv",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/ES2009d/process-memory-samples.csv",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/ES2009d/process-memory-samples.csv",
+        "sha256": "5e78b8ab35c0d6a9e118401b2ecd01c0e6af9c8c789c4f0b7931e450779fa285",
+        "bytes": 586005,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun/runs/ES2009d/receiver-assignments.jsonl.gz",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun/runs/ES2009d/receiver-assignments.jsonl.gz",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun/runs/ES2009d/receiver-assignments.jsonl.gz",
+        "sha256": "585b3810bd81c1a8d0988c5b148d4629d28d29834f6489e6305bab2103327a09",
+        "bytes": 12810,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "cost_rerun_config.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/cost_rerun_config.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/cost_rerun_config.json",
+        "sha256": "13ef051d6243c8c2d0ece46580cb46a5407e08a61bccbf06f56345fca5a53c20",
+        "bytes": 2911,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "environment/.gitattributes",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/environment/.gitattributes",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/environment/.gitattributes",
+        "sha256": "1d5d71dcc6ccd28ab46a335349ecc74742ca4b81f4fcad212f8d134f70f1f13e",
+        "bytes": 17,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "environment/ENVIRONMENT_ROCM_7_2_1_HISTORICAL.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/environment/ENVIRONMENT_ROCM_7_2_1_HISTORICAL.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/environment/ENVIRONMENT_ROCM_7_2_1_HISTORICAL.json",
+        "sha256": "b644abd0cf18b761a61d5a058325561ae7df73b536e3432d8e917e227a2d7e11",
+        "bytes": 9550,
+        "category": "historical_source_or_metadata"
+      },
+      {
+        "path": "environment/gpu_backend_probe.py",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/environment/gpu_backend_probe.py",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/environment/gpu_backend_probe.py",
+        "sha256": "bc71f7b05acb62b1d3afff657800716cea31bbaadeda6fa7b29e458b62c3ac75",
+        "bytes": 2208,
+        "category": "executable"
+      },
+      {
+        "path": "environment/requirements-rocm-7.2.1-historical.lock",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/environment/requirements-rocm-7.2.1-historical.lock",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/environment/requirements-rocm-7.2.1-historical.lock",
+        "sha256": "98ad913028fd46ab1bafa0545e90ee731d6c2b1ed65f62baf8cc9793ecf1ad13",
+        "bytes": 243,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "environment/requirements.lock",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/environment/requirements.lock",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/environment/requirements.lock",
+        "sha256": "c4c47933b3427c70684dfe22d28ce071051998232aae9495acdcf3ed0df3528f",
+        "bytes": 444,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "environment/run_backend_probe.sh",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/environment/run_backend_probe.sh",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/environment/run_backend_probe.sh",
+        "sha256": "5134a91540e18bb8f5d9ab12666679fae4eaae05b3bc4c1e48fe60786cb3416f",
+        "bytes": 379,
+        "category": "executable"
+      },
+      {
+        "path": "gt_kd_config.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/gt_kd_config.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/gt_kd_config.json",
+        "sha256": "c8abfb814f27a65160c0a52e5048e25d40364250a5c632d172804b8943410e37",
+        "bytes": 17089,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "gt_pilot.py",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/gt_pilot.py",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/gt_pilot.py",
+        "sha256": "528f8410d54269ff64d438d0f9dcff7660e50f552a989f9aae140d5cca6748c4",
+        "bytes": 167802,
+        "category": "executable"
+      },
+      {
+        "path": "gt_pilot_config.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/gt_pilot_config.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/gt_pilot_config.json",
+        "sha256": "e0c0e903177888c205f43abfa7b9ca7d6b3b89c9e7d09269e6bc30db1022ca0e",
+        "bytes": 15653,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "gt_pilot_stage_plan.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/gt_pilot_stage_plan.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/gt_pilot_stage_plan.json",
+        "sha256": "2b18a6fb418e45f9dd38997ad589766c5481fc9ca1c7210ae17b87104cded633",
+        "bytes": 3851,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "gt_probe.py",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/gt_probe.py",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/gt_probe.py",
+        "sha256": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
+        "bytes": 57536,
+        "category": "executable"
+      },
+      {
+        "path": "gt_probe_checkpoint_config.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/gt_probe_checkpoint_config.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/gt_probe_checkpoint_config.json",
+        "sha256": "e5cbd5f034070445a5dd9cc871387337349a8a1e605b65b0a1cdd563903103f3",
+        "bytes": 4142,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "gt_probe_checkpoint_plan.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/gt_probe_checkpoint_plan.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/gt_probe_checkpoint_plan.json",
+        "sha256": "08417fa24ab022ae33cccfcce06a30103378ecc343440fa784ac8a5c4cbacdda",
+        "bytes": 1344,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "gt_probe_config.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/gt_probe_config.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/gt_probe_config.json",
+        "sha256": "26b31342161b014fa4a6ccd61d0028d73c501e6ccb56e368ea494f49a6084a10",
+        "bytes": 3742,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "gt_probe_continuation_plan.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/gt_probe_continuation_plan.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/gt_probe_continuation_plan.json",
+        "sha256": "6f15b334df07df6d80b7dfb0231d62488c04690dd8d985b9bd85251816798b74",
+        "bytes": 1311,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "gt_probe_stage_plan.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/gt_probe_stage_plan.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/gt_probe_stage_plan.json",
+        "sha256": "bd43948fa5a21fe14f5119d403cd371ed46a6233d2b3f4cbc9cac46d0ee30732",
+        "bytes": 1727,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "gt_solo_contrast_config.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/gt_solo_contrast_config.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/gt_solo_contrast_config.json",
+        "sha256": "a9972a7cc6d3e92e6923a213b947d63ab2aa746970edadae02fc4e7ca36901f4",
+        "bytes": 15854,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "run_baseline.py",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/run_baseline.py",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/run_baseline.py",
+        "sha256": "3f7ee8a924bdb5e7ad848d2e1549df7e4f3ec06b2ef1c22e61213e5a3e9ee8c9",
+        "bytes": 56733,
+        "category": "executable"
+      },
+      {
+        "path": "run_gt_pilot.sh",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/run_gt_pilot.sh",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/run_gt_pilot.sh",
+        "sha256": "526e7a33ff295cd4d2b66f2dbb967f18091b2b763c469e4bb7ebc455945f9654",
+        "bytes": 812,
+        "category": "executable"
+      },
+      {
+        "path": "run_gt_probe.sh",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/run_gt_probe.sh",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/run_gt_probe.sh",
+        "sha256": "2be4fa5d7c87db01c645fc42374ec45cf881e0c92047b63f50f90c8993fc7ec4",
+        "bytes": 799,
+        "category": "executable"
+      },
+      {
+        "path": "runs/EN2009d/RESULT.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/EN2009d/RESULT.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/EN2009d/RESULT.json",
+        "sha256": "7c3ebba202e553b6e1cb2055bb79014b0e40bfea8e7d2e62eecf23966c71ad2b",
+        "bytes": 17556,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/EN2009d/dump/diar.hidden.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/EN2009d/dump/diar.hidden.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/EN2009d/dump/diar.hidden.json",
+        "sha256": "6e8f9249d51094439d8b62ae160e9f2aabcd4a5df070b5a98718a8865154c830",
+        "bytes": 225,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/EN2009d/dump/diar.logits.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/EN2009d/dump/diar.logits.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/EN2009d/dump/diar.logits.json",
+        "sha256": "3d9212af6f6449d5558ad2d8b109e7c66d2ce44809c6b0b4c9e3c0dfb2baea70",
+        "bytes": 220,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/EN2009d/dump/diar.probs.f32",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/EN2009d/dump/diar.probs.f32",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/EN2009d/dump/diar.probs.f32",
+        "sha256": "c960162899ac6c3f2b5adeba121686e227daa0b361dabf95a3530e81bcf09a8f",
+        "bytes": 9600,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/EN2009d/dump/diar.probs.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/EN2009d/dump/diar.probs.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/EN2009d/dump/diar.probs.json",
+        "sha256": "4d0f93f2c99789effc1d00a242d45b3539a47e65bedd39c4e08fcb2b030d975f",
+        "bytes": 225,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/EN2009d/dump/diar.trace.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/EN2009d/dump/diar.trace.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/EN2009d/dump/diar.trace.json",
+        "sha256": "fd4419f3bc59e43d5fe6e359e2d5f71686d20cd3e9001fc3e07b9fc88034b1c7",
+        "bytes": 46026,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/EN2009d/gpu-process-memory.csv",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/EN2009d/gpu-process-memory.csv",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/EN2009d/gpu-process-memory.csv",
+        "sha256": "14caa5d013d912e3dfcf60291ae60c52f85eb7936ae29cced642d68053efe878",
+        "bytes": 1991,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/EN2009d/native-events.jsonl.gz",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/EN2009d/native-events.jsonl.gz",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/EN2009d/native-events.jsonl.gz",
+        "sha256": "b6882448ed9ba96c9d26024f139437c8b68574f7154ceb2dac067e1798a90f09",
+        "bytes": 18476,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/EN2009d/receiver-assignments.jsonl.gz",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/EN2009d/receiver-assignments.jsonl.gz",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/EN2009d/receiver-assignments.jsonl.gz",
+        "sha256": "d96736826df9b36e0320b827ea9fd45554337fa7052c5293aeb1eaeab92553f6",
+        "bytes": 5501,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/ES2009d/RESULT.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/ES2009d/RESULT.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/ES2009d/RESULT.json",
+        "sha256": "183896fee91feee11a1ddeb82ca12f2f67155d0df7ee4f35029304c31783fd92",
+        "bytes": 19956,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/ES2009d/dump/diar.hidden.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/ES2009d/dump/diar.hidden.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/ES2009d/dump/diar.hidden.json",
+        "sha256": "ff40216172f0c3e883699ac4013bda5eb2c23d16a5b1631c6cc281b23a943605",
+        "bytes": 226,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/ES2009d/dump/diar.logits.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/ES2009d/dump/diar.logits.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/ES2009d/dump/diar.logits.json",
+        "sha256": "f43444de3044c595eadc9eeb9d1629a692d7af7c88c9e529f9be75367cd2a32e",
+        "bytes": 222,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/ES2009d/dump/diar.probs.f32",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/ES2009d/dump/diar.probs.f32",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/ES2009d/dump/diar.probs.f32",
+        "sha256": "0a2e3d23f1afe17f995c74fa6fe31b643c5f2041cbc317952349e22fe7097815",
+        "bytes": 39168,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/ES2009d/dump/diar.probs.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/ES2009d/dump/diar.probs.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/ES2009d/dump/diar.probs.json",
+        "sha256": "982f48b2f1107a1db18c3a174075823881a480ad4b55f1514968558e5b115dea",
+        "bytes": 226,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/ES2009d/dump/diar.trace.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/ES2009d/dump/diar.trace.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/ES2009d/dump/diar.trace.json",
+        "sha256": "5440ca25ada1aa6051df395943c30c098c9708a10443caf1e9cad1b5a5fcdc7f",
+        "bytes": 190642,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/ES2009d/gpu-process-memory.csv",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/ES2009d/gpu-process-memory.csv",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/ES2009d/gpu-process-memory.csv",
+        "sha256": "b30cb83876bd7ec033772a5d8bef9ff185385e371791142b11f016bca967d1f9",
+        "bytes": 7684,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/ES2009d/native-events.jsonl.gz",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/ES2009d/native-events.jsonl.gz",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/ES2009d/native-events.jsonl.gz",
+        "sha256": "11fc95b793de02a12c6a6bf509352809379810746d3bc7157a067adda585f007",
+        "bytes": 69804,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "runs/ES2009d/receiver-assignments.jsonl.gz",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/runs/ES2009d/receiver-assignments.jsonl.gz",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/runs/ES2009d/receiver-assignments.jsonl.gz",
+        "sha256": "2e998a2d089860f0e208278a2ec662e78ed53f19d51aec76eab200304d759c89",
+        "bytes": 12806,
+        "category": "raw_or_intermediate"
+      },
+      {
+        "path": "speaker_score_diagnostic.py",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/speaker_score_diagnostic.py",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/speaker_score_diagnostic.py",
+        "sha256": "b8880483ebd3528fb31627913124f8755720e11e1c821537ffdfbb5dcb3f360d",
+        "bytes": 38029,
+        "category": "executable"
+      },
+      {
+        "path": "stage_plan.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/stage_plan.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/stage_plan.json",
+        "sha256": "5d8819e3d505a583437dc0a6097dafe0bf836aeb6460b4b41425b4f5e9aa007a",
+        "bytes": 646,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "stages.py",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/stages.py",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/stages.py",
+        "sha256": "c5ceb3934428b4ecae24e2c2905281ff7483ec3ccc09d2a816b3b0e2e9be077b",
+        "bytes": 23450,
+        "category": "executable"
+      },
+      {
+        "path": "student.py",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/student.py",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/student.py",
+        "sha256": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d",
+        "bytes": 7934,
+        "category": "executable"
+      },
+      {
+        "path": "teacher_fit.py",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/teacher_fit.py",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/teacher_fit.py",
+        "sha256": "59b0953dac575ed18fd326845006d426ebd01293856097abda7eae7a7df64e14",
+        "bytes": 80497,
+        "category": "executable"
+      },
+      {
+        "path": "teacher_fit_config.json",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/teacher_fit_config.json",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/teacher_fit_config.json",
+        "sha256": "10967a169772cf1328ee9a1e3be3d108291cbdb678f72c3a00c407f70169115d",
+        "bytes": 7084,
+        "category": "configuration_or_plan"
+      },
+      {
+        "path": "tests/test_stages.py",
+        "archive_path": ".stage-control/publication-archive-4f1c0b07/tracked_files/tests/test_stages.py",
+        "git_show_path": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:experiments/psem_streaming_student/tests/test_stages.py",
+        "sha256": "caadaf113017cefae5efa7ab23038204bf5fe3b81d1f30797f359083535faab1",
+        "bytes": 12913,
+        "category": "executable"
+      }
+    ],
+    "removed_tracked_inputs_retrieval": {
+      "local_archive": "Use the local_retrieval_directory above with each archive_path.",
+      "git_history": "git show 4f1c0b070fd413a8bbafc64a8b821a3c3688e87c:<repo-relative-path>",
+      "hashes_are_not_public_artifacts": true
+    }
+  },
+  "link_classification": {
+    "current_report_links": [
+      "BASELINE.md",
+      "GT_KD_DIAGNOSTIC_RESULT.json",
+      "GT_KD_POLICY_SHADOW_RESULT.json",
+      "GT_KD_RESULT.json",
+      "GT_PILOT_RESULT.json",
+      "GT_SOLO_CONTRAST_DIAGNOSTIC_RESULT.json",
+      "GT_SOLO_CONTRAST_RESULT.json",
+      "RESEARCH_DECISION.json",
+      "SPEAKER_SCORE_DIAGNOSTIC_RESULT.json",
+      "TEACHER_FIT_TARGET_RESULT.json",
+      "TEACHER_SAVED_SCORE_DIAGNOSTIC_RESULT.json",
+      "cost_rerun/FINDINGS.json",
+      "cost_rerun/RESULT.json",
+      "environment/ENVIRONMENT.json",
+      "environment/ROCM10_BACKWARD_RESULT.json",
+      "environment/ROCM10_INFERENCE_RESULT.json"
+    ],
+    "historical_source_config_raw_paths": {
+      "all_removed_tracked_paths": [
+        ".gitattributes",
+        "FINDINGS.json",
+        "GT_CHECKPOINT_RESULT.json",
+        "GT_PROBE_RESULT.json",
+        "INSTRUMENTATION_SMOKE.json",
+        "READINESS.json",
+        "REPAIR_CHECKS.json",
+        "REPORTING_REPAIR_VERIFICATION.json",
+        "RESULT.json",
+        "STAGED_CONTROL_VERIFICATION.json",
+        "VERIFICATION.json",
+        "analyze_baseline.py",
+        "baseline_config.json",
+        "cost_rerun/PREEXECUTION_SMOKE.json",
+        "cost_rerun/READINESS.json",
+        "cost_rerun/VERIFICATION.json",
+        "cost_rerun/runs/EN2009d/RESULT.json",
+        "cost_rerun/runs/EN2009d/dump/diar.hidden.json",
+        "cost_rerun/runs/EN2009d/dump/diar.logits.json",
+        "cost_rerun/runs/EN2009d/dump/diar.probs.f32",
+        "cost_rerun/runs/EN2009d/dump/diar.probs.json",
+        "cost_rerun/runs/EN2009d/dump/diar.trace.json",
+        "cost_rerun/runs/EN2009d/gpu-process-memory.csv",
+        "cost_rerun/runs/EN2009d/native-events.jsonl.gz",
+        "cost_rerun/runs/EN2009d/process-memory-samples.csv",
+        "cost_rerun/runs/EN2009d/receiver-assignments.jsonl.gz",
+        "cost_rerun/runs/ES2009d/RESULT.json",
+        "cost_rerun/runs/ES2009d/dump/diar.hidden.json",
+        "cost_rerun/runs/ES2009d/dump/diar.logits.json",
+        "cost_rerun/runs/ES2009d/dump/diar.probs.f32",
+        "cost_rerun/runs/ES2009d/dump/diar.probs.json",
+        "cost_rerun/runs/ES2009d/dump/diar.trace.json",
+        "cost_rerun/runs/ES2009d/gpu-process-memory.csv",
+        "cost_rerun/runs/ES2009d/native-events.jsonl.gz",
+        "cost_rerun/runs/ES2009d/process-memory-samples.csv",
+        "cost_rerun/runs/ES2009d/receiver-assignments.jsonl.gz",
+        "cost_rerun_config.json",
+        "environment/.gitattributes",
+        "environment/ENVIRONMENT_ROCM_7_2_1_HISTORICAL.json",
+        "environment/gpu_backend_probe.py",
+        "environment/requirements-rocm-7.2.1-historical.lock",
+        "environment/requirements.lock",
+        "environment/run_backend_probe.sh",
+        "gt_kd_config.json",
+        "gt_pilot.py",
+        "gt_pilot_config.json",
+        "gt_pilot_stage_plan.json",
+        "gt_probe.py",
+        "gt_probe_checkpoint_config.json",
+        "gt_probe_checkpoint_plan.json",
+        "gt_probe_config.json",
+        "gt_probe_continuation_plan.json",
+        "gt_probe_stage_plan.json",
+        "gt_solo_contrast_config.json",
+        "run_baseline.py",
+        "run_gt_pilot.sh",
+        "run_gt_probe.sh",
+        "runs/EN2009d/RESULT.json",
+        "runs/EN2009d/dump/diar.hidden.json",
+        "runs/EN2009d/dump/diar.logits.json",
+        "runs/EN2009d/dump/diar.probs.f32",
+        "runs/EN2009d/dump/diar.probs.json",
+        "runs/EN2009d/dump/diar.trace.json",
+        "runs/EN2009d/gpu-process-memory.csv",
+        "runs/EN2009d/native-events.jsonl.gz",
+        "runs/EN2009d/receiver-assignments.jsonl.gz",
+        "runs/ES2009d/RESULT.json",
+        "runs/ES2009d/dump/diar.hidden.json",
+        "runs/ES2009d/dump/diar.logits.json",
+        "runs/ES2009d/dump/diar.probs.f32",
+        "runs/ES2009d/dump/diar.probs.json",
+        "runs/ES2009d/dump/diar.trace.json",
+        "runs/ES2009d/gpu-process-memory.csv",
+        "runs/ES2009d/native-events.jsonl.gz",
+        "runs/ES2009d/receiver-assignments.jsonl.gz",
+        "speaker_score_diagnostic.py",
+        "stage_plan.json",
+        "stages.py",
+        "student.py",
+        "teacher_fit.py",
+        "teacher_fit_config.json",
+        "tests/test_stages.py"
+      ],
+      "directly_referenced_by_retained_reports": [
+        "FINDINGS.json",
+        "GT_CHECKPOINT_RESULT.json",
+        "READINESS.json",
+        "RESULT.json",
+        "analyze_baseline.py",
+        "cost_rerun/runs/EN2009d/RESULT.json",
+        "cost_rerun/runs/ES2009d/RESULT.json",
+        "cost_rerun_config.json",
+        "environment/ENVIRONMENT_ROCM_7_2_1_HISTORICAL.json",
+        "environment/requirements-rocm-7.2.1-historical.lock",
+        "environment/run_backend_probe.sh",
+        "gt_kd_config.json",
+        "gt_pilot.py",
+        "gt_pilot_config.json",
+        "gt_probe.py",
+        "run_baseline.py",
+        "run_gt_pilot.sh",
+        "run_gt_probe.sh",
+        "runs/EN2009d/RESULT.json",
+        "runs/ES2009d/RESULT.json",
+        "speaker_score_diagnostic.py",
+        "stage_plan.json",
+        "stages.py",
+        "student.py",
+        "teacher_fit.py",
+        "teacher_fit_config.json",
+        "tests/test_stages.py"
+      ],
+      "retrieval_only": true,
+      "not_silently_made_runnable": true,
+      "note": "Links from retained reports to removed tracked source/config/raw/intermediate files are historical provenance. Use the local archive or git show; no executable/configuration surface is published by this cleanup."
+    },
+    "private_local_stage_control": {
+      "prefix": ".stage-control/",
+      "status": "Private checkpoints, sidecars, receipts, run state, and driver scripts remain local and are not uploaded.",
+      "hashes_alone_are_not_public_artifacts": true,
+      "linked_retained_reports": [
+        "BASELINE.md",
+        "GT_KD_DIAGNOSTIC_RESULT.json",
+        "GT_KD_POLICY_SHADOW_RESULT.json",
+        "GT_KD_RESULT.json",
+        "GT_PILOT_RESULT.json",
+        "GT_SOLO_CONTRAST_DIAGNOSTIC_RESULT.json",
+        "GT_SOLO_CONTRAST_RESULT.json",
+        "RESEARCH_DECISION.json",
+        "TEACHER_FIT_TARGET_RESULT.json",
+        "TEACHER_SAVED_SCORE_DIAGNOSTIC_RESULT.json",
+        "environment/ROCM10_BACKWARD_RESULT.json"
+      ]
+    },
+    "per_retained_report_links": [
+      {
+        "report": "BASELINE.md",
+        "current_report_links": [],
+        "historical_source_config_raw_links": [
+          "analyze_baseline.py",
+          "cost_rerun_config.json",
+          "run_baseline.py",
+          "stages.py",
+          "tests/test_stages.py"
+        ],
+        "private_stage_control_links_present": true
+      },
+      {
+        "report": "GT_KD_DIAGNOSTIC_RESULT.json",
+        "current_report_links": [
+          "GT_KD_DIAGNOSTIC_RESULT.json"
+        ],
+        "historical_source_config_raw_links": [],
+        "private_stage_control_links_present": true
+      },
+      {
+        "report": "GT_KD_POLICY_SHADOW_RESULT.json",
+        "current_report_links": [
+          "GT_KD_POLICY_SHADOW_RESULT.json"
+        ],
+        "historical_source_config_raw_links": [
+          "READINESS.json"
+        ],
+        "private_stage_control_links_present": true
+      },
+      {
+        "report": "GT_KD_RESULT.json",
+        "current_report_links": [
+          "GT_PILOT_RESULT.json"
+        ],
+        "historical_source_config_raw_links": [
+          "gt_kd_config.json",
+          "gt_pilot.py",
+          "gt_probe.py",
+          "run_gt_pilot.sh",
+          "student.py"
+        ],
+        "private_stage_control_links_present": true
+      },
+      {
+        "report": "GT_PILOT_RESULT.json",
+        "current_report_links": [],
+        "historical_source_config_raw_links": [
+          "gt_pilot.py",
+          "gt_pilot_config.json",
+          "gt_probe.py",
+          "run_gt_pilot.sh",
+          "student.py"
+        ],
+        "private_stage_control_links_present": true
+      },
+      {
+        "report": "GT_SOLO_CONTRAST_DIAGNOSTIC_RESULT.json",
+        "current_report_links": [
+          "GT_SOLO_CONTRAST_DIAGNOSTIC_RESULT.json"
+        ],
+        "historical_source_config_raw_links": [],
+        "private_stage_control_links_present": true
+      },
+      {
+        "report": "GT_SOLO_CONTRAST_RESULT.json",
+        "current_report_links": [
+          "GT_SOLO_CONTRAST_RESULT.json"
+        ],
+        "historical_source_config_raw_links": [],
+        "private_stage_control_links_present": true
+      },
+      {
+        "report": "RESEARCH_DECISION.json",
+        "current_report_links": [
+          "BASELINE.md",
+          "GT_KD_DIAGNOSTIC_RESULT.json",
+          "GT_KD_POLICY_SHADOW_RESULT.json",
+          "GT_KD_RESULT.json",
+          "GT_PILOT_RESULT.json",
+          "GT_SOLO_CONTRAST_DIAGNOSTIC_RESULT.json",
+          "GT_SOLO_CONTRAST_RESULT.json",
+          "SPEAKER_SCORE_DIAGNOSTIC_RESULT.json",
+          "TEACHER_FIT_TARGET_RESULT.json",
+          "TEACHER_SAVED_SCORE_DIAGNOSTIC_RESULT.json",
+          "cost_rerun/FINDINGS.json",
+          "cost_rerun/RESULT.json",
+          "environment/ENVIRONMENT.json"
+        ],
+        "historical_source_config_raw_links": [
+          "FINDINGS.json",
+          "RESULT.json",
+          "gt_kd_config.json"
+        ],
+        "private_stage_control_links_present": true
+      },
+      {
+        "report": "SPEAKER_SCORE_DIAGNOSTIC_RESULT.json",
+        "current_report_links": [],
+        "historical_source_config_raw_links": [
+          "speaker_score_diagnostic.py"
+        ],
+        "private_stage_control_links_present": false
+      },
+      {
+        "report": "TEACHER_FIT_TARGET_RESULT.json",
+        "current_report_links": [],
+        "historical_source_config_raw_links": [
+          "gt_pilot.py",
+          "gt_probe.py",
+          "run_baseline.py",
+          "speaker_score_diagnostic.py",
+          "teacher_fit.py",
+          "teacher_fit_config.json"
+        ],
+        "private_stage_control_links_present": true
+      },
+      {
+        "report": "TEACHER_SAVED_SCORE_DIAGNOSTIC_RESULT.json",
+        "current_report_links": [],
+        "historical_source_config_raw_links": [],
+        "private_stage_control_links_present": true
+      },
+      {
+        "report": "cost_rerun/FINDINGS.json",
+        "current_report_links": [],
+        "historical_source_config_raw_links": [
+          "analyze_baseline.py",
+          "cost_rerun_config.json",
+          "run_baseline.py"
+        ],
+        "private_stage_control_links_present": false
+      },
+      {
+        "report": "cost_rerun/RESULT.json",
+        "current_report_links": [],
+        "historical_source_config_raw_links": [
+          "RESULT.json",
+          "cost_rerun/runs/EN2009d/RESULT.json",
+          "cost_rerun/runs/ES2009d/RESULT.json",
+          "runs/EN2009d/RESULT.json",
+          "runs/ES2009d/RESULT.json"
+        ],
+        "private_stage_control_links_present": false
+      },
+      {
+        "report": "environment/ENVIRONMENT.json",
+        "current_report_links": [
+          "environment/ROCM10_INFERENCE_RESULT.json"
+        ],
+        "historical_source_config_raw_links": [
+          "GT_CHECKPOINT_RESULT.json",
+          "environment/ENVIRONMENT_ROCM_7_2_1_HISTORICAL.json",
+          "environment/requirements-rocm-7.2.1-historical.lock",
+          "environment/run_backend_probe.sh",
+          "run_gt_probe.sh",
+          "stage_plan.json",
+          "student.py"
+        ],
+        "private_stage_control_links_present": false
+      },
+      {
+        "report": "environment/ROCM10_BACKWARD_RESULT.json",
+        "current_report_links": [],
+        "historical_source_config_raw_links": [],
+        "private_stage_control_links_present": true
+      },
+      {
+        "report": "environment/ROCM10_INFERENCE_RESULT.json",
+        "current_report_links": [],
+        "historical_source_config_raw_links": [],
+        "private_stage_control_links_present": false
+      }
+    ]
+  },
+  "interpretation": {
+    "teacher_practical_utility": "NOT ESTABLISHED.",
+    "strict_solo_oracle_associated_frame_score": "A stronger strict-solo/oracle-associated frame score is not a deployment baseline.",
+    "fixed_es_proxy_matches": {
+      "teacher": "3/7",
+      "students": "0/7",
+      "interpretation": "These fixed ES proxy matches are not quality gains."
+    },
+    "postpolicy_applied_parents": {
+      "teacher": "5/38",
+      "students": "1/38",
+      "interpretation": "These post-policy applied counts are not quality gains."
+    },
+    "overlap_exclusions": "Overlap exclusions limit false-positive claims.",
+    "cached_terminal_success": "A cached terminal success is not translation quality.",
+    "overall": "INCONCLUSIVE; issue OPEN.",
+    "evidence_sources": [
+      "RESEARCH_DECISION.json",
+      "GT_KD_POLICY_SHADOW_RESULT.json",
+      "GT_KD_RESULT.json",
+      "GT_KD_DIAGNOSTIC_RESULT.json",
+      "GT_SOLO_CONTRAST_RESULT.json",
+      "GT_SOLO_CONTRAST_DIAGNOSTIC_RESULT.json"
+    ]
+  },
+  "future_priority": "Before considering more student training, understand teacher usefulness and error attribution. This cleanup promises or releases no new experiment.",
+  "external_executable_dependency_check": {
+    "status": "No external executable callers of the removed psem_streaming_student helpers were found.",
+    "checked": [
+      "Repo-wide path references to psem_streaming_student outside this tree.",
+      "External imports/calls for gt_pilot, gt_probe, teacher_fit, speaker_score_diagnostic, run_baseline, analyze_baseline, stages, and student helper surfaces."
+    ],
+    "unrelated_consumers_changed": false
+  },
+  "postcleanup_inventory": {
+    "public_files_expected": [
+      ".gitignore",
+      "BASELINE.md",
+      "GT_KD_DIAGNOSTIC_RESULT.json",
+      "GT_KD_POLICY_SHADOW_RESULT.json",
+      "GT_KD_RESULT.json",
+      "GT_PILOT_RESULT.json",
+      "GT_SOLO_CONTRAST_DIAGNOSTIC_RESULT.json",
+      "GT_SOLO_CONTRAST_RESULT.json",
+      "PUBLICATION_INDEX.json",
+      "RESEARCH_DECISION.json",
+      "SPEAKER_SCORE_DIAGNOSTIC_RESULT.json",
+      "TEACHER_FIT_TARGET_RESULT.json",
+      "TEACHER_SAVED_SCORE_DIAGNOSTIC_RESULT.json",
+      "cost_rerun/FINDINGS.json",
+      "cost_rerun/RESULT.json",
+      "environment/ENVIRONMENT.json",
+      "environment/ROCM10_BACKWARD_RESULT.json",
+      "environment/ROCM10_INFERENCE_RESULT.json"
+    ],
+    "public_files_exclude": [
+      ".stage-control/**",
+      "**/__pycache__/**"
+    ],
+    "no_other_public_executable_config_smoke_intermediate_or_raw_tracked_files": true,
+    "ignored_local_generated_prefixes": [
+      ".stage-control/**",
+      "runs/**",
+      "cost_rerun/runs/**",
+      "**/__pycache__/**"
+    ],
+    "ignored_local_generated_files_not_touched": 517,
+    "note": "Pre-existing ignored local raw/runtime files and optional __pycache__ remain local; no broad cleanup was performed."
+  },
+  "verification": {
+    "archive_copy_sha256_and_size_verified_before_unlink": true,
+    "all_archive_entries_read_back_and_rehashed_after_unlink": true,
+    "retained_results_rehashed_after_cleanup": true,
+    "retained_json_reparsed_after_cleanup": true,
+    "root_gitignore_byte_identical": true,
+    "actual_archive_readback_probe_is_proof": true,
+    "measured_results_changed": false,
+    "production_architecture_changed": false
+  }
+}
