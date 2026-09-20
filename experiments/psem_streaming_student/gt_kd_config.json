@@ -6,14 +6,14 @@
     "issue": 164,
     "paid_or_cloud_calls": 0,
     "production_mutation": false,
-    "scope": "one controlled FIT-balanced solo-CE contrast on the unchanged student; not full issue164 completion",
+    "scope": "one matched GT BCE plus fixed 0.25 teacher BCE; not full issue164 completion",
     "teacher_passes": 0
   },
   "budget": {
     "automatic_retry_after_unknown_partial_update": false,
-    "maximum_cumulative_optimizer_updates": 1583,
+    "maximum_cumulative_optimizer_updates": 2363,
     "maximum_optimizer_updates": 780,
-    "prior_cumulative_optimizer_updates": 803,
+    "prior_cumulative_optimizer_updates": 1583,
     "repeated_fit_training_seconds": 11856,
     "unique_fit_seconds": 1185.6
   },
@@ -24,12 +24,14 @@
       780
     ],
     "eval_logits_manifest": "eval_logits_manifest.json",
+    "infer_proof_chunk_forwards": 4,
+    "infer_proof_source_id": "ami_EN2009d",
     "init_logit_match_tolerance": 1e-06,
     "no_threshold_sweep": true,
     "operating_point": 0.5,
     "resume_logit_tolerance": 0.0001
   },
-  "implementation_base_commit": "f162d99e404c546c7e2d3599e2ce2c7e7ea06b92",
+  "implementation_base_commit": "07c706366f167ba63b072018664f5ef20cc2b387",
   "implementation_sha256": {
     "gt_pilot.py": "74083d41280250000f31f7e6c4316fc392d2dda1f5acac63606efc4bfd8eb9cb",
     "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
@@ -82,7 +84,7 @@
   },
   "persistence": {
     "planned_clean_pause_after_update": 2,
-    "run_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-solo-contrast-1"
+    "run_root": "experiments/psem_streaming_student/.stage-control/issue-164-gt-kd-1"
   },
   "prepared_import": {
     "origin_frozen_config_path": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/frozen_config.json",
@@ -260,6 +262,48 @@
     "confirmed_es2006a_fourth_speaker_seconds": 306.418,
     "sample_rate": 16000
   },
+  "teacher_inputs": {
+    "all_four_sources_eligible": true,
+    "executed_producer_sha256": "bf08e02024093a793ad4023321b766a901dff784e2102cf77b1369871a6d1e7c",
+    "executed_teacher_config_sha256": "6c57ecc9b8ef04feb4591b6e9fea4d813bc9739d29d5a826f71edc7cad98b0ea",
+    "manifest": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1/teacher_targets_manifest.json",
+    "manifest_sha256": "1c40adaabc8c5e63112d8d0e179bd27ca6d391c9a9a685ba56d348935b7ef968",
+    "permutations": {
+      "ami_ES2005a": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "ami_ES2006a": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "ami_ES2007a": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "ami_ES2008a": [
+        2,
+        0,
+        1,
+        3
+      ]
+    },
+    "prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+    "schema": "PSEM-TEACHER-FIT-MANIFEST-1",
+    "sidecar_schema": "PSEM-TEACHER-FIT-SIDECAR-1",
+    "sidecar_sha256": {
+      "ami_ES2005a": "e012af625c334f3b47abd0b468abcd8246258b0dc3d8d36c8d6a5afc747f8d45",
+      "ami_ES2006a": "41fbf46b209dffd70aae043544a982de2e15351bccab0a8ab41ca06bdcfb8320",
+      "ami_ES2007a": "e3831753283cbb8140bc64d61049825124419a377b7eb45432ec5ee290167f74",
+      "ami_ES2008a": "e7b47eef6340cac512629f74865391fb14504548eabbdd2c3fa0f55fd61558b1"
+    }
+  },
   "training": {
     "batch_size": 1,
     "chunk_samples": 243200,
@@ -268,23 +312,11 @@
     "frames_per_update": 190,
     "fresh_initialization": true,
     "objective": {
-      "FIT_solo_class_counts": [
-        3446,
-        1351,
-        1417,
-        865
-      ],
-      "FIT_solo_total": 7079,
       "activity_bce_coefficient": 1.0,
-      "class_weight_formula": "w[k] = 7079 / (4 * FIT_solo_class_counts[k])",
-      "class_weights_float64": [
-        0.5135664538595474,
-        1.3099555884529979,
-        1.2489414255469302,
-        2.0459537572254334
-      ],
-      "name": "activity_bce_plus_fit_balanced_solo_ce",
-      "solo_ce_coefficient": 1.0
+      "name": "activity_bce_plus_fixed_teacher_bce",
+      "solo_ce_coefficient": 0.0,
+      "teacher_weight": 0.25,
+      "temperature": 1
     },
     "optimizer": {
       "gradient_clip_norm": 5.0,

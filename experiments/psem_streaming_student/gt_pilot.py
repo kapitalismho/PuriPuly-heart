@@ -49,6 +49,10 @@ EVAL_MANIFEST_SCHEMA = "PSEM-ISSUE-164-GT-PILOT-EVAL-MANIFEST-1"
 EVAL_LOGITS_MANIFEST_NAME = "eval_logits_manifest.json"
 OBJECTIVE_ACTIVITY_BCE = "activity_bce"
 OBJECTIVE_SOLO_CONTRAST = "activity_bce_plus_fit_balanced_solo_ce"
+OBJECTIVE_TEACHER_KD = "activity_bce_plus_fixed_teacher_bce"
+TEACHER_MANIFEST_SCHEMA = "PSEM-TEACHER-FIT-MANIFEST-1"
+TEACHER_SIDECAR_SCHEMA = "PSEM-TEACHER-FIT-SIDECAR-1"
+TEACHER_WEIGHT = 0.25
 INIT_LOGIT_MATCH_TOLERANCE = 1.0e-6
 FIT_SOLO_CLASS_COUNTS = (3446, 1351, 1417, 865)
 FIT_SOLO_TOTAL = 7079
@@ -77,6 +81,16 @@ def validate_training_objective(config: dict[str, Any]) -> dict[str, Any]:
             raise RuntimeError("activity BCE coefficient must remain 1.0")
         if float(objective.get("solo_ce_coefficient", 0.0)) != 0.0:
             raise RuntimeError("activity-BCE control must not add solo CE")
+        return objective
+    if name == OBJECTIVE_TEACHER_KD:
+        if float(objective.get("activity_bce_coefficient", 1.0)) != 1.0:
+            raise RuntimeError("activity BCE coefficient must remain 1.0")
+        if float(objective.get("solo_ce_coefficient", 0.0)) != 0.0:
+            raise RuntimeError("teacher KD must not add solo CE")
+        if float(objective["teacher_weight"]) != TEACHER_WEIGHT:
+            raise RuntimeError("teacher weight must remain 0.25")
+        if float(objective.get("temperature", 1.0)) != 1.0:
+            raise RuntimeError("teacher temperature must remain 1")
         return objective
     if name != OBJECTIVE_SOLO_CONTRAST:
         raise RuntimeError(f"unsupported training objective {name}")
@@ -605,18 +619,48 @@ def training_objective_terms(
     *,
     objective: dict[str, Any],
     class_weights: Tensor | None,
+    teacher_probabilities: Tensor | None = None,
+    teacher_support: Tensor | None = None,
 ) -> dict[str, Tensor]:
     if not bool(validity.any()):
         raise RuntimeError("training chunk has no valid bins")
     activity_bce = nn.functional.binary_cross_entropy_with_logits(
         logits[validity], targets[validity]
     )
+    zero = activity_bce * 0
     if objective["name"] == OBJECTIVE_ACTIVITY_BCE:
-        zero = activity_bce * 0
         return {
             "activity_bce": activity_bce,
             "solo_ce": zero,
+            "teacher_bce": zero,
             "total_objective": activity_bce,
+        }
+    if objective["name"] == OBJECTIVE_TEACHER_KD:
+        n_valid = validity.to(dtype=logits.dtype).sum()
+        denom = n_valid * float(OUTPUT_SLOTS)
+        if teacher_probabilities is None or teacher_support is None:
+            raise RuntimeError("teacher KD requires support-valid probabilities")
+        common = validity & teacher_support
+        if bool(common.any()):
+            selected = teacher_probabilities[common]
+            if (not bool(torch.isfinite(selected).all())) or bool((selected < 0).any()) or bool(
+                (selected > 1).any()
+            ):
+                raise RuntimeError("corrupt teacher probabilities on support-valid rows")
+            teacher_bce = (
+                nn.functional.binary_cross_entropy_with_logits(
+                    logits[common], selected, reduction="sum"
+                )
+                / denom
+            )
+        else:
+            teacher_bce = logits.new_zeros(())
+        total = activity_bce + float(objective["teacher_weight"]) * teacher_bce
+        return {
+            "activity_bce": activity_bce,
+            "solo_ce": zero,
+            "teacher_bce": teacher_bce,
+            "total_objective": total,
         }
     n_valid = validity.to(dtype=logits.dtype).sum()
     solo = stable_solo_mask(targets, validity)
@@ -632,8 +676,131 @@ def training_objective_terms(
     return {
         "activity_bce": activity_bce,
         "solo_ce": solo_ce,
+        "teacher_bce": zero,
         "total_objective": total,
     }
+
+
+def teacher_binding(config: dict[str, Any]) -> dict[str, Any] | None:
+    if config["training"].get("objective", {}).get("name") != OBJECTIVE_TEACHER_KD:
+        return None
+    spec = config.get("teacher_inputs")
+    if not isinstance(spec, dict):
+        raise RuntimeError("teacher KD requires teacher_inputs")
+    return {
+        "objective_name": OBJECTIVE_TEACHER_KD,
+        "teacher_weight": TEACHER_WEIGHT,
+        "teacher_manifest_sha256": spec["manifest_sha256"],
+        "teacher_sidecar_sha256": dict(spec["sidecar_sha256"]),
+    }
+
+
+def teacher_sidecar_path(manifest_path: Path, source_id: str) -> Path:
+    return manifest_path.parent / "sources" / source_id / "teacher_sidecar.pt"
+
+
+def validate_teacher_sidecar_payload(
+    payload: dict[str, Any],
+    *,
+    source_id: str,
+    prefix_samples: int,
+    permutation: list[int],
+    prepared_sha256: str,
+    frontiers: Tensor | None,
+) -> dict[str, Tensor]:
+    if payload.get("schema") != TEACHER_SIDECAR_SCHEMA:
+        raise RuntimeError(f"{source_id} sidecar schema mismatch")
+    if payload.get("source_id") != source_id:
+        raise RuntimeError(f"{source_id} sidecar source identity mismatch")
+    if payload.get("pilot_role") != "FIT":
+        raise RuntimeError(f"{source_id} sidecar role must be FIT")
+    if int(payload["prefix_samples"]) != int(prefix_samples):
+        raise RuntimeError(f"{source_id} sidecar prefix mismatch")
+    if int(payload["output_slots"]) != OUTPUT_SLOTS:
+        raise RuntimeError(f"{source_id} sidecar slot count mismatch")
+    if int(payload["hop_samples"]) != HOP:
+        raise RuntimeError(f"{source_id} sidecar hop mismatch")
+    if payload.get("prepared_sources_sha256") != prepared_sha256:
+        raise RuntimeError(f"{source_id} sidecar prepared identity mismatch")
+    if list(payload.get("permutation") or []) != list(permutation):
+        raise RuntimeError(f"{source_id} sidecar permutation mismatch")
+    if sorted(permutation) != list(range(OUTPUT_SLOTS)):
+        raise RuntimeError(f"{source_id} permutation is not a four-slot bijection")
+    raw = payload["raw_probabilities"]
+    ordered = payload["gt_ordered_probabilities"]
+    emitted = payload["emitted_mask"].to(dtype=torch.bool)
+    support = payload["support_valid_mask"].to(dtype=torch.bool)
+    if tuple(raw.shape) != tuple(ordered.shape) or raw.shape[-1] != OUTPUT_SLOTS:
+        raise RuntimeError(f"{source_id} probability shape mismatch")
+    if tuple(emitted.shape) != (raw.shape[0],) or tuple(support.shape) != (raw.shape[0],):
+        raise RuntimeError(f"{source_id} mask shape mismatch")
+    if bool((support & ~emitted).any()):
+        raise RuntimeError(f"{source_id} support-valid is not a subset of emitted")
+    if bool(emitted.any()):
+        selected = raw[emitted]
+        if (not bool(torch.isfinite(selected).all())) or bool((selected < 0).any()) or bool(
+            (selected > 1).any()
+        ):
+            raise RuntimeError(f"{source_id} emitted probabilities are corrupt")
+        mapped = selected[:, list(permutation)]
+        if not torch.equal(ordered[emitted], mapped):
+            raise RuntimeError(f"{source_id} GT-ordered probabilities disagree with the permutation")
+    if frontiers is not None and not torch.equal(payload["frontiers"], frontiers):
+        raise RuntimeError(f"{source_id} sidecar frontiers differ from prepared")
+    return {
+        "gt_ordered_probabilities": ordered.to(dtype=torch.float32),
+        "support_valid_mask": support,
+        "emitted_mask": emitted,
+        "frontiers": payload["frontiers"],
+    }
+
+
+def load_teacher_fit_targets(
+    config: dict[str, Any],
+    prepared: dict[str, Any] | None,
+) -> dict[str, dict[str, Tensor]]:
+    spec = config.get("teacher_inputs")
+    if not isinstance(spec, dict):
+        raise RuntimeError("teacher KD requires teacher_inputs")
+    repo = Path(__file__).resolve().parent.parent.parent
+    manifest_path = (repo / spec["manifest"]).resolve()
+    if sha256_file(manifest_path) != spec["manifest_sha256"]:
+        raise RuntimeError("teacher manifest identity mismatch")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("schema") != TEACHER_MANIFEST_SCHEMA:
+        raise RuntimeError("teacher manifest schema mismatch")
+    if manifest.get("prepared_sources_sha256") != spec.get(
+        "prepared_sources_sha256", config.get("prepared_import", {}).get("origin_prepared_sha256")
+    ):
+        raise RuntimeError("teacher manifest prepared identity mismatch")
+    prepared_sha256 = manifest["prepared_sources_sha256"]
+    fit_ids = [source["source_id"] for source in config["sources"]["FIT"]]
+    rows = {row["source_id"]: row for row in manifest["sources"]}
+    if set(rows) != set(fit_ids):
+        raise RuntimeError("teacher manifest FIT sources differ")
+    loaded: dict[str, dict[str, Tensor]] = {}
+    catalog = catalog_sources(config)
+    for source_id in fit_ids:
+        path = teacher_sidecar_path(manifest_path, source_id)
+        expected = spec["sidecar_sha256"][source_id]
+        if sha256_file(path) != expected or rows[source_id]["sidecar_sha256"] != expected:
+            raise RuntimeError(f"{source_id} teacher sidecar identity mismatch")
+        payload = torch.load(path, map_location="cpu", weights_only=False)
+        frontiers = None
+        prefix = int(catalog[source_id]["prefix_samples"])
+        if prepared is not None:
+            frontiers = prepared["sources"][source_id]["frontiers"]
+            prefix = int(prepared["sources"][source_id]["waveform"].numel())
+        loaded[source_id] = validate_teacher_sidecar_payload(
+            payload,
+            source_id=source_id,
+            prefix_samples=prefix,
+            permutation=list(spec["permutations"][source_id]),
+            prepared_sha256=prepared_sha256,
+            frontiers=frontiers,
+        )
+    return loaded
+
 
 
 def fit_solo_class_counts(prepared: dict[str, Any], source_ids: list[str]) -> list[int]:
@@ -1609,6 +1776,61 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
 
 
 
+def infer_proof_stage(config_path: Path, run_root: Path) -> None:
+    config_path = bind_pilot_config(config_path, run_root)
+    config = load_pilot_config(config_path)
+    require_authorization()
+    prepared = load_prepared(run_root, config_path)
+    config_sha256 = sha256_file(config_path)
+    prepared_sha256 = sha256_file(run_root / "prepared_sources.pt")
+    schedule = fit_schedule(config)
+    device = require_gpu(config)
+    chunk = int(config["training"]["chunk_samples"])
+    selection = json.loads((run_root / "cal_selection.json").read_text(encoding="utf-8"))
+    step = selection["selected"]["step"]
+    ckpt_path = run_root / f"checkpoint_step_{step}.pt"
+    payload = load_current_checkpoint_for_eval(
+        ckpt_path,
+        config,
+        config_sha256,
+        prepared_sha256,
+        int(step),
+        schedule,
+    )
+    model = StreamingStudent().to(device)
+    model.load_state_dict(payload["model"])
+    source_id = "ami_EN2009d"
+    source_payload = prepared["sources"][source_id]
+    logits, frontiers = stream_source(
+        model, source_payload["waveform"], device, chunk
+    )
+    if not torch.equal(frontiers, source_payload["frontiers"]):
+        raise RuntimeError("standalone EN2009d frontiers differ")
+    ordinary_path = run_root / "eval_logits" / f"checkpoint_{step}_{source_id}.pt"
+    ordinary = torch.load(ordinary_path, map_location="cpu", weights_only=False)
+    delta = float((logits - ordinary["logits"]).abs().max())
+    atomic_json(
+        run_root / "infer_proof.json",
+        {
+            "stage": "infer-proof",
+            "source_id": source_id,
+            "selected_step": step,
+            "checkpoint_sha256": sha256_file(ckpt_path),
+            "chunk_forwards": 4,
+            "prefix_samples": int(source_payload["waveform"].numel()),
+            "teacher_assets_opened": False,
+            "max_abs_logit_delta": delta,
+            "tolerance": RESUME_LOGIT_TOLERANCE,
+            "matched_ordinary_selected_en": delta <= RESUME_LOGIT_TOLERANCE,
+            "runtime": pilot_runtime(config_path),
+        },
+    )
+    if delta > RESUME_LOGIT_TOLERANCE:
+        raise RuntimeError(
+            f"standalone EN2009d logits differ from ordinary selected logits by {delta}"
+        )
+
+
 def optimizer_step_count(optimizer: torch.optim.Optimizer) -> set[int]:
     return {
         int(value.item())
@@ -1717,6 +1939,9 @@ def save_checkpoint(
         "schedule_cursor": cursor,
         "resume_witness": witness,
     }
+    binding = teacher_binding(config)
+    if binding is not None:
+        payload.update(binding)
     atomic_torch_save(path, payload)
     return sha256_file(path)
 
@@ -1730,6 +1955,22 @@ def refuse_stale_checkpoint(checkpoint: dict[str, Any], ledger_rows: list[dict[s
         )
     if status["intent"] > completed and status["completed"] < status["intent"]:
         raise RuntimeError("in-flight uncertain update is charged; automatic retry is forbidden")
+
+
+def validate_checkpoint_teacher_binding(
+    checkpoint: dict[str, Any],
+    config: dict[str, Any],
+    *,
+    live_teacher: bool,
+) -> None:
+    binding = teacher_binding(config)
+    if binding is None:
+        return
+    for key, expected in binding.items():
+        if checkpoint.get(key) != expected:
+            raise RuntimeError(f"checkpoint {key} does not match the frozen teacher binding")
+    if live_teacher:
+        load_teacher_fit_targets(config, None)
 
 
 def validate_current_checkpoint_identity(
@@ -1754,6 +1995,7 @@ def validate_current_checkpoint_identity(
         raise RuntimeError("checkpoint prepared-input identity does not match")
     if list(checkpoint.get("source_order") or []) != list(config["training"]["source_order"]):
         raise RuntimeError("checkpoint source order does not match")
+    validate_checkpoint_teacher_binding(checkpoint, config, live_teacher=False)
     completed = int(checkpoint["completed_updates"])
     if expected_completed is not None and completed != int(expected_completed):
         raise RuntimeError(
@@ -1812,7 +2054,7 @@ def validate_bound_checkpoint_for_resume(
     validate_current_checkpoint_identity(
         checkpoint, config, config_sha256, prepared_sha256, schedule
     )
-
+    validate_checkpoint_teacher_binding(checkpoint, config, live_teacher=True)
 
 def load_current_checkpoint_for_eval(
     path: Path,
@@ -2178,8 +2420,11 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
     chunk = int(config["training"]["chunk_samples"])
     objective = config["training"]["objective"]
     class_weights = None
+    teacher = None
     if objective["name"] == OBJECTIVE_SOLO_CONTRAST:
         class_weights = solo_class_weight_tensor(objective, device)
+    elif objective["name"] == OBJECTIVE_TEACHER_KD:
+        teacher = load_teacher_fit_targets(config, prepared)
     if resume:
         if not latest_path.exists():
             raise RuntimeError("resume requested without checkpoint_latest.pt")
@@ -2311,12 +2556,24 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
             validity = payload["validity"][frame_left:frame_right].to(device)
             if not bool(validity.any()):
                 raise RuntimeError(f"update {row['update_index']} has no valid bins")
+            teacher_probabilities = None
+            teacher_support = None
+            if teacher is not None:
+                teacher_row = teacher[row["source_id"]]
+                teacher_probabilities = teacher_row["gt_ordered_probabilities"][
+                    frame_left:frame_right
+                ].to(device)
+                teacher_support = teacher_row["support_valid_mask"][frame_left:frame_right].to(
+                    device
+                )
             terms = training_objective_terms(
                 logits.squeeze(0),
                 targets,
                 validity,
                 objective=objective,
                 class_weights=class_weights,
+                teacher_probabilities=teacher_probabilities,
+                teacher_support=teacher_support,
             )
             loss = terms["total_objective"]
             optimizer.zero_grad(set_to_none=True)
@@ -2328,10 +2585,17 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
             loss_value = float(loss.detach().cpu())
             activity_bce_value = float(terms["activity_bce"].detach().cpu())
             solo_ce_value = float(terms["solo_ce"].detach().cpu())
+            teacher_bce_value = float(terms["teacher_bce"].detach().cpu())
             grad_value = float(grad_norm.detach().cpu())
             if not all(
                 math.isfinite(value)
-                for value in (loss_value, activity_bce_value, solo_ce_value, grad_value)
+                for value in (
+                    loss_value,
+                    activity_bce_value,
+                    solo_ce_value,
+                    teacher_bce_value,
+                    grad_value,
+                )
             ):
                 raise RuntimeError(f"update {row['update_index']} is non-finite")
             optimizer.step()
@@ -2362,6 +2626,7 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
                 "total_objective": loss_value,
                 "activity_bce": activity_bce_value,
                 "solo_ce": solo_ce_value,
+                "teacher_bce": teacher_bce_value,
                 "gradient_norm_before_clip": grad_value,
                 "valid_bins": int(validity.cpu().sum()),
             },
@@ -2379,6 +2644,7 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
                 "total_objective": loss_value,
                 "activity_bce": activity_bce_value,
                 "solo_ce": solo_ce_value,
+                "teacher_bce": teacher_bce_value,
                 "gradient_norm_before_clip": grad_value,
                 "valid_bins": int(validity.cpu().sum()),
                 "source_id": row["source_id"],
@@ -2435,21 +2701,23 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
             if pause_after == completed:
                 pause_path = run_root / f"checkpoint_pause_update{completed}.pt"
                 atomic_torch_save(pause_path, torch.load(latest_path, map_location="cpu", weights_only=False))
-                atomic_json(
-                    accounting_path,
-                    {
-                        "completed_updates": completed,
-                        "uncertain_updates": 0,
-                        "pause_after": completed,
-                        "latest_checkpoint_sha256": digest,
-                        "optimizer_step_counters": sorted(optimizer_step_count(optimizer)),
-                        "records": records,
-                        "peak_reserved_bytes": torch.cuda.max_memory_reserved(device),
-                        "peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
-                        "training_elapsed_seconds_synchronized": time.perf_counter() - started,
-                        "timing_scope": "wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through pause checkpoint, including host/device transfers and optimizer updates; excludes that pre-timer setup. Allocator peak reset is after resume restore/witness or after the initial zero-update checkpoint on a fresh train.",
-                    },
-                )
+                pause_doc = {
+                    "process_phase": "pause",
+                    "completed_updates": completed,
+                    "uncertain_updates": 0,
+                    "pause_after": completed,
+                    "update_index_range": [records[0]["update_index"], completed] if records else [],
+                    "records_this_process": len(records),
+                    "latest_checkpoint_sha256": digest,
+                    "optimizer_step_counters": sorted(optimizer_step_count(optimizer)),
+                    "records": records,
+                    "peak_reserved_bytes": torch.cuda.max_memory_reserved(device),
+                    "peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
+                    "training_elapsed_seconds_synchronized": time.perf_counter() - started,
+                    "timing_scope": "pause-process wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through pause checkpoint, covering this process's optimizer updates only; excludes pre-timer setup and the later resume process.",
+                }
+                atomic_json(run_root / "pause_accounting.json", pause_doc)
+                atomic_json(accounting_path, pause_doc)
                 return
     if optimizer_step_count(optimizer) != {780}:
         raise RuntimeError("optimizer counters do not equal 780 after the full allocation")
@@ -2471,15 +2739,22 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
     atomic_json(
         accounting_path,
         {
+            "process_phase": "resume" if resume else "train",
             "completed_updates": 780,
             "uncertain_updates": 0,
+            "update_index_range": [records[0]["update_index"], 780] if records else [],
+            "records_this_process": len(records),
             "latest_checkpoint_sha256": digest,
             "optimizer_step_counters": sorted(optimizer_step_count(optimizer)),
             "records": records,
             "peak_reserved_bytes": torch.cuda.max_memory_reserved(device),
             "peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
             "training_elapsed_seconds_synchronized": time.perf_counter() - started,
-            "timing_scope": "wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through final checkpoint, including host/device transfers and optimizer updates; excludes that pre-timer setup. Allocator peak reset is after resume restore/witness or after the initial zero-update checkpoint on a fresh train.",
+            "timing_scope": (
+                "resume-process wall covering restore/witness and remaining updates after pause; not pause updates and not an all-780 aggregate"
+                if resume
+                else "single-process wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through final checkpoint, including host/device transfers and optimizer updates; excludes that pre-timer setup."
+            ),
         },
     )
 
@@ -2590,6 +2865,10 @@ def report_stage(config_path: Path, run_root: Path) -> None:
         )
         if executed_gt_pilot and execution_identity.get("gt_pilot_sha256") != executed_gt_pilot:
             raise RuntimeError("execution_identity gt_pilot hash differs from prepare receipt")
+    pause_accounting = None
+    pause_accounting_path = run_root / "pause_accounting.json"
+    if pause_accounting_path.is_file():
+        pause_accounting = json.loads(pause_accounting_path.read_text(encoding="utf-8"))
     hashes = {
         name: sha256_file(run_root / name)
         for name in (
@@ -2642,6 +2921,7 @@ def report_stage(config_path: Path, run_root: Path) -> None:
         "prepare": prepare_summary,
         "initial": initial,
         "accounting": accounting,
+        "pause_accounting": pause_accounting,
         "resume_witness": resume,
         "cal_selection": selection["selected"],
         "final": final,
@@ -2682,13 +2962,270 @@ def report_stage(config_path: Path, run_root: Path) -> None:
     )
 
 
+def kd_loss_probe_stage(config: dict[str, Any], run_root: Path, started: float, config_path: Path) -> None:
+    objective = config["training"]["objective"]
+    graphs: list[dict[str, Any]] = []
+    vjps = 0
+
+    def run_graph(
+        name: str,
+        logits: Tensor,
+        targets: Tensor,
+        validity: Tensor,
+        teacher_probabilities: Tensor,
+        teacher_support: Tensor,
+        *,
+        expected_teacher: float | None = None,
+        expect_zero_teacher: bool = False,
+    ) -> dict[str, Tensor]:
+        nonlocal vjps
+        if int(logits.numel()) > 32:
+            raise RuntimeError("toy logit graph exceeds 32 logits")
+        terms = training_objective_terms(
+            logits,
+            targets,
+            validity,
+            objective=objective,
+            class_weights=None,
+            teacher_probabilities=teacher_probabilities,
+            teacher_support=teacher_support,
+        )
+        teacher_value = float(terms["teacher_bce"].detach())
+        if expect_zero_teacher and teacher_value != 0.0:
+            raise RuntimeError(f"{name} teacher_bce is not zero")
+        if expected_teacher is not None and abs(teacher_value - expected_teacher) > 1.0e-6:
+            raise RuntimeError(f"{name} teacher_bce {teacher_value} != {expected_teacher}")
+        terms["total_objective"].backward()
+        vjps += 1
+        if logits.grad is None or not bool(torch.isfinite(logits.grad).all()):
+            raise RuntimeError(f"{name} toy VJP is not finite")
+        graphs.append(
+            {
+                "name": name,
+                "activity_bce": float(terms["activity_bce"].detach()),
+                "teacher_bce": teacher_value,
+                "total_objective": float(terms["total_objective"].detach()),
+                "valid_bins": int(validity.sum().item()),
+                "teacher_support_bins": int((validity & teacher_support).sum().item()),
+                "logit_count": int(logits.numel()),
+                "grad_finite": True,
+                "synthetic_logit_autograd_vjp": True,
+            }
+        )
+        return terms
+
+    empty_logits = torch.zeros(2, 4, requires_grad=True)
+    run_graph(
+        "empty_teacher_gt_only",
+        empty_logits,
+        torch.zeros(2, 4),
+        torch.ones(2, dtype=torch.bool),
+        torch.full((2, 4), float("nan")),
+        torch.zeros(2, dtype=torch.bool),
+        expect_zero_teacher=True,
+    )
+    partial_logits = torch.tensor(
+        [[2.0, 0.0, 0.0, 0.0], [2.0, 0.0, 0.0, 0.0]], requires_grad=True
+    )
+    partial_targets = torch.tensor([[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]])
+    partial_valid = torch.tensor([True, True])
+    partial_teacher = torch.tensor(
+        [[0.9, 0.1, 0.0, 0.0], [float("nan"), float("nan"), float("nan"), float("nan")]]
+    )
+    partial_support = torch.tensor([True, False])
+    denom = 8.0
+    teacher_sum = float(
+        nn.functional.binary_cross_entropy_with_logits(
+            torch.tensor([[2.0, 0.0, 0.0, 0.0]]),
+            torch.tensor([[0.9, 0.1, 0.0, 0.0]]),
+            reduction="sum",
+        )
+    )
+    teacher_by_support_count = teacher_sum / 4.0
+    expected_partial = teacher_sum / denom
+    if abs(expected_partial - teacher_by_support_count) <= 1.0e-6:
+        raise RuntimeError("partial-support case does not distinguish all-GT denominator")
+    run_graph(
+        "partial_support_all_gt_denominator",
+        partial_logits,
+        partial_targets,
+        partial_valid,
+        partial_teacher,
+        partial_support,
+        expected_teacher=expected_partial,
+    )
+    invalid_logits = torch.tensor(
+        [[2.0, 0.0, 0.0, 0.0], [2.0, 0.0, 0.0, 0.0]], requires_grad=True
+    )
+    invalid_valid = torch.tensor([False, True])
+    invalid_support = torch.tensor([True, True])
+    invalid_teacher = torch.tensor([[0.2, 0.2, 0.2, 0.2], [0.9, 0.1, 0.0, 0.0]])
+    expected_invalid = teacher_sum / 4.0
+    run_graph(
+        "gt_invalid_excluded_from_both",
+        invalid_logits,
+        partial_targets,
+        invalid_valid,
+        invalid_teacher,
+        invalid_support,
+        expected_teacher=expected_invalid,
+    )
+    frac_logits = torch.zeros(1, 4, requires_grad=True)
+    frac_targets = torch.tensor([[0.5, 0.5, 0.0, 0.0]])
+    frac_valid = torch.ones(1, dtype=torch.bool)
+    expected_frac_gt = float(
+        nn.functional.binary_cross_entropy_with_logits(torch.zeros(1, 4), frac_targets)
+    )
+    frac_terms = run_graph(
+        "fractional_multiactive_gt_preserved",
+        frac_logits,
+        frac_targets,
+        frac_valid,
+        torch.full((1, 4), float("nan")),
+        torch.zeros(1, dtype=torch.bool),
+        expect_zero_teacher=True,
+    )
+    if abs(float(frac_terms["activity_bce"].detach()) - expected_frac_gt) > 1.0e-6:
+        raise RuntimeError("fractional GT BCE changed")
+    multi_logits = torch.zeros(1, 4, requires_grad=True)
+    run_graph(
+        "two_full_ones_gt_preserved",
+        multi_logits,
+        torch.tensor([[1.0, 1.0, 0.0, 0.0]]),
+        torch.ones(1, dtype=torch.bool),
+        torch.full((1, 4), float("nan")),
+        torch.zeros(1, dtype=torch.bool),
+        expect_zero_teacher=True,
+    )
+    full_logits = torch.tensor([[1.0, 0.0, 0.0, 0.0]], requires_grad=True)
+    full_p = torch.tensor([[0.8, 0.1, 0.05, 0.05]])
+    expected_full = float(
+        nn.functional.binary_cross_entropy_with_logits(
+            torch.tensor([[1.0, 0.0, 0.0, 0.0]]), full_p, reduction="sum"
+        )
+    ) / 4.0
+    run_graph(
+        "full_teacher_support",
+        full_logits,
+        torch.tensor([[1.0, 0.0, 0.0, 0.0]]),
+        torch.ones(1, dtype=torch.bool),
+        full_p,
+        torch.ones(1, dtype=torch.bool),
+        expected_teacher=expected_full,
+    )
+    leak_logits = torch.zeros(2, 4, requires_grad=True)
+    run_graph(
+        "teacher_support_on_gt_invalid_does_not_enter",
+        leak_logits,
+        torch.zeros(2, 4),
+        torch.tensor([False, True]),
+        torch.ones(2, 4),
+        torch.ones(2, dtype=torch.bool),
+        expected_teacher=float(
+            nn.functional.binary_cross_entropy_with_logits(
+                torch.zeros(1, 4), torch.ones(1, 4), reduction="sum"
+            )
+        )
+        / 4.0,
+    )
+    mix_logits = torch.zeros(4, 4, requires_grad=True)
+    run_graph(
+        "mixed_valid_support_nan_placeholders",
+        mix_logits,
+        torch.tensor(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.5, 0.5, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+            ]
+        ),
+        torch.tensor([True, True, True, False]),
+        torch.tensor(
+            [
+                [0.7, 0.1, 0.1, 0.1],
+                [float("nan"), float("nan"), float("nan"), float("nan")],
+                [0.4, 0.4, 0.1, 0.1],
+                [0.9, 0.1, 0.0, 0.0],
+            ]
+        ),
+        torch.tensor([True, False, True, True]),
+    )
+    if len(graphs) > 8 or vjps > 8:
+        raise RuntimeError("loss-probe exceeded toy graph/VJP caps")
+    repo = Path(__file__).resolve().parent.parent.parent
+    origin_prepared = repo / config["prepared_import"]["origin_prepared_path"]
+    if sha256_file(origin_prepared) != config["prepared_import"]["origin_prepared_sha256"]:
+        raise RuntimeError("origin prepared identity mismatch during loss-probe")
+    prepared = torch.load(origin_prepared, map_location="cpu", weights_only=False)
+    loaded = load_teacher_fit_targets(config, prepared)
+    common_total = 0
+    for source_id, row in loaded.items():
+        validity = prepared["sources"][source_id]["validity"]
+        common_total += int((validity & row["support_valid_mask"]).sum().item())
+    if common_total != 14766:
+        raise RuntimeError(f"common teacher/GT rows {common_total} != 14766")
+    corrupt = dict(
+        torch.load(
+            teacher_sidecar_path(
+                (repo / config["teacher_inputs"]["manifest"]).resolve(), "ami_ES2005a"
+            ),
+            map_location="cpu",
+            weights_only=False,
+        )
+    )
+    emitted = corrupt["emitted_mask"].to(dtype=torch.bool)
+    raw = corrupt["raw_probabilities"].clone()
+    raw[emitted] = 2.0
+    corrupt["raw_probabilities"] = raw
+    rejected = False
+    try:
+        validate_teacher_sidecar_payload(
+            corrupt,
+            source_id="ami_ES2005a",
+            prefix_samples=4620800,
+            permutation=[0, 1, 2, 3],
+            prepared_sha256=config["prepared_import"]["origin_prepared_sha256"],
+            frontiers=None,
+        )
+    except RuntimeError:
+        rejected = True
+    if not rejected:
+        raise RuntimeError("corrupt emitted probabilities were not rejected")
+    elapsed = time.perf_counter() - started
+    if elapsed > 120:
+        raise RuntimeError("loss-probe exceeded 120s CPU wall")
+    atomic_json(
+        run_root / "loss_probe_receipt.json",
+        {
+            "stage": "loss-probe",
+            "optimizer_steps": 0,
+            "student_constructors": 0,
+            "model_forward": 0,
+            "model_backward": 0,
+            "synthetic_logit_graphs": len(graphs),
+            "synthetic_logit_autograd_vjp_calls": vjps,
+            "maximum_logits_per_graph": max(row["logit_count"] for row in graphs),
+            "graphs": graphs,
+            "common_gt_teacher_rows": common_total,
+            "corrupt_emitted_rejected": True,
+            "teacher_sidecars_validated": sorted(loaded),
+            "elapsed_seconds": elapsed,
+            "runtime": pilot_runtime(config_path),
+        },
+    )
+
+
 def loss_probe_stage(config_path: Path, run_root: Path) -> None:
     started = time.perf_counter()
     config_path = bind_pilot_config(config_path, run_root)
     config = load_pilot_config(config_path)
     objective = config["training"]["objective"]
+    if objective["name"] == OBJECTIVE_TEACHER_KD:
+        kd_loss_probe_stage(config, run_root, started, config_path)
+        return
     if objective["name"] != OBJECTIVE_SOLO_CONTRAST:
-        raise RuntimeError("loss-probe requires the solo contrast objective")
+        raise RuntimeError("loss-probe requires the solo contrast or teacher KD objective")
     weights = solo_class_weight_tensor(objective)
     graphs: list[dict[str, Any]] = []
     vjps = 0
@@ -3095,6 +3632,7 @@ def main() -> int:
             "report",
             "probe",
             "loss-probe",
+            "infer-proof",
             "repair-evaluate",
         ),
     )
@@ -3129,6 +3667,8 @@ def main() -> int:
         probe_stage(args.config.resolve(), args.run_root.resolve())
     elif args.stage == "loss-probe":
         loss_probe_stage(args.config.resolve(), args.run_root.resolve())
+    elif args.stage == "infer-proof":
+        infer_proof_stage(args.config.resolve(), args.run_root.resolve())
     elif args.stage == "repair-evaluate":
         repair_evaluate_stage(args.config.resolve(), args.run_root.resolve())
     elif args.stage == "report":
