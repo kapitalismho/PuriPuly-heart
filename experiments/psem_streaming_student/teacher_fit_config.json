@@ -1,0 +1,143 @@
+{
+  "schema": "PSEM-TEACHER-FIT-CONFIG-1",
+  "experiment_id": "TEACHER-FIT-TARGETS-1",
+  "authority_id": "AUTONOMY-2",
+  "baseline_commit": "d75106b33774c92cd632d7b3172010abf5588fd0",
+  "material_execution_requires_director_release": true,
+  "automatic_retry": false,
+  "contract": {
+    "path": "experiments/psem_streaming_student/.stage-control/autonomous-research/teacher-fit-target-contract.json",
+    "sha256": "d651165b1d3229048376b7cefb02008648bf589c9eba800d2c892702af3d35c1"
+  },
+  "native_prerequisites": {
+    "path": "experiments/psem_streaming_student/.stage-control/autonomous-research/teacher-fit-native-prerequisites.json",
+    "sha256": "73cd5b4d56749b389ba3ab369782280c17cd23b1ef4f35c69ccc968a4a27ef8d"
+  },
+  "inputs": {
+    "original_config": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/frozen_config.json",
+    "original_config_sha256": "167817c7070b5bb6774aabc0e96c978bff5237c1411a3f1fd1f02a8c29fc6ac9",
+    "prepared_sources": "experiments/psem_streaming_student/.stage-control/issue-164-gt-pilot-1/prepared_sources.pt",
+    "prepared_sources_sha256": "1dff77f2899b2eec89ada38b5a68bb1d987edd3be6ce85624ad2b98205d7234b",
+    "identity_rule": "Inherit exact FIT waveform/GT/projection/slot and locked-component identities from the immutable original config and prepared artifact. FIT role and locked-source/speaker exclusions are verified before waveform access. No CAL, DEV, EVAL or HOLDOUT teacher target generation."
+  },
+  "sources": [
+    {"source_id": "ami_ES2005a", "prefix_samples": 4620800},
+    {"source_id": "ami_ES2006a", "prefix_samples": 5107200},
+    {"source_id": "ami_ES2007a", "prefix_samples": 4620800},
+    {"source_id": "ami_ES2008a", "prefix_samples": 4620800}
+  ],
+  "geometry": {
+    "sample_rate": 16000,
+    "hop_samples": 1280,
+    "output_slots": 4,
+    "source_start_sample": 0,
+    "total_unique_prefix_seconds": 1185.6,
+    "total_nominal_frames": 14820,
+    "pcm_scale": 32768
+  },
+  "native": {
+    "executable": "C:/tmp/psem-e2o2-paced/bin/transcribe-cli.exe",
+    "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+    "model": "C:/tmp/psem-vulkan-fp16-model/diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+    "backend": "vulkan",
+    "profile": {
+      "chunk_len": 6,
+      "chunk_left_context": 1,
+      "chunk_right_context": 7,
+      "fifo_len": 188,
+      "spkcache_len": 188,
+      "spkcache_update_period": 144
+    },
+    "causal_frontend": true,
+    "F32_head": true,
+    "VK_NO_MUL_MAT_VEC": true,
+    "mode": "unpaced_source_zero_streaming",
+    "required_environment": {
+      "TRANSCRIBE_SORTFORMER_STREAM_CHUNK_LEN": "6",
+      "TRANSCRIBE_SORTFORMER_STREAM_LC": "1",
+      "TRANSCRIBE_SORTFORMER_STREAM_RC": "7",
+      "TRANSCRIBE_SORTFORMER_STREAM_FIFO_LEN": "188",
+      "TRANSCRIBE_SORTFORMER_STREAM_SPKCACHE_LEN": "188",
+      "TRANSCRIBE_SORTFORMER_STREAM_UPDATE_PERIOD": "144",
+      "TRANSCRIBE_PSEM_CAUSAL_FRONTEND": "1",
+      "TRANSCRIBE_SORTFORMER_F32_HEAD": "1",
+      "TRANSCRIBE_VK_NO_MUL_MAT_VEC": "1"
+    },
+    "absent_environment": [
+      "TRANSCRIBE_PSEM_PACE_16KHZ",
+      "TRANSCRIBE_PSEM_PACE_FROM_SAMPLE",
+      "TRANSCRIBE_PSEM_PACE_UNTIL_SAMPLE",
+      "TRANSCRIBE_PSEM_EVENTS_TCP",
+      "TRANSCRIBE_SORTFORMER_OFFLINE_DUMP"
+    ]
+  },
+  "association": {
+    "criterion": "one_source_global_bijection_minimizing_independent_activity_bce",
+    "mask": "gt_activity_valid_and_teacher_support_valid",
+    "include_fractional_and_multi_active_gt": true,
+    "permutation_count": 24,
+    "tie_break": "lexicographic",
+    "numerical_rule": "gt_pilot.permutation_oracle",
+    "logit_from_probability": "speaker_score_diagnostic.logit_from_probability",
+    "logit_clip": 1e-12,
+    "logit_clip_role": "association_and_diagnostic_numerics_only",
+    "raw_kd_probabilities_clipped": false,
+    "raw_kd_probabilities_softmaxed": false,
+    "not_human_identity_guarantee": true
+  },
+  "reviewed_helpers": {
+    "speaker_score_diagnostic.py": "b8880483ebd3528fb31627913124f8755720e11e1c821537ffdfbb5dcb3f360d",
+    "gt_pilot.py": "89577e61a758788dafba7822b861502422d9c672d21206b1208dee3a6a97c14a",
+    "run_baseline.py": "3f7ee8a924bdb5e7ad848d2e1549df7e4f3ec06b2ef1c22e61213e5a3e9ee8c9",
+    "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a"
+  },
+  "fit_strict_solo_counts_before_teacher_tail": {
+    "ami_ES2005a": [764, 208, 403, 570],
+    "ami_ES2006a": [1909, 15, 270, 57],
+    "ami_ES2007a": [740, 176, 122, 14],
+    "ami_ES2008a": [33, 952, 622, 224]
+  },
+  "fit_strict_solo_counts_role": "verified_prepared_gt_identity_before_teacher_tail_exclusions_not_an_acceptance_threshold",
+  "derived_tail_expectation_not_observed": {
+    "4620800": {"nominal_frames": 3610, "chunks": 602, "support_incomplete_tail_rows": 10},
+    "5107200": {"nominal_frames": 3990, "chunks": 665, "support_incomplete_tail_rows": 12},
+    "role": "derived_geometry_only_actual_traces_decide_masks"
+  },
+  "bounds": {
+    "new_native_source_trajectories": 4,
+    "expected_native_chunks": 2471,
+    "max_emitted_frames": 14820,
+    "max_unique_source_seconds": 1185.6,
+    "whole_run_wall_seconds": 3600,
+    "per_source_wall_seconds": 900,
+    "max_observed_paired_host_working_set_bytes": 4294967296,
+    "max_observed_GPU_dedicated_bytes": 4294967296,
+    "max_new_artifact_bytes": 536870912,
+    "optimizer_updates": 0,
+    "cumulative_optimizer_updates_unchanged": 1583,
+    "external_cost": 0,
+    "new_installation": false,
+    "model_instantiation": 0
+  },
+  "outputs": {
+    "run_root": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1",
+    "public_result": "experiments/psem_streaming_student/TEACHER_FIT_TARGET_RESULT.json",
+    "sidecar_schema": "PSEM-TEACHER-FIT-SIDECAR-1",
+    "manifest_schema": "PSEM-TEACHER-FIT-MANIFEST-1"
+  },
+  "retained_dev_parser_smoke_read_only": [
+    {
+      "source_id": "ami_ES2009d",
+      "role": "DEV_not_FIT_target",
+      "dump": "experiments/psem_streaming_student/cost_rerun/runs/ES2009d/dump",
+      "prefix_samples": 3136000
+    },
+    {
+      "source_id": "ami_EN2009d",
+      "role": "DEV_not_FIT_target",
+      "dump": "experiments/psem_streaming_student/cost_rerun/runs/EN2009d/dump",
+      "prefix_samples": 774400
+    }
+  ]
+}
