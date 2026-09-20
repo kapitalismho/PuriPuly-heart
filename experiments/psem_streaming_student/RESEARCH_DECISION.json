@@ -26,7 +26,7 @@
     "kd_forward_calls": 1052,
     "kd_audio_samples_forwarded": 255200000,
     "kd_audio_seconds_forwarded": 15950,
-    "initialization_resume_and_teacher_free_inference": "Actual checks passed with maximum logit/initial-state delta0; detailed identities and scopes in GT_KD_RESULT.json",
+    "initialization_resume_and_teacher_free_inference": "Reported maximum logit deltas were0 at the same-seed initial comparison (tolerance1e-6), resume witness and standalone teacher-free inference (tolerance1e-4). No hidden-state or optimizer-state tensor equality is asserted; detailed identities and scopes are in GT_KD_RESULT.json",
     "shadow": {
       "parents": 38,
       "parent_arm_evaluations": 152,
