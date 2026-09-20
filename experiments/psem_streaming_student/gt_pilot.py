@@ -161,6 +161,11 @@ def parse_pilot_config(path: Path) -> dict[str, Any]:
         raise RuntimeError("student parameter count must remain 5940740")
     if "objective" in training:
         validate_training_objective(value)
+    evaluation = value["evaluation"]
+    if int(evaluation["maximum_total_chunk_forwards"]) != 1052:
+        raise RuntimeError("pilot total chunk-forward cap must be 1052")
+    if int(evaluation["maximum_total_model_audio_seconds"]) != 15950:
+        raise RuntimeError("pilot total model-audio cap must be 15950 seconds")
     return value
 
 
@@ -693,6 +698,95 @@ def teacher_binding(config: dict[str, Any]) -> dict[str, Any] | None:
         "teacher_manifest_sha256": spec["manifest_sha256"],
         "teacher_sidecar_sha256": dict(spec["sidecar_sha256"]),
     }
+
+def apply_teacher_binding(payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+    binding = teacher_binding(config)
+    if binding is not None:
+        payload.update(binding)
+    return payload
+
+
+def empty_forward_exposure() -> dict[str, int]:
+    return {
+        "chunk_forwards": 0,
+        "input_samples": 0,
+        "witness_chunk_forwards": 0,
+        "witness_input_samples": 0,
+        "optimizer_update_chunk_forwards": 0,
+    }
+
+
+def planned_stream_exposure(sample_count: int, chunk_samples: int) -> dict[str, int]:
+    forwards = 0
+    samples = 0
+    offset = 0
+    while offset < sample_count:
+        right = min(offset + chunk_samples, sample_count)
+        forwards += 1
+        samples += right - offset
+        offset = right
+    return {"chunk_forwards": forwards, "input_samples": samples}
+
+
+def add_forward_exposure(
+    total: dict[str, int], extra: dict[str, int], *, kind: str = "stream"
+) -> dict[str, int]:
+    total["chunk_forwards"] += int(extra["chunk_forwards"])
+    total["input_samples"] += int(extra["input_samples"])
+    if kind == "witness":
+        total["witness_chunk_forwards"] += int(extra["chunk_forwards"])
+        total["witness_input_samples"] += int(extra["input_samples"])
+    elif kind == "update":
+        total["optimizer_update_chunk_forwards"] += int(extra["chunk_forwards"])
+    return total
+
+
+def model_audio_seconds(input_samples: int) -> float:
+    return float(input_samples) / float(SAMPLE_RATE)
+
+
+def inference_cost_record(
+    device: torch.device,
+    elapsed: float,
+    exposure: dict[str, int],
+    scope: str,
+) -> dict[str, Any]:
+    return {
+        "elapsed_seconds_synchronized": elapsed,
+        "scope": scope,
+        "chunk_forwards": int(exposure["chunk_forwards"]),
+        "input_samples": int(exposure["input_samples"]),
+        "model_audio_seconds": model_audio_seconds(int(exposure["input_samples"])),
+        "peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
+        "peak_reserved_bytes": torch.cuda.max_memory_reserved(device),
+        "device": device_report(device),
+    }
+
+
+def collect_run_forward_exposure(
+    *,
+    pause_accounting: dict[str, Any] | None,
+    accounting: dict[str, Any],
+    initial: dict[str, Any],
+    selection: dict[str, Any],
+    final: dict[str, Any],
+    infer: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    total = empty_forward_exposure()
+    for doc in (pause_accounting, accounting):
+        extra = (doc or {}).get("forward_exposure")
+        if extra:
+            add_forward_exposure(total, extra)
+    for doc in (initial, selection, final):
+        extra = (doc or {}).get("inference_cost")
+        if extra and extra.get("chunk_forwards") is not None:
+            add_forward_exposure(total, extra)
+    if infer is not None:
+        extra = infer.get("inference_cost") or infer
+        if extra.get("chunk_forwards") is not None:
+            add_forward_exposure(total, extra)
+    return {**total, "model_audio_seconds": model_audio_seconds(total["input_samples"])}
+
 
 
 def teacher_sidecar_path(manifest_path: Path, source_id: str) -> Path:
@@ -1518,11 +1612,13 @@ def compare_same_seed_initial_logits(
 
 def stream_source(
     model: StreamingStudent, waveform: Tensor, device: torch.device, chunk_samples: int
-) -> tuple[Tensor, Tensor]:
+) -> tuple[Tensor, Tensor, dict[str, int]]:
     state = model.initial_state(1, device)
     logits = []
     frontiers = []
     offset = 0
+    chunk_forwards = 0
+    input_samples = 0
     while offset < waveform.numel():
         right = min(offset + chunk_samples, waveform.numel())
         chunk = waveform[offset:right].to(device).unsqueeze(0)
@@ -1530,8 +1626,14 @@ def stream_source(
         logits.append(values.squeeze(0).detach().cpu())
         frontiers.append(edges.detach().cpu())
         state = state.detached()
+        chunk_forwards += 1
+        input_samples += right - offset
         offset = right
-    return torch.cat(logits, dim=0), torch.cat(frontiers)
+    return (
+        torch.cat(logits, dim=0),
+        torch.cat(frontiers),
+        {"chunk_forwards": chunk_forwards, "input_samples": input_samples},
+    )
 
 
 def evaluate_model_on_sources(
@@ -1548,15 +1650,18 @@ def evaluate_model_on_sources(
     prepared_sha256: str | None = None,
     weight_id: str | None = None,
     checkpoint_sha256: str | None = None,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[str, int]]:
     model.eval()
     results = {}
+    exposure = {"chunk_forwards": 0, "input_samples": 0}
     with torch.no_grad():
         for source_id in source_ids:
             payload = prepared["sources"][source_id]
-            logits, frontiers = stream_source(
+            logits, frontiers, extra = stream_source(
                 model, payload["waveform"], device, chunk_samples
             )
+            exposure["chunk_forwards"] += extra["chunk_forwards"]
+            exposure["input_samples"] += extra["input_samples"]
             if not torch.equal(frontiers, payload["frontiers"]):
                 raise RuntimeError(f"{source_id} evaluation frontiers differ")
             if weight_id is not None:
@@ -1585,7 +1690,7 @@ def evaluate_model_on_sources(
                     payload["timeline"],
                 ),
             }
-    return results
+    return results, exposure
 
 
 def build_fresh_model(config: dict[str, Any], device: torch.device) -> StreamingStudent:
@@ -1615,7 +1720,10 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
         cal_ids = [source["source_id"] for source in config["sources"]["CAL"]]
         dev_ids = [source["source_id"] for source in config["sources"]["DEV"]]
         initial_ids = fit_ids + cal_ids + dev_ids
-        untrained = evaluate_model_on_sources(
+        torch.cuda.reset_peak_memory_stats(device)
+        torch.cuda.synchronize(device)
+        started = time.perf_counter()
+        untrained, exposure = evaluate_model_on_sources(
             model,
             prepared,
             initial_ids,
@@ -1629,6 +1737,8 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
             weight_id="untrained_seed20260915",
             checkpoint_sha256=None,
         )
+        torch.cuda.synchronize(device)
+        elapsed = time.perf_counter() - started
         same_init = compare_same_seed_initial_logits(run_root, config, initial_ids)
         prior_rows = {}
         means = torch.tensor(prepared["fit_constant_prior"], dtype=torch.float32)
@@ -1658,12 +1768,22 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
                 "untrained": untrained,
                 "fit_constant_prior": prior_rows,
                 "same_initialization": same_init,
+                "inference_cost": inference_cost_record(
+                    device,
+                    elapsed,
+                    exposure,
+                    "untrained source-zero prefix replay over FIT+CAL+DEV after model construction; timer starts after load, peak reset, and device synchronize; first streamed prefixes are included; not a warmup pass; excludes constant-prior CPU scoring and training; not live 80ms admission or matched teacher cost",
+                ),
                 "runtime": pilot_runtime(config_path),
             },
         )
         return
     if which == "cal":
         rows = {}
+        exposure = {"chunk_forwards": 0, "input_samples": 0}
+        torch.cuda.reset_peak_memory_stats(device)
+        torch.cuda.synchronize(device)
+        started = time.perf_counter()
         for step in config["evaluation"]["calibration_checkpoint_steps"]:
             path = run_root / f"checkpoint_step_{step}.pt"
             payload = load_current_checkpoint_for_eval(
@@ -1677,23 +1797,29 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
             model = StreamingStudent().to(device)
             model.load_state_dict(payload["model"])
             checkpoint_sha256 = sha256_file(path)
+            cal, extra = evaluate_model_on_sources(
+                model,
+                prepared,
+                [source["source_id"] for source in config["sources"]["CAL"]],
+                device,
+                chunk,
+                threshold,
+                f"cal_step_{step}",
+                run_root=run_root,
+                config_sha256=config_sha256,
+                prepared_sha256=prepared_sha256,
+                weight_id=f"checkpoint_{step}",
+                checkpoint_sha256=checkpoint_sha256,
+            )
+            exposure["chunk_forwards"] += extra["chunk_forwards"]
+            exposure["input_samples"] += extra["input_samples"]
             rows[str(step)] = {
                 "checkpoint_sha256": checkpoint_sha256,
-                "cal": evaluate_model_on_sources(
-                    model,
-                    prepared,
-                    [source["source_id"] for source in config["sources"]["CAL"]],
-                    device,
-                    chunk,
-                    threshold,
-                    f"cal_step_{step}",
-                    run_root=run_root,
-                    config_sha256=config_sha256,
-                    prepared_sha256=prepared_sha256,
-                    weight_id=f"checkpoint_{step}",
-                    checkpoint_sha256=checkpoint_sha256,
-                ),
+                "cal": cal,
+                "forward_exposure": extra,
             }
+        torch.cuda.synchronize(device)
+        elapsed = time.perf_counter() - started
         selected = None
         for step in config["evaluation"]["calibration_checkpoint_steps"]:
             bce = rows[str(step)]["cal"][config["sources"]["CAL"][0]["source_id"]][
@@ -1713,6 +1839,12 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
                     "checkpoint_sha256": selected["checkpoint_sha256"],
                     "rule": "lowest canonical masked BCE on CAL only; earliest step on exact ties",
                 },
+                "inference_cost": inference_cost_record(
+                    device,
+                    elapsed,
+                    exposure,
+                    "CAL-only prefix replay of calibration checkpoints 78/390/780 after each load; timer starts before the first load, peak reset, and device synchronize; first streamed prefixes are included; not a warmup pass; excludes training; not live 80ms admission or matched teacher cost",
+                ),
                 "runtime": pilot_runtime(config_path),
             },
         )
@@ -1738,7 +1870,7 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
         torch.cuda.reset_peak_memory_stats(device)
         torch.cuda.synchronize(device)
         started = time.perf_counter()
-        scored = evaluate_model_on_sources(
+        scored, exposure = evaluate_model_on_sources(
             model,
             prepared,
             fit_ids + dev_ids,
@@ -1761,13 +1893,12 @@ def evaluate_stage(config_path: Path, run_root: Path, which: str) -> None:
                 "selected_step": step,
                 "checkpoint_sha256": sha256_file(path),
                 "scores": scored,
-                "inference_cost": {
-                    "elapsed_seconds_synchronized": elapsed,
-                    "scope": "selected-checkpoint source-zero prefix replay over FIT+DEV after model load; timer starts after load, peak reset, and device synchronize; first streamed prefixes are included; not a warmup pass; excludes training; not live 80ms admission or matched teacher cost",
-                    "peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
-                    "peak_reserved_bytes": torch.cuda.max_memory_reserved(device),
-                    "device": device_report(device),
-                },
+                "inference_cost": inference_cost_record(
+                    device,
+                    elapsed,
+                    exposure,
+                    "selected-checkpoint source-zero prefix replay over FIT+DEV after model load; timer starts after load, peak reset, and device synchronize; first streamed prefixes are included; not a warmup pass; excludes training; not live 80ms admission or matched teacher cost",
+                ),
                 "runtime": pilot_runtime(config_path),
             },
         )
@@ -1799,11 +1930,23 @@ def infer_proof_stage(config_path: Path, run_root: Path) -> None:
     )
     model = StreamingStudent().to(device)
     model.load_state_dict(payload["model"])
-    source_id = "ami_EN2009d"
+    source_id = str(config["evaluation"]["infer_proof_source_id"])
     source_payload = prepared["sources"][source_id]
-    logits, frontiers = stream_source(
+    expected_chunks = int(config["evaluation"]["infer_proof_chunk_forwards"])
+    torch.cuda.reset_peak_memory_stats(device)
+    torch.cuda.synchronize(device)
+    started = time.perf_counter()
+    logits, frontiers, extra = stream_source(
         model, source_payload["waveform"], device, chunk
     )
+    torch.cuda.synchronize(device)
+    elapsed = time.perf_counter() - started
+    if extra["chunk_forwards"] != expected_chunks:
+        raise RuntimeError(
+            f"{source_id} infer-proof streamed {extra['chunk_forwards']} chunks, expected {expected_chunks}"
+        )
+    if extra["input_samples"] != int(source_payload["waveform"].numel()):
+        raise RuntimeError(f"{source_id} infer-proof sample count differs from prefix")
     if not torch.equal(frontiers, source_payload["frontiers"]):
         raise RuntimeError("standalone EN2009d frontiers differ")
     ordinary_path = run_root / "eval_logits" / f"checkpoint_{step}_{source_id}.pt"
@@ -1816,12 +1959,19 @@ def infer_proof_stage(config_path: Path, run_root: Path) -> None:
             "source_id": source_id,
             "selected_step": step,
             "checkpoint_sha256": sha256_file(ckpt_path),
-            "chunk_forwards": 4,
+            "chunk_forwards": extra["chunk_forwards"],
+            "input_samples": extra["input_samples"],
             "prefix_samples": int(source_payload["waveform"].numel()),
             "teacher_assets_opened": False,
             "max_abs_logit_delta": delta,
             "tolerance": RESUME_LOGIT_TOLERANCE,
             "matched_ordinary_selected_en": delta <= RESUME_LOGIT_TOLERANCE,
+            "inference_cost": inference_cost_record(
+                device,
+                elapsed,
+                extra,
+                "selected-checkpoint source-zero prefix replay of EN2009d after model load; timer starts after load, peak reset, and device synchronize; first streamed prefixes are included; not a warmup pass; excludes training; not live 80ms admission or matched teacher cost",
+            ),
             "runtime": pilot_runtime(config_path),
         },
     )
@@ -1939,9 +2089,7 @@ def save_checkpoint(
         "schedule_cursor": cursor,
         "resume_witness": witness,
     }
-    binding = teacher_binding(config)
-    if binding is not None:
-        payload.update(binding)
+    apply_teacher_binding(payload, config)
     atomic_torch_save(path, payload)
     return sha256_file(path)
 
@@ -2147,6 +2295,7 @@ def checkpoint_identity_probes(config: dict[str, Any]) -> dict[str, Any]:
         },
         "schedule_cursor": cursor,
     }
+    apply_teacher_binding(bound, config)
     validate_bound_checkpoint_for_resume(
         bound, config, config_sha256, prepared_sha256, schedule, ledger
     )
@@ -2241,34 +2390,37 @@ def _current_bound_checkpoint_payload(
     settings = optimizer_settings_from_config(config)
     cursor = expected_cursor(schedule, completed)
     numeric = expected_numeric_state(cursor, config)
-    return {
-        "schema": CURRENT_CHECKPOINT_SCHEMA,
-        "model": {},
-        "fixture_role": fixture_role,
-        "optimizer": {
-            "state": {0: {"step": torch.tensor(completed)}},
-            "param_groups": [
-                {
-                    "lr": settings["learning_rate"],
-                    "weight_decay": settings["weight_decay"],
-                }
-            ],
+    return apply_teacher_binding(
+        {
+            "schema": CURRENT_CHECKPOINT_SCHEMA,
+            "model": {},
+            "fixture_role": fixture_role,
+            "optimizer": {
+                "state": {0: {"step": torch.tensor(completed)}},
+                "param_groups": [
+                    {
+                        "lr": settings["learning_rate"],
+                        "weight_decay": settings["weight_decay"],
+                    }
+                ],
+            },
+            "config_schema": config["schema"],
+            "config_sha256": config_sha256,
+            "implementation_sha256": dict(config["implementation_sha256"]),
+            "prepared_sha256": prepared_sha256,
+            "source_order": list(config["training"]["source_order"]),
+            "optimizer_settings": settings,
+            "optimizer_step_counters": [completed],
+            "completed_updates": completed,
+            "numeric_state": numeric,
+            "streaming_state": {
+                "total_samples": numeric["total_samples"],
+                "emitted_outputs": numeric["emitted_outputs"],
+            },
+            "schedule_cursor": cursor,
         },
-        "config_schema": config["schema"],
-        "config_sha256": config_sha256,
-        "implementation_sha256": dict(config["implementation_sha256"]),
-        "prepared_sha256": prepared_sha256,
-        "source_order": list(config["training"]["source_order"]),
-        "optimizer_settings": settings,
-        "optimizer_step_counters": [completed],
-        "completed_updates": completed,
-        "numeric_state": numeric,
-        "streaming_state": {
-            "total_samples": numeric["total_samples"],
-            "emitted_outputs": numeric["emitted_outputs"],
-        },
-        "schedule_cursor": cursor,
-    }
+        config,
+    )
 
 
 def current_checkpoint_eval_loader_probes(
@@ -2393,13 +2545,16 @@ def next_chunk_logits(
     waveform: Tensor,
     bounds: list[int],
     device: torch.device,
-) -> Tensor:
+) -> tuple[Tensor, dict[str, int]]:
     model.eval()
     with torch.no_grad():
         audio = waveform[bounds[0] : bounds[1]].to(device).unsqueeze(0)
         logits, _, _ = model.forward_stream(audio, state)
     model.train()
-    return logits.squeeze(0).detach().cpu()
+    return logits.squeeze(0).detach().cpu(), {
+        "chunk_forwards": 1,
+        "input_samples": int(bounds[1] - bounds[0]),
+    }
 
 
 def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after: int | None) -> None:
@@ -2425,6 +2580,7 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
         class_weights = solo_class_weight_tensor(objective, device)
     elif objective["name"] == OBJECTIVE_TEACHER_KD:
         teacher = load_teacher_fit_targets(config, prepared)
+    exposure = empty_forward_exposure()
     if resume:
         if not latest_path.exists():
             raise RuntimeError("resume requested without checkpoint_latest.pt")
@@ -2463,13 +2619,14 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
             witness_payload = prepared["sources"][
                 witness.get("source_id", cursor["source_id"])
             ]
-            current = next_chunk_logits(
+            current, witness_extra = next_chunk_logits(
                 model,
                 state_for_witness,
                 witness_payload["waveform"],
                 witness["sample_bounds"],
                 device,
             )
+            add_forward_exposure(exposure, witness_extra, kind="witness")
             expected = witness["logits"]
             delta = float((current - expected).abs().max())
             if delta > RESUME_LOGIT_TOLERANCE:
@@ -2484,6 +2641,10 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
                     "tolerance": RESUME_LOGIT_TOLERANCE,
                     "precision": "float32",
                     "extra_optimizer_updates": 0,
+                    "forward_exposure": {
+                        "chunk_forwards": witness_extra["chunk_forwards"],
+                        "input_samples": witness_extra["input_samples"],
+                    },
                 },
             )
             state = model.state_from_dict(checkpoint["streaming_state"], device)
@@ -2547,6 +2708,11 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
         try:
             audio = payload["waveform"][left:right].to(device).unsqueeze(0)
             logits, frontiers, state = model.forward_stream(audio, state)
+            add_forward_exposure(
+                exposure,
+                {"chunk_forwards": 1, "input_samples": int(right - left)},
+                kind="update",
+            )
             frame_left = row["chunk_index"] * int(config["training"]["frames_per_update"])
             frame_right = frame_left + int(config["training"]["frames_per_update"])
             expected = payload["frontiers"][frame_left:frame_right]
@@ -2655,28 +2821,32 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
         if pause_after == completed and completed < len(schedule):
             nxt = schedule[completed]
             if nxt["source_id"] == row["source_id"] and nxt["epoch"] == row["epoch"]:
+                logits, extra = next_chunk_logits(
+                    model, state, payload["waveform"], nxt["sample_bounds"], device
+                )
+                add_forward_exposure(exposure, extra, kind="witness")
                 witness = {
                     "update_index": nxt["update_index"],
                     "source_id": nxt["source_id"],
                     "epoch": nxt["epoch"],
                     "sample_bounds": nxt["sample_bounds"],
-                    "logits": next_chunk_logits(
-                        model, state, payload["waveform"], nxt["sample_bounds"], device
-                    ),
+                    "logits": logits,
                 }
             else:
+                logits, extra = next_chunk_logits(
+                    model,
+                    model.initial_state(1, device),
+                    prepared["sources"][nxt["source_id"]]["waveform"],
+                    nxt["sample_bounds"],
+                    device,
+                )
+                add_forward_exposure(exposure, extra, kind="witness")
                 witness = {
                     "update_index": nxt["update_index"],
                     "source_id": nxt["source_id"],
                     "epoch": nxt["epoch"],
                     "sample_bounds": nxt["sample_bounds"],
-                    "logits": next_chunk_logits(
-                        model,
-                        model.initial_state(1, device),
-                        prepared["sources"][nxt["source_id"]]["waveform"],
-                        nxt["sample_bounds"],
-                        device,
-                    ),
+                    "logits": logits,
                 }
         boundary = row["source_boundary_after"]
         cal_step = completed in set(config["evaluation"]["calibration_checkpoint_steps"])
@@ -2715,6 +2885,7 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
                     "peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
                     "training_elapsed_seconds_synchronized": time.perf_counter() - started,
                     "timing_scope": "pause-process wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through pause checkpoint, covering this process's optimizer updates only; excludes pre-timer setup and the later resume process.",
+                    "forward_exposure": dict(exposure),
                 }
                 atomic_json(run_root / "pause_accounting.json", pause_doc)
                 atomic_json(accounting_path, pause_doc)
@@ -2755,6 +2926,7 @@ def train_stage(config_path: Path, run_root: Path, *, resume: bool, pause_after:
                 if resume
                 else "single-process wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through final checkpoint, including host/device transfers and optimizer updates; excludes that pre-timer setup."
             ),
+            "forward_exposure": dict(exposure),
         },
     )
 
@@ -2906,17 +3078,50 @@ def report_stage(config_path: Path, run_root: Path) -> None:
         limitations.append(
             "check_stage synthetic metric probes, slot projections, and checkpoint identity probes were not produced by this run"
         )
+    kd = config["training"].get("objective", {}).get("name") == OBJECTIVE_TEACHER_KD
+    infer = None
+    if kd:
+        infer_path = run_root / "infer_proof.json"
+        if not infer_path.is_file():
+            raise RuntimeError("KD report requires infer_proof.json")
+        infer = json.loads(infer_path.read_text(encoding="utf-8"))
+        if not infer.get("matched_ordinary_selected_en"):
+            raise RuntimeError("KD infer-proof did not match ordinary selected EN logits")
+        scope = "bounded GT BCE plus fixed 0.25 teacher BCE on the unchanged student; not issue164 completion, generalization, or production evidence"
+    else:
+        scope = "bounded multi-source GT learning decision pilot; not issue164 completion, generalization, KD, or production evidence"
     executed_runtime = dict(prepare["runtime"])
-    executed_device = retained_execution_device_provenance(
+    device_docs = [
         ("final_eval.inference_cost.device", final),
         ("cal_selection.inference_cost.device", selection),
         ("initial_eval.inference_cost.device", initial),
-    )
+    ]
+    if infer is not None:
+        device_docs.append(("infer_proof.inference_cost.device", infer))
+    executed_device = retained_execution_device_provenance(*device_docs)
     reporter = reporter_runtime(frozen_path, config)
+    exposure = collect_run_forward_exposure(
+        pause_accounting=pause_accounting,
+        accounting=accounting,
+        initial=initial,
+        selection=selection,
+        final=final,
+        infer=infer,
+    )
+    max_forwards = int(config["evaluation"]["maximum_total_chunk_forwards"])
+    max_seconds = float(config["evaluation"]["maximum_total_model_audio_seconds"])
+    if exposure["chunk_forwards"] > max_forwards:
+        raise RuntimeError(
+            f"aggregated chunk_forwards {exposure['chunk_forwards']} exceed cap {max_forwards}"
+        )
+    if exposure["model_audio_seconds"] > max_seconds:
+        raise RuntimeError(
+            f"aggregated model_audio_seconds {exposure['model_audio_seconds']} exceed cap {max_seconds}"
+        )
     result: dict[str, Any] = {
         "schema": "PSEM-ISSUE-164-GT-PILOT-RESULT-1",
         "status": "completed",
-        "scope": "bounded multi-source GT learning decision pilot; not issue164 completion, generalization, KD, or production evidence",
+        "scope": scope,
         "identities": prepare["identities"],
         "prepare": prepare_summary,
         "initial": initial,
@@ -2933,6 +3138,12 @@ def report_stage(config_path: Path, run_root: Path) -> None:
             + accounting["completed_updates"],
             "maximum_cumulative": config["budget"]["maximum_cumulative_optimizer_updates"],
         },
+        "forward_exposure": {
+            **exposure,
+            "maximum_total_chunk_forwards": max_forwards,
+            "maximum_total_model_audio_seconds": max_seconds,
+            "within_caps": True,
+        },
         "pipeline_proofs": {
             "frozen_config_sha256": frozen_sha256,
             "prepare_receipt_stage": prepare["stage"],
@@ -2944,6 +3155,9 @@ def report_stage(config_path: Path, run_root: Path) -> None:
         "executed_device_provenance": executed_device,
         "reporter": reporter,
     }
+    if infer is not None:
+        result["infer_proof"] = infer
+        result["teacher_provenance"] = teacher_binding(config)
     if execution_identity is not None:
         result["execution_identity"] = execution_identity
     atomic_json(run_root / "result.json", result)
@@ -3192,6 +3406,32 @@ def kd_loss_probe_stage(config: dict[str, Any], run_root: Path, started: float, 
         rejected = True
     if not rejected:
         raise RuntimeError("corrupt emitted probabilities were not rejected")
+    fixture = _current_bound_checkpoint_payload(
+        config,
+        2,
+        "a" * 64,
+        "b" * 64,
+        fixture_role="kd-loss-probe-teacher-binding-fixture-not-training",
+    )
+    validate_current_checkpoint_identity(
+        fixture, config, "a" * 64, "b" * 64, fit_schedule(config), 2
+    )
+    binding = teacher_binding(config)
+    if binding is None:
+        raise RuntimeError("KD loss-probe requires teacher binding")
+    for key, expected in binding.items():
+        if fixture.get(key) != expected:
+            raise RuntimeError(f"synthetic bound fixture missing teacher field {key}")
+    en_prefix = next(
+        int(source["prefix_samples"])
+        for source in config["sources"]["DEV"]
+        if source["source_id"] == config["evaluation"]["infer_proof_source_id"]
+    )
+    planned_en = planned_stream_exposure(
+        en_prefix, int(config["training"]["chunk_samples"])
+    )
+    if planned_en["chunk_forwards"] != int(config["evaluation"]["infer_proof_chunk_forwards"]):
+        raise RuntimeError("planned EN2009d chunk count differs from infer-proof cap")
     elapsed = time.perf_counter() - started
     if elapsed > 120:
         raise RuntimeError("loss-probe exceeded 120s CPU wall")
@@ -3210,6 +3450,14 @@ def kd_loss_probe_stage(config: dict[str, Any], run_root: Path, started: float, 
             "common_gt_teacher_rows": common_total,
             "corrupt_emitted_rejected": True,
             "teacher_sidecars_validated": sorted(loaded),
+            "fixture_teacher_binding_accepted": True,
+            "planned_en2009d_stream_exposure": planned_en,
+            "maximum_total_chunk_forwards": int(
+                config["evaluation"]["maximum_total_chunk_forwards"]
+            ),
+            "maximum_total_model_audio_seconds": int(
+                config["evaluation"]["maximum_total_model_audio_seconds"]
+            ),
             "elapsed_seconds": elapsed,
             "runtime": pilot_runtime(config_path),
         },
@@ -3493,7 +3741,7 @@ def repair_evaluate_stage(config_path: Path, run_root: Path) -> None:
                 if time.perf_counter() > deadline:
                     raise RuntimeError("repair wall cap exhausted")
                 payload = prepared["sources"][source_id]
-                logits, frontiers = stream_source(
+                logits, frontiers, _extra = stream_source(
                     model, payload["waveform"], device, chunk
                 )
                 if torch.cuda.max_memory_reserved(device) > max_reserved:
