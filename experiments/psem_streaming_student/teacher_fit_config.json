@@ -118,7 +118,7 @@
     "cumulative_optimizer_updates_unchanged": 1583,
     "external_cost": 0,
     "new_installation": false,
-    "model_instantiation": 0
+    "orchestrator_pytorch_model_construction": 0
   },
   "outputs": {
     "run_root": "experiments/psem_streaming_student/.stage-control/issue-164-teacher-fit-targets-1",

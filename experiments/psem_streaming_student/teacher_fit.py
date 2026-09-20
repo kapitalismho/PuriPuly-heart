@@ -103,11 +103,13 @@ def load_teacher_config(path: Path) -> dict[str, Any]:
     require(config["association"]["raw_kd_probabilities_softmaxed"] is False, "KD probabilities must not be softmaxed")
     require(int(config["bounds"]["optimizer_updates"]) == 0, "optimizer updates are not authorized")
     require(int(config["bounds"]["cumulative_optimizer_updates_unchanged"]) == 1583, "cumulative optimizer count must stay 1583")
-    require(int(config["bounds"]["model_instantiation"]) == 0, "model instantiation is not authorized")
+    require(int(config["bounds"]["orchestrator_pytorch_model_construction"]) == 0, "orchestrator PyTorch model construction is not authorized")
+    require(int(config["bounds"]["new_native_source_trajectories"]) == 4, "native teacher trajectories must remain 4")
     return config
 
 
-def verify_pinned_files(config: dict[str, Any]) -> dict[str, str]:
+def verify_pinned_files(config: dict[str, Any], executed_config_path: Path) -> dict[str, str]:
+    executed_config_path = executed_config_path.resolve()
     hashes = {
         "contract": digest_file(repo_path(config["contract"]["path"])),
         "native_prerequisites": digest_file(repo_path(config["native_prerequisites"]["path"])),
@@ -118,7 +120,8 @@ def verify_pinned_files(config: dict[str, Any]) -> dict[str, str]:
         "run_baseline.py": digest_file(HERE / "run_baseline.py"),
         "gt_probe.py": digest_file(HERE / "gt_probe.py"),
         "teacher_fit.py": digest_file(HERE / "teacher_fit.py"),
-        "teacher_fit_config.json": digest_file(HERE / "teacher_fit_config.json"),
+        "config": digest_file(executed_config_path),
+        "executed_config_path": str(executed_config_path),
     }
     require(hashes["contract"] == config["contract"]["sha256"], "teacher-fit contract hash mismatch")
     require(hashes["native_prerequisites"] == config["native_prerequisites"]["sha256"], "native prerequisites hash mismatch")
@@ -267,23 +270,43 @@ def prefix_export_matches_prepared(source_wav: Path, prepared_wave: torch.Tensor
 
 def native_environment(config: dict[str, Any], dump_dir: Path) -> dict[str, str]:
     env = os.environ.copy()
-    drop = list(config["native"]["absent_environment"]) + list(run_baseline.PROFILE_KEYS.values()) + ["TRANSCRIBE_DUMP_DIR"]
-    for key in drop:
-        env.pop(key, None)
+    for key in list(env):
+        if key.startswith("TRANSCRIBE_"):
+            env.pop(key, None)
     env.update({key: str(value) for key, value in config["native"]["required_environment"].items()})
     env["TRANSCRIBE_DUMP_DIR"] = str(dump_dir)
     for key in config["native"]["absent_environment"]:
         require(key not in env, f"forbidden environment still set: {key}")
     require("TRANSCRIBE_SORTFORMER_OFFLINE_DUMP" not in env, "offline dump environment leaked")
+    for key, value in config["native"]["required_environment"].items():
+        require(env.get(key) == str(value), f"required environment missing: {key}")
     return env
 
 
-def relevant_environment(env: dict[str, str], config: dict[str, Any]) -> dict[str, Any]:
-    keys = list(config["native"]["required_environment"]) + ["TRANSCRIBE_DUMP_DIR"] + list(config["native"]["absent_environment"])
-    return {
-        "set": {key: env.get(key) for key in keys if key in env},
-        "absent": {key: key not in env for key in config["native"]["absent_environment"]},
+def describe_environment(env: dict[str, str]) -> dict[str, Any]:
+    transcribe = {key: env[key] for key in sorted(env) if key.startswith("TRANSCRIBE_")}
+    inherited = {
+        key: env[key]
+        for key in sorted(env)
+        if key.startswith(("CUDA_", "HIP_", "ROCR_", "HSA_", "VK_", "GGML_"))
     }
+    return {
+        "effective_transcribe": transcribe,
+        "other_inherited_backend_flags": inherited,
+        "other_inherited_backend_flags_not_exhaustive_os_environment": True,
+        "absent": {key: key not in env for key in (
+            "TRANSCRIBE_PSEM_PACE_16KHZ",
+            "TRANSCRIBE_PSEM_PACE_FROM_SAMPLE",
+            "TRANSCRIBE_PSEM_PACE_UNTIL_SAMPLE",
+            "TRANSCRIBE_PSEM_EVENTS_TCP",
+            "TRANSCRIBE_SORTFORMER_OFFLINE_DUMP",
+        )},
+    }
+
+
+def relevant_environment(env: dict[str, str], config: dict[str, Any]) -> dict[str, Any]:
+    del config
+    return describe_environment(env)
 
 
 def verify_trace_profile(trace: dict[str, Any], config: dict[str, Any], prefix_samples: int) -> None:
@@ -788,12 +811,104 @@ def load_director_release(run_root: Path, config: dict[str, Any], hashes: dict[s
     require(release.get("schema") == RELEASE_SCHEMA, "unexpected director release schema")
     require(release.get("automatic_retry") is False, "director release must forbid automatic retry")
     require(release.get("teacher_fit_sha256") == hashes["teacher_fit.py"], "director release teacher_fit.py hash mismatch")
-    require(release.get("config_sha256") == hashes["teacher_fit_config.json"], "director release config hash mismatch")
+    require(release.get("config_sha256") == hashes["config"], "director release config hash mismatch")
     require(release.get("prepared_sources_sha256") == config["inputs"]["prepared_sources_sha256"], "director release prepared hash mismatch")
     require(release.get("executable_sha256") == config["native"]["executable_sha256"], "director release executable hash mismatch")
     require(release.get("model_sha256") == config["native"]["model_sha256"], "director release model hash mismatch")
     require(release.get("contract_sha256") == config["contract"]["sha256"], "director release contract hash mismatch")
     return release
+
+
+def config_release_identity_probes(executed_config_path: Path) -> dict[str, Any]:
+    executed_config_path = executed_config_path.resolve()
+    config = load_teacher_config(executed_config_path)
+    with tempfile.TemporaryDirectory(prefix="teacher-fit-config-gate-") as temp:
+        root = Path(temp)
+        frozen = root / "frozen_config.json"
+        frozen.write_bytes(executed_config_path.read_bytes())
+        hashes = verify_pinned_files(config, frozen)
+        require(hashes["config"] == digest_file(frozen), "executed config hash is not the frozen bytes")
+        require(hashes["config"] != "", "executed config hash missing")
+        publish_json(
+            root / "director_release.json",
+            {
+                "schema": RELEASE_SCHEMA,
+                "automatic_retry": False,
+                "teacher_fit_sha256": hashes["teacher_fit.py"],
+                "config_sha256": hashes["config"],
+                "prepared_sources_sha256": config["inputs"]["prepared_sources_sha256"],
+                "executable_sha256": config["native"]["executable_sha256"],
+                "model_sha256": config["native"]["model_sha256"],
+                "contract_sha256": config["contract"]["sha256"],
+            },
+        )
+        load_director_release(root, config, hashes)
+        modified = load_json(executed_config_path)
+        modified["native"]["required_environment"]["TRANSCRIBE_SORTFORMER_STREAM_CHUNK_LEN"] = "99"
+        modified["bounds"]["whole_run_wall_seconds"] = 1
+        modified_path = root / "modified_config.json"
+        modified_path.write_text(json.dumps(modified, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+        modified_config = load_teacher_config(modified_path)
+        modified_hashes = verify_pinned_files(modified_config, modified_path)
+        require(modified_hashes["config"] != hashes["config"], "modified config hash collided with executed frozen hash")
+        rejected = False
+        try:
+            load_director_release(root, modified_config, modified_hashes)
+        except RuntimeError as error:
+            rejected = "config hash mismatch" in str(error)
+        require(rejected, "modified executed config was accepted by the release metadata gate")
+        native_launched = False
+    return {
+        "unchanged_frozen_accepted": True,
+        "modified_config_rejected_before_launch": True,
+        "native_launched": native_launched,
+        "executed_config_sha256": hashes["config"],
+    }
+
+
+def environment_isolation_probes(config: dict[str, Any]) -> dict[str, Any]:
+    injected = {
+        "TRANSCRIBE_SORTFORMER_PRESET": "injected-preset",
+        "TRANSCRIBE_DUMP_HIDDEN": "1",
+        "TRANSCRIBE_EXPORT_EMBED": "1",
+        "TRANSCRIBE_SORTFORMER_OFFLINE_DUMP": "1",
+        "TRANSCRIBE_PSEM_PACE_16KHZ": "1",
+        "TRANSCRIBE_PSEM_EVENTS_TCP": "127.0.0.1:1",
+    }
+    prior = {key: os.environ.get(key) for key in injected}
+    dump = Path("cpu-env-probe-dump")
+    try:
+        os.environ.update(injected)
+        env = native_environment(config, dump)
+        described = describe_environment(env)
+        for key in injected:
+            require(key not in env, f"injected {key} survived native environment construction")
+        for key, value in config["native"]["required_environment"].items():
+            require(env.get(key) == str(value), f"approved {key} was not set")
+        require(env.get("TRANSCRIBE_DUMP_DIR") == str(dump), "DUMP_DIR was not the run-local dump")
+        require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_STREAM_CHUNK_LEN") == "6", "chunk_len")
+        require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_STREAM_LC") == "1", "left context")
+        require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_STREAM_RC") == "7", "right context")
+        require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_STREAM_FIFO_LEN") == "188", "fifo")
+        require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_STREAM_SPKCACHE_LEN") == "188", "spkcache")
+        require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_STREAM_UPDATE_PERIOD") == "144", "update period")
+        require(described["effective_transcribe"].get("TRANSCRIBE_PSEM_CAUSAL_FRONTEND") == "1", "causal frontend")
+        require(described["effective_transcribe"].get("TRANSCRIBE_SORTFORMER_F32_HEAD") == "1", "F32 head")
+        require(described["effective_transcribe"].get("TRANSCRIBE_VK_NO_MUL_MAT_VEC") == "1", "VK_NO_MUL_MAT_VEC")
+        require(all(described["absent"].values()), "pace/TCP/offline keys must stay absent")
+    finally:
+        for key, value in prior.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+    return {
+        "injected_preset_hidden_export_absent": True,
+        "approved_profile_present": True,
+        "offline_pace_tcp_absent": True,
+        "effective_transcribe": described["effective_transcribe"],
+        "other_inherited_backend_flags_not_exhaustive_os_environment": True,
+    }
 
 
 def bind_frozen_config(config_path: Path, run_root: Path) -> Path:
@@ -1032,7 +1147,7 @@ def run_native_source(
 def smoke_stage(config_path: Path, run_root: Path) -> dict[str, Any]:
     run_root.mkdir(parents=True, exist_ok=True)
     config = load_teacher_config(config_path)
-    hashes = verify_pinned_files(config)
+    hashes = verify_pinned_files(config, config_path)
     native = verify_native_identities(config)
     origin = load_origin_config(config)
     identities = bind_fit_identities(config, origin)
@@ -1062,10 +1177,19 @@ def smoke_stage(config_path: Path, run_root: Path) -> dict[str, Any]:
     require(release_blocked, "missing Director release was not treated as a native blocker")
     env = native_environment(config, run_root / "smoke-dump")
     require(all(env.get(key) == value for key, value in config["native"]["required_environment"].items()), "required unpaced environment")
+    config_gate = config_release_identity_probes(config_path)
+    env_gate = environment_isolation_probes(config)
     receipt = {
         "schema": "PSEM-TEACHER-FIT-SMOKE-1",
         "status": "preparation_smoke_passed",
-        "model_instantiation": False,
+        "orchestrator_pytorch_model_construction": 0,
+        "native_model_loads": {
+            "max_trajectories": 4,
+            "successful_decoded_loads": 0,
+            "uncertain_or_failed_launches_not_counted_as_loads": 0,
+            "failed_intent_is_not_a_known_successful_load": True,
+            "this_stage": "cpu_preparation",
+        },
         "model_forward": False,
         "native_material_executed": False,
         "fit_targets_written": False,
@@ -1078,6 +1202,8 @@ def smoke_stage(config_path: Path, run_root: Path) -> dict[str, Any]:
         "prefix_export": exports,
         "synthetic_geometry": geometry,
         "retained_dev_parser": dev_parser,
+        "config_release_identity_probes": config_gate,
+        "environment_isolation_probes": env_gate,
         "material_gate_blocks_without_authorize_and_release": True,
         "future_argv": future_argv(config_path, run_root),
     }
@@ -1089,7 +1215,8 @@ def bind_stage(config_path: Path, run_root: Path) -> dict[str, Any]:
     run_root.mkdir(parents=True, exist_ok=True)
     frozen = bind_frozen_config(config_path, run_root)
     config = load_teacher_config(frozen)
-    hashes = verify_pinned_files(config)
+    hashes = verify_pinned_files(config, frozen)
+    require(hashes["config"] == digest_file(frozen), "bind config identity is not the frozen bytes")
     native = verify_native_identities(config)
     origin = load_origin_config(config)
     identities = bind_fit_identities(config, origin)
@@ -1127,7 +1254,8 @@ def execute_stage(config_path: Path, run_root: Path) -> dict[str, Any]:
     run_root.mkdir(parents=True, exist_ok=True)
     frozen = bind_frozen_config(config_path, run_root)
     config = load_teacher_config(frozen)
-    hashes = verify_pinned_files(config)
+    hashes = verify_pinned_files(config, frozen)
+    require(hashes["config"] == digest_file(frozen), "release/config identity is not the executed frozen bytes")
     release = load_director_release(run_root, config, hashes)
     native = verify_native_identities(config)
     origin = load_origin_config(config)
@@ -1171,7 +1299,7 @@ def execute_stage(config_path: Path, run_root: Path) -> dict[str, Any]:
         "prepared_sources_sha256": prepared_sha,
         "original_config_sha256": config["inputs"]["original_config_sha256"],
         "teacher_fit_sha256": hashes["teacher_fit.py"],
-        "config_sha256": hashes["teacher_fit_config.json"],
+        "config_sha256": hashes["config"],
         "executable_sha256": native["executable_sha256"],
         "model_sha256": native["model_sha256"],
         "sources": [
@@ -1201,12 +1329,20 @@ def execute_stage(config_path: Path, run_root: Path) -> dict[str, Any]:
         "orchestrator_wall_s": time.perf_counter() - started,
         "optimizer_updates": 0,
         "cumulative_optimizer_updates_unchanged": 1583,
+        "orchestrator_pytorch_model_construction": 0,
+        "native_model_loads": {
+            "max_trajectories": int(config["bounds"]["new_native_source_trajectories"]),
+            "successful_decoded_loads": sum(1 for row in source_results if row.get("exit_code") == 0),
+            "uncertain_or_failed_launches_not_counted_as_loads": int(config["bounds"]["new_native_source_trajectories"]) - sum(1 for row in source_results if row.get("exit_code") == 0),
+            "failed_intent_is_not_a_known_successful_load": True,
+        },
         "findings": [
             "Teacher support validity is stored separately from GT validity.",
             "One source-global permutation was fit on common-valid independent activity BCE only.",
             "Raw sidecar probabilities are unclipped and not softmax-normalized.",
             "Association used existing 1e-12 logit clipping and disclosed clip counts.",
             "Permutation is a FIT task projection, not a human-identity guarantee.",
+            "Native model-load count is successful decoded trajectories only, not launch intent.",
         ],
     }
     publish_json(repo_path(config["outputs"]["public_result"]), public)
