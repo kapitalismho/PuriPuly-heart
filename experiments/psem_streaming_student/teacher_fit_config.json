@@ -101,7 +101,7 @@
   },
   "reviewed_helpers": {
     "speaker_score_diagnostic.py": "b8880483ebd3528fb31627913124f8755720e11e1c821537ffdfbb5dcb3f360d",
-    "gt_pilot.py": "3a6cacf2a87ce617bd832784f29a682fa42d2f6bf862084410e002b1fc370dda",
+    "gt_pilot.py": "f88d190bd3817bee2d6118978bfe2f02f46b0a7d571d1c5717dadea90e7e44a2",
     "run_baseline.py": "3f7ee8a924bdb5e7ad848d2e1549df7e4f3ec06b2ef1c22e61213e5a3e9ee8c9",
     "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a"
   },

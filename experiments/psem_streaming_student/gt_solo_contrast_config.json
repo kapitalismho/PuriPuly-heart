@@ -25,15 +25,13 @@
     ],
     "eval_logits_manifest": "eval_logits_manifest.json",
     "init_logit_match_tolerance": 1e-06,
-    "maximum_total_chunk_forwards": 1052,
-    "maximum_total_model_audio_seconds": 15950,
     "no_threshold_sweep": true,
     "operating_point": 0.5,
     "resume_logit_tolerance": 0.0001
   },
   "implementation_base_commit": "f162d99e404c546c7e2d3599e2ce2c7e7ea06b92",
   "implementation_sha256": {
-    "gt_pilot.py": "3a6cacf2a87ce617bd832784f29a682fa42d2f6bf862084410e002b1fc370dda",
+    "gt_pilot.py": "f88d190bd3817bee2d6118978bfe2f02f46b0a7d571d1c5717dadea90e7e44a2",
     "gt_probe.py": "50a2be6c6913877ad9c7e1e7672d681c4870fd4e2bda51731547fe27bd0e4e5a",
     "run_gt_pilot.sh": "526e7a33ff295cd4d2b66f2dbb967f18091b2b763c469e4bb7ebc455945f9654",
     "student.py": "771e1ad0a97bf2e2d3d82c4a2f9ee3b155363341bc08cb792a0c819434f2d82d"

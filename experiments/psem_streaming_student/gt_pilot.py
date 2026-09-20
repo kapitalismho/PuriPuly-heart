@@ -161,11 +161,12 @@ def parse_pilot_config(path: Path) -> dict[str, Any]:
         raise RuntimeError("student parameter count must remain 5940740")
     if "objective" in training:
         validate_training_objective(value)
-    evaluation = value["evaluation"]
-    if int(evaluation["maximum_total_chunk_forwards"]) != 1052:
-        raise RuntimeError("pilot total chunk-forward cap must be 1052")
-    if int(evaluation["maximum_total_model_audio_seconds"]) != 15950:
-        raise RuntimeError("pilot total model-audio cap must be 15950 seconds")
+    if training.get("objective", {}).get("name") == OBJECTIVE_TEACHER_KD:
+        evaluation = value["evaluation"]
+        if int(evaluation["maximum_total_chunk_forwards"]) != 1052:
+            raise RuntimeError("teacher KD total chunk-forward cap must be 1052")
+        if int(evaluation["maximum_total_model_audio_seconds"]) != 15950:
+            raise RuntimeError("teacher KD total model-audio cap must be 15950 seconds")
     return value
 
 
@@ -763,28 +764,87 @@ def inference_cost_record(
     }
 
 
-def collect_run_forward_exposure(
+def measured_stage_exposure(doc: dict[str, Any] | None, field: str) -> dict[str, int] | None:
+    extra = (doc or {}).get(field) if isinstance(doc, dict) else None
+    if not isinstance(extra, dict):
+        return None
+    if extra.get("chunk_forwards") is None or extra.get("input_samples") is None:
+        return None
+    return {
+        "chunk_forwards": int(extra["chunk_forwards"]),
+        "input_samples": int(extra["input_samples"]),
+    }
+
+
+def kd_required_stage_exposures(
     *,
     pause_accounting: dict[str, Any] | None,
     accounting: dict[str, Any],
     initial: dict[str, Any],
     selection: dict[str, Any],
     final: dict[str, Any],
-    infer: dict[str, Any] | None = None,
+    infer: dict[str, Any] | None,
+) -> dict[str, dict[str, int]]:
+    required = {
+        "pause_accounting.forward_exposure": measured_stage_exposure(
+            pause_accounting, "forward_exposure"
+        ),
+        "accounting.forward_exposure": measured_stage_exposure(accounting, "forward_exposure"),
+        "initial_eval.inference_cost": measured_stage_exposure(initial, "inference_cost"),
+        "cal_selection.inference_cost": measured_stage_exposure(selection, "inference_cost"),
+        "final_eval.inference_cost": measured_stage_exposure(final, "inference_cost"),
+        "infer_proof.inference_cost": measured_stage_exposure(infer, "inference_cost"),
+    }
+    missing = [name for name, value in required.items() if value is None]
+    if missing:
+        raise RuntimeError("KD report missing measured stage counts: " + ", ".join(missing))
+    return required
+
+
+def verified_kd_forward_exposure(
+    config: dict[str, Any], stages: dict[str, dict[str, int]]
 ) -> dict[str, Any]:
     total = empty_forward_exposure()
-    for doc in (pause_accounting, accounting):
-        extra = (doc or {}).get("forward_exposure")
-        if extra:
-            add_forward_exposure(total, extra)
-    for doc in (initial, selection, final):
-        extra = (doc or {}).get("inference_cost")
-        if extra and extra.get("chunk_forwards") is not None:
-            add_forward_exposure(total, extra)
-    if infer is not None:
-        extra = infer.get("inference_cost") or infer
-        if extra.get("chunk_forwards") is not None:
-            add_forward_exposure(total, extra)
+    for extra in stages.values():
+        add_forward_exposure(total, extra)
+    seconds = model_audio_seconds(total["input_samples"])
+    max_forwards = int(config["evaluation"]["maximum_total_chunk_forwards"])
+    max_seconds = float(config["evaluation"]["maximum_total_model_audio_seconds"])
+    if total["chunk_forwards"] > max_forwards:
+        raise RuntimeError(
+            f"aggregated chunk_forwards {total['chunk_forwards']} exceed cap {max_forwards}"
+        )
+    if seconds > max_seconds:
+        raise RuntimeError(f"aggregated model_audio_seconds {seconds} exceed cap {max_seconds}")
+    return {
+        **total,
+        "model_audio_seconds": seconds,
+        "maximum_total_chunk_forwards": max_forwards,
+        "maximum_total_model_audio_seconds": max_seconds,
+        "within_caps": True,
+    }
+
+
+def historical_forward_exposure_report(
+    *,
+    pause_accounting: dict[str, Any] | None,
+    accounting: dict[str, Any],
+    initial: dict[str, Any],
+    selection: dict[str, Any],
+    final: dict[str, Any],
+) -> dict[str, Any] | None:
+    measured = [
+        measured_stage_exposure(pause_accounting, "forward_exposure"),
+        measured_stage_exposure(accounting, "forward_exposure"),
+        measured_stage_exposure(initial, "inference_cost"),
+        measured_stage_exposure(selection, "inference_cost"),
+        measured_stage_exposure(final, "inference_cost"),
+    ]
+    if any(row is None for row in measured):
+        return None
+    total = empty_forward_exposure()
+    for extra in measured:
+        add_forward_exposure(total, extra)
     return {**total, "model_audio_seconds": model_audio_seconds(total["input_samples"])}
 
 
@@ -3100,23 +3160,23 @@ def report_stage(config_path: Path, run_root: Path) -> None:
         device_docs.append(("infer_proof.inference_cost.device", infer))
     executed_device = retained_execution_device_provenance(*device_docs)
     reporter = reporter_runtime(frozen_path, config)
-    exposure = collect_run_forward_exposure(
-        pause_accounting=pause_accounting,
-        accounting=accounting,
-        initial=initial,
-        selection=selection,
-        final=final,
-        infer=infer,
-    )
-    max_forwards = int(config["evaluation"]["maximum_total_chunk_forwards"])
-    max_seconds = float(config["evaluation"]["maximum_total_model_audio_seconds"])
-    if exposure["chunk_forwards"] > max_forwards:
-        raise RuntimeError(
-            f"aggregated chunk_forwards {exposure['chunk_forwards']} exceed cap {max_forwards}"
+    if kd:
+        stages = kd_required_stage_exposures(
+            pause_accounting=pause_accounting,
+            accounting=accounting,
+            initial=initial,
+            selection=selection,
+            final=final,
+            infer=infer,
         )
-    if exposure["model_audio_seconds"] > max_seconds:
-        raise RuntimeError(
-            f"aggregated model_audio_seconds {exposure['model_audio_seconds']} exceed cap {max_seconds}"
+        exposure_field: dict[str, Any] | None = verified_kd_forward_exposure(config, stages)
+    else:
+        exposure_field = historical_forward_exposure_report(
+            pause_accounting=pause_accounting,
+            accounting=accounting,
+            initial=initial,
+            selection=selection,
+            final=final,
         )
     result: dict[str, Any] = {
         "schema": "PSEM-ISSUE-164-GT-PILOT-RESULT-1",
@@ -3138,12 +3198,6 @@ def report_stage(config_path: Path, run_root: Path) -> None:
             + accounting["completed_updates"],
             "maximum_cumulative": config["budget"]["maximum_cumulative_optimizer_updates"],
         },
-        "forward_exposure": {
-            **exposure,
-            "maximum_total_chunk_forwards": max_forwards,
-            "maximum_total_model_audio_seconds": max_seconds,
-            "within_caps": True,
-        },
         "pipeline_proofs": {
             "frozen_config_sha256": frozen_sha256,
             "prepare_receipt_stage": prepare["stage"],
@@ -3160,6 +3214,10 @@ def report_stage(config_path: Path, run_root: Path) -> None:
         result["teacher_provenance"] = teacher_binding(config)
     if execution_identity is not None:
         result["execution_identity"] = execution_identity
+    if exposure_field is not None:
+        result["forward_exposure"] = exposure_field
+    else:
+        result["forward_exposure"] = {"available": False}
     atomic_json(run_root / "result.json", result)
     atomic_json(
         run_root / "report_receipt.json",
