@@ -770,10 +770,18 @@ def measured_stage_exposure(doc: dict[str, Any] | None, field: str) -> dict[str,
         return None
     if extra.get("chunk_forwards") is None or extra.get("input_samples") is None:
         return None
-    return {
+    row: dict[str, int] = {
         "chunk_forwards": int(extra["chunk_forwards"]),
         "input_samples": int(extra["input_samples"]),
     }
+    for key in (
+        "optimizer_update_chunk_forwards",
+        "witness_chunk_forwards",
+        "witness_input_samples",
+    ):
+        if extra.get(key) is not None:
+            row[key] = int(extra[key])
+    return row
 
 
 def kd_required_stage_exposures(
@@ -806,7 +814,15 @@ def verified_kd_forward_exposure(
 ) -> dict[str, Any]:
     total = empty_forward_exposure()
     for extra in stages.values():
-        add_forward_exposure(total, extra)
+        total["chunk_forwards"] += int(extra["chunk_forwards"])
+        total["input_samples"] += int(extra["input_samples"])
+        for key in (
+            "optimizer_update_chunk_forwards",
+            "witness_chunk_forwards",
+            "witness_input_samples",
+        ):
+            if extra.get(key) is not None:
+                total[key] += int(extra[key])
     seconds = model_audio_seconds(total["input_samples"])
     max_forwards = int(config["evaluation"]["maximum_total_chunk_forwards"])
     max_seconds = float(config["evaluation"]["maximum_total_model_audio_seconds"])
@@ -844,7 +860,15 @@ def historical_forward_exposure_report(
         return None
     total = empty_forward_exposure()
     for extra in measured:
-        add_forward_exposure(total, extra)
+        total["chunk_forwards"] += int(extra["chunk_forwards"])
+        total["input_samples"] += int(extra["input_samples"])
+        for key in (
+            "optimizer_update_chunk_forwards",
+            "witness_chunk_forwards",
+            "witness_input_samples",
+        ):
+            if extra.get(key) is not None:
+                total[key] += int(extra[key])
     return {**total, "model_audio_seconds": model_audio_seconds(total["input_samples"])}
 
 

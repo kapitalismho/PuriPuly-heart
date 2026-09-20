@@ -7729,5 +7729,20 @@
     "numpy": "2.5.2",
     "device": "cpu",
     "wall_seconds": 3.758936037
+  },
+  "limitations": [
+    "Accepted teacher FIT targets carry known uncertainty: ES2007a has an approximately 0.000514 assignment margin with mixed class2/3 conditional means and only 14 strict-solo class3 bins, and its mapping is uncertain with teacher predictions conflicting with GT; ES2008a first-quarter class0 has 4 strict-solo bins with mapped means approximately [0.002, 0.745, 0.062, 0] and this early short voice is not reliably represented by the teacher.",
+    "All four FIT teacher targets were used unmodified at fixed lambda 0.25 with no confidence or source-quality masking; original GT activity/fractional/multi-active supervision was preserved and missing/support-incomplete teacher rows contributed zero KD, never zero GT. GT-preserving known noise does not license any claim that teacher errors caused the observed KD score result.",
+    "Teacher targets are future/history-conditioned and paced differently from the causal streaming student; unpaced generation is not live availability and carries no held-out generalization, translation-benefit, or student-speed claim.",
+    "Two already-exposed source-disjoint DEV prefixes totaling 244.4s support directional diagnosis only; they are not untouched evaluation and do not establish generalization.",
+    "Source-global oracle permutation is diagnostic only, not inference, calibration, or per-chunk remapping. FIT-only common-logit offsets isolate a shared activity-plus-static-slot explanation from relative-head variation and never prove voice-identity causality nor remove source/channel/time confounding.",
+    "KD selected390 is the frozen lowest-CAL-BCE checkpoint; neither total/KD loss, DEV, teacher scores, nor this diagnostic oracle selected it. This metadata amendment changes no score payload; adoption remains null."
+  ],
+  "uncertainty": {
+    "teacher_fit_target_result_sha256": "49cd36a2590786c361e58728549aafa9c95ccecba934037186bebc08b141c4e9",
+    "teacher_fit_evidence_acceptance_sha256": "8ff16273dfe4b4dd66e2a5086df0c18079e222fa12fa0c530fb8706483f5783d",
+    "teacher_effective_target_rule": "(GT + 0.25 * teacher) / 1.25 on supported cells, hence GT1 targets at least 0.8 and GT0 targets at most 0.2; a loss-target property, not a guarantee about learned predictions. ES2005a quarter3 class1 mean approximately 0.471 shows conditional discrimination and the fixed 0.5 operating point are distinct.",
+    "metadata_only": true,
+    "score_fields_unchanged": true
   }
 }

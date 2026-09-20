@@ -55,6 +55,57 @@
       "step": 390
     }
   },
+  "corrected_forward_exposure": {
+    "per_phase_counts": {
+      "evaluate_cal": {
+        "chunk_forwards": 57
+      },
+      "evaluate_final": {
+        "chunk_forwards": 95
+      },
+      "evaluate_initial": {
+        "chunk_forwards": 114
+      },
+      "infer_proof": {
+        "chunk_forwards": 4
+      },
+      "train_pause2": {
+        "chunk_forwards": 3,
+        "optimizer_update_chunk_forwards": 2,
+        "witness_chunk_forwards": 1,
+        "witness_input_samples": 243200
+      },
+      "train_resume778": {
+        "chunk_forwards": 779,
+        "optimizer_update_chunk_forwards": 778,
+        "witness_chunk_forwards": 1,
+        "witness_input_samples": 243200
+      }
+    },
+    "total": {
+      "chunk_forwards": 1052,
+      "input_samples": 255200000,
+      "model_audio_seconds": 15950.0,
+      "optimizer_update_chunk_forwards": 780,
+      "within_caps": true,
+      "witness_chunk_forwards": 2,
+      "witness_input_samples": 486400
+    }
+  },
+  "erratum": {
+    "corrected_derived_counts": {
+      "chunk_forwards": 1052,
+      "input_samples": 255200000,
+      "model_audio_seconds": 15950.0,
+      "optimizer_update_chunk_forwards": 780,
+      "witness_chunk_forwards": 2,
+      "witness_input_samples": 486400
+    },
+    "corrects_public_sha256": "633aecc47fca5786ffa58f821942043745e740104a930616a3cf8659b099196a",
+    "derivation": "pause forward_exposure 2 update + 1 witness and 243200 witness samples; resume forward_exposure 778 update + 1 witness and 243200 witness samples; eval/infer inference_cost counts carry no subfields and contribute only to stream totals. Completed run root and result.json 85780812972f stay immutable; no recomputation.",
+    "raw_zero_breakdown": "The completed immutable result.json forward_exposure carries optimizer_update_chunk_forwards 0, witness_chunk_forwards 0 and witness_input_samples 0 because report aggregation summed only generic stream counters.",
+    "source_fix": "gt_pilot.py measured_stage_exposure now preserves the three measured subfields and verified_kd_forward_exposure sums them; historical absent counters remain unavailable, never inferred zeros."
+  },
   "executed_code_vs_reporter": {
     "executed": {
       "config_sha256": "29293ca79296566f4003e442619d0f1552e1500dd3e2393b4735545ccb3348fb",
@@ -140,7 +191,7 @@
       "within_caps": true
     }
   },
-  "incomparable_cost_metrics": "unavailable: original public result reports only final-inference elapsed 13.0926s with the same allocator peaks; per-phase training/CAL/initial timings from the original run are not published in comparable fields, so no original per-phase comparison is made.",
+  "incomparable_cost_metrics": "Original GT also publishes final-inference elapsed 13.092628055999967s with peaks 130274816/153092096 under the same source-zero prefix-replay scope as KD final 13.881701592000013s with peaks 130274816/153092096. Original per-phase CAL/initial inference timings are not published in comparable fields, so no original per-phase inference comparison is made.",
   "inference_costs_allocator_peaks": {
     "allocator_cap_bytes": 4294967296,
     "device": {
@@ -196,6 +247,33 @@
     "prior_cumulative": 1583,
     "this_run_new": 780,
     "uncertain": 0
+  },
+  "original_gt_training_phase_walls": {
+    "kd_this_report": {
+      "pause2": {
+        "elapsed_s": 7.611729929999996,
+        "scope": "pause-process wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through pause checkpoint, covering this process's optimizer updates only; excludes pre-timer setup and the later resume process."
+      },
+      "resume778": {
+        "elapsed_s": 77.98935025399999,
+        "scope": "resume-process wall covering restore/witness and remaining updates after pause; not pause updates and not an all-780 aggregate"
+      }
+    },
+    "no_speedup_claim": "Single-run phase walls are not matched pure-neural cost; no speedup, live 80ms, or admission-cost inference is made.",
+    "pause2_train": {
+      "elapsed_s": 6.134571484999995,
+      "note": "pause accounting.json was overwritten by the resume process; elapsed/peaks for pause2 are from the pre-overwrite snapshot, not the current accounting.json. Original elapsed number is unchanged.",
+      "peak_allocated_bytes": 292306432,
+      "peak_reserved_bytes": 320864256,
+      "scope": "pause-process wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through pause checkpoint, including host/device transfers and 2 optimizer updates; excludes that pre-timer setup. This pause process was a fresh train: allocator peak reset was after the initial zero-update checkpoint and before the two updates. Peaks are those post-reset measurements; excluded setup peaks were not recorded."
+    },
+    "resume_train": {
+      "elapsed_s": 78.489717646,
+      "peak_allocated_bytes": 292838912,
+      "peak_reserved_bytes": 320864256,
+      "records": "updates 3-780 only",
+      "timing_scope": "resume-process wall from perf_counter after bind/load config, authorization, prepared load, schedule build, GPU require, and path setup through final checkpoint. That elapsed includes resume restore and the no-update witness forward, then updates 3-780. It is not train_stage function entry. Allocator peak reset ran after restore/witness, so reported peaks exclude restore/witness allocations and include the subsequent training updates. Original elapsed/peak numbers are unchanged."
+    }
   },
   "per_source": {
     "ami_EN2009d": {
@@ -1304,5 +1382,15 @@
       },
       "teacher_weight": 0.25
     }
+  },
+  "teacher_data_uncertainty_local": {
+    "accepted_targets": "teacher-fit-evidence-acceptance.json public 49cd36a2590786c361e58728549aafa9c95ccecba934037186bebc08b141c4e9 with TEACHER_FIT_TARGET_RESULT.json 49cd36a2590786c361e58728549aafa9c95ccecba934037186bebc08b141c4e9",
+    "causal_limit": "No claim that these teacher errors caused the observed KD result; empirical comparison was still required.",
+    "dev_scope": "DEV uses two short already-exposed source-disjoint prefixes ES2009d 196s and EN2009d 48.4s for directional diagnosis only; not untouched evaluation and not a generalization claim.",
+    "fixed_response": "All four FIT sources kept with lambda 0.25 fixed teacher BCE; GT preserved everywhere valid; no confidence or source-quality mask, no new threshold, no remap by quarter.",
+    "known_errors": [
+      "ES2007a mapped slots 2/3 conflict: approximately 0.000514 assignment margin, mixed class2/3 conditional means, only 14 strict-solo class3 bins; mapping retained as source-global minimum independent-BCE [0,2,1,3].",
+      "ES2008a early short voice: first-quarter class0 has 4 strict-solo bins with mapped means approximately [0.002,0.745,0.062,0] despite stronger later class0 evidence; not reliably represented by the teacher."
+    ]
   }
 }
