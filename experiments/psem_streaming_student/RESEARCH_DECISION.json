@@ -1,0 +1,81 @@
+{
+  "schema": "PSEM-ISSUE-164-RESEARCH-DECISION-1",
+  "authority": "AUTONOMY-2",
+  "decision_owner": "Main",
+  "disposition": "INCONCLUSIVE_NO_STUDENT_ADOPTION",
+  "decision": "Stop this local research allocation with a supported directional result: the fixed compact student regime has not retained enough teacher speaker distinctions to justify selecting either student for integration, and the matched KD setting provides no demonstrated advantage over GT-only. Retain GT-only as the experimental control, not as a deployment selection. Do not allocate automatic extra seeds, thresholds, architectures or training from these results.",
+  "issue_completion_claimed": false,
+  "issue_state": "OPEN; no issue mutation or publication performed",
+  "why_stop": [
+    "Both learned arms, teacher targets, saved-score diagnostics and the decision-bearing fixed-policy shadow were actually executed. This is not a scripts-only result.",
+    "Selected-checkpoint strict-solo DEV source-macro balanced accuracy is GT 0.3760860725903099 versus KD 0.37000968370142095; the constant FIT-prior diagnostic is 0.375. These are directional, already-exposed DEV observations, not statistical acceptance thresholds.",
+    "On four-speaker ES2009d, both students emit zero confirmed transitions under the frozen decoder, versus nine teacher transitions. The restricted non-overlap word-role proxy has seven reference changes there; teacher matches three at the fixed250ms collar, students zero.",
+    "On EN2009d, GT matches the one eligible reference change; KD emits one early event at sample7680 and matches none. Teacher matches one. Unmatched events are unmatched to a restricted proxy, not automatically false acoustic events; overlap exclusions are12 ES and56 EN.",
+    "With supported evidence made retrospectively visible, teacher has five applied parents and students one each out of38. Both students have37 absent-raw-candidate parents, not37 receiver-policy rejections. Fixed-policy suppression is therefore not the sole explanation for these outputs. This does not prove a universal acoustic, architectural or KD limitation.",
+    "CAL score ranking remains weak: selected-checkpoint per-class conditional AUCs are approximately0.51-0.59 for both arms. Later KD checkpoint780 improves CAL balanced conditional log loss but still has canonical slot2 recall3/139 and slot3 recall0/13. This does not support silently replacing checkpoint selection or launching a calibration/threshold sweep.",
+    "The evidence does not isolate a unique objective, representation or data repair. A future learned proposal should first target demonstrable multi-speaker discrimination with preserved multi-active GT and source-local state, rather than tuning the fixed downstream policy to hide missing student evidence. No specific new learned run is justified or released by this record. R5 permits an inconclusive end without automatic extra seeds/data."
+  ],
+  "measured_comparison": {
+    "student_parameters": 5940740,
+    "seed": 20260915,
+    "matched_updates_per_arm": 780,
+    "selected_checkpoint_step_each_arm": 390,
+    "kd_objective": "unchanged valid GT BCE +0.25 teacher probability BCE, masked by declared teacher support and normalized by all GT-valid cells",
+    "kd_new_optimizer_updates": 780,
+    "cumulative_optimizer_updates": 2363,
+    "kd_forward_calls": 1052,
+    "kd_audio_samples_forwarded": 255200000,
+    "kd_audio_seconds_forwarded": 15950,
+    "initialization_resume_and_teacher_free_inference": "Actual checks passed with maximum logit/initial-state delta0; detailed identities and scopes in GT_KD_RESULT.json",
+    "shadow": {
+      "parents": 38,
+      "parent_arm_evaluations": 152,
+      "decoder_ingest_calls": 1518,
+      "process_cpu_seconds": 10.1875,
+      "body_wall_seconds": 11.016096699997433,
+      "meaning": "CPU replay of retained outputs, not neural inference latency or live end-to-end cost",
+      "failed_attempts": "Two earlier driver attempts failed before any replay evaluation: filename composition then argparse. Their approximately1.98s and1.36s harness times are separate from successful-body measurements; all receipts retained.",
+      "report_derivation_cost": "Full guard/report derivation CPU and wall duration unmeasured; reported assembly-only timers are not substitutes."
+    }
+  },
+  "final_policy_and_downstream": {
+    "authority": "Unchanged #156 UNKNOWN-only suppression; no production #160 or Soniox changes",
+    "unit_layers": "Raw receiver assignment and final selected-request units are separate. The final policy changes six of152 parent-arm partitions; use the corrected final-policy view, not raw applied_units as a post-policy field.",
+    "material_case": "EN parent333454d7-cf3c-4110-bbc6-bf037c3e739f: final KD guard has wrong tokens16-23 /39characters, same wrong-character count as no-PSEM; the pre-policy3-character value is not the final-policy outcome. This is an ownership proxy, not translation meaning.",
+    "cache": "Only parent5b09905d-fcc2-4c75-b03e-316edfe2df95 has an exact applicable teacher request cache match: final policy four-segment body c1f71572ffb70a2fa7be3a07fa81ee89d3d20b185a2979d2143e6ad69d825ad3, retained terminal success. Student/no-PSEM bodies have no matching retained record; the other37 parents are NOT RUN for these downstream requests. No new provider calls.",
+    "translation_quality": "Not established by a cached success status; no new meaning/readability/display result is claimed."
+  },
+  "unavailable_or_unperformed": [
+    "Actual ASR-final admission timing is not available for the retained baseline path. Span-end/synthetic clocks are not an actual admission bridge, and no interpolation was treated as live execution.",
+    "The shadow uses synthetic availability0 with span-end/16000 admission on a declared retrospective clock. It is not live timing, a wait policy or an end-to-end latency result.",
+    "Configured100ms confirmation crosses after two80ms bins:160ms accumulated bins, not a sub100ms interruption guarantee.",
+    "No fully observed unambiguous A-B-A or A-B-C witness exists in these shadow windows. The one annotation pattern747520-791680 is only partially visible: one of its three words is within EN common support760320. Return preservation is unresolved, not passed or failed.",
+    "Complete same-clock neural-student-to-actual-ASR/translation/display quality-cost superiority is not established. Existing per-phase/backend cost and memory reports are retained with their scopes; no speedup ratio is inferred from model size or offline replay time.",
+    "Teacher targets are imperfect, including ES2007a slot2/3 association ambiguity and ES2008a early short-voice error. GT was retained; the fixed KD term did not silently replace it.",
+    "Single seed, four FIT sources, one CAL source and two short already-exposed DEV sources do not establish generalization. No locked HOLDOUT/EVAL or new corpus was used."
+  ],
+  "evidence_entry_points": {
+    "teacher_continuous_cost_and_timing": ["cost_rerun/RESULT.json", "cost_rerun/FINDINGS.json", "BASELINE.md"],
+    "training_and_backend": ["GT_PILOT_RESULT.json", "GT_KD_RESULT.json", "gt_kd_config.json", "environment/ENVIRONMENT.json"],
+    "teacher_targets": ["TEACHER_FIT_TARGET_RESULT.json", "TEACHER_SAVED_SCORE_DIAGNOSTIC_RESULT.json"],
+    "diagnostics": ["SPEAKER_SCORE_DIAGNOSTIC_RESULT.json", "GT_SOLO_CONTRAST_RESULT.json", "GT_SOLO_CONTRAST_DIAGNOSTIC_RESULT.json", "GT_KD_DIAGNOSTIC_RESULT.json"],
+    "fixed_policy_shadow": "GT_KD_POLICY_SHADOW_RESULT.json",
+    "shadow_public_sha256": "c2e28329aa6194bf2ea46490025ba1926af2eb6b04b7c08d31e7d74989512890",
+    "shadow_raw": ".stage-control/issue-164-gt-kd-policy-shadow-1/GT_KD_POLICY_SHADOW_RESULT.json",
+    "shadow_raw_sha256": "0138731f196ead2881fef783f34b0df369b3455948be216eb839ee71cb53cdac",
+    "corrected_final_policy_view": ".stage-control/issue-164-gt-kd-policy-shadow-1/GT_KD_POLICY_SHADOW_FINAL_POLICY_VIEW.json",
+    "corrected_view_sha256": "965f28f76c9d5ee74df64b2c305cc32f25c9675086c86bfa9b4aaf7125d5d879",
+    "gt_selected_checkpoint_sha256": "b956d5fbccdb18bee722176b5073f3bfbb2e19d71c4c18171fa021257747e089",
+    "kd_selected_checkpoint_sha256": "978a29565f810857c6ee61573d60f4798e75c0ce7d6b62726f822cf0cd283512",
+    "implementation_commits": ["f162d99e404c546c7e2d3599e2ce2c7e7ea06b92", "e06e97c9", "1061109e17ee35cc48ddf0e89cb0ab05fdc04a69"],
+    "retrieval": "Paths here are relative to experiments/psem_streaming_student. Read the public reports first; their manifests link local checkpoint/logit/native artifacts and exact identities. Inspect persisted artifacts under .stage-control and cost_rerun/runs; do not re-execute consumed release commands merely to retrieve evidence. Binary artifacts and corpus inputs remain in the existing local accessible store, not uploaded."
+  },
+  "verification": {
+    "kd_material": "Independent FULL_REVIEW: no material findings",
+    "kd_reports": "Independent REPAIR_VERIFY: cost provenance, uncertainty and counters repaired",
+    "shadow": "Independent full outcome review and REPAIR_VERIFY closed partial-pattern coverage and pre/post-policy attribution; final residual verification repair_verified",
+    "implementation_role": "Ordinary worker only for this continuation; Main adjudicated and integrated",
+    "architecture_drift": "No production architecture or policy change introduced; experiment/report artifacts only",
+    "publication": "No merge, push, publication, deployment or issue closure"
+  }
+}
