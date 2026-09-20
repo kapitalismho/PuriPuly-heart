@@ -121,8 +121,9 @@ def test_save_failure_is_reported_instead_of_succeeding(monkeypatch, tmp_path: P
         ),
     )
 
-    with pytest.raises(RuntimeError, match="blocked"):
+    with pytest.raises(CanonicalSettingsPersistenceError) as raised:
         preference_module.persist_installer_telemetry_preference(path, False)
+    assert raised.value.status == "save_failed"
     assert not path.exists()
 
 
@@ -171,6 +172,36 @@ def test_installer_cli_reports_stable_failure_category_without_exception_content
     assert fields["status"] == "failure"
     assert fields["failure_category"] == expected_category
     assert "private path" not in captured.err
+
+
+def test_installer_cli_keeps_primary_settings_failure_when_diagnostic_stream_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "settings.json"
+    content = "{not-json"
+    path.write_text(content, encoding="utf-8")
+
+    class UnwritableStream:
+        def write(self, _s: str) -> int:
+            raise OSError(22, "invalid stream")
+
+        def flush(self) -> None:
+            raise OSError(22, "invalid stream")
+
+    monkeypatch.setattr(main_module.sys, "stderr", UnwritableStream())
+
+    result = main_module.main(
+        [
+            "--config",
+            str(path),
+            "installer-telemetry-preference",
+            "disable",
+        ]
+    )
+
+    assert result == 23
+    assert path.read_text(encoding="utf-8") == content
 
 
 def test_installer_cli_persists_before_runtime_logging_or_gui_startup(

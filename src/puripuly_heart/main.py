@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import logging
 import sys
 from pathlib import Path
@@ -360,11 +361,12 @@ def _run_installer_telemetry_preference(path: Path, action: str) -> int:
         category = _installer_preference_failure_category(exc.status)
     except Exception:
         category = "unexpected_error"
-    print(
-        f"installer_telemetry_preference operation={action} "
-        f"status=failure failure_category={category}",
-        file=sys.stderr,
-    )
+    with contextlib.suppress(OSError):
+        print(
+            f"installer_telemetry_preference operation={action} "
+            f"status=failure failure_category={category}",
+            file=sys.stderr,
+        )
     return 23
 
 
