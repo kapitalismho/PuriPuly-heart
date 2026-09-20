@@ -654,6 +654,59 @@ Future<String?> runPython({
 
     main_path = lib_root / "main.dart"
     main = main_path.read_text(encoding="utf-8")
+    old_storage = """    var appDataPath = path.join(
+        (await path_provider.getApplicationSupportDirectory()).path, "data");
+    if (!await Directory(appDataPath).exists()) {
+      await Directory(appDataPath).create(recursive: true);
+    }
+    Directory.current = appDataPath;
+
+    // FLET_APP_STORAGE_CACHE — regenerable; the OS may purge it.
+    var appCachePath = (await path_provider.getApplicationCacheDirectory()).path;
+    // FLET_APP_STORAGE_TEMP — volatile OS temp; may vanish between launches.
+    var appTempPath = (await path_provider.getTemporaryDirectory()).path;
+
+    environmentVariables.putIfAbsent("FLET_APP_STORAGE_DATA", () => appDataPath);
+    environmentVariables.putIfAbsent(
+        "FLET_APP_STORAGE_CACHE", () => appCachePath);
+    environmentVariables.putIfAbsent("FLET_APP_STORAGE_TEMP", () => appTempPath);
+"""
+    new_storage = """    var appDataPath = environmentVariables["FLET_APP_STORAGE_DATA"] ??
+        path.join(
+            (await path_provider.getApplicationSupportDirectory()).path, "data");
+    // FLET_APP_STORAGE_CACHE — regenerable; the OS may purge it.
+    var appCachePath = environmentVariables["FLET_APP_STORAGE_CACHE"] ??
+        (await path_provider.getApplicationCacheDirectory()).path;
+    // FLET_APP_STORAGE_TEMP — volatile OS temp; may vanish between launches.
+    var appTempPath = environmentVariables["FLET_APP_STORAGE_TEMP"] ??
+        (await path_provider.getTemporaryDirectory()).path;
+
+    appDataPath = appDataPath.isEmpty
+        ? appDataPath
+        : Directory(appDataPath).absolute.path;
+    appCachePath = appCachePath.isEmpty
+        ? appCachePath
+        : Directory(appCachePath).absolute.path;
+    appTempPath = appTempPath.isEmpty
+        ? appTempPath
+        : Directory(appTempPath).absolute.path;
+
+    for (var directory in [appDataPath, appCachePath, appTempPath]) {
+      var selectedDirectory = Directory(directory);
+      if (!await selectedDirectory.exists()) {
+        await selectedDirectory.create(recursive: true);
+      }
+    }
+    Directory.current = appDataPath;
+
+    environmentVariables["FLET_APP_STORAGE_DATA"] = appDataPath;
+    environmentVariables["FLET_APP_STORAGE_CACHE"] = appCachePath;
+    environmentVariables["FLET_APP_STORAGE_TEMP"] = appTempPath;
+"""
+    if main.count(old_storage) != 1:
+        raise ValueError("pinned Flet main.dart storage block changed")
+    main = main.replace(old_storage, new_storage)
+
     old_console = """    outLogFilename = path.join(appCachePath, "console.log");
     environmentVariables.putIfAbsent("FLET_APP_CONSOLE", () => outLogFilename);
 
