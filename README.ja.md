@@ -1,0 +1,564 @@
+<p align="center">
+  <img src="../../src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — VRChat向けリアルタイム双方向音声翻訳ツール" width="128" />
+</p>
+
+<h1 align="center">PuriPuly<br>
+  <sub>VRChat向けリアルタイム双方向音声翻訳ツール</sub>
+</h1>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-2.7.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
+  <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
+  <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
+</p>
+
+<h2 align="center">
+  <a href="README.md">🇺🇸 English</a> ·
+  <a href="README.ko.md">🇰🇷 한국어</a> ·
+  🇯🇵 日本語 ·
+  <a href="README.zh-CN.md">🇨🇳 简体中文</a> ·
+  <a href="README.ru.md">🇷🇺 Русский</a>
+</h2>
+
+---
+
+## デモ
+
+![PuriPuly（Deepgram + Gemini 3 Flash）と VRCT（Google Web Speech + Google Translate）の翻訳比較。PuriPuly 音声認識：「진짜한개도없어서완전허탈했어.」、翻訳：「（本当に一つもなくて、すごくがっかりしちゃった。）」 | VRCT 音声認識：「진짜 한 개도 없어서 완전 허탈했다」、翻訳：「本当の犬もいませんでした。」](docs/images/demo/ko-jp_screenshot.png)
+
+---
+
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
+
+PuriPulyを通じて他の外国人の友達と実際に交流している様子をもっと見たい方は：
+- [デモ 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [デモ 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [デモ 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## Finally, talk like real friends.
+
+慰めたかったのに、  
+「大丈夫？」としか声がかけられなかったこと、ありますよね。
+
+伝えたい気持ちが、  
+ただの「翻訳機」じゃ届かないこと、わかってますよね。
+
+だから、作ったんです。
+
+## PuriPulyとは？
+
+PuriPulyは、自分の声と相手の声をリアルタイムで翻訳するWindows向け双方向音声翻訳ツールです。
+LLMによる自然な翻訳を追求しています。
+硬い翻訳を超えて、本当の人と人とのコミュニケーションができるように。
+VRChatやDiscordを含む、さまざまな環境で使えます。
+
+- **LLMベースのローカライズ** — スラング、口語、タメ口/敬語まで自然に
+- **文脈の記憶** — 前後の流れを踏まえた自然な会話を維持
+- **双方向の音声翻訳** — 相手の音声も一緒に翻訳、VR字幕オーバーレイ対応
+- **Discordで始められる** — 複雑な設定なしですぐに使える
+- **最強のローカルフルスタック** — ParakeetからGemma 4 E4Bまで、今一番効率的なモデルだけを搭載。
+
+## よくある質問
+
+- **翻訳の品質はどのくらいですか？**
+→ 人と人が交わす最も深い会話まで、無理なく自然に話せます。また、従来の商用翻訳サービスを大きく上回っています。詳しくは下の「翻訳比較」をご覧ください。
+
+- **話してから翻訳されるまでどのくらいかかりますか？**
+→ 最適な環境であれば、遅延は約1秒ほどです。相手の話が終わった時点が基準です。
+
+- **使うのにお金はかかりますか？**
+→ はい、でも後からです。新規ユーザーには無料の使用枠が用意されています。それ以降もとても安く、1ドルで数千回翻訳できます。また、ローカルモデルを活用すれば無料でも使えます。
+
+- **APIキーを発行する必要がありますか？**
+→ はい、でもこれも後からです。最初はインストールしてDiscordで認証するだけで使えます。
+
+- **音声認識が遅いです**
+→ ローカルASRを使用している際、マシンスペックが不足していると処理が遅くなることがあります。その場合はクラウドSTTサービスへの切り替えをおすすめします。
+
+- **個人データはどのように扱われますか？**
+→ Puripulyのサーバーに音声や会話の内容が送信されることはありません。また、すべてのコードがこのリポジトリで公開されているため、ネットワークの動作を直接確認・検証できます。
+
+### [📥 ダウンロード](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## 翻訳比較
+![韓国語→英語/日本語/中国語（簡体）翻訳の文あたり平均エラーペナルティチャート。216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：1位 Gemma 4 31B (0.353)、2位 Gemma 4 26B A4B (0.387)、3位 DeepSeek-V4 Flash 0731 (0.571)、4位 Gemma 4 12B QAT Q4 (0.855)、5位 Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部ベースライン：Hy-MT-7B (1.863)、Papago (2.699)、Gemini 3.5 Live Translate (2.991)、MiLMMT 46-4B (3.087)、DeepL (3.914)、Google Cloud Translation Basic (5.731)。](docs/images/performance/2.png)
+
+- 青い棒グラフはPuriPulyで使用できるモデルです。
+- マイクロソフトのGemba MQMフレームワークを使って実験しました。
+- 実際の会話に近づけるため、マルチターン環境で構成しました。
+- 全体の実験結果は[こちら](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)を参照してください。
+
+## コスト
+
+### 1ドルあたりの使用可能回数
+
+#### 推奨モデル
+
+| LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
+|---|---|---|---|---|
+| **Gemma 4 E4B (Local)** | 無制限 | 無制限 | 5,000回 | 3,660回 |
+| **Gemma 4 26B A4B + 31B** | 13,940回 | 13,940回 | 3,680回 | 2,900回 |
+| **DeepSeek V4 Flash (OpenRouter)** | 17,020回 | 17,020回 | 3,860回 | 3,010回 |
+| **DeepSeek V4.1 Flash** | 16,800回 | 16,800回 | 3,860回 | 3,000回 |
+
+#### その他のモデル
+
+| LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380回 | 14,380回 | 3,710回 | 2,920回 |
+| **Gemma 4 31B** | 10,940回 | 10,940回 | 3,430回 | 2,740回 |
+| **Gemini 3.8 Flash** | 1,160回 | 1,160回 | 940回 | 880回 |
+| **Qwen 3.8 Flash** | 7,460回 | 7,460回 | 2,990回 | 2,460回 |
+
+### 発話あたりのコスト
+
+#### 推奨モデル
+
+| LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
+|---|---|---|---|---|
+| **Gemma 4 E4B (Local)** | 0円 | 0円 | ~0.03円 | ~0.04円 |
+| **Gemma 4 26B A4B + 31B** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
+| **DeepSeek V4 Flash (OpenRouter)** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
+| **DeepSeek V4.1 Flash** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
+
+#### その他のモデル
+
+| LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
+| **Gemma 4 31B** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
+| **Gemini 3.8 Flash** | ~0.13円 | ~0.13円 | ~0.16円 | ~0.17円 |
+| **Qwen 3.8 Flash** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.06円 |
+
+*   *（入力 900トークン + 出力 12トークン）× 発話1回あたりの平均LLM呼び出し回数 1.2回と仮定*
+*   *1ドルあたりの使用可能回数は、発話あたりのコスト表の四捨五入前の値を基準に算出*
+*   *すべてのコストと使用可能回数は概算*
+*   *DeepSeek V4.1 Flashはキャッシュヒット率70%、V4 Flash（OpenRouter）は60%を仮定しています*
+*   *Qwen APIコストは北京リージョン基準*
+*   *料金表基準: 2026年9月14日*
+*   *1ドル = 150円*
+
+### 無料クレジット
+
+| サービス | 無料クレジット | 期限 | 備考 |
+|--------|------------|------|------|
+| **Deepgram** | $200 | なし | カード登録不要 |
+| **ElevenLabs** | 10,000クレジット | 毎月更新 | カード登録不要 |
+| **Gemini 3.5 Transcribe** | 無料枠 | なし | 無料枠で実質無制限 |
+| **Alibaba Cloud** | モデルごと100万トークン | 90日 | シンガポールリージョン基準 |
+| **Alibaba Cloud** | ¥300 | 1年 | 中国国内の学生向け |
+
+---
+
+## ローカルモデル
+
+PuriPulyには、次のローカルモデルが搭載されています。さらにOpenAI互換APIにも接続できます。
+GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダーを問わず使用できます。
+
+**ASR**
+
+| モデル | 実行環境 | 量子化 |
+|---|---|---|
+| Parakeet TDT 0.6B v3 | CPU | INT8 |
+| Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
+| Qwen3-ASR 0.6B | CPU | INT8 |
+| Qwen3-ASR 1.7B | GPU | Q6_K |
+| OpenAI互換API | — | — |
+
+**LLM**
+
+| モデル | 実行環境 | 量子化 |
+|---|---|---|
+| Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| OpenAI互換API | — | — |
+
+---
+
+# 問題が起きたら、[Twitter/X](https://x.com/kapitalismho)でDMを送ってください。
+
+## 使い方
+
+1. [ダウンロードページ](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)から最新バージョンをダウンロード
+2. PuriPulyをインストール
+3. **TALK** ボタンをクリック
+4. **TRANS** ボタンをクリックしてDiscord認証
+5. **CAPTIONS** ボタンを押してVR字幕をオン
+6. （任意）**LISTEN** ボタンを押して相手の音声翻訳をオン
+
+   > 相手の音声翻訳機能がきちんと動作するには、騒がしくない環境が必要です。VRChatで使う場合は、Earmuff機能を使って環境をコントロールしてください。
+
+7. VRChatでOSCを有効化: Action menu → Settings → OSC → Enable
+
+### 音声がキャプチャされない場合
+音声がキャプチャされない場合は、**設定 > 一般** で次の手順を行ってください。
+
+1. **オーディオホストAPI** を **自動選択** または **MME** に変更
+2. 正しいマイクを選択
+3. アプリを再起動
+
+---
+
+### 中国のユーザーへ向けた案内
+
+Soniox / Gemini / Deepgramへのアクセスがブロックされている地域の場合は、以下の組み合わせをお使いください。
+
+- STT: **Qwen Audio**
+- LLM: **DeepSeek V4.1 Flash**
+
+   > Discordの代わりにQQで認証できます。
+
+---
+
+### 自分のAPIキーを使う
+
+利用するサービスに合わせて、適切なガイドを見ながら進めてください。
+
+翻訳用LLMは、OpenRouter経由でGemma 4モデルを使うことをおすすめします。
+
+もしよければ、設定するついでに、ASR側も一緒に設定しませんか？
+PuriPulyはクラウドSTTと組み合わせると最良の体験になります。
+たとえば同じQwen ASRでも、ローカルとクラウドでは音声認識性能にかなり差があります。
+
+まずはDeepgramから始めるのをおすすめします。
+登録するだけで200ドル分の無料クレジットがもらえます。
+
+<details>
+<summary><h3>OpenRouter</h3></summary>
+
+1. 赤い丸の中のオプションをスクリーンショットのとおりに設定してください。
+   ![step0](docs/images/openrouter/0.png)
+
+2. アプリ内で赤い丸の中のボタンを押します。
+   ![step1](docs/images/openrouter/1.png)
+
+3. OpenRouterでログインします。
+   ![step2](docs/images/openrouter/2.png)
+
+4. 赤い丸の中のボタンを押して決済画面を抜けます。
+   ![step3](docs/images/openrouter/3.png)
+
+5. **Authorize** ボタンを押します。
+   ![step4](docs/images/openrouter/4.png)
+
+6. 使う分だけ前払いでチャージします。
+   ![step5](docs/images/openrouter/5.png)
+
+<details>
+<summary><h3>Authorizeボタンを押しても認証されない場合</h3></summary>
+
+Authorizeボタンを押しても認証されない場合は、再試行するか、以下の手順で直接APIキーを発行して貼り付けてください。
+
+6. 右上のアカウントをクリックし、左のAPI Keysタブを開いて、中央のCreateボタンを押します。
+   ![step6](docs/images/openrouter/6.png)
+
+7. Createボタンを押します。
+   ![step7](docs/images/openrouter/7.png)
+
+8. ボタンを押してAPIキーをコピーし、翻訳機のAPIタブに貼り付けます。
+   ![step8](docs/images/openrouter/8.png)
+
+</details>
+
+</details>
+
+<details>
+<summary><h3>DeepSeek</h3></summary>
+
+1. 赤い丸の中のオプションをスクリーンショットのとおりに設定してください。
+   ![step0](docs/images/deepseek/0.png)
+
+2. [DeepSeek公式サイト](https://www.deepseek.com/en/)にアクセスし、**Access API** ボタンをクリックします。
+   ![step1](docs/images/deepseek/1.png)
+
+3. サイトでログインします。
+   ![step2](docs/images/deepseek/2.png)
+
+4. API Keysタブに移動して **Create new API Keys** を押します。
+   ![step3](docs/images/deepseek/3.png)
+
+5. ボタンを押してAPIキーをコピーし、翻訳機のAPIタブに貼り付けます。
+   ![step4](docs/images/deepseek/4.png)
+
+6. Top Upタブに移動し、使う分だけ前払いでチャージします。
+   ![step5](docs/images/deepseek/5.png)
+
+</details>
+
+<details>
+<summary><h3>Deepgram</h3></summary>
+
+1. [Deepgram Console](https://console.deepgram.com/)にアクセスしてログインします。
+   ![step1](docs/images/deepgram/1.png)
+
+2. 歓迎メッセージとアンケートが表示されたら、**Skip** を押してスキップします。
+   ![step2](docs/images/deepgram/2.png)
+
+3. サービス選択画面で **STT (Speech-to-Text)** を選択します。
+   ![step3](docs/images/deepgram/3.png)
+
+4. API Keysメニューで **Create a New API Key** をクリックします。
+   ![step4](docs/images/deepgram/4.png)
+
+5. キーの名前を入力し（例：`puripuly`）、作成します。
+   ![step5](docs/images/deepgram/5.png)
+
+6. 作成されたキーをコピーして、PuriPulyの設定に貼り付けます。
+   ![step6](docs/images/deepgram/6.png)
+
+</details>
+
+<details>
+<summary><h3>Gemini</h3></summary>
+
+1. [Google AI Studio](https://aistudio.google.com/apikey)にアクセスし、**Get API key** ボタンをクリックします。
+   ![step1](docs/images/gemini/1.png)
+
+2. 新しいプロジェクトを作成します。
+   ![step2](docs/images/gemini/2.png)
+
+3. 任意の名前を付けます。
+   ![step3](docs/images/gemini/3.png)
+
+4. 作成したプロジェクトを選択し、**Create key** を押します。
+   ![step4](docs/images/gemini/4.png)
+
+5. 丸で囲まれた部分を押します。
+   ![step5](docs/images/gemini/5.png)
+
+6. 丸で囲まれた部分を押してキーをコピーします。
+   ![step6](docs/images/gemini/6.png)
+
+7. （推奨）黄色で強調表示されている **Set Up Billing** ボタンを押し、有料プランに切り替えます。
+プラン切り替えには少し時間がかかることがあります。
+   ![step7](docs/images/gemini/7.png)
+
+<details>
+<summary><h3>Geminiの有料サブスクリプションをお持ちの方</h3></summary>
+
+8. [Google Developer Program](https://developers.google.com/program/my-benefits) にアクセスし、プログラムに参加してください。
+   ![step8](docs/images/gemini/8.png)
+
+9. ステップ7で設定した有料プランのプロジェクトを選択してください。
+   ![step9](docs/images/gemini/9.png)
+
+</details>
+
+</details>
+
+<details>
+<summary><h3>Qwen</h3></summary>
+
+1. 地域に合った経路でAlibaba Cloud Model Studioにアクセスします。
+   - [中国本土](https://bailian.console.aliyun.com/cn-beijing)
+   - [中国本土以外の地域](https://bailian.console.alibabacloud.com)
+
+2. アクセスしたアドレスからログインします。APIキーを発行したいリージョン（Region）を正確に選択してください（例：Beijing）。
+   ![step2](docs/images/qwen/1.png)
+
+3. 右上の **歯車アイコン** をクリックします。
+   ![step3](docs/images/qwen/2.png)
+
+4. ワークスペースを作成し、**API-KEY** ページに移動します。
+   ![step4](docs/images/qwen/3.png)
+
+5. **Create API Key** をクリックします。
+   ![step5](docs/images/qwen/4.png)
+
+6. アカウントとワークスペースを割り当てて、OKボタンを押します。
+   ![step6](docs/images/qwen/5.png)
+
+7. 丸で囲まれた部分を押してキーをコピーします。
+   ![step7](docs/images/qwen/6.png)
+
+</details>
+
+<details>
+<summary><h3>Soniox</h3></summary>
+
+1. [Soniox Console](https://console.soniox.com/)にログインします。
+   ![step1](docs/images/soniox/1.png)
+
+2. 組織の名前を任意で入力します。
+   ![step2](docs/images/soniox/2.png)
+
+3. **Add Funds** ボタンを押し、支払い方法を登録します。
+   ![step3](docs/images/soniox/3.png)
+
+4. Sonioxはプリペイド方式のチャージが必要です。チャージ完了後、**API Keys** メニューへ移動します。
+   ![step4](docs/images/soniox/4.png)
+
+5. 新しいAPI Keyを作成します。
+   ![step5](docs/images/soniox/5.png)
+
+6. 作成されたキーをコピーして、PuriPulyの設定に貼り付けます。
+   ![step6](docs/images/soniox/6.png)
+
+</details>
+
+
+---
+
+## アーキテクチャ
+
+![PuriPuly Heart ヘキサゴナルアーキテクチャ図](docs/architecture-light.png)
+
+[`docs/architecture.md`](docs/architecture.md) を参照してください。
+
+## ロードマップ
+
+今後の作業は [PuriPulyプロジェクトボード](https://github.com/users/kapitalismho/projects/2)で公開管理されています。
+
+---
+
+## 開発
+
+### 環境
+
+| 領域 | 推奨環境 | ドキュメント |
+|---|---|---|
+| Python デスクトップアプリ | Windows | このセクション |
+| Broker サービス | Linux | [`broker/README.md`](broker/README.md) |
+| ネイティブ VR オーバーレイ | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
+
+### Python 環境
+
+Python アプリには Python 3.12 または 3.13 が必要です。
+
+Windows 環境を作成して有効化します:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+アプリと開発用依存関係をインストールします:
+
+```powershell
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+`uv` を使っても構いません:
+
+```powershell
+uv sync --dev
+```
+
+リポジトリのフックをインストールします:
+
+```powershell
+pre-commit install
+```
+
+Linux や WSL で作業する場合は、利用可能なら `.venv-wsl` を使用します。
+
+```bash
+UV_PROJECT_ENVIRONMENT=.venv-wsl uv sync --dev
+```
+
+`direnv` が設定されたリポジトリでは、次のようにコマンドを実行できます:
+
+```bash
+direnv exec . <command>
+```
+
+### アプリの実行
+
+Flet デスクトップアプリを実行します:
+
+```powershell
+python -m puripuly_heart.main run-gui
+```
+
+同等の `uv` コマンド:
+
+```powershell
+uv run python -m puripuly_heart.main run-gui
+```
+
+隠れた UI 状態の開発者プレビュー機能は次で有効になります:
+
+```powershell
+python -m puripuly_heart.main run-gui --debug-ui-preview
+```
+
+### Python の検証
+
+Python ソースとテストをフォーマットします:
+
+```powershell
+black src tests
+```
+
+ファイルを変更せずにフォーマットを確認します:
+
+```powershell
+black --check src tests
+```
+
+リントチェックを実行します:
+
+```powershell
+ruff check src tests
+```
+
+Python テストスイート全体を実行します:
+
+```powershell
+python -m pytest
+```
+
+開発中に特定のテストファイルやディレクトリを実行する場合:
+
+```powershell
+python -m pytest tests/path/to/test_file.py
+```
+
+### その他の領域
+
+Broker のドキュメントは [`broker/README.md`](broker/README.md) で管理されています。
+
+ネイティブ VR オーバーレイのドキュメントは [`native/overlay/README.md`](native/overlay/README.md) で管理されています。
+
+カスタム HTTP API 拡張のドキュメントは [`docs/http-extensions.md`](docs/http-extensions.md) で管理されています。接続に必要な JSON Schema は [`docs/http-extension.schema.json`](docs/http-extension.schema.json) を参照してください。
+
+VRChat OSC コントロールは [`docs/vrchat-osc.md`](docs/vrchat-osc.md) を参照してください。
+
+---
+
+## 開発者
+
+[salee](https://github.com/kapitalismho)
+
+---
+
+## コントリビューター
+
+[RICHARDwuxiaofei](https://github.com/RICHARDwuxiaofei)
+[fzcfweasdferttgg-png](https://github.com/fzcfweasdferttgg-png)
+
+---
+
+## Special Thanks
+
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
+
+---
+
+## ポリシー
+
+- [Code signing policy](CODE_SIGNING.md)
+- [プライバシーポリシー](PRIVACY.md)
+
+---
+
+## ライセンス
+
+[AGPL-3.0-or-later](LICENSE)
+
+サードパーティライセンスおよび通知: `src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt`

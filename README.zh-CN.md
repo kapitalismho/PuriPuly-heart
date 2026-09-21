@@ -1,0 +1,562 @@
+<p align="center">
+  <img src="../../src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — VRChat 实时双向语音翻译工具" width="128" />
+</p>
+
+<h1 align="center">PuriPuly<br>
+  <sub>VRChat 实时双向语音翻译工具</sub>
+</h1>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-2.7.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
+  <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
+  <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
+</p>
+
+<h2 align="center">
+  <a href="README.md">🇺🇸 English</a> ·
+  <a href="README.ko.md">🇰🇷 한국어</a> ·
+  <a href="README.ja.md">🇯🇵 日本語</a> ·
+  🇨🇳 简体中文 ·
+  <a href="README.ru.md">🇷🇺 Русский</a>
+</h2>
+
+---
+
+## 演示
+
+![PuriPuly（Deepgram + Qwen 3.8 Flash）与 VRCT（Google Web Speech + Google Translate）的翻译对比。PuriPuly 语音识别：“집에굴러다니는게손잡이빠진것까지합치면열개는넘을걸.”，翻译：“（家里散落的伞，加上那把没把手的，估计都超过十把了呢。）” | VRCT 语音识别：“집에 굴러다니는게 손잡이 빠진 것까지 합치면 10개는 넘을 걸”，翻译：“房子周围肯定有超过 10 个，包括那些没有把手的。”](docs/images/performance/2.png)
+
+---
+
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
+
+如果你想看更多通过 PuriPuly 与其他外国朋友实际交流的画面：
+- [演示 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [演示 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [演示 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## Finally, talk like real friends.
+
+想安慰对方，
+却只说得出一句"你还好吗？"
+——对吧。
+
+想传达的心意，
+靠"翻译器"是传不到的，你知道的。
+
+所以，我做了这个。
+
+## PuriPuly 是什么？
+
+PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译器。
+我们追求通过 LLM 实现自然的翻译。
+超越生硬的翻译，让真正的人与人之间的交流成为可能。
+可用于 VRChat、Discord 等多种环境。
+
+- **基于大语言模型的本地化** — 俚语、口语，乃至敬语与平语，都能自然转换
+- **记忆上下文** — 结合语境，保持自然流畅的对话节奏
+- **双向语音翻译** — 同时翻译对方的语音，支持 VR 字幕浮层
+- **从 Discord 开始** — 无需复杂配置，立即可用
+- **最强本地全栈** — 从 Parakeet 到 Gemma 4 E4B，只搭载当前最高效的模型。
+
+## 常见问题
+
+- **翻译质量如何？**
+→ 人与人之间最深入的交流也能轻松顺畅地进行。此外，它大幅超越了传统的商业翻译服务。详情请参阅下方“翻译比较”一节。
+
+- **从说话到翻译完成需要多长时间？**
+→ 在最佳环境下，延迟约为 1 秒左右。以对方说话结束的时刻为基准。
+
+- **使用需要付费吗？**
+→ 是的，但要稍后才付。新用户会获得免费额度。即使额度用完，价格依然非常便宜——1 美元可翻译数千次。此外，使用本地模型还可以完全免费使用。
+
+- **必须申请 API 密钥吗？**
+→ 是的，但同样是稍后再说。一开始只需安装并通过 Discord 验证即可使用。
+
+- **语音识别速度慢**
+→ 使用本地 ASR 时，若计算资源不足，处理时间可能会变长。此时建议切换为云端 STT 服务。
+
+- **个人数据如何处理？**
+→ 语音和对话内容不会发送到 Puripuly 服务器。此外，所有代码均在当前代码库中公开，您可以直接验证网络行为。
+
+### [📥 下载](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## 翻译比较
+![韩语→英语/日语/中文（简体）翻译的每句平均错误惩罚图表。216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是 PuriPuly 中可用的模型：第 1 名 Gemma 4 31B (0.353)，第 2 名 Gemma 4 26B A4B (0.387)，第 3 名 DeepSeek-V4 Flash 0731 (0.571)，第 4 名 Gemma 4 12B QAT Q4 (0.855)，第 5 名 Gemma 4 E4B QAT Q4 (1.577)。橙色柱状图是外部基线：Hy-MT-7B (1.863)、Papago (2.699)、Gemini 3.5 Live Translate (2.991)、MiLMMT 46-4B (3.087)、DeepL (3.914)、Google Cloud Translation Basic (5.731)。](docs/images/performance/2.png)
+
+- 蓝色柱状图是PuriPuly中可用的模型。
+- 我们使用微软的 Gemba MQM 框架进行实验。
+- 为贴近真实对话环境，采用了多轮对话设置。
+- 完整实验结果请参阅[此处](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)。
+
+## 费用
+
+### 每 1 美元可用次数
+
+#### 推荐模型
+
+| LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
+|---|---|---|---|---|
+| **Gemma 4 E4B (本地)** | 无限制 | 无限制 | 5,000 次 | 3,660 次 |
+| **Gemma 4 26B A4B + 31B** | 13,940 次 | 13,940 次 | 3,680 次 | 2,900 次 |
+| **DeepSeek V4 Flash (OpenRouter)** | 17,020 次 | 17,020 次 | 3,860 次 | 3,010 次 |
+| **DeepSeek V4.1 Flash** | 16,800 次 | 16,800 次 | 3,860 次 | 3,000 次 |
+
+#### 其他模型
+
+| LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 次 | 14,380 次 | 3,710 次 | 2,920 次 |
+| **Gemma 4 31B** | 10,940 次 | 10,940 次 | 3,430 次 | 2,740 次 |
+| **Gemini 3.8 Flash** | 1,160 次 | 1,160 次 | 940 次 | 880 次 |
+| **Qwen 3.8 Flash** | 7,460 次 | 7,460 次 | 2,990 次 | 2,460 次 |
+
+### 每次发言成本
+
+#### 推荐模型
+
+| LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
+|---|---|---|---|---|
+| **Gemma 4 E4B (本地)** | 0 元 | 0 元 | ~0.001 元 | ~0.002 元 |
+| **Gemma 4 26B A4B + 31B** | ~0.0005 元 | ~0.0005 元 | ~0.002 元 | ~0.002 元 |
+| **DeepSeek V4 Flash (OpenRouter)** | ~0.0004 元 | ~0.0004 元 | ~0.002 元 | ~0.002 元 |
+| **DeepSeek V4.1 Flash** | ~0.0004 元 | ~0.0004 元 | ~0.002 元 | ~0.002 元 |
+
+#### 其他模型
+
+| LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | ~0.0005 元 | ~0.0005 元 | ~0.002 元 | ~0.002 元 |
+| **Gemma 4 31B** | ~0.0007 元 | ~0.0007 元 | ~0.002 元 | ~0.002 元 |
+| **Gemini 3.8 Flash** | ~0.006 元 | ~0.006 元 | ~0.008 元 | ~0.008 元 |
+| **Qwen 3.8 Flash** | ~0.001 元 | ~0.001 元 | ~0.002 元 | ~0.003 元 |
+
+*   *(假设输入 900 token + 输出 12 token) × 每次发言平均 LLM 调用次数 1.2 次*
+*   *每 1 美元可用次数以「每次发言成本」表中四舍五入前的计算值为准*
+*   *所有费用与可用次数均为近似计算*
+*   *DeepSeek V4.1 Flash 假设缓存命中率为 70%，V4 Flash（OpenRouter）为 60%*
+*   *Qwen API 计费以北京区域为准*
+*   *资费标准截至：2026 年 9 月 14 日*
+*   *1 美元 ≈ 7.2 元人民币*
+
+### 免费额度
+
+| 服务 | 免费额度 | 期限 | 备注 |
+|--------|------------|------|------|
+| **Deepgram** | $200 | 无限制 | 无需信用卡 |
+| **ElevenLabs** | 10,000 点数 | 每月重置 | 无需信用卡 |
+| **Gemini 3.5 Transcribe** | 免费档 | 无限制 | 免费档下实际无限制 |
+| **阿里云** | 每个模型 100 万 token | 90 天 | 新加坡区域为准 |
+| **阿里云** | ¥300 | 1 年 | 面向中国境内学生 |
+
+---
+
+## 本地模型
+
+PuriPuly 内置了以下本地模型，还可以连接 OpenAI 兼容 API。
+GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
+
+**ASR**
+
+| 模型 | 运行环境 | 量化 |
+|---|---|---|
+| Parakeet TDT 0.6B v3 | CPU | INT8 |
+| Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
+| Qwen3-ASR 0.6B | CPU | INT8 |
+| Qwen3-ASR 1.7B | GPU | Q6_K |
+| OpenAI 兼容 API | — | — |
+
+**LLM**
+
+| 模型 | 运行环境 | 量化 |
+|---|---|---|
+| Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| OpenAI 兼容 API | — | — |
+
+---
+
+# 如果遇到问题，请通过 [Twitter/X](https://x.com/kapitalismho) 发 DM 联系我。
+
+## 使用方法
+
+1. 从[下载页面](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)下载最新版本
+2. 安装 PuriPuly
+3. 点击 **TALK** 按钮
+4. 点击 **TRANS** 按钮后通过 Discord 验证
+5. 点击 **CAPTIONS** 按钮开启 VR 字幕
+6. （可选）点击 **LISTEN** 按钮开启对方语音翻译
+
+   > 对方语音翻译功能正常工作需要噪音较少的环境。若在 VRChat 中使用，请通过 Earmuff 功能控制环境。
+
+7. 在 VRChat 中启用 OSC：Action menu → Settings → OSC → Enable
+
+### 如果无法捕获音频
+如果无法捕获音频，请在 **设置 > 常规** 中按以下步骤操作。
+
+1. 将 **应用音频接口** 改为 **自动选择** 或 **MME**
+2. 选择正确的麦克风
+3. 重启应用
+
+---
+
+### 中国大陆用户指南
+
+如果您所在地区无法访问 Soniox / Gemini / Deepgram，请使用以下组合。
+
+- STT：**Qwen Audio**
+- LLM：**DeepSeek V4.1 Flash**
+
+   > 可以通过 QQ 认证，而不是 Discord。
+
+---
+
+### 使用您自己的 API 密钥
+
+请根据您要使用的服务，参考对应指南操作。
+
+翻译用 LLM 建议通过 OpenRouter 使用 Gemma 4 模型。
+
+如果方便的话，既然要设置，何不顺便把 ASR 也一起配置好呢？
+PuriPuly 与云端 STT 结合时能提供最佳体验。
+例如即使同样是 Qwen ASR，本地与云端的语音识别性能也有相当差距。
+
+<details>
+<summary><h3>OpenRouter</h3></summary>
+
+1. 请按下方截图所示设置红色圆圈内的选项。
+   ![step0](docs/images/openrouter/0.png)
+
+2. 在应用中点击红色圆圈内的按钮。
+   ![step1](docs/images/openrouter/1.png)
+
+3. 在 OpenRouter 中登录。
+   ![step2](docs/images/openrouter/2.png)
+
+4. 点击红色圆圈内的按钮以退出付款窗口。
+   ![step3](docs/images/openrouter/3.png)
+
+5. 点击 **Authorize** 按钮。
+   ![step4](docs/images/openrouter/4.png)
+
+6. 按需充值预付金。
+   ![step5](docs/images/openrouter/5.png)
+
+<details>
+<summary><h3>点击 Authorize 后仍未完成认证</h3></summary>
+
+如果点击 Authorize 后仍未通过认证，请重试，或按下方步骤手动申请 API 密钥并粘贴。
+
+6. 点击右上角账户后，进入左侧的 API Keys 标签，再点击中央的 Create 按钮。
+   ![step6](docs/images/openrouter/6.png)
+
+7. 点击 Create 按钮。
+   ![step7](docs/images/openrouter/7.png)
+
+8. 点击按钮复制 API 密钥，然后粘贴到翻译器的 API 标签中。
+   ![step8](docs/images/openrouter/8.png)
+
+</details>
+
+</details>
+
+<details>
+<summary><h3>DeepSeek</h3></summary>
+
+1. 请按下方截图所示设置红色圆圈内的选项。
+   ![step0](docs/images/deepseek/0.png)
+
+2. 访问 [DeepSeek 官网](https://www.deepseek.com/en/) 并点击 **Access API** 按钮。
+   ![step1](docs/images/deepseek/1.png)
+
+3. 在主页登录。
+   ![step2](docs/images/deepseek/2.png)
+
+4. 切换到 API Keys 标签后，点击 **Create new API Keys**。
+   ![step3](docs/images/deepseek/3.png)
+
+5. 点击按钮复制 API 密钥后，粘贴到翻译器的 API 标签中。
+   ![step4](docs/images/deepseek/4.png)
+
+6. 切换到 Top Up 标签，按需充值预付金。
+   ![step5](docs/images/deepseek/5.png)
+
+</details>
+
+<details>
+<summary><h3>Deepgram</h3></summary>
+
+1. 访问并登录 [Deepgram Console](https://console.deepgram.com/)。
+   ![step1](docs/images/deepgram/1.png)
+
+2. 当出现欢迎信息或调查问卷时，请点击 **Skip** 跳过。
+   ![step2](docs/images/deepgram/2.png)
+
+3. 在服务选择界面中，选择 **STT (Speech-to-Text)**。
+   ![step3](docs/images/deepgram/3.png)
+
+4. 在 API Keys 菜单中，点击 **Create a New API Key**。
+   ![step4](docs/images/deepgram/4.png)
+
+5. 输入密钥名称（例如：`puripuly`）并生成。
+   ![step5](docs/images/deepgram/5.png)
+
+6. 复制生成的密钥并粘贴到 PuriPuly 设置中。
+   ![step6](docs/images/deepgram/6.png)
+
+</details>
+
+<details>
+<summary><h3>Gemini</h3></summary>
+
+1. 访问 [Google AI Studio](https://aistudio.google.com/apikey) 并点击 **Get API key** 按钮。
+   ![step1](docs/images/gemini/1.png)
+
+2. 创建一个新项目。
+   ![step2](docs/images/gemini/2.png)
+
+3. 随意起一个名字。
+   ![step3](docs/images/gemini/3.png)
+
+4. 选择创建好的项目并点击 **Create key**。
+   ![step4](docs/images/gemini/4.png)
+
+5. 点击圆圈标记的地方。
+   ![step5](docs/images/gemini/5.png)
+
+6. 点击圆圈标记的地方并复制密钥。
+   ![step6](docs/images/gemini/6.png)
+
+7. （推荐）点击黄色高亮的 **Set Up Billing** 按钮，升级并切换到付费方案。
+切换方案可能需要一些时间。
+   ![step7](docs/images/gemini/7.png)
+
+<details>
+<summary><h3>Gemini 付费订阅用户</h3></summary>
+
+8. 前往 [Google Developer Program](https://developers.google.com/program/my-benefits) 并加入该计划。
+   ![step8](docs/images/gemini/8.png)
+
+9. 选择您在第 7 步中设置的付费方案项目。
+   ![step9](docs/images/gemini/9.png)
+
+</details>
+
+</details>
+
+<details>
+<summary><h3>Qwen</h3></summary>
+
+1. 根据您所在的地区，选择合适的链接访问阿里云百炼平台：
+   - [中国大陆](https://bailian.console.aliyun.com/cn-beijing)
+   - [中国大陆以外的地区](https://bailian.console.alibabacloud.com)
+
+2. 在访问的地址中登录。请准确选择您希望申请 API 密钥的区域（Region）。（例如：Beijing）
+   ![step2](docs/images/qwen/1.png)
+
+3. 点击右上角的 **齿轮图标**。
+   ![step3](docs/images/qwen/2.png)
+
+4. 创建一个工作空间（Workspace），然后进入 **API-KEY** 页面。
+   ![step4](docs/images/qwen/3.png)
+
+5. 点击 **Create API Key**。
+   ![step5](docs/images/qwen/4.png)
+
+6. 分配账号和工作空间，然后点击 OK 按钮。
+   ![step6](docs/images/qwen/5.png)
+
+7. 点击圆圈标记的地方以复制密钥。
+   ![step7](docs/images/qwen/6.png)
+
+</details>
+
+<details>
+<summary><h3>Soniox</h3></summary>
+
+1. 登录 [Soniox Console](https://console.soniox.com/)。
+   ![step1](docs/images/soniox/1.png)
+
+2. 随意填写一个组织名称。
+   ![step2](docs/images/soniox/2.png)
+
+3. 点击 **Add Funds** 按钮以绑定支付方式。
+   ![step3](docs/images/soniox/3.png)
+
+4. Soniox 需要预先充值余额。充值完成后，请前往 **API Keys** 菜单。
+   ![step4](docs/images/soniox/4.png)
+
+5. 创建一个新的 API Key。
+   ![step5](docs/images/soniox/5.png)
+
+6. 复制生成的密钥并粘贴到 PuriPuly 设置中。
+   ![step6](docs/images/soniox/6.png)
+
+</details>
+
+
+---
+
+## 架构
+
+![PuriPuly Heart 六边形架构图](docs/architecture-light.png)
+
+参见 [`docs/architecture.md`](docs/architecture.md)。
+
+## 路线图
+
+后续工作在 [PuriPuly 项目看板](https://github.com/users/kapitalismho/projects/2)中公开跟踪。
+
+---
+
+## 开发
+
+### 环境
+
+| 领域 | 推荐环境 | 文档 |
+|---|---|---|
+| Python 桌面应用 | Windows | 本节 |
+| Broker 服务 | Linux | [`broker/README.md`](broker/README.md) |
+| 原生 VR 浮层 | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
+
+### Python 环境
+
+Python 应用需要 Python 3.12 或 3.13。
+
+创建并激活 Windows 环境：
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+安装应用和开发依赖：
+
+```powershell
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+也可以使用 `uv`：
+
+```powershell
+uv sync --dev
+```
+
+安装仓库钩子：
+
+```powershell
+pre-commit install
+```
+
+在 Linux 或 WSL 中工作时，请使用 `.venv-wsl`（如果可用）。
+
+```bash
+UV_PROJECT_ENVIRONMENT=.venv-wsl uv sync --dev
+```
+
+配置了 `direnv` 的仓库可通过以下命令运行：
+
+```bash
+direnv exec . <command>
+```
+
+### 运行应用
+
+运行 Flet 桌面应用：
+
+```powershell
+python -m puripuly_heart.main run-gui
+```
+
+等效的 `uv` 命令：
+
+```powershell
+uv run python -m puripuly_heart.main run-gui
+```
+
+隐藏 UI 状态的开发者预览控件通过以下命令启用：
+
+```powershell
+python -m puripuly_heart.main run-gui --debug-ui-preview
+```
+
+### Python 验证
+
+格式化 Python 源码和测试：
+
+```powershell
+black src tests
+```
+
+仅检查格式而不修改文件：
+
+```powershell
+black --check src tests
+```
+
+运行代码检查：
+
+```powershell
+ruff check src tests
+```
+
+运行完整的 Python 测试套件：
+
+```powershell
+python -m pytest
+```
+
+开发时运行指定的测试文件或目录：
+
+```powershell
+python -m pytest tests/path/to/test_file.py
+```
+
+### 其他领域
+
+Broker 文档维护于 [`broker/README.md`](broker/README.md)。
+
+原生 VR 浮层文档维护于 [`native/overlay/README.md`](native/overlay/README.md)。
+
+自定义 HTTP API 扩展文档维护于 [`docs/http-extensions.md`](docs/http-extensions.md)。连接所需的 JSON Schema 请参阅 [`docs/http-extension.schema.json`](docs/http-extension.schema.json)。
+
+VRChat OSC 控制请参阅 [`docs/vrchat-osc.md`](docs/vrchat-osc.md)。
+
+---
+
+## 开发者
+
+[salee](https://github.com/kapitalismho)
+
+---
+
+## 贡献者
+
+[RICHARDwuxiaofei](https://github.com/RICHARDwuxiaofei)
+[fzcfweasdferttgg-png](https://github.com/fzcfweasdferttgg-png)
+
+---
+
+## Special Thanks
+
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
+
+---
+
+## 政策
+
+- [Code signing policy](CODE_SIGNING.md)
+- [隐私政策](PRIVACY.md)
+
+---
+
+## 许可证
+
+[AGPL-3.0-or-later](LICENSE)
+
+第三方许可证与声明：`src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt`
