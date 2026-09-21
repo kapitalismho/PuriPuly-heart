@@ -196,7 +196,7 @@ def _build_provider_preferences(
         }
     if model == "google/gemma-4-26b-a4b-it" and len(models) <= 1:
         return {
-            "order": ["wafer", "cloudflare", "deepinfra", "makora"],
+            "sort": {"by": "latency"},
             "only": ["wafer", "cloudflare", "deepinfra", "makora"],
             "allow_fallbacks": True,
         }
