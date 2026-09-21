@@ -55,8 +55,6 @@ LEGACY_OPENROUTER_SELECTION_ALIAS_BYOK_QWEN_35_FLASH_02_23 = (
 class LLMSelectionProfile:
     alias: str
     provider: str
-    label_key: str
-    description_key: str
     gemini_model: str | None = None
     qwen_model: str | None = None
     openrouter_model: str | None = None
@@ -68,8 +66,6 @@ PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
     OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemma4_26b_31b",
-        description_key="provider.gemma4_26b_31b.description",
         openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
         openrouter_models=(
             OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
@@ -80,8 +76,6 @@ PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
     OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemma4_26b_31b",
-        description_key="provider.gemma4_26b_31b.description",
         openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
         openrouter_models=(
             OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
@@ -92,8 +86,6 @@ PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
     OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemma4_31b_openrouter",
-        description_key="provider.gemma4_31b_openrouter.description",
         openrouter_model=OPENROUTER_MODEL_GEMMA_4_31B_IT,
         openrouter_models=(OPENROUTER_MODEL_GEMMA_4_31B_IT,),
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
@@ -101,8 +93,6 @@ PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
     OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemma4_31b_openrouter",
-        description_key="provider.gemma4_31b_openrouter.description",
         openrouter_model=OPENROUTER_MODEL_GEMMA_4_31B_IT,
         openrouter_models=(OPENROUTER_MODEL_GEMMA_4_31B_IT,),
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
@@ -110,8 +100,6 @@ PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
     OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemma4_managed",
-        description_key="provider.gemma4_managed.description",
         openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
         openrouter_models=(OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,),
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
@@ -119,8 +107,6 @@ PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
     OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemma4_26b_a4b_it",
-        description_key="provider.gemma4_26b_a4b_it.description",
         openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
         openrouter_models=(OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,),
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
@@ -128,56 +114,42 @@ PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
     OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_MANAGED: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_MANAGED,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.qwen35_flash_managed",
-        description_key="provider.qwen35_flash_managed.description",
         openrouter_model=OPENROUTER_MODEL_QWEN_35_FLASH_02_23,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
     ),
     OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.qwen35_flash_openrouter",
-        description_key="provider.qwen35_flash_openrouter.description",
         openrouter_model=OPENROUTER_MODEL_QWEN_35_FLASH_02_23,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.deepseek_v4_flash_managed",
-        description_key="provider.deepseek_v4_flash_managed.description",
         openrouter_model=OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
     ),
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.deepseek_v4_flash_openrouter",
-        description_key="provider.deepseek_v4_flash_openrouter.description",
         openrouter_model=OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41_MANAGED: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41_MANAGED,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.deepseek_v4_flash_41_managed",
-        description_key="provider.deepseek_v4_flash_41_managed.description",
         openrouter_model=OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
     ),
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41_BYOK: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41_BYOK,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.deepseek_v4_flash_41_openrouter",
-        description_key="provider.deepseek_v4_flash_41_openrouter.description",
         openrouter_model=OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),
     OPENROUTER_SELECTION_ALIAS_GEMINI_FLASH_BYOK: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_GEMINI_FLASH_BYOK,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemini_flash_openrouter",
-        description_key="provider.gemini_flash_openrouter.description",
         openrouter_model=OPENROUTER_MODEL_GEMINI_FLASH,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),
@@ -188,48 +160,36 @@ LEGACY_PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
     LEGACY_OPENROUTER_SELECTION_ALIAS_NONE_GEMMA_4_26B_A4B_IT: LLMSelectionProfile(
         alias=LEGACY_OPENROUTER_SELECTION_ALIAS_NONE_GEMMA_4_26B_A4B_IT,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemma4_26b_a4b_it",
-        description_key="provider.gemma4_26b_a4b_it.description",
         openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_NONE,
     ),
     LEGACY_OPENROUTER_SELECTION_ALIAS_MANAGED_GEMMA_4_26B_A4B_IT: LLMSelectionProfile(
         alias=LEGACY_OPENROUTER_SELECTION_ALIAS_MANAGED_GEMMA_4_26B_A4B_IT,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemma4_managed",
-        description_key="provider.gemma4_managed.description",
         openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
     ),
     LEGACY_OPENROUTER_SELECTION_ALIAS_BYOK_GEMMA_4_26B_A4B_IT: LLMSelectionProfile(
         alias=LEGACY_OPENROUTER_SELECTION_ALIAS_BYOK_GEMMA_4_26B_A4B_IT,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemma4_26b_a4b_it",
-        description_key="provider.gemma4_26b_a4b_it.description",
         openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),
     LEGACY_OPENROUTER_SELECTION_ALIAS_NONE_QWEN_35_FLASH_02_23: LLMSelectionProfile(
         alias=LEGACY_OPENROUTER_SELECTION_ALIAS_NONE_QWEN_35_FLASH_02_23,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.qwen35_flash_openrouter",
-        description_key="provider.qwen35_flash_openrouter.description",
         openrouter_model=OPENROUTER_MODEL_QWEN_35_FLASH_02_23,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_NONE,
     ),
     LEGACY_OPENROUTER_SELECTION_ALIAS_BYOK_QWEN_35_FLASH_02_23: LLMSelectionProfile(
         alias=LEGACY_OPENROUTER_SELECTION_ALIAS_BYOK_QWEN_35_FLASH_02_23,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.qwen35_flash_openrouter",
-        description_key="provider.qwen35_flash_openrouter.description",
         openrouter_model=OPENROUTER_MODEL_QWEN_35_FLASH_02_23,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),
     LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK: LLMSelectionProfile(
         alias=LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemini_flash_openrouter",
-        description_key="provider.gemini_flash_openrouter.description",
         openrouter_model=OPENROUTER_MODEL_GEMINI_FLASH,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),

@@ -15,7 +15,6 @@ class OverlayPeerToggleContract:
     effective_enabled: bool
     action_enabled: bool
     state: OverlayPeerSurfaceState
-    status_text: str
     helper_text: str = ""
     warning_reason: str | None = None
     failure_reason: str | None = None
@@ -44,7 +43,6 @@ def build_overlay_peer_consumer_contract(
         effective_enabled=overlay_state == "connected",
         action_enabled=True,
         state=_overlay_surface_state(overlay_intent_enabled, overlay_state),
-        status_text=_overlay_status_text(overlay_state, overlay_failure_reason),
         warning_reason=_overlay_warning_reason(overlay_intent_enabled, overlay_state),
         failure_reason=overlay_failure_reason,
     )
@@ -65,11 +63,8 @@ def build_overlay_peer_consumer_contract(
         effective_enabled=peer_effective_enabled,
         action_enabled=overlay_state == "connected" or peer_intent_enabled,
         state=peer_state,
-        status_text=t(f"settings.peer_translation.status.{peer_state}"),
         helper_text=_peer_helper_text(
             peer_state=peer_state,
-            overlay_state=overlay_state,
-            overlay_failure_reason=overlay_failure_reason,
             peer_warning_reason=resolved_peer_warning_reason,
         ),
         warning_reason=resolved_peer_warning_reason,
@@ -123,28 +118,6 @@ def _overlay_warning_reason(
     return "overlay_required"
 
 
-def _overlay_status_text(
-    overlay_state: str,
-    overlay_failure_reason: str | None,
-) -> str:
-    state_label = t(f"settings.overlay.status.{overlay_state}", default=overlay_state)
-    if overlay_state == "failed" and overlay_failure_reason:
-        return t(
-            "settings.overlay.status.failed_with_reason",
-            status=state_label,
-            reason=_overlay_failure_text(overlay_failure_reason),
-            default=f"{state_label}: {_overlay_failure_text(overlay_failure_reason)}",
-        )
-    return state_label
-
-
-def _overlay_failure_text(overlay_failure_reason: str | None) -> str:
-    return t(
-        f"settings.overlay.failure.{overlay_failure_reason or 'unknown'}",
-        default=overlay_failure_reason or "unknown",
-    )
-
-
 def _peer_surface_state(
     peer_intent_enabled: bool,
     peer_effective_enabled: bool,
@@ -185,27 +158,10 @@ def _resolve_peer_warning_reason(
 def _peer_helper_text(
     *,
     peer_state: OverlayPeerSurfaceState,
-    overlay_state: str,
-    overlay_failure_reason: str | None,
     peer_warning_reason: str | None,
 ) -> str:
-    if peer_state == "off":
-        if overlay_state == "connected":
-            return ""
-        return t("settings.peer_translation.disabled.overlay_required")
-    if peer_state in {"starting", "on"}:
+    if peer_state != "warning":
         return ""
-    if peer_warning_reason == "overlay_starting":
-        return t("settings.peer_translation.warning.overlay_starting")
-    if peer_warning_reason == "overlay_stopping":
-        return t("settings.peer_translation.warning.overlay_stopping")
-    if peer_warning_reason == "overlay_failed":
-        return t(
-            "settings.peer_translation.warning.overlay_failed",
-            reason=_overlay_failure_text(overlay_failure_reason),
-        )
-    if peer_warning_reason == "runtime_unavailable":
-        return t("settings.peer_translation.warning.runtime_unavailable")
     if peer_warning_reason == "process_unavailable_no_process":
         return t("settings.peer_translation.warning.process_unavailable_no_process")
     if peer_warning_reason == "process_unavailable_ambiguous":
@@ -214,17 +170,7 @@ def _peer_helper_text(
         return t("settings.peer_translation.warning.process_unavailable_ineligible")
     if peer_warning_reason == "process_unavailable_unsupported_platform":
         return t("settings.peer_translation.warning.process_unavailable_unsupported_platform")
-    if peer_warning_reason == "process_setup_failed":
-        return t("settings.peer_translation.warning.process_setup_failed")
-    if peer_warning_reason == "process_target_exited":
-        return t("settings.peer_translation.warning.process_target_exited")
-    if peer_warning_reason == "process_source_failed":
-        return t("settings.peer_translation.warning.process_source_failed")
-    if peer_warning_reason == "process_provider_failed":
-        return t("settings.peer_translation.warning.process_provider_failed")
-    if peer_warning_reason is not None and peer_warning_reason.startswith("process_"):
-        return t("settings.peer_translation.warning.process_capture_failed")
-    return t("settings.peer_translation.disabled.overlay_required")
+    return ""
 
 
 def is_process_capture_warning_reason(reason: str | None) -> bool:

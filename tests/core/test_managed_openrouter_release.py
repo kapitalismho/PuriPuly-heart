@@ -2865,7 +2865,7 @@ async def test_managed_openrouter_provider_issues_on_first_llm_start_only() -> N
     service = FakeIssueService(
         ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
+            message_key="managed_release.retry",
             api_key="managed-key",
             local_key_available=True,
             pending_issue=False,
@@ -2935,7 +2935,7 @@ async def test_managed_openrouter_provider_notifies_when_delegate_becomes_ready(
     service = FakeIssueService(
         ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
+            message_key="managed_release.retry",
             api_key="managed-key",
             local_key_available=True,
             pending_issue=False,

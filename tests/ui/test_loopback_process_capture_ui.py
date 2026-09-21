@@ -146,11 +146,6 @@ PROCESS_WARNING_KEYS = [
     "settings.peer_translation.warning.process_unavailable_ambiguous",
     "settings.peer_translation.warning.process_unavailable_ineligible",
     "settings.peer_translation.warning.process_unavailable_unsupported_platform",
-    "settings.peer_translation.warning.process_setup_failed",
-    "settings.peer_translation.warning.process_target_exited",
-    "settings.peer_translation.warning.process_source_failed",
-    "settings.peer_translation.warning.process_provider_failed",
-    "settings.peer_translation.warning.process_capture_failed",
     "settings.desktop_audio.section.process",
     "settings.desktop_audio.section.device",
     "settings.desktop_audio.process.vrchat",
@@ -167,10 +162,10 @@ def test_process_warning_i18n_keys_have_locale_parity() -> None:
             assert key in keys, f"{locale} missing {key}"
 
 
-def test_activation_starting_i18n_keys_have_locale_parity() -> None:
+def test_local_stt_loading_i18n_keys_have_locale_parity() -> None:
     keys = (
-        "settings.peer_translation.status.starting",
-        "dashboard.local_stt_notice_starting",
+        "dashboard.local_stt_notice_self_loading",
+        "dashboard.local_stt_notice_peer_loading",
         "dashboard.local_stt_notice_start_failed",
     )
     bundles = {locale: _load_locale_keys(locale) for locale in ("en", "ko", "ja", "zh-CN")}
@@ -188,7 +183,6 @@ def test_peer_contract_exposes_starting_before_readiness() -> None:
         peer_activation_starting=True,
     )
     assert contract.peer.state == "starting"
-    assert contract.peer.status_text == t("settings.peer_translation.status.starting")
 
 
 def test_peer_contract_keeps_starting_visible_during_effective_model_transition() -> None:
@@ -224,11 +218,11 @@ def test_peer_contract_keeps_process_failure_warning_during_overlay_startup() ->
         overlay_failure_reason=None,
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_warning_reason="process_provider_failed",
+        peer_warning_reason="process_unavailable_unsupported_platform",
     )
 
     assert contract.peer.state == "warning"
-    assert contract.peer.warning_reason == "process_provider_failed"
+    assert contract.peer.warning_reason == "process_unavailable_unsupported_platform"
 
 
 @pytest.mark.asyncio
@@ -443,11 +437,13 @@ def test_process_warning_helper_text_is_localized_and_retry_classified() -> None
         overlay_failure_reason=None,
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_warning_reason="process_target_exited",
+        peer_warning_reason="process_unavailable_no_process",
     )
     assert contract.peer.state == "warning"
     assert is_process_capture_warning_reason(contract.peer.warning_reason)
-    assert contract.peer.helper_text == t("settings.peer_translation.warning.process_target_exited")
+    assert contract.peer.helper_text == t(
+        "settings.peer_translation.warning.process_unavailable_no_process"
+    )
 
 
 def test_dashboard_process_warning_click_toggles_off_instead_of_retrying() -> None:
@@ -458,7 +454,7 @@ def test_dashboard_process_warning_click_toggles_off_instead_of_retrying() -> No
         overlay_failure_reason=None,
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_warning_reason="process_setup_failed",
+        peer_warning_reason="process_unavailable_ambiguous",
     )
     retries: list[bool] = []
     toggles: list[bool] = []
@@ -748,7 +744,7 @@ def test_dashboard_process_warning_clears_on_success_without_touching_other_warn
         overlay_failure_reason=None,
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_warning_reason="process_target_exited",
+        peer_warning_reason="process_unavailable_no_process",
     )
     view.set_overlay_peer_contract(warning)
     assert view._process_capture_warning_active is True
@@ -776,7 +772,7 @@ def test_dashboard_process_warning_clears_on_peer_disabled() -> None:
         overlay_failure_reason=None,
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_warning_reason="process_setup_failed",
+        peer_warning_reason="process_unavailable_ambiguous",
     )
     view.set_overlay_peer_contract(warning)
     disabled = build_overlay_peer_consumer_contract(
@@ -801,7 +797,7 @@ def test_dashboard_process_warning_does_not_clear_stt_warning_content() -> None:
         overlay_failure_reason=None,
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_warning_reason="process_source_failed",
+        peer_warning_reason="process_unavailable_ineligible",
     )
     view.set_overlay_peer_contract(warning)
     view.set_display_text(t("dashboard.warn_stt_key"))
@@ -830,7 +826,7 @@ def test_dashboard_process_warning_does_not_clear_newer_display_content(
         overlay_failure_reason=None,
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_warning_reason="process_source_failed",
+        peer_warning_reason="process_unavailable_ineligible",
     )
     view.set_overlay_peer_contract(warning)
     view.set_display_text("newer unrelated content")
@@ -855,7 +851,7 @@ def test_dashboard_process_warning_does_not_clear_newer_matching_primary_text() 
         overlay_failure_reason=None,
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_warning_reason="process_source_failed",
+        peer_warning_reason="process_unavailable_ineligible",
     )
     view.set_overlay_peer_contract(warning)
     view.set_display_text(warning.peer.helper_text)
@@ -912,7 +908,7 @@ def test_dashboard_process_warning_does_not_clear_after_status_transition() -> N
         overlay_failure_reason=None,
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_warning_reason="process_target_exited",
+        peer_warning_reason="process_unavailable_no_process",
     )
     view.set_overlay_peer_contract(warning)
     view.set_status("connecting")
@@ -975,7 +971,7 @@ def test_dashboard_unchanged_process_warning_does_not_reacquire_invalidated_prim
         overlay_failure_reason=None,
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_warning_reason="process_source_failed",
+        peer_warning_reason="process_unavailable_ineligible",
     )
     view.set_overlay_peer_contract(warning)
     owned_revision = view._process_capture_warning_display_revision
@@ -994,7 +990,7 @@ def test_dashboard_unchanged_process_warning_does_not_reacquire_invalidated_prim
             overlay_failure_reason=None,
             peer_intent_enabled=True,
             peer_effective_enabled=False,
-            peer_warning_reason="process_source_failed",
+            peer_warning_reason="process_unavailable_ineligible",
         )
     )
     assert statuses == ["connecting"]
@@ -1049,7 +1045,7 @@ def test_dashboard_changed_process_warning_reclaims_primary_with_new_guidance() 
         overlay_failure_reason=None,
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_warning_reason="process_target_exited",
+        peer_warning_reason="process_unavailable_ambiguous",
     )
     view.set_overlay_peer_contract(unavailable)
     view.set_display_text("newer peer content")

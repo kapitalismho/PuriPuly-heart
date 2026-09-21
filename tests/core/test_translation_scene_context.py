@@ -460,7 +460,7 @@ async def test_managed_openrouter_provider_forwards_scene_count() -> None:
         async def ensure_key_for_llm_start(self):  # type: ignore[no-untyped-def]
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.READY,
-                message_key="managed_release.ready",
+                message_key="managed_release.retry",
                 api_key="managed-key",
                 local_key_available=True,
                 pending_issue=False,

@@ -56,7 +56,7 @@ from puripuly_heart.ui.components import subtab_shell as subtab_shell_module
 from puripuly_heart.ui.components.bottom_nav import BottomNavBar
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
-from puripuly_heart.ui.i18n import language_name, provider_label, t
+from puripuly_heart.ui.i18n import language_name, t
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from puripuly_heart.ui.theme import COLOR_NEUTRAL_DARK
 from puripuly_heart.ui.views import settings as settings_view
@@ -905,8 +905,6 @@ def test_peer_language_card_removed_from_general_tab(
     assert t("settings.section.peer_stt") in api_titles
     assert t("settings.peer_language.source") not in general_labels
     assert t("settings.peer_language.target") not in general_labels
-    assert t("settings.dashboard_language_redirect") not in general_labels
-    assert t("settings.dashboard_language_redirect") not in api_labels
     assert not hasattr(view, "_peer_source_text")
     assert not hasattr(view, "_peer_target_text")
 
@@ -2384,7 +2382,7 @@ def test_on_stt_selected_routes_compatibility_warning_through_snackbar_callback(
     monkeypatch.setattr(view._stt_text, "update", lambda: None)
     monkeypatch.setattr(view._peer_stt_text, "update", lambda: None)
     view.show_snackbar = lambda message, color: snackbars.append((message, color))
-    warning = SimpleNamespace(key="warning.deepgram_not_supported", language_code="xx")
+    warning = SimpleNamespace(key="warning.deepgram_suggest_qwen", language_code="xx")
     monkeypatch.setattr(
         settings_view,
         "get_stt_compatibility_warning",
@@ -2468,7 +2466,6 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
     assert captured["left_column_sections"] == 2
     assert local_qwen_option.label == "Qwen3 ASR 0.6B"
     assert local_qwen_option.disabled is False
-    assert local_qwen_option.description == t("provider.local_qwen.description")
     assert all(
         option.disabled == (option.value == STTProviderName.LOCAL_CPU_AUTO.value)
         for option in options
@@ -2489,11 +2486,14 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
         STTProviderName.CUSTOM_REALTIME.value,
     }
     assert STTProviderName.LOCAL_QWEN_GPU.value in {option.value for option in options}
+    soniox_option = next(
+        option for option in options if option.value == STTProviderName.SONIOX.value
+    )
     qwen_audio_option = next(
         option for option in options if option.value == STTProviderName.QWEN_AUDIO.value
     )
     assert qwen_audio_option.label == t("provider.qwen_audio")
-    assert qwen_audio_option.description == t("provider.qwen_audio.description")
+    assert soniox_option.description == t("provider.soniox.description")
 
 
 def test_qwen_asr_model_button_is_removed_from_api_key_card(
@@ -3125,38 +3125,6 @@ def test_on_llm_selected_sets_deepseek_managed_connection_and_label(
         "settings.translation_connection.managed"
     )
     assert view._prompt_editor.value == "G"
-
-
-def test_on_llm_selected_updates_prompt_helper_copy_live_when_mounted(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
-        connection=TranslationConnection.OFFICIAL_BYOK.value,
-    )
-    settings = _vnext(settings, system_prompt="G")
-
-    view = _make_llm_selection_view(monkeypatch, settings)
-    monkeypatch.setattr(settings_view.SettingsView, "page", property(lambda self: object()))
-    prompt_copy_updates: list[str] = []
-    view._prompt_for_text = SimpleNamespace(
-        value="stale",
-        update=lambda: prompt_copy_updates.append(view._prompt_for_text.value),
-    )
-
-    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
-
-    assert view._prompt_for_text.value == t(
-        "settings.prompt_for",
-        provider=provider_label(LLMProviderName.QWEN.value),
-    )
-    assert prompt_copy_updates == [
-        t(
-            "settings.prompt_for",
-            provider=provider_label(LLMProviderName.QWEN.value),
-        )
-    ]
 
 
 def test_on_llm_selected_stages_byok_without_mutating_managed_identity_snapshot(
@@ -3803,8 +3771,7 @@ def test_audio_and_vad_handlers_update_state(
     monkeypatch.setattr(type(view._vad_slider), "update", lambda self: None)
     view._handle_vad_visual_change(visual_event)
     view._handle_vad_change(visual_event)
-    view._peer_vad_field.value = "0.61"
-    view._on_peer_vad_threshold_change(SimpleNamespace(control=view._peer_vad_field))
+    view._handle_peer_vad_change(SimpleNamespace(control=SimpleNamespace(value=0.61)))
 
     assert view._settings.intent.audio.input_host_api == "MME"
     assert view._settings.intent.audio.input_device == "Mic 2"
@@ -3812,7 +3779,7 @@ def test_audio_and_vad_handlers_update_state(
     assert view._settings.intent.desktop_audio.vad_speech_threshold == 0.61
 
 
-def test_peer_vad_slider_change_skips_hidden_field_update_when_view_is_mounted(
+def test_peer_vad_slider_change_updates_state_and_emits_intent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class UpdateRecorder:
@@ -3834,7 +3801,6 @@ def test_peer_vad_slider_change_skips_hidden_field_update_when_view_is_mounted(
     view._handle_peer_vad_change(SimpleNamespace(control=SimpleNamespace(value=0.77)))
 
     assert view._settings.intent.desktop_audio.vad_speech_threshold == 0.77
-    assert view._peer_vad_field.value == "0.77"
     assert view._peer_vad_slider.label == "0.77"
     assert slider_page.updated == [view._peer_vad_slider]
     assert len(changed) == 1
@@ -4261,7 +4227,6 @@ def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only
         assert t("settings.overlay.calibration.offset_x") not in overlay_titles
         assert t("settings.overlay.calibration.offset_y") not in overlay_titles
         assert t("settings.overlay.calibration.text_scale") not in overlay_titles
-        assert t("settings.overlay.status.off") not in overlay_titles
         assert all(row.visible is False for row in view._overlay_vr_rows)
         assert all(row.visible is True for row in view._overlay_desktop_rows)
         assert view._desktop_overlay_size_button.content.value == t(
@@ -4837,23 +4802,14 @@ def test_audio_change_updates_desktop_loopback_controls(monkeypatch: pytest.Monk
 
     view._audio_settings.desktop_output_device = "Speakers (Loopback)"
     view._on_audio_change()
-    view._peer_vad_field.value = "0.72"
-    view._on_peer_vad_threshold_change(SimpleNamespace(control=view._peer_vad_field))
-    view._peer_hangover_field.value = "950"
-    view._on_peer_hangover_change(SimpleNamespace(control=view._peer_hangover_field))
-    view._peer_pre_roll_field.value = "420"
-    view._on_peer_pre_roll_change(SimpleNamespace(control=view._peer_pre_roll_field))
+    view._handle_peer_vad_change(SimpleNamespace(control=SimpleNamespace(value=0.72)))
 
     assert view._settings.intent.desktop_audio.output_device == "Speakers (Loopback)"
     assert view._settings.intent.desktop_audio.vad_speech_threshold == 0.72
-    assert view._settings.intent.desktop_audio.vad_hangover_ms == 950
-    assert view._settings.intent.desktop_audio.vad_pre_roll_ms == 420
-    assert len(changed) == 4
+    assert len(changed) == 2
     assert all(incoming is not settings for incoming in changed)
     assert changed[-1].intent.desktop_audio.output_device == "Speakers (Loopback)"
     assert changed[-1].intent.desktop_audio.vad_speech_threshold == 0.72
-    assert changed[-1].intent.desktop_audio.vad_hangover_ms == 950
-    assert changed[-1].intent.desktop_audio.vad_pre_roll_ms == 420
 
 
 def test_general_tab_keeps_fixed_three_slot_rows_with_vrchat_osc_card(
@@ -5101,7 +5057,8 @@ def test_general_tab_host_api_card_exposes_host_api_only(
     host_api_card = _general_tab_card(view, t("settings.audio_host_api"))
     host_api_labels = _control_labels(host_api_card)
 
-    assert t("settings.desktop_audio.output_device") not in host_api_labels
+    assert t("settings.desktop_audio.section.device") not in host_api_labels
+    assert t("settings.section.microphone_audio") not in host_api_labels
     assert _tree_contains_control(host_api_card, view._audio_host_api_text)
 
 
@@ -5113,7 +5070,6 @@ def test_general_tab_microphone_audio_card_exposes_microphone_only(
     mic_audio_labels = _control_labels(mic_audio_card)
 
     assert t("settings.audio_host_api") not in mic_audio_labels
-    assert t("settings.desktop_audio.output_device") not in mic_audio_labels
     assert _tree_contains_control(mic_audio_card, view._mic_audio_text)
     assert not _tree_contains_control(mic_audio_card, view._audio_host_api_text)
 
@@ -5136,9 +5092,7 @@ def test_general_tab_self_vad_card_contains_only_self_vad_slider(
     self_vad_card = _general_tab_card(view, t("settings.section.self_vad_sensitivity"))
 
     assert _tree_contains_control(self_vad_card, view._vad_slider)
-    assert not _tree_contains_control(self_vad_card, view._peer_vad_field)
-    assert not _tree_contains_control(self_vad_card, view._peer_hangover_field)
-    assert not _tree_contains_control(self_vad_card, view._peer_pre_roll_field)
+    assert not _tree_contains_control(self_vad_card, view._peer_vad_slider)
 
 
 def test_general_tab_peer_vad_card_contains_peer_fields_only(
@@ -5148,13 +5102,8 @@ def test_general_tab_peer_vad_card_contains_peer_fields_only(
     peer_vad_card = _general_tab_card(view, t("settings.section.peer_vad_sensitivity"))
     peer_vad_labels = _control_labels(peer_vad_card)
 
-    assert t("settings.vad.peer") not in peer_vad_labels
-    assert t("settings.vad.peer_hangover_ms") not in peer_vad_labels
-    assert t("settings.vad.peer_pre_roll_ms") not in peer_vad_labels
+    assert peer_vad_labels == [t("settings.section.peer_vad_sensitivity")]
     assert _tree_contains_control(peer_vad_card, view._peer_vad_slider)
-    assert not _tree_contains_control(peer_vad_card, view._peer_vad_field)
-    assert not _tree_contains_control(peer_vad_card, view._peer_hangover_field)
-    assert not _tree_contains_control(peer_vad_card, view._peer_pre_roll_field)
     assert not _tree_contains_control(peer_vad_card, view._vad_slider)
 
 
@@ -5787,7 +5736,7 @@ def test_custom_vocabulary_loads_empty_tags_for_fresh_settings(
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert _custom_vocab_chip_terms(view) == []
-    assert view._custom_vocab_tag_editor._empty_text.visible is False  # noqa: SLF001
+    assert view._custom_vocab_tag_editor._chips_wrap.visible is False  # noqa: SLF001
 
 
 def test_custom_vocabulary_card_shows_one_line_provider_support_helper(
@@ -5842,10 +5791,8 @@ def test_prompt_tab_hides_prompt_provider_copy_and_old_language_helper_text(
         prompt_card = _prompt_tab_card(view, t("settings.section.persona"))
         custom_vocab_card = _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
 
-        assert t(
-            "settings.prompt_for",
-            provider=provider_label(LLMProviderName.GEMINI.value),
-        ) not in _control_labels(prompt_card)
+        assert t("settings.section.persona") in _control_labels(prompt_card)
+        assert not hasattr(view, "_prompt_for_text")
         assert not hasattr(view, "_custom_vocab_helper_text")
         assert t("settings.custom_vocabulary.description") in _control_labels(custom_vocab_card)
     finally:
@@ -5929,8 +5876,7 @@ def test_api_keys_card_omits_helper_copy_and_keeps_qwen_region_button_in_header(
     assert api_header.controls[0] is view._api_title
     assert api_header.controls[2] is view._api_guide_btn
     assert api_header.controls[3] is view._qwen_region_btn
-    assert view._api_credentials_helper_text not in api_column.controls
-    assert t("settings.api_credentials_helper") not in _control_labels(api_card)
+    assert not hasattr(view, "_api_credentials_helper_text")
 
 
 def test_api_provider_row_does_not_override_shared_card_height(
@@ -6508,9 +6454,7 @@ def test_cloud_modal_section_leads_with_qwen_audio_then_deepgram(
         STTProviderName.ELEVENLABS_SCRIBE,
     ):
         assert view._stt_option_item(provider).description == ""
-    assert view._stt_option_item(STTProviderName.QWEN_AUDIO).description == t(
-        "provider.qwen_audio.description"
-    )
+    assert view._stt_option_item(STTProviderName.QWEN_AUDIO).description == ""
     rolling_option = view._stt_option_item(STTProviderName.ROLLING_FREE)
     assert "\n" not in rolling_option.label
     assert rolling_option.label == t("provider.rolling_free").replace("\n", " ")

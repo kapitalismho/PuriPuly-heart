@@ -38,7 +38,6 @@ def _dialog(
     page: DummyPage,
     events: list[str] | None = None,
     *,
-    on_reopen_browser: Callable[[], None] | None = None,
     on_cancel: Callable[[], None] | None = None,
 ) -> DiscordManagedAuthDialog:
     calls = events if events is not None else []
@@ -47,21 +46,7 @@ def _dialog(
         on_continue=lambda: calls.append("continue"),
         on_byok=lambda: calls.append("byok"),
         on_close=lambda: calls.append("close"),
-        on_reopen_browser=on_reopen_browser or (lambda: calls.append("reopen")),
         on_cancel=on_cancel,
-    )
-
-
-def _dialog_without_reopen(
-    page: DummyPage,
-    events: list[str] | None = None,
-) -> DiscordManagedAuthDialog:
-    calls = events if events is not None else []
-    return DiscordManagedAuthDialog(
-        page,
-        on_continue=lambda: calls.append("continue"),
-        on_byok=lambda: calls.append("byok"),
-        on_close=lambda: calls.append("close"),
     )
 
 
@@ -116,7 +101,6 @@ def test_discord_managed_auth_dialog_uses_warm_document_layout(
         on_continue=lambda: None,
         on_byok=lambda: None,
         on_close=lambda: None,
-        on_reopen_browser=lambda: None,
     )
 
     dialog.open()
@@ -256,20 +240,12 @@ def test_discord_managed_auth_dialog_waiting_state_uses_waiting_labels() -> None
     dialog.open()
     dialog.set_waiting()
 
-    assert dialog.waiting_action_labels == [
-        "discord_auth.cancel",
-        "discord_auth.reopen_browser",
-    ]
+    assert dialog.waiting_action_labels == ["discord_auth.cancel"]
     assert dialog._body_text is not None
     assert dialog._body_text.value == t("discord_auth.waiting_body")
-    assert dialog._reopen_browser_button is not None
     assert dialog._cancel_button is not None
-    assert [control.content for control in dialog._actions.controls] == [
-        t("discord_auth.cancel"),
-        t("discord_auth.reopen_browser"),
-    ]
+    assert [control.content for control in dialog._actions.controls] == [t("discord_auth.cancel")]
     assert dialog._cancel_button is dialog._actions.controls[0]
-    assert dialog._reopen_browser_button is dialog._actions.controls[1]
 
 
 def test_discord_managed_auth_dialog_removes_referral_field_when_waiting() -> None:
@@ -302,10 +278,7 @@ def test_discord_managed_auth_dialog_callback_received_expands_body() -> None:
 
     assert dialog._body_text is not None
     assert dialog._body_text.value == t("discord_auth.callback_received_body")
-    assert [control.content for control in dialog._actions.controls] == [
-        t("discord_auth.cancel"),
-        t("discord_auth.reopen_browser"),
-    ]
+    assert [control.content for control in dialog._actions.controls] == [t("discord_auth.cancel")]
 
 
 def test_discord_managed_auth_dialog_callback_received_requires_open_waiting_dialog() -> None:
@@ -384,7 +357,6 @@ def test_discord_managed_auth_dialog_close_closes_then_invokes_callback() -> Non
         on_continue=lambda: events.append("continue"),
         on_byok=lambda: events.append(f"byok_closed={page.dialog is None}"),
         on_close=lambda: events.append(f"close_closed={page.dialog is None}"),
-        on_reopen_browser=lambda: events.append("reopen"),
     )
     close_dialog.open()
 
@@ -396,7 +368,7 @@ def test_discord_managed_auth_dialog_close_closes_then_invokes_callback() -> Non
     assert page.dialog is None
 
 
-def test_discord_managed_auth_dialog_waiting_reopen_and_cancel_behavior() -> None:
+def test_discord_managed_auth_dialog_waiting_cancel_behavior() -> None:
     page = DummyPage()
     events: list[str] = []
     dialog = DiscordManagedAuthDialog(
@@ -404,38 +376,17 @@ def test_discord_managed_auth_dialog_waiting_reopen_and_cancel_behavior() -> Non
         on_continue=lambda: events.append("continue"),
         on_byok=lambda: events.append("byok"),
         on_close=lambda: events.append(f"close_closed={page.dialog is None}"),
-        on_reopen_browser=lambda: events.append(f"reopen_closed={page.dialog is None}"),
         on_cancel=lambda: events.append(f"cancel_closed={page.dialog is None}"),
     )
     dialog.open()
     dialog.set_waiting()
 
-    assert dialog._reopen_browser_button is not None
-    dialog._reopen_browser_button.on_click(None)
-
-    assert events == ["reopen_closed=False"]
-    assert page.closed == []
-    assert page.dialog is dialog._dialog
-
     assert dialog._cancel_button is not None
     dialog._cancel_button.on_click(None)
 
-    assert events == ["reopen_closed=False", "cancel_closed=True"]
+    assert events == ["cancel_closed=True"]
     assert page.closed == [dialog._dialog]
     assert page.dialog is None
-
-
-def test_discord_managed_auth_dialog_hides_reopen_when_callback_is_absent() -> None:
-    page = DummyPage()
-    events: list[str] = []
-    dialog = _dialog_without_reopen(page, events)
-    dialog.open()
-
-    dialog.set_waiting()
-
-    assert dialog._reopen_browser_button is None
-    assert dialog._cancel_button is not None
-    assert [control.content for control in dialog._actions.controls] == [t("discord_auth.cancel")]
 
 
 def test_discord_managed_auth_dialog_waiting_cancel_falls_back_to_close_callback() -> None:
@@ -446,7 +397,6 @@ def test_discord_managed_auth_dialog_waiting_cancel_falls_back_to_close_callback
         on_continue=lambda: events.append("continue"),
         on_byok=lambda: events.append("byok"),
         on_close=lambda: events.append(f"close_closed={page.dialog is None}"),
-        on_reopen_browser=lambda: events.append("reopen"),
     )
     dialog.open()
     dialog.set_waiting()

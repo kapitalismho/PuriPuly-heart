@@ -58,8 +58,6 @@ from puripuly_heart.app.ports.settings_view import (
     OverlayTranslationSettingsIntent,
     PeerExpectedLanguagesIntent,
     PeerSttProviderEdit,
-    PeerVadHangoverIntent,
-    PeerVadPreRollIntent,
     PeerVadSpeechThresholdIntent,
     PromptApplyIntent,
     PromptSettingsSnapshot,
@@ -281,7 +279,6 @@ _TRANSLATION_CONNECTION_LABEL_KEYS = {
     TranslationConnection.OLLAMA: "settings.translation_connection.ollama",
     TranslationConnection.CUSTOM_HTTP: "settings.translation_connection.custom_http",
 }
-_TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.only_supported"
 _TRANSLATION_MODELS = (
     TranslationModel.MANAGED_GEMMA,
     TranslationModel.GEMMA4_26B_31B,
@@ -1095,9 +1092,6 @@ class SettingsView(ft.Column):
         self._stt_title = ft.Text(
             t("settings.section.stt"), size=24, weight=ft.FontWeight.BOLD, color=COLOR_SECONDARY
         )
-        self._stt_provider_label = ft.Text(
-            t("settings.self_stt_provider"), size=16, color=COLOR_ON_BACKGROUND
-        )
         self._self_stt_card = self._wrap_unit_card(
             title=self._stt_title,
             value=self._stt_text,
@@ -1112,9 +1106,6 @@ class SettingsView(ft.Column):
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
-        )
-        self._translation_provider_label = ft.Text(
-            t("settings.shared_translation_provider"), size=16, color=COLOR_ON_BACKGROUND
         )
         self._translation_provider_card = self._wrap_unit_card(
             title=self._trans_title,
@@ -1361,11 +1352,6 @@ class SettingsView(ft.Column):
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        self._api_credentials_helper_text = ft.Text(
-            t("settings.api_credentials_helper"),
-            size=16,
-            color=COLOR_SECONDARY,
-        )
         self._api_guide_btn = _make_text_button(
             t("settings.api_keys_guide"),
             style=ft.ButtonStyle(
@@ -1420,7 +1406,7 @@ class SettingsView(ft.Column):
             value=self._ui_text,
         )
 
-        self._audio_settings = AudioSettings(on_change=self._on_audio_change)
+        self._audio_settings = AudioSettings()
         self._chatbox_source_text = self._build_clickable_text(
             t("settings.chatbox_source.on"),
             self._on_chatbox_source_click,
@@ -1600,21 +1586,6 @@ class SettingsView(ft.Column):
             on_change=self._handle_peer_vad_visual_change,
             on_change_end=self._handle_peer_vad_change,
         )
-        self._peer_vad_field = self._build_numeric_setting_field(
-            label=t("settings.vad.peer"),
-            value="0.50",
-            on_change_end=self._on_peer_vad_threshold_change,
-        )
-        self._peer_hangover_field = self._build_numeric_setting_field(
-            label=t("settings.vad.peer_hangover_ms"),
-            value="700",
-            on_change_end=self._on_peer_hangover_change,
-        )
-        self._peer_pre_roll_field = self._build_numeric_setting_field(
-            label=t("settings.vad.peer_pre_roll_ms"),
-            value="500",
-            on_change_end=self._on_peer_pre_roll_change,
-        )
         self._peer_vad_card = self._wrap_unit_card(
             title=self._peer_vad_title,
             value=ft.Container(
@@ -1647,19 +1618,9 @@ class SettingsView(ft.Column):
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        self._dashboard_language_redirect_text = ft.Text(
-            t("settings.dashboard_language_redirect"),
-            size=16,
-            color=COLOR_SECONDARY,
-        )
         self._peer_stt_text = self._build_clickable_text(
             provider_label(STTProviderName.LOCAL_CPU_AUTO.value),
             self._on_peer_stt_click,
-        )
-        self._peer_stt_label = ft.Text(
-            t("settings.peer_stt_provider"),
-            size=16,
-            color=COLOR_ON_BACKGROUND,
         )
         self._peer_stt_card = self._wrap_unit_card(
             title=self._peer_provider_title,
@@ -2017,7 +1978,7 @@ class SettingsView(ft.Column):
         )
 
         self._desktop_overlay_status_title = ft.Text(
-            t("settings.overlay.status.off"),
+            "",
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
@@ -2197,13 +2158,6 @@ class SettingsView(ft.Column):
             ),
             show_status=False,
         )
-        local_llm_api_key_description = t("settings.local_llm.api_key.description")
-        self._local_llm_api_key_helper = ft.Text(
-            local_llm_api_key_description,
-            size=15,
-            color=COLOR_SECONDARY,
-            visible=bool(local_llm_api_key_description.strip()),
-        )
         self._local_llm_extra_body = ft.TextField(
             label=t("settings.local_llm.extra_body"),
             value=json.dumps(
@@ -2247,7 +2201,6 @@ class SettingsView(ft.Column):
                     self._local_llm_base_url,
                     self._local_llm_model,
                     self._local_llm_api_key,
-                    self._local_llm_api_key_helper,
                     self._local_llm_extra_body,
                     self._local_llm_extra_body_error,
                 ],
@@ -2302,13 +2255,6 @@ class SettingsView(ft.Column):
             ),
             show_status=False,
         )
-        custom_stt_api_key_description = t("settings.custom_stt.api_key.description")
-        self._custom_stt_api_key_helper = ft.Text(
-            custom_stt_api_key_description,
-            size=15,
-            color=COLOR_SECONDARY,
-            visible=bool(custom_stt_api_key_description.strip()),
-        )
         self._custom_stt_extra = ft.TextField(
             label=t("settings.custom_stt.extra"),
             value="{}",
@@ -2344,7 +2290,6 @@ class SettingsView(ft.Column):
                     self._custom_stt_extra,
                     self._custom_stt_extra_error,
                     self._custom_stt_api_key,
-                    self._custom_stt_api_key_helper,
                 ],
                 spacing=8,
             ),
@@ -2435,11 +2380,6 @@ class SettingsView(ft.Column):
         self._persona_title = ft.Text(
             t("settings.section.persona"), size=24, weight=ft.FontWeight.BOLD, color=COLOR_SECONDARY
         )
-        self._prompt_for_text = ft.Text(
-            self._prompt_provider_copy(),
-            size=16,
-            color=COLOR_SECONDARY,
-        )
 
         # Reset button (matches Persona title color, hover -> primary)
         self._reset_prompt_btn = _make_text_button(
@@ -2501,7 +2441,6 @@ class SettingsView(ft.Column):
             on_add_terms=self._on_custom_vocabulary_add_terms,
             on_remove_term=self._on_custom_vocabulary_remove_term,
         )
-        self._apply_custom_vocabulary_tag_editor_locale()
         row7 = SharedCardWrapper(
             ft.Column(
                 [
@@ -2963,9 +2902,6 @@ class SettingsView(ft.Column):
         _ = connection
         return ""
 
-    def _translation_connection_only_supported_description(self) -> str:
-        return t(_TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY, default="")
-
     def _set_translation_connection_text(self, text: str) -> None:
         text_control = self._translation_connection_text.content
         text_control.value = text
@@ -3017,12 +2953,6 @@ class SettingsView(ft.Column):
             return profile_for_alias(self._display_openrouter_selection_alias(settings).value)
         except KeyError:
             return None
-
-    def _openrouter_profile_display_label(self, profile) -> str:
-        return t(profile.label_key)
-
-    def _openrouter_profile_display_description(self, profile) -> str:
-        return t(profile.description_key, default="")
 
     def _get_llm_display_label(self, settings: ProviderSettingsSnapshot) -> str:
         model = settings.translation.model
@@ -3095,26 +3025,8 @@ class SettingsView(ft.Column):
             return "en"
         return self._prompt_snapshot.source_language
 
-    def _prompt_provider_copy(self) -> str:
-        return t(
-            "settings.prompt_for",
-            provider=provider_label(self._active_prompt_key()),
-        )
-
-    def _apply_custom_vocabulary_tag_editor_locale(self) -> None:
-        self._custom_vocab_tag_editor.set_placeholder(
-            t("settings.custom_vocabulary.add_placeholder")
-        )
-        self._custom_vocab_tag_editor.set_add_label(t("settings.custom_vocabulary.add_action"))
-        self._custom_vocab_tag_editor.set_empty_text(t("settings.custom_vocabulary.empty"))
-        self._custom_vocab_tag_editor.set_remove_label_template(
-            t("settings.custom_vocabulary.remove_hint")
-        )
-
     def _sync_prompt_tab_copy(self) -> None:
-        self._prompt_for_text.value = self._prompt_provider_copy()
         self._custom_vocab_description_text.value = t("settings.custom_vocabulary.description")
-        self._apply_custom_vocabulary_tag_editor_locale()
         peer_auto_languages_title = getattr(self, "_peer_auto_languages_title", None)
         if peer_auto_languages_title is not None:
             peer_auto_languages_title.value = t("settings.peer_auto_languages.title")
@@ -3125,7 +3037,6 @@ class SettingsView(ft.Column):
             peer_auto_languages_editor.apply_locale()
         if is_control_mounted(self):
             for control in (
-                self._prompt_for_text,
                 self._custom_vocab_description_text,
                 peer_auto_languages_title,
             ):
@@ -3776,9 +3687,6 @@ class SettingsView(ft.Column):
         self._vad_slider.label = f"{general.self_vad_speech_threshold:.2f}"
         self._peer_vad_slider.value = general.peer_vad_speech_threshold
         self._peer_vad_slider.label = f"{general.peer_vad_speech_threshold:.2f}"
-        self._peer_vad_field.value = f"{general.peer_vad_speech_threshold:.2f}"
-        self._peer_hangover_field.value = str(general.peer_vad_hangover_ms)
-        self._peer_pre_roll_field.value = str(general.peer_vad_pre_roll_ms)
         self._vrc_mic_text.content.value = t(
             "settings.vrc_mic.on" if general.vrc_mic_intercept else "settings.vrc_mic.off"
         )
@@ -5643,11 +5551,6 @@ class SettingsView(ft.Column):
             )
             self._desktop_overlay_view_logs_action.visible = True
         else:
-            self._desktop_overlay_status_title.value = t(
-                "settings.overlay.status.stopping"
-                if state == "stopping"
-                else "settings.overlay.status.off"
-            )
             self._set_desktop_overlay_primary_action(
                 label_key=None,
                 action_kind=None,
@@ -6201,69 +6104,9 @@ class SettingsView(ft.Column):
             self._general_snapshot,
             peer_vad_speech_threshold=new_vad,
         )
-        self._peer_vad_field.value = f"{new_vad:.2f}"
         self._peer_vad_slider.label = f"{new_vad:.2f}"
-        _update_control_if_mounted(self._peer_vad_field)
         _update_control_if_mounted(self._peer_vad_slider)
         self._emit_settings_changed(PeerVadSpeechThresholdIntent(new_vad))
-
-    def _on_peer_vad_threshold_change(self, e) -> None:
-        if self._general_snapshot is None:
-            return
-
-        old_value = self._general_snapshot.peer_vad_speech_threshold
-        new_value = self._parse_setting_float(
-            e.control.value,
-            fallback=old_value,
-            minimum=VAD_ONSET_MIN,
-            maximum=VAD_ONSET_MAX,
-        )
-
-        self._general_snapshot = replace(
-            self._general_snapshot,
-            peer_vad_speech_threshold=new_value,
-        )
-        self._peer_vad_field.value = f"{new_value:.2f}"
-        _update_control_if_mounted(self._peer_vad_field)
-        self._emit_settings_changed(PeerVadSpeechThresholdIntent(new_value))
-
-    def _on_peer_hangover_change(self, e) -> None:
-        if self._general_snapshot is None:
-            return
-
-        old_value = self._general_snapshot.peer_vad_hangover_ms
-        new_value = self._parse_setting_int(
-            e.control.value,
-            fallback=old_value,
-            minimum=0,
-        )
-
-        self._general_snapshot = replace(
-            self._general_snapshot,
-            peer_vad_hangover_ms=new_value,
-        )
-        self._peer_hangover_field.value = str(new_value)
-        _update_control_if_mounted(self._peer_hangover_field)
-        self._emit_settings_changed(PeerVadHangoverIntent(new_value))
-
-    def _on_peer_pre_roll_change(self, e) -> None:
-        if self._general_snapshot is None:
-            return
-
-        old_value = self._general_snapshot.peer_vad_pre_roll_ms
-        new_value = self._parse_setting_int(
-            e.control.value,
-            fallback=old_value,
-            minimum=0,
-        )
-
-        self._general_snapshot = replace(
-            self._general_snapshot,
-            peer_vad_pre_roll_ms=new_value,
-        )
-        self._peer_pre_roll_field.value = str(new_value)
-        _update_control_if_mounted(self._peer_pre_roll_field)
-        self._emit_settings_changed(PeerVadPreRollIntent(new_value))
 
     def _on_vrc_mic_click(self, e) -> None:
         """Toggle VRC mic intercept immediately from the unit card."""
@@ -6564,9 +6407,6 @@ class SettingsView(ft.Column):
         self._managed_key_invite_progress_label.value = t(
             "settings.managed_key.invite_progress.label"
         )
-        self._stt_provider_label.value = t("settings.self_stt_provider")
-        self._translation_provider_label.value = t("settings.shared_translation_provider")
-        self._api_credentials_helper_text.value = t("settings.api_credentials_helper")
         self._ui_title.value = t("settings.section.ui")
         self._audio_host_api_title.value = t("settings.audio_host_api")
         self._mic_audio_title.value = t("settings.section.microphone_audio")
@@ -6574,9 +6414,6 @@ class SettingsView(ft.Column):
         self._self_vad_title.value = t("settings.section.self_vad_sensitivity")
         self._peer_vad_title.value = t("settings.section.peer_vad_sensitivity")
         self._microphone_test_title.value = t("settings.microphone_test")
-        self._peer_vad_field.label = t("settings.vad.peer")
-        self._peer_hangover_field.label = t("settings.vad.peer_hangover_ms")
-        self._peer_pre_roll_field.label = t("settings.vad.peer_pre_roll_ms")
         self._translation_connection_title.value = t("settings.translation_connection")
         self._cloud_free_tier_title.value = t("settings.cloud_free_tier")
         self._soniox_speaker_diarization_title.value = t("settings.soniox_speaker_diarization")
@@ -6587,9 +6424,6 @@ class SettingsView(ft.Column):
         self._custom_stt_endpoint.label = t("settings.custom_stt.endpoint")
         self._custom_stt_model.label = t("settings.custom_stt.model")
         self._custom_stt_api_key.apply_locale()
-        custom_stt_api_key_description = t("settings.custom_stt.api_key.description")
-        self._custom_stt_api_key_helper.value = custom_stt_api_key_description
-        self._custom_stt_api_key_helper.visible = bool(custom_stt_api_key_description.strip())
         self._sync_custom_stt_card()
         self._http_extension_title.value = t("settings.http_extension.title")
         self._http_extension_path_title.value = t("settings.http_extension.path")
@@ -6602,9 +6436,6 @@ class SettingsView(ft.Column):
         self._local_llm_base_url.label = t("settings.local_llm.base_url")
         self._local_llm_model.label = t("settings.local_llm.model")
         self._local_llm_api_key.apply_locale()
-        local_llm_api_key_description = t("settings.local_llm.api_key.description")
-        self._local_llm_api_key_helper.value = local_llm_api_key_description
-        self._local_llm_api_key_helper.visible = bool(local_llm_api_key_description.strip())
         self._local_llm_extra_body.label = t("settings.local_llm.extra_body")
         self._local_llm_extra_body_helper.value = t("settings.local_llm.extra_body.description")
         if self._local_llm_base_url.error:
@@ -6626,8 +6457,6 @@ class SettingsView(ft.Column):
         self._clipboard_auto_translate_title.value = t("settings.clipboard_auto_translate")
         self._telemetry_enabled_title.value = t("settings.telemetry.title")
         self._peer_provider_title.value = t("settings.section.peer_stt")
-        self._dashboard_language_redirect_text.value = t("settings.dashboard_language_redirect")
-        self._peer_stt_label.value = t("settings.peer_stt_provider")
         self._gpu_device_title.value = t("settings.gpu_device.asr")
         self._gpu_llm_title.value = t("settings.gpu_device.llm")
         self._gpu_refresh_title.value = t("settings.gpu_device.refresh")

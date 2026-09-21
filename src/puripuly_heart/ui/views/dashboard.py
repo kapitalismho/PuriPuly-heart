@@ -6,7 +6,6 @@ import flet as ft
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
-    ManagedGemmaNoticeAction,
     OscControlPresentationState,
 )
 from puripuly_heart.config.runtime_resolution import stt_supports_peer_auto_detection
@@ -23,7 +22,6 @@ from puripuly_heart.ui.dashboard.capture_notices import (
     gpu_capture_action_label,
     gpu_capture_notice,
     local_asr_capture_notice,
-    managed_gemma_action_label,
     managed_gemma_capture_notice,
 )
 from puripuly_heart.ui.dashboard.contract import (
@@ -134,9 +132,6 @@ class DashboardView(ft.Column):
         self.on_toggle_peer_translation = None
         self.on_retry_peer_process_capture = None
         self.on_gpu_notice_action: Callable[[GpuNoticeAction], object] | None = None
-        self.on_managed_gemma_notice_action: Callable[[ManagedGemmaNoticeAction], object] | None = (
-            None
-        )
         self.on_language_change: Callable[[LanguageSelectionChange], None] | None = None
         self.on_message_input_activity = None
 
@@ -234,7 +229,6 @@ class DashboardView(ft.Column):
         self.on_toggle_overlay = capture.toggle_overlay
         self.on_retry_peer_process_capture = capture.retry_peer_process_capture
         self.on_gpu_notice_action = capture.run_gpu_notice_action
-        self.on_managed_gemma_notice_action = capture.run_managed_gemma_notice_action
 
     def _toggle_overlay(self) -> None:
         enabled = True
@@ -802,12 +796,6 @@ class DashboardView(ft.Column):
 
         run_task(invoke)
 
-    def _run_managed_gemma_notice_action(
-        self,
-        action: ManagedGemmaNoticeAction,
-    ) -> None:
-        self._run_notice_action(self.on_managed_gemma_notice_action, action)
-
     def set_vrchat_osc_notice(self, active: bool) -> None:
         self._vrchat_osc_notice_active = bool(active)
         self._sync_notice()
@@ -916,24 +904,13 @@ class DashboardView(ft.Column):
             self.display_card.set_notice(None, None)
             return
         text, tone, _action = candidates[selected]
-        if selected == "managed_gemma":
-            managed_action = (
-                None if self._managed_gemma_notice is None else self._managed_gemma_notice.action
-            )
-            action_label = managed_gemma_action_label(managed_action)
-            on_action = (
-                None
-                if managed_action is None
-                else lambda: self._run_managed_gemma_notice_action(managed_action)
-            )
-        else:
-            gpu_action = None if self._gpu_notice is None else self._gpu_notice.action
-            action_label = gpu_capture_action_label(gpu_action if selected == "gpu" else None)
-            on_action = (
-                None
-                if selected != "gpu" or gpu_action is None
-                else lambda: self._run_gpu_notice_action(gpu_action)
-            )
+        gpu_action = None if self._gpu_notice is None else self._gpu_notice.action
+        action_label = gpu_capture_action_label(gpu_action if selected == "gpu" else None)
+        on_action = (
+            None
+            if selected != "gpu" or gpu_action is None
+            else lambda: self._run_gpu_notice_action(gpu_action)
+        )
         yields_to_content = selected in OVERLAY_YIELDING_NOTICE_SOURCES
         try:
             self.display_card.set_notice(

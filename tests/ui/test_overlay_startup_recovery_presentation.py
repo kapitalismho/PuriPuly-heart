@@ -43,20 +43,6 @@ def test_recovering_keeps_peer_in_starting() -> None:
     assert contract.peer.warning_reason == "overlay_starting"
 
 
-def test_recovering_status_text_uses_localized_copy() -> None:
-    contract = build_overlay_peer_consumer_contract(
-        overlay_intent_enabled=True,
-        overlay_state="recovering",
-        overlay_failure_reason=None,
-        peer_intent_enabled=False,
-        peer_effective_enabled=False,
-    )
-
-    bundle = json.loads((I18N_DIR / "en.json").read_text(encoding="utf-8"))
-    assert bundle["settings.overlay.status.recovering"] not in ("", "recovering")
-    assert contract.overlay.status_text == bundle["settings.overlay.status.recovering"]
-
-
 def test_reveal_loss_reuses_reopen_action() -> None:
     assert _action_kind("window_reveal_lost") == "reopen"
     assert _action_kind("window_visibility_unstable") == "reopen"

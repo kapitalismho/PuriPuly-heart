@@ -40,19 +40,6 @@ CUSTOM_STT_VALIDATION_STATUSES: Final[tuple[str, ...]] = (
     CUSTOM_STT_VALIDATION_READY,
 )
 
-CUSTOM_STT_VALIDATION_I18N_KEYS: Final[Mapping[str, str]] = {
-    CUSTOM_STT_VALIDATION_UNREACHABLE: "settings.custom_stt.validation.unreachable",
-    CUSTOM_STT_VALIDATION_AUTH_FAILURE: "settings.custom_stt.validation.auth_failure",
-    CUSTOM_STT_VALIDATION_COMPATIBILITY_MISMATCH: (
-        "settings.custom_stt.validation.compatibility_mismatch"
-    ),
-    CUSTOM_STT_VALIDATION_MODEL_UNAVAILABLE: "settings.custom_stt.validation.model_unavailable",
-    CUSTOM_STT_VALIDATION_TRANSCRIPTION_UNVERIFIED: (
-        "settings.custom_stt.validation.transcription_unverified"
-    ),
-    CUSTOM_STT_VALIDATION_READY: "settings.custom_stt.validation.ready",
-}
-
 _DEFAULT_COMPATIBILITY_BY_MODE: Final[Mapping[str, str]] = {
     CUSTOM_STT_MODE_OFFLINE: CUSTOM_STT_COMPAT_OPENAI_TRANSCRIPTION,
     CUSTOM_STT_MODE_REALTIME: CUSTOM_STT_COMPAT_OPENAI_REALTIME,

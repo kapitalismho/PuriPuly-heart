@@ -7,7 +7,6 @@ import pytest
 
 ft = pytest.importorskip("flet")
 
-from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.ui.dashboard import capture as dashboard_capture_module
@@ -215,11 +214,9 @@ def _make_overlay_peer_contract(
     *,
     overlay_intent_enabled: bool,
     overlay_state: str,
-    overlay_status_text: str,
     overlay_helper_text: str = "",
     peer_intent_enabled: bool,
     peer_effective_enabled: bool,
-    peer_status_text: str,
     peer_helper_text: str = "",
     peer_state: str | None = None,
 ) -> OverlayPeerConsumerContract:
@@ -233,7 +230,6 @@ def _make_overlay_peer_contract(
                 if overlay_state == "connected"
                 else ("off" if not overlay_intent_enabled else "warning")
             ),
-            status_text=overlay_status_text,
             helper_text=overlay_helper_text,
         ),
         peer=OverlayPeerToggleContract(
@@ -248,7 +244,6 @@ def _make_overlay_peer_contract(
                     else ("off" if not peer_intent_enabled else "warning")
                 )
             ),
-            status_text=peer_status_text,
             helper_text=peer_helper_text,
         ),
     )
@@ -441,6 +436,7 @@ def test_dashboard_public_setters_update_components(monkeypatch: pytest.MonkeyPa
     view.set_stt_enabled(False)
     view.set_translation_needs_key(True, update_ui=True)
     view.set_stt_needs_key(True, update_ui=True)
+    view.set_local_stt_notice_model("qwen3-asr-0.6b-int8-sherpa")
     view.set_local_stt_notice("missing")
     view.set_managed_auth_pending(True)
     view.set_display_text("src", language_code="ko")
@@ -452,7 +448,10 @@ def test_dashboard_public_setters_update_components(monkeypatch: pytest.MonkeyPa
     assert view.display_card.display_calls[-1] == ("src", False, "font-ko")
     assert view.display_card.translation_calls[-1] == ("dst", "font-en")
     assert view.display_card.notice_calls[-1] == (
-        dashboard_module.t("dashboard.local_stt_notice_missing"),
+        dashboard_module.t(
+            "dashboard.local_stt_notice_missing_model",
+            model=dashboard_module.t("local_stt.model.qwen3-asr-0.6b-int8-sherpa"),
+        ),
         "warning",
     )
     assert view.language_card.languages[-1] == ("name-ko", "name-en", "name-ko", "name-en")
@@ -686,10 +685,8 @@ def test_dashboard_osc_projection_preserves_rich_peer_and_overlay_states(
         _make_overlay_peer_contract(
             overlay_intent_enabled=True,
             overlay_state="warning",
-            overlay_status_text="Overlay warning",
             peer_intent_enabled=True,
             peer_effective_enabled=False,
-            peer_status_text="Peer starting",
             peer_state="starting",
         )
     )
@@ -815,14 +812,20 @@ def test_dashboard_managed_auth_pending_restores_local_stt_notice_when_cleared(
 ) -> None:
     view = _make_dashboard(monkeypatch)
 
+    view.set_local_stt_notice_model("qwen3-asr-0.6b-int8-sherpa")
     view.set_local_stt_notice("missing")
     view.set_managed_auth_pending(True)
     view.set_managed_auth_pending(False)
 
+    missing_notice = dashboard_module.t(
+        "dashboard.local_stt_notice_missing_model",
+        model=dashboard_module.t("local_stt.model.qwen3-asr-0.6b-int8-sherpa"),
+    )
     assert view.display_card.notice_calls == [
-        (dashboard_module.t("dashboard.local_stt_notice_missing"), "warning"),
-        (dashboard_module.t("dashboard.local_stt_notice_missing"), "warning"),
-        (dashboard_module.t("dashboard.local_stt_notice_missing"), "warning"),
+        (None, None),
+        (missing_notice, "warning"),
+        (missing_notice, "warning"),
+        (missing_notice, "warning"),
     ]
 
 
@@ -1024,11 +1027,9 @@ def test_dashboard_overlay_peer_buttons_render_consumer_contract_state_only(
     contract = _make_overlay_peer_contract(
         overlay_intent_enabled=True,
         overlay_state="failed",
-        overlay_status_text="Overlay failed",
         overlay_helper_text="Overlay helper copy",
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_status_text="Peer waiting",
         peer_helper_text="Overlay is starting",
     )
 
@@ -1055,10 +1056,8 @@ def test_dashboard_peer_button_renders_starting_contract_with_spinner(
     contract = _make_overlay_peer_contract(
         overlay_intent_enabled=True,
         overlay_state="connected",
-        overlay_status_text="Overlay ready",
         peer_intent_enabled=True,
         peer_effective_enabled=False,
-        peer_status_text="Peer starting",
         peer_state="starting",
     )
 
@@ -1088,7 +1087,6 @@ def test_dashboard_overlay_failure_notice_is_lowest_priority_notice_source(
                 effective_enabled=False,
                 action_enabled=True,
                 state="warning",
-                status_text="Failed: runtime unavailable",
                 failure_reason="runtime_unavailable",
             ),
             peer=OverlayPeerToggleContract(
@@ -1096,7 +1094,6 @@ def test_dashboard_overlay_failure_notice_is_lowest_priority_notice_source(
                 effective_enabled=False,
                 action_enabled=True,
                 state="off",
-                status_text="Off",
             ),
         )
     )
@@ -1227,51 +1224,6 @@ async def test_dashboard_gpu_action_runs_as_page_task(
     assert actions == ["install"]
 
 
-@pytest.mark.asyncio
-async def test_managed_gemma_download_preempts_other_notices_and_can_be_cancelled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view = _make_dashboard(monkeypatch)
-    tasks: list[asyncio.Task[None]] = []
-    actions: list[str] = []
-
-    class Page:
-        def run_task(self, callback) -> None:
-            tasks.append(asyncio.create_task(callback()))
-
-    async def on_action(action: str) -> None:
-        actions.append(action)
-
-    attach_dummy_page(monkeypatch, view, Page())
-    view.on_managed_gemma_notice_action = on_action
-    view.set_vrchat_osc_notice(True)
-    view.set_managed_gemma_notice(
-        ManagedGemmaDashboardNotice(
-            status="downloading",
-            progress_percent=37,
-            action="cancel",
-        )
-    )
-
-    assert view.display_card.notice_calls[-1] == (
-        dashboard_module.t("dashboard.managed_gemma_notice.downloading", percent=37),
-        "info",
-    )
-    action_label, action_callback = view.display_card.notice_actions[-1]
-    assert action_label == dashboard_module.t("dashboard.managed_gemma_action.cancel")
-    assert callable(action_callback)
-
-    action_callback()
-    await tasks[-1]
-    assert actions == ["cancel"]
-
-    view.set_managed_gemma_notice(None)
-    assert view.display_card.notice_calls[-1] == (
-        dashboard_module.t("dashboard.vrchat_osc_disabled"),
-        "warning",
-    )
-
-
 def test_dashboard_steamvr_overlay_failure_notice_uses_actionable_reason_without_status_prefix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1288,7 +1240,6 @@ def test_dashboard_steamvr_overlay_failure_notice_uses_actionable_reason_without
                 effective_enabled=False,
                 action_enabled=True,
                 state="warning",
-                status_text="stale contract literal",
                 failure_reason="steamvr_not_running",
             ),
             peer=OverlayPeerToggleContract(
@@ -1296,7 +1247,6 @@ def test_dashboard_steamvr_overlay_failure_notice_uses_actionable_reason_without
                 effective_enabled=False,
                 action_enabled=True,
                 state="off",
-                status_text="Off",
             ),
         )
     )
@@ -1320,7 +1270,6 @@ def test_dashboard_overlay_notices_yield_to_content_while_others_block(
                 effective_enabled=False,
                 action_enabled=True,
                 state="warning",
-                status_text="stale contract literal",
                 failure_reason="steamvr_not_running",
             ),
             peer=OverlayPeerToggleContract(
@@ -1328,7 +1277,6 @@ def test_dashboard_overlay_notices_yield_to_content_while_others_block(
                 effective_enabled=False,
                 action_enabled=True,
                 state="off",
-                status_text="Off",
             ),
         )
     )
@@ -1354,7 +1302,6 @@ def test_dashboard_overlay_failure_notice_relocalizes_on_apply_locale(
                 effective_enabled=False,
                 action_enabled=True,
                 state="warning",
-                status_text="stale contract literal",
                 failure_reason="runtime_disconnected",
             ),
             peer=OverlayPeerToggleContract(
@@ -1362,7 +1309,6 @@ def test_dashboard_overlay_failure_notice_relocalizes_on_apply_locale(
                 effective_enabled=False,
                 action_enabled=True,
                 state="off",
-                status_text="Off",
             ),
         )
     )
@@ -1400,10 +1346,8 @@ def test_dashboard_overlay_and_peer_buttons_toggle_live_from_contract_intent(
         _make_overlay_peer_contract(
             overlay_intent_enabled=False,
             overlay_state="off",
-            overlay_status_text="Overlay off",
             peer_intent_enabled=False,
             peer_effective_enabled=False,
-            peer_status_text="Peer off",
         )
     )
     view.peer_button.on_click()
@@ -1413,10 +1357,8 @@ def test_dashboard_overlay_and_peer_buttons_toggle_live_from_contract_intent(
         _make_overlay_peer_contract(
             overlay_intent_enabled=True,
             overlay_state="connected",
-            overlay_status_text="Overlay on",
             peer_intent_enabled=True,
             peer_effective_enabled=True,
-            peer_status_text="Peer on",
         )
     )
     view.peer_button.on_click()
@@ -1551,15 +1493,28 @@ def test_dashboard_local_stt_notice_can_change_and_clear_without_touching_displa
 ) -> None:
     view = _make_dashboard(monkeypatch)
 
+    view.set_local_stt_notice_model("qwen3-asr-0.6b-int8-sherpa")
     view.set_local_stt_notice("missing")
     view.set_display_text("hello", language_code="ko")
     view.set_local_stt_notice("downloading", percent=63)
     view.set_local_stt_notice(None)
 
+    model_label = dashboard_module.t("local_stt.model.qwen3-asr-0.6b-int8-sherpa")
     assert view.display_card.display_calls == [("hello", False, "font-ko")]
     assert view.display_card.notice_calls == [
-        (dashboard_module.t("dashboard.local_stt_notice_missing"), "warning"),
-        (dashboard_module.t("dashboard.local_stt_notice_downloading_progress", percent=63), "info"),
+        (None, None),
+        (
+            dashboard_module.t("dashboard.local_stt_notice_missing_model", model=model_label),
+            "warning",
+        ),
+        (
+            dashboard_module.t(
+                "dashboard.local_stt_notice_downloading_progress_model",
+                model=model_label,
+                percent=63,
+            ),
+            "info",
+        ),
         (None, None),
     ]
 

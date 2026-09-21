@@ -22,7 +22,7 @@ from puripuly_heart.config.provider_values import (
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.ui import i18n as i18n_module
-from puripuly_heart.ui.i18n import provider_label, t
+from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import attach_dummy_page
 
@@ -108,19 +108,11 @@ def test_settings_view_switches_prompt_on_llm_change(monkeypatch) -> None:
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert view._prompt_editor.value == load_prompt_for_provider("openrouter")
-    assert view._prompt_for_text.value == t(
-        "settings.prompt_for",
-        provider=provider_label(LLMProviderName.OPENROUTER.value),
-    )
 
     view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
     pending = view.build_provider_apply_settings()
 
     assert view._prompt_editor.value == load_prompt_for_provider("qwen")
-    assert view._prompt_for_text.value == t(
-        "settings.prompt_for",
-        provider=provider_label(LLMProviderName.QWEN.value),
-    )
     assert _llm(settings) == LLMProviderName.OPENROUTER.value
     assert pending is not None
     assert _llm(pending) == LLMProviderName.QWEN.value
@@ -130,10 +122,6 @@ def test_settings_view_switches_prompt_on_llm_change(monkeypatch) -> None:
     pending = view.build_provider_apply_settings()
 
     assert view._prompt_editor.value == load_prompt_for_provider("local_llm")
-    assert view._prompt_for_text.value == t(
-        "settings.prompt_for",
-        provider=provider_label(LLMProviderName.LOCAL_LLM.value),
-    )
     assert _llm(settings) == LLMProviderName.OPENROUTER.value
     assert pending is not None
     assert _llm(pending) == LLMProviderName.LOCAL_LLM.value
@@ -142,10 +130,6 @@ def test_settings_view_switches_prompt_on_llm_change(monkeypatch) -> None:
     pending = view.build_provider_apply_settings()
 
     assert view._prompt_editor.value == load_prompt_for_provider("gemini")
-    assert view._prompt_for_text.value == t(
-        "settings.prompt_for",
-        provider=provider_label(LLMProviderName.GEMINI.value),
-    )
     assert _llm(settings) == LLMProviderName.OPENROUTER.value
     assert pending is not None
     assert _llm(pending) == LLMProviderName.GEMINI.value
@@ -154,10 +138,6 @@ def test_settings_view_switches_prompt_on_llm_change(monkeypatch) -> None:
     pending = view.build_provider_apply_settings()
 
     assert view._prompt_editor.value == load_prompt_for_provider("openrouter")
-    assert view._prompt_for_text.value == t(
-        "settings.prompt_for",
-        provider=provider_label(LLMProviderName.OPENROUTER.value),
-    )
     assert _llm(settings) == LLMProviderName.OPENROUTER.value
     assert pending is not None
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
@@ -177,10 +157,6 @@ def test_deepseek_managed_keeps_single_prompt(monkeypatch) -> None:
     pending = view.build_provider_apply_settings()
 
     assert view._prompt_editor.value == "GEMINI CUSTOM"
-    assert view._prompt_for_text.value == t(
-        "settings.prompt_for",
-        provider=provider_label(LLMProviderName.OPENROUTER.value),
-    )
     assert pending is not None
     assert _translation(pending).model == TranslationModel.DEEPSEEK_V4_FLASH.value
     assert _translation(pending).connection == TranslationConnection.MANAGED.value
@@ -209,10 +185,6 @@ def test_prompt_tab_labels_and_tag_editor_copy_render_from_i18n(monkeypatch) -> 
 
         assert view._persona_title.value == t("settings.section.persona")
         assert view._custom_vocab_title.value == t("settings.section.custom_vocabulary")
-        assert view._prompt_for_text.value == t(
-            "settings.prompt_for",
-            provider=provider_label(LLMProviderName.QWEN.value),
-        )
         assert view._custom_vocab_description_text.value == t(
             "settings.custom_vocabulary.description"
         )

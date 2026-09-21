@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
-    ManagedGemmaNoticeAction,
 )
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice, GpuNoticeAction
 from puripuly_heart.ui.i18n import t
@@ -14,6 +13,7 @@ LOCAL_ASR_MODEL_LABEL_KEYS = {
     "parakeet-tdt-ctc-0.6b-ja-int8-sherpa": "local_stt.model.parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
     "qwen3-asr-0.6b-int8-sherpa": "local_stt.model.qwen3-asr-0.6b-int8-sherpa",
 }
+
 LOCAL_ASR_TARGETED_NOTICE_KEYS = {
     "missing": "dashboard.local_stt_notice_missing_model",
     "invalid": "dashboard.local_stt_notice_invalid_model",
@@ -21,17 +21,11 @@ LOCAL_ASR_TARGETED_NOTICE_KEYS = {
     "download_failed": "dashboard.local_stt_notice_download_failed_model",
 }
 LOCAL_ASR_NOTICE_KEYS = {
-    "starting": "dashboard.local_stt_notice_starting",
     "self_loading": "dashboard.local_stt_notice_self_loading",
     "peer_loading": "dashboard.local_stt_notice_peer_loading",
     "start_failed": "dashboard.local_stt_notice_start_failed",
-    "missing": "dashboard.local_stt_notice_missing",
-    "invalid": "dashboard.local_stt_notice_invalid",
-    "downloading": "dashboard.local_stt_notice_downloading",
-    "download_failed": "dashboard.local_stt_notice_download_failed",
 }
 LOCAL_ASR_NOTICE_TONES = {
-    "starting": "info",
     "self_loading": "info",
     "peer_loading": "info",
     "start_failed": "error",
@@ -60,9 +54,6 @@ GPU_NOTICE_TONES = {
     "activation_failed": "error",
 }
 GPU_ACTION_KEYS = {
-    "install": "dashboard.gpu_action.install",
-    "repair": "dashboard.gpu_action.repair",
-    "reinstall": "dashboard.gpu_action.reinstall",
     "rediscover": "dashboard.gpu_action.rediscover",
     "restart": "dashboard.gpu_action.restart",
 }
@@ -79,9 +70,6 @@ MANAGED_GEMMA_NOTICE_TONES = {
     "preparing": "info",
     "failed": "error",
     "cancelled": "warning",
-}
-MANAGED_GEMMA_ACTION_KEYS = {
-    "cancel": "dashboard.managed_gemma_action.cancel",
 }
 
 
@@ -100,25 +88,21 @@ def local_asr_capture_notice(
 ) -> CaptureNotice | None:
     if status is None:
         return None
-    notice_key = LOCAL_ASR_NOTICE_KEYS.get(status)
-    if notice_key is None:
-        return None
 
-    targeted = model_id is not None and status in LOCAL_ASR_TARGETED_NOTICE_KEYS
-    if targeted:
-        model = t(LOCAL_ASR_MODEL_LABEL_KEYS.get(model_id, ""), default=model_id)
+    targeted_key = LOCAL_ASR_TARGETED_NOTICE_KEYS.get(status)
+    if targeted_key is not None:
+        model = t(LOCAL_ASR_MODEL_LABEL_KEYS.get(model_id or "", ""), default=model_id or "")
         text = (
             t("dashboard.local_stt_notice_downloading_progress_model", model=model, percent=percent)
             if status == "downloading" and percent is not None
-            else t(LOCAL_ASR_TARGETED_NOTICE_KEYS[status], model=model)
+            else t(targeted_key, model=model)
         )
-    else:
-        text = (
-            t("dashboard.local_stt_notice_downloading_progress", percent=percent)
-            if status == "downloading" and percent is not None
-            else t(notice_key)
-        )
-    return CaptureNotice(text=text, tone=LOCAL_ASR_NOTICE_TONES.get(status))
+        return CaptureNotice(text=text, tone=LOCAL_ASR_NOTICE_TONES.get(status))
+
+    notice_key = LOCAL_ASR_NOTICE_KEYS.get(status)
+    if notice_key is None:
+        return None
+    return CaptureNotice(text=t(notice_key), tone=LOCAL_ASR_NOTICE_TONES.get(status))
 
 
 def gpu_capture_notice(notice: GpuDashboardNotice | None) -> CaptureNotice | None:
@@ -136,7 +120,8 @@ def gpu_capture_notice(notice: GpuDashboardNotice | None) -> CaptureNotice | Non
 def gpu_capture_action_label(action: GpuNoticeAction | None) -> str | None:
     if action is None:
         return None
-    return t(GPU_ACTION_KEYS[action])
+    key = GPU_ACTION_KEYS.get(action)
+    return None if key is None else t(key)
 
 
 def managed_gemma_capture_notice(
@@ -155,14 +140,6 @@ def managed_gemma_capture_notice(
     )
 
 
-def managed_gemma_action_label(
-    action: ManagedGemmaNoticeAction | None,
-) -> str | None:
-    if action is None:
-        return None
-    return t(MANAGED_GEMMA_ACTION_KEYS[action])
-
-
 __all__ = [
     "GPU_ACTION_KEYS",
     "GPU_NOTICE_KEYS",
@@ -171,13 +148,11 @@ __all__ = [
     "LOCAL_ASR_NOTICE_KEYS",
     "LOCAL_ASR_NOTICE_TONES",
     "LOCAL_ASR_TARGETED_NOTICE_KEYS",
-    "MANAGED_GEMMA_ACTION_KEYS",
     "MANAGED_GEMMA_NOTICE_KEYS",
     "MANAGED_GEMMA_NOTICE_TONES",
     "CaptureNotice",
     "gpu_capture_action_label",
     "gpu_capture_notice",
     "local_asr_capture_notice",
-    "managed_gemma_action_label",
     "managed_gemma_capture_notice",
 ]

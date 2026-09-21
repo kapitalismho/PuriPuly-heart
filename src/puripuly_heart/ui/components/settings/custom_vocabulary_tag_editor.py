@@ -16,7 +16,6 @@ from puripuly_heart.ui.theme import (
     COLOR_ON_PRIMARY_CONTAINER,
     COLOR_PRIMARY,
     COLOR_PRIMARY_CONTAINER,
-    COLOR_SECONDARY,
 )
 
 _CHIP_TERM_WIDTH = 220
@@ -45,17 +44,7 @@ class CustomVocabularyTagEditor(ft.Column):
         self.on_add_terms = on_add_terms
         self.on_remove_term = on_remove_term
         self._terms: list[str] = []
-        self._remove_label_template = ""
-        self._add_label = ""
 
-        self._empty_text = ft.Text(
-            "",
-            size=14,
-            color=COLOR_SECONDARY,
-            max_lines=2,
-            overflow=ft.TextOverflow.ELLIPSIS,
-            visible=False,
-        )
         self._chips_wrap = ft.Row(
             controls=[],
             spacing=6,
@@ -97,29 +86,8 @@ class CustomVocabularyTagEditor(ft.Column):
         self.controls = (
             [self._chips_wrap, self._input_field] if chip_controls else [self._input_field]
         )
-        self._empty_text.visible = False
         _update_control_if_mounted(self._chips_wrap)
-        _update_control_if_mounted(self._empty_text)
         _update_control_if_mounted(self)
-
-    def set_placeholder(self, text: str) -> None:
-        """Accept legacy placeholder copy; token input intentionally stays quiet."""
-        _ = text
-        self._input_field.hint_text = ""
-        _update_control_if_mounted(self._input_field)
-
-    def set_empty_text(self, text: str) -> None:
-        """Update empty-state copy."""
-        self._empty_text.value = text
-        _update_control_if_mounted(self._empty_text)
-
-    def set_remove_label_template(self, template: str) -> None:
-        """Accept legacy remove copy; chips intentionally render no hover tooltip."""
-        self._remove_label_template = template
-
-    def set_add_label(self, text: str) -> None:
-        """Accept legacy add-button copy; token input no longer renders a button."""
-        self._add_label = text
 
     def clear_input(self) -> None:
         """Clear unsubmitted add-input text."""

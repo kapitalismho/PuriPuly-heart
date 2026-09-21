@@ -56,7 +56,6 @@ def test_set_terms_renders_compact_chips_above_native_input() -> None:
 
     chips = _chip_controls(editor)
     assert editor._chips_wrap.wrap is True
-    assert editor._empty_text.visible is False
     assert len(chips) == 2
     assert [_chip_term_text(chip).value for chip in chips] == ["Puripuly", "VRChat"]
     assert [chip.data for chip in chips] == ["Puripuly", "VRChat"]
@@ -80,14 +79,10 @@ def test_set_terms_renders_compact_chips_above_native_input() -> None:
 
 def test_empty_terms_show_only_native_input_without_placeholder_help() -> None:
     editor = _make_editor()
-    editor.set_empty_text("No hints yet.")
-    editor.set_placeholder("Type hint, then Space")
 
     editor.set_terms([])
 
     assert _chip_controls(editor) == []
-    assert editor._empty_text.value == "No hints yet."
-    assert editor._empty_text.visible is False
     assert editor._chips_wrap.visible is False
     assert list(editor.controls) == [editor._input_field]
     assert editor._input_field.hint_text == ""
@@ -184,7 +179,6 @@ def test_clicking_chip_calls_remove_callback_with_visible_term() -> None:
     editor = _make_editor()
     removed: list[str] = []
     editor.on_remove_term = removed.append
-    editor.set_remove_label_template("Remove {term}")
     editor.set_terms(["Puripuly"])
 
     chip = _chip_controls(editor)[0]
@@ -213,20 +207,6 @@ def test_chip_hover_matches_dashboard_active_button_colors() -> None:
     assert chip.bgcolor == module.COLOR_PRIMARY_CONTAINER
     assert chip.border.top.color == module.COLOR_DIVIDER
     assert term_text.color == module.COLOR_ON_PRIMARY_CONTAINER
-
-
-def test_locale_setters_update_placeholder_empty_add_and_existing_remove_labels() -> None:
-    editor = _make_editor()
-    editor.set_terms(["Puripuly"])
-
-    editor.set_placeholder("힌트 추가")
-    editor.set_empty_text("아직 추가된 힌트가 없어요.")
-    editor.set_add_label("추가")
-    editor.set_remove_label_template("{term} 삭제")
-
-    assert editor._input_field.hint_text == ""
-    assert editor._empty_text.value == "아직 추가된 힌트가 없어요."
-    assert _chip_controls(editor)[0].tooltip is None
 
 
 def test_clear_input_clears_unsubmitted_add_text() -> None:

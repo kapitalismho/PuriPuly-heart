@@ -10,7 +10,6 @@ REQUIRED_DISCORD_AUTH_KEYS = [
     "discord_auth.body",
     "discord_auth.continue",
     "discord_auth.close",
-    "discord_auth.reopen_browser",
     "discord_auth.cancel",
     "discord_auth.waiting_body",
     "discord_auth.callback_received_body",
