@@ -18,6 +18,7 @@ from puripuly_heart.app.ports.application_runtime_logging import (
 from puripuly_heart.app.ports.application_runtime_shutdown import (
     ApplicationRuntimeShutdownPort,
 )
+from puripuly_heart.app.ports.application_startup import ApplicationStartupDiagnostic
 from puripuly_heart.app.ports.settings_view import (
     ImmediateSettingsIntent,
     OpenRouterPkceTarget,
@@ -77,6 +78,11 @@ class ApplicationRuntimeLoggingStub:
         if callable(sink):
             sink(message, level=level)
         return exception is not None
+
+    def emit_startup_diagnostic(self, diagnostic: ApplicationStartupDiagnostic) -> None:
+        sink = getattr(self._backend, "emit_startup_diagnostic", None)
+        if callable(sink):
+            sink(diagnostic)
 
 
 class EmptySettingsSecretStore:

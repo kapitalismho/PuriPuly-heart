@@ -532,6 +532,8 @@ class PeerApplicationOwner:
         stop_mode: Literal["retain", "release"] = "retain",
     ) -> None:
         state = self.state_provider()
+        if self._ingress_stopped or state.ingress_frozen:
+            return
         runtime = self._runtime
         if not state.settings_available or not state.runtime_available or runtime is None:
             return
@@ -582,6 +584,9 @@ class PeerApplicationOwner:
                 self._model_loading = False
                 self.sync_local_notice()
                 self.presentation_changed()
+        if runtime.snapshot.provider_status is PeerCaptureProviderStatus.PENDING:
+            self.sync_effective_flags()
+            return
         if self.capture_runtime_convergence(config, state) is False:
             raise ProviderRuntimeConvergenceError(
                 "Peer STT runtime did not converge to requested settings",

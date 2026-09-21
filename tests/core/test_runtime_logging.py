@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 import re
 import threading
 import time
 from collections.abc import Awaitable
-from dataclasses import dataclass
 from logging.handlers import QueueHandler, RotatingFileHandler
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -33,17 +34,12 @@ from puripuly_heart.core.observability import (
     RuntimeLogEvent,
 )
 from puripuly_heart.core.output.models import OutputRoutingDecision
+from puripuly_heart.core.runtime.logging import RuntimeLoggingService
 from puripuly_heart.core.runtime_logging import (
+    RuntimeLoggingSinks,
     SessionRuntimeLoggingService,
     configure_main_logging,
 )
-
-
-@dataclass
-class _SharedSinkBundle:
-    stream_handler: logging.Handler
-    file_handler: logging.Handler
-    log_file: object
 
 
 class _ObservabilityRunner:
@@ -207,10 +203,10 @@ def _make_runtime_logging_capture() -> tuple[SessionRuntimeLoggingService, io.St
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         session_logger=session_logger,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=stream_handler,
             file_handler=logging.NullHandler(),
-            log_file="runtime.log",
+            log_file=Path("runtime.log"),
         ),
     )
     return runtime_logging, stream
@@ -370,7 +366,7 @@ def test_session_runtime_logging_redacts_direct_records_with_injected_sinks(tmp_
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         session_logger=session_logger,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=stream_handler,
             file_handler=file_handler,
             log_file=log_file,
@@ -509,6 +505,24 @@ def test_force_close_shared_queue_releases_even_with_outstanding_refs(tmp_path) 
     finally:
         first.close()
         second.close()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows requires log handles to close before rename")
+def test_terminal_logging_owner_drains_and_releases_supplied_sinks(tmp_path) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.supplied.terminal.{uuid4()}")
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    session = SessionRuntimeLoggingService(root_logger=root_logger, sinks=sinks)
+    owner = RuntimeLoggingService(session_service=session)
+    try:
+        owner.emit_persisted("[Lifecycle] terminal_delivery_sentinel")
+        owner.close_after_producers_stop()
+        released = tmp_path / "released.log"
+        sinks.log_file.replace(released)
+        assert "terminal_delivery_sentinel" in released.read_text(encoding="utf-8")
+    finally:
+        owner.close_after_producers_stop()
+        sinks.close(force=True)
 
 
 def test_default_session_logging_services_share_queue_until_last_close(
@@ -881,7 +895,7 @@ def test_session_runtime_logging_redacts_unsafe_legacy_text_before_live_and_pers
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         session_logger=session_logger,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=stream_handler,
             file_handler=file_handler,
             log_file=log_file,
@@ -935,7 +949,7 @@ def test_session_runtime_logging_redacts_unsafe_text_assignment_keys_before_sink
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         session_logger=session_logger,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=stream_handler,
             file_handler=file_handler,
             log_file=log_file,
@@ -983,7 +997,7 @@ def test_session_runtime_logging_redacts_token_assignment_variants_before_sinks(
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         session_logger=session_logger,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=stream_handler,
             file_handler=file_handler,
             log_file=log_file,
@@ -1056,10 +1070,10 @@ async def test_session_runtime_logging_emits_structured_events_without_changing_
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=logging.getLogger(f"test.runtime_logging.structured.root.{uuid4()}"),
         session_logger=logging.getLogger(f"test.runtime_logging.structured.session.{uuid4()}"),
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=stream_handler,
             file_handler=logging.NullHandler(),
-            log_file="runtime.log",
+            log_file=Path("runtime.log"),
         ),
         runtime_log_sink=sink,
         diagnostics_sink=sink,
@@ -1386,7 +1400,7 @@ def test_record_request_context_is_file_only_and_keeps_original_texts(tmp_path) 
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         session_logger=session_logger,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=stream_handler,
             file_handler=file_handler,
             log_file=log_file,
@@ -1448,7 +1462,7 @@ def test_record_request_context_redacts_secret_shaped_text(tmp_path) -> None:
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         session_logger=session_logger,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=logging.StreamHandler(io.StringIO()),
             file_handler=file_handler,
             log_file=log_file,

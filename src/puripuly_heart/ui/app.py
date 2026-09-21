@@ -424,7 +424,11 @@ class TranslatorApp:
 
     async def _close_after_window_request(self) -> None:
         try:
-            await self.shutdown()
+            try:
+                await self.shutdown()
+            except asyncio.CancelledError:
+                await self.shutdown()
+                raise
         finally:
             destroy_result = self.page.window.destroy()
             if inspect.isawaitable(destroy_result):

@@ -1187,7 +1187,7 @@ class SessionRuntimeLoggingService:
             except Exception as exc:
                 failures.append(exc)
         self._session_handlers.clear()
-        if self._owns_sinks:
+        if self._owns_sinks or force_owned_sinks:
             try:
                 self._sinks.close(force=force_owned_sinks)
             except Exception as exc:

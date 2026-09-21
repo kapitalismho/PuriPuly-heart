@@ -1093,6 +1093,43 @@ async def test_window_close_orchestration_survives_owned_page_task_cancellation(
 
 
 @pytest.mark.asyncio
+async def test_cancelled_window_close_preserves_shutdown_before_destroy() -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+    destroyed = asyncio.Event()
+
+    class Controller:
+        async def stop(self) -> None:
+            started.set()
+            await release.wait()
+
+    async def destroy() -> None:
+        destroyed.set()
+
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = SimpleNamespace(window=SimpleNamespace(destroy=destroy))
+    app._ui_application = _application_boundary_with_stop(Controller())
+    app._shutting_down = False
+    app._shutdown_complete = False
+    app._settings_mutation_queue = []
+    close_task = asyncio.create_task(app._close_after_window_request())
+    try:
+        await asyncio.wait_for(started.wait(), timeout=1.0)
+        close_task.cancel()
+        await asyncio.sleep(0)
+        assert not destroyed.is_set()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(close_task, timeout=1.0)
+        assert app._get_application_lifecycle().is_terminal
+        assert destroyed.is_set()
+    finally:
+        release.set()
+        await asyncio.gather(close_task, return_exceptions=True)
+        await app.shutdown()
+
+
+@pytest.mark.asyncio
 async def test_main_gui_constructs_the_real_application_and_presentation_boundaries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

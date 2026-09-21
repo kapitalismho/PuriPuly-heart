@@ -503,17 +503,38 @@ async def test_composed_application_exposes_live_owner_snapshots_and_repeated_cl
 
     from puripuly_heart.composition.application_runtime import compose_application_runtime
     from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+    from puripuly_heart.domain.events import STTSessionState, STTSessionStateEvent
     from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+
+    projected_statuses: list[str] = []
+    status_projected = asyncio.Event()
+
+    def set_status(value: str) -> None:
+        projected_statuses.append(value)
+        status_projected.set()
 
     production_access = []
     app = compose_application_runtime(
         presentation=FletUiPresentationAdapter(
-            SimpleNamespace(debug_ui_preview=False),
+            SimpleNamespace(
+                debug_ui_preview=False,
+                view_dashboard=SimpleNamespace(set_status=set_status),
+            ),
         ),
         config_path=tmp_path / "settings.json",
         local_asr_evidence_sink=production_access.append,
     )
     await production_access[0].initialize(AppSettingsVNext())
+    access = production_access[0]
+    await access.start_callbacks.start_output(False)
+    await access.start_application_events()
+    await access.start_callbacks.open_self_ingress()
+    await access.self_vad.handle_stt_event(
+        STTSessionStateEvent(state=STTSessionState.STREAMING, channel="self")
+    )
+    await asyncio.wait_for(status_projected.wait(), timeout=1.0)
+
+    assert projected_statuses == ["connected"]
 
     diagnostic = app.capture_application_shutdown_stall_diagnostic()
     states = {state.owner_name: state for state in diagnostic.runtime_states}

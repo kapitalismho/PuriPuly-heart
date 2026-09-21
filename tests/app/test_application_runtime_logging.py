@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from puripuly_heart.app.ports.application_startup import ApplicationStartupDiagnostic
 from puripuly_heart.app.services.application_runtime_logging import (
     ApplicationRuntimeLoggingOwner,
 )
@@ -163,6 +164,41 @@ def test_owner_diagnostic_fallback_reports_failed_delivery_without_handlers() ->
     )
 
     assert owner.emit_diagnostic("private payload", level=logging.ERROR) is False
+
+
+def test_owner_persists_correlated_startup_boundaries_without_masking_delivery_failure() -> None:
+    owner, _ = _owner()
+    service = RecordingRuntimeLogging()
+    owner.install_service(service)
+    entered = ApplicationStartupDiagnostic(
+        outcome="entered",
+        attempt_id="startup-attempt",
+        process_id=123,
+        monotonic_ns=456,
+    )
+    completed = ApplicationStartupDiagnostic(
+        outcome="completed",
+        attempt_id=entered.attempt_id,
+        process_id=entered.process_id,
+        monotonic_ns=789,
+    )
+
+    owner.emit_startup_diagnostic(entered)
+    owner.emit_startup_diagnostic(completed)
+
+    messages = [message for _level, message in service.persisted]
+    assert all("attempt_id=startup-attempt" in message for message in messages)
+    assert all("process_id=123" in message for message in messages)
+    assert "outcome=entered" in messages[0] and "monotonic_ns=456" in messages[0]
+    assert "outcome=completed" in messages[1] and "monotonic_ns=789" in messages[1]
+
+    class FailingPersistedLogging(RecordingRuntimeLogging):
+        def emit_persisted(self, message: str, *, level: int) -> None:
+            _ = message, level
+            raise RuntimeError("delivery failed")
+
+    owner.install_service(FailingPersistedLogging())
+    owner.emit_startup_diagnostic(entered)
 
 
 def test_owner_keeps_shutdown_diagnostics_and_close_on_the_logging_boundary() -> None:

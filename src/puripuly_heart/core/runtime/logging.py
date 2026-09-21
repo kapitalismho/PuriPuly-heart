@@ -5,7 +5,7 @@ import logging
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from puripuly_heart.core.messages import DiagnosticFieldValue
 from puripuly_heart.core.observability import ConversationRecordChannel, RealtimeLogSink
@@ -235,6 +235,39 @@ class RuntimeLoggingService:
             return
         self._session.emit_persisted(message, level=level)
 
+    def emit_startup_boundary(
+        self,
+        *,
+        outcome: Literal["entered", "completed", "cancelled", "failed"],
+        attempt_id: str,
+        process_id: int,
+        monotonic_ns: int,
+        exception_class: str | None,
+    ) -> None:
+        message = _format_startup_boundary(
+            outcome=outcome,
+            attempt_id=attempt_id,
+            process_id=process_id,
+            monotonic_ns=monotonic_ns,
+            exception_class=exception_class,
+        )
+        level = logging.ERROR if outcome == "failed" else logging.INFO
+        if self._closed:
+            self._emit_fallback(
+                message,
+                level=level,
+                message_is_safe=True,
+            )
+            return
+        try:
+            self._session.emit_persisted(message, level=level)
+        except Exception:
+            self._emit_fallback(
+                message,
+                level=level,
+                message_is_safe=True,
+            )
+
     def record_conversation_observation(
         self,
         *,
@@ -392,6 +425,53 @@ class RuntimeLoggingService:
                 break
             current = current.parent
         return emitted
+
+
+def _format_startup_boundary(
+    *,
+    outcome: Literal["entered", "completed", "cancelled", "failed"],
+    attempt_id: str,
+    process_id: int,
+    monotonic_ns: int,
+    exception_class: str | None,
+) -> str:
+    if outcome not in {"entered", "completed", "cancelled", "failed"}:
+        raise ValueError("invalid startup boundary outcome")
+    if (
+        not attempt_id.startswith("startup-")
+        or len(attempt_id) != len("startup-") + 32
+        or any(character not in "0123456789abcdef" for character in attempt_id[8:])
+    ):
+        raise ValueError("invalid startup boundary attempt ID")
+    if isinstance(process_id, bool) or not isinstance(process_id, int) or process_id <= 0:
+        raise ValueError("invalid startup boundary process ID")
+    if isinstance(monotonic_ns, bool) or not isinstance(monotonic_ns, int) or monotonic_ns < 0:
+        raise ValueError("invalid startup boundary timestamp")
+    rendered_exception_class = _canonical_startup_exception_class(exception_class)
+    return (
+        "[Lifecycle][Startup] boundary "
+        f"outcome={outcome} "
+        f"attempt_id={attempt_id} "
+        f"process_id={process_id} "
+        f"monotonic_ns={monotonic_ns} "
+        f"exception_class={rendered_exception_class}"
+    )
+
+
+def _canonical_startup_exception_class(exception_class: str | None) -> str:
+    if exception_class is None:
+        return "none"
+    if (
+        exception_class
+        and len(exception_class) <= 128
+        and all(
+            character.isascii() and (character.isalnum() or character == "_")
+            for character in exception_class
+        )
+    ):
+        return exception_class
+    digest = hashlib.sha256(exception_class.encode("utf-8", errors="replace")).hexdigest()[:16]
+    return f"redacted_{digest}"
 
 
 def _format_final_shutdown_summary(failures: Sequence[BaseException]) -> str:

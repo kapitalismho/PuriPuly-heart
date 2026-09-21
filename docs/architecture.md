@@ -400,19 +400,12 @@ Behavior tests: `tests/core/test_overlay_presenter.py`.
 
 Implementation: `core/runtime_logging.py`, `app/services/application_runtime_logging.py`. Behavior tests: `tests/core/test_runtime_logging.py`, `tests/core/test_file_logging.py`.
 
-## Runtime Layout Boundary
+## Runtime Layout
 
-`runtime_layout.py` is the immutable bootstrap boundary for source, PyInstaller, and experimental native-host layouts. It distinguishes the host executable from the Python interpreter and exposes read-only application resources, native runtimes, and the existing writable user-data/model/log roots. Feature code resolves prompts and native executables through this boundary rather than inspecting frozen flags, `_MEIPASS`, or the working directory. Explicit prompt, llama.cpp, and native-host bootstrap overrides remain supported.
-
-The maintainer selected native-only delivery in issue #177 amendment NATIVE-ONLY-1. The existing release workflow still uses PyInstaller until qualified native cutover; an upgraded PyInstaller comparator is no longer a required delivery target. The native layout does not fake PyInstaller state, move writable roots, or change native worker ownership.
-
-The experimental Windows host consumes `native/windows_host/artifact-layout.json` as the single versioned relative-path contract used by staging, generated C++, Python child environments, validation, installer compilation, and artifact inventory. The root contains the canonical `PuriPulyHeart.exe`, one official `python.exe` sharing the embedded runtime DLL and standard library, `app/`, `site-packages/`, `Lib/`, and `DLLs/`. The native dependency closure excludes the prebuilt `flet-desktop` viewer and build-only extras; embedded main and renderer surfaces use the already-running Flutter host.
-
-The native Flutter bootstrap resolves the existing `FLET_APP_STORAGE_DATA`, `FLET_APP_STORAGE_CACHE`, and `FLET_APP_STORAGE_TEMP` overrides before their respective `path_provider` defaults. Nonempty selected paths become absolute before directory creation and the data-directory CWD change; Python receives those same paths. An empty explicit value does not silently select a default. Unset defaults retain the pinned SDK's Windows locations. This framework boundary does not relocate Python settings, secrets, logs, or models. Windows Known Folder lookups do not follow `APPDATA`/`LOCALAPPDATA` overrides, so isolated GUI execution must supply all three framework paths explicitly.
-
-The native GUI bootstrap does not create a second normal-runtime logging service or tee ordinary stdout into a plain file. `SessionRuntimeLoggingService` continues to own normal application logging and accepted-conversation privacy. Before product execution, the bootstrap only prepares interpreter/runtime policy. On an uncaught bootstrap exception, it restores the original streams, constructs a byte-bounded diagnostic retaining exception identity and useful frames, attempts one error-only write under `RuntimeLayout.log_root`, and independently returns the same bounded diagnostic over the native exit bridge.
-
-`scripts/ci/build-native-experimental.ps1` is the maintained native qualification entry point and is not yet the release workflow. It verifies the pinned Flet/Flutter/Dart/Serious Python/bridge/Python inputs, renders the maintained native template, installs the locked runtime-only dependency closure, stages compliance and native workers, compiles application bytecode with optimization level zero and checked-hash invalidation, and emits a hashed artifact manifest. Native-only delivery still requires standalone qualification, replacement coverage and separately authorized release; the existing PyInstaller workflow is a transitional implementation, not a second upgraded delivery obligation.
+- `runtime_layout.py` separates host and interpreter paths, read-only resources, and writable user data.
+- Features resolve runtime paths through this boundary, not process flags or the working directory.
+- Bootstrap selects shared runtime, UI asset, and framework storage paths before application startup.
+- Packaging does not change feature ownership or application logging policy.
 
 ## Lifecycle
 
@@ -452,13 +445,13 @@ Stop ingress before draining or cancelling owned work. Close external resources 
 
 The application shutdown adapter coordinates teardown across capture, translation, output, child processes, and application services.
 
-The UI foundation tracks window-close orchestration separately from ordinary cancel-on-close page jobs. That orchestration awaits the existing shutdown coordinator without being cancelled by its ordinary UI-task cleanup; window destruction follows the ordered close.
+Window-close orchestration must survive ordinary UI-task cancellation until ordered shutdown completes.
 
 Implementation: `app/adapters/application_runtime_shutdown.py`. Use shutdown code and lifecycle tests for exact ordering.
 
-`ApplicationShutdownCoordinator.capture_stall_diagnostic()` is an on-demand snapshot exposed by `UiApplicationPort`. The composed `ApplicationRuntimeShutdownAdapter` supplies live Self/Peer capture generations, Local ASR channel generations and native phases, GPU worker PID/active channels, and active model-download/helper-child state. A shutdown callback timeout captures this snapshot before cancellation and sends it through runtime logging with coordinator state, terminal flag, failure count, the active owner/callback, bounded named-task await graphs, and `native_stack_available=false`. This is not always-on tracing. The projection uses only explicitly selected lifecycle fields; it must not serialize arbitrary owner objects, transcripts, credentials, settings, or native stack claims.
+Shutdown diagnostics expose bounded lifecycle metadata, not user content or credentials.
 
-Source development retains the Flet desktop viewer; the legacy PyInstaller path also retains it pending qualified native cutover. Both the main GUI launcher and desktop-overlay renderer wrap that child in the existing Windows kill-on-close Job Object boundary. Application-level shutdown remains authoritative for normal close; Job Object containment is the abrupt-main-host-loss fallback, not evidence of graceful cleanup. Native main and renderer invocations instead use their own Flutter hosts from the shared installed distribution.
+Child processes remain owned for the host lifetime. Abrupt-exit containment is a fallback, not a substitute for graceful shutdown.
 
 ## Async Event Model
 

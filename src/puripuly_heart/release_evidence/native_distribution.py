@@ -654,6 +654,12 @@ Future<String?> runPython({
 
     main_path = lib_root / "main.dart"
     main = main_path.read_text(encoding="utf-8")
+    old_assets = '    assetsDir = path.join(appDir, "assets");'
+    new_assets = '    assetsDir = path.join(appDir, "puripuly_heart", "data");'
+    if main.count(old_assets) != 1:
+        raise ValueError("pinned Flet main.dart asset root changed")
+    main = main.replace(old_assets, new_assets)
+
     old_storage = """    var appDataPath = path.join(
         (await path_provider.getApplicationSupportDirectory()).path, "data");
     if (!await Directory(appDataPath).exists()) {

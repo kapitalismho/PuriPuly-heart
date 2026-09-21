@@ -5,6 +5,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from puripuly_heart.app.ports.application_startup import ApplicationStartupDiagnostic
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownContext,
@@ -173,6 +174,38 @@ class ApplicationRuntimeLoggingOwner:
                 type(exc).__name__,
             )
 
+    def emit_startup_diagnostic(self, diagnostic: ApplicationStartupDiagnostic) -> None:
+        service = self.service
+        emit_boundary = getattr(service, "emit_startup_boundary", None)
+        if callable(emit_boundary):
+            try:
+                emit_boundary(
+                    outcome=diagnostic.outcome,
+                    attempt_id=diagnostic.attempt_id,
+                    process_id=diagnostic.process_id,
+                    monotonic_ns=diagnostic.monotonic_ns,
+                    exception_class=diagnostic.exception_class,
+                )
+            except Exception:
+                emit_safe_fallback_log(
+                    self.fallback_logger,
+                    _format_startup_diagnostic(diagnostic),
+                    level=_startup_diagnostic_level(diagnostic),
+                    live=False,
+                )
+            return
+        message = _format_startup_diagnostic(diagnostic)
+        level = _startup_diagnostic_level(diagnostic)
+        try:
+            service.emit_persisted(message, level=level)
+        except Exception:
+            emit_safe_fallback_log(
+                self.fallback_logger,
+                message,
+                level=level,
+                live=False,
+            )
+
     def emit_terminal_summary(self, context: ApplicationShutdownContext) -> None:
         service = self._service
         if service is None:
@@ -264,6 +297,21 @@ class ApplicationRuntimeLoggingOwner:
             self.fallback_logger.error(message)
         if diagnostic.stall_diagnostic is not None:
             self.emit_shutdown_stall_diagnostic(diagnostic.stall_diagnostic)
+
+
+def _startup_diagnostic_level(diagnostic: ApplicationStartupDiagnostic) -> int:
+    return logging.ERROR if diagnostic.outcome == "failed" else logging.INFO
+
+
+def _format_startup_diagnostic(diagnostic: ApplicationStartupDiagnostic) -> str:
+    return (
+        "[Lifecycle][Startup] boundary "
+        f"outcome={diagnostic.outcome} "
+        f"attempt_id={diagnostic.attempt_id} "
+        f"process_id={diagnostic.process_id} "
+        f"monotonic_ns={diagnostic.monotonic_ns} "
+        f"exception_class={diagnostic.exception_class or 'none'}"
+    )
 
 
 def _safe_diagnostic_token(value: str) -> str:
