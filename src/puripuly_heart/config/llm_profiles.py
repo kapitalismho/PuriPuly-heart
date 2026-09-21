@@ -17,7 +17,7 @@ OPENROUTER_MODEL_DEEPSEEK_V4_FLASH = "deepseek/deepseek-v4-flash-0731"
 OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41 = "deepseek/deepseek-v4.1-flash"
 LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH = "deepseek/deepseek-v4-flash"
 LEGACY_OPENROUTER_MODEL_GEMINI_31_FLASH_LITE = "google/gemini-3.1-flash-lite"
-OPENROUTER_MODEL_GEMINI_37_FLASH = "google/gemini-3.7-flash"
+OPENROUTER_MODEL_GEMINI_FLASH = "google/gemini-3.8-flash"
 
 OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED = "gemma4_managed"
 OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK = "gemma4_byok"
@@ -31,7 +31,7 @@ OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED = "deepseek_v4_flash_manage
 OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK = "deepseek_v4_flash_byok"
 OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41_MANAGED = "deepseek_v4_flash_41_managed"
 OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41_BYOK = "deepseek_v4_flash_41_byok"
-OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK = "gemini37_flash_byok"
+OPENROUTER_SELECTION_ALIAS_GEMINI_FLASH_BYOK = "gemini_flash_byok"
 LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK = "gemini31_flash_lite_byok"
 
 LEGACY_OPENROUTER_SELECTION_ALIAS_NONE_GEMMA_4_26B_A4B_IT = (
@@ -173,12 +173,12 @@ PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
         openrouter_model=OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),
-    OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK: LLMSelectionProfile(
-        alias=OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK,
+    OPENROUTER_SELECTION_ALIAS_GEMINI_FLASH_BYOK: LLMSelectionProfile(
+        alias=OPENROUTER_SELECTION_ALIAS_GEMINI_FLASH_BYOK,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemini37_flash_openrouter",
-        description_key="provider.gemini37_flash_openrouter.description",
-        openrouter_model=OPENROUTER_MODEL_GEMINI_37_FLASH,
+        label_key="provider.gemini_flash_openrouter",
+        description_key="provider.gemini_flash_openrouter.description",
+        openrouter_model=OPENROUTER_MODEL_GEMINI_FLASH,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),
 }
@@ -228,9 +228,9 @@ LEGACY_PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
     LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK: LLMSelectionProfile(
         alias=LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
         provider=LLM_PROVIDER_OPENROUTER,
-        label_key="provider.gemini37_flash_openrouter",
-        description_key="provider.gemini37_flash_openrouter.description",
-        openrouter_model=OPENROUTER_MODEL_GEMINI_37_FLASH,
+        label_key="provider.gemini_flash_openrouter",
+        description_key="provider.gemini_flash_openrouter.description",
+        openrouter_model=OPENROUTER_MODEL_GEMINI_FLASH,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),
 }
@@ -244,7 +244,7 @@ OPENROUTER_MAIN_SELECTION_ALIASES: tuple[str, ...] = (
     OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED,
     OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_MANAGED,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED,
-    OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK,
+    OPENROUTER_SELECTION_ALIAS_GEMINI_FLASH_BYOK,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_41_MANAGED,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK,
     OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK,
@@ -302,9 +302,9 @@ def openrouter_alias_for_fields(
         if source == OPENROUTER_CREDENTIAL_SOURCE_MANAGED:
             return OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED
         return OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK
-    if model == OPENROUTER_MODEL_GEMINI_37_FLASH:
+    if model == OPENROUTER_MODEL_GEMINI_FLASH:
         if source == OPENROUTER_CREDENTIAL_SOURCE_BYOK:
-            return OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK
+            return OPENROUTER_SELECTION_ALIAS_GEMINI_FLASH_BYOK
         return None
     return None
 
@@ -319,8 +319,9 @@ def get_openrouter_selection_alias_for_model_and_source(
 LEGACY_OPENROUTER_MODEL_BY_VALUE: dict[str, str] = {
     LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH: OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     "deepseek/deepseek-v4-flash-0423": OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
-    "google/gemini-3-flash-preview": OPENROUTER_MODEL_GEMINI_37_FLASH,
-    LEGACY_OPENROUTER_MODEL_GEMINI_31_FLASH_LITE: OPENROUTER_MODEL_GEMINI_37_FLASH,
+    "google/gemini-3-flash-preview": OPENROUTER_MODEL_GEMINI_FLASH,
+    "google/gemini-3.7-flash": OPENROUTER_MODEL_GEMINI_FLASH,
+    LEGACY_OPENROUTER_MODEL_GEMINI_31_FLASH_LITE: OPENROUTER_MODEL_GEMINI_FLASH,
 }
 
 

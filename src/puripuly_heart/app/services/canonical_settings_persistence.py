@@ -606,9 +606,9 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
 
     translation = settings.intent.translation
     model = translation.model
-    if model == "gemini31_flash_lite":
-        translation = replace(translation, model="gemini37_flash")
-        model = "gemini37_flash"
+    if model in {"gemini31_flash_lite", "gemini37_flash"}:
+        translation = replace(translation, model="gemini_flash")
+        model = "gemini_flash"
     elif model == "qwen35_plus":
         translation = replace(translation, model="qwen38_flash")
         model = "qwen38_flash"
@@ -697,9 +697,9 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
                     source=selected_source,
                 ),
             }
-    elif model == "gemini37_flash":
+    elif model == "gemini_flash":
         if connection == "openrouter":
-            openrouter_model = "google/gemini-3.7-flash"
+            openrouter_model = "google/gemini-3.8-flash"
             updates = {
                 "openrouter_model": openrouter_model,
                 "openrouter_provider_routing": "google_gemini_latency",
@@ -712,7 +712,7 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
         else:
             updates = {
                 "openrouter_provider_routing": "default",
-                "gemini": replace(translation.gemini, llm_model="gemini-3.7-flash"),
+                "gemini": replace(translation.gemini, llm_model="gemini-3.8-flash"),
             }
     elif model == "qwen38_flash":
         updates = {

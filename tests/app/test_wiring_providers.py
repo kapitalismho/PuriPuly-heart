@@ -137,7 +137,7 @@ from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 
 _LLM_DEFAULTS: dict[str, tuple[str, str]] = {
-    "gemini": ("gemini37_flash", "official_byok"),
+    "gemini": ("gemini_flash", "official_byok"),
     "qwen": ("qwen38_flash", "official_byok"),
     "deepseek": ("deepseek_v4_flash", "official_byok"),
     "local_llm": ("local_llm", "ollama"),
@@ -163,8 +163,8 @@ _OPENROUTER_ALIAS_DEFAULTS: dict[str, tuple[str, str]] = {
         "deepseek_v4_flash",
         "managed",
     ),
-    OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK.value: (
-        "gemini37_flash",
+    OpenRouterSelectionAlias.GEMINI_FLASH_BYOK.value: (
+        "gemini_flash",
         "openrouter",
     ),
 }
@@ -518,19 +518,19 @@ def test_create_llm_provider_gemini_uses_secret_and_concurrency_limit() -> None:
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner.primary, GeminiLLMProvider)
     assert provider.inner.primary.api_key == "k"
-    assert provider.inner.primary.model == "gemini-3.7-flash"
+    assert provider.inner.primary.model == "gemini-3.8-flash"
     assert_bounded_concurrency(provider, 3)
 
 
 def test_create_llm_provider_gemini_uses_selected_model() -> None:
-    settings = _vnext(llm="gemini", gemini_model=GeminiLLMModel.GEMINI_37_FLASH.value)
+    settings = _vnext(llm="gemini", gemini_model=GeminiLLMModel.GEMINI_FLASH.value)
     secrets = InMemorySecretStore()
     secrets.set("google_api_key", "k")
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner.primary, GeminiLLMProvider)
-    assert provider.inner.primary.model == "gemini-3.7-flash"
+    assert provider.inner.primary.model == "gemini-3.8-flash"
 
 
 def test_create_llm_provider_gemini_passes_runtime_logging() -> None:
@@ -816,7 +816,7 @@ def test_create_llm_provider_from_resolved_openrouter_gemini_byok_uses_google_la
     resolved = ResolvedLLMConfig(
         primary=ResolvedLLMTarget(
             provider="openrouter",
-            model=OpenRouterLLMModel.GEMINI_37_FLASH.value,
+            model=OpenRouterLLMModel.GEMINI_FLASH.value,
             credential=ResolvedCredentialRequirement(
                 source=CREDENTIAL_SOURCE_SECRET_STORE,
                 required=True,
@@ -835,7 +835,7 @@ def test_create_llm_provider_from_resolved_openrouter_gemini_byok_uses_google_la
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, OpenRouterLLMProvider)
     assert provider.inner.api_key == "gemini-byok-key"
-    assert provider.inner.model == OpenRouterLLMModel.GEMINI_37_FLASH.value
+    assert provider.inner.model == OpenRouterLLMModel.GEMINI_FLASH.value
     assert provider.inner.routing_mode == OpenRouterRoutingMode.LATENCY
     assert provider.inner.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
     assert_bounded_concurrency(provider, 3)

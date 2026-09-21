@@ -113,7 +113,7 @@ It works in many environments, including VRChat and Discord.
 |---|---|---|---|---|
 | **Gemma 4 26B A4B** | 14,380 | 14,380 | 3,710 | 2,920 |
 | **Gemma 4 31B** | 10,940 | 10,940 | 3,430 | 2,740 |
-| **Gemini 3.7 Flash** | 1,160 | 1,160 | 940 | 880 |
+| **Gemini 3.8 Flash** | 1,160 | 1,160 | 940 | 880 |
 | **Qwen 3.8 Flash** | 7,460 | 7,460 | 2,990 | 2,460 |
 
 ### Cost per Utterance
@@ -133,7 +133,7 @@ It works in many environments, including VRChat and Discord.
 |---|---|---|---|---|
 | **Gemma 4 26B A4B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.0003 |
 | **Gemma 4 31B** | ~$0.00009 | ~$0.00009 | ~$0.0003 | ~$0.0003 |
-| **Gemini 3.7 Flash** | ~$0.0009 | ~$0.0009 | ~$0.0011 | ~$0.0011 |
+| **Gemini 3.8 Flash** | ~$0.0009 | ~$0.0009 | ~$0.0011 | ~$0.0011 |
 | **Qwen 3.8 Flash** | ~$0.0001 | ~$0.0001 | ~$0.0003 | ~$0.0004 |
 
 *   *Based on (Input 900 tokens + Output 12 tokens) × 1.2 avg LLM calls per utterance.*
@@ -175,7 +175,6 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 | Model | Runtime | Quantization |
 |---|---|---|
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
-| Gemma 4 12B IT QAT | GPU | UD Q4_K_XL |
 | OpenAI-compatible API | — | — |
 
 ---

@@ -43,7 +43,7 @@ def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
 
     direct = _with_translation(
         baseline,
-        model="gemini37_flash",
+        model="gemini_flash",
         connection="official_byok",
     )
     different_identity = replace(

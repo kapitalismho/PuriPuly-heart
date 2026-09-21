@@ -76,7 +76,7 @@ def _vnext(
     current = AppSettingsVNext()
     translation = current.intent.translation
     if llm == "gemini":
-        model = model or "gemini37_flash"
+        model = model or "gemini_flash"
         connection = connection or "official_byok"
     elif llm == "local_llm":
         model = model or "local_llm"

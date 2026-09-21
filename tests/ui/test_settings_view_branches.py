@@ -145,7 +145,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
     view.on_settings_changed = lambda _settings: emitted.append("settings")
     view.on_providers_changed = lambda: emitted.append("providers")
     canonical = _vnext(
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
         stt_provider=STTProviderName.SONIOX.value,
         peer_stt_provider=STTProviderName.LOCAL_QWEN_GPU.value,
@@ -223,7 +223,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         assert projected.custom_stt_mode == canonical.intent.stt.custom.mode
         assert projected.custom_stt_compatibility == canonical.intent.stt.custom.compatibility
         assert projected.llm_provider == LLMProviderName.GEMINI
-        assert projected.translation.model == TranslationModel.GEMINI_37_FLASH
+        assert projected.translation.model == TranslationModel.GEMINI_FLASH
         assert projected.translation.connection == TranslationConnection.OFFICIAL_BYOK
     assert view._provider_draft is not None
     assert (
@@ -239,7 +239,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         "https://draft.invalid/v1/audio/transcriptions"
     )
     assert view._provider_edits[TranslationSelectionEdit].selection.model == (
-        TranslationModel.GEMINI_37_FLASH
+        TranslationModel.GEMINI_FLASH
     )
     assert view._custom_vocab_tag_editor._terms == ["osc-term"]
     assert view._custom_vocab_tag_editor._input_field.value == "unsubmitted vocabulary"
@@ -385,7 +385,7 @@ def _vnext(
     translation = current.intent.translation
     apply_llm_defaults = llm is not None and model is None and connection is None
     if apply_llm_defaults and llm == "gemini":
-        model = model or "gemini37_flash"
+        model = model or "gemini_flash"
         connection = connection or "official_byok"
     elif apply_llm_defaults and llm == "qwen":
         model = model or "qwen38_flash"
@@ -1751,7 +1751,7 @@ def test_deepseek_connection_selection_controls_api_key_visibility(
     monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
     settings = _vnext(
         llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
 
@@ -1783,7 +1783,7 @@ def test_on_llm_selected_updates_to_local_llms_with_ollama_connection(
 ) -> None:
     settings = _vnext(
         llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -1808,7 +1808,7 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     settings = AppSettingsVNext()
     settings = _vnext(
         settings,
-        model=TranslationModel.GEMINI_37_FLASH,
+        model=TranslationModel.GEMINI_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
@@ -2764,7 +2764,7 @@ def test_settings_view_omits_legacy_overlay_peer_toggle_api(
 def test_on_llm_selected_updates_model_and_prompt_state(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = _vnext(
         llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -2793,7 +2793,7 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
 ) -> None:
     settings = _vnext(
         llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -2841,7 +2841,7 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
         connection_history={
             TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
             TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.MANAGED_CHINA,
-            TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
+            TranslationModel.GEMINI_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
         },
     )
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -2853,7 +2853,7 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
         settings,
         connection_history={
             **settings.intent.translation.connection_history,
-            TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OPENROUTER,
+            TranslationModel.GEMINI_FLASH.value: TranslationConnection.OPENROUTER,
         },
     )
 
@@ -2866,9 +2866,9 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
     assert pending.intent.translation.connection_history[
         TranslationModel.DEEPSEEK_V4_FLASH_41.value
     ] == (TranslationConnection.OFFICIAL_BYOK.value)
-    assert pending.intent.translation.connection_history[
-        TranslationModel.GEMINI_37_FLASH.value
-    ] == (TranslationConnection.OFFICIAL_BYOK.value)
+    assert pending.intent.translation.connection_history[TranslationModel.GEMINI_FLASH.value] == (
+        TranslationConnection.OFFICIAL_BYOK.value
+    )
 
 
 def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
@@ -2876,7 +2876,7 @@ def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
 ) -> None:
     settings = _vnext(
         llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -2948,7 +2948,7 @@ def test_on_llm_selected_invalid_value_is_noop(
 ) -> None:
     settings = _vnext(
         llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -2963,7 +2963,7 @@ def test_on_llm_selected_invalid_value_is_noop(
 
     assert pending is not None
     assert view._provider_draft is None
-    assert pending.intent.translation.model == TranslationModel.GEMINI_37_FLASH.value
+    assert pending.intent.translation.model == TranslationModel.GEMINI_FLASH.value
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
     assert _llm(pending) == LLMProviderName.GEMINI.value
     assert view._llm_text.content.value == "Gemini 3 Flash"
@@ -3008,7 +3008,7 @@ def test_on_llm_selected_stages_byok_with_default_openrouter_prompt_when_unsaved
     )
     settings = _vnext(
         llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="")
@@ -3034,7 +3034,7 @@ def test_on_llm_selected_updates_managed_openrouter_label_and_source(
 ) -> None:
     settings = _vnext(
         llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -3070,7 +3070,7 @@ def test_on_llm_selected_openrouter_provider_value_defaults_to_gemma_managed(
 ) -> None:
     settings = _vnext(
         llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
 
@@ -3097,7 +3097,7 @@ def test_on_llm_selected_sets_deepseek_managed_connection_and_label(
 ) -> None:
     settings = _vnext(
         llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -3132,7 +3132,7 @@ def test_on_llm_selected_updates_prompt_helper_copy_live_when_mounted(
 ) -> None:
     settings = _vnext(
         llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -3249,7 +3249,7 @@ def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_g
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
-    view._on_llm_selected(TranslationModel.GEMINI_37_FLASH.value)
+    view._on_llm_selected(TranslationModel.GEMINI_FLASH.value)
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
@@ -3567,12 +3567,12 @@ def test_on_llm_selected_stages_byok_even_when_legacy_openrouter_key_exists(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.GEMINI_37_FLASH.value
+    assert pending.intent.translation.model == TranslationModel.GEMINI_FLASH.value
     assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
     assert (
         pending.intent.translation.openrouter_selection_alias
-        == OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK.value
+        == OpenRouterSelectionAlias.GEMINI_FLASH_BYOK.value
     )
 
 
@@ -3589,7 +3589,7 @@ def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
     view._on_openrouter_pkce_click(None)
 
-    assert requested[0].selection_alias == OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK
+    assert requested[0].selection_alias == OpenRouterSelectionAlias.GEMINI_FLASH_BYOK
     assert requested[0].system_prompt == "G"
     assert any(
         isinstance(edit, TranslationSelectionEdit) for edit in requested[0].provider_intent.edits
@@ -3648,16 +3648,16 @@ def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
-    view._on_llm_selected(TranslationModel.GEMINI_37_FLASH.value)
+    view._on_llm_selected(TranslationModel.GEMINI_FLASH.value)
 
     pending = view.build_provider_apply_settings()
 
     assert _llm(settings) == LLMProviderName.DEEPSEEK.value
-    assert settings.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH.value
+    assert settings.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_FLASH.value
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.GEMINI_37_FLASH.value
+    assert pending.intent.translation.model == TranslationModel.GEMINI_FLASH.value
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
-    assert pending.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH.value
+    assert pending.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_FLASH.value
     assert view._prompt_editor.value == "G"
     assert settings.intent.prompts.system_prompt_override == "G"
     assert view.has_provider_changes is True
@@ -3669,7 +3669,7 @@ def test_on_llm_selected_logs_only_changed_fields_for_provider_switch(
     settings = AppSettingsVNext()
     settings = _vnext(
         settings,
-        model=TranslationModel.GEMINI_37_FLASH,
+        model=TranslationModel.GEMINI_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)

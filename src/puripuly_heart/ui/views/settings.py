@@ -266,7 +266,7 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "provider.deepseek_v4_flash_41",
-    TranslationModel.GEMINI_37_FLASH: "provider.gemini37_flash",
+    TranslationModel.GEMINI_FLASH: "provider.gemini_flash",
     TranslationModel.QWEN_38_FLASH: "provider.qwen38_flash",
     TranslationModel.LOCAL_LLM: "provider.local_llms",
     TranslationModel.CUSTOM_HTTP: "provider.custom_http",
@@ -291,7 +291,7 @@ _TRANSLATION_MODELS = (
     TranslationModel.DEEPSEEK_V4_FLASH_41,
     TranslationModel.LOCAL_LLM,
     TranslationModel.CUSTOM_HTTP,
-    TranslationModel.GEMINI_37_FLASH,
+    TranslationModel.GEMINI_FLASH,
     TranslationModel.QWEN_38_FLASH,
 )
 _TRANSLATION_MODEL_SECTION_ORDER = (
@@ -310,7 +310,7 @@ _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.DEEPSEEK_V4_FLASH_41: "settings.translation_model.section.recommended_cloud",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
-    TranslationModel.GEMINI_37_FLASH: "settings.translation_model.section.others",
+    TranslationModel.GEMINI_FLASH: "settings.translation_model.section.others",
     TranslationModel.QWEN_38_FLASH: "settings.translation_model.section.others",
 }
 
@@ -1104,7 +1104,7 @@ class SettingsView(ft.Column):
         )
 
         self._llm_text = self._build_clickable_text(
-            t("provider.gemini37_flash"),
+            t("provider.gemini_flash"),
             self._on_llm_click,
         )
         self._trans_title = ft.Text(
@@ -4808,7 +4808,7 @@ class SettingsView(ft.Column):
                     if openrouter_source == OpenRouterCredentialSource.MANAGED
                     else OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_BYOK
                 )
-        elif model == TranslationModel.GEMINI_37_FLASH:
+        elif model == TranslationModel.GEMINI_FLASH:
             llm_provider = (
                 LLMProviderName.GEMINI
                 if connection == TranslationConnection.OFFICIAL_BYOK
@@ -4816,8 +4816,8 @@ class SettingsView(ft.Column):
             )
             if llm_provider == LLMProviderName.OPENROUTER:
                 openrouter_source = OpenRouterCredentialSource.BYOK
-                openrouter_model = OpenRouterLLMModel.GEMINI_37_FLASH
-                openrouter_alias = OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK
+                openrouter_model = OpenRouterLLMModel.GEMINI_FLASH
+                openrouter_alias = OpenRouterSelectionAlias.GEMINI_FLASH_BYOK
         elif model == TranslationModel.QWEN_38_FLASH:
             llm_provider = LLMProviderName.QWEN
         elif model == TranslationModel.MANAGED_GEMMA:

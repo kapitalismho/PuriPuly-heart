@@ -707,7 +707,7 @@ def _local_llm_runtime_input() -> runtime_resolution.RuntimeResolutionInput:
             broker_base_url=None,
         ),
         direct=runtime_resolution.DirectProviderRuntimeIntent(
-            gemini_37_flash_model="gemini-3.7-flash",
+            gemini_flash_model="gemini-3.8-flash",
             deepseek_v4_flash_model="deepseek-v4-flash",
             qwen_38_flash_model="qwen3.8-flash",
             qwen_region=QwenRegion.BEIJING,

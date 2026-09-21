@@ -47,10 +47,10 @@ def test_osc_abi_registries_are_explicit_and_cover_current_languages() -> None:
 
 
 def test_gemini_osc_id_5_is_canonical_and_id_6_is_inbound_legacy_only() -> None:
-    assert TRANSLATION_MODEL_IDS[5] == "gemini37_flash"
-    assert TRANSLATION_MODEL_IDS[6] == "gemini37_flash"
-    assert TRANSLATION_MODEL_ID_BY_VALUE["gemini37_flash"] == 5
-    assert translation_model_id_for_selection("gemini37_flash", "official_byok") == 5
+    assert TRANSLATION_MODEL_IDS[5] == "gemini_flash"
+    assert TRANSLATION_MODEL_IDS[6] == "gemini_flash"
+    assert TRANSLATION_MODEL_ID_BY_VALUE["gemini_flash"] == 5
+    assert translation_model_id_for_selection("gemini_flash", "official_byok") == 5
     assert set(LANGUAGE_IDS.values()) == set(SUPPORTED_LANGUAGES)
     assert len(LANGUAGE_IDS) == len(set(LANGUAGE_IDS.values()))
 
@@ -198,8 +198,8 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         1: "gemma4_31b",
         2: "gemma4",
         3: "deepseek_v4_flash",
-        5: "gemini37_flash",
-        6: "gemini37_flash",
+        5: "gemini_flash",
+        6: "gemini_flash",
         7: "qwen38_flash",
         8: "local_llm",
         9: "custom_http",

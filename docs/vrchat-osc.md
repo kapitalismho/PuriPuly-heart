@@ -100,7 +100,7 @@
 | 1 | Gemma 4 31B |
 | 2 | Gemma 4 26B A4B |
 | 3 | DeepSeek V4 Flash |
-| 5 | Gemini 3.7 Flash |
+| 5 | Gemini 3.8 Flash |
 | 7 | Qwen 3.8 Flash |
 | 8 | OpenAI-compatible API |
 | 9 | Custom HTTP API |

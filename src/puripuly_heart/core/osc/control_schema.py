@@ -91,8 +91,8 @@ TRANSLATION_MODEL_IDS: Final[Mapping[int, str]] = MappingProxyType(
         1: "gemma4_31b",
         2: "gemma4",
         3: "deepseek_v4_flash",
-        5: "gemini37_flash",
-        6: "gemini37_flash",
+        5: "gemini_flash",
+        6: "gemini_flash",
         7: "qwen38_flash",
         8: "local_llm",
         9: "custom_http",
@@ -165,7 +165,7 @@ ASR_ID_BY_PROVIDER: Final[Mapping[str, int]] = MappingProxyType(
 TRANSLATION_MODEL_ID_BY_VALUE: Final[Mapping[str, int]] = MappingProxyType(
     {
         **{value: identifier for identifier, value in TRANSLATION_MODEL_IDS.items()},
-        "gemini37_flash": 5,
+        "gemini_flash": 5,
         "managed_gemma": 10,
     }
 )

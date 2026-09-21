@@ -607,33 +607,37 @@ def _migrate_gemini_3_flash_translation(translation: dict[str, Any]) -> None:
         "gemini3_flash",
         "gemini31_flash_lite",
         "gemini-3.1-flash-lite",
+        "gemini37_flash",
     }
     if translation.get("model") in legacy_models:
-        translation["model"] = "gemini37_flash"
+        translation["model"] = "gemini_flash"
     if translation.get("previous_llm_model") in legacy_models:
-        translation["previous_llm_model"] = "gemini37_flash"
+        translation["previous_llm_model"] = "gemini_flash"
     gemini = translation.get("gemini")
     if isinstance(gemini, dict) and gemini.get("llm_model") in {
         "gemini-3-flash",
         "gemini-3-flash-preview",
         "gemini-3.1-flash-lite",
+        "gemini-3.7-flash",
     }:
-        gemini["llm_model"] = "gemini-3.7-flash"
+        gemini["llm_model"] = "gemini-3.8-flash"
     if translation.get("openrouter_model") in {
         "google/gemini-3-flash-preview",
         "google/gemini-3.1-flash-lite",
+        "google/gemini-3.7-flash",
     }:
-        translation["openrouter_model"] = "google/gemini-3.7-flash"
+        translation["openrouter_model"] = "google/gemini-3.8-flash"
     if translation.get("openrouter_selection_alias") in {
         "gemini3_flash_byok",
         "gemini31_flash_lite_byok",
+        "gemini37_flash_byok",
     }:
-        translation["openrouter_selection_alias"] = "gemini37_flash_byok"
+        translation["openrouter_selection_alias"] = "gemini_flash_byok"
     history = translation.get("connection_history")
     if isinstance(history, dict):
         for legacy_model in legacy_models:
             if legacy_model in history:
-                history.setdefault("gemini37_flash", history[legacy_model])
+                history.setdefault("gemini_flash", history[legacy_model])
                 history.pop(legacy_model, None)
 
 

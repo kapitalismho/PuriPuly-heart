@@ -213,20 +213,20 @@ def _install_fake_google_model_entries(
 async def test_gemini_verify_api_key_checks_requested_model(monkeypatch):
     state = _install_fake_google_model_list(
         monkeypatch,
-        names=["models/gemini-3.7-flash"],
+        names=["models/gemini-3.8-flash"],
     )
 
     assert (
         await GeminiLLMProvider.verify_api_key(
             "secret",
-            model="gemini-3.7-flash",
+            model="gemini-3.8-flash",
         )
         is True
     )
     assert (
         await GeminiLLMProvider.verify_api_key(
             "secret",
-            model="gemini-3.7-flash-preview",
+            model="gemini-3.8-flash-preview",
         )
         is False
     )
@@ -239,12 +239,12 @@ async def test_gemini_verify_api_key_accepts_base_model_aliases(monkeypatch):
         monkeypatch,
         entries=[
             SimpleNamespace(
-                name="models/gemini-3.7-flash-001",
-                base_model_id="gemini-3.7-flash",
+                name="models/gemini-3.8-flash-001",
+                base_model_id="gemini-3.8-flash",
             ),
             SimpleNamespace(
-                name="models/gemini-3.7-flash-001",
-                baseModelId="gemini-3.7-flash",
+                name="models/gemini-3.8-flash-001",
+                baseModelId="gemini-3.8-flash",
             ),
         ],
     )
@@ -252,14 +252,14 @@ async def test_gemini_verify_api_key_accepts_base_model_aliases(monkeypatch):
     assert (
         await GeminiLLMProvider.verify_api_key(
             "secret",
-            model="gemini-3.7-flash",
+            model="gemini-3.8-flash",
         )
         is True
     )
     assert (
         await GeminiLLMProvider.verify_api_key(
             "secret",
-            model="gemini-3.7-flash",
+            model="gemini-3.8-flash",
         )
         is True
     )
@@ -311,8 +311,8 @@ async def test_google_genai_client_formats_prompt_and_context(
 @pytest.mark.parametrize(
     ("model", "expected_thinking_level"),
     [
-        ("gemini-3.7-flash", "low"),
-        ("models/gemini-3.7-flash", "low"),
+        ("gemini-3.8-flash", "low"),
+        ("models/gemini-3.8-flash", "low"),
         ("m", "low"),
     ],
 )

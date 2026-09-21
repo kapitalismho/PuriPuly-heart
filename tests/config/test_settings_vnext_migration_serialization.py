@@ -220,10 +220,34 @@ def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
     migrated = migration.from_dict(canonical)
     result = serialization.to_dict(migrated)["intent"]["translation"]
 
-    assert result["model"] == "gemini37_flash"
-    assert result["gemini"]["llm_model"] == "gemini-3.7-flash"
-    assert result["openrouter_model"] == "google/gemini-3.7-flash"
-    assert result["openrouter_selection_alias"] == "gemini37_flash_byok"
+    assert result["model"] == "gemini_flash"
+    assert result["gemini"]["llm_model"] == "gemini-3.8-flash"
+    assert result["openrouter_model"] == "google/gemini-3.8-flash"
+    assert result["openrouter_selection_alias"] == "gemini_flash_byok"
+
+
+def test_vnext_dict_migrates_gemini_flash_version_bump_nested_fields() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    translation = canonical["intent"]["translation"]
+    translation["model"] = "gemini37_flash"
+    translation["connection"] = "official_byok"
+    translation["gemini"] = {"llm_model": "gemini-3.7-flash"}
+    translation["openrouter_model"] = "google/gemini-3.7-flash"
+    translation["openrouter_selection_alias"] = "gemini37_flash_byok"
+    translation["previous_llm_model"] = "gemini37_flash"
+    translation["connection_history"] = {"gemini37_flash": "official_byok"}
+
+    migrated = migration.from_dict(canonical)
+    result = serialization.to_dict(migrated)["intent"]["translation"]
+
+    assert result["model"] == "gemini_flash"
+    assert result["gemini"]["llm_model"] == "gemini-3.8-flash"
+    assert result["openrouter_model"] == "google/gemini-3.8-flash"
+    assert result["openrouter_selection_alias"] == "gemini_flash_byok"
+    assert result["previous_llm_model"] == "gemini_flash"
+    assert result["connection_history"] == {"gemini_flash": "official_byok"}
 
 
 def test_vnext_dict_migrates_legacy_deepseek_openrouter_model() -> None:
@@ -638,7 +662,7 @@ def test_vnext_dict_migrates_legacy_gemini_byok_alias_only() -> None:
 
     canonical = serialization.to_dict(AppSettingsVNext())
     translation = canonical["intent"]["translation"]
-    translation["model"] = "gemini37_flash"
+    translation["model"] = "gemini_flash"
     translation["connection"] = "openrouter"
     translation["openrouter_selected_source"] = "byok"
     translation["openrouter_selection_alias"] = "gemini31_flash_lite_byok"
@@ -647,8 +671,8 @@ def test_vnext_dict_migrates_legacy_gemini_byok_alias_only() -> None:
     migrated = migration.from_dict(canonical)
     result = serialization.to_dict(migrated)["intent"]["translation"]
 
-    assert result["model"] == "gemini37_flash"
-    assert result["openrouter_selection_alias"] == "gemini37_flash_byok"
+    assert result["model"] == "gemini_flash"
+    assert result["openrouter_selection_alias"] == "gemini_flash_byok"
 
 
 def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:

@@ -21,7 +21,7 @@ def test_presentation_state_captures_the_post_apply_canonical_snapshot() -> None
             stt=replace(settings.intent.stt, provider=STTProviderName.SONIOX.value),
             translation=replace(
                 settings.intent.translation,
-                model=TranslationModel.GEMINI_37_FLASH.value,
+                model=TranslationModel.GEMINI_FLASH.value,
                 connection=TranslationConnection.OFFICIAL_BYOK.value,
             ),
         ),
@@ -45,7 +45,7 @@ def test_presentation_state_captures_the_post_apply_canonical_snapshot() -> None
     assert state.self_source_language == "ja"
     assert state.self_asr == "soniox"
     assert state.self_asr_setting == STTProviderName.SONIOX.value
-    assert state.translation_model == TranslationModel.GEMINI_37_FLASH.value
+    assert state.translation_model == TranslationModel.GEMINI_FLASH.value
     assert state.translation_connection == TranslationConnection.OFFICIAL_BYOK.value
     assert isinstance(state.translation_connection_history, tuple)
     with pytest.raises(FrozenInstanceError):

@@ -9,7 +9,7 @@ class TranslationModel(str, Enum):
     GEMMA4 = "gemma4"
     DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
     DEEPSEEK_V4_FLASH_41 = "deepseek_v4_flash_41"
-    GEMINI_37_FLASH = "gemini37_flash"
+    GEMINI_FLASH = "gemini_flash"
     QWEN_38_FLASH = "qwen38_flash"
     MANAGED_GEMMA = "managed_gemma"
     LOCAL_LLM = "local_llm"
@@ -54,7 +54,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[
         TranslationConnection.OPENROUTER,
         TranslationConnection.OFFICIAL_BYOK,
     ),
-    TranslationModel.GEMINI_37_FLASH: (
+    TranslationModel.GEMINI_FLASH: (
         TranslationConnection.OFFICIAL_BYOK,
         TranslationConnection.OPENROUTER,
     ),
@@ -83,7 +83,7 @@ def supported_translation_connections(
 def default_translation_connection(model: TranslationModel) -> TranslationConnection:
     if model == TranslationModel.CUSTOM_HTTP:
         return TranslationConnection.CUSTOM_HTTP
-    if model == TranslationModel.GEMINI_37_FLASH:
+    if model == TranslationModel.GEMINI_FLASH:
         return TranslationConnection.OFFICIAL_BYOK
     supported_connections = supported_translation_connections(model)
     for connection in TRANSLATION_CONNECTION_PRIORITY:
@@ -99,7 +99,7 @@ def provider_llm_for_translation(model: str, connection: str) -> str:
         return "local_llm"
     if model == "deepseek_v4_flash_41" and connection == "official_byok":
         return "deepseek"
-    if model == "gemini37_flash":
+    if model == "gemini_flash":
         if connection == "openrouter":
             return "openrouter"
         return "gemini"

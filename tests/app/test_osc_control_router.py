@@ -171,7 +171,7 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("languages", ("ja", "en", "en", "ko")),
         ("self_asr", "soniox"),
         ("peer_asr", "local_parakeet_v3"),
-        ("model", ("gemini37_flash", None)),
+        ("model", ("gemini_flash", None)),
     ]
     assert projected == [name for name, _value in packets]
     await router.close()
@@ -200,7 +200,7 @@ async def test_router_accepts_legacy_gemini_translation_id_6() -> None:
     result = await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 6)
 
     assert result.applied is True
-    assert application.calls == [("model", ("gemini37_flash", None))]
+    assert application.calls == [("model", ("gemini_flash", None))]
     await router.close()
 
 
@@ -526,7 +526,7 @@ async def test_router_skips_a_cancelled_pending_coalesced_command() -> None:
     application.gate.set()
     assert (await first).applied is True
 
-    assert ("model", ("gemini37_flash", None)) not in application.calls
+    assert ("model", ("gemini_flash", None)) not in application.calls
     assert projected == ["PuriPuly_SelfASR"]
     await router.close()
 
