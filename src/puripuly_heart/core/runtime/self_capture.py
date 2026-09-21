@@ -1202,6 +1202,7 @@ class SelfCaptureSessionOwner:
                 SelfCaptureDiagnosticEvent.FAILURE,
                 generation=generation,
                 reason=SelfCaptureFailureReason.PROVIDER_FAILED,
+                detail=result.reason,
             )
         self._notify_state_changed()
 

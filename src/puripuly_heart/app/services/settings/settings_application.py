@@ -75,6 +75,8 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     OverlayOscOutputRuntimeApplyAdapter,
     SttLanguageAudioRuntimeApplyAdapter,
     UiPromptClipboardStateRuntimeApplyAdapter,
+    _exception_code,
+    _log_runtime_apply_exception,
     _overlay_osc_output_runtime_degraded_transaction_result,
     _overlay_osc_output_save_failed_transaction_result,
     _runtime_apply_result_as_degraded_transaction,
@@ -1164,8 +1166,21 @@ class SettingsApplicationOwner:
                         operation="apply_order22_order23_order24_full_draft_save"
                     )
                 )
-            except Exception:
-                self._set_result(_ui_prompt_clipboard_state_runtime_degraded_transaction_result())
+            except Exception as exc:
+                _log_runtime_apply_exception(
+                    self.failure_sink,
+                    operation="apply_order22_order23_order24_full_draft_save",
+                    surface="ui_prompt_clipboard_state",
+                    exc=exc,
+                )
+                self._set_result(
+                    _ui_prompt_clipboard_state_runtime_degraded_transaction_result(
+                        code=_exception_code(
+                            exc,
+                            "ui_prompt_clipboard_state_runtime_apply_exception",
+                        )
+                    )
+                )
 
         if reload_settings_view and self.settings.canonical is not None:
             self.projection.render(
@@ -1213,6 +1228,7 @@ class SettingsApplicationOwner:
                 state_provider=self.runtime_effects.state,
                 settings=committed_settings,
                 reload_settings_view=reload_settings_view,
+                failure_sink=self.failure_sink,
             )
         )
         result = await self._mutate(
@@ -1266,8 +1282,21 @@ class SettingsApplicationOwner:
                         operation="apply_stt_language_audio_full_draft_save"
                     )
                 )
-            except Exception:
-                self._set_result(_stt_language_audio_runtime_degraded_transaction_result())
+            except Exception as exc:
+                _log_runtime_apply_exception(
+                    self.failure_sink,
+                    operation="apply_stt_language_audio_full_draft_save",
+                    surface="stt_language_audio",
+                    exc=exc,
+                )
+                self._set_result(
+                    _stt_language_audio_runtime_degraded_transaction_result(
+                        code=_exception_code(
+                            exc,
+                            "stt_language_audio_runtime_apply_exception",
+                        )
+                    )
+                )
             else:
                 unavailable = _stt_language_audio_runtime_unavailable_result(
                     state=self.runtime_effects.state(next_settings),
@@ -1308,6 +1337,7 @@ class SettingsApplicationOwner:
             else OverlayOscOutputRuntimeApplyAdapter(
                 apply_settings=self._apply_runtime_effect,
                 settings=committed_settings,
+                failure_sink=self.failure_sink,
             )
         )
         result = await self._mutate(
@@ -1339,8 +1369,21 @@ class SettingsApplicationOwner:
                         operation="apply_overlay_osc_output_full_draft_save"
                     )
                 )
-            except Exception:
-                self._set_result(_overlay_osc_output_runtime_degraded_transaction_result())
+            except Exception as exc:
+                _log_runtime_apply_exception(
+                    self.failure_sink,
+                    operation="apply_overlay_osc_output_full_draft_save",
+                    surface="overlay_osc_output",
+                    exc=exc,
+                )
+                self._set_result(
+                    _overlay_osc_output_runtime_degraded_transaction_result(
+                        code=_exception_code(
+                            exc,
+                            "overlay_osc_output_runtime_apply_exception",
+                        )
+                    )
+                )
         elif self.settings.canonical is None or self.settings.canonical is base_settings:
             self.settings.canonical = committed_settings
         self.projection.remember_order23(self.settings.canonical)
@@ -1367,6 +1410,7 @@ class SettingsApplicationOwner:
             else UiPromptClipboardStateRuntimeApplyAdapter(
                 apply_settings=self._apply_runtime_effect,
                 settings=runtime_settings,
+                failure_sink=self.failure_sink,
             )
         )
         result = await self._mutate(
@@ -1398,8 +1442,21 @@ class SettingsApplicationOwner:
                         operation="apply_ui_prompt_clipboard_state_full_draft_save"
                     )
                 )
-            except Exception:
-                self._set_result(_ui_prompt_clipboard_state_runtime_degraded_transaction_result())
+            except Exception as exc:
+                _log_runtime_apply_exception(
+                    self.failure_sink,
+                    operation="apply_ui_prompt_clipboard_state_full_draft_save",
+                    surface="ui_prompt_clipboard_state",
+                    exc=exc,
+                )
+                self._set_result(
+                    _ui_prompt_clipboard_state_runtime_degraded_transaction_result(
+                        code=_exception_code(
+                            exc,
+                            "ui_prompt_clipboard_state_runtime_apply_exception",
+                        )
+                    )
+                )
         else:
             self.settings.canonical = runtime_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:

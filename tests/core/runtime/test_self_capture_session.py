@@ -972,13 +972,17 @@ async def test_running_provider_handoff_preserves_capture_and_prior_state_on_non
     mutation_status: SelfCaptureProviderMutationStatus,
 ) -> None:
     provider = RecordingProvider()
-    owner, _, _, sources, _, _ = build_owner(provider=provider)
+    diagnostics: list[SelfCaptureDiagnostic] = []
+    owner, _, _, sources, _, _ = build_owner(provider=provider, diagnostics=diagnostics)
     first = config("one")
     second = config("two")
 
     await owner.apply_intent(first, enabled=True)
     first_task = owner.loop_task
-    provider.handoff_result = SelfCaptureProviderMutation(mutation_status)
+    provider.handoff_result = SelfCaptureProviderMutation(
+        mutation_status,
+        reason="provider_readiness_unavailable",
+    )
 
     snapshot = await owner.apply_intent(second, enabled=True)
 
@@ -992,6 +996,11 @@ async def test_running_provider_handoff_preserves_capture_and_prior_state_on_non
         assert snapshot.provider_id == first.provider_id
         if mutation_status is SelfCaptureProviderMutationStatus.FAILED:
             assert snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
+            assert [
+                diagnostic.detail
+                for diagnostic in diagnostics
+                if diagnostic.reason is SelfCaptureFailureReason.PROVIDER_FAILED
+            ] == ["provider_readiness_unavailable"]
 
     await owner.close()
 

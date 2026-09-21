@@ -172,6 +172,7 @@ def _application_owner(
     *,
     session: SelfCaptureSessionOwner,
     settings_holder: dict[str, AppSettingsVNext],
+    basic_logs: list[str] | None = None,
 ) -> SelfCaptureApplicationOwner:
     return SelfCaptureApplicationOwner(
         settings_provider=lambda: SelfCaptureApplicationSettings(
@@ -193,7 +194,11 @@ def _application_owner(
         state_sink=lambda _snapshot: None,
         sync_effective_flags=lambda: None,
         sync_local_notice=lambda: None,
-        log_basic=lambda _message: None,
+        log_basic=(
+            (lambda message: basic_logs.append(message))
+            if basic_logs is not None
+            else (lambda _message: None)
+        ),
         log_diagnostic=lambda _message, _level: None,
     )
 
@@ -467,7 +472,12 @@ async def test_failed_scoped_language_handoff_does_not_look_applied(
     settings_holder = {"settings": korean}
     provider = _RecordingProvider()
     session = _build_owner(provider, settings_holder)
-    application = _application_owner(session=session, settings_holder=settings_holder)
+    diagnostics: list[str] = []
+    application = _application_owner(
+        session=session,
+        settings_holder=settings_holder,
+        basic_logs=diagnostics,
+    )
 
     await session.apply_intent(build_self_capture_session_config(korean), enabled=True)
     provider.handoff_result = SelfCaptureProviderMutation(SelfCaptureProviderMutationStatus.FAILED)
@@ -476,6 +486,10 @@ async def test_failed_scoped_language_handoff_does_not_look_applied(
     with pytest.raises(RuntimeError, match="did not apply the requested configuration"):
         await application.replace_provider(smooth_local=True)
 
+    assert diagnostics == [
+        "[STT] Provider replacement not applied: failure_reason=provider_failed "
+        "provider_status=ready state=running signature_mismatch=True required=True"
+    ]
     assert session.snapshot.runtime_signature == build_self_stt_runtime_signature(korean)
     assert session.snapshot.provider_status is SelfCaptureProviderStatus.READY
     await session.close()
