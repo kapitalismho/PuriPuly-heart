@@ -648,9 +648,12 @@ async def test_peer_activation_waits_for_provisioning_before_recording_convergen
     await owner.refresh_dependencies()
 
     assert owner.snapshot().effective_enabled is True
-    assert owner.capture_runtime_convergence(
-        build_peer_capture_session_config(harness.settings.canonical)
-    ) is True
+    assert (
+        owner.capture_runtime_convergence(
+            build_peer_capture_session_config(harness.settings.canonical)
+        )
+        is True
+    )
 
 
 @pytest.mark.asyncio

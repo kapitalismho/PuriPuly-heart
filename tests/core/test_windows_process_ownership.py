@@ -31,8 +31,7 @@ async def test_process_lifetime_job_reaps_descendants_without_changing_root_exit
     kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
     kernel32.CloseHandle.restype = wintypes.BOOL
     source_root = str(Path(windows_process_ownership.__file__).resolve().parents[2])
-    program = textwrap.dedent(
-        f"""
+    program = textwrap.dedent(f"""
         import subprocess
         import sys
         sys.path.insert(0, {source_root!r})
@@ -48,8 +47,7 @@ async def test_process_lifetime_job_reaps_descendants_without_changing_root_exit
         print(child.pid, flush=True)
         sys.stdin.buffer.read(1)
         raise SystemExit(7)
-        """
-    )
+        """)
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         "-I",
