@@ -586,6 +586,77 @@ async def test_peer_owner_applies_runtime_policy_and_retains_failed_close_debt()
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("shutdown_gate", ["owner", "application"])
+async def test_peer_dependency_refresh_during_shutdown_preserves_cleanup_debt(
+    shutdown_gate: str,
+) -> None:
+    harness = Harness(provider_available=False, overlay_state="off")
+    harness.settings.ui.peer_translation_enabled = True
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+    runtime = Runtime(
+        effective_active=False,
+        apply_converges=False,
+        close_error=RuntimeError("close failed"),
+    )
+    owner.bind_runtime(runtime)
+    owner.model_loading = True
+
+    if shutdown_gate == "owner":
+        owner.stop_ingress()
+    else:
+        harness.ingress_frozen = True
+        owner.invalidate_activation()
+
+    await owner.refresh_dependencies()
+
+    assert runtime.snapshot.effective_active is False
+    assert owner.runtime is runtime
+    with pytest.raises(RuntimeError, match="close failed"):
+        await owner.close()
+    assert owner.runtime is runtime
+
+    runtime.close_error = None
+    await owner.close()
+    assert owner.runtime is None
+
+
+@pytest.mark.asyncio
+async def test_peer_activation_waits_for_provisioning_before_recording_convergence() -> None:
+    harness = Harness(ready=False, provider_available=False, overlay_state="starting")
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+    runtime = Runtime(
+        desired_active=True,
+        effective_active=False,
+        provider_status=PeerCaptureProviderStatus.PENDING,
+        apply_converges=False,
+    )
+    owner.bind_runtime(runtime)
+
+    await owner.set_enabled(True)
+    harness.overlay_state = "connected"
+    await owner.refresh_dependencies()
+
+    assert owner.snapshot().intent_enabled is True
+    assert owner.snapshot().effective_enabled is False
+    assert owner.last_runtime_signature is None
+
+    harness.ready = True
+    harness.provider_available = True
+    runtime.apply_converges = True
+    await owner.refresh_dependencies()
+
+    assert owner.snapshot().effective_enabled is True
+    assert (
+        owner.capture_runtime_convergence(
+            build_peer_capture_session_config(harness.settings.canonical)
+        )
+        is True
+    )
+
+
+@pytest.mark.asyncio
 async def test_peer_owner_rejects_non_converged_apply_without_poisoning_signature_cache() -> None:
     harness = Harness()
     harness.settings.ui.peer_translation_enabled = True

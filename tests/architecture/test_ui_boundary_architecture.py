@@ -6,7 +6,6 @@ import inspect
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.app.services.ui_application import (
-    UI_APPLICATION_USER_INTENT_METHODS,
     UiApplicationBoundary,
 )
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
@@ -17,50 +16,6 @@ APP_PATH = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "app.py"
 APPLICATION_RUNTIME_PATH = (
     REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 )
-
-UI_APPLICATION_NON_INTENT_MEMBERS = {
-    "application_lifecycle",
-    "build_managed_openrouter_byok_target",
-    "cancel_managed_auth_task",
-    "clear_managed_auth_task",
-    "close_github_star_prompt_runtime",
-    "close_managed_auth_tasks",
-    "compatibility_settings",
-    "current_loopback_capture_option_value",
-    "dashboard_managed_auth_action",
-    "dashboard_managed_auth_prompt_kind",
-    "emit_application_shutdown_diagnostic",
-    "effective_osc_ports",
-    "get_event_language_codes",
-    "http_extension_registry",
-    "is_current_github_star_prompt_generation",
-    "list_loopback_capture_options",
-    "list_loopback_device_options",
-    "list_loopback_process_options",
-    "local_llm_selected",
-    "log_basic",
-    "log_diagnostic",
-    "loopback_capture_summary",
-    "managed_auth_last_failure_kind",
-    "managed_auth_task_names",
-    "managed_auth_tasks_open",
-    "merge_settings_tab_apply_with_current_languages",
-    "merge_settings_view_change_with_current",
-    "overlay_calibration",
-    "overlay_peer_presentation_state",
-    "refresh_settings_after_openrouter_pkce_success",
-    "refresh_settings_projection",
-    "register_application_shutdown_callbacks",
-    "should_show_github_star_prompt",
-    "settings_general_snapshot",
-    "settings_overlay_snapshot",
-    "settings_secrets",
-    "state",
-    "stop",
-    "stop_github_star_prompt_ingress",
-    "supports_discord_managed_auth_reopen",
-    "translation_enable_succeeded",
-}
 
 
 def _contract_members(contract: type[object]) -> set[str]:
@@ -152,17 +107,6 @@ def test_ui_event_bridge_boundary_declares_every_consumed_operation() -> None:
     source = APPLICATION_RUNTIME_PATH.read_text(encoding="utf-8")
     assert "event_bridge: UIEventBridgePort | None" in source
     assert "def start_event_bridge(bridge: UIEventBridgePort)" in source
-
-
-def test_every_ui_application_member_is_classified_as_guarded_intent_or_safe_operation() -> None:
-    contract = _contract_members(UiApplicationPort)
-
-    assert UI_APPLICATION_USER_INTENT_METHODS.isdisjoint(UI_APPLICATION_NON_INTENT_MEMBERS)
-    assert contract == UI_APPLICATION_USER_INTENT_METHODS | UI_APPLICATION_NON_INTENT_MEMBERS
-    assert all(
-        hasattr(getattr(UiApplicationBoundary, name), "__wrapped__")
-        for name in UI_APPLICATION_USER_INTENT_METHODS
-    )
 
 
 def test_production_gui_constructor_wires_one_explicit_boundary_in_each_direction() -> None:

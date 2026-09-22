@@ -27,6 +27,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownCoordinator,
     ApplicationShutdownDiagnostic,
+    ApplicationShutdownStallDiagnostic,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
@@ -75,6 +76,9 @@ class UiApplicationPort(Protocol):
     async def stop(self) -> None: ...
 
     def application_lifecycle(self) -> ApplicationShutdownCoordinator: ...
+    def capture_application_shutdown_stall_diagnostic(
+        self,
+    ) -> ApplicationShutdownStallDiagnostic: ...
 
     def register_application_shutdown_callbacks(
         self,

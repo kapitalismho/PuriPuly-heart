@@ -83,7 +83,7 @@ class _PsutilProcessIdentityWatch:
     def _matches_identity(self) -> bool:
         try:
             return f"{self.process.pid}:{self.process.create_time()}" == self.identity.instance_id
-        except (self.psutil.AccessDenied, self.psutil.NoSuchProcess, self.psutil.ZombieProcess):
+        except self.psutil.AccessDenied, self.psutil.NoSuchProcess, self.psutil.ZombieProcess:
             return False
 
     def _still_matches_running_identity(self) -> bool:
@@ -91,7 +91,7 @@ class _PsutilProcessIdentityWatch:
             if not self._matches_identity():
                 return False
             return bool(self.process.is_running())
-        except (self.psutil.AccessDenied, self.psutil.NoSuchProcess, self.psutil.ZombieProcess):
+        except self.psutil.AccessDenied, self.psutil.NoSuchProcess, self.psutil.ZombieProcess:
             return False
 
     def _wait_for_exit(self) -> None:
@@ -99,7 +99,7 @@ class _PsutilProcessIdentityWatch:
             while not self._closed.wait(timeout=_WATCH_POLL_INTERVAL_S):
                 if not self._still_matches_running_identity():
                     break
-        except (self.psutil.AccessDenied, self.psutil.NoSuchProcess, self.psutil.ZombieProcess):
+        except self.psutil.AccessDenied, self.psutil.NoSuchProcess, self.psutil.ZombieProcess:
             pass
         if not self._closed.is_set():
             self.on_terminal()
@@ -115,7 +115,7 @@ class PsutilProcessIdentityWatcher:
         psutil = _import_psutil()
         try:
             process = psutil.Process(identity.pid)
-        except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess):
+        except psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess:
             return _PsutilProcessIdentityWatch(
                 process=_UnavailableProcess(),
                 identity=identity,

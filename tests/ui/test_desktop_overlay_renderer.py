@@ -93,6 +93,39 @@ def _block(
     )
 
 
+def test_native_renderer_uses_embedded_flet_without_viewer_owner(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    class ForbiddenOwner:
+        def __init__(self, **_kwargs) -> None:
+            raise AssertionError("native renderer must not construct the desktop viewer owner")
+
+    async def fake_run_async(**kwargs) -> None:
+        calls.append(kwargs)
+
+    monkeypatch.setattr(flet_desktop_runtime, "FletDesktopViewProcessOwner", ForbiddenOwner)
+    monkeypatch.setattr(
+        desktop_overlay,
+        "current_runtime_layout",
+        lambda: type("Layout", (), {"host_kind": "native"})(),
+    )
+    monkeypatch.setattr(ft, "run_async", fake_run_async)
+    window = desktop_overlay.FletDesktopRendererWindow(
+        window_z_order_port=desktop_window_zorder.NoopWindowZOrderPort(),
+    )
+
+    def target(_page) -> None:
+        pass
+
+    asyncio.run(window._app_runner(target))
+
+    assert len(calls) == 1
+    assert calls[0]["main"] is target
+    assert calls[0]["view"] is ft.AppView.FLET_APP_HIDDEN
+    assert window._view_process_owner is None
+    assert window._window_process_info_provider() == (os.getpid(), None)
+
+
 def test_desktop_overlay_snapshot_mapping_table_covers_block_contract_and_emitted_lines() -> None:
     rows = {
         (row.snapshot_field, row.block_type, row.slot): row
@@ -3894,7 +3927,7 @@ async def test_desktop_overlay_shipping_surface_has_no_overlay_local_controls() 
             desktop_overlay.t_for_locale("en", "settings.overlay.desktop.empty_state.action.lock")
         ]
         assert not any(
-            isinstance(item, ft.ElevatedButton)
+            isinstance(item, ft.Button)
             for control in app.page.controls
             for item in _walk_control_tree(control)
         )
@@ -5705,6 +5738,91 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
         await renderer.shutdown()
         server.close()
         await server.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_acknowledges_shutdown_before_destroying_window() -> None:
+    sequence: list[str] = []
+
+    class OrderedLifecycleSink(RecordingLifecycleSink):
+        async def emit(self, event: dict[str, object]) -> None:
+            sequence.append(str(event["type"]))
+            await super().emit(event)
+
+    class OrderedRendererWindow(FakeRendererWindow):
+        async def close(self) -> None:
+            sequence.append("window_close")
+            await super().close()
+
+    sink = OrderedLifecycleSink()
+    window = OrderedRendererWindow()
+    renderer = desktop_overlay.DesktopOverlayRenderer(
+        _manifest(),
+        window=window,
+        lifecycle_sink=sink,
+        parent_monitor=FakeParentMonitor(),
+    )
+
+    await renderer.shutdown()
+
+    assert sequence == ["shutdown_ack", "window_close", "shutdown_complete"]
+    assert sink.events == [
+        {
+            "type": "shutdown_ack",
+            "overlay_instance_id": "desktop-overlay-test",
+        },
+        {
+            "type": "shutdown_complete",
+            "overlay_instance_id": "desktop-overlay-test",
+        },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_lifecycle_transport_failures_do_not_bypass_cleanup() -> None:
+    class FailingLifecycleSink:
+        def __init__(self) -> None:
+            self.attempts: list[str] = []
+
+        async def emit(self, event: dict[str, object]) -> None:
+            self.attempts.append(str(event["type"]))
+            raise ConnectionError("lifecycle sink is unavailable")
+
+    class BrokenWebsocket:
+        def __init__(self) -> None:
+            self.send_calls = 0
+            self.close_calls = 0
+
+        async def send(self, _payload: str) -> None:
+            self.send_calls += 1
+            raise ConnectionError("websocket is unavailable")
+
+        async def close(self) -> None:
+            self.close_calls += 1
+
+    sink = FailingLifecycleSink()
+    websocket = BrokenWebsocket()
+    window = FakeRendererWindow()
+    diagnostic_port = RecordingRendererDiagnosticPort()
+    parent_monitor = ClosableFakeParentMonitor()
+    renderer = desktop_overlay.DesktopOverlayRenderer(
+        _manifest(),
+        window=window,
+        lifecycle_sink=sink,
+        parent_monitor=parent_monitor,
+        diagnostic_port=diagnostic_port,
+    )
+    renderer._websocket = websocket
+
+    await renderer.shutdown()
+
+    assert sink.attempts == ["shutdown_ack", "shutdown_complete"]
+    assert websocket.send_calls == 2
+    assert websocket.close_calls == 1
+    assert window.close_calls == 1
+    assert diagnostic_port.closed is True
+    assert parent_monitor.close_calls == 1
+    assert renderer.is_shutdown is True
 
 
 @pytest.mark.asyncio

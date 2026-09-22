@@ -13,7 +13,7 @@ from puripuly_heart.config.settings_vnext.schema import (
 def detect_system_locale() -> str | None:
     try:
         return locale.getlocale()[0]
-    except (ValueError, locale.Error):
+    except ValueError, locale.Error:
         return None
 
 

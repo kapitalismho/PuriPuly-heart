@@ -5,7 +5,13 @@ import logging
 
 import pytest
 
-from puripuly_heart.app.ports.application_startup import ApplicationStartupState
+from puripuly_heart.app.ports.application_startup import (
+    ApplicationStartupDiagnostic,
+    ApplicationStartupState,
+)
+from puripuly_heart.app.services.application_runtime_logging import (
+    ApplicationRuntimeLoggingOwner,
+)
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownContext,
     ApplicationShutdownDiagnostic,
@@ -26,6 +32,7 @@ from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
 from puripuly_heart.core.observability import DiagnosticEvent
+from puripuly_heart.core.runtime.logging import RuntimeLoggingService
 from puripuly_heart.ui.app import TranslatorApp
 from tests.helpers.ui_application import (
     ApplicationRuntimeShutdownStub,
@@ -350,12 +357,229 @@ async def test_runtime_shutdown_graph_preserves_order_and_logging_last_after_fai
     assert LIFECYCLE_SHUTDOWN_PHASE_ORDER[-1] == SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS
 
 
+class _StartupBoundaryLoggingSession:
+    def __init__(self) -> None:
+        self.persisted: list[tuple[int, str]] = []
+        self.closed = False
+
+    def emit_persisted(self, message: str, *, level: int) -> None:
+        self.persisted.append((level, message))
+
+    def close_terminal_owner(self) -> None:
+        self.closed = True
+
+
+def _real_startup_logging_owner() -> tuple[
+    ApplicationRuntimeLoggingOwner,
+    RuntimeLoggingService,
+    _StartupBoundaryLoggingSession,
+]:
+    session = _StartupBoundaryLoggingSession()
+    service = RuntimeLoggingService(session_service=session)
+
+    class Presentation:
+        def attach_runtime_log_sink(self, sink: object) -> None:
+            _ = sink
+
+    owner = ApplicationRuntimeLoggingOwner(
+        presentation=Presentation(),
+        service_factory=lambda: service,
+        fallback_logger=logging.getLogger("test.startup-boundary-fallback"),
+    )
+    return owner, service, session
+
+
+def _boundary_fields(message: str) -> dict[str, str]:
+    return dict(token.split("=", 1) for token in message.split() if "=" in token)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure_type", [RuntimeError, asyncio.CancelledError])
+async def test_startup_terminal_survives_real_logging_close_and_preserves_failure(
+    failure_type: type[BaseException],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    logging_owner, service, session = _real_startup_logging_owner()
+
+    class ApplicationRuntime:
+        async def start(self) -> None:
+            service.close_after_producers_stop()
+            raise failure_type("original startup failure")
+
+    boundary = compose_test_ui_application_boundary(
+        ApplicationRuntime(),
+        runtime_logging=logging_owner,
+    )
+
+    with pytest.raises(failure_type, match="original startup failure"):
+        await boundary.start()
+
+    entry = next(message for _level, message in session.persisted if "outcome=entered" in message)
+    terminal = capsys.readouterr().err
+    entry_fields = _boundary_fields(entry)
+    terminal_fields = _boundary_fields(terminal)
+    expected_outcome = "cancelled" if failure_type is asyncio.CancelledError else "failed"
+    assert terminal.count("[Lifecycle][Startup] boundary") == 1
+    assert terminal_fields["outcome"] == expected_outcome
+    assert terminal_fields["attempt_id"] == entry_fields["attempt_id"]
+    assert terminal_fields["process_id"] == entry_fields["process_id"]
+    assert int(terminal_fields["monotonic_ns"]) >= int(entry_fields["monotonic_ns"])
+    assert terminal_fields["exception_class"] == (
+        "none" if failure_type is asyncio.CancelledError else "RuntimeError"
+    )
+
+
+@pytest.mark.asyncio
+async def test_startup_terminal_canonicalizes_unsafe_exception_class_after_logging_close(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    logging_owner, service, session = _real_startup_logging_owner()
+    failure_type = type("Räw/Boundary Error", (RuntimeError,), {})
+    original_failure = failure_type("original startup failure")
+
+    class ApplicationRuntime:
+        async def start(self) -> None:
+            service.close_after_producers_stop()
+            raise original_failure
+
+    boundary = compose_test_ui_application_boundary(
+        ApplicationRuntime(),
+        runtime_logging=logging_owner,
+    )
+
+    with pytest.raises(failure_type) as exc_info:
+        await boundary.start()
+
+    assert exc_info.value is original_failure
+    entry = next(message for _level, message in session.persisted if "outcome=entered" in message)
+    terminal = capsys.readouterr().err
+    entry_fields = _boundary_fields(entry)
+    terminal_fields = _boundary_fields(terminal)
+    assert terminal.count("[Lifecycle][Startup] boundary") == 1
+    assert terminal_fields["outcome"] == "failed"
+    assert terminal_fields["attempt_id"] == entry_fields["attempt_id"]
+    assert terminal_fields["process_id"] == entry_fields["process_id"]
+    assert int(terminal_fields["monotonic_ns"]) >= int(entry_fields["monotonic_ns"])
+    assert terminal_fields["exception_class"].startswith("redacted_")
+    assert "Räw/Boundary Error" not in terminal
+
+
+@pytest.mark.asyncio
+async def test_completed_startup_terminal_survives_concurrent_real_logging_close(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    logging_owner, service, session = _real_startup_logging_owner()
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    class ApplicationRuntime:
+        async def start(self) -> None:
+            started.set()
+            await release.wait()
+
+    boundary = compose_test_ui_application_boundary(
+        ApplicationRuntime(),
+        runtime_logging=logging_owner,
+    )
+    startup_task = asyncio.create_task(boundary.start())
+    await started.wait()
+    service.close_after_producers_stop()
+    release.set()
+    await startup_task
+
+    entry = next(message for _level, message in session.persisted if "outcome=entered" in message)
+    terminal = capsys.readouterr().err
+    entry_fields = _boundary_fields(entry)
+    terminal_fields = _boundary_fields(terminal)
+    assert terminal.count("[Lifecycle][Startup] boundary") == 1
+    assert terminal_fields["outcome"] == "completed"
+    assert terminal_fields["attempt_id"] == entry_fields["attempt_id"]
+    assert terminal_fields["process_id"] == entry_fields["process_id"]
+    assert int(terminal_fields["monotonic_ns"]) >= int(entry_fields["monotonic_ns"])
+    assert terminal_fields["exception_class"] == "none"
+
+
+@pytest.mark.asyncio
+async def test_startup_diagnostics_bracket_completed_application_start() -> None:
+    events: list[str] = []
+    diagnostics: list[ApplicationStartupDiagnostic] = []
+
+    class Settings:
+        async def prepare_startup_settings(self) -> ApplicationStartupState:
+            events.append("settings")
+            return ApplicationStartupState(object(), (), False)
+
+    class Presentation:
+        def apply_startup_presentation(self, state: ApplicationStartupState) -> None:
+            _ = state
+            events.append("presentation")
+
+    class Runtime:
+        async def launch_startup_runtime(self, state: ApplicationStartupState) -> None:
+            _ = state
+            events.append("runtime")
+
+    class Events:
+        async def start_application_events(self) -> None:
+            events.append("events")
+
+    owner = ApplicationStartupOwner(
+        settings=Settings(),
+        presentation=Presentation(),
+        runtime=Runtime(),
+        events=Events(),
+    )
+
+    class ApplicationRuntime:
+        async def start(self) -> None:
+            await owner.start()
+
+        def emit_startup_diagnostic(self, diagnostic: ApplicationStartupDiagnostic) -> None:
+            diagnostics.append(diagnostic)
+            events.append(f"diagnostic:{diagnostic.outcome}")
+
+    boundary = compose_test_ui_application_boundary(ApplicationRuntime())
+
+    await boundary.start()
+
+    assert events == [
+        "diagnostic:entered",
+        "settings",
+        "presentation",
+        "runtime",
+        "events",
+        "diagnostic:completed",
+    ]
+    assert [item.outcome for item in diagnostics] == ["entered", "completed"]
+    assert diagnostics[0].attempt_id == diagnostics[1].attempt_id
+    assert diagnostics[0].process_id == diagnostics[1].process_id
+    assert diagnostics[0].monotonic_ns <= diagnostics[1].monotonic_ns
+    assert diagnostics[1].exception_class is None
+
+
+@pytest.mark.asyncio
+async def test_startup_diagnostic_delivery_failure_does_not_mask_startup_failure() -> None:
+    class ApplicationRuntime:
+        async def start(self) -> None:
+            raise ValueError("original startup failure")
+
+        def emit_startup_diagnostic(self, diagnostic: ApplicationStartupDiagnostic) -> None:
+            _ = diagnostic
+            raise RuntimeError("diagnostic delivery failure")
+
+    boundary = compose_test_ui_application_boundary(ApplicationRuntime())
+
+    with pytest.raises(ValueError, match="original startup failure"):
+        await boundary.start()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure_type", [RuntimeError, asyncio.CancelledError])
 async def test_startup_partial_allocation_failure_runs_boundary_cleanup(
     failure_type: type[BaseException],
 ) -> None:
     events: list[str] = []
+    diagnostics: list[ApplicationStartupDiagnostic] = []
     shutdown = ApplicationRuntimeShutdownStub(object())
 
     class Settings:
@@ -389,6 +613,10 @@ async def test_startup_partial_allocation_failure_runs_boundary_cleanup(
         async def start(self) -> None:
             await self._startup.start()
 
+        def emit_startup_diagnostic(self, diagnostic: ApplicationStartupDiagnostic) -> None:
+            diagnostics.append(diagnostic)
+            events.append(f"diagnostic:{diagnostic.outcome}")
+
     class RecordingCleanup(ApplicationRuntimeShutdownStub):
         async def close_runtime_pipeline_launcher(self) -> None:
             events.append("cleanup-runtime")
@@ -412,11 +640,24 @@ async def test_startup_partial_allocation_failure_runs_boundary_cleanup(
     with pytest.raises(failure_type, match="startup interrupted"):
         await boundary.start()
 
+    assert [item.outcome for item in diagnostics] == [
+        "entered",
+        "cancelled" if failure_type is asyncio.CancelledError else "failed",
+    ]
+    assert diagnostics[0].attempt_id == diagnostics[1].attempt_id
+    assert diagnostics[0].process_id == diagnostics[1].process_id
+    assert diagnostics[0].monotonic_ns <= diagnostics[1].monotonic_ns
+    assert diagnostics[1].exception_class == (
+        None if failure_type is asyncio.CancelledError else failure_type.__name__
+    )
+
     assert events == [
+        "diagnostic:entered",
         "settings",
         "presentation",
         "runtime-allocated",
         "cleanup-runtime",
         "cleanup-logging",
+        f"diagnostic:{'cancelled' if failure_type is asyncio.CancelledError else 'failed'}",
     ]
     assert boundary.application_lifecycle().is_terminal

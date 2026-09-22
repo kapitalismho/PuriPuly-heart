@@ -1,0 +1,48 @@
+{
+  "schema": "puripuly-heart/native-upstream-inputs/v1",
+  "versions": {
+    "flet": "1.0.0",
+    "flutter": "3.44.8",
+    "dart": "3.12.2",
+    "flutter_framework_revision": "058e0af2c2b57e369d905a03ac9748b0ebf543c6",
+    "serious_python": "4.7.0",
+    "dart_bridge": "1.9.0",
+    "python_build_release": "20260908",
+    "python": "3.14.7"
+  },
+  "inputs": {
+    "flet-build-template.zip": {
+      "bytes": 611066,
+      "sha256": "d82972b6438e6b9c03f0741a1a307e5baa1448503886e97da62805a08c1facee"
+    },
+    "python-windows-for-dart-3.14.7.zip": {
+      "bytes": 27579030,
+      "sha256": "a36cd03d9bcd68de30f3ff27de78e0f4eba31ac6ccfc0597ffa17ef663155e6e"
+    },
+    "dart_bridge-windows-x86_64.dll": {
+      "bytes": 30208,
+      "sha256": "70f111699c3a8f4ef96ebf997228fe68f9f6de84c48573a7eb6578b368fe5ec8"
+    },
+    "dart_bridge_d-windows-x86_64.dll": {
+      "bytes": 32768,
+      "sha256": "c4165c69121668e5c0a9d312028474de65dbd4a45c9fd8a1d1fade21ba29efda"
+    },
+    "flet-1.0.0-py3-none-any.whl": {
+      "bytes": 631615,
+      "sha256": "7e61fffc7f2ee70de1d0729ee39177b838897f10258fb92d534e4a0ef8564f48"
+    },
+    "flutter_windows_3.44.8-stable.zip": {
+      "bytes": 1901326708,
+      "sha256": "095c108a08e0377d8a6501fed65aeb288908a070ed3f135e525dc6431c7686e4"
+    },
+    "cpython-3.14.7+20260901-x86_64-pc-windows-msvc-install_only_stripped.tar.gz": {
+      "bytes": 22783936,
+      "sha256": "ca3c33ca924dfcab3b74205a7a58a88b0255135c53f95497b26b5e60700fd66d"
+    },
+    "python-3.14.7-embed-amd64.zip": {
+      "bytes": 12673227,
+      "sha256": "d297e5ff019966817ad8502465176139f2d3d840fa4ed84b13bed399a6ab1f15",
+      "python_executable_sha256": "4942b86a6597e5aee0128daa00050ed79bc21f6e709a78eb19cbfeb0c2f39ac9"
+    }
+  }
+}

@@ -5,12 +5,13 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import threading
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 from .local_stt_download_port import (
     HuggingFaceDownloadProgress,
@@ -33,9 +34,12 @@ def _default_worker_command(
     request_path: Path,
     event_path: Path,
 ) -> Sequence[str]:
-    command = [sys.executable]
-    if not getattr(sys, "frozen", False):
+    layout = current_runtime_layout()
+    command = [str(layout.host_executable)]
+    if layout.host_kind == "source":
         command.extend(["-m", "puripuly_heart.main"])
+    elif layout.host_kind == "native":
+        command.append("--headless")
     command.extend(
         [
             "hf-xet-download-worker",
@@ -121,6 +125,14 @@ async def _stop_worker(process: asyncio.subprocess.Process) -> None:
 class HuggingFaceXetDownloadAdapter:
     def __init__(self, *, worker_command_factory: WorkerCommandFactory | None = None) -> None:
         self._worker_command_factory = worker_command_factory or _default_worker_command
+        self._active_workers: dict[int, str] = {}
+
+    @property
+    def child_states(self) -> tuple[str, ...]:
+        return tuple(
+            f"hf-xet-worker:pid={pid}:{state}"
+            for pid, state in sorted(self._active_workers.items())
+        )
 
     async def download(
         self,
@@ -188,6 +200,8 @@ class HuggingFaceXetDownloadAdapter:
                     creationflags=creationflags,
                     env=_worker_environment(disable_xet=disable_xet),
                 )
+                if process.pid is not None:
+                    self._active_workers[int(process.pid)] = "running"
             except Exception as exc:
                 raise LocalSTTDownloadPortError(
                     "Hugging Face/Xet worker could not start",
@@ -268,6 +282,8 @@ class HuggingFaceXetDownloadAdapter:
         finally:
             if process is not None and process.returncode is None:
                 await _stop_worker(process)
+            if process is not None and process.pid is not None:
+                self._active_workers.pop(int(process.pid), None)
             request_path.unlink(missing_ok=True)
             event_path.unlink(missing_ok=True)
 
@@ -322,7 +338,7 @@ def _optional_int(value: object) -> int | None:
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 

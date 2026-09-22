@@ -22,7 +22,7 @@ from puripuly_heart.config.prompts import (
 
 
 def test_load_prompt_for_llm_providers_uses_shared_translation_prompt() -> None:
-    raw = Path("prompts/translation_prompt.md").read_text(encoding="utf-8").strip()
+    raw = (get_prompts_dir() / "translation_prompt.md").read_text(encoding="utf-8").strip()
     assert load_prompt_for_provider("gemini") == raw
     assert load_prompt_for_provider("qwen") == raw
     assert load_prompt_for_provider("deepseek") == raw
@@ -305,9 +305,9 @@ def test_get_default_prompt_reads_translation_prompt(tmp_path, monkeypatch) -> N
     assert get_default_prompt() == "TRANSLATION"
 
 
-def test_get_prompts_dir_falls_back_to_cwd(tmp_path, monkeypatch) -> None:
+def test_get_prompts_dir_is_independent_of_cwd(tmp_path, monkeypatch) -> None:
+    expected = get_prompts_dir()
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("PURIPULY_HEART_PROMPTS_DIR", raising=False)
-    monkeypatch.setattr(prompts_module, "__file__", str(tmp_path / "fake.py"))
 
-    assert get_prompts_dir() == tmp_path / "prompts"
+    assert get_prompts_dir() == expected

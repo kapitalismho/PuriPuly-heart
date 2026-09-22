@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import math
 import os
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -13,6 +12,7 @@ from puripuly_heart.core.local_translation.assets import (
     GemmaModelSpec,
     e4b_gemma_spec,
 )
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 LLAMA_CPP_BUILD = "b10423"
 LLAMA_CPP_COMMIT = "a94d563ed801d1da1b8c2432946de07d0231bb3d"
@@ -99,7 +99,7 @@ def load_or_detect_thread_profile(
                 threads_batch=int(raw["threads_batch"]),
                 draft_threads=int(raw["draft_threads"]),
             )
-        except (OSError, KeyError, TypeError, ValueError):
+        except OSError, KeyError, TypeError, ValueError:
             pass
     detected = derive_thread_profile(
         physical_cores if physical_cores is not None else _physical_cores(),
@@ -130,9 +130,10 @@ def default_llama_runtime_root() -> Path:
     configured = os.getenv("PURIPULY_HEART_LLAMA_CPP_ROOT")
     if configured:
         return Path(configured).resolve()
-    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS) / "_runtime" / LLAMA_CPP_RUNTIME_DIRNAME
-    return Path.cwd() / "build" / "llama.cpp" / LLAMA_CPP_RUNTIME_DIRNAME
+    layout = current_runtime_layout()
+    if layout.host_kind == "source":
+        return layout.native(LLAMA_CPP_RUNTIME_DIRNAME)
+    return layout.native("_runtime", LLAMA_CPP_RUNTIME_DIRNAME)
 
 
 def default_gemma_runtime_paths(root: Path | None = None) -> GemmaRuntimePaths:

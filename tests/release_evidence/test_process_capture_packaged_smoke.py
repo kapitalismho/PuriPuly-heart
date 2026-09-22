@@ -11,7 +11,7 @@ from puripuly_heart.release_evidence import process_capture_packaged_smoke as sm
 def test_release_only_smoke_starts_strict_factory_and_hashes_packaged_native(
     tmp_path: Path, monkeypatch
 ) -> None:
-    artifact_native = tmp_path / "artifact" / "proctap" / "_native.cp312-win_amd64.pyd"
+    artifact_native = tmp_path / "artifact" / "proctap" / "_native.cp314-win_amd64.pyd"
     runtime_native = artifact_native
     package_file = tmp_path / "artifact" / "modules.pkg"
     helper_file = tmp_path / "artifact" / "PuriPulyHeartProcessCaptureSmoke.exe"
@@ -79,8 +79,8 @@ def test_release_only_smoke_rejects_helper_outside_artifact_root(
 
 def test_release_only_smoke_rejects_swapped_runtime_native(tmp_path: Path, monkeypatch) -> None:
     artifact = tmp_path / "artifact"
-    native = artifact / "proctap" / "_native.cp312-win_amd64.pyd"
-    swapped = artifact / "duplicate" / "_native.cp312-win_amd64.pyd"
+    native = artifact / "proctap" / "_native.cp314-win_amd64.pyd"
+    swapped = artifact / "duplicate" / "_native.cp314-win_amd64.pyd"
     helper = artifact / "PuriPulyHeartProcessCaptureSmoke.exe"
     module_artifact = artifact / "modules.pkg"
     native.parent.mkdir(parents=True)

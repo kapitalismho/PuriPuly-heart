@@ -11,10 +11,10 @@ from pathlib import Path
 import pytest
 
 from puripuly_heart.core.overlay.protocol import OverlayPresentationSnapshot
+from puripuly_heart.core.windows_process_ownership import WindowsKillOnCloseProcessJob
 from puripuly_heart.ui.desktop_overlay import FletDesktopRendererWindow
 from puripuly_heart.ui.flet_desktop_runtime import (
     FletDesktopViewProcessOwner,
-    _WindowsKillOnCloseProcessJob,
 )
 
 
@@ -529,7 +529,7 @@ async def test_windows_kill_on_close_job_reaps_assigned_real_process() -> None:
         "import time; time.sleep(60)",
         creationflags=subprocess.CREATE_NO_WINDOW,
     )
-    job = _WindowsKillOnCloseProcessJob()
+    job = WindowsKillOnCloseProcessJob()
     try:
         assert process.pid is not None
         assert job.assign(process.pid) is True

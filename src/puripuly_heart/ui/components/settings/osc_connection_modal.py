@@ -176,7 +176,15 @@ class OscConnectionModal:
             dense=True,
             height=_PORT_FIELD_HEIGHT,
             width=FILL_PARENT_WIDTH,
-            border=ft.InputBorder.NONE,
+            border={
+                state: ft.NoInputBorder()
+                for state in (
+                    ft.ControlState.DEFAULT,
+                    ft.ControlState.FOCUSED,
+                    ft.ControlState.ERROR,
+                    ft.ControlState.DISABLED,
+                )
+            },
             filled=False,
             bgcolor=ft.Colors.TRANSPARENT,
             color=COLOR_PRIMARY,
@@ -325,7 +333,7 @@ class OscConnectionModal:
         try:
             send_port = int((send_field.value or "").strip())
             receive_port = int((receive_field.value or "").strip())
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self._show_port_error()
             return False
         if not (1 <= send_port <= 65535 and 1 <= receive_port <= 65535):

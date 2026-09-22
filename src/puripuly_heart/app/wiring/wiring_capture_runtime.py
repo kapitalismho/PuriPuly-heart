@@ -81,6 +81,8 @@ class CaptureDiagnosticsAdapter:
             fields.append(f"provider={diagnostic.provider_id}")
         if diagnostic.reason is not None:
             fields.append(f"cause={diagnostic.reason.value}")
+        if diagnostic.detail is not None:
+            fields.append(f"detail={diagnostic.detail}")
         self.log_basic(" ".join(fields))
         self.log_diagnostic(" ".join(fields))
 

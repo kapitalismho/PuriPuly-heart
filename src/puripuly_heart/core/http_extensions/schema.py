@@ -276,7 +276,7 @@ def extract_translation_text(extension: HttpExtension, response_text: str) -> st
         payload: object = None
         try:
             payload = json.loads(response_text)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             invalid_json = True
         if invalid_json:
             raise HttpExtensionResponseError("invalid response JSON")

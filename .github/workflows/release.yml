@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PYTHON_VERSION: "3.12.10"
+  PYTHON_VERSION: "3.14.7"
   UV_VERSION: "0.9.17"
   INNOSETUP_VERSION: "6.6.1"
   VULKAN_SDK_VERSION: "1.4.350.0"
@@ -220,6 +220,73 @@ jobs:
         run: |
           ./.venv/Scripts/python.exe -m PyInstaller --clean --noconfirm build.spec
 
+      - name: Build release-only process-capture smoke helper
+        shell: pwsh
+        run: |
+          $env:PURIPULY_HEART_RELEASE_PROCESS_CAPTURE_SMOKE = "1"
+          try {
+            ./.venv/Scripts/python.exe -m PyInstaller --clean --noconfirm `
+              --distpath build/release-smoke/dist `
+              --workpath build/release-smoke/work `
+              build.spec
+          } finally {
+            Remove-Item Env:PURIPULY_HEART_RELEASE_PROCESS_CAPTURE_SMOKE -ErrorAction SilentlyContinue
+          }
+
+      - name: Gate packaged headless runtime
+        shell: pwsh
+        run: |
+          $artifact = (Resolve-Path "dist/PuriPulyHeart").Path
+          $exe = Join-Path $artifact "PuriPulyHeart.exe"
+          $smokeRoot = (Resolve-Path "build/release-smoke/dist/PuriPulyHeartProcessCaptureSmoke").Path
+          $smokeExe = Join-Path $smokeRoot "PuriPulyHeartProcessCaptureSmoke.exe"
+          $scratch = Join-Path $env:RUNNER_TEMP "PuriPuly Heart 릴리스 smoke"
+          New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+          $config = Join-Path $scratch "설정 with spaces.json"
+          function Invoke-PackagedCommand {
+            param(
+              [Parameter(Mandatory = $true)][string]$FilePath,
+              [Parameter(Mandatory = $true)][string[]]$Arguments
+            )
+            $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+            $startInfo.FileName = $FilePath
+            $startInfo.WorkingDirectory = $scratch
+            $startInfo.UseShellExecute = $false
+            foreach ($argument in $Arguments) {
+              [void]$startInfo.ArgumentList.Add($argument)
+            }
+            $process = [System.Diagnostics.Process]::Start($startInfo)
+            $process.WaitForExit()
+            return $process.ExitCode
+          }
+          $checks = @(
+            @("--version"),
+            @("gui-startup-check"),
+            @("local-qwen-runtime-check"),
+            @("soxr-runtime-check"),
+            @("hf-xet-runtime-check"),
+            @("--config", $config, "installer-telemetry-preference", "disable")
+          )
+          foreach ($arguments in $checks) {
+            $exitCode = Invoke-PackagedCommand -FilePath $exe -Arguments $arguments
+            if ($exitCode -ne 0) {
+              throw "Packaged headless smoke failed for '$($arguments -join ' ')' with exit $exitCode"
+            }
+          }
+          $report = Join-Path $scratch "process-capture.json"
+          $exitCode = Invoke-PackagedCommand -FilePath $smokeExe -Arguments @(
+            "--artifact-root", $smokeRoot, "--report", $report
+          )
+          if ($exitCode -ne 0) {
+            throw "Packaged process-capture smoke failed with exit $exitCode"
+          }
+          $capture = Get-Content $report -Raw -Encoding utf8 | ConvertFrom-Json
+          if ($capture.status -ne "passed" -or
+              $capture.native_process_specific -ne $true -or
+              $capture.device_fallback_used -ne $false) {
+            throw "Packaged process-capture report failed strict validation"
+          }
+
       - name: Verify managed Gemma package contract
         shell: pwsh
         run: |
@@ -286,7 +353,7 @@ jobs:
             --run-attempt "${{ github.run_attempt }}" `
             --main-exe "dist/PuriPulyHeart/PuriPulyHeart.exe" `
             --gpu-worker-exe "dist/PuriPulyHeart/PuriPulyHeartGpuWorker.exe" `
-            --overlay-exe "build/overlay/PuriPulyHeartOverlay.exe" `
+            --overlay-exe "dist/PuriPulyHeart/PuriPulyHeartOverlay.exe" `
             --installer "installer_output/PuriPulyHeart-Setup-$env:APP_VERSION.exe" `
             --soxr-bundle "build/soxr-release-inputs/PuriPulyHeart-soxr-third-party-source-bundle.zip" `
             --provenance-out "installer_output/release-provenance-$env:APP_VERSION.json"

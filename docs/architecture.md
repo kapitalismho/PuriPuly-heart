@@ -400,6 +400,13 @@ Behavior tests: `tests/core/test_overlay_presenter.py`.
 
 Implementation: `core/runtime_logging.py`, `app/services/application_runtime_logging.py`. Behavior tests: `tests/core/test_runtime_logging.py`, `tests/core/test_file_logging.py`.
 
+## Runtime Layout
+
+- `runtime_layout.py` separates host and interpreter paths, read-only resources, and writable user data.
+- Features resolve runtime paths through this boundary, not process flags or the working directory.
+- Bootstrap selects shared runtime, UI asset, and framework storage paths before application startup.
+- Packaging does not change feature ownership or application logging policy.
+
 ## Lifecycle
 
 Every owner of a task, process, source, or provider session must define:
@@ -438,7 +445,13 @@ Stop ingress before draining or cancelling owned work. Close external resources 
 
 The application shutdown adapter coordinates teardown across capture, translation, output, child processes, and application services.
 
+Window-close orchestration must survive ordinary UI-task cancellation until ordered shutdown completes.
+
 Implementation: `app/adapters/application_runtime_shutdown.py`. Use shutdown code and lifecycle tests for exact ordering.
+
+Shutdown diagnostics expose bounded lifecycle metadata, not user content or credentials.
+
+Child processes remain owned for the host lifetime. Abrupt-exit containment is a fallback, not a substitute for graceful shutdown.
 
 ## Async Event Model
 

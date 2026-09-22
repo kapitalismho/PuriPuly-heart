@@ -16,6 +16,7 @@ _EXPORT_SOURCES = {
     "persist_desktop_audio_capture_target": "capture_target_settings",
     "SelfCaptureApplicationOwner": "self_capture_application",
     "SelfCaptureApplicationSettings": "self_capture_application",
+    "SelfCaptureRuntimeApplyError": "self_capture_application",
     "SettingsPresentationSink": "peer_capture_target_application",
     "WarningReset": "peer_capture_target_application",
 }
@@ -32,6 +33,7 @@ __all__ = [
     "self_capture_application",
     "SelfCaptureApplicationOwner",
     "SelfCaptureApplicationSettings",
+    "SelfCaptureRuntimeApplyError",
     "SettingsPresentationSink",
     "WarningReset",
 ]

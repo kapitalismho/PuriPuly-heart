@@ -160,6 +160,12 @@ class LocalASRProvisioningOwner:
     def is_closed(self) -> bool:
         return self._closed
 
+    @property
+    def child_states(self) -> tuple[str, ...]:
+        downloader = self._huggingface_downloader
+        states = getattr(downloader, "child_states", ())
+        return tuple(str(state) for state in states)
+
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
             "owner": self.owner_name,

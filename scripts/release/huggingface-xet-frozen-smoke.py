@@ -138,7 +138,7 @@ async def _run(executable: Path, output_dir: Path) -> dict[str, object]:
                         connection.status == psutil.CONN_ESTABLISHED
                         for connection in child.net_connections(kind="inet")
                     )
-                except (psutil.AccessDenied, psutil.NoSuchProcess):
+                except psutil.AccessDenied, psutil.NoSuchProcess:
                     pass
         if cancel_progress or network_observed:
             break

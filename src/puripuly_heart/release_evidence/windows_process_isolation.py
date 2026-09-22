@@ -31,6 +31,7 @@ from puripuly_heart.config.process_capture_platform import (
 )
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.core.peer_capture import PeerCaptureFailureReason
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 EVIDENCE_SCHEMA = "puripuly-heart/windows-process-isolation/v1"
 SAMPLE_RATE_HZ = 48000
@@ -312,7 +313,7 @@ def _build_empty_evidence(
         "supported_target": {
             "system": "Windows",
             "implementation": "CPython",
-            "python": "3.12",
+            "python": "3.14",
             "machine": "AMD64",
             "minimum_windows_build": PROCESS_CAPTURE_MIN_WINDOWS_BUILD,
         },
@@ -452,8 +453,12 @@ class _EmitterProcess:
 
 
 def _worker_command(*args: str) -> list[str]:
-    executable = getattr(sys, "_base_executable", None) or sys.executable
-    return [str(Path(executable).resolve()), "-m", WORKER_MODULE, *args]
+    layout = current_runtime_layout()
+    if layout.host_kind == "native":
+        executable = layout.python_executable
+    else:
+        executable = Path(getattr(sys, "_base_executable", None) or sys.executable).resolve()
+    return [str(executable), "-m", WORKER_MODULE, *args]
 
 
 def _worker_environment(runtime_dir: Path) -> dict[str, str]:
@@ -465,6 +470,13 @@ def _worker_environment(runtime_dir: Path) -> dict[str, str]:
         "TMP": str(runtime_dir),
         "PYTHONIOENCODING": "utf-8",
     }
+    layout = current_runtime_layout()
+    if layout.host_kind == "native":
+        for name in ("USERPROFILE", "HOME", "APPDATA", "LOCALAPPDATA"):
+            value = os.environ.get(name)
+            if value:
+                environment[name] = value
+        return layout.python_child_environment(environment)
     source_root = str(Path(__file__).resolve().parents[2])
     environment["PYTHONPATH"] = os.pathsep.join((source_root, sysconfig.get_paths()["purelib"]))
     return environment
@@ -979,7 +991,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
             "supported_target": {
                 "system": "Windows",
                 "implementation": "CPython",
-                "python": "3.12",
+                "python": "3.14",
                 "machine": "AMD64",
                 "minimum_windows_build": PROCESS_CAPTURE_MIN_WINDOWS_BUILD,
             },

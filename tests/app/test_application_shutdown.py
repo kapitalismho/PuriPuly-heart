@@ -9,6 +9,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownCoordinator,
     ApplicationShutdownRegistrationError,
+    ApplicationShutdownRuntimeState,
     application_shutdown_callback,
 )
 from puripuly_heart.core.lifecycle import (
@@ -20,6 +21,24 @@ from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
+
+
+def test_on_demand_stall_diagnostic_is_safe_outside_event_loop() -> None:
+    def fail_supplier():
+        raise RuntimeError("private owner state")
+
+    diagnostic = ApplicationShutdownCoordinator(
+        runtime_state_supplier=fail_supplier,
+    ).capture_stall_diagnostic()
+
+    assert diagnostic.task_await_graphs == {}
+    assert diagnostic.runtime_states == (
+        ApplicationShutdownRuntimeState(
+            owner_name="ApplicationShutdownCoordinator",
+            active_native_operations=("runtime-state-unavailable:RuntimeError",),
+        ),
+    )
+    assert "private owner state" not in repr(diagnostic)
 
 
 @pytest.mark.asyncio
@@ -259,6 +278,112 @@ async def test_terminal_waits_for_repeated_cancellation_suppression_to_settle() 
 
 
 @pytest.mark.asyncio
+async def test_on_demand_stall_diagnostic_reports_owner_await_graph_and_retained_native_work() -> (
+    None
+):
+    entered = asyncio.Event()
+    release_native = asyncio.Event()
+
+    async def close_owner() -> None:
+        entered.set()
+        await release_native.wait()
+
+    coordinator = ApplicationShutdownCoordinator(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="PeerCaptureSessionOwner",
+                callback_name="close",
+                callback=close_owner,
+            ),
+        ),
+        runtime_state_supplier=lambda: (
+            ApplicationShutdownRuntimeState(
+                owner_name="PeerCaptureSessionOwner",
+                generation=7,
+                active_native_operations=("proctap-stop",),
+                child_states=("capture-helper:stopping",),
+            ),
+        ),
+    )
+
+    first_close = asyncio.create_task(coordinator.shutdown(), name="first-close-request")
+    repeated_close = asyncio.create_task(coordinator.shutdown(), name="repeated-close-request")
+    await entered.wait()
+
+    diagnostic = coordinator.capture_stall_diagnostic()
+
+    assert diagnostic.phase == SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL
+    assert diagnostic.active_owner_name == "PeerCaptureSessionOwner"
+    assert diagnostic.active_callback_name == "close"
+    assert diagnostic.runtime_states[0].generation == 7
+    assert diagnostic.runtime_states[0].active_native_operations == ("proctap-stop",)
+    assert diagnostic.runtime_states[0].child_states == ("capture-helper:stopping",)
+    assert diagnostic.native_stack_available is False
+    callback_task_name = (
+        f"application-shutdown:{SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL}:PeerCaptureSessionOwner:close"
+    )
+    assert callback_task_name in diagnostic.task_await_graphs
+    assert "release_native" not in repr(diagnostic.runtime_states)
+
+    release_native.set()
+    first_snapshot, repeated_snapshot = await asyncio.gather(first_close, repeated_close)
+    assert first_snapshot == repeated_snapshot
+    assert first_snapshot.terminal is True
+    assert diagnostic.coordinator_state == "shutting_down"
+    assert diagnostic.coordinator_terminal is False
+    assert diagnostic.coordinator_failure_count == 0
+
+
+@pytest.mark.asyncio
+async def test_timeout_diagnostic_captures_stall_before_cancelling_owner() -> None:
+    release = asyncio.Event()
+    diagnostics = []
+
+    async def blocked() -> None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            await release.wait()
+
+    coordinator = ApplicationShutdownCoordinator(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="NativeOwner",
+                callback_name="close",
+                callback=blocked,
+                timeout_seconds=0.01,
+            ),
+        ),
+        diagnostics_sink=diagnostics.append,
+        task_settle_timeout_seconds=0.005,
+        runtime_state_supplier=lambda: (
+            ApplicationShutdownRuntimeState(
+                owner_name="NativeOwner",
+                generation=11,
+                active_native_operations=("decode",),
+                child_states=("gpu-worker:pid=42:ready",),
+            ),
+        ),
+    )
+
+    with pytest.raises(TimeoutError):
+        await coordinator.shutdown()
+
+    diagnostic = diagnostics[0].stall_diagnostic
+    assert diagnostic is not None
+    assert diagnostic.active_owner_name == "NativeOwner"
+    assert diagnostic.coordinator_state == "shutting_down"
+    assert diagnostic.coordinator_terminal is False
+    assert diagnostic.coordinator_failure_count == 1
+    assert diagnostic.runtime_states[0].generation == 11
+    assert any(name.startswith("application-shutdown:") for name in diagnostic.task_await_graphs)
+    release.set()
+    await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
 async def test_application_shutdown_invokes_sync_ingress_before_awaiting_cleanup() -> None:
     ingress_stopped = False
     release = asyncio.Event()
@@ -368,3 +493,66 @@ async def test_shutdown_registration_closes_when_shutdown_starts() -> None:
 
     release.set()
     await task
+
+
+@pytest.mark.asyncio
+async def test_composed_application_exposes_live_owner_snapshots_and_repeated_close(
+    tmp_path,
+) -> None:
+    from types import SimpleNamespace
+
+    from puripuly_heart.composition.application_runtime import compose_application_runtime
+    from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+    from puripuly_heart.domain.events import STTSessionState, STTSessionStateEvent
+    from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+
+    projected_statuses: list[str] = []
+    status_projected = asyncio.Event()
+
+    def set_status(value: str) -> None:
+        projected_statuses.append(value)
+        status_projected.set()
+
+    production_access = []
+    app = compose_application_runtime(
+        presentation=FletUiPresentationAdapter(
+            SimpleNamespace(
+                debug_ui_preview=False,
+                view_dashboard=SimpleNamespace(set_status=set_status),
+            ),
+        ),
+        config_path=tmp_path / "settings.json",
+        local_asr_evidence_sink=production_access.append,
+    )
+    await production_access[0].initialize(AppSettingsVNext())
+    access = production_access[0]
+    await access.start_callbacks.start_output(False)
+    await access.start_application_events()
+    await access.start_callbacks.open_self_ingress()
+    await access.self_vad.handle_stt_event(
+        STTSessionStateEvent(state=STTSessionState.STREAMING, channel="self")
+    )
+    await asyncio.wait_for(status_projected.wait(), timeout=1.0)
+
+    assert projected_statuses == ["connected"]
+
+    diagnostic = app.capture_application_shutdown_stall_diagnostic()
+    states = {state.owner_name: state for state in diagnostic.runtime_states}
+
+    assert states["SelfCaptureSessionOwner"].generation == 1
+    assert states["PeerCaptureSessionOwner"].generation == 0
+    assert states["LocalASRProviderRuntimeOwner:self"].generation == 1
+    assert "provider:dormant" in (
+        states["LocalASRProviderRuntimeOwner:self"].active_native_operations
+    )
+    assert states["LocalASRProviderRuntimeOwner:peer"].generation == 0
+    assert diagnostic.coordinator_state == "running"
+    assert diagnostic.coordinator_terminal is False
+    assert diagnostic.native_stack_available is False
+
+    await asyncio.gather(app.stop(), app.stop())
+    first_terminal = app.application_lifecycle().snapshot
+    await app.stop()
+
+    assert app.application_lifecycle().snapshot == first_terminal
+    assert first_terminal.state == "completed"

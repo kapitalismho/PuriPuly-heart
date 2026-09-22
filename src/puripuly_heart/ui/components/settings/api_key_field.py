@@ -23,6 +23,7 @@ from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_WARNING,
+    text_field_outline_border,
 )
 
 _STATUS_MESSAGES = {
@@ -78,9 +79,7 @@ class ApiKeyField(ft.Row):
             can_reveal_password=False,
             on_blur=self._handle_blur,
             on_change=self._handle_change,
-            border_radius=12,
-            border_color=COLOR_DIVIDER,
-            focused_border_color=COLOR_PRIMARY,
+            border=text_field_outline_border(border_radius=12),
             expand=True,
             text_size=28,
             color=COLOR_NEUTRAL_DARK,

@@ -11,6 +11,7 @@ import pytest
 
 from puripuly_heart.core.overlay import process as process_module
 from puripuly_heart.core.overlay.manifest import OVERLAY_CONTRACT_VERSION, OverlayLaunchManifest
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 
 def _overlay_manifest(**overrides: object) -> OverlayLaunchManifest:
@@ -63,6 +64,40 @@ def test_desktop_runner_frozen_command_uses_app_executable_subcommand(tmp_path: 
         "--config",
         str(manifest_path),
     )
+
+
+def test_desktop_runner_native_command_uses_host_gui_subcommand(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_root = tmp_path / "설치 경로 with spaces"
+    resources = install_root / "resources"
+    runtime = install_root / "python-runtime"
+    host = install_root / "PuriPulyHeart.exe"
+    python = runtime / "python.exe"
+    for path in (resources, runtime):
+        path.mkdir(parents=True)
+    host.write_bytes(b"host")
+    python.write_bytes(b"python")
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(resources))
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RUNTIME_ROOT", str(runtime))
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_HOST_EXECUTABLE", str(host))
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_PYTHON_EXECUTABLE", str(python))
+
+    layout = current_runtime_layout()
+    manifest_path = tmp_path / "overlay-manifest.json"
+    runner = process_module.DesktopFletOverlayRunner()
+
+    assert layout.host_kind == "native"
+    assert runner.prepare(_overlay_manifest()) == layout.host_executable
+    command = runner.build_command(manifest_path)
+    assert command == (
+        str(layout.host_executable),
+        "run-desktop-overlay",
+        "--config",
+        str(manifest_path),
+    )
+    assert "--headless" not in command
 
 
 def test_desktop_runner_command_does_not_resolve_native_overlay_or_openvr_checks(

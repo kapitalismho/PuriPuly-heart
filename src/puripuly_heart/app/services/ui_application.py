@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import functools
 import inspect
 import logging
+import os
+import time
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
+from uuid import uuid4
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.application_runtime_logging import (
@@ -13,6 +17,7 @@ from puripuly_heart.app.ports.application_runtime_logging import (
 from puripuly_heart.app.ports.application_runtime_shutdown import (
     ApplicationRuntimeShutdownPort,
 )
+from puripuly_heart.app.ports.application_startup import ApplicationStartupDiagnostic
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretsPort
 from puripuly_heart.app.ports.settings_view import (
     GeneralSettingsSnapshot,
@@ -47,6 +52,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownCoordinator,
     ApplicationShutdownDiagnostic,
+    ApplicationShutdownStallDiagnostic,
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
@@ -230,14 +236,48 @@ class UiApplicationBoundary:
         return self._state_owner.overlay_calibration()
 
     async def start(self) -> None:
+        attempt_id = f"startup-{uuid4().hex}"
+        process_id = os.getpid()
+        self._emit_startup_diagnostic(
+            ApplicationStartupDiagnostic(
+                outcome="entered",
+                attempt_id=attempt_id,
+                process_id=process_id,
+                monotonic_ns=time.monotonic_ns(),
+            )
+        )
         try:
             await self._startup.start()
-        except BaseException:
+        except BaseException as exc:
             try:
                 await self.stop()
             except BaseException:
                 pass
+            cancelled = isinstance(exc, asyncio.CancelledError)
+            self._emit_startup_diagnostic(
+                ApplicationStartupDiagnostic(
+                    outcome="cancelled" if cancelled else "failed",
+                    attempt_id=attempt_id,
+                    process_id=process_id,
+                    monotonic_ns=time.monotonic_ns(),
+                    exception_class=None if cancelled else type(exc).__name__,
+                )
+            )
             raise
+        self._emit_startup_diagnostic(
+            ApplicationStartupDiagnostic(
+                outcome="completed",
+                attempt_id=attempt_id,
+                process_id=process_id,
+                monotonic_ns=time.monotonic_ns(),
+            )
+        )
+
+    def _emit_startup_diagnostic(self, diagnostic: ApplicationStartupDiagnostic) -> None:
+        try:
+            self._runtime_logging.emit_startup_diagnostic(diagnostic)
+        except Exception:
+            pass
 
     async def stop(self) -> None:
         await self.application_lifecycle().shutdown()
@@ -251,9 +291,15 @@ class UiApplicationBoundary:
                     *self._owned_application_shutdown_callbacks,
                 ),
                 diagnostics_sink=self._runtime_shutdown.emit_application_shutdown_diagnostic,
+                runtime_state_supplier=(self._runtime_shutdown.application_shutdown_runtime_states),
             )
             self._application_lifecycle = lifecycle
         return lifecycle
+
+    def capture_application_shutdown_stall_diagnostic(
+        self,
+    ) -> ApplicationShutdownStallDiagnostic:
+        return self.application_lifecycle().capture_stall_diagnostic()
 
     def register_application_shutdown_callbacks(
         self,
@@ -712,7 +758,7 @@ for _intent_method_name in UI_APPLICATION_USER_INTENT_METHODS:
 def _accepts_keyword(callable_obj: object, keyword: str) -> bool:
     try:
         parameters = inspect.signature(callable_obj).parameters
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return True
     return keyword in parameters or any(
         parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()

@@ -6,6 +6,8 @@ import os
 import sys
 from pathlib import Path
 
+from puripuly_heart.runtime_layout import current_runtime_layout
+
 logger = logging.getLogger(__name__)
 
 LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR = Path("_runtime") / "local_qwen"
@@ -25,15 +27,9 @@ _REGISTERED_LOCAL_QWEN_RUNTIME_LIBRARY: object | None = None
 
 
 def resolve_local_qwen_runtime_dir() -> Path:
-    if sys.platform == "win32" and getattr(sys, "frozen", False):
-        executable_dir = Path(sys.executable).resolve().parent
-        packaged_runtime_dir = executable_dir / LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR
-        internal_packaged_runtime_dir = (
-            executable_dir / "_internal" / LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR
-        )
-        if internal_packaged_runtime_dir.is_dir() and not packaged_runtime_dir.is_dir():
-            return internal_packaged_runtime_dir
-        return packaged_runtime_dir
+    layout = current_runtime_layout()
+    if sys.platform == "win32" and layout.host_kind != "source":
+        return layout.native(*LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR.parts)
 
     import onnxruntime
 

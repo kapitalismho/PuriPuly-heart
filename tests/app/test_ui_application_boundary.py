@@ -11,6 +11,7 @@ import pytest
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationIntentRejectedError,
+    ApplicationShutdownRuntimeState,
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.ui_application import (
@@ -419,10 +420,20 @@ async def test_lifecycle_callbacks_diagnostics_and_logging_stay_behind_boundary(
 
 
 @pytest.mark.asyncio
-async def test_every_user_intent_is_rejected_after_freeze_without_backend_invocation() -> None:
+async def test_frozen_boundary_rejects_mutating_intents_but_keeps_stall_diagnostic_callable() -> (
+    None
+):
     backend = RecordingBackend()
     boundary = UiApplicationBoundary(backend)
     freeze_started = asyncio.Event()
+    backend.application_shutdown_runtime_states = lambda: (
+        ApplicationShutdownRuntimeState(
+            owner_name="SelfCaptureSessionOwner",
+            generation=7,
+            active_native_operations=("capture-loop",),
+            child_states=("audio-helper:pid=123:running",),
+        ),
+    )
     release_freeze = asyncio.Event()
 
     async def freeze() -> None:
@@ -452,6 +463,23 @@ async def test_every_user_intent_is_rejected_after_freeze_without_backend_invoca
             else:
                 intent()
         assert exc_info.value.intent_name == intent_name
+
+    diagnostic = boundary.capture_application_shutdown_stall_diagnostic()
+    assert diagnostic.coordinator_state == "shutting_down"
+    assert diagnostic.coordinator_terminal is False
+    assert diagnostic.phase == SHUTDOWN_PHASE_FREEZE_INGRESS
+    assert diagnostic.active_owner_name == "Application"
+    assert diagnostic.active_callback_name == "freeze"
+    assert diagnostic.runtime_states == (
+        ApplicationShutdownRuntimeState(
+            owner_name="SelfCaptureSessionOwner",
+            generation=7,
+            active_native_operations=("capture-loop",),
+            child_states=("audio-helper:pid=123:running",),
+        ),
+    )
+    assert "application-shutdown-coordinator" in diagnostic.task_await_graphs
+    assert diagnostic.task_await_graphs["application-shutdown-coordinator"]
 
     assert backend.events == []
     release_freeze.set()

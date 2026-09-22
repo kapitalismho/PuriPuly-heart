@@ -12,7 +12,7 @@ Windows Rust runtime for the VR subtitle overlay.
   - `src/puripuly_heart/ui/desktop_overlay.py`
 
 
-The shared bridge protocol is version 8 with execution contract r2. Python owns
+The shared bridge protocol is version 9 with execution contract r2. Python owns
 caption expiry and send-time pruning; native renders the accepted current snapshot
 without a validity-lease exchange or autonomous caption-expiry Hide. Old captions
 can remain if the application cannot deliver removal or the replacement frame fails.

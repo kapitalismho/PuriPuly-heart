@@ -202,7 +202,7 @@ def test_discord_managed_auth_dialog_scales_referral_id_field_content() -> None:
     assert field.dense is False
     assert field.content_padding is not None
     assert field.bgcolor is None
-    assert field.focused_border_color == COLOR_PRIMARY
+    assert field.border[ft.ControlState.FOCUSED].side.color == COLOR_PRIMARY
 
 
 def test_discord_managed_auth_dialog_referral_field_is_present_before_page_open(

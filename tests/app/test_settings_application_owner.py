@@ -18,6 +18,9 @@ from puripuly_heart.app.ports.settings_runtime_effects import (
     SettingsRuntimeTransition,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.capture.self_capture_application import (
+    SelfCaptureRuntimeApplyError,
+)
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
 )
@@ -30,6 +33,7 @@ from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_TRANSACTION,
     DIAGNOSTIC_VISIBILITY_BASIC,
+    RUNTIME_APPLY_STATUS_FAILED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     ErrorDiagnostics,
@@ -382,6 +386,79 @@ async def test_settings_application_owner_can_suppress_language_view_reload(
 
     assert effects.reload_settings_view == [False]
     assert renders == []
+
+
+@pytest.mark.asyncio
+async def test_settings_application_owner_names_degrading_runtime_apply_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = FakeSettingsOwner(AppSettingsVNext())
+    projection = SettingsProjectionOwner(
+        presentation=SimpleNamespace(render_settings=lambda *_args, **_kwargs: True),
+        config_path=Path("settings.json"),
+        current_settings=lambda: settings.canonical,
+    )
+    projection.remember_all(settings.canonical)
+    failures: list[str] = []
+    applied: list[object] = []
+
+    class ApplyingMutationService:
+        def __init__(self, *, runtime_apply: object, **_kwargs: object) -> None:
+            self.runtime_apply = runtime_apply
+
+        async def mutate(self, _request: object) -> TransactionResult:
+            applied.append(await self.runtime_apply.apply_runtime(SimpleNamespace()))
+            return TransactionResult(
+                status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+                message=None,
+                diagnostics=None,
+            )
+
+    monkeypatch.setattr(
+        settings_application_module,
+        "SettingsMutationService",
+        ApplyingMutationService,
+    )
+    owner = SettingsApplicationOwner(
+        settings=settings,
+        projection=projection,
+        runtime_effects=FakeRuntimeEffects(
+            [],
+            SelfCaptureRuntimeApplyError(
+                "Self STT runtime did not apply the requested configuration"
+            ),
+        ),
+        manual_fallback=ManualLocalASRFallbackOwner(),
+        cpu_auto_available=lambda: True,
+        inspect_cpu=lambda: None,
+        fallback_sink=lambda _channels, _installation: None,
+        sync_ui=lambda: None,
+        fallback_log_sink=lambda _previous, _normalized, _channels: None,
+        mutation_service_provider=lambda: None,
+        consume_superseded_settings=lambda _settings: False,
+        active_local_asr_change=lambda _base, _next: False,
+        failure_sink=failures.append,
+    )
+    pending = replace(
+        settings.canonical,
+        intent=replace(
+            settings.canonical.intent,
+            languages=replace(settings.canonical.intent.languages, source_language="ja"),
+        ),
+    )
+
+    assert await owner.apply(pending)
+
+    assert failures[-1] == (
+        "[Settings] runtime_apply_failed surface=stt_language_audio "
+        "operation=apply_stt_language_audio_runtime "
+        "exception_type=SelfCaptureRuntimeApplyError "
+        "exception_code=self_stt_runtime_apply_not_converged"
+    )
+    runtime_result = applied[-1]
+    assert runtime_result.status == RUNTIME_APPLY_STATUS_FAILED
+    assert runtime_result.diagnostics is not None
+    assert runtime_result.diagnostics.code == "self_stt_runtime_apply_not_converged"
 
 
 @pytest.mark.asyncio

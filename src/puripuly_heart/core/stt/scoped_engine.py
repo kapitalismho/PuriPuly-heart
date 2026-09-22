@@ -1185,7 +1185,7 @@ class ScopedRecognitionEngine:
             return
         try:
             task.exception()
-        except (asyncio.CancelledError, Exception):
+        except asyncio.CancelledError, Exception:
             return
 
 

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass, field
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from typing import Final, Literal, TypeAlias
 
 from puripuly_heart.core.lifecycle import (
@@ -58,6 +58,28 @@ class ApplicationShutdownDiagnostic:
     callback_name: str
     exception_class: str
     timed_out: bool
+    stall_diagnostic: ApplicationShutdownStallDiagnostic | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ApplicationShutdownRuntimeState:
+    owner_name: str
+    generation: int | None = None
+    active_native_operations: tuple[str, ...] = ()
+    child_states: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ApplicationShutdownStallDiagnostic:
+    phase: LifecycleShutdownPhase | None
+    active_owner_name: str | None
+    active_callback_name: str | None
+    runtime_states: tuple[ApplicationShutdownRuntimeState, ...]
+    task_await_graphs: Mapping[str, str]
+    native_stack_available: bool = False
+    coordinator_state: ApplicationLifecycleState = "running"
+    coordinator_terminal: bool = False
+    coordinator_failure_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +136,9 @@ class ApplicationShutdownCoordinator:
         diagnostics_sink: ApplicationShutdownDiagnosticsSink | None = None,
         diagnostics_timeout_seconds: float = DEFAULT_APPLICATION_SHUTDOWN_DIAGNOSTIC_TIMEOUT_SECONDS,
         task_settle_timeout_seconds: float = DEFAULT_APPLICATION_SHUTDOWN_TASK_SETTLE_TIMEOUT_SECONDS,
+        runtime_state_supplier: (
+            Callable[[], Sequence[ApplicationShutdownRuntimeState]] | None
+        ) = None,
     ) -> None:
         if diagnostics_timeout_seconds <= 0:
             raise ValueError("Application shutdown diagnostics_timeout_seconds must be positive")
@@ -123,6 +148,7 @@ class ApplicationShutdownCoordinator:
         self._diagnostics_sink = diagnostics_sink
         self._diagnostics_timeout_seconds = diagnostics_timeout_seconds
         self._task_settle_timeout_seconds = task_settle_timeout_seconds
+        self._runtime_state_supplier = runtime_state_supplier
         self._state: ApplicationLifecycleState = "running"
         self._phase: LifecycleShutdownPhase | None = None
         self._phase_history: list[LifecycleShutdownPhase] = []
@@ -131,6 +157,7 @@ class ApplicationShutdownCoordinator:
         self._terminal_exception: BaseException | None = None
         self._timed_out_callback_tasks: set[asyncio.Task[None]] = set()
         self._shutdown_phases_completed = False
+        self._active_callback: ApplicationShutdownCallback | None = None
 
     @property
     def accepting_intents(self) -> bool:
@@ -193,6 +220,44 @@ class ApplicationShutdownCoordinator:
             raise self._terminal_exception
         return snapshot
 
+    def capture_stall_diagnostic(self) -> ApplicationShutdownStallDiagnostic:
+        active = self._active_callback
+        task_graphs: dict[str, str] = {}
+        try:
+            tasks = tuple(asyncio.all_tasks())
+        except RuntimeError:
+            tasks = ()
+        for task in sorted(tasks, key=lambda item: item.get_name()):
+            if task.done():
+                continue
+            try:
+                task_graphs[task.get_name()] = asyncio.format_call_graph(task, depth=8)
+            except Exception as exc:
+                task_graphs[task.get_name()] = f"call_graph_unavailable:{type(exc).__name__}"
+        try:
+            states = (
+                tuple(self._runtime_state_supplier())
+                if self._runtime_state_supplier is not None
+                else ()
+            )
+        except Exception as exc:
+            states = (
+                ApplicationShutdownRuntimeState(
+                    owner_name=self.owner_name,
+                    active_native_operations=(f"runtime-state-unavailable:{type(exc).__name__}",),
+                ),
+            )
+        return ApplicationShutdownStallDiagnostic(
+            phase=self._phase,
+            active_owner_name=active.owner_name if active is not None else None,
+            active_callback_name=active.callback_name if active is not None else None,
+            runtime_states=states,
+            task_await_graphs=task_graphs,
+            coordinator_state=self._state,
+            coordinator_terminal=self.is_terminal,
+            coordinator_failure_count=len(self._failures),
+        )
+
     async def _run_shutdown(self) -> ApplicationLifecycleSnapshot:
         self._state = "shutting_down"
         for phase in LIFECYCLE_SHUTDOWN_PHASE_ORDER:
@@ -215,46 +280,62 @@ class ApplicationShutdownCoordinator:
             failures=tuple(failure.summary for failure in self._failures),
             cleanup_exceptions=tuple(failure.exception for failure in self._failures),
         )
+        self._active_callback = callback
+        stall_diagnostic: ApplicationShutdownStallDiagnostic | None = None
         try:
-            result = callback.callback(context)
-            if not inspect.isawaitable(result):
-                return
-            task = asyncio.create_task(
-                self._await_callback(result),
-                name=(
-                    "application-shutdown:"
-                    f"{callback.phase}:{callback.owner_name}:{callback.callback_name}"
-                ),
-            )
-            done, _pending = await asyncio.wait(
-                {task},
-                timeout=callback.timeout_seconds,
-                return_when=asyncio.ALL_COMPLETED,
-            )
-            if task not in done:
-                await self._cancel_and_settle_timed_out_task(
-                    task,
-                    timeout_seconds=callback.timeout_seconds,
+            try:
+                result = callback.callback(context)
+                if not inspect.isawaitable(result):
+                    return
+                task = asyncio.create_task(
+                    self._await_callback(result),
+                    name=(
+                        "application-shutdown:"
+                        f"{callback.phase}:{callback.owner_name}:{callback.callback_name}"
+                    ),
                 )
-                raise TimeoutError(
-                    "Application shutdown callback exceeded its coordinator deadline"
+                done, _pending = await asyncio.wait(
+                    {task},
+                    timeout=callback.timeout_seconds,
+                    return_when=asyncio.ALL_COMPLETED,
                 )
-            await task
-        except BaseException as exc:
-            if isinstance(exc, (KeyboardInterrupt, SystemExit)):
-                raise
-            failure = _RecordedFailure(
-                summary=ApplicationShutdownFailure(
-                    phase=callback.phase,
-                    owner_name=callback.owner_name,
-                    callback_name=callback.callback_name,
-                    exception_class=type(exc).__name__,
-                    timed_out=isinstance(exc, TimeoutError),
-                ),
-                exception=exc,
-            )
-            self._failures.append(failure)
-            await self._emit_diagnostic(failure.summary)
+                if task not in done:
+                    stall_diagnostic = self.capture_stall_diagnostic()
+                    await self._cancel_and_settle_timed_out_task(
+                        task,
+                        timeout_seconds=callback.timeout_seconds,
+                    )
+                    raise TimeoutError(
+                        "Application shutdown callback exceeded its coordinator deadline"
+                    )
+                await task
+            except BaseException as exc:
+                if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+                    raise
+                failure = _RecordedFailure(
+                    summary=ApplicationShutdownFailure(
+                        phase=callback.phase,
+                        owner_name=callback.owner_name,
+                        callback_name=callback.callback_name,
+                        exception_class=type(exc).__name__,
+                        timed_out=isinstance(exc, TimeoutError),
+                    ),
+                    exception=exc,
+                )
+                self._failures.append(failure)
+                if stall_diagnostic is not None:
+                    stall_diagnostic = replace(
+                        stall_diagnostic,
+                        coordinator_state=self._state,
+                        coordinator_terminal=self.is_terminal,
+                        coordinator_failure_count=len(self._failures),
+                    )
+                await self._emit_diagnostic(
+                    failure.summary,
+                    stall_diagnostic=stall_diagnostic,
+                )
+        finally:
+            self._active_callback = None
 
     async def _await_callback(self, result: Awaitable[None]) -> None:
         await result
@@ -298,7 +379,12 @@ class ApplicationShutdownCoordinator:
             return
         self._state = "completed_with_failures" if self._failures else "completed"
 
-    async def _emit_diagnostic(self, failure: ApplicationShutdownFailure) -> None:
+    async def _emit_diagnostic(
+        self,
+        failure: ApplicationShutdownFailure,
+        *,
+        stall_diagnostic: ApplicationShutdownStallDiagnostic | None = None,
+    ) -> None:
         if self._diagnostics_sink is None:
             return
         diagnostic = ApplicationShutdownDiagnostic(
@@ -307,6 +393,7 @@ class ApplicationShutdownCoordinator:
             callback_name=failure.callback_name,
             exception_class=failure.exception_class,
             timed_out=failure.timed_out,
+            stall_diagnostic=stall_diagnostic,
         )
         try:
             result = self._diagnostics_sink(diagnostic)
@@ -386,6 +473,8 @@ __all__ = [
     "ApplicationShutdownContext",
     "ApplicationShutdownCoordinator",
     "ApplicationShutdownDiagnostic",
+    "ApplicationShutdownRuntimeState",
+    "ApplicationShutdownStallDiagnostic",
     "ApplicationShutdownFailure",
     "ApplicationShutdownRegistrationError",
     "DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS",

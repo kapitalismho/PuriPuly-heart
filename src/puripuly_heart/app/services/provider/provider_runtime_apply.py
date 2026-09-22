@@ -278,6 +278,28 @@ def _settings_mutation_diagnostics(
     )
 
 
+def _exception_code(exc: BaseException, fallback: str) -> str:
+    code = getattr(exc, "code", None)
+    return code if isinstance(code, str) and code else fallback
+
+
+def _log_runtime_apply_exception(
+    sink: Callable[[str], None] | None,
+    *,
+    operation: str,
+    surface: str,
+    exc: BaseException,
+) -> None:
+    if sink is None:
+        return
+    sink(
+        "[Settings] runtime_apply_failed "
+        f"surface={surface} operation={operation} "
+        f"exception_type={type(exc).__name__} "
+        f"exception_code={_exception_code(exc, 'none')}"
+    )
+
+
 def _runtime_apply_failed_result(
     *,
     operation: str,
@@ -356,11 +378,13 @@ def _stt_language_audio_runtime_unavailable_result(
     return None
 
 
-def _stt_language_audio_runtime_degraded_transaction_result() -> TransactionResult:
+def _stt_language_audio_runtime_degraded_transaction_result(
+    *, code: str | None = None
+) -> TransactionResult:
     return _runtime_apply_result_as_degraded_transaction(
         _runtime_apply_failed_result(
             operation="apply_stt_language_audio_runtime",
-            code="stt_language_audio_runtime_apply_exception",
+            code=code or "stt_language_audio_runtime_apply_exception",
             surface="stt_language_audio",
         )
     )
@@ -402,11 +426,13 @@ def _stt_language_audio_save_failed_transaction_result(*, operation: str) -> Tra
     )
 
 
-def _overlay_osc_output_runtime_degraded_transaction_result() -> TransactionResult:
+def _overlay_osc_output_runtime_degraded_transaction_result(
+    *, code: str | None = None
+) -> TransactionResult:
     return _runtime_apply_result_as_degraded_transaction(
         _runtime_apply_failed_result(
             operation="apply_overlay_osc_output_runtime",
-            code="overlay_osc_output_runtime_apply_exception",
+            code=code or "overlay_osc_output_runtime_apply_exception",
             surface="overlay_osc_output",
         )
     )
@@ -430,11 +456,13 @@ def _overlay_osc_output_save_failed_transaction_result(*, operation: str) -> Tra
     )
 
 
-def _ui_prompt_clipboard_state_runtime_degraded_transaction_result() -> TransactionResult:
+def _ui_prompt_clipboard_state_runtime_degraded_transaction_result(
+    *, code: str | None = None
+) -> TransactionResult:
     return _runtime_apply_result_as_degraded_transaction(
         _runtime_apply_failed_result(
             operation="apply_ui_prompt_clipboard_state_runtime",
-            code="ui_prompt_clipboard_state_runtime_apply_exception",
+            code=code or "ui_prompt_clipboard_state_runtime_apply_exception",
             surface="ui_prompt_clipboard_state",
         )
     )
@@ -483,11 +511,7 @@ class ProviderRuntimeApplyAdapter:
                 diagnostics=_settings_mutation_diagnostics(
                     component="gui_controller",
                     operation=self.operation,
-                    code=(
-                        getattr(exc, "code", None)
-                        if isinstance(getattr(exc, "code", None), str)
-                        else "provider_runtime_apply_exception"
-                    ),
+                    code=_exception_code(exc, "provider_runtime_apply_exception"),
                     category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
                     surface=self.surface,
                 ),
@@ -514,6 +538,7 @@ class SttLanguageAudioRuntimeApplyAdapter:
     state_provider: SettingsRuntimeStateProvider
     settings: object
     reload_settings_view: bool = True
+    failure_sink: Callable[[str], None] | None = None
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
@@ -522,7 +547,13 @@ class SttLanguageAudioRuntimeApplyAdapter:
                 self.settings,
                 self.reload_settings_view,
             )
-        except Exception:
+        except Exception as exc:
+            _log_runtime_apply_exception(
+                self.failure_sink,
+                operation="apply_stt_language_audio_runtime",
+                surface="stt_language_audio",
+                exc=exc,
+            )
             return RuntimeApplyResult(
                 status=RUNTIME_APPLY_STATUS_FAILED,
                 message=UserMessageRef(
@@ -533,7 +564,10 @@ class SttLanguageAudioRuntimeApplyAdapter:
                 diagnostics=_settings_mutation_diagnostics(
                     component="gui_controller",
                     operation="apply_stt_language_audio_runtime",
-                    code="stt_language_audio_runtime_apply_exception",
+                    code=_exception_code(
+                        exc,
+                        "stt_language_audio_runtime_apply_exception",
+                    ),
                     category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
                     surface="stt_language_audio",
                 ),
@@ -555,6 +589,7 @@ class SttLanguageAudioRuntimeApplyAdapter:
 class OverlayOscOutputRuntimeApplyAdapter:
     apply_settings: SettingsRuntimeApplyEffect
     settings: object
+    failure_sink: Callable[[str], None] | None = None
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
@@ -563,10 +598,16 @@ class OverlayOscOutputRuntimeApplyAdapter:
                 self.settings,
                 True,
             )
-        except Exception:
+        except Exception as exc:
+            _log_runtime_apply_exception(
+                self.failure_sink,
+                operation="apply_overlay_osc_output_runtime",
+                surface="overlay_osc_output",
+                exc=exc,
+            )
             return _runtime_apply_failed_result(
                 operation="apply_overlay_osc_output_runtime",
-                code="overlay_osc_output_runtime_apply_exception",
+                code=_exception_code(exc, "overlay_osc_output_runtime_apply_exception"),
                 surface="overlay_osc_output",
             )
         return RuntimeApplyResult(
@@ -580,6 +621,7 @@ class OverlayOscOutputRuntimeApplyAdapter:
 class UiPromptClipboardStateRuntimeApplyAdapter:
     apply_settings: SettingsRuntimeApplyEffect
     settings: object
+    failure_sink: Callable[[str], None] | None = None
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
@@ -588,10 +630,19 @@ class UiPromptClipboardStateRuntimeApplyAdapter:
                 self.settings,
                 True,
             )
-        except Exception:
+        except Exception as exc:
+            _log_runtime_apply_exception(
+                self.failure_sink,
+                operation="apply_ui_prompt_clipboard_state_runtime",
+                surface="ui_prompt_clipboard_state",
+                exc=exc,
+            )
             return _runtime_apply_failed_result(
                 operation="apply_ui_prompt_clipboard_state_runtime",
-                code="ui_prompt_clipboard_state_runtime_apply_exception",
+                code=_exception_code(
+                    exc,
+                    "ui_prompt_clipboard_state_runtime_apply_exception",
+                ),
                 surface="ui_prompt_clipboard_state",
             )
         return RuntimeApplyResult(

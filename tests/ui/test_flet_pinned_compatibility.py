@@ -13,14 +13,20 @@ pytest.importorskip("flet")
 import flet as ft
 
 from puripuly_heart.ui.components.settings import api_key_field as api_key_field_module
+from puripuly_heart.ui.theme import (
+    COLOR_DIVIDER,
+    COLOR_ERROR,
+    COLOR_PRIMARY,
+    text_field_outline_border,
+)
 from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import DummyPage, attach_dummy_page
 from tests.helpers.paths import REPO_ROOT as ROOT
 
-FLET_VERSION = "0.86.1"
+FLET_VERSION = "1.0.0"
 
 
-def test_flet_runtime_and_lock_use_one_exact_0861_protocol() -> None:
+def test_flet_runtime_and_lock_use_one_exact_100_protocol() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     dependencies = pyproject["project"]["dependencies"]
     build_dependencies = pyproject["project"]["optional-dependencies"]["build"]
@@ -43,13 +49,13 @@ def test_flet_runtime_and_lock_use_one_exact_0861_protocol() -> None:
     assert version("flet-desktop") == FLET_VERSION
 
 
-def test_gate_a_windows_runtime_uses_python_312() -> None:
+def test_gate_c_windows_runtime_uses_python_314() -> None:
     if sys.platform != "win32":
-        pytest.skip("Gate A runtime version is verified on Windows")
-    assert sys.version_info[:2] == (3, 12)
+        pytest.skip("Gate C runtime version is verified on Windows")
+    assert sys.version_info[:2] == (3, 14)
 
 
-def test_ui_uses_flet_0861_dialog_api() -> None:
+def test_ui_uses_flet_100_dialog_api() -> None:
     assert hasattr(ft.Page, "show_dialog")
     assert hasattr(ft.Page, "pop_dialog")
     assert not hasattr(ft.Page, "open")
@@ -71,7 +77,23 @@ def test_ui_uses_flet_0861_dialog_api() -> None:
     assert violations == []
 
 
-def test_api_key_field_uses_flet_086_icon_api(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_text_field_outline_border_covers_every_visual_state() -> None:
+    borders = text_field_outline_border(border_radius=12)
+
+    assert set(borders) == {
+        ft.ControlState.DEFAULT,
+        ft.ControlState.FOCUSED,
+        ft.ControlState.ERROR,
+        ft.ControlState.DISABLED,
+    }
+    assert borders[ft.ControlState.DEFAULT].side == ft.BorderSide(1, COLOR_DIVIDER)
+    assert borders[ft.ControlState.FOCUSED].side == ft.BorderSide(2, COLOR_PRIMARY)
+    assert borders[ft.ControlState.ERROR].side == ft.BorderSide(1, COLOR_ERROR)
+    assert borders[ft.ControlState.DISABLED].side == ft.BorderSide(1, COLOR_DIVIDER)
+    assert all(border.border_radius == 12 for border in borders.values())
+
+
+def test_api_key_field_uses_flet_100_icon_api(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeIcon:
         def __init__(self, *, icon, color, size, tooltip):
             self.icon = icon
@@ -116,7 +138,7 @@ def test_api_key_field_uses_flet_086_icon_api(monkeypatch: pytest.MonkeyPatch) -
     assert field._status_icon.icon == api_key_field_module.icons.CHECK_CIRCLE_ROUNDED
 
 
-def test_make_text_button_uses_flet_086_content_argument(
+def test_make_text_button_uses_flet_100_content_argument(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen: dict[str, object] = {}
@@ -136,7 +158,7 @@ def test_make_text_button_uses_flet_086_content_argument(
     assert button.content == "Gemma 4"
 
 
-def test_set_text_button_label_uses_flet_086_content_property() -> None:
+def test_set_text_button_label_uses_flet_100_content_property() -> None:
     class FakeButton:
         __slots__ = ("content",)
 
@@ -150,7 +172,7 @@ def test_set_text_button_label_uses_flet_086_content_property() -> None:
     assert button.content == "Managed"
 
 
-def test_make_overlay_anchor_dropdown_uses_flet_086_on_select(
+def test_make_overlay_anchor_dropdown_uses_flet_100_on_select(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen: dict[str, object] = {}

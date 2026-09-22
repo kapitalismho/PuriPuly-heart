@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import importlib
 import inspect
 import json
@@ -108,6 +109,94 @@ def test_main_run_gui_invokes_flet_run(monkeypatch, tmp_path) -> None:
     asyncio.run(calls["main"](object()))
     assert calls["config_path"] == config_path
     assert calls["debug_ui_preview"] is False
+
+
+def test_main_gui_wraps_viewer_in_owned_job_boundary(monkeypatch, tmp_path) -> None:
+    events: list[str] = []
+
+    class FakeOwner:
+        async def close(self) -> None:
+            events.append("owner-closed")
+
+    @contextlib.contextmanager
+    def fake_patch(*, process_owner):
+        assert isinstance(process_owner, FakeOwner)
+        events.append("patch-entered")
+        try:
+            yield
+        finally:
+            events.append("patch-exited")
+
+    fake_flet = ModuleType("flet")
+    fake_flet.run = lambda **_kwargs: events.append("flet-run")
+    fake_flet.AppView = FAKE_APP_VIEW
+    monkeypatch.setitem(sys.modules, "flet", fake_flet)
+    fake_ui_app = ModuleType("puripuly_heart.ui.app")
+    fake_ui_app.main_gui = lambda *_args, **_kwargs: None
+    monkeypatch.setitem(sys.modules, "puripuly_heart.ui.app", fake_ui_app)
+    fake_fonts = ModuleType("puripuly_heart.ui.fonts")
+    fake_fonts.assets_dir = lambda: tmp_path
+    monkeypatch.setitem(sys.modules, "puripuly_heart.ui.fonts", fake_fonts)
+    monkeypatch.setattr(
+        "puripuly_heart.ui.flet_desktop_runtime.FletDesktopViewProcessOwner",
+        FakeOwner,
+    )
+    monkeypatch.setattr(
+        "puripuly_heart.ui.flet_desktop_runtime.patch_hidden_view_launcher",
+        fake_patch,
+    )
+
+    assert (
+        main_module._run_gui(
+            tmp_path / "settings.json",
+            debug_ui_preview=False,
+            runtime_logging_sinks=object(),
+        )
+        == 0
+    )
+    assert events == ["patch-entered", "flet-run", "patch-exited", "owner-closed"]
+
+
+def test_native_main_gui_uses_embedded_flet_without_viewer_owner(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    events: list[str] = []
+
+    fake_flet = ModuleType("flet")
+    fake_flet.run = lambda **_kwargs: events.append("embedded-flet-run")
+    fake_flet.AppView = FAKE_APP_VIEW
+    monkeypatch.setitem(sys.modules, "flet", fake_flet)
+    fake_ui_app = ModuleType("puripuly_heart.ui.app")
+    fake_ui_app.main_gui = lambda *_args, **_kwargs: None
+    monkeypatch.setitem(sys.modules, "puripuly_heart.ui.app", fake_ui_app)
+    fake_fonts = ModuleType("puripuly_heart.ui.fonts")
+    fake_fonts.assets_dir = lambda: tmp_path
+    monkeypatch.setitem(sys.modules, "puripuly_heart.ui.fonts", fake_fonts)
+
+    class ForbiddenOwner:
+        def __init__(self) -> None:
+            raise AssertionError("native GUI must not construct the desktop viewer owner")
+
+    monkeypatch.setattr(
+        "puripuly_heart.ui.flet_desktop_runtime.FletDesktopViewProcessOwner",
+        ForbiddenOwner,
+    )
+    monkeypatch.setattr(
+        main_module,
+        "current_runtime_layout",
+        lambda: type("Layout", (), {"host_kind": "native"})(),
+    )
+
+    assert (
+        main_module._run_gui(
+            tmp_path / "settings.json",
+            debug_ui_preview=False,
+            runtime_logging_sinks=object(),
+        )
+        == 0
+    )
+    assert events == ["embedded-flet-run"]
 
 
 def test_run_gui_logs_actionable_flet_runtime_startup_failure(

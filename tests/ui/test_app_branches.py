@@ -176,6 +176,13 @@ class DummyPage:
             self.window.destroy_calls += 1
 
         self.opened: list[object] = []
+
+        async def wait_until_ready_to_show() -> None:
+            return None
+
+        async def center_window() -> None:
+            self.window.center_calls += 1
+
         self.closed: list[object] = []
         self.tasks: list[object] = []
         self.title: str = ""
@@ -203,10 +210,8 @@ class DummyPage:
             icon="",
             center_calls=0,
             visible=False,
-            center=lambda: None,
-        )
-        self.window.center = lambda: setattr(
-            self.window, "center_calls", self.window.center_calls + 1
+            center=center_window,
+            wait_until_ready_to_show=wait_until_ready_to_show,
         )
         self.dialog = None
 
@@ -1028,6 +1033,100 @@ async def test_window_close_awaits_application_shutdown_before_destroy(
     await page.tasks[0]()
 
     assert transitions == ["shutdown", "destroy"]
+
+
+@pytest.mark.asyncio
+async def test_window_close_orchestration_survives_owned_page_task_cancellation() -> None:
+    events: list[str] = []
+
+    class ConcurrentPage:
+        def __init__(self) -> None:
+            self.tasks: list[asyncio.Task[object]] = []
+
+            async def destroy() -> None:
+                events.append("destroy")
+
+            self.window = SimpleNamespace(destroy=destroy)
+
+        def run_task(self, coroutine, *args):
+            task = asyncio.create_task(coroutine(*args))
+            self.tasks.append(task)
+            return task
+
+    class Controller:
+        async def stop(self) -> None:
+            events.append("critical-start")
+            await asyncio.sleep(0)
+            events.append("critical-finished")
+
+    async def ordinary_ui_job() -> None:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            events.append("ordinary-cancelled")
+
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = ConcurrentPage()
+    app._ui_application = _application_boundary_with_stop(Controller())
+    app._shutting_down = False
+    app._shutdown_complete = False
+    app._window_close_requested = False
+    app._settings_mutation_queue = [object()]
+
+    ordinary_task = app._run_page_task(ordinary_ui_job)
+    await asyncio.sleep(0)
+    app._on_window_event(SimpleNamespace(type=ft.WindowEventType.CLOSE))
+    app._on_window_event(SimpleNamespace(type=ft.WindowEventType.CLOSE))
+
+    close_task = app.page.tasks[-1]
+    await asyncio.wait_for(close_task, timeout=1.0)
+
+    assert ordinary_task.cancelled()
+    assert app._get_application_lifecycle().snapshot.terminal is True
+    assert events == [
+        "ordinary-cancelled",
+        "critical-start",
+        "critical-finished",
+        "destroy",
+    ]
+    assert len(app.page.tasks) == 2
+
+
+@pytest.mark.asyncio
+async def test_cancelled_window_close_preserves_shutdown_before_destroy() -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+    destroyed = asyncio.Event()
+
+    class Controller:
+        async def stop(self) -> None:
+            started.set()
+            await release.wait()
+
+    async def destroy() -> None:
+        destroyed.set()
+
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = SimpleNamespace(window=SimpleNamespace(destroy=destroy))
+    app._ui_application = _application_boundary_with_stop(Controller())
+    app._shutting_down = False
+    app._shutdown_complete = False
+    app._settings_mutation_queue = []
+    close_task = asyncio.create_task(app._close_after_window_request())
+    try:
+        await asyncio.wait_for(started.wait(), timeout=1.0)
+        close_task.cancel()
+        await asyncio.sleep(0)
+        assert not destroyed.is_set()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(close_task, timeout=1.0)
+        assert app._get_application_lifecycle().is_terminal
+        assert destroyed.is_set()
+    finally:
+        release.set()
+        await asyncio.gather(close_task, return_exceptions=True)
+        await app.shutdown()
 
 
 @pytest.mark.asyncio

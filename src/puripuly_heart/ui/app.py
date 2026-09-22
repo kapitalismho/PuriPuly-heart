@@ -118,15 +118,8 @@ async def _prepare_and_show_main_window(page: ft.Page) -> None:
     try:
         page.update()
 
-        wait_until_ready = getattr(page.window, "wait_until_ready_to_show", None)
-        if callable(wait_until_ready):
-            ready_result = wait_until_ready()
-            if inspect.isawaitable(ready_result):
-                await ready_result
-
-        center_result = page.window.center()
-        if inspect.isawaitable(center_result):
-            await center_result
+        await page.window.wait_until_ready_to_show()
+        await page.window.center()
     except Exception:
         logger.warning(
             "Failed to center the main window before showing it",
@@ -140,7 +133,7 @@ async def _prepare_and_show_main_window(page: ft.Page) -> None:
 def _callable_accepts_keyword(callable_obj: object, keyword: str) -> bool:
     try:
         parameters = inspect.signature(callable_obj).parameters
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return True
     return keyword in parameters or any(
         parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
@@ -422,11 +415,17 @@ class TranslatorApp:
         if self._window_close_requested:
             return
         self._window_close_requested = True
-        self._run_page_task(self._close_after_window_request)
+        self._ensure_foundation_runtime().run_application_shutdown_task(
+            self._close_after_window_request
+        )
 
     async def _close_after_window_request(self) -> None:
         try:
-            await self.shutdown()
+            try:
+                await self.shutdown()
+            except asyncio.CancelledError:
+                await self.shutdown()
+                raise
         finally:
             destroy_result = self.page.window.destroy()
             if inspect.isawaitable(destroy_result):
@@ -672,7 +671,7 @@ class TranslatorApp:
         update_kwargs = {"log_diagnostic": self._log_diagnostic}
         try:
             update_parameters = inspect.signature(_check_and_notify_update).parameters
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             update_parameters = {}
         if "load_update_info" in update_parameters or any(
             parameter.kind == inspect.Parameter.VAR_KEYWORD
@@ -798,14 +797,9 @@ class TranslatorApp:
         )
 
     def _close_github_star_prompt_snackbar(self, snackbar: ft.SnackBar) -> None:
-        pop_dialog = getattr(self.page, "pop_dialog", None)
-        if callable(pop_dialog):
-            with contextlib.suppress(Exception):
-                pop_dialog()
-        else:
-            snackbar.open = False
-            with contextlib.suppress(Exception):
-                self.page.update()
+        _ = snackbar
+        with contextlib.suppress(Exception):
+            self.page.pop_dialog()
 
     def _preview_github_star_snackbar(self) -> None:
         snackbar = None
@@ -1007,11 +1001,8 @@ class TranslatorApp:
             microphone_test_dialog.close(notify=True)
             return
 
-        pop_dialog = getattr(self.page, "pop_dialog", None)
-        if not callable(pop_dialog):
-            return
         try:
-            pop_dialog()
+            self.page.pop_dialog()
         except Exception:
             logger.exception("Failed to close dialog during navigation")
 

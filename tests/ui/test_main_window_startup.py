@@ -7,8 +7,6 @@ import pytest
 
 from puripuly_heart.ui import app as app_module
 
-MISSING = object()
-
 
 class PageDouble:
     def __init__(self, window) -> None:
@@ -19,10 +17,15 @@ class PageDouble:
         self.visibility_updates.append(self.window.visible)
 
 
-def _make_page(*, wait_until_ready_to_show=MISSING, center=None) -> PageDouble:
-    window = SimpleNamespace(visible=False, center=center or (lambda: None))
-    if wait_until_ready_to_show is not MISSING:
-        window.wait_until_ready_to_show = wait_until_ready_to_show
+def _make_page(*, wait_until_ready_to_show=None, center=None) -> PageDouble:
+    async def noop() -> None:
+        return None
+
+    window = SimpleNamespace(
+        visible=False,
+        center=center or noop,
+        wait_until_ready_to_show=wait_until_ready_to_show or noop,
+    )
     return PageDouble(window)
 
 
@@ -51,33 +54,6 @@ async def test_prepare_and_show_main_window_awaits_center_before_showing() -> No
 
 
 @pytest.mark.asyncio
-async def test_prepare_and_show_main_window_tolerates_synchronous_center() -> None:
-    events: list[str] = []
-
-    def center() -> None:
-        events.append("center")
-
-    page = _make_page(center=center)
-
-    await app_module._prepare_and_show_main_window(page)
-
-    assert events == ["center"]
-    assert page.window.visible is True
-    assert page.visibility_updates == [False, True]
-
-
-@pytest.mark.asyncio
-async def test_prepare_and_show_main_window_tolerates_missing_readiness_method() -> None:
-    events: list[str] = []
-    page = _make_page(center=lambda: events.append("center"))
-
-    await app_module._prepare_and_show_main_window(page)
-
-    assert events == ["center"]
-    assert page.window.visible is True
-
-
-@pytest.mark.asyncio
 async def test_prepare_and_show_main_window_shows_after_readiness_failure() -> None:
     async def wait_until_ready_to_show() -> None:
         raise RuntimeError("window not ready")
@@ -92,7 +68,7 @@ async def test_prepare_and_show_main_window_shows_after_readiness_failure() -> N
 
 @pytest.mark.asyncio
 async def test_prepare_and_show_main_window_shows_after_center_failure() -> None:
-    def center() -> None:
+    async def center() -> None:
         raise RuntimeError("center failed")
 
     page = _make_page(center=center)

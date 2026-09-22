@@ -274,6 +274,9 @@ async def test_runtime_close_leaves_no_huggingface_xet_helper_or_late_status(
     while not pid_path.exists():
         await asyncio.sleep(0.01)
     worker_pid = int(pid_path.read_text())
+    assert len(adapter.child_states) == 1
+    diagnostic_worker_pid = int(adapter.child_states[0].split("pid=", 1)[1].split(":", 1)[0])
+    assert psutil.pid_exists(diagnostic_worker_pid)
 
     await runtime.close()
     status_count = len(statuses)
@@ -281,6 +284,8 @@ async def test_runtime_close_leaves_no_huggingface_xet_helper_or_late_status(
 
     assert task.done()
     assert not psutil.pid_exists(worker_pid)
+    assert adapter.child_states == ()
+    assert not psutil.pid_exists(diagnostic_worker_pid)
     assert len(statuses) == status_count
     assert not (tmp_path / manifest.install_dirname).exists()
     assert not tuple(tmp_path.rglob(".hf-xet-*"))

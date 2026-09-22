@@ -299,6 +299,7 @@ class _LocalASRProductionCompositionAccess:
     runtime_initializer: Callable[[AppSettingsVNext], Awaitable[None]]
     components_provider: Callable[[], RuntimePipelineComponents | None]
     gpu_retry: Callable[[], Awaitable[None]]
+    application_events_starter: Callable[[], Awaitable[None]]
 
     def load_compatibility_settings(self) -> AppSettingsVNext:
         return self.settings_loader()
@@ -343,6 +344,9 @@ class _LocalASRProductionCompositionAccess:
     @property
     def start_callbacks(self) -> RuntimePipelineStartCallbacks:
         return self._components.start_callbacks
+
+    async def start_application_events(self) -> None:
+        await self.application_events_starter()
 
     async def retry_gpu_activation(self) -> None:
         await self.gpu_retry()
@@ -2019,36 +2023,35 @@ def compose_application_runtime(
             raise RuntimeError("UI Event Bridge owner is unavailable")
         await output_runtime.wait_for_ui_event_bridge_started()
 
-    startup = compose_application_startup(
-        ApplicationStartupAdapter(
+    startup_adapter = ApplicationStartupAdapter(
+        settings=settings,
+        settings_loader=lambda: load_application_settings(
             settings=settings,
-            settings_loader=lambda: load_application_settings(
-                settings=settings,
-            ),
-            provisioning=require_provisioning(),
-            gpu_state=gpu_state,
-            manual_fallback=manual_fallback,
-            save_failure_sink=lambda exc: log_error(f"Failed to save settings: {exc}"),
-            calibration=require_calibration(),
-            presentation=presentation,
-            sync_presentation=sync_ui_from_settings,
-            notify_fallback=require_settings_application().notify_fallback,
-            runtime_logging=runtime_logging,
-            sync_runtime_signatures=sync_signature_caches,
-            pipeline_launcher=pipeline_launcher,
-            pipeline=pipeline,
-            sync_local_asr_notice=lambda: require_local_asr().adapters.notice.sync(),
-            stt_requires_secret=stt_requires_secret,
-            llm_requires_secret=llm_requires_secret,
-            alibaba_verified_key=alibaba_verified_key,
-            managed_translation_available=managed_translation_available,
-            receiver_active=lambda: require_vrc_mic_sync().receiver is not None,
-            create_event_bridge=create_event_bridge,
-            start_event_bridge=start_event_bridge,
-            wait_for_event_bridge=wait_for_event_bridge,
-            sync_clipboard=sync_clipboard,
-        )
+        ),
+        provisioning=require_provisioning(),
+        gpu_state=gpu_state,
+        manual_fallback=manual_fallback,
+        save_failure_sink=lambda exc: log_error(f"Failed to save settings: {exc}"),
+        calibration=require_calibration(),
+        presentation=presentation,
+        sync_presentation=sync_ui_from_settings,
+        notify_fallback=require_settings_application().notify_fallback,
+        runtime_logging=runtime_logging,
+        sync_runtime_signatures=sync_signature_caches,
+        pipeline_launcher=pipeline_launcher,
+        pipeline=pipeline,
+        sync_local_asr_notice=lambda: require_local_asr().adapters.notice.sync(),
+        stt_requires_secret=stt_requires_secret,
+        llm_requires_secret=llm_requires_secret,
+        alibaba_verified_key=alibaba_verified_key,
+        managed_translation_available=managed_translation_available,
+        receiver_active=lambda: require_vrc_mic_sync().receiver is not None,
+        create_event_bridge=create_event_bridge,
+        start_event_bridge=start_event_bridge,
+        wait_for_event_bridge=wait_for_event_bridge,
+        sync_clipboard=sync_clipboard,
     )
+    startup = compose_application_startup(startup_adapter)
 
     async def close_local_asr() -> None:
         if local_asr is not None:
@@ -2083,6 +2086,7 @@ def compose_application_runtime(
         clipboard=lambda: clipboard,
         microphone=lambda: microphone,
         close_managed_gemma_owner=managed_gemma.close,
+        local_asr_provisioning=lambda: provisioning,
     )
 
     overlay_owner = require_overlay()
@@ -2201,6 +2205,7 @@ def compose_application_runtime(
                 runtime_initializer=initialize_local_asr_evidence,
                 components_provider=lambda: pipeline.current,
                 gpu_retry=retry_gpu_activation,
+                application_events_starter=startup_adapter.start_application_events,
             )
         )
     return application

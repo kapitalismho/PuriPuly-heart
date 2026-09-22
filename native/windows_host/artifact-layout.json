@@ -1,0 +1,18 @@
+{
+  "schema": "puripuly-heart/native-artifact-layout/v1",
+  "host_executable": "PuriPulyHeart.exe",
+  "python_executable": "python.exe",
+  "application_root": "app",
+  "dependency_root": "site-packages",
+  "stdlib_root": "Lib",
+  "extension_dll_root": "DLLs",
+  "native_runtime_root": ".",
+  "soxr_runtime_root": "site-packages/soxr",
+  "soxr_compliance_root": "third_party/soxr",
+  "llama_runtime_root": "_runtime/llama.cpp-b10423",
+  "local_qwen_runtime_root": "_runtime/local_qwen",
+  "overlay_executable": "PuriPulyHeartOverlay.exe",
+  "gpu_worker_executable": "PuriPulyHeartGpuWorker.exe",
+  "openvr_dll": "openvr_api.dll",
+  "artifact_manifest": "native-artifact-manifest.json"
+}

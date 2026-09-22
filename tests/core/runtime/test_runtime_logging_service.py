@@ -421,6 +421,38 @@ def test_late_logs_after_close_use_fallback_without_session_writes() -> None:
     )
 
 
+def test_closed_service_preserves_typed_startup_terminal_and_hashes_generic_late_logs() -> None:
+    session = FakeSessionRuntimeLogging()
+    fallback_logger, fallback = _fallback_logger()
+    service = RuntimeLoggingService(session_service=session, fallback_logger=fallback_logger)
+    service.close_after_producers_stop()
+    fallback.messages.clear()
+
+    service.emit_startup_boundary(
+        outcome="failed",
+        attempt_id="startup-0123456789abcdef0123456789abcdef",
+        process_id=321,
+        monotonic_ns=987654321,
+        exception_class="RuntimeError",
+    )
+    service.emit_basic("late secret=raw-value", level=logging.WARNING)
+
+    level, terminal = fallback.messages[0]
+    assert level == logging.ERROR
+    assert terminal.startswith("[Lifecycle][Startup] boundary ")
+    assert "outcome=failed" in terminal
+    assert "attempt_id=startup-0123456789abcdef0123456789abcdef" in terminal
+    assert "process_id=321" in terminal
+    assert "monotonic_ns=987654321" in terminal
+    assert "exception_class=RuntimeError" in terminal
+    assert "late secret=raw-value" not in fallback.messages[1][1]
+    _assert_bounded_late_log(
+        fallback.messages[1][1],
+        raw_message="late secret=raw-value",
+        level=logging.WARNING,
+    )
+
+
 @pytest.mark.parametrize("include_persisted_failure", [False, True])
 def test_close_failure_is_bounded_and_surfaced_after_final_summary_attempt(
     include_persisted_failure: bool,

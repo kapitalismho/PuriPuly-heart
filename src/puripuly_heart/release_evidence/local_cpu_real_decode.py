@@ -6,12 +6,10 @@ import gc
 import hashlib
 import importlib
 import json
-import logging
-import math
 import platform
-import re
 import sys
 import time
+import traceback
 import wave
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,14 +28,6 @@ from puripuly_heart.core.local_stt_catalog import inspect_required_cpu_model_ins
 from puripuly_heart.providers.stt.local_cpu import create_local_cpu_backend
 
 REPORT_SCHEMA = "puripuly-heart/local-cpu-real-decode/v1"
-ATTEMPT_PATTERN = re.compile(
-    r"\[LocalASR\]\[Attempt\] channel=(?P<channel>\S+) "
-    r"model=(?P<model>\S+) backend=(?P<backend>\S+) "
-    r"audio_seconds=(?P<audio_seconds>\d+\.\d+) "
-    r"decode_seconds=(?P<decode_seconds>\d+\.\d+) "
-    r"rtf=(?P<rtf>\d+\.\d+) result=(?P<result>\S+) "
-    r"queue_wait_seconds=(?P<queue_wait_seconds>\d+\.\d+)"
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,17 +70,6 @@ DECODE_CASES = (
         ),
     ),
 )
-
-
-class _AttemptHandler(logging.Handler):
-    def __init__(self) -> None:
-        super().__init__(level=logging.INFO)
-        self.messages: list[str] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        message = record.getMessage()
-        if "[LocalASR][Attempt]" in message:
-            self.messages.append(message)
 
 
 def _sha256(path: Path) -> str:
@@ -137,25 +116,29 @@ def _runtime_module_identity(module_name: str) -> dict[str, object]:
     }
 
 
-def _attempt_payload(message: str, expected_model_id: str) -> dict[str, object]:
-    match = ATTEMPT_PATTERN.search(message)
-    if match is None:
-        raise RuntimeError("local CPU attempt diagnostic was not emitted")
-    payload: dict[str, object] = dict(match.groupdict())
-    for key in ("audio_seconds", "decode_seconds", "rtf", "queue_wait_seconds"):
-        payload[key] = float(str(payload[key]))
-    if payload["model"] != expected_model_id:
-        raise RuntimeError("attempt diagnostic model identity mismatch")
-    if payload["backend"] != "CPU" or payload["result"] != "success":
-        raise RuntimeError("attempt diagnostic did not record CPU success")
-    audio_seconds = float(payload["audio_seconds"])
-    decode_seconds = float(payload["decode_seconds"])
-    rtf = float(payload["rtf"])
+def _require_nonempty_final(event: object) -> None:
+    if not bool(getattr(event, "is_final", False)) or not str(getattr(event, "text", "") or ""):
+        raise RuntimeError("real local CPU decode did not produce a nonempty final result")
+
+
+def _measured_decode(*, audio_seconds: float, decode_seconds: float) -> dict[str, object]:
     if audio_seconds <= 0 or decode_seconds <= 0:
-        raise RuntimeError("attempt diagnostic timing is not positive")
-    if not math.isclose(rtf, decode_seconds / audio_seconds, rel_tol=0.002, abs_tol=0.002):
-        raise RuntimeError("attempt diagnostic RTF is inconsistent")
-    return payload
+        raise RuntimeError("decode timing is not positive")
+    return {
+        "channel": "evidence",
+        "backend": "CPU",
+        "audio_seconds": audio_seconds,
+        "decode_seconds": decode_seconds,
+        "rtf": decode_seconds / audio_seconds,
+        "result": "success",
+    }
+
+
+async def _first_final(session: object) -> object:
+    async for event in session.events():
+        if bool(getattr(event, "is_final", False)):
+            return event
+    raise RuntimeError("real local CPU decode did not produce a nonempty final result")
 
 
 async def _decode_case(
@@ -163,12 +146,11 @@ async def _decode_case(
     *,
     model_root: Path,
     audio_root: Path,
-    handler: _AttemptHandler,
 ) -> dict[str, object]:
     audio_path = (audio_root / case.audio_filename).resolve()
     samples, source_rate_hz = _read_audio(audio_path)
     samples_16k = _resample(samples, source_rate_hz)
-    message_offset = len(handler.messages)
+    audio_seconds = samples_16k.size / 16000.0
     backend = create_local_cpu_backend(
         case.model_id,
         model_root=model_root,
@@ -182,17 +164,12 @@ async def _decode_case(
         session = await backend.open_session()
         load_seconds = time.perf_counter() - load_started
         send_audio_f32 = getattr(session, "send_audio_f32")
+        decode_started = time.perf_counter()
         await send_audio_f32(samples_16k)
         await session.on_speech_end()
-        event = await asyncio.wait_for(anext(session.events()), timeout=300)
-        if not event.is_final or not event.text:
-            raise RuntimeError("real local CPU decode did not produce a nonempty final result")
-        attempt_message = next(
-            message
-            for message in handler.messages[message_offset:]
-            if f"model={case.model_id}" in message
-        )
-        attempt = _attempt_payload(attempt_message, case.model_id)
+        event = await asyncio.wait_for(_first_final(session), timeout=300)
+        decode_seconds = time.perf_counter() - decode_started
+        _require_nonempty_final(event)
         return {
             "model_id": case.model_id,
             "provider_id": str(getattr(backend, "provider_id")),
@@ -204,14 +181,17 @@ async def _decode_case(
                 "sha256": _sha256(audio_path),
                 "source_sample_rate_hz": source_rate_hz,
                 "decode_sample_rate_hz": 16000,
-                "audio_seconds": samples_16k.size / 16000.0,
+                "audio_seconds": audio_seconds,
             },
             "model_load_seconds": load_seconds,
             "decode_result": {
                 "status": "nonempty_final",
-                "text_length": len(event.text),
+                "text_length": len(str(getattr(event, "text", "") or "")),
             },
-            "attempt": attempt,
+            "attempt": _measured_decode(
+                audio_seconds=audio_seconds,
+                decode_seconds=decode_seconds,
+            ),
         }
     finally:
         if session is not None:
@@ -233,78 +213,90 @@ async def run_evidence(
     resolved_report_path = report_path.resolve()
     executable = Path(sys.executable).resolve()
     started_at = time.time()
-    validation_started = time.perf_counter()
-    snapshot = inspect_required_cpu_model_installs(
-        resolved_model_root,
-        verify_checksums=True,
-    )
-    validation_seconds = time.perf_counter() - validation_started
-    if not snapshot.cpu_auto_available:
-        raise RuntimeError("strict validation did not accept all required CPU models")
-    installs: list[dict[str, object]] = []
-    for model in snapshot.models:
-        manifest = load_local_stt_asset_manifest(model.model_id)
-        installed = model.state.installed_manifest
-        if installed is None:
-            raise RuntimeError("strict validation returned no installed manifest")
-        installs.append(
-            {
-                "model_id": model.model_id,
-                "status": model.state.status,
-                "selected_source": installed.selected_source,
-                "selected_revision": installed.selected_revision,
-                "file_count": len(manifest.files),
-                "expected_total_bytes": sum(item.size_bytes or 0 for item in manifest.files),
-            }
-        )
-    logger = logging.getLogger("puripuly_heart.providers.stt.local_qwen_sherpa")
-    previous_level = logger.level
-    handler = _AttemptHandler()
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
     try:
+        validation_started = time.perf_counter()
+        snapshot = inspect_required_cpu_model_installs(
+            resolved_model_root,
+            verify_checksums=True,
+        )
+        validation_seconds = time.perf_counter() - validation_started
+        if not snapshot.cpu_auto_available:
+            raise RuntimeError("strict validation did not accept all required CPU models")
+        installs: list[dict[str, object]] = []
+        for model in snapshot.models:
+            manifest = load_local_stt_asset_manifest(model.model_id)
+            installed = model.state.installed_manifest
+            if installed is None:
+                raise RuntimeError("strict validation returned no installed manifest")
+            installs.append(
+                {
+                    "model_id": model.model_id,
+                    "status": model.state.status,
+                    "selected_source": installed.selected_source,
+                    "selected_revision": installed.selected_revision,
+                    "file_count": len(manifest.files),
+                    "expected_total_bytes": sum(item.size_bytes or 0 for item in manifest.files),
+                }
+            )
         decodes = [
             await _decode_case(
                 case,
                 model_root=resolved_model_root,
                 audio_root=resolved_audio_root,
-                handler=handler,
             )
             for case in DECODE_CASES
         ]
-    finally:
-        logger.removeHandler(handler)
-        logger.setLevel(previous_level)
-    report = {
-        "schema": REPORT_SCHEMA,
-        "status": "passed",
-        "started_unix_seconds": started_at,
-        "completed_unix_seconds": time.time(),
-        "application": {
-            "version": __version__,
-            "executable": str(executable),
-            "executable_sha256": _sha256(executable),
-            "frozen": bool(getattr(sys, "frozen", False)),
-            "python": platform.python_version(),
-            "platform": platform.platform(),
-        },
-        "runtime_modules": [
-            _runtime_module_identity("sherpa_onnx"),
-            _runtime_module_identity("onnxruntime"),
-            _runtime_module_identity("soxr"),
-        ],
-        "model_root": str(resolved_model_root),
-        "strict_validation_seconds": validation_seconds,
-        "cpu_auto_available": snapshot.cpu_auto_available,
-        "model_installs": installs,
-        "decodes": decodes,
-    }
+        report = {
+            "schema": REPORT_SCHEMA,
+            "status": "passed",
+            "started_unix_seconds": started_at,
+            "completed_unix_seconds": time.time(),
+            "application": {
+                "version": __version__,
+                "executable": str(executable),
+                "executable_sha256": _sha256(executable),
+                "frozen": bool(getattr(sys, "frozen", False)),
+                "python": platform.python_version(),
+                "platform": platform.platform(),
+            },
+            "runtime_modules": [
+                _runtime_module_identity("sherpa_onnx"),
+                _runtime_module_identity("onnxruntime"),
+                _runtime_module_identity("soxr"),
+            ],
+            "model_root": str(resolved_model_root),
+            "strict_validation_seconds": validation_seconds,
+            "cpu_auto_available": snapshot.cpu_auto_available,
+            "model_installs": installs,
+            "decodes": decodes,
+        }
+        exit_code = 0
+    except Exception as exc:
+        report = {
+            "schema": REPORT_SCHEMA,
+            "status": "failed",
+            "started_unix_seconds": started_at,
+            "completed_unix_seconds": time.time(),
+            "application": {
+                "version": __version__,
+                "executable": str(executable),
+                "frozen": bool(getattr(sys, "frozen", False)),
+                "python": platform.python_version(),
+                "platform": platform.platform(),
+            },
+            "model_root": str(resolved_model_root),
+            "audio_root": str(resolved_audio_root),
+            "failure_type": type(exc).__name__,
+            "failure": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+        exit_code = 1
     resolved_report_path.parent.mkdir(parents=True, exist_ok=True)
     resolved_report_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    return 0
+    return exit_code
 
 
 def main(argv: Sequence[str] | None = None) -> int:

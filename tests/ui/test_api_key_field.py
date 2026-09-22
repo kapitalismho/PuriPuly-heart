@@ -121,7 +121,8 @@ async def test_api_key_field_verifies_latest_edit_after_blur_during_inflight_ver
     )
 
 
-def test_api_key_field_can_hide_status_and_skip_verification() -> None:
+@pytest.mark.asyncio
+async def test_api_key_field_can_hide_status_and_skip_verification() -> None:
     saved: list[tuple[str, str]] = []
     verified: list[tuple[str, str]] = []
 
@@ -141,6 +142,7 @@ def test_api_key_field_can_hide_status_and_skip_verification() -> None:
     field._text_field.value = "local-secret"
     field._handle_change(None)
     field._handle_blur(None)
+    await field._run_verification()
 
     assert len(field.controls) == 1
     assert saved == [("local_llm_api_key", "local-secret")]
@@ -148,7 +150,8 @@ def test_api_key_field_can_hide_status_and_skip_verification() -> None:
     assert not field.controller.has_pending
 
 
-def test_api_key_field_does_not_save_unchanged_loaded_value() -> None:
+@pytest.mark.asyncio
+async def test_api_key_field_does_not_save_unchanged_loaded_value() -> None:
     saved: list[tuple[str, str]] = []
     field = ApiKeyField(
         "settings.local_llm.api_key",
@@ -160,6 +163,7 @@ def test_api_key_field_does_not_save_unchanged_loaded_value() -> None:
 
     field.value = "loaded-secret"
     field._handle_blur(None)
+    await field._run_verification()
 
     assert saved == []
 

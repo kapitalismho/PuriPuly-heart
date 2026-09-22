@@ -13,6 +13,10 @@ from puripuly_heart.core.self_capture import (
 )
 
 
+class SelfCaptureRuntimeApplyError(RuntimeError):
+    code = "self_stt_runtime_apply_not_converged"
+
+
 @dataclass(frozen=True, slots=True)
 class SelfCaptureApplicationSettings:
     config: SelfCaptureSessionConfig
@@ -111,11 +115,34 @@ class SelfCaptureApplicationOwner:
         self.state_sink(snapshot)
         self.project_availability(snapshot)
         self.restart_requested = False
-        if (
-            snapshot.failure_reason is not None
-            or snapshot.runtime_signature != config.runtime_signature
-        ):
-            raise RuntimeError("Self STT runtime did not apply the requested configuration")
+        failure_reason = snapshot.failure_reason
+        signature_mismatch = snapshot.runtime_signature != config.runtime_signature
+        if failure_reason is not None or signature_mismatch:
+            required = signature_mismatch and self._replacement_required(config, snapshot)
+            self.log_basic(
+                "[STT] Provider replacement not applied: "
+                f"failure_reason={failure_reason.value if failure_reason is not None else 'none'} "
+                f"provider_status={snapshot.provider_status.value} "
+                f"state={snapshot.state.value} "
+                f"signature_mismatch={signature_mismatch} "
+                f"required={required}"
+            )
+            if failure_reason is not None or required:
+                raise SelfCaptureRuntimeApplyError(
+                    "Self STT runtime did not apply the requested configuration"
+                )
+
+    def _replacement_required(
+        self,
+        config: SelfCaptureSessionConfig,
+        snapshot: SelfCaptureSessionSnapshot,
+    ) -> bool:
+        if not snapshot.desired_active:
+            return False
+        current = self.settings_provider()
+        if current is not None and current.config.runtime_signature != config.runtime_signature:
+            return False
+        return True
 
     def project_availability(self, snapshot: SelfCaptureSessionSnapshot) -> bool:
         available = snapshot.provider_status is SelfCaptureProviderStatus.READY
@@ -131,4 +158,5 @@ class SelfCaptureApplicationOwner:
 __all__ = [
     "SelfCaptureApplicationOwner",
     "SelfCaptureApplicationSettings",
+    "SelfCaptureRuntimeApplyError",
 ]

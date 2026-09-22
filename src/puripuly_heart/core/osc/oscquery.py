@@ -444,7 +444,7 @@ class ZeroconfOscQueryService(OscQueryServicePort):
                 return
             status, payload = self._resolve_query_target(parts[1])
             await self._write_http_response(writer, status, payload)
-        except (asyncio.CancelledError, TimeoutError, UnicodeError):
+        except asyncio.CancelledError, TimeoutError, UnicodeError:
             pass
         finally:
             writer.close()

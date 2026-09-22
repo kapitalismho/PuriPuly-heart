@@ -1,5 +1,11 @@
 [CmdletBinding()]
-param()
+param(
+    [Parameter()]
+    [string]$OutputRoot = "",
+
+    [Parameter()]
+    [string]$PackagedRuntimeRelativeDir = "soxr"
+)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -15,12 +21,14 @@ $ZeroconfVersion = "0.150.0"
 $ZeroconfSdistUrl = "https://files.pythonhosted.org/packages/09/ea/34bb185645ecaa18d34e5883bffea71aa9bffbbb994634884e8b2f3ad0c4/zeroconf-0.150.0.tar.gz"
 $ZeroconfSdistSha256 = "a5fe7feab1de6ef5e541e0a3d07e534fd91629b813fc27281593584100f63164"
 $SoxrBuildPatchName = "python-soxr-1.1.0-release-input.patch"
-$ReleaseInputsRoot = Join-Path $PWD "build/soxr-release-inputs"
-$ManifestRelativePath = "build/soxr-release-inputs/manifest.json"
-$ManifestPath = Join-Path $PWD $ManifestRelativePath
+if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    $ReleaseInputsRoot = Join-Path $PWD "build/soxr-release-inputs"
+} else {
+    $ReleaseInputsRoot = [System.IO.Path]::GetFullPath($OutputRoot)
+}
+$ManifestPath = Join-Path $ReleaseInputsRoot "manifest.json"
 $SourceBundleName = "PuriPulyHeart-soxr-third-party-source-bundle.zip"
 $SourceBundlePath = Join-Path $ReleaseInputsRoot $SourceBundleName
-$PackagedRuntimeRelativeDir = "soxr"
 
 function Invoke-External {
     param(
@@ -393,6 +401,17 @@ $wheelPath = Get-ChildItem -Path $wheelOutputDir -Filter "soxr-$SoxrVersion-*.wh
 if ($null -eq $wheelPath) {
     throw "Custom system-linked soxr wheel was not produced in $wheelOutputDir"
 }
+Invoke-External -FilePath $pythonCommand -ArgumentList @(
+    "-m",
+    "puripuly_heart.release_evidence.native_distribution",
+    "finalize-soxr-wheel",
+    "--wheel",
+    $wheelPath.FullName,
+    "--dll",
+    $libsoxrBuiltDllPath,
+    "--output",
+    $wheelPath.FullName
+)
 
 Write-Host "Extracting wheel contents for runtime staging..."
 Invoke-External -FilePath $pythonCommand -ArgumentList @(
@@ -405,12 +424,16 @@ Invoke-External -FilePath $pythonCommand -ArgumentList @(
 $stagedSoxrExtensionPath = Join-Path $runtimeStageDir "soxr_ext.pyd"
 $stagedSoxrDllPath = Join-Path $runtimeStageDir "soxr.dll"
 $wheelExtensionPath = Join-Path $wheelExtractDir "soxr\soxr_ext.pyd"
+$wheelDllPath = Join-Path $wheelExtractDir "soxr\soxr.dll"
 if (-not (Test-Path $wheelExtensionPath)) {
     throw "Extracted wheel is missing soxr/soxr_ext.pyd: $wheelExtensionPath"
 }
+if (-not (Test-Path $wheelDllPath)) {
+    throw "Extracted wheel is missing soxr/soxr.dll: $wheelDllPath"
+}
 
 Copy-Item -Path $wheelExtensionPath -Destination $stagedSoxrExtensionPath -Force
-Copy-Item -Path $libsoxrBuiltDllPath -Destination $stagedSoxrDllPath -Force
+Copy-Item -Path $wheelDllPath -Destination $stagedSoxrDllPath -Force
 
 Copy-Item -Path $soxrSdistPath -Destination (Join-Path $sourceBundleStageDir ([System.IO.Path]::GetFileName($soxrSdistPath))) -Force
 Copy-Item -Path $libsoxrSourcePath -Destination (Join-Path $sourceBundleStageDir ([System.IO.Path]::GetFileName($libsoxrSourcePath))) -Force

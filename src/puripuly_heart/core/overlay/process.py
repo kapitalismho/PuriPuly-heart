@@ -118,6 +118,7 @@ class OverlayProcessManager:
     startup_timeout_ms: int = 3000
     bridge_url: str = "ws://127.0.0.1:0"
     bridge_messages: asyncio.Queue[dict[str, object]] | None = None
+    bridge_messages_authenticated: bool = False
     session_token: str = field(default_factory=lambda: secrets.token_urlsafe(16))
     locale: str = "en"
     log_dir: str = "logs"
@@ -275,7 +276,7 @@ class OverlayProcessManager:
         try:
             width = float(value[2])
             height = float(value[3])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
         return width > 0 and height > 0
 
@@ -747,10 +748,7 @@ class OverlayProcessManager:
 
                 if bridge_task is not None and bridge_task in done:
                     outcome = await self._handle_lifecycle_event(
-                        _OverlayProcessEvent(
-                            payload=bridge_task.result(),
-                            trust_origin="bridge_reverse",
-                        ),
+                        self._bridge_process_event(bridge_task.result()),
                         allow_ready=True,
                     )
                     if outcome == "ready":
@@ -848,10 +846,7 @@ class OverlayProcessManager:
                 if bridge_task is not None and bridge_task in done:
                     if (
                         await self._handle_lifecycle_event(
-                            _OverlayProcessEvent(
-                                payload=bridge_task.result(),
-                                trust_origin="bridge_reverse",
-                            ),
+                            self._bridge_process_event(bridge_task.result()),
                             allow_ready=False,
                         )
                         == "failed"
@@ -902,6 +897,16 @@ class OverlayProcessManager:
         return self._create_task(
             self.bridge_messages.get(),
             task_name="bridge-message",
+        )
+
+    def _bridge_process_event(self, payload: dict[str, object]) -> _OverlayProcessEvent:
+        return _OverlayProcessEvent(
+            payload=payload,
+            trust_origin=(
+                "authenticated_bridge_reverse"
+                if self.bridge_messages_authenticated
+                else "bridge_reverse"
+            ),
         )
 
     def _create_task(
@@ -996,11 +1001,11 @@ class OverlayProcessManager:
                     accepted=False,
                 )
             return "ignored"
-        if event_type == "shutdown_complete":
+        if event_type in {"shutdown_ack", "shutdown_complete"}:
             if not trusted_process_event:
                 self._record_process(
                     "renderer_message_ignored",
-                    reason="untrusted_shutdown_complete",
+                    reason=f"untrusted_{event_type}",
                     accepted=False,
                 )
                 return "ignored"
@@ -1015,7 +1020,10 @@ class OverlayProcessManager:
                 return "ignored"
             if not self._shutdown_acknowledged:
                 self._shutdown_acknowledged = True
-                self._record_process("graceful_shutdown_acknowledged")
+                self._record_process(
+                    "graceful_shutdown_acknowledged",
+                    acknowledgement_type=event_type,
+                )
             self._maybe_mark_desktop_cleanup_complete()
             return "ignored"
         if event_type == _DESKTOP_STARTUP_FIRST_VISIBLE_EVENT:
@@ -1316,7 +1324,7 @@ class OverlayProcessManager:
             try:
                 if exit_task.exception() is None and exit_task.result() is not None:
                     return True
-            except (asyncio.CancelledError, Exception):
+            except asyncio.CancelledError, Exception:
                 return False
         return False
 
@@ -1494,6 +1502,29 @@ class OverlayProcessManager:
             return "unknown"
         return _EXIT_CODE_TO_FAILURE_REASON.get(exit_code, "unknown")
 
+    async def _next_shutdown_lifecycle_event(
+        self,
+        process: OverlayManagedProcess,
+    ) -> tuple[object, ...]:
+        if not self.bridge_messages_authenticated or self.bridge_messages is None:
+            return (await process.next_event(),)
+        process_task = asyncio.create_task(process.next_event())
+        bridge_task = asyncio.create_task(self.bridge_messages.get())
+        tasks = {process_task, bridge_task}
+        try:
+            done, _pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            events: list[object] = []
+            if process_task in done:
+                events.append(process_task.result())
+            if bridge_task in done:
+                events.append(self._bridge_process_event(bridge_task.result()))
+            return tuple(events)
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
     async def _request_graceful_shutdown_before_terminate(
         self,
         process: OverlayManagedProcess,
@@ -1548,7 +1579,7 @@ class OverlayProcessManager:
         ack_task: asyncio.Task[Any] | None = None
         if not self._shutdown_acknowledged:
             ack_task = self._create_cleanup_task(
-                process.next_event(),
+                self._next_shutdown_lifecycle_event(process),
                 task_name="graceful-shutdown-ack",
             )
         exit_task = self._active_process_exit_task
@@ -1566,6 +1597,11 @@ class OverlayProcessManager:
                 if process_exited:
                     await self._finish_process_readers(process)
                     if ack_task is not None:
+                        if self.bridge_messages_authenticated and not ack_task.done():
+                            await asyncio.wait(
+                                {ack_task},
+                                timeout=max(0.0, deadline - loop.time()),
+                            )
                         await self._reconcile_terminal_process_events(process, ack_task)
                         ack_task = None
                     else:
@@ -1600,15 +1636,16 @@ class OverlayProcessManager:
                     break
                 if ack_task is not None and ack_task in done:
                     try:
-                        event = ack_task.result()
+                        events = ack_task.result()
                     except Exception:
                         break
-                    await self._record_shutdown_lifecycle_event(event)
+                    for event in events:
+                        await self._record_shutdown_lifecycle_event(event)
                     acknowledged = self._shutdown_acknowledged
                     ack_task = None
                     if not acknowledged:
                         ack_task = self._create_cleanup_task(
-                            process.next_event(),
+                            self._next_shutdown_lifecycle_event(process),
                             task_name="graceful-shutdown-ack",
                         )
                 if exit_task in done:
@@ -1650,7 +1687,7 @@ class OverlayProcessManager:
             return False
         try:
             return exit_task.exception() is None and exit_task.result() is not None
-        except (asyncio.CancelledError, Exception):
+        except asyncio.CancelledError, Exception:
             return False
 
     @staticmethod
@@ -1665,7 +1702,7 @@ class OverlayProcessManager:
             return None
         try:
             result = exit_task.result()
-        except (asyncio.CancelledError, Exception):
+        except asyncio.CancelledError, Exception:
             return None
         return result if isinstance(result, int) else None
 
@@ -1881,9 +1918,12 @@ class OverlayProcessManager:
         if not event_task.done():
             event_task.cancel()
         results = await asyncio.gather(event_task, return_exceptions=True)
-        event = results[0]
-        if not isinstance(event, BaseException):
-            await self._record_shutdown_lifecycle_event(event)
+        events = results[0]
+        if not isinstance(events, BaseException):
+            if not isinstance(events, tuple):
+                events = (events,)
+            for event in events:
+                await self._record_shutdown_lifecycle_event(event)
         await self._drain_process_events(process)
 
     async def _finish_process_readers(self, process: OverlayManagedProcess) -> None:
@@ -1926,7 +1966,7 @@ class OverlayProcessManager:
             }
             self._shutdown_evidence.append(safe_event)
             event_type = str(event.get("type", ""))
-            if event_type in {"overlay_trace", "shutdown_complete"}:
+            if event_type in {"overlay_trace", "shutdown_ack", "shutdown_complete"}:
                 await self._handle_lifecycle_event(source_event, allow_ready=False)
                 return
             if event_type in {"startup_error", "runtime_error"}:

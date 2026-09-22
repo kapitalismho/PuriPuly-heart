@@ -14,7 +14,7 @@
 
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
 
-  <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
+  <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
 
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 
@@ -493,7 +493,7 @@ Authorize 버튼을 눌렀는데도 인증이 안되어 있다면 재시도 하�
 
 ### Python 환경
 
-Python 앱은 Python 3.12 또는 3.13이 필요해요.
+Python 앱에는 일반 GIL 활성 CPython 3.14(Windows x64)가 필요해요.
 
 Windows 환경을 만들고 활성화하세요:
 
@@ -513,12 +513,6 @@ pip install -e ".[dev]"
 
 ```powershell
 uv sync --dev
-```
-
-저장소 훅을 설치하세요:
-
-```powershell
-pre-commit install
 ```
 
 Linux 또는 WSL에서 작업할 때는 `.venv-wsl`이 있으면 사용하세요.

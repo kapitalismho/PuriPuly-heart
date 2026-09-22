@@ -6,10 +6,15 @@ from types import SimpleNamespace
 
 import pytest
 
+from puripuly_heart.app.ports.application_startup import ApplicationStartupDiagnostic
 from puripuly_heart.app.services.application_runtime_logging import (
     ApplicationRuntimeLoggingOwner,
 )
-from puripuly_heart.app.services.application_shutdown import ApplicationShutdownDiagnostic
+from puripuly_heart.app.services.application_shutdown import (
+    ApplicationShutdownDiagnostic,
+    ApplicationShutdownRuntimeState,
+    ApplicationShutdownStallDiagnostic,
+)
 from puripuly_heart.app.wiring.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
 )
@@ -161,6 +166,41 @@ def test_owner_diagnostic_fallback_reports_failed_delivery_without_handlers() ->
     assert owner.emit_diagnostic("private payload", level=logging.ERROR) is False
 
 
+def test_owner_persists_correlated_startup_boundaries_without_masking_delivery_failure() -> None:
+    owner, _ = _owner()
+    service = RecordingRuntimeLogging()
+    owner.install_service(service)
+    entered = ApplicationStartupDiagnostic(
+        outcome="entered",
+        attempt_id="startup-attempt",
+        process_id=123,
+        monotonic_ns=456,
+    )
+    completed = ApplicationStartupDiagnostic(
+        outcome="completed",
+        attempt_id=entered.attempt_id,
+        process_id=entered.process_id,
+        monotonic_ns=789,
+    )
+
+    owner.emit_startup_diagnostic(entered)
+    owner.emit_startup_diagnostic(completed)
+
+    messages = [message for _level, message in service.persisted]
+    assert all("attempt_id=startup-attempt" in message for message in messages)
+    assert all("process_id=123" in message for message in messages)
+    assert "outcome=entered" in messages[0] and "monotonic_ns=456" in messages[0]
+    assert "outcome=completed" in messages[1] and "monotonic_ns=789" in messages[1]
+
+    class FailingPersistedLogging(RecordingRuntimeLogging):
+        def emit_persisted(self, message: str, *, level: int) -> None:
+            _ = message, level
+            raise RuntimeError("delivery failed")
+
+    owner.install_service(FailingPersistedLogging())
+    owner.emit_startup_diagnostic(entered)
+
+
 def test_owner_keeps_shutdown_diagnostics_and_close_on_the_logging_boundary() -> None:
     owner, _ = _owner()
     service = RecordingRuntimeLogging()
@@ -182,7 +222,24 @@ def test_owner_keeps_shutdown_diagnostics_and_close_on_the_logging_boundary() ->
         owner_name="Owner",
         callback_name="close",
         exception_class="RuntimeError",
-        timed_out=False,
+        timed_out=True,
+        stall_diagnostic=ApplicationShutdownStallDiagnostic(
+            phase=SHUTDOWN_PHASE_FINAL_DIAGNOSTICS,
+            active_owner_name="Owner",
+            active_callback_name="close",
+            runtime_states=(
+                ApplicationShutdownRuntimeState(
+                    owner_name="LocalASRProviderRuntimeOwner:self",
+                    generation=4,
+                    active_native_operations=("provider:running",),
+                    child_states=("gpu-worker:pid=123:phase=ready",),
+                ),
+            ),
+            task_await_graphs={"application-shutdown:owner": "awaiting close()"},
+            coordinator_state="shutting_down",
+            coordinator_terminal=False,
+            coordinator_failure_count=1,
+        ),
     )
 
     owner.emit_shutdown_diagnostic(diagnostic)
@@ -191,12 +248,19 @@ def test_owner_keeps_shutdown_diagnostics_and_close_on_the_logging_boundary() ->
 
     assert service.persisted[0][0] == logging.ERROR
     assert "owner=Owner" in service.persisted[0][1]
-    assert service.persisted[1][0] == logging.INFO
-    assert "failure_count=1" in service.persisted[1][1]
-    assert "first_failure=CaptureOwner/close/TimeoutError/timed_out=true" in (
-        service.persisted[1][1]
+    terminal_level, terminal_message = next(
+        item for item in service.persisted if "coordinator_terminal" in item[1]
     )
-    assert "additional_failure_count=0" in service.persisted[1][1]
+    assert terminal_level == logging.INFO
+    assert "failure_count=1" in terminal_message
+    assert "first_failure=CaptureOwner/close/TimeoutError/timed_out=true" in terminal_message
+    assert "additional_failure_count=0" in terminal_message
+    persisted = "\n".join(message for _level, message in service.persisted)
+    assert "native_stack_available=false" in persisted
+    assert "state=shutting_down terminal=false failure_count=1" in persisted
+    assert "LocalASRProviderRuntimeOwner:self" in persisted
+    assert "gpu-worker:pid=123:phase=ready" in persisted
+    assert "task=application-shutdown:owner" in persisted
     assert service.close_failures == (cleanup_error,)
 
 

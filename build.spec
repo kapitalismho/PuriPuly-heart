@@ -35,6 +35,8 @@ from PyInstaller.utils.hooks import (
     get_module_file_attribute,
 )
 
+os.environ["HF_HUB_OFFLINE"] = "1"
+
 # Add src to path for imports
 src_path = Path("src").resolve()
 sys.path.insert(0, str(src_path))
@@ -106,7 +108,10 @@ block_cipher = None
 SOXR_RELEASE_INPUTS_MANIFEST_PATH = Path("build/soxr-release-inputs/manifest.json").resolve()
 SOXR_PACKAGED_RUNTIME_RELATIVE_DIR = Path("soxr")
 FLET_WINDOWS_RUNTIME_ARCHIVE_PATH = Path("build/flet/flet-windows.zip").resolve()
-FLET_WINDOWS_RUNTIME_SHA256 = "2cf0865b31bd0e394a24a6c2d270e084cf9dad9c711e0b5d0cf9fa9bfac31e14"
+FLET_WINDOWS_RUNTIME_SIDECAR_PATH = Path(
+    str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH) + ".sha256"
+)
+FLET_WINDOWS_RUNTIME_SHA256 = "758f21506fbb9ad180bd93c7460a2ca55630401c6026a9bc9e2273444014491d"
 NOTO_CJK_SOURCE_FONT_PATH = src_path / "puripuly_heart" / "data" / "fonts" / "NotoSansCJK-Medium.ttc"
 NOTO_CJK_PROVENANCE_DIR = Path("third_party/noto-sans-cjk").resolve()
 NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR = Path("third_party/noto-sans-cjk")
@@ -158,6 +163,10 @@ if flet_windows_runtime_sha256 != FLET_WINDOWS_RUNTIME_SHA256:
         "Pinned Flet Windows runtime checksum mismatch: expected "
         f"{FLET_WINDOWS_RUNTIME_SHA256}, found {flet_windows_runtime_sha256}"
     )
+FLET_WINDOWS_RUNTIME_SIDECAR_PATH.write_text(
+    f"{flet_windows_runtime_sha256} {FLET_WINDOWS_RUNTIME_ARCHIVE_PATH.stat().st_size}",
+    encoding="ascii",
+)
 flet_pyinstaller_hook_config.temp_bin_dir = str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH.parent)
 
 
@@ -269,6 +278,10 @@ datas = [
     ("LICENSE", "."),
     # VAD model and data files
     (str(src_path / "puripuly_heart" / "data"), "puripuly_heart/data"),
+    (
+        str(FLET_WINDOWS_RUNTIME_SIDECAR_PATH),
+        "flet_desktop/app",
+    ),
     # Prompt templates
     ("prompts", "prompts"),
     (
@@ -305,6 +318,7 @@ runtime_binaries += proctap_runtime_binaries
 runtime_binaries += collect_staged_soxr_runtime_binaries()
 runtime_binaries += collect_vendored_openvr_runtime_binaries()
 runtime_binaries += [(str(gpu_worker_staged_path), ".")]
+runtime_binaries += [(str(overlay_staged_path), ".")]
 hf_xet_native_extension = Path(get_module_file_attribute("hf_xet.hf_xet")).resolve()
 if not hf_xet_native_extension.is_file() or hf_xet_native_extension.name.lower() != "hf_xet.pyd":
     raise SystemExit("Pinned hf_xet package did not provide the Windows hf_xet.pyd extension")
@@ -347,7 +361,10 @@ hiddenimports = [
     "puripuly_heart.core.local_asr.local_qwen_runtime",
     "puripuly_heart.config.process_capture_platform",
     "puripuly_heart.core.audio.process_source",
-] + moved_module_hiddenimports + collect_submodules("proctap") + collect_submodules("huggingface_hub")
+    "proctap",
+    "proctap._native",
+    "proctap.backends.windows",
+] + moved_module_hiddenimports + collect_submodules("huggingface_hub")
 
 required_proctap_hiddenimports = {"proctap", "proctap._native", "proctap.backends.windows"}
 if not required_proctap_hiddenimports.issubset(set(hiddenimports)):
@@ -366,7 +383,7 @@ if release_smoke:
         "proctap.backends.windows",
         "puripuly_heart.config.process_capture_platform",
         "puripuly_heart.core.audio.process_source",
-    ] + collect_submodules("proctap")
+    ]
 
 a = Analysis(
     [str(entry_script)],
@@ -381,6 +398,13 @@ a = Analysis(
         "soxr.soxr_ext",
         "tkinter",
         "unittest",
+        # Build/test tooling is present in the packaging environment, but must
+        # never become part of the shipped runtime through dependency hooks.
+        "PyInstaller",
+        "flet_cli",
+        "pytest",
+        "_pytest",
+        "py",
         "pydoc",
         "doctest",
     ],

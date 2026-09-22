@@ -580,6 +580,10 @@ def _is_rfc3339_utc(value: object) -> bool:
         r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z", value
     ):
         return False
+    # CPython 3.14 accepts ISO 8601's end-of-day spelling ``24:00:00``.
+    # RFC 3339 permits only hours 00 through 23.
+    if int(value[11:13]) > 23:
+        return False
     try:
         parsed = datetime.fromisoformat(f"{value[:-1]}+00:00")
     except ValueError:

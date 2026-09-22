@@ -286,7 +286,7 @@ def _module_public_export_signals(path: Path) -> frozenset[str]:
         ):
             try:
                 exported_names = ast.literal_eval(node.value)
-            except (SyntaxError, ValueError):
+            except SyntaxError, ValueError:
                 signals.add("__all__")
                 continue
             if exported_names:

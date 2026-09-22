@@ -5,10 +5,12 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from puripuly_heart.app.ports.application_startup import ApplicationStartupDiagnostic
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownContext,
     ApplicationShutdownDiagnostic,
+    ApplicationShutdownStallDiagnostic,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope
 from puripuly_heart.core.runtime.logging import emit_safe_fallback_log
@@ -172,6 +174,38 @@ class ApplicationRuntimeLoggingOwner:
                 type(exc).__name__,
             )
 
+    def emit_startup_diagnostic(self, diagnostic: ApplicationStartupDiagnostic) -> None:
+        service = self.service
+        emit_boundary = getattr(service, "emit_startup_boundary", None)
+        if callable(emit_boundary):
+            try:
+                emit_boundary(
+                    outcome=diagnostic.outcome,
+                    attempt_id=diagnostic.attempt_id,
+                    process_id=diagnostic.process_id,
+                    monotonic_ns=diagnostic.monotonic_ns,
+                    exception_class=diagnostic.exception_class,
+                )
+            except Exception:
+                emit_safe_fallback_log(
+                    self.fallback_logger,
+                    _format_startup_diagnostic(diagnostic),
+                    level=_startup_diagnostic_level(diagnostic),
+                    live=False,
+                )
+            return
+        message = _format_startup_diagnostic(diagnostic)
+        level = _startup_diagnostic_level(diagnostic)
+        try:
+            service.emit_persisted(message, level=level)
+        except Exception:
+            emit_safe_fallback_log(
+                self.fallback_logger,
+                message,
+                level=level,
+                live=False,
+            )
+
     def emit_terminal_summary(self, context: ApplicationShutdownContext) -> None:
         service = self._service
         if service is None:
@@ -205,6 +239,44 @@ class ApplicationRuntimeLoggingOwner:
             cleanup_failures=context.cleanup_exceptions,
         )
 
+    def emit_shutdown_stall_diagnostic(
+        self,
+        diagnostic: ApplicationShutdownStallDiagnostic,
+    ) -> None:
+        service = self._service
+        emit_persisted = getattr(service, "emit_persisted", None) if service is not None else None
+        messages = [
+            "[Lifecycle][Shutdown] stall "
+            f"state={diagnostic.coordinator_state} "
+            f"terminal={str(diagnostic.coordinator_terminal).lower()} "
+            f"failure_count={diagnostic.coordinator_failure_count} "
+            f"phase={diagnostic.phase or 'none'} "
+            f"owner={diagnostic.active_owner_name or 'none'} "
+            f"callback={diagnostic.active_callback_name or 'none'} "
+            f"native_stack_available={str(diagnostic.native_stack_available).lower()}"
+        ]
+        messages.extend(
+            "[Lifecycle][Shutdown] runtime_state "
+            f"owner={_safe_diagnostic_token(state.owner_name)} "
+            f"generation={state.generation if state.generation is not None else 'none'} "
+            "native_operations="
+            f"{','.join(_safe_diagnostic_token(item) for item in state.active_native_operations) or 'none'} "
+            "children="
+            f"{','.join(_safe_diagnostic_token(item) for item in state.child_states) or 'none'}"
+            for state in diagnostic.runtime_states
+        )
+        messages.extend(
+            "[Lifecycle][Shutdown] await_graph "
+            f"task={_safe_diagnostic_token(task_name)} "
+            f"graph={_safe_diagnostic_graph(graph)}"
+            for task_name, graph in sorted(diagnostic.task_await_graphs.items())
+        )
+        for message in messages:
+            if callable(emit_persisted):
+                emit_persisted(message, level=logging.ERROR)
+            else:
+                self.fallback_logger.error(message)
+
     def emit_shutdown_diagnostic(
         self,
         diagnostic: ApplicationShutdownDiagnostic,
@@ -218,9 +290,36 @@ class ApplicationRuntimeLoggingOwner:
             f"timed_out={str(diagnostic.timed_out).lower()}"
         )
         service = self._service
-        if service is not None:
-            emit_persisted = getattr(service, "emit_persisted", None)
-            if callable(emit_persisted):
-                emit_persisted(message, level=logging.ERROR)
-                return
-        self.fallback_logger.error(message)
+        emit_persisted = getattr(service, "emit_persisted", None) if service is not None else None
+        if callable(emit_persisted):
+            emit_persisted(message, level=logging.ERROR)
+        else:
+            self.fallback_logger.error(message)
+        if diagnostic.stall_diagnostic is not None:
+            self.emit_shutdown_stall_diagnostic(diagnostic.stall_diagnostic)
+
+
+def _startup_diagnostic_level(diagnostic: ApplicationStartupDiagnostic) -> int:
+    return logging.ERROR if diagnostic.outcome == "failed" else logging.INFO
+
+
+def _format_startup_diagnostic(diagnostic: ApplicationStartupDiagnostic) -> str:
+    return (
+        "[Lifecycle][Startup] boundary "
+        f"outcome={diagnostic.outcome} "
+        f"attempt_id={diagnostic.attempt_id} "
+        f"process_id={diagnostic.process_id} "
+        f"monotonic_ns={diagnostic.monotonic_ns} "
+        f"exception_class={diagnostic.exception_class or 'none'}"
+    )
+
+
+def _safe_diagnostic_token(value: str) -> str:
+    return "".join(
+        character if character.isalnum() or character in "._:-=," else "_"
+        for character in value[:256]
+    )
+
+
+def _safe_diagnostic_graph(value: str) -> str:
+    return " ".join(value.split())[:4096]

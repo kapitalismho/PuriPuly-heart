@@ -79,6 +79,58 @@ async def _emit(
         await result
 
 
+def _remove_owned_staging(
+    staging_dir: Path,
+    *,
+    primary_failure: BaseException,
+) -> None:
+    try:
+        shutil.rmtree(staging_dir)
+    except FileNotFoundError:
+        pass
+    except BaseException as cleanup_failure:
+        raise BaseExceptionGroup(
+            "Gemma provisioning and staging cleanup failed",
+            (primary_failure, cleanup_failure),
+        ) from primary_failure
+
+
+async def _await_download_cleanup(
+    download: Awaitable[Path],
+    *,
+    cancel_event: threading.Event | None,
+) -> Path:
+    task = asyncio.create_task(download)
+    settled = asyncio.Event()
+    task.add_done_callback(lambda _task: settled.set())
+    try:
+        await settled.wait()
+    except asyncio.CancelledError as cancellation:
+        current = asyncio.current_task()
+        if current is None or not current.cancelling():
+            raise
+        if cancel_event is not None:
+            cancel_event.set()
+        else:
+            task.cancel()
+        while not task.done():
+            try:
+                await settled.wait()
+            except asyncio.CancelledError:
+                continue
+        try:
+            task.result()
+        except asyncio.CancelledError, LocalSTTDownloadPortCancelled:
+            pass
+        except BaseException as cleanup_failure:
+            raise BaseExceptionGroup(
+                "Gemma download cancellation and cleanup failed",
+                (cancellation, cleanup_failure),
+            ) from None
+        raise cancellation
+    return task.result()
+
+
 async def _download_asset(
     *,
     downloader: HuggingFaceDownloadPort,
@@ -138,16 +190,19 @@ async def _download_asset(
         return tuple(result for result in results if isinstance(result, BaseException))
 
     try:
-        downloaded_path = await downloader.download(
-            HuggingFaceDownloadRequest(
-                repo_id=spec.repo_id,
-                revision=spec.revision,
-                remote_path=asset.filename,
-                local_dir=staging_dir,
-                expected_size_bytes=asset.size_bytes,
+        downloaded_path = await _await_download_cleanup(
+            downloader.download(
+                HuggingFaceDownloadRequest(
+                    repo_id=spec.repo_id,
+                    revision=spec.revision,
+                    remote_path=asset.filename,
+                    local_dir=staging_dir,
+                    expected_size_bytes=asset.size_bytes,
+                ),
+                cancel_event=cancel_event,
+                on_progress=on_progress,
             ),
             cancel_event=cancel_event,
-            on_progress=on_progress,
         )
     except BaseException as download_failure:
         progress_failures = await drain_progress()
@@ -250,7 +305,6 @@ async def _ensure_gemma_installed_with_lease(
         downloader = HuggingFaceXetDownloadAdapter()
 
     staging_dir = resolved.with_name(f"{resolved.name}.staging-{uuid4().hex}")
-    shutil.rmtree(staging_dir, ignore_errors=True)
     staging_dir.mkdir(parents=True, exist_ok=False)
     completed_bytes = 0
     try:
@@ -294,28 +348,35 @@ async def _ensure_gemma_installed_with_lease(
             total_bytes=total_bytes,
         )
         return manifest
-    except asyncio.CancelledError:
-        shutil.rmtree(staging_dir, ignore_errors=True)
+    except asyncio.CancelledError as exc:
+        _remove_owned_staging(staging_dir, primary_failure=exc)
         raise
     except LocalSTTDownloadPortCancelled as exc:
-        shutil.rmtree(staging_dir, ignore_errors=True)
-        raise GemmaProvisioningCancelled("Gemma model provisioning cancelled") from exc
-    except GemmaProvisioningCancelled:
-        shutil.rmtree(staging_dir, ignore_errors=True)
+        cancellation = GemmaProvisioningCancelled("Gemma model provisioning cancelled")
+        cancellation.__cause__ = exc
+        _remove_owned_staging(staging_dir, primary_failure=cancellation)
+        raise cancellation
+    except GemmaProvisioningCancelled as exc:
+        _remove_owned_staging(staging_dir, primary_failure=exc)
         raise
     except Exception as exc:
-        shutil.rmtree(staging_dir, ignore_errors=True)
+        failure = (
+            exc
+            if isinstance(exc, GemmaProvisioningError)
+            else GemmaProvisioningError(f"Gemma model provisioning failed: {exc}")
+        )
+        if failure is not exc:
+            failure.__cause__ = exc
+        _remove_owned_staging(staging_dir, primary_failure=failure)
         await _emit(
             on_status,
             state="failed",
             downloaded_bytes=completed_bytes,
             total_bytes=total_bytes,
         )
-        if isinstance(exc, GemmaProvisioningError):
-            raise
-        raise GemmaProvisioningError(f"Gemma model provisioning failed: {exc}") from exc
-    except BaseExceptionGroup:
-        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise failure
+    except BaseExceptionGroup as exc:
+        _remove_owned_staging(staging_dir, primary_failure=exc)
         raise
 
 

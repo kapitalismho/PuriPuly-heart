@@ -297,7 +297,7 @@ def _holds_retired_install(install_dir: Path, *, model_id: str, model_filename: 
         return False
     try:
         value = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+    except OSError, UnicodeDecodeError, json.JSONDecodeError:
         return False
     return isinstance(value, dict) and value.get("model_id") == model_id
 

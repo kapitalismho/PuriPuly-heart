@@ -1048,7 +1048,7 @@ class SettingsView(ft.Column):
                 return scale
         try:
             return float(preset_key)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 1.0
 
     def _parse_setting_float(
@@ -1061,7 +1061,7 @@ class SettingsView(ft.Column):
     ) -> float:
         try:
             parsed = float(raw_value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             parsed = fallback
         if parsed < minimum:
             parsed = minimum
@@ -1078,7 +1078,7 @@ class SettingsView(ft.Column):
     ) -> int:
         try:
             parsed = int(raw_value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             parsed = fallback
         return max(minimum, parsed)
 
@@ -3516,7 +3516,7 @@ class SettingsView(ft.Column):
 
         try:
             json.dumps(parsed, allow_nan=False)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self._show_local_llm_extra_body_error("settings.local_llm.extra_body.not_serializable")
             return
 
@@ -4842,7 +4842,7 @@ class SettingsView(ft.Column):
         else:
             try:
                 model = TranslationModel(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 if value == LLMProviderName.OPENROUTER.value:
                     model = TranslationModel.GEMMA4
                 else:
@@ -4902,7 +4902,7 @@ class SettingsView(ft.Column):
         model = current_settings.translation.model
         try:
             connection = TranslationConnection(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return
         if connection not in supported_translation_connections(model):
             return
@@ -5400,7 +5400,7 @@ class SettingsView(ft.Column):
             return DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA
         try:
             alpha = float(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA
         if not math.isfinite(alpha):
             return DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA
@@ -6203,7 +6203,7 @@ class SettingsView(ft.Column):
         try:
             send_port = int(send_port)
             receive_port = int(receive_port)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return
         if not 1 <= send_port <= 65535 or not 1 <= receive_port <= 65535:
             return

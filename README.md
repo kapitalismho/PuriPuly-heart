@@ -9,7 +9,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.7.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
-  <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
+  <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
@@ -429,7 +429,7 @@ Upcoming work is tracked publicly on the [PuriPuly project board](https://github
 
 ### Python Environment
 
-The Python application requires Python 3.12 or 3.13.
+The Python application requires ordinary GIL-enabled CPython 3.14 on Windows x64.
 
 Create and activate the Windows environment:
 
@@ -449,12 +449,6 @@ pip install -e ".[dev]"
 
 ```powershell
 uv sync --dev
-```
-
-Install the repository hooks:
-
-```powershell
-pre-commit install
 ```
 
 For Linux or WSL work, use `.venv-wsl` when it is available.

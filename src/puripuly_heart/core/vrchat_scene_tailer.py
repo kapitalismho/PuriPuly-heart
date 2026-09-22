@@ -47,7 +47,7 @@ def log_start_time(file_name: str) -> float | None:
                 -1,
             )
         )
-    except (OverflowError, ValueError):
+    except OverflowError, ValueError:
         return None
     if moment <= 0:
         return None

@@ -160,7 +160,7 @@ def _copy_local_llm_extra_body(values: Mapping[object, object]) -> dict[str, obj
         copied[raw_key] = _copy_local_llm_extra_body_value(raw_value)
     try:
         json.dumps(copied, allow_nan=False)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return _default_local_llm_extra_body()
     return copied
 

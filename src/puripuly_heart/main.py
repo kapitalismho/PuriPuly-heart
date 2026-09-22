@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
+import contextlib
 import logging
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 if TYPE_CHECKING:
     from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -210,7 +215,19 @@ def _run_gui(
     ft, vrchat_osc_presence_adapter, compose_ui_application, main_gui, assets_dir = (
         _load_gui_runtime()
     )
+    native_embedded = current_runtime_layout().host_kind == "native"
+    view_process_owner = None
+    patch_hidden_view_launcher = None
+    if not native_embedded:
+        from puripuly_heart.ui.flet_desktop_runtime import (
+            FletDesktopViewProcessOwner,
+        )
+        from puripuly_heart.ui.flet_desktop_runtime import (
+            patch_hidden_view_launcher as desktop_view_launcher,
+        )
 
+        view_process_owner = FletDesktopViewProcessOwner()
+        patch_hidden_view_launcher = desktop_view_launcher
     vrchat_osc_presence = vrchat_osc_presence_adapter()
 
     async def _target(page: ft.Page):
@@ -235,11 +252,20 @@ def _run_gui(
             raise
 
     try:
-        ft.run(
-            main=_target,
-            assets_dir=str(assets_dir()),
-            view=ft.AppView.FLET_APP_HIDDEN,
-        )
+        if native_embedded:
+            ft.run(
+                main=_target,
+                assets_dir=str(assets_dir()),
+                view=ft.AppView.FLET_APP_HIDDEN,
+            )
+        else:
+            assert patch_hidden_view_launcher is not None
+            with patch_hidden_view_launcher(process_owner=view_process_owner):
+                ft.run(
+                    main=_target,
+                    assets_dir=str(assets_dir()),
+                    view=ft.AppView.FLET_APP_HIDDEN,
+                )
     except Exception as exc:
         from puripuly_heart.core.runtime_logging import emit_basic_log
 
@@ -249,7 +275,14 @@ def _run_gui(
             type(exc).__name__,
             level=logging.ERROR,
         )
+        if view_process_owner is not None:
+            try:
+                asyncio.run(view_process_owner.close())
+            except Exception:
+                logger.exception("The Flet desktop view cleanup also failed")
         raise
+    if view_process_owner is not None:
+        asyncio.run(view_process_owner.close())
     return 0
 
 
@@ -300,7 +333,23 @@ def _settings_config_path(args: argparse.Namespace) -> tuple[Path, bool]:
     return default_settings_path(), False
 
 
+def _installer_preference_failure_category(status: object) -> str:
+    value = getattr(status, "value", status)
+    category = str(value).rsplit(".", maxsplit=1)[-1].lower()
+    if category in {
+        "parse_failed",
+        "migration_failed",
+        "backup_failed",
+        "save_failed",
+    }:
+        return category
+    return "unexpected_error"
+
+
 def _run_installer_telemetry_preference(path: Path, action: str) -> int:
+    from puripuly_heart.app.ports.canonical_settings_persistence import (
+        CanonicalSettingsPersistenceError,
+    )
     from puripuly_heart.app.services.installer_telemetry_preference import (
         persist_installer_telemetry_preference,
     )
@@ -308,8 +357,17 @@ def _run_installer_telemetry_preference(path: Path, action: str) -> int:
     try:
         persist_installer_telemetry_preference(path, action == "enable")
         return 0
+    except CanonicalSettingsPersistenceError as exc:
+        category = _installer_preference_failure_category(exc.status)
     except Exception:
-        return 23
+        category = "unexpected_error"
+    with contextlib.suppress(OSError):
+        print(
+            f"installer_telemetry_preference operation={action} "
+            f"status=failure failure_category={category}",
+            file=sys.stderr,
+        )
+    return 23
 
 
 def main(argv: list[str] | None = None) -> int:

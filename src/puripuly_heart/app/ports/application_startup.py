@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
@@ -11,6 +11,18 @@ class ApplicationStartupState:
     settings: AppSettingsVNext
     fallback_channels: tuple[str, ...]
     installation_fallback: bool
+
+
+ApplicationStartupOutcome = Literal["entered", "completed", "cancelled", "failed"]
+
+
+@dataclass(frozen=True, slots=True)
+class ApplicationStartupDiagnostic:
+    outcome: ApplicationStartupOutcome
+    attempt_id: str
+    process_id: int
+    monotonic_ns: int
+    exception_class: str | None = None
 
 
 class ApplicationStartupSettingsPort(Protocol):

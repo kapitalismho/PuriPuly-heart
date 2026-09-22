@@ -174,6 +174,38 @@ async def test_failed_prepare_exposes_bounded_download_diagnostics() -> None:
 
 
 @pytest.mark.asyncio
+async def test_combined_cancellation_and_cleanup_failure_is_terminal_and_bounded() -> None:
+    def prepare(**_kwargs: object) -> ManagedGemmaReadiness:
+        raise BaseExceptionGroup(
+            "combined failure",
+            [
+                asyncio.CancelledError(),
+                PermissionError(5, "sensitive staging path"),
+            ],
+        )
+
+    statuses = []
+    owner = ManagedGemmaTranslationOwner(
+        runtime=RecordingRuntime(prepare),
+        status_sink=statuses.append,
+    )
+
+    with pytest.raises(BaseExceptionGroup) as caught:
+        await owner.prepare(_selection())
+
+    assert any(
+        isinstance(exception, asyncio.CancelledError) for exception in caught.value.exceptions
+    )
+    assert any(isinstance(exception, PermissionError) for exception in caught.value.exceptions)
+    assert owner.snapshot.state == "failed"
+    assert owner.snapshot.failure_phase == "provisioning"
+    assert owner.snapshot.failure_code == "filesystem_failed"
+    assert owner.snapshot.cause_type == "PermissionError"
+    assert all(snapshot.state != "ready" for snapshot in statuses)
+    assert "sensitive staging path" not in repr(owner.snapshot)
+
+
+@pytest.mark.asyncio
 async def test_failed_prepare_diagnostic_does_not_prevent_terminal_runtime_close() -> None:
     diagnostics = []
 

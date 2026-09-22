@@ -84,6 +84,7 @@ class _ApplicationLocalASRProductionEvidence:
     async def start_runtime(self) -> None:
         callbacks = self.access.start_callbacks
         await callbacks.start_output(False)
+        await self.access.start_application_events()
         await callbacks.open_self_ingress()
         await callbacks.open_peer_ingress()
         await callbacks.start_translation_turns()
