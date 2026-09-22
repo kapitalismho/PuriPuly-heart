@@ -263,6 +263,9 @@ def runtime_record() -> dict:
 
     record = {
         "baseline_sha": "13274569769d3c1ec7a896a2d15b919b76136a6e",
+        "probe_sha256": _sha256_file(Path(__file__)),
+        "checkout_head": None,
+        "background_load": "not sampled",
         "python": platform.python_version(),
         "numpy": np.__version__,
         "onnxruntime": ort.__version__,
@@ -285,6 +288,14 @@ def runtime_record() -> dict:
             )
         },
     }
+    try:
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, timeout=15
+        )
+        if revision.returncode == 0:
+            record["checkout_head"] = revision.stdout.strip()
+    except OSError, subprocess.TimeoutExpired:
+        pass
     try:
         out = subprocess.run(["powercfg", "/getactivescheme"], capture_output=True, timeout=15)
         raw = out.stdout if isinstance(out.stdout, bytes) else (out.stdout or "").encode()

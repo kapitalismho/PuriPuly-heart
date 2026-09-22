@@ -14,10 +14,14 @@ Raw per-call records are under ignored `.data/smartturn-179/`.
 ## Authority, setup, and superseded evidence
 
 - Baseline: `13274569769d3c1ec7a896a2d15b919b76136a6e`.
-- The conversation records maintainer approval of `POLICY-179-CURRENT` as the
-  frozen empirical comparator: timely-incomplete-only 800 ms extension,
-  automatic and expanded language support, and the existing 192/128 ms age
-  steps. This probe does not repair policy.
+- Maintainer approval of the frozen comparator is published as
+  [CURRENT-LISTEN-SMARTTURN-2026-09-23](https://github.com/kapitalismho/PuriPuly-heart/issues/134#issuecomment-5784588222)
+  (updated 2026-09-22T21:37:31Z), with the
+  [#179 confirmation](https://github.com/kapitalismho/PuriPuly-heart/issues/179#issuecomment-5784589142).
+  It matches the conversation's `POLICY-179-CURRENT`: timely-incomplete-only
+  800 ms extension, current automatic/manual language eligibility, and existing
+  192/128 ms age steps. Missing or invalid evidence seals at 512 ms.
+  Historical receipts remain historical; no endpoint policy is changed here.
 - The lifecycle owner reported 91 focused tests passing before the corrected
   measurements. The post-correction controller, CPU, finalist recheck, and
   paced runs started afterward; no correctness run overlapped them.
@@ -41,10 +45,10 @@ from pinned `openslr/librispeech_asr` revision
 `71cacbfb7e2354c4226d01e70d77d5fca3d04ba1`, parquet
 `all/test.clean/0000.parquet`, SHA-256
 `7113aa4c3cf963fb54697145719a7725f984c8836d1c494a554cbb9f1a017df0`. Eight
-distinct-speaker windows and five boundary guards are recorded by hash in the
-manifest and tracked evidence. This report makes no speech-quality claim about
-the model scores; they are observed numerical outputs for the specified input
-windows.
+distinct-speaker windows are hashed in the audio manifest and tracked evidence;
+the five synthetic boundary guards are hashed in the tracked evidence and raw
+matrix fixture sequence (not the speech-only audio manifest). This report
+makes no speech-quality claim about observed model scores.
 
 Probe-only setup and fetch commands:
 
@@ -83,6 +87,17 @@ input hashes without adding production logging.
   measured batch before dividing by request count because Windows `psutil`
   process-time deltas are coarse. The observed nonzero per-call quanta were
   15.625–46.875 ms, depending on arm/run.
+
+The tracked packet also preserves per-arm scheduling summaries: submission to
+predict entry (the historical `task_start_ms` label includes nested admission),
+each worker completion to loop return, predict return to callback, and
+completion to controller receipt. These are separate from worker compute time.
+
+Historical runs did not emit a probe-script hash. Their binding to committed
+probe `feda47ceefe8ff452919fb416179c7f79cadafef` was independently checked by
+inspection, including the retained matrix's unchanged measurement path; an
+exact historical script hash cannot be reconstructed and is not backfilled.
+New probe outputs record the actual script SHA-256 and checkout HEAD.
 
 ## Corrected matrix (retained)
 
@@ -225,8 +240,10 @@ disposition: explicitly reject this allocation change, with no production edit.
   The investigation does not adopt or reject that product tradeoff.
 - **Fused dispatch:** no consistent benefit in the corrected recheck. Keep
   experimental fused paths in the probe only.
-- **Dedicated executor:** no-change. Queue waits remained sub-millisecond;
-  the exercised co-load did not justify another resource lifecycle.
+- **Dedicated executor:** no-change. Matrix queue waits were below 0.138 ms;
+  concurrent co-load maxima were 4.265/3.063/3.190/3.883 ms for S12/S11/F12/F11.
+  This bounded co-load does not justify another resource lifecycle; it does
+  not establish absence of contention under every application workload.
 - **ORT spinning:** support was checked, but no profile sweep was performed.
   Zero observed idle-gap CPU is subject to Windows counter granularity, not
   proof of zero CPU use. Retain the existing configuration.
@@ -241,8 +258,11 @@ disposition: explicitly reject this allocation change, with no production edit.
 
 ## Verification and limits
 
-After shared formatting, the following integration check passed: **145 tests**
-(91 SmartTurn runtime/controller and 54 existing peer-capture tests).
+After review repairs and shared formatting, the integration check passed:
+**144 tests** (90 SmartTurn runtime/controller and 54 existing peer-capture tests).
+The redundant twin-harness equality test was removed; the existing explicit
+threshold-equality and receipt-deadline tests remain. Controller snapshot
+isolation now observes the submitted reference, not a stub-created copy.
 
 ```text
 .venv/Scripts/python.exe -m pytest tests/core/test_smart_turn_runtime.py tests/core/test_smart_turn_delivery.py tests/core/runtime/test_peer_capture_session.py -o addopts= -q
@@ -259,4 +279,7 @@ local Silero frame replay, not live microphone/OS-device capture, full desktop
 application load, cloud ASR, or an HMD campaign. No hardware-drop guarantee,
 second-machine result, stable CPU percentage, packaged embedded-Python
 performance, or speech-quality claim follows from these measurements.
+Background system load was not sampled per batch. Coarse CPU counters and
+unrecorded background variation limit attribution of the cross-batch CPU
+differences; the unchanged-production disposition does not assume a stable gain.
 No architecture ownership or dependency boundary changed.

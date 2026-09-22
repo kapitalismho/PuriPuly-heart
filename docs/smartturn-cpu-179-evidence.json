@@ -6,7 +6,10 @@
   "production_changes": false,
   "policy": {
     "name": "POLICY-179-CURRENT",
-    "maintainer_approval": "Conversation approval recorded for the frozen empirical comparator; no policy repair in this probe."
+    "maintainer_approval": "Conversation approval confirmed by CURRENT-LISTEN-SMARTTURN-2026-09-23; no policy repair in this probe.",
+    "authority_url": "https://github.com/kapitalismho/PuriPuly-heart/issues/134#issuecomment-5784588222",
+    "issue_confirmation_url": "https://github.com/kapitalismho/PuriPuly-heart/issues/179#issuecomment-5784589142",
+    "authority_updated_at": "2026-09-22T21:37:31Z"
   },
   "runtime": {
     "python": "3.14.7",
@@ -15,6 +18,7 @@
     "cpu": "AMD Ryzen 7 9800X3D, 8C/16T",
     "power_scheme": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c (high performance)",
     "power_scheme_drift": false,
+    "background_load": "not sampled; cross-batch CPU variability cannot be attributed solely to the chosen profile",
     "thread_env": {
       "OMP_NUM_THREADS": null,
       "OPENBLAS_NUM_THREADS": null,
@@ -55,13 +59,59 @@
       {"utterance_id": "3575-170457-0000", "window_sha256": "8f8b8b223d3e6e2e58b8cbe5adf466ef5371951089d88eb7d4d4dfcedd610231"},
       {"utterance_id": "7127-75947-0000", "window_sha256": "36c94a7763686f034b026c395838be134e394c20c8ed97669fd42920bac89ac9"}
     ],
-    "guards": ["silence_8s", "near_silence_8s", "short_1s", "exact_8s", "over_8s_10s"]
+    "guards": [
+      {"name": "guard_silence_8s", "sha256": "2d4da04b861bb9dbe77c871415931785a18138d6db035f1bbcd0cf8277c6fc23"},
+      {"name": "guard_near_silence_8s", "sha256": "ea79f59a464034f375a5a9e0ac6611b7b36595d56b7892506f53f6f47e69f279"},
+      {"name": "guard_short_1s", "sha256": "b30dde97f347b9f64623089f9395a253f69c4213fda97bb045a558cf734a0755"},
+      {"name": "guard_exact_8s", "sha256": "beb8e5a1c530db6aa0dbb170a0dc815e93b329d1329e451d00cbe9e7c6724919"},
+      {"name": "guard_over_8s_10s", "sha256": "2ca1fa4e1587231ef41cc351580ea9665cb239cacca7a580c7dd0e55da8b8bf6"}
+    ]
   },
   "superseded": [
     {"artifact": ".data/smartturn-179/controller.json", "reason": "fed only the first 512 samples, used repeated synthetic frames, delivered spans with future end times, and filled the boundary decision from a later seal"},
     {"artifact": ".data/smartturn-179/paced_s12.json and paced_f12.json", "reason": "ran the VAD after SmartTurn and sampled active RSS before the request"},
     {"artifact": ".data/smartturn-179/recheck_s12_f12.json", "reason": "pre-instrument-correction finalist recheck"}
   ],
+  "retained_scheduling": {
+    "units": "milliseconds",
+    "matrix_count_per_arm": 40,
+    "controller_count_per_arm": 8,
+    "source_artifacts": ["matrix_post_lifecycle.json", "controller_post_contract.json"],
+    "task_start_ms_definition": "submission to predict entry, including owner task and nested operation admission",
+    "worker_to_loop_return_ms_definition": "historical name: predict return to receipt; actual worker-to-loop values use stage-specific keys",
+    "arms": {
+      "S12": {
+        "task_start_ms": {"median": 0.1320, "p95": 0.1814, "worst": 0.1997},
+        "completed_to_receipt_ms": {"median": 0.0051, "p95": 0.0078, "worst": 0.0079},
+        "worker_to_loop_return_ms": {"median": 0.0306, "p95": 0.0546, "worst": 0.0615},
+        "features_worker_to_loop_ms": {"median": 0.1422, "p95": 0.1872, "worst": 0.3660},
+        "onnx_worker_to_loop_ms": {"median": 0.1929, "p95": 0.2507, "worst": 0.2872},
+        "controller_completed_to_receipt_ms": {"median": 0.0061, "p95": 0.0126, "worst": 0.0126}
+      },
+      "S11": {
+        "task_start_ms": {"median": 0.1178, "p95": 0.1689, "worst": 0.1937},
+        "completed_to_receipt_ms": {"median": 0.0055, "p95": 0.0079, "worst": 0.0085},
+        "worker_to_loop_return_ms": {"median": 0.0308, "p95": 0.0471, "worst": 0.0529},
+        "features_worker_to_loop_ms": {"median": 0.1458, "p95": 0.1909, "worst": 0.2163},
+        "onnx_worker_to_loop_ms": {"median": 0.1810, "p95": 0.2460, "worst": 0.2745},
+        "controller_completed_to_receipt_ms": {"median": 0.0060, "p95": 0.0089, "worst": 0.0089}
+      },
+      "F12": {
+        "task_start_ms": {"median": 0.1272, "p95": 0.1858, "worst": 0.2022},
+        "completed_to_receipt_ms": {"median": 0.0052, "p95": 0.0073, "worst": 0.0420},
+        "worker_to_loop_return_ms": {"median": 0.0152, "p95": 0.0366, "worst": 0.0562},
+        "inference_worker_to_loop_ms": {"median": 0.2036, "p95": 0.2623, "worst": 0.2989},
+        "controller_completed_to_receipt_ms": {"median": 0.0063, "p95": 0.0090, "worst": 0.0090}
+      },
+      "F11": {
+        "task_start_ms": {"median": 0.1322, "p95": 0.1862, "worst": 0.1958},
+        "completed_to_receipt_ms": {"median": 0.0058, "p95": 0.0081, "worst": 0.0082},
+        "worker_to_loop_return_ms": {"median": 0.0160, "p95": 0.0225, "worst": 0.0241},
+        "inference_worker_to_loop_ms": {"median": 0.1927, "p95": 0.2600, "worst": 0.2650},
+        "controller_completed_to_receipt_ms": {"median": 0.0064, "p95": 0.0095, "worst": 0.0095}
+      }
+    }
+  },
   "matrix_retained": {
     "artifact": ".data/smartturn-179/matrix_post_lifecycle.json",
     "reason": "matrix timing path is independent of the corrected controller frame source and active-resource sampling",
@@ -163,7 +213,7 @@
   "disposition": {
     "selected": "retain S12 (ORT 1/2 split); no production optimization adopted",
     "reason": "F12 has no consistent benefit in the corrected recheck. 1/1 adds about 37 ms/request with lower CPU in some samples; S12 CPU varied from 0.086426 to 0.053223 s/request across batches, so no stable CPU percentage or universal winner is established.",
-    "dedicated_executor": "no-change: matrix queue waits sub-millisecond and all admissions started",
+    "dedicated_executor": "no-change: matrix queue waits below 0.138 ms; concurrent co-load maxima S12 4.2648 ms, S11 3.0634 ms, F12 3.1901 ms, F11 3.8834 ms. These observations do not justify another lifecycle; no saturated-executor claim.",
     "spinning": "no-change: ORT accepted allow_spinning=0, while paced idle-gap CPU was 0.0 s",
     "hann": "reject: bounded probe measured negligible/noisy end-to-end delta",
     "r6_state": "Director-selected supported tradeoff/inconclusive investigation; current production configuration retained without adopting a new latency target"
@@ -178,10 +228,11 @@
     "fetch": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py fetch",
     "power": "powercfg /getactivescheme recorded and checked for drift; no global setting changed",
     "raw_artifacts": ".data/smartturn-179/ (git-ignored)",
-    "tracked_summary": "docs/smartturn-cpu-179-evidence.json"
+    "tracked_summary": "docs/smartturn-cpu-179-evidence.json",
+    "historical_probe_binding": "Measurements predate script-sha emission; independently reviewed against committed probe feda47ceefe8ff452919fb416179c7f79cadafef. Historical exact script hashes unavailable and not backfilled. Future artifacts emit probe_sha256 and checkout_head."
   },
   "verification": {
-    "lifecycle_focused_tests": "91 focused SmartTurn tests plus 54 existing peer-capture tests: 145 passed together after shared formatting",
+    "lifecycle_focused_tests": "90 focused SmartTurn tests plus 54 existing peer-capture tests: 144 passed after review repair; redundant twin-harness comparison removed, real reference isolation strengthened",
     "probe_lint": "ruff check scripts/bench_smart_turn_179.py passed",
     "probe_syntax": "ast.parse passed",
     "ort_spin_support": "both intra/inter allow_spinning=0 accepted",

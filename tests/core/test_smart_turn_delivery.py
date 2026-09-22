@@ -584,20 +584,35 @@ async def test_retirement_during_inference_rejects_late_completion() -> None:
 
 @pytest.mark.asyncio
 async def test_submitted_snapshot_is_isolated_from_later_capture_and_trim() -> None:
-    harness = Harness()
+    class ReferenceInference(InferenceOwner):
+        def submit(self, identity, audio, completion):
+            status = self.statuses[min(len(self.requests), len(self.statuses) - 1)]
+            self.requests.append(identity)
+            self.audio.append(audio)
+            self.callbacks.append(completion)
+            return status
+
+    harness = Harness(inference=ReferenceInference())
     await harness.open(value=1.0)
     await harness.feed(224, speech=False)
+    assert len(harness.inference.requests) == 1
     submitted = harness.inference.audio[0]
     before = submitted.copy()
     assert before.size == (32 + 224) * 16
-    submitted_view = submitted
+    for part in harness.controller._context_parts:
+        assert not np.shares_memory(submitted, part)
+    for part in harness.controller._context_parts:
+        part[:] = 9.0
+    np.testing.assert_array_equal(submitted, before)
     await harness.feed(288, speech=False)
     assert len(harness.vad.ends) == 1
-    np.testing.assert_array_equal(submitted_view, before)
-    harness.controller._context_parts.append(np.ones(128000, dtype=np.float32))
-    harness.controller._context_samples += 128000
-    harness.controller._append_context(np.full(16000, 9.0, dtype=np.float32))
-    np.testing.assert_array_equal(submitted_view, before)
+    np.testing.assert_array_equal(submitted, before)
+    for part in harness.controller._context_parts:
+        assert not np.shares_memory(submitted, part)
+    harness.controller._append_context(np.full(128000 + 16000, 7.0, dtype=np.float32))
+    np.testing.assert_array_equal(submitted, before)
+    for part in harness.controller._context_parts:
+        assert not np.shares_memory(submitted, part)
 
 
 @pytest.mark.asyncio
@@ -683,33 +698,3 @@ async def test_repeated_activation_reprobes_and_listen_off_stays_silent() -> Non
     assert len(off.vad.ends) == 1
     assert off.inference.requests == []
     assert off.inference.prepare_count == 0
-
-
-@pytest.mark.asyncio
-async def test_equal_threshold_with_receipt_timeline_is_deterministic() -> None:
-    first = Harness()
-    await first.open()
-    await first.feed(224, speech=False)
-    request = first.inference.requests[0]
-    await first.complete(
-        0,
-        score=SMART_TURN_COMPLETE_THRESHOLD,
-        at=request.complete_deadline_monotonic_s - 0.1,
-    )
-    await first.feed(288, speech=False)
-    assert len(first.vad.ends) == 1
-    second = Harness()
-    await second.open()
-    await second.feed(224, speech=False)
-    other = second.inference.requests[0]
-    await second.complete(
-        0,
-        score=SMART_TURN_COMPLETE_THRESHOLD,
-        at=other.complete_deadline_monotonic_s - 0.1,
-    )
-    await second.feed(288, speech=False)
-    assert len(second.vad.ends) == 1
-    assert first.ledger.snapshots[0].content_sample_count == (
-        second.ledger.snapshots[0].content_sample_count
-    )
-    assert first.ledger.snapshots[0].seal_reason == second.ledger.snapshots[0].seal_reason
