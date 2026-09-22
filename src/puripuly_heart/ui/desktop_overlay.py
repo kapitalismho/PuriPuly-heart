@@ -59,6 +59,7 @@ from puripuly_heart.core.diagnostic_validation import (
 from puripuly_heart.core.overlay.manifest import (
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
+    OVERLAY_SPEAKER_TRANSITION_CONTRACT,
     OverlayLaunchManifest,
 )
 from puripuly_heart.core.overlay.protocol import (
@@ -2795,6 +2796,7 @@ class DesktopOverlayRenderer:
                         "runtime_generation": 1,
                         "capabilities": {
                             "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                            "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
                         },
                     }
                 )
@@ -2840,6 +2842,7 @@ class DesktopOverlayRenderer:
             ready_event["runtime_generation"] = 1
             ready_event["capabilities"] = {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
             }
             startup_generation = getattr(self.window, "startup_generation", 0)
             if isinstance(startup_generation, int) and startup_generation > 0:

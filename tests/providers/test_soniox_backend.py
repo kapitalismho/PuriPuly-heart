@@ -295,6 +295,34 @@ async def test_soniox_preserves_present_and_missing_speakers_in_session_scope() 
     assert second.speaker_session_scope != first.speaker_session_scope
 
 
+def test_soniox_preserves_timing_confidence_and_marks_overlapping_speaker_runs() -> None:
+    session = _make_session(enable_language_identification=True)
+    tokens = [
+        soniox_module._FinalToken("a ", 100, 250, 0.9, "en", "A"),
+        soniox_module._FinalToken("b ", 200, 350, 0.8, "en", "B"),
+        soniox_module._FinalToken("b2", 350, 450, 0.7, "en", "B"),
+    ]
+
+    runs = session._speaker_runs_for_tokens(tokens)
+
+    assert [
+        (
+            run.text,
+            run.speaker_id,
+            run.source_start_ms,
+            run.source_end_ms,
+            run.speaker_confidence,
+            run.overlaps_previous,
+        )
+        for run in runs
+    ] == [
+        ("a ", "A", 100, 250, 0.9, False),
+        ("b b2", "B", 200, 450, 0.7, True),
+    ]
+    assert runs[0].has_ordered_source_evidence is True
+    assert runs[1].has_ordered_source_evidence is False
+
+
 @pytest.mark.asyncio
 async def test_soniox_terminal_cleanup_keeps_final_runs_equal_to_emitted_text() -> None:
     session = _make_session(enable_language_identification=True)

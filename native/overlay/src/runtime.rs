@@ -300,6 +300,8 @@ struct LogicalCaptionBlockIdentity {
     secondary_enabled: bool,
     primary_language: Option<String>,
     secondary_language: Option<String>,
+    speaker_style: Option<String>,
+    speaker_boundary: bool,
 }
 
 fn retain_semantically_current_blocks(snapshot: &mut OverlayPresentationSnapshot) {
@@ -685,6 +687,10 @@ impl PresentationRuntime {
                 "native_presentation_retry": {
                     "version": 1,
                     "ownership": "exclusive"
+                },
+                "speaker_transition_presentation": {
+                    "version": 1,
+                    "modes": ["A", "C", "E"]
                 }
             }
         });
@@ -1313,6 +1319,7 @@ fn frame_content_identity(blocks: &[CaptionBlock], presentation: &CaptionPresent
         block.primary_text.hash(&mut hasher);
         block.secondary_text.hash(&mut hasher);
         block.secondary_enabled.hash(&mut hasher);
+        block.speaker_boundary.hash(&mut hasher);
         block.primary_language.hash(&mut hasher);
         block.secondary_language.hash(&mut hasher);
         block.block_variant.hash(&mut hasher);
@@ -2375,6 +2382,8 @@ fn logical_caption_identity(state: &OverlayState) -> LogicalCaptionIdentity {
                 secondary_enabled: slot.secondary_enabled,
                 primary_language: slot.primary_language.clone(),
                 secondary_language: slot.secondary_language.clone(),
+                speaker_style: slot.speaker_style.clone(),
+                speaker_boundary: slot.speaker_boundary,
             })
             .collect(),
     )
@@ -2533,7 +2542,8 @@ pub async fn run_cli(args: &[String]) -> i32 {
                 "contract_version": EXPECTED_CONTRACT_VERSION,
                 "app_version": env!("CARGO_PKG_VERSION"),
                 "execution_contract": {"version": 1, "revision": "r2"},
-                "native_presentation_retry": {"version": 1, "ownership": "exclusive"}
+                "native_presentation_retry": {"version": 1, "ownership": "exclusive"},
+                "speaker_transition_presentation": {"version": 1, "modes": ["A", "C", "E"]},
             })
         );
         return 0;
@@ -2664,7 +2674,11 @@ impl PresentationRuntime {
 
 fn caption_block_for_strip(strip: &OverlaySlot) -> CaptionBlock {
     let channel = if strip.channel == "peer" {
-        CaptionChannel::PeerChannel
+        if strip.speaker_style.as_deref() == Some("cyan") {
+            CaptionChannel::PeerCyan
+        } else {
+            CaptionChannel::PeerChannel
+        }
     } else {
         CaptionChannel::SelfChannel
     };
@@ -2682,6 +2696,7 @@ fn caption_block_for_strip(strip: &OverlaySlot) -> CaptionBlock {
         .with_channel(channel)
         .with_variant(variant)
         .with_secondary_text(strip.secondary_text.clone(), strip.secondary_enabled)
+        .with_speaker_boundary(strip.speaker_boundary)
         .with_language_metadata(
             strip.primary_language.clone(),
             strip.secondary_language.clone(),

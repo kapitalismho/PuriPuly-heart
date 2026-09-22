@@ -4069,18 +4069,22 @@ def test_overlay_display_toggles_update_persistent_settings(
     view._on_overlay_translation_click(None)
     view._on_overlay_peer_original_click(None)
     view._on_desktop_overlay_swap_caption_languages_click(None)
+    view._on_speaker_transition_mode_click(None)
 
     assert settings.intent.overlay.show_translation is True
     assert settings.intent.overlay.show_peer_original is True
     assert settings.intent.overlay.desktop_flet.swap_caption_languages is False
+    assert settings.intent.overlay.speaker_transition_mode == "A"
     assert view._settings.intent.overlay.show_translation is False
     assert view._settings.intent.overlay.show_peer_original is False
     assert view._settings.intent.overlay.desktop_flet.swap_caption_languages is True
-    assert len(settings_calls) == 3
+    assert view._settings.intent.overlay.speaker_transition_mode == "C"
+    assert len(settings_calls) == 4
     assert all(incoming is not settings for incoming in settings_calls)
     assert settings_calls[-1].intent.overlay.show_translation is False
     assert settings_calls[-1].intent.overlay.show_peer_original is False
     assert settings_calls[-1].intent.overlay.desktop_flet.swap_caption_languages is True
+    assert settings_calls[-1].intent.overlay.speaker_transition_mode == "C"
 
 
 def test_overlay_single_action_cards_use_broad_value_slot_click_targets(
@@ -5119,6 +5123,7 @@ def test_overlay_tab_uses_target_specific_unit_card_rows(
         t("settings.overlay.caption_location"),
         t("settings.overlay.show_translation"),
         t("settings.overlay.show_peer_original"),
+        t("settings.overlay.speaker_transition_mode"),
         t("settings.overlay.calibration.anchor"),
         t("settings.overlay.calibration.distance"),
         t("settings.overlay.calibration.offset_x"),
@@ -5126,42 +5131,46 @@ def test_overlay_tab_uses_target_specific_unit_card_rows(
         t("settings.overlay.calibration.text_scale"),
         t("settings.overlay.position_reset.vr.title"),
     ]
-    assert len(overlay_controls) == 6
+    assert len(overlay_controls) == 7
     assert _row_card_titles(overlay_controls[0]) == [
         t("settings.overlay.caption_location"),
         t("settings.overlay.show_translation"),
         t("settings.overlay.show_peer_original"),
     ]
     assert _row_card_titles(overlay_controls[1]) == [
+        t("settings.overlay.speaker_transition_mode"),
+    ]
+    assert _row_card_titles(overlay_controls[2]) == [
         t("settings.overlay.calibration.anchor"),
         t("settings.overlay.calibration.distance"),
         t("settings.overlay.calibration.offset_x"),
     ]
-    assert _row_card_titles(overlay_controls[2]) == [
+    assert _row_card_titles(overlay_controls[3]) == [
         t("settings.overlay.calibration.offset_y"),
         t("settings.overlay.calibration.text_scale"),
         t("settings.overlay.position_reset.vr.title"),
     ]
-    assert _row_card_titles(overlay_controls[3]) == [
+    assert _row_card_titles(overlay_controls[4]) == [
         t("settings.overlay.desktop.size.title"),
         t("settings.overlay.desktop.lock.title"),
         t("settings.overlay.desktop.background_alpha.title"),
     ]
-    assert _row_card_titles(overlay_controls[4]) == [
+    assert _row_card_titles(overlay_controls[5]) == [
         t("settings.overlay.desktop.swap_caption_languages.title"),
         t("settings.overlay.position_reset.desktop.title"),
     ]
-    assert len(_layout_cards(overlay_controls[4])) == 3
-    assert [getattr(card, "visible", True) for card in _layout_cards(overlay_controls[4])] == [
+    assert len(_layout_cards(overlay_controls[5])) == 3
+    assert [getattr(card, "visible", True) for card in _layout_cards(overlay_controls[5])] == [
         True,
         True,
         True,
     ]
     assert overlay_controls[1].visible is True
     assert overlay_controls[2].visible is True
-    assert overlay_controls[3].visible is False
+    assert overlay_controls[3].visible is True
     assert overlay_controls[4].visible is False
     assert overlay_controls[5].visible is False
+    assert overlay_controls[6].visible is False
 
 
 def test_apply_locale_updates_general_clickable_value_fonts_to_zh_cn(

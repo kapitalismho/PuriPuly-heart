@@ -20,6 +20,7 @@ from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.manifest import (
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
+    OVERLAY_SPEAKER_TRANSITION_CONTRACT,
     OverlayLaunchManifest,
 )
 from puripuly_heart.core.overlay.protocol import (
@@ -29,6 +30,7 @@ from puripuly_heart.core.overlay.protocol import (
 )
 from puripuly_heart.ui import desktop_overlay, desktop_window_zorder, flet_desktop_runtime
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
+    _DESKTOP_CAPTION_CYAN,
     _DESKTOP_CAPTION_GOLD,
     _DESKTOP_CAPTION_LINE_HEIGHT,
     _DESKTOP_CAPTION_MAX_VISIBLE_LINES,
@@ -78,6 +80,8 @@ def _block(
     secondary_enabled: bool = False,
     primary_language: str | None = None,
     secondary_language: str | None = None,
+    speaker_style: str | None = None,
+    speaker_boundary: bool = False,
 ) -> OverlayPresentationBlock:
     return OverlayPresentationBlock(
         id=block_id,
@@ -90,7 +94,43 @@ def _block(
         secondary_enabled=secondary_enabled,
         primary_language=primary_language,
         secondary_language=secondary_language,
+        speaker_style=speaker_style,  # type: ignore[arg-type]
+        speaker_boundary=speaker_boundary,
     )
+
+
+def test_desktop_overlay_renders_selected_e1_rule_and_sky_body_without_changing_slot_size() -> None:
+    plan = desktop_overlay.build_desktop_caption_plan(
+        OverlayPresentationSnapshot(
+            blocks=[
+                _block(
+                    "peer-transition",
+                    channel="peer",
+                    block_variant="translated_peer",
+                    appearance_seq=1,
+                    primary_text="translated peer",
+                    secondary_text="peer source",
+                    secondary_enabled=True,
+                    speaker_style="cyan",
+                    speaker_boundary=True,
+                )
+            ]
+        ),
+        window_width=4096,
+        window_height=1024,
+    )
+
+    assert plan.slots[0].speaker_boundary is True
+    assert {line.color for line in plan.lines} == {_DESKTOP_CAPTION_CYAN}
+    surface = desktop_overlay.build_desktop_caption_surface(plan)
+    inner_card = surface.content.controls[0].controls[0].content
+    assert inner_card.height == plan.slot_height
+    assert isinstance(inner_card.content, ft.Stack)
+    padded_text, marker = inner_card.content.controls
+    assert marker.bgcolor == _DESKTOP_CAPTION_GOLD
+    assert marker.width == pytest.approx(196.0)
+    assert marker.height == pytest.approx(14.0)
+    assert padded_text.padding.top == pytest.approx(42.0)
 
 
 def test_native_renderer_uses_embedded_flet_without_viewer_owner(monkeypatch) -> None:
@@ -5139,7 +5179,10 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
+            },
         }
         assert window.started.is_set()
         assert window.snapshots[0].revision == 7
@@ -5147,7 +5190,10 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
+            },
         }
         assert token not in json.dumps(sink.events)
 
@@ -5171,7 +5217,10 @@ async def test_desktop_overlay_malformed_initial_snapshot_is_startup_error_with_
             "contract_version": OVERLAY_CONTRACT_VERSION,
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
+            },
         }
         await connection.send(
             json.dumps(
@@ -5226,7 +5275,10 @@ async def test_desktop_overlay_rejects_unframed_initial_runtime_controls() -> No
             "contract_version": OVERLAY_CONTRACT_VERSION,
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
+            },
         }
         await connection.send(
             json.dumps(
@@ -5351,7 +5403,10 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
             "contract_version": OVERLAY_CONTRACT_VERSION,
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
+            },
         }
         await connection.send(
             json.dumps(
@@ -5398,7 +5453,10 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
+            },
         }
 
         async def _wait_until_runtime_control_dispatched() -> None:
@@ -5692,7 +5750,10 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
             "contract_version": OVERLAY_CONTRACT_VERSION,
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
+            },
         }
         await connection.send(
             json.dumps(
@@ -5724,7 +5785,10 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
-            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
+            },
         }
         runtime_error = await asyncio.wait_for(received.get(), timeout=1.0)
 

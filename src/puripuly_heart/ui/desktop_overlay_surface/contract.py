@@ -15,6 +15,7 @@ from puripuly_heart.ui.theme import COLOR_BACKGROUND
 _DESKTOP_CAPTION_WHITE = "#FFFFFF"
 
 _DESKTOP_CAPTION_GOLD = "#FFD700"
+_DESKTOP_CAPTION_CYAN = "#33D6FF"
 
 _DESKTOP_CAPTION_FONT_FAMILY = FONT_FAMILY_NOTO_SANS_CJK_JP
 
@@ -102,9 +103,12 @@ _DESKTOP_EMPTY_LOCK_ACTION_VERTICAL_PADDING = 12
 _DESKTOP_EMPTY_LOCK_ACTION_TEXT_WIDTH_SAFETY = 24
 
 
-def _desktop_caption_color_for_channel(channel: str) -> str:
+def _desktop_caption_color_for_channel(
+    channel: str,
+    speaker_style: str | None = None,
+) -> str:
     if channel == "peer":
-        return _DESKTOP_CAPTION_GOLD
+        return _DESKTOP_CAPTION_CYAN if speaker_style == "cyan" else _DESKTOP_CAPTION_GOLD
     return _DESKTOP_CAPTION_WHITE
 
 
@@ -304,6 +308,7 @@ class DesktopCaptionSlot:
     appearance_seq: int
     lines: tuple[DesktopCaptionLine, ...]
     secondary_enabled: bool
+    speaker_boundary: bool = False
     card_width: float = 0.0
     card_text_width: float = 0.0
     active: bool = False

@@ -95,6 +95,7 @@ ORDER23_OVERLAY_OSC_OUTPUT_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "intent.overlay.target",
     "intent.overlay.show_translation",
     "intent.overlay.show_peer_original",
+    "intent.overlay.speaker_transition_mode",
     "intent.overlay.calibration.anchor",
     "intent.overlay.calibration.offset_x",
     "intent.overlay.calibration.offset_y",

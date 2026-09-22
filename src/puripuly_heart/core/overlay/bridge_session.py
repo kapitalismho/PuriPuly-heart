@@ -52,6 +52,7 @@ class AuthenticatedSessionHealth:
         contract_version: int,
         execution_contract: Mapping[str, Any],
         native_retry_contract: Mapping[str, Any],
+        speaker_transition_contract: Mapping[str, Any],
     ) -> bool:
         if (
             payload.get("type") != "auth"
@@ -66,6 +67,8 @@ class AuthenticatedSessionHealth:
         if not isinstance(capabilities, dict):
             return False
         if capabilities.get("execution_contract") != execution_contract:
+            return False
+        if capabilities.get("speaker_transition_presentation") != speaker_transition_contract:
             return False
         if (
             not desktop_runtime

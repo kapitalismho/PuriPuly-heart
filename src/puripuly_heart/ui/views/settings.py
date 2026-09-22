@@ -54,6 +54,7 @@ from puripuly_heart.app.ports.settings_view import (
     OverlayCalibrationSnapshot,
     OverlayPeerOriginalSettingsIntent,
     OverlaySettingsSnapshot,
+    OverlaySpeakerTransitionModeIntent,
     OverlayTargetSettingsIntent,
     OverlayTranslationSettingsIntent,
     PeerExpectedLanguagesIntent,
@@ -1713,6 +1714,24 @@ class SettingsView(ft.Column):
             value=self._overlay_peer_original_button,
         )
 
+        self._speaker_transition_mode_title = ft.Text(
+            t("settings.overlay.speaker_transition_mode"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._speaker_transition_mode_button = self._build_clickable_text(
+            t("settings.overlay.speaker_transition_mode.A"),
+            self._on_speaker_transition_mode_click,
+            size=20,
+            max_lines=3,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        )
+        self._speaker_transition_mode_card = self._wrap_unit_card(
+            title=self._speaker_transition_mode_title,
+            value=self._speaker_transition_mode_button,
+        )
+
         self._overlay_target_title = ft.Text(
             t("settings.overlay.caption_location"),
             size=24,
@@ -2041,6 +2060,7 @@ class SettingsView(ft.Column):
                 overlay_target=self._overlay_target_card,
                 overlay_translation=self._overlay_translation_card,
                 overlay_peer_original=self._overlay_peer_original_card,
+                speaker_transition_mode=self._speaker_transition_mode_card,
                 anchor=self._overlay_anchor_card,
                 distance=self._overlay_distance_card,
                 offset_x=self._overlay_offset_x_card,
@@ -5983,6 +6003,13 @@ class SettingsView(ft.Column):
             self._overlay_peer_original_button,
             t("settings.option.on" if overlay_peer_original_enabled else "settings.option.off"),
         )
+        speaker_mode = (
+            self._overlay_snapshot.speaker_transition_mode if self._overlay_snapshot else "A"
+        )
+        self._set_unit_card_value_text(
+            self._speaker_transition_mode_button,
+            t(f"settings.overlay.speaker_transition_mode.{speaker_mode}"),
+        )
         self._sync_overlay_target_control()
         self._sync_overlay_target_specific_visibility()
         self._sync_desktop_overlay_main_controls()
@@ -5991,6 +6018,7 @@ class SettingsView(ft.Column):
         disabled = self._overlay_snapshot is None
         self._overlay_translation_button.disabled = disabled
         self._overlay_peer_original_button.disabled = disabled
+        self._speaker_transition_mode_button.disabled = disabled
         self._overlay_target_button.disabled = disabled
         self._overlay_anchor_button.disabled = disabled
         self._overlay_distance_decrease_button.disabled = disabled
@@ -6074,6 +6102,23 @@ class SettingsView(ft.Column):
             OverlayPeerOriginalSettingsIntent(self._overlay_snapshot.show_peer_original)
         )
 
+    def _on_speaker_transition_mode_click(self, e) -> None:
+        _ = e
+        if self._overlay_snapshot is None or self._speaker_transition_mode_button.disabled:
+            return
+        modes = ("A", "C", "E")
+        current = self._overlay_snapshot.speaker_transition_mode
+        self._on_speaker_transition_mode_selected(modes[(modes.index(current) + 1) % len(modes)])
+
+    def _on_speaker_transition_mode_selected(self, mode: str) -> None:
+        if self._overlay_snapshot is None or mode not in {"A", "C", "E"}:
+            return
+        self._overlay_snapshot = replace(
+            self._overlay_snapshot,
+            speaker_transition_mode=mode,
+        )
+        self._sync_overlay_controls()
+        self._emit_settings_changed(OverlaySpeakerTransitionModeIntent(mode))
     def _handle_vad_visual_change(self, e) -> None:
         self._vad_slider.label = f"{float(e.control.value):.2f}"
         _update_control_if_mounted(self._vad_slider)
@@ -6463,6 +6508,9 @@ class SettingsView(ft.Column):
         self._overlay_target_title.value = t("settings.overlay.caption_location")
         self._overlay_translation_title.value = t("settings.overlay.show_translation")
         self._overlay_peer_original_title.value = t("settings.overlay.show_peer_original")
+        self._speaker_transition_mode_title.value = t(
+            "settings.overlay.speaker_transition_mode"
+        )
         self._audio_settings.apply_locale()
         self._sync_general_audio_card_texts()
         self._overlay_anchor_title.value = t("settings.overlay.calibration.anchor")

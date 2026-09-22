@@ -241,6 +241,7 @@ mod tests {
             block_variant: CaptionBlockVariant::Finalized,
             secondary_enabled: true,
             secondary_reserved: true,
+            speaker_boundary: false,
             primary_font_size_key: 12_800,
             secondary_font_size_key: 7_936,
             content_width_key: 3_200,

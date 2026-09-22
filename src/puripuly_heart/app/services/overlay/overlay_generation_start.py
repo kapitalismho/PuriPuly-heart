@@ -152,6 +152,7 @@ class OverlayGenerationStartOwner:
                     clock=request.clock,
                     show_translation=request.config.show_translation,
                     show_peer_original=request.config.show_peer_original,
+                    speaker_transition_mode=request.config.speaker_transition_mode,
                     task_factory=runtime.create_child_task,
                     native_retry_enabled=native_retry_enabled,
                     translation_enabled=request.translation_enabled,
@@ -163,6 +164,7 @@ class OverlayGenerationStartOwner:
                 show_translation=request.config.show_translation,
                 show_peer_original=request.config.show_peer_original,
             )
+            await presenter.update_speaker_transition_mode(request.config.speaker_transition_mode)
             await presenter.begin_native_retry_epoch(enabled=native_retry_enabled)
             bridge = OverlayBridge(
                 session_token=self.session_token_factory(),

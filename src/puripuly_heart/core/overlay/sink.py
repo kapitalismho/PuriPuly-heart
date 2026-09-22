@@ -50,6 +50,8 @@ class OverlayEvent:
     source_text_hash: str | None = None
     source_text_len: int | None = None
     logical_turn_key: str | None = None
+    speaker_transition: str | None = None
+    speaker_transition_claim_id: str | None = None
     turn_kind: OverlayTurnKind | None = None
     parent_utterance_id: UUID | None = None
     turn_generation: int | None = None
@@ -380,6 +382,8 @@ class OverlayEventAdapter:
         source_text_hash: str | None = None,
         source_text_len: int | None = None,
         logical_turn_key: str | None = None,
+        speaker_transition: str | None = None,
+        speaker_transition_claim_id: str | None = None,
         output_scope: OverlayPublicationScope | None = None,
     ) -> TranslationFinal:
         return TranslationFinal(
@@ -393,6 +397,8 @@ class OverlayEventAdapter:
                 source_text_hash=source_text_hash,
                 source_text_len=source_text_len,
                 logical_turn_key=logical_turn_key,
+                speaker_transition=speaker_transition,
+                speaker_transition_claim_id=speaker_transition_claim_id,
                 output_scope=output_scope,
             ),
             text=text,
@@ -434,6 +440,8 @@ class OverlayEventAdapter:
         source_text_hash: str | None = None,
         source_text_len: int | None = None,
         logical_turn_key: str | None = None,
+        speaker_transition: str | None = None,
+        speaker_transition_claim_id: str | None = None,
         turn_kind: OverlayTurnKind | None = None,
         parent_utterance_id: UUID | None = None,
         turn_generation: int | None = None,
@@ -465,6 +473,8 @@ class OverlayEventAdapter:
             "source_text_hash": source_text_hash,
             "source_text_len": source_text_len,
             "logical_turn_key": logical_turn_key,
+            "speaker_transition": speaker_transition,
+            "speaker_transition_claim_id": speaker_transition_claim_id,
             "turn_kind": turn_kind,
             "parent_utterance_id": parent_utterance_id,
             "turn_generation": turn_generation,

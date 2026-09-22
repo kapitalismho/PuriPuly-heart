@@ -37,6 +37,7 @@ from puripuly_heart.app.ports.settings_view import (
     OverlayCalibrationSnapshot,
     OverlayPeerOriginalSettingsIntent,
     OverlaySettingsSnapshot,
+    OverlaySpeakerTransitionModeIntent,
     OverlayTargetSettingsIntent,
     OverlayTranslationSettingsIntent,
     PeerExpectedLanguagesIntent,
@@ -312,6 +313,7 @@ def settings_view_surface_snapshots(
         target=intent.overlay.target,
         show_translation=intent.overlay.show_translation,
         show_peer_original=intent.overlay.show_peer_original,
+        speaker_transition_mode=intent.overlay.speaker_transition_mode,
         desktop_size_preset=intent.overlay.desktop_flet.size_preset,
         desktop_background_alpha=intent.overlay.desktop_flet.visual.background_alpha,
         desktop_swap_caption_languages=intent.overlay.desktop_flet.swap_caption_languages,
@@ -513,6 +515,11 @@ def materialize_immediate_settings_intent(
         updated = _with_intent(
             updated,
             overlay=replace(updated.intent.overlay, show_peer_original=intent.enabled),
+        )
+    elif isinstance(intent, OverlaySpeakerTransitionModeIntent):
+        updated = _with_intent(
+            updated,
+            overlay=replace(updated.intent.overlay, speaker_transition_mode=intent.mode),
         )
     elif isinstance(intent, DesktopOverlayBackgroundAlphaIntent):
         desktop = updated.intent.overlay.desktop_flet

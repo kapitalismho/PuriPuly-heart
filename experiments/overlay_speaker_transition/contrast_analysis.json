@@ -1,0 +1,99 @@
+{
+  "meta": {
+    "method": "WCAG relative luminance on sRGB, strip rgba(0,0,0,0.24) blended over each scene sample; black 5px outline not modeled numerically",
+    "cvd": "Machado-Oliveira-Fernandes-2009 severity 1.0, applied in linear light",
+    "cvd_reference": "Machado-Oliveira-Fernandes-2009 severity 1.0, sRGB decode, matrix in linear light, clamp, sRGB encode",
+    "note": "Busy scene is a gradient; samples bound it, fog sample approximates the worst case"
+  },
+  "text_vs_backdrop_contrast": {
+    "white": {
+      "dark": 19.91,
+      "bright": 2.04,
+      "busy-navy": 16.23,
+      "busy-ochre": 8.9,
+      "busy-teal": 4.92,
+      "busy-fog": 2.16
+    },
+    "gold": {
+      "dark": 14.19,
+      "bright": 1.45,
+      "busy-navy": 11.57,
+      "busy-ochre": 6.34,
+      "busy-teal": 3.51,
+      "busy-fog": 1.54
+    },
+    "sky": {
+      "dark": 11.57,
+      "bright": 1.19,
+      "busy-navy": 9.43,
+      "busy-ochre": 5.17,
+      "busy-teal": 2.86,
+      "busy-fog": 1.26
+    },
+    "mint": {
+      "dark": 11.8,
+      "bright": 1.21,
+      "busy-navy": 9.62,
+      "busy-ochre": 5.27,
+      "busy-teal": 2.92,
+      "busy-fog": 1.28
+    }
+  },
+  "role_distinction": [
+    {
+      "pair": "gold-vs-sky",
+      "linear_distance": 1.391,
+      "luminance_delta": 0.138,
+      "protanopia_distance": 1.063,
+      "protanopia_luminance_delta": 0.016,
+      "deuteranopia_distance": 1.166,
+      "deuteranopia_luminance_delta": 0.218,
+      "tritanopia_distance": 1.065,
+      "tritanopia_luminance_delta": 0.036
+    },
+    {
+      "pair": "gold-vs-mint",
+      "linear_distance": 1.052,
+      "luminance_delta": 0.126,
+      "protanopia_distance": 0.405,
+      "protanopia_luminance_delta": 0.016,
+      "deuteranopia_distance": 0.587,
+      "deuteranopia_luminance_delta": 0.2,
+      "tritanopia_distance": 1.034,
+      "tritanopia_luminance_delta": 0.056
+    },
+    {
+      "pair": "white-vs-gold",
+      "linear_distance": 1.05,
+      "luminance_delta": 0.301,
+      "protanopia_distance": 1.068,
+      "protanopia_luminance_delta": 0.352,
+      "deuteranopia_distance": 1.018,
+      "deuteranopia_luminance_delta": 0.269,
+      "tritanopia_distance": 0.689,
+      "tritanopia_luminance_delta": 0.357
+    },
+    {
+      "pair": "white-vs-sky",
+      "linear_distance": 1.021,
+      "luminance_delta": 0.44,
+      "protanopia_distance": 0.615,
+      "protanopia_luminance_delta": 0.368,
+      "deuteranopia_distance": 0.804,
+      "deuteranopia_luminance_delta": 0.487,
+      "tritanopia_distance": 1.052,
+      "tritanopia_luminance_delta": 0.393
+    },
+    {
+      "pair": "white-vs-mint",
+      "linear_distance": 1.174,
+      "luminance_delta": 0.428,
+      "protanopia_distance": 0.777,
+      "protanopia_luminance_delta": 0.367,
+      "deuteranopia_distance": 0.867,
+      "deuteranopia_luminance_delta": 0.469,
+      "tritanopia_distance": 1.09,
+      "tritanopia_luminance_delta": 0.413
+    }
+  ]
+}

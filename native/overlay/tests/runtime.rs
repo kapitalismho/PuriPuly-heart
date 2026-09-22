@@ -1978,8 +1978,8 @@ fn readiness_failures_expose_typed_parent_failure_reasons() {
 }
 
 #[test]
-fn runtime_expected_contract_version_is_r2_protocol_nine() {
-    assert_eq!(EXPECTED_CONTRACT_VERSION, 9);
+fn runtime_expected_contract_version_is_r2_protocol_ten() {
+    assert_eq!(EXPECTED_CONTRACT_VERSION, 10);
 }
 
 #[test]

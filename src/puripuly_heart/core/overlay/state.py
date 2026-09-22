@@ -61,6 +61,8 @@ class OverlayLogicalTurnEntry:
     translation_source_text_hash: str | None = None
     translation_source_text_len: int | None = None
     translation_logical_turn_key: str | None = None
+    speaker_transition: str | None = None
+    speaker_transition_claim_id: str | None = None
     translation_seq: int | None = None
     occupant_key: str = ""
     appearance_seq: int | None = None
@@ -140,6 +142,8 @@ class OverlayPresentationEntry(Protocol):
     translation_source_text_hash: str | None
     translation_source_text_len: int | None
     translation_logical_turn_key: str | None
+    speaker_transition: str | None
+    speaker_transition_claim_id: str | None
     occupant_key: str
     appearance_seq: int | None
     publishable_seq: int | None
@@ -299,7 +303,6 @@ class OverlayPresentationState:
         key = self.entry_key(event.channel, event.utterance_id)
         retired_preview_seq = self.retired_preview_self_seqs.get(key)
         if retired_preview_seq is not None and event.seq <= retired_preview_seq:
-
             return OverlayReductionResult(False)
         active_entry = self._active_update_entry_or_none(
             channel=event.channel,
@@ -400,7 +403,6 @@ class OverlayPresentationState:
             return OverlayReductionResult(False)
         key, entry = live_self
         if event.seq < entry.last_updated_seq:
-
             return OverlayReductionResult(False)
         if not entry.live_text:
             self.live_self_turn_key = None
@@ -446,7 +448,6 @@ class OverlayPresentationState:
         if entry.retained_hidden:
             return OverlayReductionResult(False)
         if event.seq < entry.last_updated_seq:
-
             return OverlayReductionResult(False)
         event_source_language = _content_language_or_none(event.source_language)
         if (
@@ -454,7 +455,6 @@ class OverlayPresentationState:
             and entry.original_language == event_source_language
             and entry.last_updated_seq == event.seq
         ):
-
             return OverlayReductionResult(False)
 
         previous_rendered_translation_text = self._rendered_self_translation_text(entry)
@@ -515,7 +515,6 @@ class OverlayPresentationState:
             return OverlayReductionResult(False)
         entry = self.entry_for(event.channel, event.utterance_id)
         if event.seq < entry.last_updated_seq:
-
             return OverlayReductionResult(False)
         event_source_language = _content_language_or_none(event.source_language)
         event_target_language = _content_language_or_none(event.target_language)
@@ -525,7 +524,6 @@ class OverlayPresentationState:
             and entry.translation_language == event_target_language
             and entry.last_updated_seq == event.seq
         ):
-
             return OverlayReductionResult(False)
         if event_source_language is not None:
             entry.original_language = event_source_language
@@ -588,10 +586,8 @@ class OverlayPresentationState:
         if entry is None:
             return OverlayReductionResult(False)
         if event.seq < entry.last_updated_seq:
-
             return OverlayReductionResult(False)
         if entry.closed_seq == event.seq:
-
             return OverlayReductionResult(False)
         entry.closed_seq = event.seq
         entry.closed_at = now
@@ -682,7 +678,6 @@ class OverlayPresentationState:
         if entry.retained_hidden:
             return OverlayReductionResult(False)
         if event.seq < entry.last_updated_seq:
-
             return OverlayReductionResult(False)
         event_source_language = _content_language_or_none(event.source_language)
         if (
@@ -690,7 +685,6 @@ class OverlayPresentationState:
             and entry.original_language == event_source_language
             and entry.last_updated_seq == event.seq
         ):
-
             return OverlayReductionResult(False)
 
         self._remember_entry_input_seq(entry, event_seq=event.seq)
@@ -727,7 +721,6 @@ class OverlayPresentationState:
             return OverlayReductionResult(False)
         entry = self.entry_for(event.channel, event.utterance_id)
         if event.seq < entry.last_updated_seq:
-
             return OverlayReductionResult(False)
         event_source_language = _content_language_or_none(event.source_language)
         event_target_language = _content_language_or_none(event.target_language)
@@ -737,7 +730,6 @@ class OverlayPresentationState:
             and entry.translation_language == event_target_language
             and entry.last_updated_seq == event.seq
         ):
-
             return OverlayReductionResult(False)
 
         self._remember_entry_input_seq(entry, event_seq=event.seq)
@@ -754,6 +746,9 @@ class OverlayPresentationState:
                 previous_visible_since=entry.translation_visible_since,
                 now=now,
             )
+        first_readable_translation = (
+            bool(event.text.strip()) and entry.translation_observed_visible_since is None
+        )
         entry.translation_text = event.text
         if event.text.strip():
             entry.translation_language = event_target_language
@@ -763,6 +758,9 @@ class OverlayPresentationState:
             entry.translation_source_text_hash = event.source_text_hash
             entry.translation_source_text_len = event.source_text_len
             entry.translation_logical_turn_key = event.logical_turn_key
+            if first_readable_translation:
+                entry.speaker_transition = event.speaker_transition
+                entry.speaker_transition_claim_id = event.speaker_transition_claim_id
             entry.translation_seq = event.seq
             entry.live_text = ""
             entry.live_seq = None
@@ -774,6 +772,8 @@ class OverlayPresentationState:
             entry.translation_source_text_hash = None
             entry.translation_source_text_len = None
             entry.translation_logical_turn_key = None
+            entry.speaker_transition = None
+            entry.speaker_transition_claim_id = None
             if not entry.live_secondary_text.strip():
                 entry.translation_seq = None
         if event.text.strip() and entry.translation_observed_visible_since is None:
@@ -805,10 +805,8 @@ class OverlayPresentationState:
         if entry is None:
             return OverlayReductionResult(False)
         if event.seq < entry.last_updated_seq:
-
             return OverlayReductionResult(False)
         if entry.closed_seq == event.seq:
-
             return OverlayReductionResult(False)
         entry.closed_seq = event.seq
         entry.closed_at = now
@@ -1030,6 +1028,8 @@ class OverlayPresentationState:
             block.source_text_hash if include_translation_metadata else None,
             block.source_text_len if include_translation_metadata else None,
             block.logical_turn_key if include_translation_metadata else None,
+            block.speaker_style,
+            block.speaker_boundary,
         )
 
     def rendered_blocks_signature(
@@ -1130,12 +1130,10 @@ class OverlayPresentationState:
         if live_entry is not None:
             live_key, current_live_entry = live_entry
             if live_key != key and event_seq < current_live_entry.last_updated_seq:
-
                 return None
 
         entry = self.entry_for(channel, utterance_id)
         if event_seq < entry.last_updated_seq:
-
             return None
         if live_entry is not None and live_entry[0] != key:
             if channel == "self":
@@ -1509,6 +1507,8 @@ class OverlayPresentationState:
                     source_text_hash=entry.translation_source_text_hash,
                     source_text_len=entry.translation_source_text_len,
                     logical_turn_key=entry.translation_logical_turn_key,
+                    speaker_style=None,
+                    speaker_boundary=False,
                 )
             active_text = entry.live_text.strip()
             if active_text:

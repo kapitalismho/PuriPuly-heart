@@ -1197,6 +1197,7 @@ fn layout_cache_key_for_block(
         block_variant: block.block_variant,
         secondary_enabled: block.secondary_enabled,
         secondary_reserved: block_reserves_secondary_row(block),
+        speaker_boundary: block.speaker_boundary,
         primary_font_size_key: scalar_key(DEFAULT_FONT_SIZE_PX * text_scale),
         secondary_font_size_key: scalar_key(
             DEFAULT_FONT_SIZE_PX * text_scale * SECONDARY_FONT_SCALE,
@@ -1264,6 +1265,7 @@ fn materialize_resolved_block_layout(
         primary_lines,
         secondary_line,
         secondary_reserved: template.secondary_reserved,
+        speaker_boundary: block.speaker_boundary,
         bounds,
         visual_bounds,
         content_width_px: template.content_width_px,
@@ -1748,11 +1750,15 @@ mod tests {
     fn fill_color_for_channel_uses_fixed_text_only_palette() {
         let this = fill_color_for_channel(CaptionChannel::SelfChannel);
         let peer = fill_color_for_channel(CaptionChannel::PeerChannel);
+        let peer_cyan = fill_color_for_channel(CaptionChannel::PeerCyan);
         assert_eq!(this, (1.0, 1.0, 1.0, 1.0));
         assert_eq!(peer, (1.0, 215.0 / 255.0, 0.0, 1.0));
+        assert_eq!(peer_cyan, (51.0 / 255.0, 214.0 / 255.0, 1.0, 1.0));
         assert_ne!(this, peer);
+        assert_ne!(peer, peer_cyan);
         assert_eq!(this.3, 1.0);
         assert_eq!(peer.3, 1.0);
+        assert_eq!(peer_cyan.3, 1.0);
     }
 
     #[test]

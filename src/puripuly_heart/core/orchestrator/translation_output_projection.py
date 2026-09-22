@@ -2601,7 +2601,7 @@ class TranslationOutputProjectionOwner:
 
     @staticmethod
     def _translation_metadata(translation: Translation) -> dict[str, object]:
-        return {
+        metadata: dict[str, object] = {
             "update_id": translation.update_id,
             "origin_wall_clock_ms": translation.origin_wall_clock_ms,
             "session_scope": translation.session_scope,
@@ -2609,6 +2609,12 @@ class TranslationOutputProjectionOwner:
             "source_text_len": translation.source_text_len,
             "logical_turn_key": translation.logical_turn_key,
         }
+        if translation.channel == "peer":
+            metadata.update(
+                speaker_transition=translation.speaker_transition,
+                speaker_transition_claim_id=translation.speaker_transition_claim_id,
+            )
+        return metadata
 
     @staticmethod
     def _active_translation_metadata(

@@ -25,6 +25,7 @@ from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_DYNAMIC_WIDTH_SAFETY,
     _DESKTOP_CAPTION_EMOJI_WIDTH_EM,
     _DESKTOP_CAPTION_FONT_FAMILY,
+    _DESKTOP_CAPTION_GOLD,
     _DESKTOP_CAPTION_LATIN_NARROW_WIDTH_EM,
     _DESKTOP_CAPTION_LATIN_WIDE_WIDTH_EM,
     _DESKTOP_CAPTION_LINE_HEIGHT,
@@ -638,6 +639,7 @@ def _caption_slots_for_snapshot(
                 appearance_seq=block.appearance_seq,
                 lines=lines,
                 secondary_enabled=block.secondary_enabled,
+                speaker_boundary=block.speaker_boundary,
                 active=block.block_variant in {"active_self", "active_peer"},
             )
         )
@@ -960,7 +962,7 @@ def _caption_line(
         text=text,
         role=role,
         slot=slot,
-        color=_desktop_caption_color_for_channel(block.channel),
+        color=_desktop_caption_color_for_channel(block.channel, block.speaker_style),
         priority=priority,
         block_id=block.id,
         channel=block.channel,
@@ -1162,8 +1164,9 @@ def _build_flet_caption_slot(ft: Any, plan: DesktopCaptionPlan, slot: DesktopCap
         tight=True,
         scroll=None,
     )
+    text_content: Any = column
     text_layer = ft.Container(
-        content=column,
+        content=text_content,
         width=card_text_width,
         bgcolor=ft.Colors.TRANSPARENT,
         alignment=(
@@ -1172,18 +1175,47 @@ def _build_flet_caption_slot(ft: Any, plan: DesktopCaptionPlan, slot: DesktopCap
             else ft.Alignment.CENTER
         ),
     )
+    card_content: Any = text_layer
+    card_padding: Any = ft.Padding.symmetric(
+        horizontal=plan.padding_horizontal,
+        vertical=plan.padding_vertical,
+    )
+    if slot.speaker_boundary:
+        scale = plan.window_width / 4096.0
+        marker_height = max(2.0, 14.0 * scale)
+        marker = ft.Container(
+            width=max(24.0, 196.0 * scale),
+            height=marker_height,
+            bgcolor=_DESKTOP_CAPTION_GOLD,
+            left=plan.padding_horizontal,
+            top=0,
+        )
+        padded_text = ft.Container(
+            content=text_layer,
+            width=card_width,
+            height=plan.slot_height,
+            padding=ft.Padding.only(
+                left=plan.padding_horizontal,
+                top=marker_height + max(4.0, 28.0 * scale),
+                right=plan.padding_horizontal,
+                bottom=plan.padding_vertical,
+            ),
+        )
+        card_content = ft.Stack(
+            controls=[padded_text, marker],
+            width=card_width,
+            height=plan.slot_height,
+        )
+        card_padding = None
     inner_card = ft.Container(
-        content=text_layer,
+        content=card_content,
         width=card_width,
         height=plan.slot_height,
         bgcolor=(
             ft.Colors.TRANSPARENT if plan.full_window_background_visible else plan.background_color
         ),
         border_radius=plan.border_radius,
-        padding=ft.Padding.symmetric(
-            horizontal=plan.padding_horizontal,
-            vertical=plan.padding_vertical,
-        ),
+        padding=card_padding,
         alignment=ft.Alignment.CENTER,
     )
     return ft.Container(

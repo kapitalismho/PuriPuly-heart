@@ -542,6 +542,9 @@ class SettingsRuntimeEffectsAdapter:
                 show_translation=settings.intent.overlay.show_translation,
                 show_peer_original=settings.intent.overlay.show_peer_original,
             )
+            await presenter.update_speaker_transition_mode(
+                settings.intent.overlay.speaker_transition_mode
+            )
 
         if transition.previous_overlay_enabled != self._settings.overlay_enabled():
             await self._overlay.set_enabled(self._settings.overlay_enabled())

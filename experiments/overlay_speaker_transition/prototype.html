@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overlay Speaker Transition — Visual Candidates (Preliminary Browser Comparison)</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #101216; color: #EDEFF2; font-family: "Noto Sans", "Segoe UI", system-ui, sans-serif; }
+  header { padding: 16px 20px 8px; }
+  header h1 { font-size: 18px; margin: 0 0 4px; }
+  header p { margin: 4px 0; font-size: 13px; color: #C9CDD3; max-width: 1100px; }
+  .banner { display: inline-block; font-size: 12px; font-weight: 700; background: #3A2B00; color: #FFD700; border: 1px solid #FFD700; border-radius: 6px; padding: 3px 8px; margin-bottom: 8px; }
+  main { padding: 8px 20px 40px; max-width: 1180px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+  .controls .group { display: flex; gap: 6px; align-items: center; background: #1A1D22; border: 1px solid #2C313A; border-radius: 8px; padding: 6px 8px; }
+  .controls .label { font-size: 11px; color: #9AA0AA; text-transform: uppercase; letter-spacing: .06em; }
+  button { font: inherit; font-size: 13px; background: #242931; color: #EDEFF2; border: 1px solid #3A414C; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  button[aria-pressed="true"] { background: #FFD700; color: #111; border-color: #FFD700; font-weight: 700; }
+  button:disabled { opacity: .45; cursor: default; }
+  input[type="range"] { width: 280px; }
+  .stage-wrap { margin: 12px 0; }
+  .stage-meta { font-size: 13px; color: #C9CDD3; margin: 6px 0; }
+  .stage { width: 900px; height: 232px; border-radius: 10px; position: relative; overflow: hidden; border: 1px solid #333; }
+  .stage.busy { background: linear-gradient(135deg,#1B2A4A 0%,#7A5C2E 38%,#3AA58B 62%,#E8E8E8 100%); }
+  .stage.dark { background: #0A0C10; }
+  .stage.bright { background: #EDEFF2; }
+  .strip { position: absolute; left: 11px; right: 11px; bottom: 9px; background: rgba(0,0,0,0.24); border-radius: 6px; padding: 7px 5px; display: flex; flex-direction: column; gap: 8px; }
+  .block { padding: 0 6px; }
+  .rule { height: 3px; width: 43px; border-radius: 2px; margin: 0 0 6px 1px; }
+  .primary { font-size: 29px; line-height: 33px; font-weight: 600; text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000; overflow-wrap: break-word; }
+  .secondary { font-size: 18px; line-height: 23px; font-weight: 500; margin-top: 2px; text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000; overflow-wrap: break-word; }
+  .dash { padding-right: 8px; }
+  .legend { font-size: 12px; color: #C9CDD3; background: #1A1D22; border: 1px solid #2C313A; border-radius: 8px; padding: 8px 10px; margin: 8px 0; max-width: 900px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 460px); gap: 12px; margin-top: 12px; }
+  .cell { background: #16191E; border: 1px solid #2C313A; border-radius: 8px; padding: 8px; }
+  .cell h3 { margin: 0 0 6px; font-size: 13px; }
+  .cell h3 span { color: #9AA0AA; font-weight: 400; }
+  .mini { width: 444px; height: 114px; border-radius: 6px; position: relative; overflow: hidden; border: 1px solid #333; }
+  .mini .strip { left: 5px; right: 5px; bottom: 4px; padding: 3px; gap: 4px; }
+  .mini .primary { font-size: 14px; line-height: 16px; }
+  .mini .secondary { font-size: 9px; line-height: 11px; }
+  .mini .rule { height: 2px; width: 21px; margin-bottom: 3px; }
+  table { border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+  th, td { border: 1px solid #333; padding: 4px 8px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  .readout { font-size: 13px; background: #16191E; border: 1px solid #2C313A; border-radius: 8px; padding: 8px 10px; margin-top: 10px; max-width: 900px; }
+  .readout code { color: #FFD700; }
+  section { margin-top: 26px; }
+  section h2 { font-size: 15px; margin: 0 0 6px; }
+  section p { font-size: 13px; color: #C9CDD3; max-width: 1000px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="banner">PRELIMINARY BROWSER COMPARISON ONLY — NOT SteamVR/HMD OR PRODUCTION INTEGRATION EVIDENCE</div>
+  <h1>Overlay speaker-transition visual candidates — runnable comparison</h1>
+  <p>Issue <a href="https://github.com/kapitalismho/PuriPuly-heart/issues/178" style="color:#FFD700">#178</a>.
+  Fixed synthetic sequence, two-block window, no transcript history. Speaker letters are test annotations and never appear as product labels.
+  Native constraints emulated: 4096x1056 surface at 0.22 scale (900x232), primary 132px, secondary 82px, 5px black outline, strip alpha 0.24, no flashing.</p>
+  <p>Meaning of the cue: the start of this Peer content has sufficient local evidence of a speaker transition versus the previous relevant Peer content.
+  Same color is not proof of the same person. No marker is not proof of the same speaker.</p>
+</header>
+<main>
+  <div class="controls">
+    <div class="group" id="modeGroup" role="group" aria-label="Candidate mode"><span class="label">Mode</span></div>
+    <div class="group" role="group" aria-label="Background"><span class="label">Scene</span>
+      <button data-bg="dark" aria-pressed="true">Dark</button>
+      <button data-bg="bright" aria-pressed="false">Bright</button>
+      <button data-bg="busy" aria-pressed="false">Busy</button>
+    </div>
+    <div class="group" role="group" aria-label="Vision simulation"><span class="label">Simulate</span>
+      <button data-cvd="none" aria-pressed="true">None</button>
+      <button data-cvd="protanopia" aria-pressed="false">P</button>
+      <button data-cvd="deuteranopia" aria-pressed="false">D</button>
+      <button data-cvd="tritanopia" aria-pressed="false">T</button>
+    </div>
+    <div class="group"><span class="label">Event</span>
+      <button id="prev">Prev</button>
+      <input id="scrub" type="range" min="0" max="13" step="1" value="2">
+      <button id="next">Next</button>
+    </div>
+  </div>
+
+  <div class="stage-wrap">
+    <div class="stage-meta" id="stageMeta"></div>
+    <div class="stage dark" id="stage"><div class="strip" id="strip"></div></div>
+    <div class="legend" id="legend"></div>
+    <div class="readout" id="readout"></div>
+  </div>
+
+  <section>
+    <h2>Side-by-side at the same event — all modes, same input</h2>
+    <p>Every cell renders the identical two-block window for the selected event. Compare: A1 dash vs A2 rule; C1 sky vs C2 mint as equal-status pairs;
+    E1 rule+sky vs E2 dash+mint emphasis salience. Baseline shows existing White/Gold with no marker.</p>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section>
+    <h2>Contrast reference (computed, not a pass claim)</h2>
+    <p>WCAG relative-luminance ratios of strip-blended text over scene samples (strip rgba(0,0,0,0.24); black outline not modeled). Role distinction is separate from text contrast; see CVD rows.</p>
+    <div id="contrastTables"></div>
+  </section>
+
+  <section>
+    <h2>How to run</h2>
+    <p>Open this file in a browser directly, or serve the experiment folder: <code>python -m http.server 8137 --directory experiments/overlay_speaker_transition</code> then visit <code>http://127.0.0.1:8137/prototype.html</code>.
+    Step through t01..t14 with Prev/Next or the slider; switch scene and vision simulation. Deterministic input lives in <code>scenario.json</code>; expected per-mode windows in <code>expected_results.json</code>;
+    regenerate with <code>python experiments/overlay_speaker_transition/replay.py</code>.</p>
+  </section>
+</main>
+<script>
+const HEX = { white: "#FFFFFF", gold: "#FFD700", sky: "#33D6FF", mint: "#2DE1A8", goldC2: "#FFC21A" };
+const MODES = [
+  { id: "baseline", label: "Baseline", sub: "White/Gold, no marker" },
+  { id: "A1", label: "A1 dash", sub: "Gold + leading em dash" },
+  { id: "A2", label: "A2 rule ★", sub: "Gold + 196x14 upper rule" },
+  { id: "C1", label: "C1 sky ★", sub: "Gold / Sky #33D6FF" },
+  { id: "C2", label: "C2 mint", sub: "Gold / Mint #2DE1A8" },
+  { id: "E1", label: "E1 rule+sky ★", sub: "Gold rule + sky emphasis" },
+  { id: "E2", label: "E2 dash+mint", sub: "dash marker + mint emphasis" },
+];
+const EVENTS = [
+  { id: "t01", key: "peer-a1", channel: "peer", kind: "initial", evidence: "First peer turn, fresh context. No transition claim.", primary: "Good morning, let us test the translation overlay.", secondary: "Good morning, let us test the translation overlay.", lang: "EN/EN" },
+  { id: "t02", key: "peer-a2", channel: "peer", kind: "same", evidence: "Delivery cut only. No marker, no toggle.", primary: "Same voice continues, delivery cut only, not a new speaker.", secondary: "Same voice continues, delivery cut only, not a new speaker.", lang: "EN/EN" },
+  { id: "t03", key: "peer-b1", channel: "peer", kind: "confirmed_transition", evidence: "Qualifying transition vs peer-a2.", primary: "Hi, a second voice joins in now.", secondary: "Hi, a second voice joins in now.", lang: "EN/EN" },
+  { id: "t04", key: "peer-b2", channel: "peer", kind: "same", evidence: "Continuation. No duplicate cue or toggle.", primary: "Yes, the same second voice keeps going.", secondary: "Yes, the same second voice keeps going.", lang: "EN/EN" },
+  { id: "t05", key: "self-s1", channel: "self", kind: "self", evidence: "SELF interposition. White everywhere; C keeps run; E emphasis expires here.", primary: "Got it, I can see both lines clearly.", secondary: "", lang: "EN" },
+  { id: "t06", key: "peer-b3", channel: "peer", kind: "same", evidence: "Same speaker across SELF. No new boundary.", primary: "Still the second voice after your reply.", secondary: "Still the second voice after your reply.", lang: "EN/EN" },
+  { id: "t07", key: "peer-c1", channel: "peer", kind: "confirmed_transition", evidence: "Confirmed B to C transition.", primary: "A third voice cuts in briefly here.", secondary: "A third voice cuts in briefly here.", lang: "EN/EN" },
+  { id: "t08", key: "peer-a3", channel: "peer", kind: "confirmed_transition", evidence: "Confirmed C to A transition. Toggle once; no lookup of earlier hue.", primary: "First voice returns. OK.", secondary: "First voice returns. OK.", lang: "EN/EN" },
+  { id: "t09", key: "peer-u1", channel: "peer", kind: "unknown", evidence: "Mixed/overlap. Withheld; hue retained without claiming continuity.", primary: "Overlapping voices, hard to tell.", secondary: "Overlapping voices, hard to tell.", lang: "EN/EN" },
+  { id: "t10", key: "peer-r1", channel: "peer", kind: "reset_fresh", evidence: "Reset then reconnect, empty window. Fresh Gold start.", primary: "Back after the reset, fresh context.", secondary: "Back after the reset, fresh context.", lang: "EN/EN" },
+  { id: "t11", key: "peer-a3", channel: "peer", kind: "revision", evidence: "Revision of expired peer-a3. Withheld; nothing recolored or replayed.", primary: "First voice returns. OK, slight reword.", secondary: "First voice returns. OK, slight reword.", lang: "EN/EN (withheld)" },
+  { id: "t12", key: "peer-b1", channel: "peer", kind: "late_expired", evidence: "Late arrival for an expired generation. Withheld.", primary: "Late evidence about an expired turn.", secondary: "Late evidence about an expired turn.", lang: "EN/EN (withheld)" },
+  { id: "t13", key: "peer-m1", channel: "peer", kind: "confirmed_transition", evidence: "Wrapping multilingual turn. Whole turn takes one arrival color.", primary: "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.", secondary: "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color.", lang: "KO/EN" },
+  { id: "t14", key: "peer-s2", channel: "peer", kind: "same", evidence: "Short reply. E emphasis from t13 expires; its rule marker persists.", primary: "OK.", secondary: "はい、わかりました。短い返事も同じ转写ルールです。", lang: "EN/JA" },
+];
+const MARKER = { A1: "dash", A2: "rule", E1: "rule", E2: "dash" };
+const CVD_MATRICES = {
+  protanopia: [[0.152286,1.052583,-0.204868],[0.114503,0.786281,0.099216],[-0.003882,-0.048116,1.051998]],
+  deuteranopia: [[0.367322,0.860646,-0.227968],[0.280085,0.672501,0.047413],[-0.011820,0.042940,0.968881]],
+  tritanopia: [[1.255528,-0.076749,-0.178779],[-0.078411,0.930809,0.147602],[0.004733,0.691367,0.303900]],
+};
+const CVD_METHOD = "Machado-Oliveira-Fernandes-2009 severity 1.0, linear-light sRGB decode/matrix/clamp/encode";
+let state = { mode: "A2", bg: "dark", cvd: "none", index: 2 };
+
+function srgbToLinear(c) { return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function linearToSrgb(c) { return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(Math.max(c, 0), 1 / 2.4) - 0.055; }
+function clamp01(v) { return Math.min(1, Math.max(0, v)); }
+function hexToRgb(h) { return [parseInt(h.slice(1,3),16)/255, parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255]; }
+function rgbToHex(c) { return "#" + c.map(v => Math.round(clamp01(v)*255).toString(16).padStart(2,"0")).join("").toUpperCase(); }
+function simulate(hex, cvd) {
+  if (cvd === "none") return hex;
+  const m = CVD_MATRICES[cvd], linear = hexToRgb(hex).map(srgbToLinear);
+  return rgbToHex([0,1,2].map(r => linearToSrgb(clamp01(m[r][0]*linear[0] + m[r][1]*linear[1] + m[r][2]*linear[2]))));
+}
+function emphasisHex(mode) { return (mode === "C2" || mode === "E2") ? HEX.mint : HEX.sky; }
+function peerBase(mode) { return mode === "C2" ? HEX.goldC2 : HEX.gold; }
+
+function replayUpTo(mode, index) {
+  let run = "gold", emphasis = null, window = [];
+  const snaps = [];
+  for (let i = 0; i <= index; i++) {
+    const ev = EVENTS[i];
+    if (ev.kind === "late_expired" || (ev.kind === "revision")) { snaps.push({ action: "withheld", window: window.slice(), run, emphasis }); continue; }
+    if (ev.kind === "reset_fresh") { window = []; run = "gold"; emphasis = null; }
+    else if ((mode === "E1" || mode === "E2") && emphasis !== null && ev.key !== emphasis) {
+      window.forEach(e => { if (e.key === emphasis && e.role === "cyan") { e.role = "gold"; e.hex = peerBase(mode); } });
+      emphasis = null;
+    }
+    let role = "gold", marker = "none", action = "carry";
+    if (ev.channel === "self") { role = "white"; action = "self-white"; }
+    else if (ev.kind === "confirmed_transition") {
+      if (mode === "C1" || mode === "C2") { run = (run === "gold") ? "cyan" : "gold"; role = run; action = "toggle-run"; }
+      else if (mode === "E1" || mode === "E2") { emphasis = ev.key; role = "cyan"; marker = MARKER[mode]; action = "emphasis-with-marker"; }
+      else { marker = MARKER[mode]; action = "marker-only"; }
+    } else {
+      if ((mode === "C1" || mode === "C2") && ev.channel === "peer") role = run;
+      else if (ev.channel === "peer") role = "gold";
+      else role = "white";
+    }
+    let hex = role === "white" ? HEX.white : role === "cyan" ? emphasisHex(mode) : peerBase(mode);
+    let marker_hex = null;
+    if (marker !== "none") marker_hex = (mode === "E1") ? HEX.gold : (mode === "E2" ? HEX.mint : hex);
+    window.push({ key: ev.key, channel: ev.channel, role, hex, marker, marker_hex, primary: ev.primary, secondary: ev.secondary });
+    window = window.slice(-2);
+    snaps.push({ action, window: window.slice(), run, emphasis });
+  }
+  return snaps[snaps.length - 1];
+}
+
+function blockHTML(entry, mini) {
+  const fg = simulate(entry.hex, state.cvd);
+  const marker = entry.marker;
+  const markerHex = entry.marker_hex || entry.hex;
+  let html = "";
+  if (marker === "rule") html += `<div class="rule" style="background:${simulate(markerHex, state.cvd)}"></div>`;
+  const dash = marker === "dash" ? `<span class="dash" style="color:${simulate(markerHex, state.cvd)}" aria-hidden="true">—</span>` : "";
+  html += `<div class="primary" style="color:${fg}">${dash}${escapeHTML(entry.primary)}</div>`;
+  if (entry.secondary) html += `<div class="secondary" style="color:${fg}">${escapeHTML(entry.secondary)}</div>`;
+  return `<div class="block">${html}</div>`;
+}
+function escapeHTML(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function render() {
+  const ev = EVENTS[state.index];
+  const snap = replayUpTo(state.mode, state.index);
+  const stage = document.getElementById("stage");
+  stage.className = "stage " + state.bg;
+  document.getElementById("strip").innerHTML = snap.window.map(e => blockHTML(e)).join("");
+  document.getElementById("stageMeta").textContent = `${state.mode} — ${ev.id} (${ev.kind}) · ${ev.lang} · scene ${state.bg} · simulate ${state.cvd} · window: ${snap.window.map(w => w.key).join(" + ") || "empty"}`;
+  document.getElementById("legend").textContent = "Boundary (— or short upper rule) = local speaker-change evidence at the start of that Peer block. Same color never means the same person. No marker never means the same speaker. SELF is always White.";
+  document.getElementById("readout").innerHTML = `Evidence: <code>${escapeHTML(ev.evidence)}</code> · Action: <code>${snap.action}</code> · Run: <code>${snap.run}</code> · Emphasis: <code>${snap.emphasis || "none"}</code>`;
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  MODES.forEach(m => {
+    const s = replayUpTo(m.id, state.index);
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.innerHTML = `<h3>${m.label} <span>${m.sub} · ${s.action}</span></h3><div class="mini ${state.bg}"><div class="strip">${s.window.map(e => blockHTML(e, true)).join("")}</div></div>`;
+    grid.appendChild(cell);
+  });
+  document.getElementById("scrub").value = String(state.index);
+  document.querySelectorAll("#modeGroup button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode)));
+}
+
+function buildControls() {
+  const g = document.getElementById("modeGroup");
+  MODES.forEach(m => {
+    const b = document.createElement("button");
+    b.textContent = m.label; b.dataset.mode = m.id;
+    b.setAttribute("aria-pressed", String(m.id === state.mode));
+    b.onclick = () => { state.mode = m.id; render(); };
+    g.appendChild(b);
+  });
+  document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => {
+    state.bg = b.dataset.bg;
+    document.querySelectorAll("[data-bg]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    render();
+  });
+  document.querySelectorAll("[data-cvd]").forEach(b => b.onclick = () => {
+    state.cvd = b.dataset.cvd;
+    document.querySelectorAll("[data-cvd]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    render();
+  });
+  document.getElementById("prev").onclick = () => { state.index = Math.max(0, state.index - 1); render(); };
+  document.getElementById("next").onclick = () => { state.index = Math.min(EVENTS.length - 1, state.index + 1); render(); };
+  document.getElementById("scrub").oninput = e => { state.index = Number(e.target.value); render(); };
+}
+
+function buildContrast() {
+  const rows = [
+    ["White #FFFFFF", "19.91", "2.04", "16.23 / 8.90 / 4.92 / 2.16"],
+    ["Gold #FFD700", "14.19", "1.45", "11.57 / 6.34 / 3.51 / 1.54"],
+    ["Sky #33D6FF", "11.57", "1.19", "9.43 / 5.17 / 2.86 / 1.26"],
+    ["Mint #2DE1A8", "11.80", "1.21", "9.62 / 5.27 / 2.92 / 1.28"],
+  ];
+  document.getElementById("contrastTables").innerHTML =
+    `<table><tr><th>Text</th><th>Dark</th><th>Bright</th><th>Busy navy/ochre/teal/fog</th></tr>` +
+    rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join("") + `</table>` +
+    `<p>Role distinction (linear-RGB distance; larger = more separable): Gold–Sky 1.391 (P 1.063 / D 1.166 / T 1.065), Gold–Mint 1.052 (P 0.405 / D 0.587 / T 1.034). ` +
+    `Luminance delta: Gold–Sky 0.138 (P 0.016 / D 0.218 / T 0.036), Gold–Mint 0.126 (P 0.016 / D 0.200 / T 0.056). ` +
+    `CVD simulation: ${CVD_METHOD}. Earlier numbers that applied the matrix directly to gamma-encoded sRGB were wrong and are withdrawn; the deuteranopia Sky→purple rendering was that bug. ` +
+    `Full numbers in <code>contrast_analysis.json</code> (generator: <code>contrast_check.py</code>). Bright/busy-fog backgrounds compress every ratio toward 1.2–2.2; the black outline, not modeled numerically, carries legibility there.</p>`;
+}
+
+window.__overlay = { set: (patch) => { Object.assign(state, patch); render(); return replayUpTo(state.mode, state.index); }, get: () => ({ ...state }), MODES, EVENTS, replayUpTo };
+buildControls();
+buildContrast();
+render();
+</script>
+</body>
+</html>

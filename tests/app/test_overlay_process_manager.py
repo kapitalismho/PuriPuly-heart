@@ -21,6 +21,7 @@ from puripuly_heart.core.overlay.manifest import (
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_NATIVE_RETRY_CONTRACT,
+    OVERLAY_SPEAKER_TRANSITION_CONTRACT,
     OverlayLaunchManifest,
 )
 from puripuly_heart.core.overlay.openvr_vendor import VendoredOpenVrBundle
@@ -200,6 +201,7 @@ class FakeOverlayManagedProcess(OverlayManagedProcess):
                         "capabilities": {
                             "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                             "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+                            "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
                         },
                     }
                 )
@@ -522,6 +524,7 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
                         "capabilities": {
                             "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                             "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+                            "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
                         },
                     },
                     {
@@ -2796,6 +2799,7 @@ async def test_overlay_ready_rejects_stale_instance_and_duplicate_generation() -
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
             },
         },
         allow_ready=True,
@@ -2809,6 +2813,7 @@ async def test_overlay_ready_rejects_stale_instance_and_duplicate_generation() -
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
             },
         },
         allow_ready=True,
@@ -2983,6 +2988,7 @@ async def test_window_bounds_event_rejects_generation_other_than_ready_generatio
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+                "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
             },
         },
         allow_ready=True,

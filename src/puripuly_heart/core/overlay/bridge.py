@@ -23,6 +23,7 @@ from .manifest import (
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_NATIVE_RETRY_CONTRACT,
+    OVERLAY_SPEAKER_TRANSITION_CONTRACT,
 )
 from .protocol import OverlayPresentationSnapshot
 
@@ -501,6 +502,7 @@ class OverlayBridge:
             contract_version=OVERLAY_CONTRACT_VERSION,
             execution_contract=OVERLAY_EXECUTION_CONTRACT,
             native_retry_contract=OVERLAY_NATIVE_RETRY_CONTRACT,
+            speaker_transition_contract=OVERLAY_SPEAKER_TRANSITION_CONTRACT,
         )
 
     def _load_message(self, payload: Any) -> dict[str, Any]:

@@ -1,0 +1,2990 @@
+{
+  "meta": {
+    "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/178",
+    "baseline": "13274569769d3c1ec7a896a2d15b919b76136a6e",
+    "scenario_sha256": "246a0672a758f52d83164ee7aa3ad12912d467ceb1ab97b15290ad0dcdadbf9b",
+    "scenario_version": 1,
+    "window_blocks": 2
+  },
+  "per_mode": {
+    "baseline": [
+      {
+        "action": "carry",
+        "reason": "First peer turn in a fresh context. No transition claim.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t01"
+      },
+      {
+        "action": "carry",
+        "reason": "Ordinary turn segmentation must not create a marker or toggle.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          },
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t02"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Qualifying transition evidence vs previous peer.",
+        "window": [
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          },
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t03"
+      },
+      {
+        "action": "carry",
+        "reason": "Continuation must not duplicate a cue or toggle.",
+        "window": [
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          },
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t04"
+      },
+      {
+        "action": "self-white",
+        "reason": "SELF interposition. White in every mode. C must not toggle. E expires the previous emphasis on this readable turn.",
+        "window": [
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          },
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t05"
+      },
+      {
+        "action": "carry",
+        "reason": "Valid comparison across SELF. No new boundary. C keeps the run color.",
+        "window": [
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          },
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t06"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Confirmed B to C transition.",
+        "window": [
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          },
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t07"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Confirmed C to A transition. No lookup of earlier hue. Toggle once.",
+        "window": [
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          },
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t08"
+      },
+      {
+        "action": "carry",
+        "reason": "Mixed and overlap evidence. Withhold cue. Retain hue without claiming continuity.",
+        "window": [
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          },
+          {
+            "event": "t09",
+            "block": "b09",
+            "key": "peer-u1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Overlapping voices, hard to tell.",
+            "secondary": "Overlapping voices, hard to tell."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t09"
+      },
+      {
+        "action": "carry",
+        "reason": "Reference loss then reconnect with an empty window. Fresh Gold start must not imply a transition from any surviving Cyan.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t10"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t11"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t12"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Wrapping multilingual turn. Whole turn takes one color. Secondary keeps its smaller size, never a second speaker meaning.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          },
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t13"
+      },
+      {
+        "action": "carry",
+        "reason": "Short reply plus Japanese secondary. Cue stays attached to the incoming block, readable at small sizes.",
+        "window": [
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          },
+          {
+            "event": "t14",
+            "block": "b12",
+            "key": "peer-s2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "OK.",
+            "secondary": "はい、わかりました。短い返事も同じ转写ルールです。"
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t14"
+      }
+    ],
+    "A1": [
+      {
+        "action": "carry",
+        "reason": "First peer turn in a fresh context. No transition claim.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t01"
+      },
+      {
+        "action": "carry",
+        "reason": "Ordinary turn segmentation must not create a marker or toggle.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          },
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t02"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Qualifying transition evidence vs previous peer.",
+        "window": [
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          },
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#FFD700",
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t03"
+      },
+      {
+        "action": "carry",
+        "reason": "Continuation must not duplicate a cue or toggle.",
+        "window": [
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#FFD700",
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          },
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t04"
+      },
+      {
+        "action": "self-white",
+        "reason": "SELF interposition. White in every mode. C must not toggle. E expires the previous emphasis on this readable turn.",
+        "window": [
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          },
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t05"
+      },
+      {
+        "action": "carry",
+        "reason": "Valid comparison across SELF. No new boundary. C keeps the run color.",
+        "window": [
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          },
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t06"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Confirmed B to C transition.",
+        "window": [
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          },
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#FFD700",
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t07"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Confirmed C to A transition. No lookup of earlier hue. Toggle once.",
+        "window": [
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#FFD700",
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          },
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#FFD700",
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t08"
+      },
+      {
+        "action": "carry",
+        "reason": "Mixed and overlap evidence. Withhold cue. Retain hue without claiming continuity.",
+        "window": [
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#FFD700",
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          },
+          {
+            "event": "t09",
+            "block": "b09",
+            "key": "peer-u1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Overlapping voices, hard to tell.",
+            "secondary": "Overlapping voices, hard to tell."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t09"
+      },
+      {
+        "action": "carry",
+        "reason": "Reference loss then reconnect with an empty window. Fresh Gold start must not imply a transition from any surviving Cyan.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t10"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t11"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t12"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Wrapping multilingual turn. Whole turn takes one color. Secondary keeps its smaller size, never a second speaker meaning.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          },
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#FFD700",
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t13"
+      },
+      {
+        "action": "carry",
+        "reason": "Short reply plus Japanese secondary. Cue stays attached to the incoming block, readable at small sizes.",
+        "window": [
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#FFD700",
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          },
+          {
+            "event": "t14",
+            "block": "b12",
+            "key": "peer-s2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "OK.",
+            "secondary": "はい、わかりました。短い返事も同じ转写ルールです。"
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t14"
+      }
+    ],
+    "A2": [
+      {
+        "action": "carry",
+        "reason": "First peer turn in a fresh context. No transition claim.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t01"
+      },
+      {
+        "action": "carry",
+        "reason": "Ordinary turn segmentation must not create a marker or toggle.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          },
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t02"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Qualifying transition evidence vs previous peer.",
+        "window": [
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          },
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t03"
+      },
+      {
+        "action": "carry",
+        "reason": "Continuation must not duplicate a cue or toggle.",
+        "window": [
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          },
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t04"
+      },
+      {
+        "action": "self-white",
+        "reason": "SELF interposition. White in every mode. C must not toggle. E expires the previous emphasis on this readable turn.",
+        "window": [
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          },
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t05"
+      },
+      {
+        "action": "carry",
+        "reason": "Valid comparison across SELF. No new boundary. C keeps the run color.",
+        "window": [
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          },
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t06"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Confirmed B to C transition.",
+        "window": [
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          },
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t07"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Confirmed C to A transition. No lookup of earlier hue. Toggle once.",
+        "window": [
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          },
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t08"
+      },
+      {
+        "action": "carry",
+        "reason": "Mixed and overlap evidence. Withhold cue. Retain hue without claiming continuity.",
+        "window": [
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          },
+          {
+            "event": "t09",
+            "block": "b09",
+            "key": "peer-u1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Overlapping voices, hard to tell.",
+            "secondary": "Overlapping voices, hard to tell."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t09"
+      },
+      {
+        "action": "carry",
+        "reason": "Reference loss then reconnect with an empty window. Fresh Gold start must not imply a transition from any surviving Cyan.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t10"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t11"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t12"
+      },
+      {
+        "action": "marker-only",
+        "reason": "Wrapping multilingual turn. Whole turn takes one color. Secondary keeps its smaller size, never a second speaker meaning.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          },
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t13"
+      },
+      {
+        "action": "carry",
+        "reason": "Short reply plus Japanese secondary. Cue stays attached to the incoming block, readable at small sizes.",
+        "window": [
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          },
+          {
+            "event": "t14",
+            "block": "b12",
+            "key": "peer-s2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "OK.",
+            "secondary": "はい、わかりました。短い返事も同じ转写ルールです。"
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t14"
+      }
+    ],
+    "C1": [
+      {
+        "action": "carry",
+        "reason": "First peer turn in a fresh context. No transition claim.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t01"
+      },
+      {
+        "action": "carry",
+        "reason": "Ordinary turn segmentation must not create a marker or toggle.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          },
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t02"
+      },
+      {
+        "action": "toggle-run",
+        "reason": "Qualifying transition evidence vs previous peer.",
+        "window": [
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          },
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t03"
+      },
+      {
+        "action": "carry",
+        "reason": "Continuation must not duplicate a cue or toggle.",
+        "window": [
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          },
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t04"
+      },
+      {
+        "action": "self-white",
+        "reason": "SELF interposition. White in every mode. C must not toggle. E expires the previous emphasis on this readable turn.",
+        "window": [
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          },
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t05"
+      },
+      {
+        "action": "carry",
+        "reason": "Valid comparison across SELF. No new boundary. C keeps the run color.",
+        "window": [
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          },
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t06"
+      },
+      {
+        "action": "toggle-run",
+        "reason": "Confirmed B to C transition.",
+        "window": [
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          },
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t07"
+      },
+      {
+        "action": "toggle-run",
+        "reason": "Confirmed C to A transition. No lookup of earlier hue. Toggle once.",
+        "window": [
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          },
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t08"
+      },
+      {
+        "action": "carry",
+        "reason": "Mixed and overlap evidence. Withhold cue. Retain hue without claiming continuity.",
+        "window": [
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          },
+          {
+            "event": "t09",
+            "block": "b09",
+            "key": "peer-u1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Overlapping voices, hard to tell.",
+            "secondary": "Overlapping voices, hard to tell."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t09"
+      },
+      {
+        "action": "carry",
+        "reason": "Reference loss then reconnect with an empty window. Fresh Gold start must not imply a transition from any surviving Cyan.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t10"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t11"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t12"
+      },
+      {
+        "action": "toggle-run",
+        "reason": "Wrapping multilingual turn. Whole turn takes one color. Secondary keeps its smaller size, never a second speaker meaning.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          },
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t13"
+      },
+      {
+        "action": "carry",
+        "reason": "Short reply plus Japanese secondary. Cue stays attached to the incoming block, readable at small sizes.",
+        "window": [
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          },
+          {
+            "event": "t14",
+            "block": "b12",
+            "key": "peer-s2",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "OK.",
+            "secondary": "はい、わかりました。短い返事も同じ转写ルールです。"
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t14"
+      }
+    ],
+    "C2": [
+      {
+        "action": "carry",
+        "reason": "First peer turn in a fresh context. No transition claim.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t01"
+      },
+      {
+        "action": "carry",
+        "reason": "Ordinary turn segmentation must not create a marker or toggle.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          },
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t02"
+      },
+      {
+        "action": "toggle-run",
+        "reason": "Qualifying transition evidence vs previous peer.",
+        "window": [
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          },
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t03"
+      },
+      {
+        "action": "carry",
+        "reason": "Continuation must not duplicate a cue or toggle.",
+        "window": [
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          },
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t04"
+      },
+      {
+        "action": "self-white",
+        "reason": "SELF interposition. White in every mode. C must not toggle. E expires the previous emphasis on this readable turn.",
+        "window": [
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          },
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t05"
+      },
+      {
+        "action": "carry",
+        "reason": "Valid comparison across SELF. No new boundary. C keeps the run color.",
+        "window": [
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          },
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t06"
+      },
+      {
+        "action": "toggle-run",
+        "reason": "Confirmed B to C transition.",
+        "window": [
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          },
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t07"
+      },
+      {
+        "action": "toggle-run",
+        "reason": "Confirmed C to A transition. No lookup of earlier hue. Toggle once.",
+        "window": [
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          },
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t08"
+      },
+      {
+        "action": "carry",
+        "reason": "Mixed and overlap evidence. Withhold cue. Retain hue without claiming continuity.",
+        "window": [
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          },
+          {
+            "event": "t09",
+            "block": "b09",
+            "key": "peer-u1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Overlapping voices, hard to tell.",
+            "secondary": "Overlapping voices, hard to tell."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t09"
+      },
+      {
+        "action": "carry",
+        "reason": "Reference loss then reconnect with an empty window. Fresh Gold start must not imply a transition from any surviving Cyan.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t10"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t11"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t12"
+      },
+      {
+        "action": "toggle-run",
+        "reason": "Wrapping multilingual turn. Whole turn takes one color. Secondary keeps its smaller size, never a second speaker meaning.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          },
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t13"
+      },
+      {
+        "action": "carry",
+        "reason": "Short reply plus Japanese secondary. Cue stays attached to the incoming block, readable at small sizes.",
+        "window": [
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          },
+          {
+            "event": "t14",
+            "block": "b12",
+            "key": "peer-s2",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "OK.",
+            "secondary": "はい、わかりました。短い返事も同じ转写ルールです。"
+          }
+        ],
+        "run": "cyan",
+        "emphasis": null,
+        "event": "t14"
+      }
+    ],
+    "E1": [
+      {
+        "action": "carry",
+        "reason": "First peer turn in a fresh context. No transition claim.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t01"
+      },
+      {
+        "action": "carry",
+        "reason": "Ordinary turn segmentation must not create a marker or toggle.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          },
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t02"
+      },
+      {
+        "action": "emphasis-with-marker",
+        "reason": "Qualifying transition evidence vs previous peer.",
+        "window": [
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          },
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          }
+        ],
+        "run": "gold",
+        "emphasis": "peer-b1",
+        "event": "t03"
+      },
+      {
+        "action": "carry",
+        "reason": "Continuation must not duplicate a cue or toggle.",
+        "window": [
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          },
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t04"
+      },
+      {
+        "action": "self-white",
+        "reason": "SELF interposition. White in every mode. C must not toggle. E expires the previous emphasis on this readable turn.",
+        "window": [
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          },
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t05"
+      },
+      {
+        "action": "carry",
+        "reason": "Valid comparison across SELF. No new boundary. C keeps the run color.",
+        "window": [
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          },
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t06"
+      },
+      {
+        "action": "emphasis-with-marker",
+        "reason": "Confirmed B to C transition.",
+        "window": [
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          },
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          }
+        ],
+        "run": "gold",
+        "emphasis": "peer-c1",
+        "event": "t07"
+      },
+      {
+        "action": "emphasis-with-marker",
+        "reason": "Confirmed C to A transition. No lookup of earlier hue. Toggle once.",
+        "window": [
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          },
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          }
+        ],
+        "run": "gold",
+        "emphasis": "peer-a3",
+        "event": "t08"
+      },
+      {
+        "action": "carry",
+        "reason": "Mixed and overlap evidence. Withhold cue. Retain hue without claiming continuity.",
+        "window": [
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          },
+          {
+            "event": "t09",
+            "block": "b09",
+            "key": "peer-u1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Overlapping voices, hard to tell.",
+            "secondary": "Overlapping voices, hard to tell."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t09"
+      },
+      {
+        "action": "carry",
+        "reason": "Reference loss then reconnect with an empty window. Fresh Gold start must not imply a transition from any surviving Cyan.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t10"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t11"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t12"
+      },
+      {
+        "action": "emphasis-with-marker",
+        "reason": "Wrapping multilingual turn. Whole turn takes one color. Secondary keeps its smaller size, never a second speaker meaning.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          },
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          }
+        ],
+        "run": "gold",
+        "emphasis": "peer-m1",
+        "event": "t13"
+      },
+      {
+        "action": "carry",
+        "reason": "Short reply plus Japanese secondary. Cue stays attached to the incoming block, readable at small sizes.",
+        "window": [
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "rule",
+            "marker_hex": "#FFD700",
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          },
+          {
+            "event": "t14",
+            "block": "b12",
+            "key": "peer-s2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "OK.",
+            "secondary": "はい、わかりました。短い返事も同じ转写ルールです。"
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t14"
+      }
+    ],
+    "E2": [
+      {
+        "action": "carry",
+        "reason": "First peer turn in a fresh context. No transition claim.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t01"
+      },
+      {
+        "action": "carry",
+        "reason": "Ordinary turn segmentation must not create a marker or toggle.",
+        "window": [
+          {
+            "event": "t01",
+            "block": "b01",
+            "key": "peer-a1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Good morning, let us test the translation overlay.",
+            "secondary": "Good morning, let us test the translation overlay."
+          },
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t02"
+      },
+      {
+        "action": "emphasis-with-marker",
+        "reason": "Qualifying transition evidence vs previous peer.",
+        "window": [
+          {
+            "event": "t02",
+            "block": "b02",
+            "key": "peer-a2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Same voice continues, delivery cut only, not a new speaker.",
+            "secondary": "Same voice continues, delivery cut only, not a new speaker."
+          },
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "dash",
+            "marker_hex": "#2DE1A8",
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          }
+        ],
+        "run": "gold",
+        "emphasis": "peer-b1",
+        "event": "t03"
+      },
+      {
+        "action": "carry",
+        "reason": "Continuation must not duplicate a cue or toggle.",
+        "window": [
+          {
+            "event": "t03",
+            "block": "b03",
+            "key": "peer-b1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#2DE1A8",
+            "primary": "Hi, a second voice joins in now.",
+            "secondary": "Hi, a second voice joins in now."
+          },
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t04"
+      },
+      {
+        "action": "self-white",
+        "reason": "SELF interposition. White in every mode. C must not toggle. E expires the previous emphasis on this readable turn.",
+        "window": [
+          {
+            "event": "t04",
+            "block": "b04",
+            "key": "peer-b2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Yes, the same second voice keeps going.",
+            "secondary": "Yes, the same second voice keeps going."
+          },
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t05"
+      },
+      {
+        "action": "carry",
+        "reason": "Valid comparison across SELF. No new boundary. C keeps the run color.",
+        "window": [
+          {
+            "event": "t05",
+            "block": "b05",
+            "key": "self-s1",
+            "channel": "self",
+            "color_role": "white",
+            "hex": "#FFFFFF",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Got it, I can see both lines clearly.",
+            "secondary": ""
+          },
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t06"
+      },
+      {
+        "action": "emphasis-with-marker",
+        "reason": "Confirmed B to C transition.",
+        "window": [
+          {
+            "event": "t06",
+            "block": "b06",
+            "key": "peer-b3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Still the second voice after your reply.",
+            "secondary": "Still the second voice after your reply."
+          },
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "dash",
+            "marker_hex": "#2DE1A8",
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          }
+        ],
+        "run": "gold",
+        "emphasis": "peer-c1",
+        "event": "t07"
+      },
+      {
+        "action": "emphasis-with-marker",
+        "reason": "Confirmed C to A transition. No lookup of earlier hue. Toggle once.",
+        "window": [
+          {
+            "event": "t07",
+            "block": "b07",
+            "key": "peer-c1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#2DE1A8",
+            "primary": "A third voice cuts in briefly here.",
+            "secondary": "A third voice cuts in briefly here."
+          },
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "dash",
+            "marker_hex": "#2DE1A8",
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          }
+        ],
+        "run": "gold",
+        "emphasis": "peer-a3",
+        "event": "t08"
+      },
+      {
+        "action": "carry",
+        "reason": "Mixed and overlap evidence. Withhold cue. Retain hue without claiming continuity.",
+        "window": [
+          {
+            "event": "t08",
+            "block": "b08",
+            "key": "peer-a3",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#2DE1A8",
+            "primary": "First voice returns. OK.",
+            "secondary": "First voice returns. OK."
+          },
+          {
+            "event": "t09",
+            "block": "b09",
+            "key": "peer-u1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Overlapping voices, hard to tell.",
+            "secondary": "Overlapping voices, hard to tell."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t09"
+      },
+      {
+        "action": "carry",
+        "reason": "Reference loss then reconnect with an empty window. Fresh Gold start must not imply a transition from any surviving Cyan.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t10"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t11"
+      },
+      {
+        "action": "withheld",
+        "reason": "late arrival for content outside the visible window",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t12"
+      },
+      {
+        "action": "emphasis-with-marker",
+        "reason": "Wrapping multilingual turn. Whole turn takes one color. Secondary keeps its smaller size, never a second speaker meaning.",
+        "window": [
+          {
+            "event": "t10",
+            "block": "b10",
+            "key": "peer-r1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "Back after the reset, fresh context.",
+            "secondary": "Back after the reset, fresh context."
+          },
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#2DE1A8",
+            "marker": "dash",
+            "marker_hex": "#2DE1A8",
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          }
+        ],
+        "run": "gold",
+        "emphasis": "peer-m1",
+        "event": "t13"
+      },
+      {
+        "action": "carry",
+        "reason": "Short reply plus Japanese secondary. Cue stays attached to the incoming block, readable at small sizes.",
+        "window": [
+          {
+            "event": "t13",
+            "block": "b11",
+            "key": "peer-m1",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "dash",
+            "marker_hex": "#2DE1A8",
+            "primary": "안녕하세요, 이것은 줄 바꿈과 보조 텍스트 계층을 확인하기 위한 긴 문장입니다. 두 줄 이상으로 감싸집니다.",
+            "secondary": "Hello, this is a long sentence that wraps past two lines to check the secondary hierarchy under the same turn color."
+          },
+          {
+            "event": "t14",
+            "block": "b12",
+            "key": "peer-s2",
+            "channel": "peer",
+            "color_role": "gold",
+            "hex": "#FFD700",
+            "marker": "none",
+            "marker_hex": null,
+            "primary": "OK.",
+            "secondary": "はい、わかりました。短い返事も同じ转写ルールです。"
+          }
+        ],
+        "run": "gold",
+        "emphasis": null,
+        "event": "t14"
+      }
+    ]
+  },
+  "invariants": [
+    {
+      "id": "segmentation-no-toggle",
+      "desc": "t02 delivery cut keeps Gold run, no marker in any mode",
+      "result": "PASS"
+    },
+    {
+      "id": "first-transition-once",
+      "desc": "t03 toggles C run to Cyan exactly once, A/E attach one marker",
+      "result": "PASS"
+    },
+    {
+      "id": "continuation-no-duplicate",
+      "desc": "t04 keeps Cyan run, no second toggle or marker",
+      "result": "PASS"
+    },
+    {
+      "id": "self-interposition",
+      "desc": "t05 Self is White, C run stays Cyan, E emphasis expires on the readable Self turn",
+      "result": "PASS"
+    },
+    {
+      "id": "self-across-no-boundary",
+      "desc": "t06 same speaker across Self adds no marker and keeps the Cyan run",
+      "result": "PASS"
+    },
+    {
+      "id": "consecutive-changes",
+      "desc": "t07 and t08 each toggle once and each keeps its own marker",
+      "result": "PASS"
+    },
+    {
+      "id": "no-person-lookup",
+      "desc": "t08 color comes only from toggle parity, never from speaker A history",
+      "result": "PASS"
+    },
+    {
+      "id": "unknown-withheld",
+      "desc": "t09 mixed evidence adds no marker, no toggle, C retains its hue",
+      "result": "PASS"
+    },
+    {
+      "id": "reset-fresh",
+      "desc": "t10 clears the window and restarts Gold without implying a transition",
+      "result": "PASS"
+    },
+    {
+      "id": "late-withheld",
+      "desc": "t11 revision of expired content and t12 late evidence change nothing",
+      "result": "PASS"
+    },
+    {
+      "id": "multilingual-whole-turn",
+      "desc": "t13 wrapping turn takes one arrival color across primary and secondary",
+      "result": "PASS"
+    },
+    {
+      "id": "short-reply-expiry-keeps-marker",
+      "desc": "t14 expires the t13 emphasis to Gold while its rule marker persists",
+      "result": "PASS"
+    },
+    {
+      "id": "revision-keeps-emphasis-synthetic",
+      "desc": "a same-key revision never expires E emphasis",
+      "result": "PASS"
+    }
+  ]
+}

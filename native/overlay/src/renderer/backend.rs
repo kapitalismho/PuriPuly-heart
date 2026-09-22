@@ -691,6 +691,7 @@ struct WindowsCaptionRenderer {
     cache_outline_brush: ID2D1SolidColorBrush,
     cache_self_text_brush: ID2D1SolidColorBrush,
     cache_peer_text_brush: ID2D1SolidColorBrush,
+    cache_peer_cyan_text_brush: ID2D1SolidColorBrush,
     target_bitmap: ID2D1Bitmap1,
     texture: ID3D11Texture2D,
     caches: WindowsRendererCaches,
@@ -782,6 +783,14 @@ impl WindowsCaptionRenderer {
                 )
                 .map_err(|error| CaptionRenderError::Init(error.to_string()))?
         };
+        let cache_peer_cyan_text_brush = unsafe {
+            d2d_context
+                .CreateSolidColorBrush(
+                    &d2d_color(fill_color_for_channel(CaptionChannel::PeerCyan)),
+                    None,
+                )
+                .map_err(|error| CaptionRenderError::Init(error.to_string()))?
+        };
         let mut renderer = Self {
             d2d_factory,
             dwrite_factory,
@@ -794,6 +803,7 @@ impl WindowsCaptionRenderer {
             cache_outline_brush,
             cache_self_text_brush,
             cache_peer_text_brush,
+            cache_peer_cyan_text_brush,
             target_bitmap,
             texture,
             caches: WindowsRendererCaches::default(),
@@ -946,6 +956,7 @@ impl WindowsCaptionRenderer {
         match channel {
             CaptionChannel::SelfChannel => self.cache_self_text_brush.clone(),
             CaptionChannel::PeerChannel => self.cache_peer_text_brush.clone(),
+            CaptionChannel::PeerCyan => self.cache_peer_cyan_text_brush.clone(),
         }
     }
 
@@ -1182,6 +1193,24 @@ impl WindowsCaptionRenderer {
 
         let mut visual_bounds: Option<super::types::VisualBounds> = None;
         let build_result = (|| {
+            if block.speaker_boundary {
+                let marker = D2D_RECT_F {
+                    left: policy.strip_horizontal_padding_px() as f32,
+                    top: 0.0,
+                    right: policy.strip_horizontal_padding_px() as f32 + 196.0,
+                    bottom: 14.0,
+                };
+                unsafe {
+                    self.d2d_context
+                        .FillRectangle(&marker, &self.cache_peer_text_brush);
+                }
+                visual_bounds = Some(super::types::VisualBounds::new(
+                    marker.left,
+                    marker.top,
+                    marker.right,
+                    marker.bottom,
+                ));
+            }
             for (role, line) in block_lines(block) {
                 if line.text.trim().is_empty() {
                     continue;
@@ -2631,6 +2660,7 @@ mod tests {
             block_variant: CaptionBlockVariant::Finalized,
             secondary_enabled: false,
             secondary_reserved: false,
+            speaker_boundary: false,
             primary_font_size_key: 132,
             secondary_font_size_key: 82,
             content_width_key: 1024,
@@ -2648,6 +2678,7 @@ mod tests {
             primary_lines: Vec::new(),
             secondary_line: None,
             secondary_reserved: false,
+            speaker_boundary: false,
             bounds,
             visual_bounds: VisualBounds::new(
                 bounds.left_px,

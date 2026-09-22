@@ -96,3 +96,33 @@ def test_overlay_settings_desktop_flet_swap_caption_languages_round_trips() -> N
     assert settings.intent.overlay.desktop_flet.swap_caption_languages is True
     assert data["intent"]["overlay"]["desktop_flet"]["swap_caption_languages"] is True
     assert round_tripped.intent.overlay.desktop_flet.swap_caption_languages is True
+
+
+def test_overlay_speaker_transition_mode_round_trips_and_invalid_values_fall_back_to_a() -> None:
+    current = AppSettingsVNext()
+    settings = replace(
+        current,
+        intent=replace(
+            current.intent,
+            overlay=replace(current.intent.overlay, speaker_transition_mode="E"),
+        ),
+    )
+
+    data = serialization.to_dict(settings)
+    round_tripped = serialization.from_dict(data)
+    invalid = serialization.from_dict(
+        {
+            **data,
+            "intent": {
+                **data["intent"],
+                "overlay": {
+                    **data["intent"]["overlay"],
+                    "speaker_transition_mode": "unknown",
+                },
+            },
+        }
+    )
+
+    assert data["intent"]["overlay"]["speaker_transition_mode"] == "E"
+    assert round_tripped.intent.overlay.speaker_transition_mode == "E"
+    assert invalid.intent.overlay.speaker_transition_mode == "A"

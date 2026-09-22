@@ -173,6 +173,7 @@ def test_order23_overlay_osc_output_patch_records_initial_covered_surface_list()
         "intent.overlay.target",
         "intent.overlay.show_translation",
         "intent.overlay.show_peer_original",
+        "intent.overlay.speaker_transition_mode",
         "intent.overlay.calibration.anchor",
         "intent.overlay.calibration.offset_x",
         "intent.overlay.calibration.offset_y",

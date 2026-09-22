@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from puripuly_heart.core.stt.backend import (
     STTNativeProvenance,
@@ -360,11 +360,7 @@ class STTScopedTurnNormalizer:
         while left and trimmed:
             item = trimmed[0]
             amount = min(left, len(item.text))
-            item = FinalSpeakerRun(
-                item.text[amount:],
-                item.speaker_id,
-                item.session_scope,
-            )
+            item = replace(item, text=item.text[amount:])
             left -= amount
             if item.text:
                 trimmed[0] = item
@@ -373,11 +369,7 @@ class STTScopedTurnNormalizer:
         while right and trimmed:
             item = trimmed[-1]
             amount = min(right, len(item.text))
-            item = FinalSpeakerRun(
-                item.text[: len(item.text) - amount],
-                item.speaker_id,
-                item.session_scope,
-            )
+            item = replace(item, text=item.text[: len(item.text) - amount])
             right -= amount
             if item.text:
                 trimmed[-1] = item
@@ -397,6 +389,15 @@ class STTScopedTurnNormalizer:
                     previous.text + item.text,
                     item.speaker_id,
                     item.session_scope,
+                    source_start_ms=previous.source_start_ms,
+                    source_end_ms=item.source_end_ms,
+                    speaker_confidence=(
+                        min(previous.speaker_confidence, item.speaker_confidence)
+                        if previous.speaker_confidence is not None
+                        and item.speaker_confidence is not None
+                        else None
+                    ),
+                    overlaps_previous=previous.overlaps_previous or item.overlaps_previous,
                 )
             else:
                 merged.append(item)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -72,6 +72,7 @@ class OverlayPresenter(OverlaySink):
     show_peer_original: bool = True
     translation_enabled: bool = True
     native_retry_enabled: bool = False
+    speaker_transition_mode: str = "A"
     task_factory: Any | None = None
 
     _acceptance: PresenterAcceptanceLedger = field(
@@ -97,8 +98,14 @@ class OverlayPresenter(OverlaySink):
     _last_new_occupant_at: float | None = field(init=False, default=None)
     _peer_admission_changed: asyncio.Event = field(init=False, default_factory=asyncio.Event)
     _closed: bool = field(init=False, default=False)
+    _speaker_seen_readable: set[str] = field(init=False, default_factory=set)
+    _speaker_colors: dict[str, str] = field(init=False, default_factory=dict)
+    _speaker_emphasis_id: str | None = field(init=False, default=None)
+    _peer_run_color: str = field(init=False, default="gold")
 
     def __post_init__(self) -> None:
+        if self.speaker_transition_mode not in {"A", "C", "E"}:
+            raise ValueError("speaker transition mode must be A, C, or E")
         self._presentation_state = OverlayPresentationState()
         self._retry_projection.reset(enabled=self.native_retry_enabled)
         self._presentation_state.generate_snapshot(
@@ -165,6 +172,10 @@ class OverlayPresenter(OverlaySink):
         self._last_new_occupant_at = None
         self._signal_peer_admission_change()
         self._appearance_seq = 0
+        self._speaker_seen_readable.clear()
+        self._speaker_colors.clear()
+        self._speaker_emphasis_id = None
+        self._peer_run_color = "gold"
         self._retry_projection.clear_scene()
         self._presentation_state.generate_snapshot(
             revision=0,
@@ -659,6 +670,7 @@ class OverlayPresenter(OverlaySink):
             if active_entry is not None:
                 active_entry.ever_visible = True
         rendered_entries = selection.rendered_entries
+        rendered_entries = self._apply_speaker_presentation(rendered_entries)
         next_blocks = [block for _, block in rendered_entries]
         next_calibration = _calibration_from_overlay(self.calibration)
         fresh_render_channel = self._eligible_fresh_render_channel(
@@ -782,6 +794,75 @@ class OverlayPresenter(OverlaySink):
                     entry.window_evicted_at = None
                     self._schedule_expiration(key, entry)
                 entry.ever_visible = True
+
+    def _apply_speaker_presentation(
+        self,
+        rendered_entries: list[tuple[tuple[str, UUID], OverlayPresentationBlock]],
+    ) -> list[tuple[tuple[str, UUID], OverlayPresentationBlock]]:
+        visible_ids = {block.id for _, block in rendered_entries}
+        for key, block in rendered_entries:
+            if block.id in self._speaker_seen_readable:
+                continue
+            self._speaker_seen_readable.add(block.id)
+            self._speaker_emphasis_id = None
+            if block.channel != "peer":
+                continue
+            entry = self._entries.get(key)
+            comparison = None if entry is None else entry.speaker_transition
+            if comparison == "transition":
+                self._peer_run_color = "cyan" if self._peer_run_color == "gold" else "gold"
+                if self.speaker_transition_mode == "E":
+                    self._speaker_emphasis_id = block.id
+            elif comparison in {"context_reset", "unavailable", None}:
+                surviving_cyan = any(
+                    self._speaker_colors.get(visible_id) == "cyan"
+                    for visible_id in visible_ids
+                    if visible_id != block.id
+                )
+                self._peer_run_color = "cyan" if surviving_cyan else "gold"
+            self._speaker_colors[block.id] = self._peer_run_color
+
+        styled: list[tuple[tuple[str, UUID], OverlayPresentationBlock]] = []
+        for key, block in rendered_entries:
+            if block.channel != "peer":
+                styled.append((key, block))
+                continue
+            entry = self._entries.get(key)
+            transition = entry is not None and entry.speaker_transition == "transition"
+            if self.speaker_transition_mode == "C":
+                speaker_style = self._speaker_colors.get(block.id, "gold")
+            elif self.speaker_transition_mode == "E" and self._speaker_emphasis_id == block.id:
+                speaker_style = "cyan"
+            else:
+                speaker_style = "gold"
+            styled.append(
+                (
+                    key,
+                    replace(
+                        block,
+                        speaker_style=speaker_style,
+                        speaker_boundary=transition and self.speaker_transition_mode in {"A", "E"},
+                    ),
+                )
+            )
+        live_ids = {entry.block_id for entry in self._entries.values()}
+        self._speaker_colors = {
+            block_id: color
+            for block_id, color in self._speaker_colors.items()
+            if block_id in live_ids
+        }
+        self._speaker_seen_readable.intersection_update(live_ids)
+        return styled
+
+    async def update_speaker_transition_mode(self, mode: str) -> None:
+        async with self._ownership_transition_lock:
+            if mode not in {"A", "C", "E"}:
+                raise ValueError("speaker transition mode must be A, C, or E")
+            if mode == self.speaker_transition_mode:
+                return
+            self.speaker_transition_mode = mode
+            self._speaker_emphasis_id = None
+            await self._publish_if_changed(force_protocol_publish=True)
 
     def _next_appearance_seq(self) -> int:
         self._appearance_seq += 1

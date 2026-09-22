@@ -22,6 +22,7 @@ from .diagnostics import OverlayDiagnosticsRecorder, default_overlay_diagnostics
 from .manifest import (
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
+    OVERLAY_SPEAKER_TRANSITION_CONTRACT,
     OverlayLaunchManifest,
 )
 from .process_adapter import (
@@ -1047,6 +1048,8 @@ class OverlayProcessManager:
             if (
                 not isinstance(capabilities, dict)
                 or capabilities.get("execution_contract") != OVERLAY_EXECUTION_CONTRACT
+                or capabilities.get("speaker_transition_presentation")
+                != OVERLAY_SPEAKER_TRANSITION_CONTRACT
                 or (
                     self.selected_target != "desktop"
                     and not self._supports_native_retry_ownership(event)

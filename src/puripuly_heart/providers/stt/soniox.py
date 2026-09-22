@@ -54,7 +54,9 @@ class _AudioWrite:
 @dataclass(frozen=True, slots=True)
 class _FinalToken:
     text: str
+    start_ms: int | None
     end_ms: int | None
+    confidence: float | None = None
     language: str = ""
     speaker_id: str | None = None
 
@@ -378,10 +380,26 @@ class _SonioxSession(STTBackendSession):
                     self._pending_last_end_ms = None
                     self._pending_finalize_requests = 0
                 return
+            start_ms = token.get("start_ms")
+            if isinstance(start_ms, (int, float)) and not isinstance(start_ms, bool):
+                start_ms = int(start_ms)
+            else:
+                start_ms = None
             end_ms = token.get("end_ms")
             if isinstance(end_ms, (int, float)):
                 end_ms = int(end_ms)
                 self._pending_last_end_ms = end_ms
+            else:
+                end_ms = None
+            confidence = token.get("confidence")
+            if (
+                isinstance(confidence, (int, float))
+                and not isinstance(confidence, bool)
+                and 0.0 <= float(confidence) <= 1.0
+            ):
+                confidence = float(confidence)
+            else:
+                confidence = None
             language = ""
             if self.enable_language_identification:
                 raw_language = token.get("language")
@@ -394,7 +412,9 @@ class _SonioxSession(STTBackendSession):
                     speaker_id = str(raw_speaker).strip() or None
             final_token = _FinalToken(
                 text=text,
+                start_ms=start_ms,
                 end_ms=end_ms,
+                confidence=confidence,
                 language=language,
                 speaker_id=speaker_id,
             )
@@ -433,6 +453,9 @@ class _SonioxSession(STTBackendSession):
                     text=final_token.text,
                     speaker_id=final_token.speaker_id,
                     session_scope=self.speaker_session_scope,
+                    source_start_ms=final_token.start_ms,
+                    source_end_ms=final_token.end_ms,
+                    speaker_confidence=final_token.confidence,
                 ),
             )
         self._event_projection.put_update(
@@ -506,13 +529,28 @@ class _SonioxSession(STTBackendSession):
         if not self.enable_speaker_diarization:
             return ()
         runs: list[FinalSpeakerRun] = []
+        previous_token_end_ms: int | None = None
+        has_previous_token = False
         for token in tokens:
+            overlaps_previous = has_previous_token and (
+                previous_token_end_ms is None
+                or token.start_ms is None
+                or token.start_ms < previous_token_end_ms
+            )
             if runs and runs[-1].speaker_id == token.speaker_id:
                 previous = runs[-1]
                 runs[-1] = FinalSpeakerRun(
                     text=previous.text + token.text,
                     speaker_id=token.speaker_id,
                     session_scope=self.speaker_session_scope,
+                    source_start_ms=previous.source_start_ms,
+                    source_end_ms=token.end_ms,
+                    speaker_confidence=(
+                        min(previous.speaker_confidence, token.confidence)
+                        if previous.speaker_confidence is not None and token.confidence is not None
+                        else None
+                    ),
+                    overlaps_previous=previous.overlaps_previous or overlaps_previous,
                 )
             else:
                 runs.append(
@@ -520,8 +558,14 @@ class _SonioxSession(STTBackendSession):
                         text=token.text,
                         speaker_id=token.speaker_id,
                         session_scope=self.speaker_session_scope,
+                        source_start_ms=token.start_ms,
+                        source_end_ms=token.end_ms,
+                        speaker_confidence=token.confidence,
+                        overlaps_previous=overlaps_previous,
                     )
                 )
+            previous_token_end_ms = token.end_ms
+            has_previous_token = True
         return tuple(runs)
 
     def _clear_scoped_turn(self) -> None:
@@ -632,7 +676,9 @@ class _SonioxSession(STTBackendSession):
                 normalized.append(
                     _FinalToken(
                         text=token.text[overlap_start - offset : overlap_end - offset],
+                        start_ms=token.start_ms,
                         end_ms=token.end_ms,
+                        confidence=token.confidence,
                         language=token.language,
                         speaker_id=token.speaker_id,
                     )

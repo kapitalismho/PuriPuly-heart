@@ -1,0 +1,374 @@
+{
+ "modes": {
+  "A": {
+   "before_self_blocks": [
+    {
+     "id": "peer:1747d7a2-0ba8-43c3-b280-689f79363ddb",
+     "speaker_style": "gold",
+     "speaker_boundary": false,
+     "primary_text": "first peer turn",
+     "secondary_text": "first peer turn"
+    },
+    {
+     "id": "peer:442c9c4e-cf7b-4e5a-8dcf-c963a8ff5bb9",
+     "speaker_style": "gold",
+     "speaker_boundary": true,
+     "primary_text": "second speaker turn",
+     "secondary_text": "second speaker turn"
+    }
+   ],
+   "revision_before_self": 2,
+   "after_live_switch": [
+    {
+     "id": "peer:1747d7a2-0ba8-43c3-b280-689f79363ddb",
+     "speaker_style": "gold",
+     "speaker_boundary": false
+    },
+    {
+     "id": "peer:442c9c4e-cf7b-4e5a-8dcf-c963a8ff5bb9",
+     "speaker_style": "cyan",
+     "speaker_boundary": false
+    }
+   ],
+   "revision_after_switch": 3,
+   "content_retained": true,
+   "visible_since_same": true,
+   "plan_slots": [
+    {
+     "block_id": "peer:1747d7a2-0ba8-43c3-b280-689f79363ddb",
+     "speaker_boundary": false,
+     "lines": [
+      {
+       "text": "first peer turn",
+       "color": "#FFD700",
+       "slot": "primary",
+       "size": 41
+      },
+      {
+       "text": "first peer turn",
+       "color": "#FFD700",
+       "slot": "secondary",
+       "size": 25
+      }
+     ]
+    },
+    {
+     "block_id": "peer:442c9c4e-cf7b-4e5a-8dcf-c963a8ff5bb9",
+     "speaker_boundary": true,
+     "lines": [
+      {
+       "text": "second speaker turn",
+       "color": "#FFD700",
+       "slot": "primary",
+       "size": 41
+      },
+      {
+       "text": "second speaker turn",
+       "color": "#FFD700",
+       "slot": "secondary",
+       "size": 25
+      }
+     ]
+    }
+   ]
+  },
+  "C": {
+   "before_self_blocks": [
+    {
+     "id": "peer:9ea58315-c459-47a2-a450-1cb41b322928",
+     "speaker_style": "gold",
+     "speaker_boundary": false,
+     "primary_text": "first peer turn",
+     "secondary_text": "first peer turn"
+    },
+    {
+     "id": "peer:045489a9-ac8b-41d7-ad75-53b8540672e2",
+     "speaker_style": "cyan",
+     "speaker_boundary": false,
+     "primary_text": "second speaker turn",
+     "secondary_text": "second speaker turn"
+    }
+   ],
+   "revision_before_self": 2,
+   "after_live_switch": [
+    {
+     "id": "peer:9ea58315-c459-47a2-a450-1cb41b322928",
+     "speaker_style": "gold",
+     "speaker_boundary": false
+    },
+    {
+     "id": "peer:045489a9-ac8b-41d7-ad75-53b8540672e2",
+     "speaker_style": "gold",
+     "speaker_boundary": true
+    }
+   ],
+   "revision_after_switch": 3,
+   "content_retained": true,
+   "visible_since_same": true,
+   "plan_slots": [
+    {
+     "block_id": "peer:9ea58315-c459-47a2-a450-1cb41b322928",
+     "speaker_boundary": false,
+     "lines": [
+      {
+       "text": "first peer turn",
+       "color": "#FFD700",
+       "slot": "primary",
+       "size": 41
+      },
+      {
+       "text": "first peer turn",
+       "color": "#FFD700",
+       "slot": "secondary",
+       "size": 25
+      }
+     ]
+    },
+    {
+     "block_id": "peer:045489a9-ac8b-41d7-ad75-53b8540672e2",
+     "speaker_boundary": false,
+     "lines": [
+      {
+       "text": "second speaker turn",
+       "color": "#33D6FF",
+       "slot": "primary",
+       "size": 41
+      },
+      {
+       "text": "second speaker turn",
+       "color": "#33D6FF",
+       "slot": "secondary",
+       "size": 25
+      }
+     ]
+    }
+   ]
+  },
+  "E": {
+   "before_self_blocks": [
+    {
+     "id": "peer:a5ab55df-31c5-4db0-bc19-5b8d9ac71bba",
+     "speaker_style": "gold",
+     "speaker_boundary": false,
+     "primary_text": "first peer turn",
+     "secondary_text": "first peer turn"
+    },
+    {
+     "id": "peer:bb87c3c5-545d-4a72-8c0d-0ef72a9ae0ce",
+     "speaker_style": "cyan",
+     "speaker_boundary": true,
+     "primary_text": "second speaker turn",
+     "secondary_text": "second speaker turn"
+    }
+   ],
+   "revision_before_self": 2,
+   "after_live_switch": [
+    {
+     "id": "peer:a5ab55df-31c5-4db0-bc19-5b8d9ac71bba",
+     "speaker_style": "gold",
+     "speaker_boundary": false
+    },
+    {
+     "id": "peer:bb87c3c5-545d-4a72-8c0d-0ef72a9ae0ce",
+     "speaker_style": "gold",
+     "speaker_boundary": true
+    }
+   ],
+   "revision_after_switch": 3,
+   "content_retained": true,
+   "visible_since_same": true,
+   "plan_slots": [
+    {
+     "block_id": "peer:a5ab55df-31c5-4db0-bc19-5b8d9ac71bba",
+     "speaker_boundary": false,
+     "lines": [
+      {
+       "text": "first peer turn",
+       "color": "#FFD700",
+       "slot": "primary",
+       "size": 41
+      },
+      {
+       "text": "first peer turn",
+       "color": "#FFD700",
+       "slot": "secondary",
+       "size": 25
+      }
+     ]
+    },
+    {
+     "block_id": "peer:bb87c3c5-545d-4a72-8c0d-0ef72a9ae0ce",
+     "speaker_boundary": true,
+     "lines": [
+      {
+       "text": "second speaker turn",
+       "color": "#33D6FF",
+       "slot": "primary",
+       "size": 41
+      },
+      {
+       "text": "second speaker turn",
+       "color": "#33D6FF",
+       "slot": "secondary",
+       "size": 25
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "settings": {
+  "default": "A",
+  "chain": {
+   "C": {
+    "intent": "C",
+    "snapshot": "C"
+   },
+   "E": {
+    "intent": "E",
+    "snapshot": "E"
+   },
+   "A": {
+    "intent": "A",
+    "snapshot": "A"
+   }
+  },
+  "reload": {
+   "intent": "A",
+   "snapshot": "A"
+  },
+  "invalid_normalized": "A"
+ },
+ "live_soniox": {
+  "method": "live scoped Soniox ingress -> PeerTranslationChannelOwner.handle_provider_turn_terminal -> translation turns/output projection -> OverlayPresenter; deterministic echo translation stand-in, real speaker plumbing",
+  "script": "experiments/overlay_speaker_transition/runtime_validation/live_soniox_production_path_smoke.py",
+  "result_file": "experiments/overlay_speaker_transition/runtime_validation/live_production_path_result.json",
+  "command": "uv run python experiments/overlay_speaker_transition/runtime_validation/live_soniox_production_path_smoke.py --audio-dir C:/t/ovr178/audio",
+  "key": "keyring soniox_api_key in-memory only; present=True; value never logged or persisted",
+  "audio": [
+   {
+    "file": "voice1_david.wav",
+    "channels": 1,
+    "width": 2,
+    "rate": 22050,
+    "seconds": 3.23
+   },
+   {
+    "file": "voice2_zira.wav",
+    "channels": 1,
+    "width": 2,
+    "rate": 22050,
+    "seconds": 2.83
+   }
+  ],
+  "single_session_scope": true,
+  "terminals": [
+   {
+    "order": 1,
+    "text": "The overlay shows speaker changes clearly.",
+    "outcome": "final",
+    "authority": "authoritative",
+    "disposition": "reuse",
+    "speaker_runs": [
+     {
+      "text": "The overlay shows speaker changes clearly.",
+      "speaker_id": "1",
+      "source_start_ms": 60,
+      "source_end_ms": 2520,
+      "speaker_confidence": 0.885,
+      "overlaps_previous": false
+     }
+    ]
+   },
+   {
+    "order": 2,
+    "text": " A second voice is now speaking today.",
+    "outcome": "final",
+    "authority": "authoritative",
+    "disposition": "reuse",
+    "speaker_runs": [
+     {
+      "text": " A second voice is now speaking today.",
+      "speaker_id": "2",
+      "source_start_ms": 3420,
+      "source_end_ms": 5160,
+      "speaker_confidence": 0.967,
+      "overlaps_previous": false
+     }
+    ]
+   }
+  ],
+  "claims": [
+   {
+    "source_text": "The overlay shows speaker changes clearly.",
+    "speaker_transition": "context_reset",
+    "claim_id_tail": "4d76f8dc"
+   },
+   {
+    "source_text": " A second voice is now speaking today.",
+    "speaker_transition": "transition",
+    "claim_id_tail": "a5699730"
+   }
+  ],
+  "presenter_live_claims": {
+   "A": [
+    [
+     "gold",
+     false
+    ],
+    [
+     "gold",
+     true
+    ]
+   ],
+   "C": [
+    [
+     "gold",
+     false
+    ],
+    [
+     "cyan",
+     false
+    ]
+   ],
+   "E": [
+    [
+     "gold",
+     false
+    ],
+    [
+     "cyan",
+     true
+    ]
+   ]
+  },
+  "translation_backend": "deterministic echo stand-in (explicit); speaker plumbing real",
+  "correction": "supersedes earlier direct-interpreter/presenter injection check; production PeerTranslationChannelOwner/output path used here",
+  "one_voice_note": "single-scope multi-utterance path confirmed; multi-speaker WITHIN one utterance (overlap/mixed) not exercised live"
+ },
+ "native_debug_exe": {
+  "path": "C:/t/ovr178/debug/PuriPulyHeartOverlay.exe",
+  "sha256": "aa18e9e9f0745329d51ddafff98550ac661976885286e9161a9cc6ecc5a09d6e",
+  "startup_contract": {
+   "app_version": "2.7.0",
+   "contract_version": 10,
+   "execution_contract": {
+    "version": 1,
+    "revision": "r2"
+   },
+   "native_presentation_retry": {
+    "version": 1,
+    "ownership": "exclusive"
+   },
+   "speaker_transition_presentation": {
+    "version": 1,
+    "modes": [
+     "A",
+     "C",
+     "E"
+    ]
+   }
+  },
+  "note": "startup identity only, not HMD render proof"
+ }
+}

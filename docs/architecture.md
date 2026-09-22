@@ -299,6 +299,12 @@ Execution options:
 
 Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
+Peer speaker-transition presentation uses `core/speaker_transition.py` to interpret conserved,
+session-scoped speaker runs into content-bound continuity, transition, reset, or unavailable
+claims. Provider speaker identifiers stop at this interpreter. Output transports the semantic
+claim with the existing publication generation and source order; renderers receive only the
+presenter's anonymous visual style.
+
 GPU worker split:
 
 - Python adapter: process launch, authentication, requests, heartbeat, cancellation, shutdown.
@@ -382,6 +388,12 @@ Implementation: `core/runtime/output.py`. Behavior tests: `tests/core/runtime/te
 Each generation owns its tasks and shutdown. Python owns caption lifetime; native owns presentation retries.
 
 `OverlayPresenter` owns provider-independent Peer subtitle admission and pacing (`core/overlay/presenter.py`); output retains bounded waiting work.
+
+`OverlayPresenter` also owns A/C/E speaker-transition projection over its canonical two-block
+window. It assigns stable per-turn color and boundary state, expires E emphasis on the next
+distinct readable logical turn, and reprojects a persisted mode change without changing caption
+age, ordering, spatial identity, or expiry. Native and desktop render the resulting Gold/Cyan and
+boundary fields without interpreting speaker evidence.
 
 Behavior tests: `tests/core/test_overlay_presenter.py`.
 

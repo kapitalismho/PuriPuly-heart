@@ -1,0 +1,170 @@
+{
+ "method": "live scoped Soniox ingress -> PeerTranslationChannelOwner.handle_provider_turn_terminal -> translation turns/output projection -> OverlayPresenter; deterministic echo translation stand-in, real speaker plumbing",
+ "key": "keyring soniox_api_key in-memory only; present=True; value never logged or persisted",
+ "audio": [
+  {
+   "file": "voice1_david.wav",
+   "channels": 1,
+   "width": 2,
+   "rate": 22050,
+   "seconds": 3.23
+  },
+  {
+   "file": "voice2_zira.wav",
+   "channels": 1,
+   "width": 2,
+   "rate": 22050,
+   "seconds": 2.83
+  }
+ ],
+ "live_terminals": [
+  {
+   "order": 1,
+   "segment_id": "0904965a-b63c-444c-b2dc-e3d9179f1e8a",
+   "text": "The overlay shows speaker changes clearly.",
+   "outcome": "final",
+   "text_authority": "authoritative",
+   "epoch_disposition": "reuse",
+   "language_runs": [],
+   "speaker_runs": [
+    {
+     "text": "The overlay shows speaker changes clearly.",
+     "speaker_id": "1",
+     "source_start_ms": 60,
+     "source_end_ms": 2520,
+     "speaker_confidence": 0.885,
+     "overlaps_previous": false
+    }
+   ],
+   "session_scope_head": "37e6f631"
+  },
+  {
+   "order": 2,
+   "segment_id": "e7073623-e1e4-43c2-8a93-461c42cad045",
+   "text": " A second voice is now speaking today.",
+   "outcome": "final",
+   "text_authority": "authoritative",
+   "epoch_disposition": "reuse",
+   "language_runs": [],
+   "speaker_runs": [
+    {
+     "text": " A second voice is now speaking today.",
+     "speaker_id": "2",
+     "source_start_ms": 3420,
+     "source_end_ms": 5160,
+     "speaker_confidence": 0.967,
+     "overlaps_previous": false
+    }
+   ],
+   "session_scope_head": "37e6f631"
+  }
+ ],
+ "single_session_scope": true,
+ "per_mode": {
+  "A": {
+   "translation_calls": [
+    "The overlay shows speaker changes clearly.",
+    " A second voice is now speaking today."
+   ],
+   "claims": [
+    {
+     "source_text": "The overlay shows speaker changes clearly.",
+     "speaker_transition": "context_reset",
+     "claim_id_tail": "4d76f8dc"
+    },
+    {
+     "source_text": " A second voice is now speaking today.",
+     "speaker_transition": "transition",
+     "claim_id_tail": "a5699730"
+    }
+   ],
+   "blocks": [
+    {
+     "id_tail": "4d76f8dc",
+     "channel": "peer",
+     "speaker_style": "gold",
+     "speaker_boundary": false,
+     "primary_text": "translated:The overlay shows speaker changes clearly."
+    },
+    {
+     "id_tail": "a5699730",
+     "channel": "peer",
+     "speaker_style": "gold",
+     "speaker_boundary": true,
+     "primary_text": "translated: A second voice is now speaking today."
+    }
+   ],
+   "revision": 2
+  },
+  "C": {
+   "translation_calls": [
+    "The overlay shows speaker changes clearly.",
+    " A second voice is now speaking today."
+   ],
+   "claims": [
+    {
+     "source_text": "The overlay shows speaker changes clearly.",
+     "speaker_transition": "context_reset",
+     "claim_id_tail": "9d424e35"
+    },
+    {
+     "source_text": " A second voice is now speaking today.",
+     "speaker_transition": "transition",
+     "claim_id_tail": "f7024cd4"
+    }
+   ],
+   "blocks": [
+    {
+     "id_tail": "9d424e35",
+     "channel": "peer",
+     "speaker_style": "gold",
+     "speaker_boundary": false,
+     "primary_text": "translated:The overlay shows speaker changes clearly."
+    },
+    {
+     "id_tail": "f7024cd4",
+     "channel": "peer",
+     "speaker_style": "cyan",
+     "speaker_boundary": false,
+     "primary_text": "translated: A second voice is now speaking today."
+    }
+   ],
+   "revision": 2
+  },
+  "E": {
+   "translation_calls": [
+    "The overlay shows speaker changes clearly.",
+    " A second voice is now speaking today."
+   ],
+   "claims": [
+    {
+     "source_text": "The overlay shows speaker changes clearly.",
+     "speaker_transition": "context_reset",
+     "claim_id_tail": "b5f1e728"
+    },
+    {
+     "source_text": " A second voice is now speaking today.",
+     "speaker_transition": "transition",
+     "claim_id_tail": "ed7b1b79"
+    }
+   ],
+   "blocks": [
+    {
+     "id_tail": "b5f1e728",
+     "channel": "peer",
+     "speaker_style": "gold",
+     "speaker_boundary": false,
+     "primary_text": "translated:The overlay shows speaker changes clearly."
+    },
+    {
+     "id_tail": "ed7b1b79",
+     "channel": "peer",
+     "speaker_style": "cyan",
+     "speaker_boundary": true,
+     "primary_text": "translated: A second voice is now speaking today."
+    }
+   ],
+   "revision": 2
+  }
+ }
+}
