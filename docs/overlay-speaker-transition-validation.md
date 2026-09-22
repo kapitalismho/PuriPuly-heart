@@ -124,7 +124,7 @@ Full manifest: `experiments/overlay_speaker_transition/manifest.json` (actual fi
 - `scenario.json` 16708 bytes, sha256 `b61d553e3667728109b39e3c2e9b37f25b16f5682b0795bb86359f0de32abea2`
 - `expected_results.json` 98867 bytes, sha256 `7285358185de57648b8dc6c3744335467b5c410aa897839c96779a05482bcb3c`
 - `contrast_analysis.json` 3390 bytes, sha256 `39104e694fd7ba4acffe4ac38b3c0c3c630b54d119dab792a68d3f5f0a10d6e9`
-- `prototype.html` 21351 bytes, sha256 `0001cdf51bf92832ab4a28f06aee5aeae02e7473f8612a1bb256054e9146e86d`
+- `prototype.html` 21683 bytes, sha256 `8d26d4afaf40b6074fd67bbbdda30e96370a1b8d19767d2122d7bc5760108a03`
 - `replay.py` 11963 bytes, sha256 `11c2a11dddf5263256229f836f1cb03fd1164834ce6881d76be4252c1f4b32ca`
 - `contrast_check.py` 5185 bytes, sha256 `9ca572c1da4b65d4a29d90267ab5432131bacbaff9e9d1675aa2bdc878879197`
 ## 9. Explicitly pending (not run / blocked / reserved)
@@ -205,6 +205,16 @@ Affected checks after repair:
 | `uv run ruff check .` | Passed |
 | Live Soniox production-path runner, rerun after repair | Passed for A/C/E; sanitized result updated in `runtime_validation/live_production_path_result.json` |
 
-Repaired native release executable SHA256: `06ce2b35869933073af72a7a71d87815ac226796263f49da15dfd1d6fe4a3667`, size 2,629,120 bytes. The original debug identity in §11 is superseded for renderer evidence. No packaged deployment, push or release was performed.
+Native release identity after the final scale correction: SHA256 `4ea9aa21142cedb5e433778312f92c5993bd0577644ad77bcf2e806f74801740`, size 2,629,120 bytes. This supersedes the intermediate release `06ce2b35869933073af72a7a71d87815ac226796263f49da15dfd1d6fe4a3667` and the original debug binary in §11. No packaged deployment, push or release was performed.
 
 All three modes remain implemented and selectable. Required HMD and human-interpretation observations remain blocked; successful renderer textures, tests and provider plumbing do not close those criteria.
+
+Repair verification at `8a4c8de854eb4c722638750aa86ffb0ced5d3c56` independently closed S1 and F1/F3/F4. Semantic checks passed: 476 relevant core/integration cases (2 subprocess skips), 135 settings/desktop cases, 230 architecture/domain cases. F2 remained open because the marker decoded a ×100 layout scale key as ×1000; F5 retained obsolete values in the prototype's visible contrast table. Both residuals were corrected: the native resolver/texture tests now require 7/14/21 marker rows at scales 0.5/1/1.5 with the 18×scale gap, and the visible table matches the alpha-zero JSON results. Full native suite remains 272 passed, 1 ignored; release startup capability check passed again. These supersede the weaker intermediate scale-test claim, not the pending HMD requirements.
+
+For local owner testing, the matching executable and vendored OpenVR DLL are staged under `build/overlay/` (ignored build output). Normal source-runtime discovery and the startup contract were checked. Start SteamVR and use:
+
+```text
+uv run python -m puripuly_heart.main run-gui
+```
+
+Select A/C/E in ordinary overlay settings. This local testing preparation does not claim that SteamVR was running or an HMD was observed.

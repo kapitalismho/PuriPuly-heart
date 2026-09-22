@@ -83,8 +83,8 @@
     },
     {
       "file": "prototype.html",
-      "bytes": 21351,
-      "sha256": "0001cdf51bf92832ab4a28f06aee5aeae02e7473f8612a1bb256054e9146e86d"
+      "bytes": 21683,
+      "sha256": "8d26d4afaf40b6074fd67bbbdda30e96370a1b8d19767d2122d7bc5760108a03"
     },
     {
       "file": "replay.py",

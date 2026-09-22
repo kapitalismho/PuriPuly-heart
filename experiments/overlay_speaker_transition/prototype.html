@@ -98,7 +98,7 @@
 
   <section>
     <h2>Contrast reference (computed, not a pass claim)</h2>
-    <p>WCAG relative-luminance ratios of strip-blended text over scene samples (strip rgba(0,0,0,0.24); black outline not modeled). Role distinction is separate from text contrast; see CVD rows.</p>
+    <p>WCAG relative-luminance ratios against the raw scene sample (effective background alpha 0; black outline not modeled, so bright/busy ratios are a lower bound). Role distinction is separate from text contrast; see CVD rows.</p>
     <div id="contrastTables"></div>
   </section>
 
@@ -256,18 +256,19 @@ function buildControls() {
 
 function buildContrast() {
   const rows = [
-    ["White #FFFFFF", "19.91", "2.04", "16.23 / 8.90 / 4.92 / 2.16"],
-    ["Gold #FFD700", "14.19", "1.45", "11.57 / 6.34 / 3.51 / 1.54"],
-    ["Sky #33D6FF", "11.57", "1.19", "9.43 / 5.17 / 2.86 / 1.26"],
-    ["Mint #2DE1A8", "11.80", "1.21", "9.62 / 5.27 / 2.92 / 1.28"],
+    ["White #FFFFFF", "19.57", "1.15", "14.22 / 6.18 / 3.03 / 1.23"],
+    ["Gold #FFD700", "13.95", "1.22", "10.14 / 4.41 / 2.16 / 1.14"],
+    ["Sky #33D6FF", "11.37", "1.49", "8.26 / 3.59 / 1.76 / 1.40"],
+    ["Mint #2DE1A8", "11.60", "1.46", "8.43 / 3.66 / 1.79 / 1.38"],
   ];
   document.getElementById("contrastTables").innerHTML =
     `<table><tr><th>Text</th><th>Dark</th><th>Bright</th><th>Busy navy/ochre/teal/fog</th></tr>` +
     rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join("") + `</table>` +
-    `<p>Role distinction (linear-RGB distance; larger = more separable): Gold–Sky 1.391 (P 1.063 / D 1.166 / T 1.065), Gold–Mint 1.052 (P 0.405 / D 0.587 / T 1.034). ` +
+    `<p>Method: WCAG relative luminance against the raw scene sample (effective background alpha 0; native text-only transparent overlay, configured 0.24 not applied). ` +
+    `Role distinction (linear-RGB distance; larger = more separable): Gold–Sky 1.391 (P 1.063 / D 1.166 / T 1.065), Gold–Mint 1.052 (P 0.405 / D 0.587 / T 1.034). ` +
     `Luminance delta: Gold–Sky 0.138 (P 0.016 / D 0.218 / T 0.036), Gold–Mint 0.126 (P 0.016 / D 0.200 / T 0.056). ` +
     `CVD simulation: ${CVD_METHOD}. Earlier numbers that applied the matrix directly to gamma-encoded sRGB were wrong and are withdrawn; the deuteranopia Sky→purple rendering was that bug. ` +
-    `Full numbers in <code>contrast_analysis.json</code> (generator: <code>contrast_check.py</code>). Bright/busy-fog backgrounds compress every ratio toward 1.2–2.2; the black outline, not modeled numerically, carries legibility there.</p>`;
+    `Full numbers in <code>contrast_analysis.json</code> (generator: <code>contrast_check.py</code>). Without a dimming strip, Gold drops to 1.22 on bright and 1.14 on busy-fog and Sky/Mint sit at 1.38–1.49 there, so bright/busy legibility relies on the black outline plus scene variation; the outline is not modeled numerically, so these ratios are a lower bound.</p>`;
 }
 
 window.__overlay = { set: (patch) => { Object.assign(state, patch); render(); return replayUpTo(state.mode, state.index); }, get: () => ({ ...state }), MODES, EVENTS, replayUpTo };
