@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import platform
 import subprocess
@@ -28,9 +29,16 @@ from puripuly_heart.core.audio.ownership import (
     PeerAudioSegmentLedger,
 )
 from puripuly_heart.core.clock import Clock, FakeClock
+from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
+    TranslationChannelOwnerCallbacks,
+)
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter, OverlayEventUnion
 from puripuly_heart.core.runtime.output import OutputRuntime
+from puripuly_heart.core.runtime.output_batch import (
+    DestinationBatch,
+    DestinationBatchAdmission,
+)
 from puripuly_heart.core.runtime.peer_channel import (
     _CaptureGeneration,
     _GenerationGuardedVadSink,
@@ -41,6 +49,7 @@ from puripuly_heart.core.runtime.self_capture import (
 from puripuly_heart.core.runtime.self_capture import (
     _GenerationGuardedVadSink as _SelfGenerationGuardedVadSink,
 )
+from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnEvent,
     STTProviderTurnIdentity,
@@ -778,6 +787,62 @@ class SelfDispatcherOwner:
         self.failures.append(reason)
 
 
+@dataclass(slots=True)
+class SelfTerminalObserver:
+    trace: RelativeLoopTrace
+
+    def note_recognition_terminal(self, event: STTProviderTurnTerminal) -> None:
+        self.trace.add(
+            "self_callback_terminal_noted",
+            turn=event.identity.segment.segment_order,
+            source_id=str(event.identity.segment.segment_id),
+            provider_turn_id=event.identity.provider_turn_id,
+            outcome=event.outcome,
+        )
+
+
+class TracingDestinationBatchAdmission(DestinationBatchAdmission):
+    def __init__(self, trace: RelativeLoopTrace) -> None:
+        super().__init__()
+        self.trace = trace
+
+    def _insert(self, batch: DestinationBatch) -> None:
+        predecessor = self.active.get(batch.scope)
+        super()._insert(batch)
+        self.trace.add(
+            "destination_batch_insert",
+            scope=batch.scope,
+            destination=batch.destination,
+            parent_id=batch.parent_id,
+            turn_generation=batch.turn_generation,
+            turn_order=batch.turn_order,
+            active=batch.active,
+            active_parent_id=(predecessor[1] if predecessor is not None else batch.parent_id),
+            waiting_parent_ids=[
+                parent_id for _scope, parent_id in self.waiting.get(batch.scope, ())
+            ],
+        )
+
+    def release(self, batch: DestinationBatch, disposition: str) -> None:
+        released_parent_id = batch.parent_id
+        scope = batch.scope
+        was_active = self.active.get(scope) == (scope, released_parent_id)
+        super().release(batch, disposition)
+        successor = self.active.get(scope)
+        self.trace.add(
+            "destination_batch_release",
+            scope=scope,
+            destination=batch.destination,
+            parent_id=released_parent_id,
+            disposition=disposition,
+            was_active=was_active,
+            activated_successor_parent_id=(
+                successor[1] if was_active and successor is not None else None
+            ),
+            waiting_parent_ids=[parent_id for _scope, parent_id in self.waiting.get(scope, ())],
+        )
+
+
 class SelfEngineRuntimeBridge:
     def __init__(self, engine: ScopedRecognitionEngine, trace: RelativeLoopTrace) -> None:
         self.engine = engine
@@ -941,6 +1006,10 @@ async def run_self_end_to_end(
         self_target_languages=("ja",),
         low_latency_mode=False,
     )
+    harness.output_runtime._batch_admission = TracingDestinationBatchAdmission(trace)
+    callbacks = TranslationChannelOwnerCallbacks(SttSessionStateProjection())
+    callbacks.bind_self(harness.self_owner)
+    callbacks.bind_self_capture(cast(Any, SelfTerminalObserver(trace)))
 
     def observe(decision: Any) -> None:
         if decision.route != "subtitle_overlay":
@@ -966,7 +1035,7 @@ async def run_self_end_to_end(
                 provider_turn_id=event.identity.provider_turn_id,
                 outcome=event.outcome,
             )
-            await harness.self_owner.handle_stt_event(event)
+            await callbacks.self_event_handler(event)
             trace.add(
                 "translation_admission_return",
                 turn=order,
@@ -1145,6 +1214,40 @@ def assert_probe_contract(rows: list[dict[str, Any]]) -> None:
             and row["event"] == "provider_write"
             and row.get("turn") == 2
         ]
+        a_source_id = one_row(rows, scenario, "self_source_available", turn=1)["source_id"]
+        b_source_id = one_row(rows, scenario, "self_source_available", turn=2)["source_id"]
+        b_original = one_row(
+            rows,
+            scenario,
+            "application_receipt_ready",
+            event_type="self_transcript_final",
+            occupant=b_source_id,
+        )
+        b_publication_id = b_original["publication_id"]
+        b_batch_wait = one_row(
+            rows,
+            scenario,
+            "destination_batch_insert",
+            parent_id=b_publication_id,
+            active=False,
+        )
+        assert b_batch_wait["scope"] == "self"
+        assert b_batch_wait["active_parent_id"] == a_source_id
+        a_batch_release = one_row(
+            rows,
+            scenario,
+            "destination_batch_release",
+            parent_id=a_source_id,
+            disposition="applied",
+            activated_successor_parent_id=b_publication_id,
+        )
+        assert a_batch_release["was_active"] is True
+        one_row(
+            rows,
+            scenario,
+            "self_callback_terminal_noted",
+            turn=2,
+        )
         assert writes == [(2, True), (8, False)]
         a_translation_done = one_row(rows, scenario, "translation_completion", source_text="turn-1")
         b_translation_start = one_row(rows, scenario, "translation_start", source_text="turn-2")
@@ -1246,13 +1349,20 @@ def verify_source_revision() -> tuple[str, tuple[str, ...]]:
 def summarize(
     rows: list[dict[str, Any]],
     *,
-    actual_sha: str,
+    ambient_head: str,
+    executed_probe_sha256: str,
     verified_changes: tuple[str, ...],
 ) -> dict[str, Any]:
     scenarios = sorted({row["scenario"] for row in rows})
     return {
-        "actual_head": actual_sha,
+        "ambient_head": ambient_head,
         "verified_production_baseline": EXPECTED_SHA,
+        "executed_probe_path": "experiments/issue_180/probe.py",
+        "executed_probe_sha256": executed_probe_sha256,
+        "artifact_content_note": (
+            "SHA256 binds the executed working-tree harness content; ambient_head does not "
+            "imply experiment artifacts are committed"
+        ),
         "verified_changes": verified_changes,
         "python": platform.python_version(),
         "platform": platform.platform(),
@@ -1262,7 +1372,8 @@ def summarize(
 
 
 async def main(output_path: Path) -> None:
-    actual_sha, verified_changes = verify_source_revision()
+    ambient_head, verified_changes = verify_source_revision()
+    executed_probe_sha256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     rows = [
         *(
             await run_self_end_to_end(
@@ -1304,7 +1415,8 @@ async def main(output_path: Path) -> None:
     assert_probe_contract(rows)
     metadata = summarize(
         rows,
-        actual_sha=actual_sha,
+        ambient_head=ambient_head,
+        executed_probe_sha256=executed_probe_sha256,
         verified_changes=verified_changes,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
