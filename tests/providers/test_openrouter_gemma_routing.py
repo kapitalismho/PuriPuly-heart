@@ -52,7 +52,14 @@ def test_openrouter_unified_request_uses_models_only() -> None:
 
 def test_gemma_semantic_routes_produce_issue_provider_policies() -> None:
     assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY) == {
-        "only": ["cloudflare", "coreweave/fp4", "deepinfra/turbo", "dekallm/bf16", "nextbit/bf16"],
+        "only": [
+            "cloudflare",
+            "coreweave/fp4",
+            "deepinfra/turbo",
+            "dekallm/bf16",
+            "nextbit/bf16",
+            "makora",
+        ],
         "sort": {"by": "latency", "partition": "none"},
         "allow_fallbacks": True,
     }
@@ -62,7 +69,7 @@ def test_gemma_semantic_routes_produce_issue_provider_policies() -> None:
         "allow_fallbacks": True,
     }
     assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_26B_LATENCY) == {
-        "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16"],
+        "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16", "makora"],
         "sort": {"by": "latency"},
         "allow_fallbacks": True,
     }

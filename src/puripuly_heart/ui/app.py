@@ -234,9 +234,6 @@ class TranslatorApp:
                 toggle_overlay=self._on_overlay_toggle,
                 retry_peer_process_capture=self._on_retry_peer_process_capture,
                 run_gpu_notice_action=self.application.handle_gpu_notice_action,
-                run_managed_gemma_notice_action=(
-                    self.application.handle_managed_gemma_notice_action
-                ),
             ),
         )
 
@@ -1563,17 +1560,11 @@ class TranslatorApp:
             on_continue = self._close_discord_managed_auth_dialog
             on_byok = self._close_discord_managed_auth_dialog
             on_close = self._close_discord_managed_auth_dialog
-            on_reopen_browser = self._close_discord_managed_auth_dialog
             on_cancel = self._close_discord_managed_auth_dialog
         else:
             on_continue = self._start_discord_managed_auth
             on_byok = self._on_discord_managed_auth_byok
             on_close = self._close_discord_managed_auth_dialog
-            on_reopen_browser = (
-                self._reopen_discord_managed_auth_browser
-                if self._supports_discord_managed_auth_reopen()
-                else None
-            )
             on_cancel = self._cancel_discord_managed_auth
 
         dialog = DiscordManagedAuthDialog(
@@ -1581,7 +1572,6 @@ class TranslatorApp:
             on_continue=on_continue,
             on_byok=on_byok,
             on_close=on_close,
-            on_reopen_browser=on_reopen_browser,
             on_cancel=on_cancel,
         )
         self._discord_managed_auth_dialog = dialog
@@ -1700,9 +1690,6 @@ class TranslatorApp:
                 cancel()
         self._qq_managed_auth_task_handle = None
         self._close_qq_managed_auth_dialog()
-
-    def _supports_discord_managed_auth_reopen(self) -> bool:
-        return self.application.supports_discord_managed_auth_reopen()
 
     def _next_discord_managed_auth_generation(self) -> int:
         generation = int(getattr(self, "_discord_managed_auth_generation", 0)) + 1
@@ -1855,15 +1842,6 @@ class TranslatorApp:
         set_action_required = getattr(dialog, "set_action_required", None)
         if callable(set_action_required):
             set_action_required()
-
-    def _reopen_discord_managed_auth_browser(self) -> None:
-        result = self.application.reopen_discord_managed_auth_browser()
-        if inspect.isawaitable(result):
-
-            async def _task() -> None:
-                await result
-
-            self._run_page_task(_task)
 
     def _cancel_discord_managed_auth(self) -> None:
         self._discord_managed_auth_cancelled = True

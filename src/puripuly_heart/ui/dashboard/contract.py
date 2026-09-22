@@ -7,7 +7,6 @@ from typing import Protocol
 import flet as ft
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
-from puripuly_heart.app.ports.ui_models import ManagedGemmaNoticeAction
 from puripuly_heart.ui.gpu_notice import GpuNoticeAction
 
 
@@ -26,7 +25,6 @@ class DashboardCaptureIntents:
     toggle_overlay: Callable[[bool], None]
     retry_peer_process_capture: Callable[[], object]
     run_gpu_notice_action: Callable[[GpuNoticeAction], object]
-    run_managed_gemma_notice_action: Callable[[ManagedGemmaNoticeAction], object] | None = None
 
 
 class DashboardIntentConsumer(Protocol):

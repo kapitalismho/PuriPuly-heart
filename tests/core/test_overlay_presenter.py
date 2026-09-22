@@ -4787,6 +4787,7 @@ async def test_protected_rows_are_not_evicted_by_elapsed_pacing_interval() -> No
 @pytest.mark.asyncio
 async def test_peer_admission_paces_only_new_replacements_after_free_slots_fill() -> None:
     clock = FakeClock(_now=10.0)
+    expected_admission_times = [10.0, 10.0, 11.0]
 
     async def fake_sleep(delay: float) -> None:
         if delay > PEER_REPLACEMENT_INTERVAL_SECONDS:
@@ -4819,7 +4820,7 @@ async def test_peer_admission_paces_only_new_replacements_after_free_slots_fill(
             )
         )
         assert receipt.outcome == "applied"
-        assert clock.now() == 10.0 + max(0, index - 1) * PEER_REPLACEMENT_INTERVAL_SECONDS
+        assert clock.now() == expected_admission_times[index]
 
     assert [block.id for block in presenter.snapshot().blocks] == [
         f"peer:{turn_ids[1]}",
@@ -4839,7 +4840,7 @@ async def test_peer_admission_paces_only_new_replacements_after_free_slots_fill(
             target_language="ja",
         )
     )
-    assert clock.now() == 10.0 + PEER_REPLACEMENT_INTERVAL_SECONDS
+    assert clock.now() == 11.0
     await presenter.close()
 
 

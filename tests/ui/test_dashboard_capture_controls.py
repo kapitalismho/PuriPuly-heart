@@ -109,7 +109,6 @@ def _contract(
             effective_enabled=peer_state == "on",
             action_enabled=True,
             state=peer_state,
-            status_text="",
             helper_text=peer_helper,
             warning_reason=peer_reason,
         ),
@@ -118,7 +117,6 @@ def _contract(
             effective_enabled=overlay_state == "on",
             action_enabled=True,
             state=overlay_state,
-            status_text="",
         ),
     )
 
@@ -273,14 +271,12 @@ def test_old_contract_without_first_visible_keeps_spinner() -> None:
             effective_enabled=False,
             action_enabled=True,
             state="off",
-            status_text="",
         ),
         overlay=OverlayPeerToggleContract(
             intent_enabled=True,
             effective_enabled=False,
             action_enabled=True,
             state="on",
-            status_text="",
         ),
     )
     presentation = capture_presentation_from_contract(contract)

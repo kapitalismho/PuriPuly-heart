@@ -819,7 +819,7 @@
       "gemma4_managed",
       "qwen35_flash_managed",
       "deepseek_v4_flash_managed",
-      "gemini37_flash_byok",
+      "gemini_flash_byok",
       "deepseek_v4_flash_41_managed",
       "gemma4_byok",
       "qwen35_flash_byok",

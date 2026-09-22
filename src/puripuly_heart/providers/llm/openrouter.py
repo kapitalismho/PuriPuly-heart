@@ -124,7 +124,7 @@ def _build_provider_preferences(
         }
     if model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41:
         return {
-            "only": ["deepseek"],
+            "only": ["deepseek", "wafer"],
             "allow_fallbacks": False,
         }
     if model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
@@ -146,6 +146,7 @@ def _build_provider_preferences(
                 "deepinfra/turbo",
                 "dekallm/bf16",
                 "nextbit/bf16",
+                "makora",
             ],
             "sort": {"by": "latency", "partition": "none"},
             "allow_fallbacks": True,
@@ -158,7 +159,7 @@ def _build_provider_preferences(
         }
     if provider_routing == OpenRouterProviderRouting.GEMMA4_26B_LATENCY:
         return {
-            "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16"],
+            "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16", "makora"],
             "sort": {"by": "latency"},
             "allow_fallbacks": True,
         }
@@ -183,7 +184,7 @@ def _build_provider_preferences(
         }
     if provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT:
         return {
-            "only": ["deepseek"],
+            "only": ["deepseek", "wafer"],
             "allow_fallbacks": False,
         }
     if provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY:
@@ -195,8 +196,8 @@ def _build_provider_preferences(
         }
     if model == "google/gemma-4-26b-a4b-it" and len(models) <= 1:
         return {
-            "order": ["wafer", "cloudflare", "deepinfra"],
-            "only": ["wafer", "cloudflare", "deepinfra"],
+            "sort": {"by": "latency"},
+            "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16", "makora"],
             "allow_fallbacks": True,
         }
     return {

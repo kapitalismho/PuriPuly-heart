@@ -426,19 +426,15 @@ def get_stt_compatibility_warning(
     if stt_provider == "deepgram" and not is_deepgram_supported(code):
         if is_qwen_audio_asr_supported(code):
             return SttCompatibilityWarning("warning.deepgram_suggest_qwen", lang_code)
-        return SttCompatibilityWarning("warning.deepgram_not_supported", lang_code)
 
     if stt_provider == "qwen_audio":
-        if not is_qwen_audio_asr_supported(code):
-            if is_deepgram_supported(code):
-                return SttCompatibilityWarning("warning.qwen_suggest_deepgram", lang_code)
-            return SttCompatibilityWarning("warning.qwen_not_supported", lang_code)
-    elif stt_provider == "local_qwen" and not is_qwen3_asr_supported(code):
-        if is_deepgram_supported(code):
+        if not is_qwen_audio_asr_supported(code) and is_deepgram_supported(code):
             return SttCompatibilityWarning("warning.qwen_suggest_deepgram", lang_code)
-        return SttCompatibilityWarning("warning.qwen_not_supported", lang_code)
-
-    if stt_provider == "soniox" and not is_soniox_supported(code):
-        return SttCompatibilityWarning("warning.soniox_not_supported", lang_code)
+    elif (
+        stt_provider == "local_qwen"
+        and not is_qwen3_asr_supported(code)
+        and is_deepgram_supported(code)
+    ):
+        return SttCompatibilityWarning("warning.qwen_suggest_deepgram", lang_code)
 
     return None

@@ -10,7 +10,7 @@ from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
-GEMINI_37_FLASH_GA_MODEL = "gemini-3.7-flash"
+GEMINI_FLASH_GA_MODEL = "gemini-3.8-flash"
 LEGACY_GEMINI_31_FLASH_LITE_MODEL = "gemini-3.1-flash-lite"
 
 
@@ -19,7 +19,7 @@ def _normalized_model_id(value: object) -> str:
         return ""
     normalized = value.strip().rsplit("/", 1)[-1]
     if normalized == LEGACY_GEMINI_31_FLASH_LITE_MODEL:
-        return GEMINI_37_FLASH_GA_MODEL
+        return GEMINI_FLASH_GA_MODEL
     return normalized
 
 
@@ -61,7 +61,7 @@ class GeminiClient(Protocol):
 @dataclass(slots=True)
 class GeminiLLMProvider:
     api_key: str
-    model: str = GEMINI_37_FLASH_GA_MODEL
+    model: str = GEMINI_FLASH_GA_MODEL
     runtime_logging: ProviderObservationPort | None = None
     client: GeminiClient | None = None
     _internal_client: GeminiClient | None = field(init=False, default=None, repr=False)
@@ -124,7 +124,7 @@ class GeminiLLMProvider:
     async def verify_api_key(
         api_key: str,
         *,
-        model: str = GEMINI_37_FLASH_GA_MODEL,
+        model: str = GEMINI_FLASH_GA_MODEL,
     ) -> bool:
         if not api_key:
             return False

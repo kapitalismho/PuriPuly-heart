@@ -55,7 +55,7 @@ class RecordingReleaseService:
         self.ensure_calls += 1
         return ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
+            message_key="managed_release.retry",
             api_key="issued-managed-key",
             local_key_available=True,
         )
@@ -320,7 +320,7 @@ async def test_standard_lazy_managed_provider_records_discord_claim_after_releas
 
     result = await provider.inner.release_service.ensure_key_for_llm_start()  # type: ignore[attr-defined]
 
-    assert result.message_key == "managed_release.ready"
+    assert result.message_key == "managed_release.retry"
     assert release_service.ensure_calls == 1
     assert managed_state.local_managed_claim_sources == ("discord",)
     assert managed_state.persist_calls == 1

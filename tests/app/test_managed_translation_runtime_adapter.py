@@ -198,7 +198,7 @@ async def test_prepare_ready_records_discord_claim_and_persists_identity() -> No
         events.append("prepare")
         return ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
+            message_key="managed_release.retry",
             local_key_available=True,
         )
 

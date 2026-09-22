@@ -168,19 +168,13 @@ def provider_label(provider_code: str) -> str:
 
 
 _SOURCE_KEY_MAP = {
-    "Managed": "dashboard.trial.source.managed",
     "You": "source.you",
     "Mic": "source.mic",
-    "VRChat": "source.vrchat",
     "Clipboard": "source.clipboard",
 }
 
 
 def source_label(source: str | None) -> str:
     if not source:
-        return t("source.unknown", default="")
+        return ""
     return t(_SOURCE_KEY_MAP.get(source, ""), default=source)
-
-
-def translated_source_label(source: str) -> str:
-    return t("history.translated_source", source=source)

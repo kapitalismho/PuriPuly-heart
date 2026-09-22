@@ -295,8 +295,8 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
     assert body["temperature"] == 0.6
     assert body["user"] == "managed-user-123"
     assert body["provider"] == {
-        "order": ["wafer", "cloudflare", "deepinfra"],
-        "only": ["wafer", "cloudflare", "deepinfra"],
+        "sort": {"by": "latency"},
+        "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16", "makora"],
         "allow_fallbacks": True,
     }
     assert body["messages"][0] == {"role": "system", "content": "SYSTEM"}
@@ -308,7 +308,7 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_gemma_uses_wafer_cloudflare_deepinfra_routing(
+async def test_httpx_openrouter_client_gemma_uses_cloudflare_dekallm_nextbit_makora_routing(
     monkeypatch,
 ) -> None:
     fake_client = FakeAsyncClient()
@@ -328,8 +328,8 @@ async def test_httpx_openrouter_client_gemma_uses_wafer_cloudflare_deepinfra_rou
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "order": ["wafer", "cloudflare", "deepinfra"],
-        "only": ["wafer", "cloudflare", "deepinfra"],
+        "sort": {"by": "latency"},
+        "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16", "makora"],
         "allow_fallbacks": True,
     }
 
@@ -343,7 +343,7 @@ async def test_httpx_openrouter_client_google_gemini_latency_denies_data_collect
 
     client = HttpxOpenRouterClient(
         api_key="test-key",
-        model="google/gemini-3.7-flash",
+        model="google/gemini-3.8-flash",
         base_url="https://example",
         provider_routing=OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY,
     )
@@ -394,7 +394,7 @@ async def test_httpx_openrouter_client_deepseek_41_routing_is_strict(
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "only": ["deepseek"],
+        "only": ["deepseek", "wafer"],
         "allow_fallbacks": False,
     }
 
@@ -421,7 +421,7 @@ async def test_httpx_openrouter_client_deepseek_41_model_overrides_stale_route(
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "only": ["deepseek"],
+        "only": ["deepseek", "wafer"],
         "allow_fallbacks": False,
     }
 
@@ -543,7 +543,7 @@ async def test_resolved_deepseek_fallback_preserves_primary_provider_pool(
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_gemma_order_ignores_explicit_latency_routing_mode(
+async def test_httpx_openrouter_client_gemma_pool_ignores_explicit_latency_routing_mode(
     monkeypatch,
 ) -> None:
     fake_client = FakeAsyncClient()
@@ -565,8 +565,8 @@ async def test_httpx_openrouter_client_gemma_order_ignores_explicit_latency_rout
     assert result == "OK"
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "order": ["wafer", "cloudflare", "deepinfra"],
-        "only": ["wafer", "cloudflare", "deepinfra"],
+        "sort": {"by": "latency"},
+        "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16", "makora"],
         "allow_fallbacks": True,
     }
 

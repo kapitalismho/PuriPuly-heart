@@ -4,6 +4,7 @@ import pytest
 
 import puripuly_heart.core.language as language_module
 from puripuly_heart.core.language import (
+    SUPPORTED_LANGUAGES,
     get_all_language_options,
     get_deepgram_language,
     get_language_info,
@@ -162,18 +163,18 @@ def test_stt_compatibility_warning_variants() -> None:
     warning = get_stt_compatibility_warning("bg", "qwen_audio")
     assert warning is None
 
-    warning = get_stt_compatibility_warning("xx", "deepgram")
-    assert warning is not None
-    assert warning.key == "warning.deepgram_not_supported"
+    warning = get_stt_compatibility_warning("ar", "soniox")
+    assert warning is None
 
-    warning = get_stt_compatibility_warning("xx", "qwen_audio")
-    assert warning is not None
-    assert warning.key == "warning.qwen_not_supported"
 
-    warning = get_stt_compatibility_warning("xx", "soniox")
-    assert warning is not None
-    assert warning.key == "warning.soniox_not_supported"
-    assert warning.language_code == "xx"
+def test_every_selectable_language_has_a_suggesting_stt_provider() -> None:
+    uncovered = [
+        code
+        for code in SUPPORTED_LANGUAGES
+        if not is_deepgram_supported(code) and not is_qwen_audio_asr_supported(code)
+    ]
+
+    assert uncovered == []
 
 
 @pytest.mark.parametrize("code", ["en", "ko", "zh-CN"])

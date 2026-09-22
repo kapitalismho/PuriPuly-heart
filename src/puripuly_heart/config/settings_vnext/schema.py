@@ -286,7 +286,7 @@ class QwenTranslationIntent:
 
 @dataclass(frozen=True, slots=True)
 class GeminiTranslationIntent:
-    llm_model: str = "gemini-3.7-flash"
+    llm_model: str = "gemini-3.8-flash"
 
 
 @dataclass(frozen=True, slots=True)

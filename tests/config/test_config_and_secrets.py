@@ -7,8 +7,8 @@ import pytest
 from puripuly_heart.config.llm_profiles import (
     LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
     OPENROUTER_MAIN_SELECTION_ALIASES,
-    OPENROUTER_MODEL_GEMINI_37_FLASH,
-    OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK,
+    OPENROUTER_MODEL_GEMINI_FLASH,
+    OPENROUTER_SELECTION_ALIAS_GEMINI_FLASH_BYOK,
     get_openrouter_llm_profile,
     openrouter_alias_for_fields,
 )
@@ -42,7 +42,7 @@ def test_translation_model_public_member_names_and_values_match_plan() -> None:
         ("GEMMA4", "gemma4"),
         ("DEEPSEEK_V4_FLASH", "deepseek_v4_flash"),
         ("DEEPSEEK_V4_FLASH_41", "deepseek_v4_flash_41"),
-        ("GEMINI_37_FLASH", "gemini37_flash"),
+        ("GEMINI_FLASH", "gemini_flash"),
         ("QWEN_38_FLASH", "qwen38_flash"),
         ("MANAGED_GEMMA", "managed_gemma"),
         ("LOCAL_LLM", "local_llm"),
@@ -73,7 +73,7 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
         TranslationConnection.OPENROUTER,
         TranslationConnection.OFFICIAL_BYOK,
     )
-    assert supported_translation_connections(TranslationModel.GEMINI_37_FLASH) == (
+    assert supported_translation_connections(TranslationModel.GEMINI_FLASH) == (
         TranslationConnection.OFFICIAL_BYOK,
         TranslationConnection.OPENROUTER,
     )
@@ -89,7 +89,7 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
     )
     assert default_translation_connection(TranslationModel.GEMMA4) == TranslationConnection.MANAGED
     assert (
-        default_translation_connection(TranslationModel.GEMINI_37_FLASH)
+        default_translation_connection(TranslationModel.GEMINI_FLASH)
         == TranslationConnection.OFFICIAL_BYOK
     )
     assert (
@@ -143,14 +143,14 @@ def test_legacy_gemini_byok_alias_is_compatibility_only() -> None:
     profile = get_openrouter_llm_profile(LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK)
 
     assert profile is not None
-    assert profile.openrouter_model == OPENROUTER_MODEL_GEMINI_37_FLASH
+    assert profile.openrouter_model == OPENROUTER_MODEL_GEMINI_FLASH
     assert profile.openrouter_source == OpenRouterCredentialSource.BYOK.value
     assert (
         LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK
         not in OPENROUTER_MAIN_SELECTION_ALIASES
     )
     assert profile.alias == LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK
-    assert OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK in OPENROUTER_MAIN_SELECTION_ALIASES
+    assert OPENROUTER_SELECTION_ALIAS_GEMINI_FLASH_BYOK in OPENROUTER_MAIN_SELECTION_ALIASES
 
 
 def test_mask_secret():
@@ -303,11 +303,11 @@ def test_parse_openrouter_llm_model_accepts_legacy_deepseek_flash() -> None:
 def test_parse_openrouter_llm_model_accepts_legacy_gemini_flash() -> None:
     assert (
         parse_openrouter_llm_model("google/gemini-3-flash-preview")
-        == OpenRouterLLMModel.GEMINI_37_FLASH
+        == OpenRouterLLMModel.GEMINI_FLASH
     )
     assert (
         parse_openrouter_llm_model("google/gemini-3.1-flash-lite")
-        == OpenRouterLLMModel.GEMINI_37_FLASH
+        == OpenRouterLLMModel.GEMINI_FLASH
     )
 
 

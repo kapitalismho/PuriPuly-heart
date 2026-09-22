@@ -76,7 +76,7 @@ def _vnext(
     current = AppSettingsVNext()
     translation = current.intent.translation
     if llm == "gemini":
-        model = model or "gemini37_flash"
+        model = model or "gemini_flash"
         connection = connection or "official_byok"
     elif llm == "local_llm":
         model = model or "local_llm"
@@ -2247,11 +2247,10 @@ def test_debug_preview_discord_auth_opens_dialog_with_close_only_actions(
         getattr(dialog, button_attr).on_click(None)
         assert app.page.closed[-1] is opened_dialog
 
-    for button_attr in ("_reopen_browser_button", "_cancel_button"):
-        dialog, opened_dialog = open_preview_dialog()
-        dialog.set_waiting()
-        getattr(dialog, button_attr).on_click(None)
-        assert app.page.closed[-1] is opened_dialog
+    dialog, opened_dialog = open_preview_dialog()
+    dialog.set_waiting()
+    dialog._cancel_button.on_click(None)
+    assert app.page.closed[-1] is opened_dialog
 
     assert app.page.tasks == []
     assert (
@@ -2948,7 +2947,7 @@ async def test_cancel_discord_managed_auth_prevents_late_success_and_enable() ->
     assert dashboard_translation_calls == []
 
 
-def test_discord_managed_auth_waiting_hides_reopen_when_controller_cannot_reopen() -> None:
+def test_discord_managed_auth_waiting_offers_cancel_only() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
     controller = SimpleNamespace()
@@ -2958,7 +2957,6 @@ def test_discord_managed_auth_waiting_hides_reopen_when_controller_cannot_reopen
     dialog = app._discord_managed_auth_dialog
     dialog.set_waiting()
 
-    assert dialog._reopen_browser_button is None
     assert [control.content for control in dialog._actions.controls] == [
         app_module.t("discord_auth.cancel")
     ]

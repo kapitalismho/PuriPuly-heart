@@ -120,13 +120,10 @@ def test_mme_selection_persists_canonical_value_and_uses_i18n_label() -> None:
         set_locale("ko")
         settings = AudioSettings()
 
-        settings._on_host_api_selected(WINDOWS_MME_HOST_API)
+        settings.host_api = WINDOWS_MME_HOST_API
 
         assert settings.host_api == WINDOWS_MME_HOST_API
         assert settings.host_api_display_label == t("settings.audio_host_api.option.windows_mme")
-        assert settings._host_api_text.content.value == t(
-            "settings.audio_host_api.option.windows_mme"
-        )
     finally:
         set_locale(old_locale)
 
@@ -185,12 +182,19 @@ def test_mme_host_api_label_exists_in_supported_locale_bundles() -> None:
         assert bundle.get(key) == WINDOWS_MME_HOST_API
 
 
-def test_host_api_selection_resets_selected_microphone() -> None:
-    settings = AudioSettings()
-    settings.host_api = WINDOWS_WASAPI_HOST_API
-    settings.microphone = "Previous Mic"
+def test_host_api_selection_resets_selected_microphone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from puripuly_heart.ui.views import settings as settings_view_module
 
-    settings._on_host_api_selected(WINDOWS_WASAPI_COMPATIBILITY_HOST_API)
+    view = settings_view_module.SettingsView.__new__(settings_view_module.SettingsView)
+    view._audio_settings = AudioSettings()
+    view._audio_settings.host_api = WINDOWS_WASAPI_HOST_API
+    view._audio_settings.microphone = "Previous Mic"
+    view._sync_general_audio_card_texts = lambda: None
+    view._on_audio_change = lambda: None
 
-    assert settings.host_api == WINDOWS_WASAPI_COMPATIBILITY_HOST_API
-    assert settings.microphone == ""
+    view._on_mic_host_api_selected(WINDOWS_WASAPI_COMPATIBILITY_HOST_API)
+
+    assert view._audio_settings.host_api == WINDOWS_WASAPI_COMPATIBILITY_HOST_API
+    assert view._audio_settings.microphone == ""

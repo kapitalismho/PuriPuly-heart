@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from tests.helpers.paths import REPO_ROOT
 from tests.ui.test_desktop_overlay_i18n import (
@@ -21,7 +22,6 @@ DYNAMIC_I18N_PREFIXES = (
     "settings.overlay.calibration.text_scale.",
     "settings.overlay.failure.",
     "settings.overlay.status.",
-    "settings.peer_translation.status.",
     "logs.mode.",
     "settings.translation_model.",
 )
@@ -65,28 +65,11 @@ OVERLAY_FAILURE_I18N_KEYS = frozenset(
     }
 )
 
-PRESERVED_TELEMETRY_I18N_KEYS = frozenset(
-    {
-        "debug_preview.telemetry_consent",
-        "settings.telemetry.modal.title",
-        "settings.telemetry.option.allow",
-        "settings.telemetry.option.allow.description",
-        "settings.telemetry.option.decline",
-        "telemetry.consent.allow",
-        "telemetry.consent.body",
-        "telemetry.consent.decline",
-        "telemetry.consent.excludes",
-        "telemetry.consent.title",
-    }
-)
-
 # Desktop-overlay copy seeds product-standard keys before every key is referenced
 # in runtime code.
 # Keep this exact, temporary allowlist narrow so typo or stale seeded keys still fail.
 TEMPORARILY_ALLOWED_UNREFERENCED_I18N_KEYS = frozenset(
-    SHIPPING_DESKTOP_OVERLAY_I18N_KEYS
-    | DESKTOP_OVERLAY_RECOVERY_I18N_KEYS
-    | PRESERVED_TELEMETRY_I18N_KEYS
+    SHIPPING_DESKTOP_OVERLAY_I18N_KEYS | DESKTOP_OVERLAY_RECOVERY_I18N_KEYS
 )
 
 
@@ -112,6 +95,31 @@ def _unused_i18n_keys(keys: list[str], runtime_source: str) -> list[str]:
         and key not in EXACT_DYNAMIC_I18N_KEYS
         and key not in TEMPORARILY_ALLOWED_UNREFERENCED_I18N_KEYS
     ]
+
+
+_CALL_SITE_I18N_KEY_RE = re.compile(r'\bt\(\s*"([a-z][A-Za-z0-9_.]*)"')
+_T_FOR_LOCALE_I18N_KEY_RE = re.compile(
+    r'\bt_for_locale\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*,\s*"([a-z][A-Za-z0-9_.]*)"'
+)
+
+
+def _referenced_literal_i18n_keys(runtime_source: str) -> set[str]:
+    return set(_CALL_SITE_I18N_KEY_RE.findall(runtime_source)) | set(
+        _T_FOR_LOCALE_I18N_KEY_RE.findall(runtime_source)
+    )
+
+
+def test_i18n_literal_call_sites_exist_in_every_bundle() -> None:
+    bundles = _load_bundles()
+    referenced = {
+        key
+        for key in _referenced_literal_i18n_keys(_runtime_python_source())
+        if not key.startswith(DYNAMIC_I18N_PREFIXES)
+    }
+
+    missing = {locale: sorted(referenced - set(bundle)) for locale, bundle in bundles.items()}
+
+    assert missing == {locale: [] for locale in bundles}
 
 
 def test_i18n_bundles_share_the_same_keys() -> None:

@@ -29,7 +29,6 @@ class DiscordManagedAuthDialog:
     ]
     waiting_action_labels = [
         "discord_auth.cancel",
-        "discord_auth.reopen_browser",
     ]
 
     def __init__(
@@ -39,14 +38,12 @@ class DiscordManagedAuthDialog:
         on_continue: Callable[[], None],
         on_byok: Callable[[], None],
         on_close: Callable[[], None],
-        on_reopen_browser: Callable[[], None] | None = None,
         on_cancel: Callable[[], None] | None = None,
     ) -> None:
         self._page = page
         self._on_continue = on_continue
         self._on_byok = on_byok
         self._on_close = on_close
-        self._on_reopen_browser = on_reopen_browser
         self._on_cancel = on_cancel
         self._dialog: ft.AlertDialog | None = None
         self._is_open = False
@@ -59,7 +56,6 @@ class DiscordManagedAuthDialog:
         self._continue_button: ft.TextButton | None = None
         self._byok_button: ft.TextButton | None = None
         self._close_button: ft.TextButton | None = None
-        self._reopen_browser_button: ft.TextButton | None = None
         self._cancel_button: ft.TextButton | None = None
         self._referral_toggle: ft.TextButton | None = None
         self._referral_toggle_label: ft.Text | None = None
@@ -121,7 +117,6 @@ class DiscordManagedAuthDialog:
             self._continue_button,
         ) = self._dialog_result.initial_action_buttons[0:2]
         self._byok_button = None
-        self._reopen_browser_button = None
         self._cancel_button = None
         self._is_open = True
 
@@ -195,13 +190,7 @@ class DiscordManagedAuthDialog:
             split_body_paragraphs(t("discord_auth.waiting_body"))
         )
         waiting_buttons = self._dialog_result.set_actions(self._build_waiting_actions())
-        self._reopen_browser_button = None
-        self._cancel_button = None
-        if self._on_reopen_browser is not None:
-            self._cancel_button = waiting_buttons[0]
-            self._reopen_browser_button = waiting_buttons[1]
-        else:
-            self._cancel_button = waiting_buttons[0]
+        self._cancel_button = waiting_buttons[0]
         self._update_page_if_possible()
 
     def set_callback_received(self) -> None:
@@ -249,23 +238,11 @@ class DiscordManagedAuthDialog:
                 close_before_action=False,
             )
         )
-        if self._on_reopen_browser is not None:
-            actions.append(
-                WarmDocumentDialogAction(
-                    label=t("discord_auth.reopen_browser"),
-                    on_select=self._reopen_browser,
-                    close_before_action=False,
-                )
-            )
         return actions
 
     def _close_then(self, action: Callable[[], None]) -> None:
         self.close()
         action()
-
-    def _reopen_browser(self) -> None:
-        if self._on_reopen_browser is not None:
-            self._on_reopen_browser()
 
     def _cancel_waiting(self) -> None:
         self.close()

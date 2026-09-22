@@ -9,12 +9,12 @@
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.7.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
-  <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
+  <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
 <h2 align="center">
-  <a href="../../README.md">🇺🇸 English</a> ·
+  <a href="README.md">🇺🇸 English</a> ·
   <a href="README.ko.md">🇰🇷 한국어</a> ·
   🇯🇵 日本語 ·
   <a href="README.zh-CN.md">🇨🇳 简体中文</a> ·
@@ -25,7 +25,7 @@
 
 ## デモ
 
-![PuriPuly（Deepgram + Gemini 3 Flash）と VRCT（Google Web Speech + Google Translate）の翻訳比較。PuriPuly 音声認識：「진짜한개도없어서완전허탈했어.」、翻訳：「（本当に一つもなくて、すごくがっかりしちゃった。）」 | VRCT 音声認識：「진짜 한 개도 없어서 완전 허탈했다」、翻訳：「本当の犬もいませんでした。」](../images/demo/ko-jp_screenshot.png)
+![PuriPuly（Deepgram + Gemini 3 Flash）と VRCT（Google Web Speech + Google Translate）の翻訳比較。PuriPuly 音声認識：「진짜한개도없어서완전허탈했어.」、翻訳：「（本当に一つもなくて、すごくがっかりしちゃった。）」 | VRCT 音声認識：「진짜 한 개도 없어서 완전 허탈했다」、翻訳：「本当の犬もいませんでした。」](docs/images/demo/ko-jp_screenshot.png)
 
 ---
 
@@ -86,7 +86,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 ---
 
 ## 翻訳比較
-![韓国語→英語/日本語/中国語（簡体）翻訳の文あたり平均エラーペナルティチャート。216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：1位 Gemma 4 31B (0.353)、2位 Gemma 4 26B A4B (0.387)、3位 DeepSeek-V4 Flash 0731 (0.571)、4位 Gemma 4 12B QAT Q4 (0.855)、5位 Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部ベースライン：Hy-MT-7B (1.863)、Papago (2.699)、Gemini 3.5 Live Translate (2.991)、MiLMMT 46-4B (3.087)、DeepL (3.914)、Google Cloud Translation Basic (5.731)。](../images/performance/2.png)
+![韓国語→英語/日本語/中国語（簡体）翻訳の文あたり平均エラーペナルティチャート。216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：1位 Gemma 4 31B (0.353)、2位 Gemma 4 26B A4B (0.387)、3位 DeepSeek-V4 Flash 0731 (0.571)、4位 Gemma 4 12B QAT Q4 (0.855)、5位 Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部ベースライン：Hy-MT-7B (1.863)、Papago (2.699)、Gemini 3.5 Live Translate (2.991)、MiLMMT 46-4B (3.087)、DeepL (3.914)、Google Cloud Translation Basic (5.731)。](docs/images/performance/2.png)
 
 - 青い棒グラフはPuriPulyで使用できるモデルです。
 - マイクロソフトのGemba MQMフレームワークを使って実験しました。
@@ -231,22 +231,22 @@ PuriPulyはクラウドSTTと組み合わせると最良の体験になります
 <summary><h3>OpenRouter</h3></summary>
 
 1. 赤い丸の中のオプションをスクリーンショットのとおりに設定してください。
-   ![step0](../images/openrouter/0.png)
+   ![step0](docs/images/openrouter/0.png)
 
 2. アプリ内で赤い丸の中のボタンを押します。
-   ![step1](../images/openrouter/1.png)
+   ![step1](docs/images/openrouter/1.png)
 
 3. OpenRouterでログインします。
-   ![step2](../images/openrouter/2.png)
+   ![step2](docs/images/openrouter/2.png)
 
 4. 赤い丸の中のボタンを押して決済画面を抜けます。
-   ![step3](../images/openrouter/3.png)
+   ![step3](docs/images/openrouter/3.png)
 
 5. **Authorize** ボタンを押します。
-   ![step4](../images/openrouter/4.png)
+   ![step4](docs/images/openrouter/4.png)
 
 6. 使う分だけ前払いでチャージします。
-   ![step5](../images/openrouter/5.png)
+   ![step5](docs/images/openrouter/5.png)
 
 <details>
 <summary><h3>Authorizeボタンを押しても認証されない場合</h3></summary>
@@ -254,13 +254,13 @@ PuriPulyはクラウドSTTと組み合わせると最良の体験になります
 Authorizeボタンを押しても認証されない場合は、再試行するか、以下の手順で直接APIキーを発行して貼り付けてください。
 
 6. 右上のアカウントをクリックし、左のAPI Keysタブを開いて、中央のCreateボタンを押します。
-   ![step6](../images/openrouter/6.png)
+   ![step6](docs/images/openrouter/6.png)
 
 7. Createボタンを押します。
-   ![step7](../images/openrouter/7.png)
+   ![step7](docs/images/openrouter/7.png)
 
 8. ボタンを押してAPIキーをコピーし、翻訳機のAPIタブに貼り付けます。
-   ![step8](../images/openrouter/8.png)
+   ![step8](docs/images/openrouter/8.png)
 
 </details>
 
@@ -270,22 +270,22 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 <summary><h3>DeepSeek</h3></summary>
 
 1. 赤い丸の中のオプションをスクリーンショットのとおりに設定してください。
-   ![step0](../images/deepseek/0.png)
+   ![step0](docs/images/deepseek/0.png)
 
 2. [DeepSeek公式サイト](https://www.deepseek.com/en/)にアクセスし、**Access API** ボタンをクリックします。
-   ![step1](../images/deepseek/1.png)
+   ![step1](docs/images/deepseek/1.png)
 
 3. サイトでログインします。
-   ![step2](../images/deepseek/2.png)
+   ![step2](docs/images/deepseek/2.png)
 
 4. API Keysタブに移動して **Create new API Keys** を押します。
-   ![step3](../images/deepseek/3.png)
+   ![step3](docs/images/deepseek/3.png)
 
 5. ボタンを押してAPIキーをコピーし、翻訳機のAPIタブに貼り付けます。
-   ![step4](../images/deepseek/4.png)
+   ![step4](docs/images/deepseek/4.png)
 
 6. Top Upタブに移動し、使う分だけ前払いでチャージします。
-   ![step5](../images/deepseek/5.png)
+   ![step5](docs/images/deepseek/5.png)
 
 </details>
 
@@ -293,22 +293,22 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 <summary><h3>Deepgram</h3></summary>
 
 1. [Deepgram Console](https://console.deepgram.com/)にアクセスしてログインします。
-   ![step1](../images/deepgram/1.png)
+   ![step1](docs/images/deepgram/1.png)
 
 2. 歓迎メッセージとアンケートが表示されたら、**Skip** を押してスキップします。
-   ![step2](../images/deepgram/2.png)
+   ![step2](docs/images/deepgram/2.png)
 
 3. サービス選択画面で **STT (Speech-to-Text)** を選択します。
-   ![step3](../images/deepgram/3.png)
+   ![step3](docs/images/deepgram/3.png)
 
 4. API Keysメニューで **Create a New API Key** をクリックします。
-   ![step4](../images/deepgram/4.png)
+   ![step4](docs/images/deepgram/4.png)
 
 5. キーの名前を入力し（例：`puripuly`）、作成します。
-   ![step5](../images/deepgram/5.png)
+   ![step5](docs/images/deepgram/5.png)
 
 6. 作成されたキーをコピーして、PuriPulyの設定に貼り付けます。
-   ![step6](../images/deepgram/6.png)
+   ![step6](docs/images/deepgram/6.png)
 
 </details>
 
@@ -316,35 +316,35 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 <summary><h3>Gemini</h3></summary>
 
 1. [Google AI Studio](https://aistudio.google.com/apikey)にアクセスし、**Get API key** ボタンをクリックします。
-   ![step1](../images/gemini/1.png)
+   ![step1](docs/images/gemini/1.png)
 
 2. 新しいプロジェクトを作成します。
-   ![step2](../images/gemini/2.png)
+   ![step2](docs/images/gemini/2.png)
 
 3. 任意の名前を付けます。
-   ![step3](../images/gemini/3.png)
+   ![step3](docs/images/gemini/3.png)
 
 4. 作成したプロジェクトを選択し、**Create key** を押します。
-   ![step4](../images/gemini/4.png)
+   ![step4](docs/images/gemini/4.png)
 
 5. 丸で囲まれた部分を押します。
-   ![step5](../images/gemini/5.png)
+   ![step5](docs/images/gemini/5.png)
 
 6. 丸で囲まれた部分を押してキーをコピーします。
-   ![step6](../images/gemini/6.png)
+   ![step6](docs/images/gemini/6.png)
 
 7. （推奨）黄色で強調表示されている **Set Up Billing** ボタンを押し、有料プランに切り替えます。
 プラン切り替えには少し時間がかかることがあります。
-   ![step7](../images/gemini/7.png)
+   ![step7](docs/images/gemini/7.png)
 
 <details>
 <summary><h3>Geminiの有料サブスクリプションをお持ちの方</h3></summary>
 
 8. [Google Developer Program](https://developers.google.com/program/my-benefits) にアクセスし、プログラムに参加してください。
-   ![step8](../images/gemini/8.png)
+   ![step8](docs/images/gemini/8.png)
 
 9. ステップ7で設定した有料プランのプロジェクトを選択してください。
-   ![step9](../images/gemini/9.png)
+   ![step9](docs/images/gemini/9.png)
 
 </details>
 
@@ -358,22 +358,22 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
    - [中国本土以外の地域](https://bailian.console.alibabacloud.com)
 
 2. アクセスしたアドレスからログインします。APIキーを発行したいリージョン（Region）を正確に選択してください（例：Beijing）。
-   ![step2](../images/qwen/1.png)
+   ![step2](docs/images/qwen/1.png)
 
 3. 右上の **歯車アイコン** をクリックします。
-   ![step3](../images/qwen/2.png)
+   ![step3](docs/images/qwen/2.png)
 
 4. ワークスペースを作成し、**API-KEY** ページに移動します。
-   ![step4](../images/qwen/3.png)
+   ![step4](docs/images/qwen/3.png)
 
 5. **Create API Key** をクリックします。
-   ![step5](../images/qwen/4.png)
+   ![step5](docs/images/qwen/4.png)
 
 6. アカウントとワークスペースを割り当てて、OKボタンを押します。
-   ![step6](../images/qwen/5.png)
+   ![step6](docs/images/qwen/5.png)
 
 7. 丸で囲まれた部分を押してキーをコピーします。
-   ![step7](../images/qwen/6.png)
+   ![step7](docs/images/qwen/6.png)
 
 </details>
 
@@ -381,22 +381,22 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 <summary><h3>Soniox</h3></summary>
 
 1. [Soniox Console](https://console.soniox.com/)にログインします。
-   ![step1](../images/soniox/1.png)
+   ![step1](docs/images/soniox/1.png)
 
 2. 組織の名前を任意で入力します。
-   ![step2](../images/soniox/2.png)
+   ![step2](docs/images/soniox/2.png)
 
 3. **Add Funds** ボタンを押し、支払い方法を登録します。
-   ![step3](../images/soniox/3.png)
+   ![step3](docs/images/soniox/3.png)
 
 4. Sonioxはプリペイド方式のチャージが必要です。チャージ完了後、**API Keys** メニューへ移動します。
-   ![step4](../images/soniox/4.png)
+   ![step4](docs/images/soniox/4.png)
 
 5. 新しいAPI Keyを作成します。
-   ![step5](../images/soniox/5.png)
+   ![step5](docs/images/soniox/5.png)
 
 6. 作成されたキーをコピーして、PuriPulyの設定に貼り付けます。
-   ![step6](../images/soniox/6.png)
+   ![step6](docs/images/soniox/6.png)
 
 </details>
 
@@ -405,9 +405,9 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 
 ## アーキテクチャ
 
-![PuriPuly Heart ヘキサゴナルアーキテクチャ図](../architecture-light.png)
+![PuriPuly Heart ヘキサゴナルアーキテクチャ図](docs/architecture-light.png)
 
-[`docs/architecture.md`](../architecture.md) を参照してください。
+[`docs/architecture.md`](docs/architecture.md) を参照してください。
 
 ## ロードマップ
 
@@ -422,12 +422,12 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 | 領域 | 推奨環境 | ドキュメント |
 |---|---|---|
 | Python デスクトップアプリ | Windows | このセクション |
-| Broker サービス | Linux | [`broker/README.md`](../../broker/README.md) |
-| ネイティブ VR オーバーレイ | Windows | [`native/overlay/README.md`](../../native/overlay/README.md) |
+| Broker サービス | Linux | [`broker/README.md`](broker/README.md) |
+| ネイティブ VR オーバーレイ | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
 
 ### Python 環境
 
-Python アプリには通常の GIL 有効 CPython 3.14（Windows x64）が必要です。
+Python アプリには Python 3.12 または 3.13 が必要です。
 
 Windows 環境を作成して有効化します:
 
@@ -447,6 +447,12 @@ pip install -e ".[dev]"
 
 ```powershell
 uv sync --dev
+```
+
+リポジトリのフックをインストールします:
+
+```powershell
+pre-commit install
 ```
 
 Linux や WSL で作業する場合は、利用可能なら `.venv-wsl` を使用します。
@@ -515,13 +521,13 @@ python -m pytest tests/path/to/test_file.py
 
 ### その他の領域
 
-Broker のドキュメントは [`broker/README.md`](../../broker/README.md) で管理されています。
+Broker のドキュメントは [`broker/README.md`](broker/README.md) で管理されています。
 
-ネイティブ VR オーバーレイのドキュメントは [`native/overlay/README.md`](../../native/overlay/README.md) で管理されています。
+ネイティブ VR オーバーレイのドキュメントは [`native/overlay/README.md`](native/overlay/README.md) で管理されています。
 
-カスタム HTTP API 拡張のドキュメントは [`docs/http-extensions.md`](../http-extensions.md) で管理されています。接続に必要な JSON Schema は [`docs/http-extension.schema.json`](../http-extension.schema.json) を参照してください。
+カスタム HTTP API 拡張のドキュメントは [`docs/http-extensions.md`](docs/http-extensions.md) で管理されています。接続に必要な JSON Schema は [`docs/http-extension.schema.json`](docs/http-extension.schema.json) を参照してください。
 
-VRChat OSC コントロールは [`docs/vrchat-osc.md`](../vrchat-osc.md) を参照してください。
+VRChat OSC コントロールは [`docs/vrchat-osc.md`](docs/vrchat-osc.md) を参照してください。
 
 ---
 
@@ -546,13 +552,13 @@ SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han �
 
 ## ポリシー
 
-- [Code signing policy](../../CODE_SIGNING.md)
-- [プライバシーポリシー](../../PRIVACY.md)
+- [Code signing policy](CODE_SIGNING.md)
+- [プライバシーポリシー](PRIVACY.md)
 
 ---
 
 ## ライセンス
 
-[AGPL-3.0-or-later](../../LICENSE)
+[AGPL-3.0-or-later](LICENSE)
 
 サードパーティライセンスおよび通知: `src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt`

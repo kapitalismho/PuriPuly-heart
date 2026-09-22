@@ -183,7 +183,7 @@ class TalkTogetherPassStatus:
 @dataclass(frozen=True, slots=True)
 class ManagedOpenRouterReleaseResult:
     behavior: ManagedOpenRouterReleaseBehavior
-    message_key: str
+    message_key: str | None = None
     message_kwargs: Mapping[str, object] = field(default_factory=dict)
     diagnostics: ManagedOpenRouterReleaseDiagnostics | None = None
     retry_after_ms: int | None = None
@@ -559,7 +559,6 @@ class ManagedOpenRouterReleaseService:
             self._clear_retry_after()
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.READY,
-                message_key="managed_release.ready",
                 api_key=resolution.api_key,
                 local_key_available=True,
             )
@@ -880,7 +879,6 @@ class ManagedOpenRouterReleaseService:
             self._clear_retry_after()
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.READY,
-                message_key="managed_release.ready",
                 api_key=resolution.api_key,
                 local_key_available=True,
             )
@@ -1284,7 +1282,6 @@ class ManagedOpenRouterReleaseService:
             self._clear_retry_after()
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.READY,
-                message_key="managed_release.ready",
                 api_key=resolution.api_key,
                 local_key_available=True,
             )
@@ -1437,7 +1434,6 @@ class ManagedOpenRouterReleaseService:
             self._clear_retry_after()
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.READY,
-                message_key="managed_release.ready",
                 api_key=issue_response.openrouter_api_key,
                 local_key_available=True,
                 referral_bonus_applied=issue_response.referral_bonus_applied is True,
@@ -1550,7 +1546,6 @@ class ManagedOpenRouterReleaseService:
             self._clear_retry_after()
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.READY,
-                message_key="managed_release.ready",
                 api_key=issue_response.openrouter_api_key,
                 local_key_available=True,
                 referral_bonus_applied=issue_response.referral_bonus_applied is True,
@@ -1562,7 +1557,6 @@ class ManagedOpenRouterReleaseService:
         self._clear_retry_after()
         return ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
             api_key=issue_response.openrouter_api_key,
             local_key_available=True,
             referral_bonus_applied=issue_response.referral_bonus_applied is True,

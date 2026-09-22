@@ -22,7 +22,6 @@ SHIPPING_DESKTOP_OVERLAY_I18N_KEYS = {
     "settings.overlay.desktop.lock.value.move",
     "settings.overlay.desktop.lock.value.locked",
     "settings.overlay.desktop.empty_state.action.lock",
-    "settings.overlay.position_reset.title",
     "settings.overlay.position_reset.vr.title",
     "settings.overlay.position_reset.desktop.title",
     "settings.overlay.position_reset.action.vr",
