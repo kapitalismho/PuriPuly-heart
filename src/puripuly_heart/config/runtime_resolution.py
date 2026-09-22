@@ -947,7 +947,11 @@ class OverlayRuntimeIntent:
         object.__setattr__(
             self,
             "speaker_transition_mode",
-            self.speaker_transition_mode if self.speaker_transition_mode in {"A", "C", "E"} else "A",
+            (
+                self.speaker_transition_mode
+                if self.speaker_transition_mode in {"A", "C", "E"}
+                else "A"
+            ),
         )
         object.__setattr__(
             self,

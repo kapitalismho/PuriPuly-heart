@@ -87,6 +87,8 @@ class TranscriptOverlayProjection:
     target_language: str
     event_kind: str | None = None
     output_scope: OverlayPublicationScope | None = None
+    speaker_transition: str | None = None
+    speaker_transition_claim_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1100,6 +1102,8 @@ class TranslationOutputProjectionOwner:
                 source_language=projection.source_language,
                 target_language=projection.target_language,
                 output_scope=projection.output_scope,
+                speaker_transition=projection.speaker_transition,
+                speaker_transition_claim_id=projection.speaker_transition_claim_id,
             ),
             publication_generation=projection.transcript.publication_generation,
             source_order=projection.transcript.source_order,
@@ -1153,6 +1157,8 @@ class TranslationOutputProjectionOwner:
         close_is_final: bool,
         finalize_latency: bool,
         output_scope: OverlayPublicationScope | None = None,
+        speaker_transition: str | None = None,
+        speaker_transition_claim_id: str | None = None,
     ) -> bool:
         if self.has_overlay_destination:
             self.diagnostics.retain_latency_until_output("peer", transcript.utterance_id)
@@ -1163,6 +1169,8 @@ class TranslationOutputProjectionOwner:
                     target_language=target_language,
                     event_kind="peer_transcript_final",
                     output_scope=output_scope,
+                    speaker_transition=speaker_transition,
+                    speaker_transition_claim_id=speaker_transition_claim_id,
                 )
             )
         return await self.close_overlay_utterance(
@@ -1989,6 +1997,8 @@ class TranslationOutputProjectionOwner:
                     close_is_final=True,
                     finalize_latency=True,
                     output_scope=output_scope,
+                    speaker_transition=submission.speaker_transition,
+                    speaker_transition_claim_id=submission.speaker_transition_claim_id,
                 )
                 await self.publish_peer_chatbox_denial(utterance_id)
             elif dual_target_self:
@@ -2108,6 +2118,8 @@ class TranslationOutputProjectionOwner:
                     close_is_final=False,
                     finalize_latency=not denied_fallback_to_chatbox,
                     output_scope=output_scope,
+                    speaker_transition=submission.speaker_transition,
+                    speaker_transition_claim_id=submission.speaker_transition_claim_id,
                 )
             if fallback_to_chatbox and await self._await_translation_destination(
                 submission,

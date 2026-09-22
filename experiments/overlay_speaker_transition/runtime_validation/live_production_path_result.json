@@ -20,7 +20,7 @@
  "live_terminals": [
   {
    "order": 1,
-   "segment_id": "0904965a-b63c-444c-b2dc-e3d9179f1e8a",
+   "segment_id": "9d58ef4e-88a3-4221-b462-68498b075012",
    "text": "The overlay shows speaker changes clearly.",
    "outcome": "final",
    "text_authority": "authoritative",
@@ -36,11 +36,11 @@
      "overlaps_previous": false
     }
    ],
-   "session_scope_head": "37e6f631"
+   "session_scope_head": "79419b94"
   },
   {
    "order": 2,
-   "segment_id": "e7073623-e1e4-43c2-8a93-461c42cad045",
+   "segment_id": "0ea2da54-803e-4fb3-91d2-3175903c2140",
    "text": " A second voice is now speaking today.",
    "outcome": "final",
    "text_authority": "authoritative",
@@ -56,7 +56,7 @@
      "overlaps_previous": false
     }
    ],
-   "session_scope_head": "37e6f631"
+   "session_scope_head": "79419b94"
   }
  ],
  "single_session_scope": true,
@@ -70,24 +70,24 @@
     {
      "source_text": "The overlay shows speaker changes clearly.",
      "speaker_transition": "context_reset",
-     "claim_id_tail": "4d76f8dc"
+     "claim_id_tail": "5c9a79b8"
     },
     {
      "source_text": " A second voice is now speaking today.",
      "speaker_transition": "transition",
-     "claim_id_tail": "a5699730"
+     "claim_id_tail": "1f648399"
     }
    ],
    "blocks": [
     {
-     "id_tail": "4d76f8dc",
+     "id_tail": "5c9a79b8",
      "channel": "peer",
      "speaker_style": "gold",
      "speaker_boundary": false,
      "primary_text": "translated:The overlay shows speaker changes clearly."
     },
     {
-     "id_tail": "a5699730",
+     "id_tail": "1f648399",
      "channel": "peer",
      "speaker_style": "gold",
      "speaker_boundary": true,
@@ -105,24 +105,24 @@
     {
      "source_text": "The overlay shows speaker changes clearly.",
      "speaker_transition": "context_reset",
-     "claim_id_tail": "9d424e35"
+     "claim_id_tail": "f62e3ee1"
     },
     {
      "source_text": " A second voice is now speaking today.",
      "speaker_transition": "transition",
-     "claim_id_tail": "f7024cd4"
+     "claim_id_tail": "be891f56"
     }
    ],
    "blocks": [
     {
-     "id_tail": "9d424e35",
+     "id_tail": "f62e3ee1",
      "channel": "peer",
      "speaker_style": "gold",
      "speaker_boundary": false,
      "primary_text": "translated:The overlay shows speaker changes clearly."
     },
     {
-     "id_tail": "f7024cd4",
+     "id_tail": "be891f56",
      "channel": "peer",
      "speaker_style": "cyan",
      "speaker_boundary": false,
@@ -140,24 +140,24 @@
     {
      "source_text": "The overlay shows speaker changes clearly.",
      "speaker_transition": "context_reset",
-     "claim_id_tail": "b5f1e728"
+     "claim_id_tail": "f4f0e1e4"
     },
     {
      "source_text": " A second voice is now speaking today.",
      "speaker_transition": "transition",
-     "claim_id_tail": "ed7b1b79"
+     "claim_id_tail": "94f9605a"
     }
    ],
    "blocks": [
     {
-     "id_tail": "b5f1e728",
+     "id_tail": "f4f0e1e4",
      "channel": "peer",
      "speaker_style": "gold",
      "speaker_boundary": false,
      "primary_text": "translated:The overlay shows speaker changes clearly."
     },
     {
-     "id_tail": "ed7b1b79",
+     "id_tail": "94f9605a",
      "channel": "peer",
      "speaker_style": "cyan",
      "speaker_boundary": true,

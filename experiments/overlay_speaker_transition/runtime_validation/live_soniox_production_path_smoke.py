@@ -44,9 +44,9 @@ sys.path.insert(0, str(REPO_ROOT))
 
 import numpy as np
 
+from puripuly_heart.app.wiring.wiring_secrets_factory import create_secret_store
 from puripuly_heart.config.paths import default_settings_path
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
-from puripuly_heart.app.wiring.wiring_secrets_factory import create_secret_store
 from puripuly_heart.core.audio.format import AudioCaptureSpan, resample_f32_linear
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentIdentity,
@@ -60,10 +60,10 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
+    STTSessionProjection,
 )
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.stt.soniox import _SonioxSession
-from puripuly_heart.core.stt.backend import STTSessionProjection
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
@@ -81,7 +81,7 @@ Get-ChildItem $outDir | Format-Table Name, Length -AutoSize
 """
 
 _SAPI_ONE = (
-    '$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; '
+    "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
     '$s.SelectVoice("{voice}"); $s.SetOutputToWaveFile("{f}"); '
     '$s.Speak("{text}"); $s.Dispose()'
 )
@@ -170,9 +170,7 @@ def _load_live_key() -> str:
     return key
 
 
-async def live_scoped_terminals(
-    api_key: str, wav_paths: list[Path]
-) -> tuple[list[dict], str]:
+async def live_scoped_terminals(api_key: str, wav_paths: list[Path]) -> tuple[list[dict], str]:
     """Run one live scoped session; return sanitized terminal records + scope head."""
     from puripuly_heart.core.stt.backend import STTProviderEpochEnded
 
@@ -218,7 +216,9 @@ async def live_scoped_terminals(
                     identity,
                     chunk,
                     payload_sequence=sequence,
-                    source_ranges=(_span(offset // chunk_bytes, offset // 2, offset // 2 + samples),),
+                    source_ranges=(
+                        _span(offset // chunk_bytes, offset // 2, offset // 2 + samples),
+                    ),
                     context_only=False,
                 )
             await session.seal_turn(
@@ -395,9 +395,7 @@ async def run_mode(records: list[dict], mode: str) -> dict:
             await harness.peer_owner.translation_turns.wait_for_idle()
             await harness.output_runtime.wait_for_peer_output_idle()
         translations = [
-            event
-            for event in overlay.events
-            if getattr(event, "type", None) == "translation_final"
+            event for event in overlay.events if getattr(event, "type", None) == "translation_final"
         ]
         return {
             "translation_calls": list(provider.calls),
@@ -405,9 +403,11 @@ async def run_mode(records: list[dict], mode: str) -> dict:
                 {
                     "source_text": event.source_text,
                     "speaker_transition": event.speaker_transition,
-                    "claim_id_tail": str(event.speaker_transition_claim_id)[-8:]
-                    if event.speaker_transition_claim_id
-                    else None,
+                    "claim_id_tail": (
+                        str(event.speaker_transition_claim_id)[-8:]
+                        if event.speaker_transition_claim_id
+                        else None
+                    ),
                 }
                 for event in translations
             ],
@@ -434,7 +434,8 @@ async def main() -> int:
     parser.add_argument(
         "--out",
         type=Path,
-        default=REPO_ROOT / "experiments/overlay_speaker_transition/runtime_validation"
+        default=REPO_ROOT
+        / "experiments/overlay_speaker_transition/runtime_validation"
         / "live_production_path_result.json",
     )
     parser.add_argument("--modes", default="A,C,E")

@@ -23,6 +23,7 @@ def hex_for(mode: str, role: str) -> str:
 def fresh_state() -> dict:
     return {"run": "gold", "emphasis": None, "window": []}
 
+
 def render_entry(mode: str, event: dict, role: str, marker: str) -> dict:
     block = event["block"]
     return {
@@ -57,7 +58,9 @@ def step(mode: str, state: dict, event: dict) -> dict:
         for entry in window:
             if entry["key"] == key:
                 entry["primary"] = event["block"]["primary_text"]
-                entry["secondary"] = event["block"]["secondary_text"] if event["block"]["secondary_enabled"] else ""
+                entry["secondary"] = (
+                    event["block"]["secondary_text"] if event["block"]["secondary_enabled"] else ""
+                )
         return {
             "action": "revised-in-place",
             "reason": "same logical turn keeps identity, color and marker",
@@ -130,25 +133,41 @@ def snap_of(results: dict, mode: str, event_id: str) -> dict:
 
 def check_revision_keeps_emphasis() -> bool:
     base = {
-        "id": "syn-rev", "speaker_ref": "A",
+        "id": "syn-rev",
+        "speaker_ref": "A",
         "evidence": {"kind": "revision", "reference": "x", "note": "synthetic"},
         "block": {
-            "id": "bXr", "occupant_key": "slot-1", "appearance_seq": 99,
-            "block_variant": "finalized", "channel": "peer",
-            "logical_turn_key": "peer-k1", "publication_scope": "s",
-            "publication_generation": 2, "publication_order": 2,
-            "primary_language": "en", "primary_text": "reword",
-            "secondary_enabled": True, "secondary_language": "en",
+            "id": "bXr",
+            "occupant_key": "slot-1",
+            "appearance_seq": 99,
+            "block_variant": "finalized",
+            "channel": "peer",
+            "logical_turn_key": "peer-k1",
+            "publication_scope": "s",
+            "publication_generation": 2,
+            "publication_order": 2,
+            "primary_language": "en",
+            "primary_text": "reword",
+            "secondary_enabled": True,
+            "secondary_language": "en",
             "secondary_text": "reword",
         },
     }
     state = fresh_state()
     state["emphasis"] = "peer-k1"
-    state["window"] = [{
-        "event": "syn-arrive", "block": "bX", "key": "peer-k1",
-        "channel": "peer", "color_role": "cyan", "hex": "#33D6FF",
-        "marker": "rule", "primary": "orig", "secondary": "orig",
-    }]
+    state["window"] = [
+        {
+            "event": "syn-arrive",
+            "block": "bX",
+            "key": "peer-k1",
+            "channel": "peer",
+            "color_role": "cyan",
+            "hex": "#33D6FF",
+            "marker": "rule",
+            "primary": "orig",
+            "secondary": "orig",
+        }
+    ]
     out = step("E1", state, base)
     return (
         out["action"] == "revised-in-place"
@@ -164,60 +183,112 @@ def run_invariants(results: dict) -> list:
         checks.append({"id": check_id, "desc": desc, "result": "PASS" if ok else "FAIL"})
 
     w = window_of(results, "C1", "t02")
-    add("segmentation-no-toggle", "t02 delivery cut keeps Gold run, no marker in any mode",
+    add(
+        "segmentation-no-toggle",
+        "t02 delivery cut keeps Gold run, no marker in any mode",
         all(entry["color_role"] == "gold" and entry["marker"] == "none" for entry in w)
-        and all(entry["marker"] == "none" for mode in ("A1", "A2", "E1", "E2") for entry in window_of(results, mode, "t02")))
+        and all(
+            entry["marker"] == "none"
+            for mode in ("A1", "A2", "E1", "E2")
+            for entry in window_of(results, mode, "t02")
+        ),
+    )
     w = window_of(results, "C1", "t03")
-    add("first-transition-once", "t03 toggles C run to Cyan exactly once, A/E attach one marker",
+    add(
+        "first-transition-once",
+        "t03 toggles C run to Cyan exactly once, A/E attach one marker",
         [entry["color_role"] for entry in w] == ["gold", "cyan"]
         and window_of(results, "A1", "t03")[-1]["marker"] == "dash"
         and window_of(results, "A2", "t03")[-1]["marker"] == "rule"
-        and window_of(results, "E1", "t03")[-1] == {**window_of(results, "E1", "t03")[-1], "color_role": "cyan", "marker": "rule"})
+        and window_of(results, "E1", "t03")[-1]
+        == {**window_of(results, "E1", "t03")[-1], "color_role": "cyan", "marker": "rule"},
+    )
     w = window_of(results, "C1", "t04")
-    add("continuation-no-duplicate", "t04 keeps Cyan run, no second toggle or marker",
+    add(
+        "continuation-no-duplicate",
+        "t04 keeps Cyan run, no second toggle or marker",
         [entry["color_role"] for entry in w] == ["cyan", "cyan"]
-        and snap_of(results, "C1", "t04")["action"] == "carry")
+        and snap_of(results, "C1", "t04")["action"] == "carry",
+    )
     s = snap_of(results, "C1", "t05")
     e = snap_of(results, "E1", "t05")
-    add("self-interposition", "t05 Self is White, C run stays Cyan, E emphasis expires on the readable Self turn",
-        s["window"][-1]["color_role"] == "white" and s["run"] == "cyan"
-        and e["emphasis"] is None and e["window"][-1]["color_role"] == "white")
-    add("self-across-no-boundary", "t06 same speaker across Self adds no marker and keeps the Cyan run",
+    add(
+        "self-interposition",
+        "t05 Self is White, C run stays Cyan, E emphasis expires on the readable Self turn",
+        s["window"][-1]["color_role"] == "white"
+        and s["run"] == "cyan"
+        and e["emphasis"] is None
+        and e["window"][-1]["color_role"] == "white",
+    )
+    add(
+        "self-across-no-boundary",
+        "t06 same speaker across Self adds no marker and keeps the Cyan run",
         window_of(results, "A2", "t06")[-1]["marker"] == "none"
-        and window_of(results, "C1", "t06")[-1]["color_role"] == "cyan")
-    add("consecutive-changes", "t07 and t08 each toggle once and each keeps its own marker",
+        and window_of(results, "C1", "t06")[-1]["color_role"] == "cyan",
+    )
+    add(
+        "consecutive-changes",
+        "t07 and t08 each toggle once and each keeps its own marker",
         [entry["color_role"] for entry in window_of(results, "C1", "t07")] == ["cyan", "gold"]
         and [entry["color_role"] for entry in window_of(results, "C1", "t08")] == ["gold", "cyan"]
         and window_of(results, "E1", "t08")[0]["marker"] == "rule"
         and window_of(results, "E1", "t08")[0]["color_role"] == "gold"
-        and window_of(results, "E1", "t08")[-1]["color_role"] == "cyan")
-    add("no-person-lookup", "t08 color comes only from toggle parity, never from speaker A history",
+        and window_of(results, "E1", "t08")[-1]["color_role"] == "cyan",
+    )
+    add(
+        "no-person-lookup",
+        "t08 color comes only from toggle parity, never from speaker A history",
         snap_of(results, "C1", "t08")["run"] == "cyan"
-        and window_of(results, "C2", "t08")[-1]["hex"] == "#2DE1A8")
-    add("unknown-withheld", "t09 mixed evidence adds no marker, no toggle, C retains its hue",
-        all(window_of(results, mode, "t09")[-1]["marker"] == "none" for mode in ("A1", "A2", "E1", "E2"))
+        and window_of(results, "C2", "t08")[-1]["hex"] == "#2DE1A8",
+    )
+    add(
+        "unknown-withheld",
+        "t09 mixed evidence adds no marker, no toggle, C retains its hue",
+        all(
+            window_of(results, mode, "t09")[-1]["marker"] == "none"
+            for mode in ("A1", "A2", "E1", "E2")
+        )
         and snap_of(results, "C1", "t09")["run"] == "cyan"
-        and window_of(results, "C1", "t09")[-1]["color_role"] == "cyan")
+        and window_of(results, "C1", "t09")[-1]["color_role"] == "cyan",
+    )
     s = snap_of(results, "C1", "t10")
-    add("reset-fresh", "t10 clears the window and restarts Gold without implying a transition",
+    add(
+        "reset-fresh",
+        "t10 clears the window and restarts Gold without implying a transition",
         [entry["block"] for entry in s["window"]] == ["b10"]
         and s["window"][0]["color_role"] == "gold"
-        and s["window"][0]["marker"] == "none" and s["run"] == "gold")
-    add("late-withheld", "t11 revision of expired content and t12 late evidence change nothing",
+        and s["window"][0]["marker"] == "none"
+        and s["run"] == "gold",
+    )
+    add(
+        "late-withheld",
+        "t11 revision of expired content and t12 late evidence change nothing",
         snap_of(results, "E1", "t11")["action"] == "withheld"
         and snap_of(results, "E1", "t12")["action"] == "withheld"
-        and snap_of(results, "E1", "t12")["window"] == snap_of(results, "E1", "t10")["window"])
+        and snap_of(results, "E1", "t12")["window"] == snap_of(results, "E1", "t10")["window"],
+    )
     w = window_of(results, "E1", "t13")
-    add("multilingual-whole-turn", "t13 wrapping turn takes one arrival color across primary and secondary",
-        w[-1]["color_role"] == "cyan" and w[-1]["marker"] == "rule"
-        and window_of(results, "C2", "t13")[-1]["hex"] == "#2DE1A8")
+    add(
+        "multilingual-whole-turn",
+        "t13 wrapping turn takes one arrival color across primary and secondary",
+        w[-1]["color_role"] == "cyan"
+        and w[-1]["marker"] == "rule"
+        and window_of(results, "C2", "t13")[-1]["hex"] == "#2DE1A8",
+    )
     w = window_of(results, "E1", "t14")
-    add("short-reply-expiry-keeps-marker", "t14 expires the t13 emphasis to Gold while its rule marker persists",
+    add(
+        "short-reply-expiry-keeps-marker",
+        "t14 expires the t13 emphasis to Gold while its rule marker persists",
         [entry["color_role"] for entry in w] == ["gold", "gold"]
-        and w[0]["marker"] == "rule" and w[-1]["marker"] == "none"
-        and snap_of(results, "C1", "t14")["run"] == snap_of(results, "C1", "t13")["run"])
-    add("revision-keeps-emphasis-synthetic", "a same-key revision never expires E emphasis",
-        check_revision_keeps_emphasis())
+        and w[0]["marker"] == "rule"
+        and w[-1]["marker"] == "none"
+        and snap_of(results, "C1", "t14")["run"] == snap_of(results, "C1", "t13")["run"],
+    )
+    add(
+        "revision-keeps-emphasis-synthetic",
+        "a same-key revision never expires E emphasis",
+        check_revision_keeps_emphasis(),
+    )
     return checks
 
 

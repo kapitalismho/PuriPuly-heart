@@ -2,8 +2,8 @@
   "meta": {
     "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/178",
     "baseline": "13274569769d3c1ec7a896a2d15b919b76136a6e",
-    "scenario_sha256": "246a0672a758f52d83164ee7aa3ad12912d467ceb1ab97b15290ad0dcdadbf9b",
-    "scenario_version": 1,
+    "scenario_sha256": "b61d553e3667728109b39e3c2e9b37f25b16f5682b0795bb86359f0de32abea2",
+    "scenario_version": 2,
     "window_blocks": 2
   },
   "per_mode": {

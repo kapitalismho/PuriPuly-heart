@@ -399,6 +399,7 @@ def _optional_string_field(data: dict[str, object], key: str) -> str | None:
         raise ValueError(f"{key} must be a string")
     return value
 
+
 def _optional_bool_field(
     data: dict[str, object],
     key: str,

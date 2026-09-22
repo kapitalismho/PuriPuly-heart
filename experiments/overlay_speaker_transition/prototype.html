@@ -26,11 +26,11 @@
   .stage.busy { background: linear-gradient(135deg,#1B2A4A 0%,#7A5C2E 38%,#3AA58B 62%,#E8E8E8 100%); }
   .stage.dark { background: #0A0C10; }
   .stage.bright { background: #EDEFF2; }
-  .strip { position: absolute; left: 11px; right: 11px; bottom: 9px; background: rgba(0,0,0,0.24); border-radius: 6px; padding: 7px 5px; display: flex; flex-direction: column; gap: 8px; }
-  .block { padding: 0 6px; }
-  .rule { height: 3px; width: 43px; border-radius: 2px; margin: 0 0 6px 1px; }
-  .primary { font-size: 29px; line-height: 33px; font-weight: 600; text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000; overflow-wrap: break-word; }
-  .secondary { font-size: 18px; line-height: 23px; font-weight: 500; margin-top: 2px; text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000; overflow-wrap: break-word; }
+  .strip { position: absolute; left: 11px; right: 11px; bottom: 9px; border-radius: 6px; padding: 7px 5px; display: flex; flex-direction: column; gap: 8px; background: transparent; }
+  .block { padding: 0 6px; text-align: center; }
+  .rule { height: 3px; width: 43px; max-width: 100%; border-radius: 2px; margin: 0 auto 4px auto; }
+  .primary { font-size: 29px; line-height: 33px; font-weight: 600; text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000; overflow-wrap: break-word; text-align: center; }
+  .secondary { font-size: 18px; line-height: 23px; font-weight: 500; margin-top: 2px; text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000; overflow-wrap: break-word; text-align: center; }
   .dash { padding-right: 8px; }
   .legend { font-size: 12px; color: #C9CDD3; background: #1A1D22; border: 1px solid #2C313A; border-radius: 8px; padding: 8px 10px; margin: 8px 0; max-width: 900px; }
   .grid { display: grid; grid-template-columns: repeat(2, 460px); gap: 12px; margin-top: 12px; }
@@ -38,10 +38,10 @@
   .cell h3 { margin: 0 0 6px; font-size: 13px; }
   .cell h3 span { color: #9AA0AA; font-weight: 400; }
   .mini { width: 444px; height: 114px; border-radius: 6px; position: relative; overflow: hidden; border: 1px solid #333; }
-  .mini .strip { left: 5px; right: 5px; bottom: 4px; padding: 3px; gap: 4px; }
-  .mini .primary { font-size: 14px; line-height: 16px; }
-  .mini .secondary { font-size: 9px; line-height: 11px; }
-  .mini .rule { height: 2px; width: 21px; margin-bottom: 3px; }
+  .mini .strip { left: 5px; right: 5px; bottom: 4px; padding: 3px; gap: 4px; background: transparent; }
+  .mini .primary { font-size: 14px; line-height: 16px; text-align: center; }
+  .mini .secondary { font-size: 9px; line-height: 11px; text-align: center; }
+  .mini .rule { height: 2px; width: 21px; margin: 0 auto 2px auto; }
   table { border-collapse: collapse; font-size: 12px; margin-top: 10px; }
   th, td { border: 1px solid #333; padding: 4px 8px; text-align: right; }
   th:first-child, td:first-child { text-align: left; }
@@ -58,9 +58,8 @@
   <h1>Overlay speaker-transition visual candidates — runnable comparison</h1>
   <p>Issue <a href="https://github.com/kapitalismho/PuriPuly-heart/issues/178" style="color:#FFD700">#178</a>.
   Fixed synthetic sequence, two-block window, no transcript history. Speaker letters are test annotations and never appear as product labels.
-  Native constraints emulated: 4096x1056 surface at 0.22 scale (900x232), primary 132px, secondary 82px, 5px black outline, strip alpha 0.24, no flashing.</p>
-  <p>Meaning of the cue: the start of this Peer content has sufficient local evidence of a speaker transition versus the previous relevant Peer content.
-  Same color is not proof of the same person. No marker is not proof of the same speaker.</p>
+  Native constraints emulated: 4096x1056 surface at 0.22 scale (900x232), centered text (native DWRITE center alignment), primary 132px, secondary 82px, 5px black outline, effective background alpha 0 (native text-only transparent overlay; configured 0.24 is not applied), no flashing.</p>
+  <p>Working rule geometry (F2 U2, production basis via ProductionRepair): marker Gold #FFD700, top=0, height=14*text_scale; existing first-line layout origin_y=32*text_scale so marker-bottom to line-origin gap=18*text_scale without moving text; x=strip padding + DirectWrite cached first nonempty rendered line ink bounds.left; width=min(196*text_scale, cached first-line ink width) so short replies cap the rule; first nonempty primary or secondary line; text positions/window/slots unchanged. Prototype approximates the ink-left centering with centered text and a first-line-length width cap.</p>
 </header>
 <main>
   <div class="controls">
@@ -111,13 +110,13 @@
   </section>
 </main>
 <script>
-const HEX = { white: "#FFFFFF", gold: "#FFD700", sky: "#33D6FF", mint: "#2DE1A8", goldC2: "#FFC21A" };
+const HEX = { white: "#FFFFFF", gold: "#FFD700", sky: "#33D6FF", mint: "#2DE1A8" };
 const MODES = [
   { id: "baseline", label: "Baseline", sub: "White/Gold, no marker" },
   { id: "A1", label: "A1 dash", sub: "Gold + leading em dash" },
-  { id: "A2", label: "A2 rule ★", sub: "Gold + 196x14 upper rule" },
-  { id: "C1", label: "C1 sky ★", sub: "Gold / Sky #33D6FF" },
-  { id: "C2", label: "C2 mint", sub: "Gold / Mint #2DE1A8" },
+  { id: "A2", label: "A2 rule ★", sub: "Gold + 196x14 upper rule, 18px gap" },
+  { id: "C1", label: "C1 sky ★", sub: "Gold #FFD700 / Sky #33D6FF" },
+  { id: "C2", label: "C2 mint", sub: "Gold #FFD700 / Mint #2DE1A8" },
   { id: "E1", label: "E1 rule+sky ★", sub: "Gold rule + sky emphasis" },
   { id: "E2", label: "E2 dash+mint", sub: "dash marker + mint emphasis" },
 ];
@@ -157,7 +156,7 @@ function simulate(hex, cvd) {
   return rgbToHex([0,1,2].map(r => linearToSrgb(clamp01(m[r][0]*linear[0] + m[r][1]*linear[1] + m[r][2]*linear[2]))));
 }
 function emphasisHex(mode) { return (mode === "C2" || mode === "E2") ? HEX.mint : HEX.sky; }
-function peerBase(mode) { return mode === "C2" ? HEX.goldC2 : HEX.gold; }
+function peerBase(mode) { return HEX.gold; }
 
 function replayUpTo(mode, index) {
   let run = "gold", emphasis = null, window = [];
@@ -191,12 +190,17 @@ function replayUpTo(mode, index) {
   return snaps[snaps.length - 1];
 }
 
+function ruleWidthStyle(entry, mini) {
+  const cap = mini ? 21 : 43;
+  const est = entry.primary.length * (mini ? 4.2 : 8.6);
+  return `width:${Math.max(8, Math.min(cap, est)).toFixed(1)}px;`;
+}
 function blockHTML(entry, mini) {
   const fg = simulate(entry.hex, state.cvd);
   const marker = entry.marker;
   const markerHex = entry.marker_hex || entry.hex;
   let html = "";
-  if (marker === "rule") html += `<div class="rule" style="background:${simulate(markerHex, state.cvd)}"></div>`;
+  if (marker === "rule") html += `<div class="rule" style="${ruleWidthStyle(entry, mini)}background:${simulate(markerHex, state.cvd)}"></div>`;
   const dash = marker === "dash" ? `<span class="dash" style="color:${simulate(markerHex, state.cvd)}" aria-hidden="true">—</span>` : "";
   html += `<div class="primary" style="color:${fg}">${dash}${escapeHTML(entry.primary)}</div>`;
   if (entry.secondary) html += `<div class="secondary" style="color:${fg}">${escapeHTML(entry.secondary)}</div>`;

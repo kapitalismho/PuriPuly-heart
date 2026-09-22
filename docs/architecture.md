@@ -302,8 +302,9 @@ Provider replacement preserves frozen settings for admitted work. Abort invalida
 Peer speaker-transition presentation uses `core/speaker_transition.py` to interpret conserved,
 session-scoped speaker runs into content-bound continuity, transition, reset, or unavailable
 claims. Provider speaker identifiers stop at this interpreter. Output transports the semantic
-claim with the existing publication generation and source order; renderers receive only the
-presenter's anonymous visual style.
+claim with the existing publication generation and source order and attaches it once to the
+logical turn's first readable Peer output, whether translated or original-only. Renderers receive
+only the presenter's anonymous visual style.
 
 GPU worker split:
 

@@ -206,6 +206,7 @@ class OverlayTranslationSettingsIntent:
 class OverlayPeerOriginalSettingsIntent:
     enabled: bool
 
+
 @dataclass(frozen=True, slots=True)
 class OverlaySpeakerTransitionModeIntent:
     mode: str

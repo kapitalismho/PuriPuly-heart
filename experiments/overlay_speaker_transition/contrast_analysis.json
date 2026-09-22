@@ -1,42 +1,42 @@
 {
   "meta": {
-    "method": "WCAG relative luminance on sRGB, strip rgba(0,0,0,0.24) blended over each scene sample; black 5px outline not modeled numerically",
+    "method": "WCAG relative luminance on sRGB against the raw scene sample (effective background alpha 0: native effective_background_alpha returns 0.0, preexisting text-only transparent overlay; configured 0.24 not applied). Black 5px outline not modeled numerically, so bright/busy ratios below are a lower bound before the outline contribution.",
     "cvd": "Machado-Oliveira-Fernandes-2009 severity 1.0, applied in linear light",
     "cvd_reference": "Machado-Oliveira-Fernandes-2009 severity 1.0, sRGB decode, matrix in linear light, clamp, sRGB encode",
-    "note": "Busy scene is a gradient; samples bound it, fog sample approximates the worst case"
+    "note": "Busy scene is a gradient; samples bound it, fog sample approximates the worst case. Bright/busy text contrast without a dimming strip is an honest risk: Gold/Sky/Mint sit near 1.1-1.6 on bright/fog and rely on the black outline plus scene variation."
   },
   "text_vs_backdrop_contrast": {
     "white": {
-      "dark": 19.91,
-      "bright": 2.04,
-      "busy-navy": 16.23,
-      "busy-ochre": 8.9,
-      "busy-teal": 4.92,
-      "busy-fog": 2.16
+      "dark": 19.57,
+      "bright": 1.15,
+      "busy-navy": 14.22,
+      "busy-ochre": 6.18,
+      "busy-teal": 3.03,
+      "busy-fog": 1.23
     },
     "gold": {
-      "dark": 14.19,
-      "bright": 1.45,
-      "busy-navy": 11.57,
-      "busy-ochre": 6.34,
-      "busy-teal": 3.51,
-      "busy-fog": 1.54
+      "dark": 13.95,
+      "bright": 1.22,
+      "busy-navy": 10.14,
+      "busy-ochre": 4.41,
+      "busy-teal": 2.16,
+      "busy-fog": 1.14
     },
     "sky": {
-      "dark": 11.57,
-      "bright": 1.19,
-      "busy-navy": 9.43,
-      "busy-ochre": 5.17,
-      "busy-teal": 2.86,
-      "busy-fog": 1.26
+      "dark": 11.37,
+      "bright": 1.49,
+      "busy-navy": 8.26,
+      "busy-ochre": 3.59,
+      "busy-teal": 1.76,
+      "busy-fog": 1.4
     },
     "mint": {
-      "dark": 11.8,
-      "bright": 1.21,
-      "busy-navy": 9.62,
-      "busy-ochre": 5.27,
-      "busy-teal": 2.92,
-      "busy-fog": 1.28
+      "dark": 11.6,
+      "bright": 1.46,
+      "busy-navy": 8.43,
+      "busy-ochre": 3.66,
+      "busy-teal": 1.79,
+      "busy-fog": 1.38
     }
   },
   "role_distinction": [

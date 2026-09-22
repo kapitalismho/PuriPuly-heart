@@ -292,6 +292,8 @@ class TranslationOutputSubmission:
     turn_kind: TranslationTurnKind | None = None
     parent_output_count: int = 1
     context_texts: tuple[str, ...] | None = None
+    speaker_transition: str | None = None
+    speaker_transition_claim_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.outcome == "translated" and self.translation is None:
@@ -319,6 +321,12 @@ class TranslationOutputSubmission:
             raise ValueError("publication generation and source order must be provided together")
         if self.publication_generation is not None and self.channel != "peer":
             raise ValueError("publication generation is only valid for Peer output")
+        if self.channel != "peer" and self.speaker_transition is not None:
+            raise ValueError("speaker transition evidence is only valid for Peer output")
+        if (self.speaker_transition is None) != (self.speaker_transition_claim_id is None):
+            raise ValueError(
+                "speaker transition comparison and claim identity must be provided together"
+            )
 
 
 @dataclass(frozen=True, slots=True)

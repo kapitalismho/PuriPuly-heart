@@ -60,6 +60,16 @@ class _EchoTranslationProvider:
 
 
 @dataclass(slots=True)
+class _FailingSelectedTranslationProvider(_EchoTranslationProvider):
+    failing_text: str = ""
+
+    async def translate(self, **kwargs) -> Translation:
+        if kwargs["text"] == self.failing_text:
+            raise RuntimeError("selected translation failure")
+        return await super().translate(**kwargs)
+
+
+@dataclass(slots=True)
 class _RecordingOverlaySink:
     presenter: OverlayPresenter
     events: list[object] = field(default_factory=list)
@@ -382,6 +392,105 @@ async def test_soniox_tokens_replay_through_translation_publication_and_presente
             key=lambda block: block.appearance_seq,
         )
         assert reconnect_block.speaker_style == "cyan"
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.parametrize("mode", ("A", "C", "E"))
+@pytest.mark.parametrize("fallback", ("translation_disabled", "translation_failed"))
+@pytest.mark.asyncio
+async def test_source_only_peer_transition_claim_reaches_first_readable_content(
+    mode: str,
+    fallback: str,
+) -> None:
+    clock = FakeClock(_now=100.0)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        speaker_transition_mode=mode,
+    )
+    provider = (
+        None
+        if fallback == "translation_disabled"
+        else _FailingSelectedTranslationProvider(failing_text="B-2")
+    )
+    overlay = _RecordingOverlaySink(presenter)
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=RecordingOscQueue(),
+        peer_translation_enabled=fallback != "translation_disabled",
+        overlay_sink=overlay,
+        clock=clock,
+    )
+    session = _soniox_session()
+
+    async def publish_peer(
+        speaker: str,
+        order: int,
+        start_ms: int,
+    ) -> tuple[str, object]:
+        receipt, terminal = await _terminal_from_soniox_tokens(
+            session,
+            speaker=speaker,
+            text=f"{speaker}-{order}",
+            start_ms=start_ms,
+            end_ms=start_ms + 90,
+            generation=1,
+            order=order,
+        )
+        harness.record_peer_speech_end_for_test(receipt.identity.segment_id)
+        event_count = len(overlay.events)
+        await harness.peer_owner.handle_provider_turn_terminal(receipt, terminal)
+        await harness.peer_owner.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+        peer_events = [
+            event
+            for event in overlay.events[event_count:]
+            if getattr(event, "type", None) in {"peer_transcript_final", "translation_final"}
+        ]
+        assert len(peer_events) == 1
+        event = peer_events[0]
+        block_id = f"peer:{event.utterance_id}"
+        block = next(block for block in presenter.snapshot().blocks if block.id == block_id)
+        return block_id, block
+
+    harness.output_runtime.activate_peer_generation(1)
+    await harness.start()
+    try:
+        _a_id, first = await publish_peer("A", 1, 100)
+        changed_id, changed = await publish_peer("B", 2, 200)
+        assert getattr(first, "speaker_boundary") is False
+        assert getattr(changed, "speaker_style") == ("cyan" if mode in {"C", "E"} else "gold")
+        assert getattr(changed, "speaker_boundary") is (mode in {"A", "E"})
+
+        changed_event = next(
+            event
+            for event in overlay.events
+            if str(getattr(event, "utterance_id", "")) == getattr(changed, "id").split(":", 1)[1]
+        )
+        assert changed_event.speaker_transition == "transition"
+        assert changed_event.speaker_transition_claim_id is not None
+
+        self_id = uuid4()
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=self_id,
+                transcript=Transcript(self_id, "self", True, channel="self"),
+            )
+        )
+        await harness.peer_owner.translation_turns.wait_for_idle()
+        retained_changed = next(
+            block for block in presenter.snapshot().blocks if block.id == changed_id
+        )
+        if mode == "E":
+            assert retained_changed.speaker_style == "gold"
+            assert retained_changed.speaker_boundary is True
+
+        _same_id, same = await publish_peer("B", 3, 300)
+        assert getattr(same, "speaker_boundary") is False
+        assert getattr(same, "speaker_style") == ("cyan" if mode == "C" else "gold")
     finally:
         await harness.stop()
         await presenter.close()

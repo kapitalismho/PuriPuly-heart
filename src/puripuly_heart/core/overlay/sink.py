@@ -224,6 +224,8 @@ class OverlayEventAdapter:
         source_text_len: int | None = None,
         logical_turn_key: str | None = None,
         output_scope: OverlayPublicationScope | None = None,
+        speaker_transition: str | None = None,
+        speaker_transition_claim_id: str | None = None,
     ) -> SelfTranscriptFinal | PeerTranscriptFinal:
         common = self._common_event_fields(
             utterance_id=transcript.utterance_id,
@@ -236,6 +238,8 @@ class OverlayEventAdapter:
             source_text_len=source_text_len,
             logical_turn_key=logical_turn_key,
             output_scope=output_scope,
+            speaker_transition=speaker_transition,
+            speaker_transition_claim_id=speaker_transition_claim_id,
         )
         event_cls = SelfTranscriptFinal if transcript.channel == "self" else PeerTranscriptFinal
         return event_cls(

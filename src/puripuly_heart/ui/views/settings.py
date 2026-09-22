@@ -6119,6 +6119,7 @@ class SettingsView(ft.Column):
         )
         self._sync_overlay_controls()
         self._emit_settings_changed(OverlaySpeakerTransitionModeIntent(mode))
+
     def _handle_vad_visual_change(self, e) -> None:
         self._vad_slider.label = f"{float(e.control.value):.2f}"
         _update_control_if_mounted(self._vad_slider)
@@ -6508,9 +6509,7 @@ class SettingsView(ft.Column):
         self._overlay_target_title.value = t("settings.overlay.caption_location")
         self._overlay_translation_title.value = t("settings.overlay.show_translation")
         self._overlay_peer_original_title.value = t("settings.overlay.show_peer_original")
-        self._speaker_transition_mode_title.value = t(
-            "settings.overlay.speaker_transition_mode"
-        )
+        self._speaker_transition_mode_title.value = t("settings.overlay.speaker_transition_mode")
         self._audio_settings.apply_locale()
         self._sync_general_audio_card_texts()
         self._overlay_anchor_title.value = t("settings.overlay.calibration.anchor")

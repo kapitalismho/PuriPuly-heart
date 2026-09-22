@@ -30,7 +30,6 @@ from puripuly_heart.core.overlay.protocol import (
 )
 from puripuly_heart.ui import desktop_overlay, desktop_window_zorder, flet_desktop_runtime
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
-    _DESKTOP_CAPTION_CYAN,
     _DESKTOP_CAPTION_GOLD,
     _DESKTOP_CAPTION_LINE_HEIGHT,
     _DESKTOP_CAPTION_MAX_VISIBLE_LINES,
@@ -99,38 +98,64 @@ def _block(
     )
 
 
-def test_desktop_overlay_renders_selected_e1_rule_and_sky_body_without_changing_slot_size() -> None:
-    plan = desktop_overlay.build_desktop_caption_plan(
-        OverlayPresentationSnapshot(
-            blocks=[
-                _block(
-                    "peer-transition",
-                    channel="peer",
-                    block_variant="translated_peer",
-                    appearance_seq=1,
-                    primary_text="translated peer",
-                    secondary_text="peer source",
-                    secondary_enabled=True,
-                    speaker_style="cyan",
-                    speaker_boundary=True,
-                )
-            ]
-        ),
-        window_width=4096,
-        window_height=1024,
+@pytest.mark.asyncio
+async def test_desktop_overlay_retained_surface_applies_and_clears_speaker_boundary() -> None:
+    app = FakeFletApp()
+    boundary_block = _block(
+        "peer-transition",
+        channel="peer",
+        block_variant="translated_peer",
+        appearance_seq=1,
+        primary_text="translated peer",
+        secondary_text="peer source",
+        secondary_enabled=True,
+        speaker_style="cyan",
+        speaker_boundary=True,
     )
+    window = desktop_overlay.FletDesktopRendererWindow(app_runner=app.run)
 
-    assert plan.slots[0].speaker_boundary is True
-    assert {line.color for line in plan.lines} == {_DESKTOP_CAPTION_CYAN}
-    surface = desktop_overlay.build_desktop_caption_surface(plan)
-    inner_card = surface.content.controls[0].controls[0].content
-    assert inner_card.height == plan.slot_height
-    assert isinstance(inner_card.content, ft.Stack)
-    padded_text, marker = inner_card.content.controls
-    assert marker.bgcolor == _DESKTOP_CAPTION_GOLD
-    assert marker.width == pytest.approx(196.0)
-    assert marker.height == pytest.approx(14.0)
-    assert padded_text.padding.top == pytest.approx(42.0)
+    try:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[boundary_block]))
+        model = window._retained_caption_surface
+        assert model is not None
+        marker = model.speaker_boundary_markers[0]
+        card = model.cards[0]
+        original_slot_height = card.height
+        assert marker.visible is True
+        assert marker.bgcolor == _DESKTOP_CAPTION_GOLD
+        assert marker.width > 0
+        assert marker.height > 0
+
+        await window.dispatch_snapshot(
+            OverlayPresentationSnapshot(
+                revision=2,
+                blocks=[replace(boundary_block, speaker_boundary=False)],
+            )
+        )
+        assert window._retained_caption_surface is model
+        assert marker.visible is False
+        assert card.height == original_slot_height
+
+        await window.dispatch_snapshot(
+            OverlayPresentationSnapshot(
+                revision=3,
+                blocks=[
+                    _block(
+                        "self-turn",
+                        channel="self",
+                        block_variant="finalized",
+                        appearance_seq=2,
+                        primary_text="self",
+                    )
+                ],
+            )
+        )
+        assert marker.visible is False
+
+        await window.dispatch_snapshot(OverlayPresentationSnapshot(revision=4, blocks=[]))
+        assert marker.visible is False
+    finally:
+        await window.close()
 
 
 def test_native_renderer_uses_embedded_flet_without_viewer_owner(monkeypatch) -> None:

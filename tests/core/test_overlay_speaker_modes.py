@@ -137,3 +137,52 @@ async def test_entering_mode_e_reprojects_boundary_without_replaying_emphasis() 
     assert block.speaker_boundary is True
     assert block.speaker_style == "gold"
     assert entry.visible_since == visible_since
+
+
+@pytest.mark.asyncio
+async def test_source_only_claim_is_not_reattached_by_later_translation_revision() -> None:
+    clock = FakeClock(_now=40.0)
+    adapter = OverlayEventAdapter(clock=clock)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        speaker_transition_mode="E",
+    )
+    turn_id = uuid4()
+
+    await presenter.emit(
+        adapter.transcript_final(
+            Transcript(turn_id, "peer source", True, channel="peer"),
+            source_language="en",
+            target_language="ko",
+            logical_turn_key=f"peer:{turn_id}",
+            speaker_transition="transition",
+            speaker_transition_claim_id="source-claim",
+        )
+    )
+    entry = presenter._entries[("peer", turn_id)]
+    visible_since = entry.visible_since
+    assert presenter.snapshot().blocks[-1].speaker_style == "cyan"
+
+    self_turn = uuid4()
+    await presenter.emit(_self_event(adapter, self_turn, "self"))
+    await presenter.emit(
+        adapter.translation_final(
+            utterance_id=turn_id,
+            channel="peer",
+            text="translated revision",
+            source_text="peer source",
+            source_language="en",
+            target_language="ko",
+            applied_context_mode="integrated",
+            logical_turn_key=f"peer:{turn_id}",
+            speaker_transition="transition",
+            speaker_transition_claim_id="late-claim",
+        )
+    )
+
+    block = next(block for block in presenter.snapshot().blocks if block.id == f"peer:{turn_id}")
+    assert block.speaker_style == "gold"
+    assert block.speaker_boundary is True
+    assert entry.speaker_transition_claim_id == "source-claim"
+    assert entry.visible_since == visible_since

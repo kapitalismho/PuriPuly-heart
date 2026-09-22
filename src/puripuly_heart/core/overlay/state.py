@@ -690,6 +690,12 @@ class OverlayPresentationState:
         self._remember_entry_input_seq(entry, event_seq=event.seq)
         entry.original_text = event.text
         entry.original_language = event_source_language
+        first_readable_original = bool(event.text.strip()) and (
+            not translation_enabled or show_peer_original
+        )
+        if first_readable_original and entry.speaker_transition_claim_id is None:
+            entry.speaker_transition = event.speaker_transition
+            entry.speaker_transition_claim_id = event.speaker_transition_claim_id
         entry.original_seq = event.seq
         entry.live_text = ""
         entry.live_seq = None
@@ -747,7 +753,9 @@ class OverlayPresentationState:
                 now=now,
             )
         first_readable_translation = (
-            bool(event.text.strip()) and entry.translation_observed_visible_since is None
+            bool(event.text.strip())
+            and entry.speaker_transition_claim_id is None
+            and entry.translation_observed_visible_since is None
         )
         entry.translation_text = event.text
         if event.text.strip():
@@ -772,8 +780,8 @@ class OverlayPresentationState:
             entry.translation_source_text_hash = None
             entry.translation_source_text_len = None
             entry.translation_logical_turn_key = None
-            entry.speaker_transition = None
-            entry.speaker_transition_claim_id = None
+            if entry.speaker_transition_claim_id is None:
+                entry.speaker_transition = None
             if not entry.live_secondary_text.strip():
                 entry.translation_seq = None
         if event.text.strip() and entry.translation_observed_visible_since is None:

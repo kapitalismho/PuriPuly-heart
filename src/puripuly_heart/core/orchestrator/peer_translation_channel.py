@@ -772,12 +772,15 @@ class PeerTranslationChannelOwner:
             and not output_submitted
         ):
             configuration = child.config_snapshot.value
+            claim = self._speaker_transitions.claim_for(child.utterance_id)
             await self.output_projection.project_peer_source_only(
                 transcript=child.transcript,
                 source_language=self._source_language_for(runtime, configuration),
                 target_language=self._target_language_for(runtime, configuration),
                 close_is_final=outcome == "source_only",
                 finalize_latency=True,
+                speaker_transition=None if claim is None else claim.comparison,
+                speaker_transition_claim_id=None if claim is None else claim.claim_id,
             )
             await self.output_projection.publish_peer_chatbox_denial(child.utterance_id)
             self._clear_runtime_latency_bookkeeping(
@@ -905,13 +908,19 @@ class PeerTranslationChannelOwner:
         if submission.channel != "peer":
             raise ValueError("Peer translation owner received non-Peer output")
         claim = self._speaker_transitions.claim_for(submission.child_utterance_id)
-        if claim is not None and submission.translation is not None:
+        if claim is not None:
             submission = replace(
                 submission,
-                translation=replace(
-                    submission.translation,
-                    speaker_transition=claim.comparison,
-                    speaker_transition_claim_id=claim.claim_id,
+                speaker_transition=claim.comparison,
+                speaker_transition_claim_id=claim.claim_id,
+                translation=(
+                    None
+                    if submission.translation is None
+                    else replace(
+                        submission.translation,
+                        speaker_transition=claim.comparison,
+                        speaker_transition_claim_id=claim.claim_id,
+                    )
                 ),
             )
         return await self._publish_translation_result(self._with_prepared_context(submission))

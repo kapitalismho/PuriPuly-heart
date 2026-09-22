@@ -91,6 +91,25 @@ use crate::presentation::{
 
 #[cfg(windows)]
 const GPU_READINESS_TIMEOUT: Duration = Duration::from_millis(50);
+const SPEAKER_BOUNDARY_WIDTH_PX: f32 = 196.0;
+const SPEAKER_BOUNDARY_HEIGHT_PX: f32 = 14.0;
+
+#[cfg(windows)]
+fn speaker_boundary_rect(
+    text_scale: f32,
+    strip_horizontal_padding_px: f32,
+    first_line_ink_bounds: super::types::VisualBounds,
+) -> D2D_RECT_F {
+    let scale = text_scale.max(0.1);
+    let ink_width = (first_line_ink_bounds.right_px - first_line_ink_bounds.left_px).max(0.0);
+    let width = (SPEAKER_BOUNDARY_WIDTH_PX * scale).min(ink_width);
+    D2D_RECT_F {
+        left: strip_horizontal_padding_px + first_line_ink_bounds.left_px,
+        top: 0.0,
+        right: strip_horizontal_padding_px + first_line_ink_bounds.left_px + width,
+        bottom: SPEAKER_BOUNDARY_HEIGHT_PX * scale,
+    }
+}
 
 #[cfg(windows)]
 #[derive(Default)]
@@ -1194,22 +1213,27 @@ impl WindowsCaptionRenderer {
         let mut visual_bounds: Option<super::types::VisualBounds> = None;
         let build_result = (|| {
             if block.speaker_boundary {
-                let marker = D2D_RECT_F {
-                    left: policy.strip_horizontal_padding_px() as f32,
-                    top: 0.0,
-                    right: policy.strip_horizontal_padding_px() as f32 + 196.0,
-                    bottom: 14.0,
-                };
-                unsafe {
-                    self.d2d_context
-                        .FillRectangle(&marker, &self.cache_peer_text_brush);
+                let first_line =
+                    block_lines(block).find(|(_role, line)| !line.text.trim().is_empty());
+                if let Some((role, line)) = first_line {
+                    let cached = self.prepared_line_visual(prepared, block, line, role)?;
+                    let text_scale = block.layout_cache_key.text_scale_key as f32 / 1000.0;
+                    let marker = speaker_boundary_rect(
+                        text_scale,
+                        policy.strip_horizontal_padding_px() as f32,
+                        cached.visual_bounds,
+                    );
+                    unsafe {
+                        self.d2d_context
+                            .FillRectangle(&marker, &self.cache_peer_text_brush);
+                    }
+                    visual_bounds = Some(super::types::VisualBounds::new(
+                        marker.left,
+                        marker.top,
+                        marker.right,
+                        marker.bottom,
+                    ));
                 }
-                visual_bounds = Some(super::types::VisualBounds::new(
-                    marker.left,
-                    marker.top,
-                    marker.right,
-                    marker.bottom,
-                ));
             }
             for (role, line) in block_lines(block) {
                 if line.text.trim().is_empty() {
@@ -2425,6 +2449,31 @@ fn bounds_intersect_damage_band(bounds: BlockBounds, damage_band: DamageBand) ->
 #[cfg(test)]
 mod tests {
     #[cfg(windows)]
+    #[test]
+    fn speaker_boundary_uses_scaled_a2_metrics_and_first_line_ink_width() {
+        for scale in [0.5_f32, 1.0, 1.5] {
+            let short = super::speaker_boundary_rect(
+                scale,
+                120.0,
+                super::super::types::VisualBounds::new(300.0, 0.0, 300.0 + 40.0 * scale, 100.0),
+            );
+            assert_eq!(short.left, 420.0);
+            assert_eq!(short.top, 0.0);
+            assert_eq!(short.bottom, 14.0 * scale);
+            assert_eq!(short.right - short.left, 40.0 * scale);
+
+            let wrapped = super::speaker_boundary_rect(
+                scale,
+                120.0,
+                super::super::types::VisualBounds::new(50.0, 0.0, 500.0, 100.0),
+            );
+            assert_eq!(wrapped.left, 170.0);
+            assert_eq!(wrapped.right - wrapped.left, 196.0 * scale);
+            assert_eq!(32.0 * scale - wrapped.bottom, 18.0 * scale);
+        }
+    }
+
+    #[cfg(windows)]
     fn texture_pixels(renderer: &super::WindowsCaptionRenderer) -> Vec<u8> {
         use windows::Win32::Graphics::Direct3D11::{
             D3D11_CPU_ACCESS_READ, D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ, D3D11_TEXTURE2D_DESC,
@@ -2461,6 +2510,71 @@ mod tests {
             renderer.d3d_context.Unmap(&staging, 0);
             pixels
         }
+    }
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_graphics_renders_speaker_boundary_in_reserved_top_padding() {
+        let mut renderer = super::WindowsCaptionRenderer::new(None).unwrap();
+        let policy = CaptionLayoutPolicy::default();
+        let presentation = CaptionPresentation::default();
+        let base = CaptionBlock::new("peer:short", "Short reply")
+            .with_channel(CaptionChannel::PeerChannel)
+            .with_variant(CaptionBlockVariant::Finalized);
+        let resolved = policy
+            .resolve_blocks_for_presentation_windows_cached(
+                vec![base.clone()],
+                super::DEFAULT_SURFACE_WIDTH_PX,
+                super::DEFAULT_SURFACE_HEIGHT_PX,
+                &presentation,
+                &renderer.layout_engine,
+                None,
+            )
+            .unwrap();
+        let marker_top = resolved.visible_blocks[0].bounds.top_px.round() as usize;
+
+        renderer
+            .render(
+                &policy,
+                &presentation,
+                vec![base.clone()],
+                super::DEFAULT_SURFACE_WIDTH_PX,
+                super::DEFAULT_SURFACE_HEIGHT_PX,
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            renderer
+                .prepare_frame_for_submission(&ReadinessCancellation::default())
+                .await,
+            ReadinessOutcome::Ready
+        );
+        let without_boundary = texture_pixels(&renderer);
+
+        renderer
+            .render(
+                &policy,
+                &presentation,
+                vec![base.with_speaker_boundary(true)],
+                super::DEFAULT_SURFACE_WIDTH_PX,
+                super::DEFAULT_SURFACE_HEIGHT_PX,
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            renderer
+                .prepare_frame_for_submission(&ReadinessCancellation::default())
+                .await,
+            ReadinessOutcome::Ready
+        );
+        let with_boundary = texture_pixels(&renderer);
+        let row_bytes = super::DEFAULT_SURFACE_WIDTH_PX as usize * 4;
+        let marker_band = marker_top * row_bytes..(marker_top + 14) * row_bytes;
+        assert!(without_boundary[marker_band.clone()]
+            .chunks_exact(4)
+            .all(|pixel| pixel[3] == 0));
+        assert!(with_boundary[marker_band]
+            .chunks_exact(4)
+            .any(|pixel| pixel[3] != 0));
     }
 
     #[cfg(windows)]

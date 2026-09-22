@@ -1,0 +1,100 @@
+{
+  "baseline_commit": "4ac0f34b6683f793e94bcbb36bd6f037ac5a9ce3",
+  "artifacts": [
+    {
+      "file": "screenshots/A2-idx02-dark-none.webp",
+      "bytes": 18284,
+      "sha256": "3dfe7eea206de2f782152ca2f815527aa9384a54b06bd034eee4b1d2dfe3b0cb"
+    },
+    {
+      "file": "screenshots/A2-idx12-bright-none.webp",
+      "bytes": 37676,
+      "sha256": "d5316a9198687b0bae4e1633a5495a24ba0f8513bdc65414b136d78969b6ae1d"
+    },
+    {
+      "file": "screenshots/A2-idx13-dark-none.webp",
+      "bytes": 27634,
+      "sha256": "9e3a91129c5d5b769f704fbd15051213ffdd1d7a17125268a67c803d87742402"
+    },
+    {
+      "file": "screenshots/baseline-idx02-dark-none.webp",
+      "bytes": 18688,
+      "sha256": "cb235296583bffc8e3cf4ebd596b5cd5229fdf06ab0a8ce6d6424ada29286577"
+    },
+    {
+      "file": "screenshots/C1-idx07-dark-none.webp",
+      "bytes": 11562,
+      "sha256": "ea79695da786d5bca58b3a061773514476c30e4dca88e62301279dabc6bfaba1"
+    },
+    {
+      "file": "screenshots/C1-idx12-busy-deuteranopia.webp",
+      "bytes": 31920,
+      "sha256": "431d62d5c915a8f8e6aca851db2e7279aecc26327a8eee18d3254f579cd43917"
+    },
+    {
+      "file": "screenshots/C1-idx12-busy-none.webp",
+      "bytes": 34646,
+      "sha256": "dd5c31727afa46a6d93bde52dac6af9b6e16b8c296a01e527ab42060d52be1c5"
+    },
+    {
+      "file": "screenshots/C2-idx07-dark-none.webp",
+      "bytes": 11198,
+      "sha256": "97f2837169f6ff6323382bba26353be46270b964076bf5d04d6afaeeec062ae8"
+    },
+    {
+      "file": "screenshots/C2-idx12-busy-deuteranopia.webp",
+      "bytes": 32484,
+      "sha256": "924791ca9db881e7eab1581785e60deeef5305102f55b681ae64348d5d021ad9"
+    },
+    {
+      "file": "screenshots/E1-idx02-dark-none.webp",
+      "bytes": 17910,
+      "sha256": "848628853055d92d0b4e154926e1a35ef8e416370712877202a25d71858a4b95"
+    },
+    {
+      "file": "screenshots/E1-idx04-dark-none.webp",
+      "bytes": 12770,
+      "sha256": "32ee3efdaf4342eebacfa1d3e5b6f8c0fd724116202d3b68d1798379a1093814"
+    },
+    {
+      "file": "screenshots/E1-idx12-busy-none.webp",
+      "bytes": 34766,
+      "sha256": "494eb871fe7bad8d87faa91cc1558f1b9df35a3b881502eb1d23bb945f2524fb"
+    },
+    {
+      "file": "screenshots/E1-idx13-dark-none.webp",
+      "bytes": 27634,
+      "sha256": "9e3a91129c5d5b769f704fbd15051213ffdd1d7a17125268a67c803d87742402"
+    },
+    {
+      "file": "scenario.json",
+      "bytes": 16708,
+      "sha256": "b61d553e3667728109b39e3c2e9b37f25b16f5682b0795bb86359f0de32abea2"
+    },
+    {
+      "file": "expected_results.json",
+      "bytes": 98867,
+      "sha256": "7285358185de57648b8dc6c3744335467b5c410aa897839c96779a05482bcb3c"
+    },
+    {
+      "file": "contrast_analysis.json",
+      "bytes": 3390,
+      "sha256": "39104e694fd7ba4acffe4ac38b3c0c3c630b54d119dab792a68d3f5f0a10d6e9"
+    },
+    {
+      "file": "prototype.html",
+      "bytes": 21351,
+      "sha256": "0001cdf51bf92832ab4a28f06aee5aeae02e7473f8612a1bb256054e9146e86d"
+    },
+    {
+      "file": "replay.py",
+      "bytes": 11963,
+      "sha256": "11c2a11dddf5263256229f836f1cb03fd1164834ce6881d76be4252c1f4b32ca"
+    },
+    {
+      "file": "contrast_check.py",
+      "bytes": 5185,
+      "sha256": "9ca572c1da4b65d4a29d90267ab5432131bacbaff9e9d1675aa2bdc878879197"
+    }
+  ]
+}

@@ -1134,6 +1134,18 @@ def _background_transparency_label_for_alpha(background_alpha: float) -> str:
     return f"{int(round(transparency * 100))}%"
 
 
+def _speaker_boundary_geometry(
+    plan: DesktopCaptionPlan,
+    *,
+    card_width: float,
+    card_text_width: float,
+) -> tuple[float, float, float]:
+    scale = plan.window_width / 4096.0
+    width = min(196.0 * scale, card_text_width)
+    height = 14.0 * scale
+    return ((card_width - width) / 2.0, width, height)
+
+
 def _build_flet_caption_slot(ft: Any, plan: DesktopCaptionPlan, slot: DesktopCaptionSlot) -> Any:
     if plan.full_window_background_visible:
         card_text_width = plan.text_width
@@ -1181,32 +1193,24 @@ def _build_flet_caption_slot(ft: Any, plan: DesktopCaptionPlan, slot: DesktopCap
         vertical=plan.padding_vertical,
     )
     if slot.speaker_boundary:
-        scale = plan.window_width / 4096.0
-        marker_height = max(2.0, 14.0 * scale)
+        marker_left, marker_width, marker_height = _speaker_boundary_geometry(
+            plan,
+            card_width=card_text_width,
+            card_text_width=card_text_width,
+        )
         marker = ft.Container(
-            width=max(24.0, 196.0 * scale),
+            width=marker_width,
             height=marker_height,
             bgcolor=_DESKTOP_CAPTION_GOLD,
-            left=plan.padding_horizontal,
+            left=marker_left,
             top=0,
         )
-        padded_text = ft.Container(
-            content=text_layer,
-            width=card_width,
-            height=plan.slot_height,
-            padding=ft.Padding.only(
-                left=plan.padding_horizontal,
-                top=marker_height + max(4.0, 28.0 * scale),
-                right=plan.padding_horizontal,
-                bottom=plan.padding_vertical,
-            ),
-        )
         card_content = ft.Stack(
-            controls=[padded_text, marker],
-            width=card_width,
+            controls=[text_layer, marker],
+            width=card_text_width,
             height=plan.slot_height,
+            alignment=ft.Alignment.CENTER,
         )
-        card_padding = None
     inner_card = ft.Container(
         content=card_content,
         width=card_width,
@@ -1381,6 +1385,8 @@ def _build_retained_desktop_caption_surface(
     secondary_regions: list[Any] = []
     primary_texts: list[Any] = []
     secondary_texts: list[Any] = []
+    card_stacks: list[Any] = []
+    speaker_boundary_markers: list[Any] = []
     for _index in range(_DESKTOP_CAPTION_MAX_VISIBLE_SLOTS):
         primary_text = _build_flet_text(ft, _retained_placeholder_line("primary"), 1)
         secondary_text = _build_flet_text(ft, _retained_placeholder_line("secondary"), 1)
@@ -1394,7 +1400,16 @@ def _build_retained_desktop_caption_surface(
             scroll=None,
         )
         text_layer = ft.Container(content=column, bgcolor=ft.Colors.TRANSPARENT)
-        card = ft.Container(content=text_layer, alignment=ft.Alignment.CENTER)
+        speaker_boundary_marker = ft.Container(
+            bgcolor=_DESKTOP_CAPTION_GOLD,
+            top=0,
+            visible=False,
+        )
+        card_stack = ft.Stack(
+            controls=[text_layer, speaker_boundary_marker],
+            alignment=ft.Alignment.CENTER,
+        )
+        card = ft.Container(content=card_stack, alignment=ft.Alignment.CENTER)
         slot_container = ft.Container(
             content=card,
             bgcolor=ft.Colors.TRANSPARENT,
@@ -1403,6 +1418,8 @@ def _build_retained_desktop_caption_surface(
         slot_containers.append(slot_container)
         cards.append(card)
         text_layers.append(text_layer)
+        card_stacks.append(card_stack)
+        speaker_boundary_markers.append(speaker_boundary_marker)
         primary_regions.append(primary_region)
         secondary_regions.append(secondary_region)
         primary_texts.append(primary_text)
@@ -1458,6 +1475,8 @@ def _build_retained_desktop_caption_surface(
         slot_containers=tuple(slot_containers),
         cards=tuple(cards),
         text_layers=tuple(text_layers),
+        card_stacks=tuple(card_stacks),
+        speaker_boundary_markers=tuple(speaker_boundary_markers),
         primary_regions=tuple(primary_regions),
         secondary_regions=tuple(secondary_regions),
         primary_texts=tuple(primary_texts),
@@ -1507,6 +1526,7 @@ def _apply_retained_desktop_caption_plan(
         slot_container.width = plan.window_width
         slot_container.height = plan.slot_height
         if slot is None:
+            model.speaker_boundary_markers[index].visible = False
             continue
         if plan.full_window_background_visible:
             card_width = plan.window_width
@@ -1517,6 +1537,8 @@ def _apply_retained_desktop_caption_plan(
         card = model.cards[index]
         text_layer = model.text_layers[index]
         card.width = card_width
+        card_stack = model.card_stacks[index]
+        speaker_boundary_marker = model.speaker_boundary_markers[index]
         card.height = plan.slot_height
         card.bgcolor = (
             ft.Colors.TRANSPARENT if plan.full_window_background_visible else plan.background_color
@@ -1526,6 +1548,17 @@ def _apply_retained_desktop_caption_plan(
             horizontal=plan.padding_horizontal,
             vertical=plan.padding_vertical,
         )
+        card_stack.width = card_text_width
+        card_stack.height = plan.slot_height
+        marker_left, marker_width, marker_height = _speaker_boundary_geometry(
+            plan,
+            card_width=card_text_width,
+            card_text_width=card_text_width,
+        )
+        speaker_boundary_marker.left = marker_left
+        speaker_boundary_marker.width = marker_width
+        speaker_boundary_marker.height = marker_height
+        speaker_boundary_marker.visible = slot.speaker_boundary
         text_layer.width = card_text_width
         primary_line = next((line for line in slot.lines if line.slot == "primary"), None)
         secondary_line = next((line for line in slot.lines if line.slot == "secondary"), None)
