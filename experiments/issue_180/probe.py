@@ -5,6 +5,7 @@ import asyncio
 import json
 import platform
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,9 +14,15 @@ from uuid import UUID, uuid5
 
 import numpy as np
 
+from puripuly_heart.app.adapters.self_capture.self_capture_vad_sink import (
+    SelfCaptureVadSinkAdapter,
+)
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import (
+    SELF_RETAINED_AUDIO_CAPACITY_BYTES,
+    SELF_RETAINED_AUDIO_CAPACITY_SAMPLE_EQUIVALENTS,
+    AudioRetentionBudget,
     AudioSegmentSettingsSnapshot,
     OwnedVadEvent,
     PeerAudioSegmentLedger,
@@ -24,7 +31,16 @@ from puripuly_heart.core.clock import Clock, FakeClock
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter, OverlayEventUnion
 from puripuly_heart.core.runtime.output import OutputRuntime
-from puripuly_heart.core.runtime.peer_channel import _CaptureGeneration, _GenerationGuardedVadSink
+from puripuly_heart.core.runtime.peer_channel import (
+    _CaptureGeneration,
+    _GenerationGuardedVadSink,
+)
+from puripuly_heart.core.runtime.self_capture import (
+    _CaptureGeneration as _SelfCaptureGeneration,
+)
+from puripuly_heart.core.runtime.self_capture import (
+    _GenerationGuardedVadSink as _SelfGenerationGuardedVadSink,
+)
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnEvent,
     STTProviderTurnIdentity,
@@ -34,7 +50,7 @@ from puripuly_heart.core.stt.backend import (
 from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine, STTRecognitionWatchdogs
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
-from puripuly_heart.domain.models import OSCMessage, Transcript
+from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 
 EXPECTED_SHA = "13274569769d3c1ec7a896a2d15b919b76136a6e"
 NAMESPACE = UUID("79ba997d-9247-4a88-b850-a24db11de180")
@@ -682,6 +698,380 @@ async def run_real_clock_pacing() -> list[dict[str, Any]]:
     return trace.rows
 
 
+@dataclass(slots=True)
+class LoopClock:
+    def now(self) -> float:
+        return asyncio.get_running_loop().time()
+
+
+@dataclass(slots=True)
+class RelativeLoopTrace:
+    scenario: str
+    origin: float
+    rows: list[dict[str, Any]] = field(default_factory=list)
+
+    def add(self, event: str, **data: Any) -> None:
+        now = asyncio.get_running_loop().time() - self.origin
+        self.rows.append(
+            {
+                "scenario": self.scenario,
+                "t_ms": round(now * 1000),
+                "t_us": round(now * 1_000_000),
+                "event": event,
+                **data,
+            }
+        )
+
+
+@dataclass(slots=True)
+class ControlledTranslationProvider:
+    trace: RelativeLoopTrace
+    delays: dict[str, float]
+
+    async def translate(
+        self,
+        *,
+        utterance_id: UUID,
+        text: str,
+        system_prompt: str,
+        source_language: str,
+        target_language: str,
+        context: str = "",
+        scene_participant_count: int | None = None,
+    ) -> Translation:
+        _ = (system_prompt, context, scene_participant_count)
+        self.trace.add(
+            "translation_start",
+            translation_id=str(utterance_id),
+            source_text=text,
+            source_language=source_language,
+            target_language=target_language,
+        )
+        await asyncio.sleep(self.delays[text])
+        self.trace.add(
+            "translation_completion",
+            translation_id=str(utterance_id),
+            source_text=text,
+        )
+        return Translation(
+            utterance_id=utterance_id,
+            text=f"translated-{text}",
+            source_text=text,
+            source_language=source_language,
+            target_language=target_language,
+            channel="self",
+        )
+
+    async def close(self) -> None:
+        return None
+
+
+@dataclass(slots=True)
+class SelfDispatcherOwner:
+    generation: int = 1
+    failures: list[str] = field(default_factory=list)
+
+    def is_current_generation(self, value: int) -> bool:
+        return value == self.generation
+
+    def note_recognition_failure(self, reason: str) -> None:
+        self.failures.append(reason)
+
+
+class SelfEngineRuntimeBridge:
+    def __init__(self, engine: ScopedRecognitionEngine, trace: RelativeLoopTrace) -> None:
+        self.engine = engine
+        self.trace = trace
+
+    async def handle_owned_vad_event(self, channel: str, owned: OwnedVadEvent) -> None:
+        assert channel == "self"
+        order = owned.segment.identity.segment_order
+        kind = type(owned.event).__name__
+        source_at = (
+            owned.segment.opened_at_monotonic_s
+            if kind == "SpeechStart"
+            else owned.segment.sealed_at_monotonic_s
+        )
+        self.trace.add(
+            "self_owner_to_engine_dispatch",
+            source_id=str(owned.segment.identity.segment_id),
+            turn=order,
+            kind=kind,
+            source_age_ms=(
+                None
+                if source_at is None
+                else round((asyncio.get_running_loop().time() - source_at) * 1000)
+            ),
+        )
+        await self.engine.handle_owned_vad_event(owned)
+        self.trace.add(
+            "self_owner_engine_return",
+            source_id=str(owned.segment.identity.segment_id),
+            turn=order,
+            kind=kind,
+        )
+
+    async def handle_vad_event(self, channel: str, event: object) -> None:
+        raise AssertionError(f"unowned Self event reached scoped probe: {channel}/{event!r}")
+
+    async def commit_handoff(self, channel: str) -> None:
+        assert channel == "self"
+        self.trace.add("self_handoff_commit")
+
+    async def observe_pending_source_work(self, channel: str, *, pending: bool) -> None:
+        assert channel == "self"
+        self.trace.add("self_pending_source_work", pending=pending)
+        await self.engine.observe_pending_source_work(pending=pending)
+
+    async def observe_source_activity(
+        self,
+        channel: str,
+        *,
+        speech_observed: bool,
+        observed_at_monotonic_s: float,
+    ) -> None:
+        assert channel == "self"
+        await self.engine.observe_source_activity(
+            speech_observed=speech_observed,
+            observed_at_monotonic_s=observed_at_monotonic_s,
+        )
+
+    async def reject_owned_segment(
+        self,
+        channel: str,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None:
+        assert channel == "self"
+        await self.engine.reject_owned_segment(event, reason=reason, outcome=cast(Any, outcome))
+
+    async def fail_owned_segment(
+        self,
+        channel: str,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+    ) -> None:
+        assert channel == "self"
+        await self.engine.fail_owned_segment(event, reason=reason)
+
+
+def self_speech_events(
+    *,
+    scenario: str,
+    order: int,
+    start_at: float,
+    seal_at: float,
+) -> tuple[SpeechStart, SpeechEnd, UUID]:
+    source_id = uuid5(NAMESPACE, f"{scenario}:self:{order}")
+    sample_base = order * 100
+    pre = AudioCaptureSpan(
+        capture_epoch=1,
+        callback_sequence=sample_base,
+        source_sample_rate_hz=16_000,
+        source_start_sample=sample_base,
+        source_end_sample=sample_base + 2,
+        source_start_monotonic_s=start_at - 0.005,
+        source_end_monotonic_s=start_at,
+        normalized_sample_rate_hz=16_000,
+        normalized_start_sample=sample_base,
+        normalized_end_sample=sample_base + 2,
+    )
+    content = AudioCaptureSpan(
+        capture_epoch=1,
+        callback_sequence=sample_base + 1,
+        source_sample_rate_hz=16_000,
+        source_start_sample=sample_base + 2,
+        source_end_sample=sample_base + 10,
+        source_start_monotonic_s=start_at,
+        source_end_monotonic_s=seal_at,
+        normalized_sample_rate_hz=16_000,
+        normalized_start_sample=sample_base + 2,
+        normalized_end_sample=sample_base + 10,
+    )
+    return (
+        SpeechStart(
+            source_id,
+            np.array([0.1, 0.1], dtype=np.float32),
+            np.array([0.2] * 8, dtype=np.float32),
+            pre_roll_capture=(pre,),
+            chunk_capture=(content,),
+        ),
+        SpeechEnd(source_id, trailing_silence_ms=20, reason="silence"),
+        source_id,
+    )
+
+
+async def run_self_end_to_end(
+    *,
+    scenario: str,
+    delayed_a_terminal: bool,
+    include_b: bool,
+    a_translation_delay_s: float = 0.180,
+) -> list[dict[str, Any]]:
+    tests_path = str(Path(__file__).resolve().parents[2] / "tests")
+    if tests_path not in sys.path:
+        sys.path.insert(0, tests_path)
+    from helpers.translation_owners import compose_translation_test_harness
+
+    loop = asyncio.get_running_loop()
+    origin = loop.time()
+    trace = RelativeLoopTrace(scenario, origin)
+    clock = LoopClock()
+    translation = ControlledTranslationProvider(
+        trace=trace,
+        delays={"turn-1": a_translation_delay_s, "turn-2": 0.040},
+    )
+    presenter = TracingPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        translation_enabled=True,
+        visible_window_target_blocks=2,
+        probe_trace=trace,
+    )
+    harness = compose_translation_test_harness(
+        osc=NullChatbox(),
+        llm=translation,
+        overlay_sink=presenter,
+        clock=clock,
+        source_language="en",
+        target_language="ja",
+        self_target_languages=("ja",),
+        low_latency_mode=False,
+    )
+
+    def observe(decision: Any) -> None:
+        if decision.route != "subtitle_overlay":
+            return
+        trace.add(
+            "self_output_decision",
+            publication_id=decision.publication_id,
+            reason=decision.reason,
+            status=decision.decision,
+            metadata=dict(decision.metadata),
+        )
+
+    harness.output_runtime.routing_observer = observe
+    session = DeterministicScopedSession(cast(Any, trace))
+
+    async def on_engine_event(event: STTProviderTurnEvent) -> None:
+        if isinstance(event, STTProviderTurnTerminal):
+            order = event.identity.segment.segment_order
+            trace.add(
+                "engine_turn_release",
+                turn=order,
+                source_id=str(event.identity.segment.segment_id),
+                provider_turn_id=event.identity.provider_turn_id,
+                outcome=event.outcome,
+            )
+            await harness.self_owner.handle_stt_event(event)
+            trace.add(
+                "translation_admission_return",
+                turn=order,
+                source_id=str(event.identity.segment.segment_id),
+                provider_turn_id=event.identity.provider_turn_id,
+            )
+
+    engine = ScopedRecognitionEngine(
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        channel="self",
+        event_sink=on_engine_event,
+        watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(
+            readiness_timeout_s=1,
+            write_timeout_s=1,
+            final_timeout_s=1,
+            drain_timeout_s=1,
+            healthy_reset_age_s=180,
+            connect_attempts=3,
+            connect_retry_base_s=0.001,
+            connect_retry_max_s=0.002,
+        ),
+        monotonic_clock=clock.now,
+    )
+    bridge = SelfEngineRuntimeBridge(engine, trace)
+    harness.self_owner.local_asr_runtime = cast(Any, bridge)
+    adapter = SelfCaptureVadSinkAdapter(runtime_provider=lambda: harness.self_owner)
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=stt_settings())
+    dispatch_owner = SelfDispatcherOwner()
+    guarded = _SelfGenerationGuardedVadSink(
+        sink=adapter,
+        owner=cast(Any, dispatch_owner),
+        capture_generation=_SelfCaptureGeneration(1),
+        ledger=ledger,
+        retention_budget=AudioRetentionBudget(
+            capacity_bytes=SELF_RETAINED_AUDIO_CAPACITY_BYTES,
+            capacity_sample_equivalents=SELF_RETAINED_AUDIO_CAPACITY_SAMPLE_EQUIVALENTS,
+        ),
+    )
+    await harness.start()
+
+    async def sleep_until(offset_s: float) -> None:
+        await asyncio.sleep(max(0.0, origin + offset_s - loop.time()))
+
+    a_terminal_at = 0.160 if delayed_a_terminal else (0.070 if not include_b else 0.040)
+    b_terminal_at = 0.200 if delayed_a_terminal else 0.150
+
+    async def deliver_terminal(order: int, at_s: float) -> None:
+        await session.sealed[order].wait()
+        await sleep_until(at_s)
+        session.terminal(order)
+
+    terminals = [asyncio.create_task(deliver_terminal(1, a_terminal_at))]
+    if include_b:
+        terminals.append(asyncio.create_task(deliver_terminal(2, b_terminal_at)))
+
+    a_start, a_end, a_id = self_speech_events(
+        scenario=scenario,
+        order=1,
+        start_at=origin,
+        seal_at=origin + 0.040,
+    )
+    trace.add(
+        "self_source_available",
+        turn=1,
+        source_id=str(a_id),
+        kind="SpeechStart",
+        buffered_content_samples=8,
+    )
+    await guarded.handle_vad_event(a_start)
+    await sleep_until(0.040)
+    trace.add("acoustic_last_sample", turn=1, source_id=str(a_id), source_offset_ms=20)
+    trace.add("local_seal", turn=1, source_id=str(a_id), endpoint_delay_ms=20)
+    await guarded.handle_vad_event(a_end)
+
+    if include_b:
+        await sleep_until(0.070)
+        b_start, b_end, b_id = self_speech_events(
+            scenario=scenario,
+            order=2,
+            start_at=origin + 0.070,
+            seal_at=origin + 0.110,
+        )
+        trace.add(
+            "self_source_available",
+            turn=2,
+            source_id=str(b_id),
+            kind="SpeechStart",
+            buffered_content_samples=8,
+        )
+        await guarded.handle_vad_event(b_start)
+        await sleep_until(0.110)
+        trace.add("acoustic_last_sample", turn=2, source_id=str(b_id), source_offset_ms=90)
+        trace.add("local_seal", turn=2, source_id=str(b_id), endpoint_delay_ms=20)
+        await guarded.handle_vad_event(b_end)
+
+    await asyncio.gather(*terminals)
+    await guarded.finish()
+    await harness.translation_turns.wait_for_idle()
+    assert not dispatch_owner.failures
+    await harness.stop()
+    await engine.close()
+    await presenter.close()
+    return trace.rows
+
+
 def one_row(
     rows: list[dict[str, Any]],
     scenario: str,
@@ -738,6 +1128,87 @@ def assert_probe_contract(rows: list[dict[str, Any]]) -> None:
     assert 900_000 <= real_bound["ready_to_application_us"] <= 1_500_000
     assert 0 <= real_bound["eligibility_to_application_us"] <= 100_000
 
+    self_immediate = "self_successive_immediate_terminal"
+    self_delayed = "self_successive_delayed_terminal"
+    immediate_self_begin = one_row(rows, self_immediate, "provider_begin", turn=2)
+    delayed_self_begin = one_row(rows, self_delayed, "provider_begin", turn=2)
+    assert delayed_self_begin["t_us"] - immediate_self_begin["t_us"] >= 70_000
+    immediate_self_release = one_row(rows, self_immediate, "engine_turn_release", turn=2)
+    delayed_self_release = one_row(rows, self_delayed, "engine_turn_release", turn=2)
+    assert delayed_self_release["t_us"] - immediate_self_release["t_us"] >= 30_000
+
+    for scenario in (self_immediate, self_delayed):
+        writes = [
+            (row["samples"], row["context_only"])
+            for row in rows
+            if row["scenario"] == scenario
+            and row["event"] == "provider_write"
+            and row.get("turn") == 2
+        ]
+        assert writes == [(2, True), (8, False)]
+        a_translation_done = one_row(rows, scenario, "translation_completion", source_text="turn-1")
+        b_translation_start = one_row(rows, scenario, "translation_start", source_text="turn-2")
+        assert b_translation_start["t_us"] >= a_translation_done["t_us"]
+
+        original_applies = [
+            row
+            for row in rows
+            if row["scenario"] == scenario
+            and row["event"] == "application_receipt_ready"
+            and row["event_type"] == "self_transcript_final"
+        ]
+        translated_applies = [
+            row
+            for row in rows
+            if row["scenario"] == scenario
+            and row["event"] == "application_receipt_ready"
+            and row["event_type"] == "translation_final"
+        ]
+        assert len(original_applies) == 2
+        assert len(translated_applies) == 2
+
+    first_original = one_row(
+        rows,
+        "self_first_isolated",
+        "application_receipt_ready",
+        event_type="self_transcript_final",
+    )
+    first_translation_done = one_row(
+        rows,
+        "self_first_isolated",
+        "translation_completion",
+        source_text="turn-1",
+    )
+    first_translated = one_row(
+        rows,
+        "self_first_isolated",
+        "application_receipt_ready",
+        event_type="translation_final",
+    )
+    assert first_original["t_us"] < first_translation_done["t_us"] <= first_translated["t_us"]
+    assert first_translated["t_us"] - first_translation_done["t_us"] <= 100_000
+
+    fast_scenario = "self_successive_fast_translation"
+    fast_b_release = one_row(rows, fast_scenario, "engine_turn_release", turn=2)
+    fast_original_applies = [
+        row
+        for row in rows
+        if row["scenario"] == fast_scenario
+        and row["event"] == "application_receipt_ready"
+        and row["event_type"] == "self_transcript_final"
+    ]
+    delayed_b_release = one_row(rows, self_immediate, "engine_turn_release", turn=2)
+    delayed_original_applies = [
+        row
+        for row in rows
+        if row["scenario"] == self_immediate
+        and row["event"] == "application_receipt_ready"
+        and row["event_type"] == "self_transcript_final"
+    ]
+    assert len(fast_original_applies) == len(delayed_original_applies) == 2
+    assert fast_original_applies[1]["t_us"] - fast_b_release["t_us"] <= 50_000
+    assert delayed_original_applies[1]["t_us"] - delayed_b_release["t_us"] >= 50_000
+
 
 def verify_source_revision() -> tuple[str, tuple[str, ...]]:
     actual_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
@@ -793,6 +1264,35 @@ def summarize(
 async def main(output_path: Path) -> None:
     actual_sha, verified_changes = verify_source_revision()
     rows = [
+        *(
+            await run_self_end_to_end(
+                scenario="self_first_isolated",
+                delayed_a_terminal=False,
+                include_b=False,
+            )
+        ),
+        *(
+            await run_self_end_to_end(
+                scenario="self_successive_immediate_terminal",
+                delayed_a_terminal=False,
+                include_b=True,
+            )
+        ),
+        *(
+            await run_self_end_to_end(
+                scenario="self_successive_fast_translation",
+                delayed_a_terminal=False,
+                include_b=True,
+                a_translation_delay_s=0.0,
+            )
+        ),
+        *(
+            await run_self_end_to_end(
+                scenario="self_successive_delayed_terminal",
+                delayed_a_terminal=True,
+                include_b=True,
+            )
+        ),
         *(await run_stt_case(False)),
         *(await run_stt_case(True)),
         *(await run_output_control()),
@@ -817,7 +1317,7 @@ async def main(output_path: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Issue #180 focused STT handoff and Peer output timing probe"
+        description="Issue #180 focused Self/Peer software latency probe"
     )
     parser.add_argument("--output", type=Path, default=Path(__file__).with_name("trace.jsonl"))
     args = parser.parse_args()
