@@ -580,3 +580,136 @@ async def test_retirement_during_inference_rejects_late_completion() -> None:
     await harness.complete(0, score=0.99, at=request.complete_deadline_monotonic_s - 0.1)
     assert not harness.vad.ends
     assert harness.inference.closed is False
+
+
+@pytest.mark.asyncio
+async def test_submitted_snapshot_is_isolated_from_later_capture_and_trim() -> None:
+    harness = Harness()
+    await harness.open(value=1.0)
+    await harness.feed(224, speech=False)
+    submitted = harness.inference.audio[0]
+    before = submitted.copy()
+    assert before.size == (32 + 224) * 16
+    submitted_view = submitted
+    await harness.feed(288, speech=False)
+    assert len(harness.vad.ends) == 1
+    np.testing.assert_array_equal(submitted_view, before)
+    harness.controller._context_parts.append(np.ones(128000, dtype=np.float32))
+    harness.controller._context_samples += 128000
+    harness.controller._append_context(np.full(16000, 9.0, dtype=np.float32))
+    np.testing.assert_array_equal(submitted_view, before)
+
+
+@pytest.mark.asyncio
+async def test_discontinuity_rejects_pending_result_and_resets_probe_input() -> None:
+    harness = Harness()
+    await harness.open(value=1.0)
+    await harness.feed(224, speech=False)
+    request = harness.inference.requests[0]
+    assert request.source_frontier == (32 + 224) * 16
+    harness.controller.invalidate_context()
+    await harness.complete(
+        0,
+        score=0.99,
+        at=request.complete_deadline_monotonic_s - 0.1,
+    )
+    assert not harness.vad.ends
+    assert harness.inference.late_count == 0
+    await harness.feed(224, speech=False)
+    assert len(harness.inference.requests) == 2
+    assert harness.inference.requests[1].pause_id != request.pause_id
+    assert harness.inference.requests[1].context_revision != request.context_revision
+    np.testing.assert_array_equal(
+        harness.inference.audio[1][: 32 * 16],
+        np.zeros(32 * 16, dtype=np.float32),
+    )
+
+
+@pytest.mark.asyncio
+async def test_natural_endpoint_resets_context_for_next_segment() -> None:
+    harness = Harness()
+    await harness.open(value=1.0)
+    await harness.feed(224, speech=False)
+    first_audio = harness.inference.audio[0].copy()
+    assert first_audio.size == (32 + 224) * 16
+    segment_id = harness.controller.current_segment_id
+    await harness.controller.handle_vad_event(SpeechEnd(segment_id, reason="silence"))
+    assert harness.controller.current_segment_id is None
+    await harness.open(genuine=True, value=4.0)
+    await harness.feed(224, speech=False)
+    assert len(harness.inference.requests) == 2
+    assert not bool((harness.inference.audio[1] == 1.0).any())
+    np.testing.assert_array_equal(
+        harness.inference.audio[1][:512],
+        np.full(512, 4.0, dtype=np.float32),
+    )
+
+
+@pytest.mark.asyncio
+async def test_hard_rollover_seal_preserves_context_for_synthetic_continuation() -> None:
+    harness = Harness()
+    await harness.open(value=1.0)
+    await harness.feed(224, speech=False)
+    assert harness.inference.audio[0].size == (32 + 224) * 16
+    sealed = harness.controller.current_segment_id
+    assert sealed is not None
+    await harness.controller._seal(sealed, reason="delivery_deadline", rollover=True)
+    assert len(harness.vad.ends) == 1
+    assert harness.vad.ends[0].reason == "delivery_deadline"
+    await harness.open(genuine=False, value=2.0)
+    await harness.feed(224, speech=False)
+    assert len(harness.inference.requests) == 2
+    continued = harness.inference.audio[1]
+    assert continued.size == (32 + 224 + 32 + 224) * 16
+    np.testing.assert_array_equal(continued[:512], np.ones(512, dtype=np.float32))
+    assert int((continued == 2.0).sum()) == 512
+
+
+@pytest.mark.asyncio
+async def test_repeated_activation_reprobes_and_listen_off_stays_silent() -> None:
+    harness = Harness()
+    await harness.open()
+    await harness.feed(224, speech=False)
+    assert len(harness.inference.requests) == 1
+    await harness.feed(288, speech=False)
+    assert len(harness.vad.ends) == 1
+    await harness.controller.close()
+    before = len(harness.inference.requests)
+    await harness.feed(224, speech=True, value=1.0)
+    assert len(harness.inference.requests) == before
+    off = Harness(profile="off", threshold=None)
+    await off.open()
+    await off.feed(800, speech=False)
+    assert len(off.vad.ends) == 1
+    assert off.inference.requests == []
+    assert off.inference.prepare_count == 0
+
+
+@pytest.mark.asyncio
+async def test_equal_threshold_with_receipt_timeline_is_deterministic() -> None:
+    first = Harness()
+    await first.open()
+    await first.feed(224, speech=False)
+    request = first.inference.requests[0]
+    await first.complete(
+        0,
+        score=SMART_TURN_COMPLETE_THRESHOLD,
+        at=request.complete_deadline_monotonic_s - 0.1,
+    )
+    await first.feed(288, speech=False)
+    assert len(first.vad.ends) == 1
+    second = Harness()
+    await second.open()
+    await second.feed(224, speech=False)
+    other = second.inference.requests[0]
+    await second.complete(
+        0,
+        score=SMART_TURN_COMPLETE_THRESHOLD,
+        at=other.complete_deadline_monotonic_s - 0.1,
+    )
+    await second.feed(288, speech=False)
+    assert len(second.vad.ends) == 1
+    assert first.ledger.snapshots[0].content_sample_count == (
+        second.ledger.snapshots[0].content_sample_count
+    )
+    assert first.ledger.snapshots[0].seal_reason == second.ledger.snapshots[0].seal_reason

@@ -1,0 +1,190 @@
+{
+  "schema": "smartturn-cpu-179-evidence-v2",
+  "status": "measured_tradeoff_retain_current_profile",
+  "baseline_sha": "13274569769d3c1ec7a896a2d15b919b76136a6e",
+  "probe": "scripts/bench_smart_turn_179.py",
+  "production_changes": false,
+  "policy": {
+    "name": "POLICY-179-CURRENT",
+    "maintainer_approval": "Conversation approval recorded for the frozen empirical comparator; no policy repair in this probe."
+  },
+  "runtime": {
+    "python": "3.14.7",
+    "numpy": "2.5.1",
+    "onnxruntime": "1.28.0",
+    "cpu": "AMD Ryzen 7 9800X3D, 8C/16T",
+    "power_scheme": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c (high performance)",
+    "power_scheme_drift": false,
+    "thread_env": {
+      "OMP_NUM_THREADS": null,
+      "OPENBLAS_NUM_THREADS": null,
+      "MKL_NUM_THREADS": null
+    },
+    "blas": {
+      "library": "OpenBLAS 0.3.33.112.0",
+      "threading_layer": "pthreads",
+      "threads": 16
+    },
+    "model": {
+      "file": "src/puripuly_heart/data/models/smart-turn-v3.2-cpu.onnx",
+      "bytes": 8679182,
+      "sha256": "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f",
+      "repo_revision": "f766f81d3cfdf7737ac64aad813d91bbfd56bf93",
+      "input_revision": "8dd248b8f73556ac32d24c00223b4b413d4aca98"
+    },
+    "ort": {
+      "execution_mode": "ORT_SEQUENTIAL",
+      "graph_optimization": "ORT_ENABLE_ALL",
+      "provider": "CPUExecutionProvider"
+    }
+  },
+  "audio": {
+    "selection": "Director-selected LibriSpeech ASR test.clean corpus",
+    "license": "CC-BY-4.0",
+    "dataset": "openslr/librispeech_asr",
+    "revision": "71cacbfb7e2354c4226d01e70d77d5fca3d04ba1",
+    "parquet": "all/test.clean/0000.parquet",
+    "parquet_sha256": "7113aa4c3cf963fb54697145719a7725f984c8836d1c494a554cbb9f1a017df0",
+    "clips": [
+      {"utterance_id": "6930-75918-0000", "window_sha256": "51efadc8c74ac6aed3972c75006d034908a6d73d99bd0af64705693bf1b89909"},
+      {"utterance_id": "1320-122617-0000", "window_sha256": "910e7e572c7982078a51d41aeceff74d8b44645c5039b9d0628f5451d400d394"},
+      {"utterance_id": "5639-40744-0000", "window_sha256": "24b8bf5163f8b6f6097a1a1fdc3b65ba2d5353da9c2a285f71ce94e8b18e2365"},
+      {"utterance_id": "260-123440-0000", "window_sha256": "70417923a414985e13237420f167534535b7bccb761e621ba238de8f1faea2a0"},
+      {"utterance_id": "7729-102255-0000", "window_sha256": "df78a15d0b7807721f94f348e0b55fe0ad22c7f2e85b473f6d88a7c6f72f7011"},
+      {"utterance_id": "2094-142345-0000", "window_sha256": "59238e4d0e199eaec64543d6773c8a69de17cbbda8f8da29a25d839e7ad32806"},
+      {"utterance_id": "3575-170457-0000", "window_sha256": "8f8b8b223d3e6e2e58b8cbe5adf466ef5371951089d88eb7d4d4dfcedd610231"},
+      {"utterance_id": "7127-75947-0000", "window_sha256": "36c94a7763686f034b026c395838be134e394c20c8ed97669fd42920bac89ac9"}
+    ],
+    "guards": ["silence_8s", "near_silence_8s", "short_1s", "exact_8s", "over_8s_10s"]
+  },
+  "superseded": [
+    {"artifact": ".data/smartturn-179/controller.json", "reason": "fed only the first 512 samples, used repeated synthetic frames, delivered spans with future end times, and filled the boundary decision from a later seal"},
+    {"artifact": ".data/smartturn-179/paced_s12.json and paced_f12.json", "reason": "ran the VAD after SmartTurn and sampled active RSS before the request"},
+    {"artifact": ".data/smartturn-179/recheck_s12_f12.json", "reason": "pre-instrument-correction finalist recheck"}
+  ],
+  "matrix_retained": {
+    "artifact": ".data/smartturn-179/matrix_post_lifecycle.json",
+    "reason": "matrix timing path is independent of the corrected controller frame source and active-resource sampling",
+    "calls_per_arm": 40,
+    "warmup_per_arm": 5,
+    "admissions": {"S12": {"started": 40, "busy": 0, "unavailable": 0}, "S11": {"started": 40, "busy": 0, "unavailable": 0}, "F12": {"started": 40, "busy": 0, "unavailable": 0}, "F11": {"started": 40, "busy": 0, "unavailable": 0}},
+    "timing_ms": {
+      "S12": {"submit_to_receipt": {"median": 43.3275, "p95": 43.9576, "worst": 44.8829}, "features_queue_wait": {"median": 0.0608, "p95": 0.1018, "worst": 0.1317}, "features_worker": {"median": 2.6082, "p95": 2.8522, "worst": 2.8986}, "onnx_queue_wait": {"median": 0.0349, "p95": 0.046, "worst": 0.1376}, "onnx_worker": {"median": 39.4543, "p95": 40.0682, "worst": 40.9902}},
+      "S11": {"submit_to_receipt": {"median": 80.1069, "p95": 81.0285, "worst": 81.5669}, "features_queue_wait": {"median": 0.0568, "p95": 0.0856, "worst": 0.0998}, "features_worker": {"median": 2.6635, "p95": 3.0216, "worst": 3.2986}, "onnx_queue_wait": {"median": 0.0348, "p95": 0.046, "worst": 0.0666}, "onnx_worker": {"median": 76.2787, "p95": 77.0952, "worst": 77.2594}},
+      "F12": {"submit_to_receipt": {"median": 43.3308, "p95": 44.897, "worst": 50.6805}, "inference_queue_wait": {"median": 0.0625, "p95": 0.088, "worst": 0.1019}, "inference_worker": {"median": 42.8745, "p95": 44.519, "worst": 50.2582}},
+      "F11": {"submit_to_receipt": {"median": 79.8688, "p95": 80.7944, "worst": 81.8856}, "inference_queue_wait": {"median": 0.0627, "p95": 0.095, "worst": 0.0972}, "inference_worker": {"median": 79.4793, "p95": 80.342, "worst": 81.5209}}
+    },
+    "parity": {
+      "S11": {"score_max_abs_diff": 0.0, "prepared_equal": true, "features_equal": true, "model_input_equal": true},
+      "F12": {"score_max_abs_diff": 0.0, "prepared_equal": true, "features_equal": true, "model_input_equal": true},
+      "F11": {"score_max_abs_diff": 0.0, "prepared_equal": true, "features_equal": true, "model_input_equal": true}
+    }
+  },
+  "controller": {
+    "artifact": ".data/smartturn-179/controller_post_contract.json",
+    "requests_per_arm": 8,
+    "source_contract": {
+      "frame_period_ms": 32,
+      "delivery_target": "source_end = origin + (frame_index + 1) * 32 ms",
+      "speech_prefix_samples": 16384,
+      "speech_prefix_ms": 1024,
+      "silence_until_pause_ms": 832,
+      "prefix_is_contiguous": true,
+      "prefix_hashes_recorded": true,
+      "speech_quality_claim": false
+    },
+    "arms": {
+      "S12": {"receipt_ms": {"median": 44.2193, "p95": 48.319, "worst": 48.319}, "min_deadline_slack_ms": 234.77, "decision_at_pause_512": {"early": 1, "incomplete": 7, "null": 0}, "pause_at_boundary_ms": {"median": 512, "worst": 512}, "seal_pause_ms": {"median": 800, "best": 512, "worst": 800}, "late": 0, "request_probe_call_ms_observed": "0.0532-0.0895"},
+      "S11": {"receipt_ms": {"median": 81.3625, "p95": 83.8983, "worst": 83.8983}, "min_deadline_slack_ms": 197.729, "decision_at_pause_512": {"early": 1, "incomplete": 7, "null": 0}, "pause_at_boundary_ms": {"median": 512, "worst": 512}, "seal_pause_ms": {"median": 800, "best": 512, "worst": 800}, "late": 0, "request_probe_call_ms_observed": "0.0612-0.0843"},
+      "F12": {"receipt_ms": {"median": 45.2247, "p95": 46.207, "worst": 46.207}, "min_deadline_slack_ms": 232.552, "decision_at_pause_512": {"early": 1, "incomplete": 7, "null": 0}, "pause_at_boundary_ms": {"median": 512, "worst": 512}, "seal_pause_ms": {"median": 800, "best": 512, "worst": 800}, "late": 0, "request_probe_call_ms_observed": "0.0670-0.1090"},
+      "F11": {"receipt_ms": {"median": 81.4991, "p95": 84.8025, "worst": 84.8025}, "min_deadline_slack_ms": 192.104, "decision_at_pause_512": {"early": 1, "incomplete": 7, "null": 0}, "pause_at_boundary_ms": {"median": 512, "worst": 512}, "seal_pause_ms": {"median": 800, "best": 512, "worst": 800}, "late": 0, "request_probe_call_ms_observed": "0.0637-0.0883"}
+    },
+    "source_time_at_pause_boundary_ms": 1536,
+    "seal_reason_counts": {"S12": {"delivery_pause": 8, "delivery_deadline": 0}, "S11": {"delivery_pause": 8, "delivery_deadline": 0}, "F12": {"delivery_pause": 8, "delivery_deadline": 0}, "F11": {"delivery_pause": 8, "delivery_deadline": 0}},
+    "score_range_observed_only": [0.0102628, 0.9829914],
+    "decision_parity": true,
+    "probe_status": "started"
+  },
+  "paced_coload": {
+    "artifact": ".data/smartturn-179/paced_post_contract.json",
+    "command": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --out .data/smartturn-179/paced_post_contract.json paced --arms S12,S11,F12,F11 --rounds 1 --gap 1.0 --coload silero",
+    "sequence_sha256": "abafb77a69774a829b76ef75700da49f06c9518c017ac5b0101c33135de5fc05",
+    "co_load": "bundled Silero VAD, concurrent 512-sample/32-ms replay delivered at source_end",
+    "frames_per_arm": 1522,
+    "capture_missed_slots": 0,
+    "endpoint_counts_per_arm": {"SpeechStart": 8, "SpeechEnd": 0},
+    "active_rss_sampling": "10 ms watcher samples while inference/VAD request window is active; no pre-request sample is labeled active",
+    "arms": {
+      "S12": {"receipt_ms": {"median": 52.6819, "p95": 58.9075, "worst": 58.9075}, "coload_process_cpu_s": 2.0625, "coload_process_cpu_per_request_s": 0.257812, "request_window_cpu_per_request_s": 0.257812, "idle_gap_cpu_s": 0.0, "rss_active_mb": {"median": 131.24, "p95": 131.46, "worst": 131.46}, "threads_active": {"median": 25, "p95": 25, "worst": 25}, "loop_lag_ms": {"median": 5.0101, "p95": 10.6129, "worst": 19.589}, "capture_lag_ms": {"median": 5.7846, "p95": 12.1031, "worst": 18.0565}},
+      "S11": {"receipt_ms": {"median": 90.1852, "p95": 91.0063, "worst": 91.0063}, "coload_process_cpu_s": 1.3438, "coload_process_cpu_per_request_s": 0.167969, "request_window_cpu_per_request_s": 0.167969, "idle_gap_cpu_s": 0.0, "rss_active_mb": {"median": 133.01, "p95": 133.3, "worst": 133.34}, "threads_active": {"median": 21, "p95": 24, "worst": 24}, "loop_lag_ms": {"median": 5.0227, "p95": 10.7229, "worst": 17.4383}, "capture_lag_ms": {"median": 5.7034, "p95": 12.0468, "worst": 19.525}},
+      "F12": {"receipt_ms": {"median": 50.6005, "p95": 55.2945, "worst": 55.2945}, "coload_process_cpu_s": 1.7188, "coload_process_cpu_per_request_s": 0.214844, "request_window_cpu_per_request_s": 0.214844, "idle_gap_cpu_s": 0.0, "rss_active_mb": {"median": 133.67, "p95": 134.4, "worst": 134.4}, "threads_active": {"median": 19, "p95": 22, "worst": 22}, "loop_lag_ms": {"median": 5.0169, "p95": 10.6211, "worst": 15.6018}, "capture_lag_ms": {"median": 5.67, "p95": 12.0546, "worst": 16.0006}},
+      "F11": {"receipt_ms": {"median": 89.2698, "p95": 90.8951, "worst": 90.8951}, "coload_process_cpu_s": 1.5312, "coload_process_cpu_per_request_s": 0.191406, "request_window_cpu_per_request_s": 0.1875, "idle_gap_cpu_s": 0.0, "rss_active_mb": {"median": 135.02, "p95": 135.94, "worst": 135.94}, "threads_active": {"median": 18, "p95": 18, "worst": 18}, "loop_lag_ms": {"median": 5.0097, "p95": 10.6403, "worst": 15.8187}, "capture_lag_ms": {"median": 5.5816, "p95": 12.1309, "worst": 15.9451}}
+    }
+  },
+  "isolated_cpu": {
+    "artifact": ".data/smartturn-179/cpu_post_contract.json",
+    "command": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --out .data/smartturn-179/cpu_post_contract.json cpu --arms S12,S11,F12,F11 --calls 32 --warmup 5",
+    "warmed_calls": 5,
+    "measured_calls": 32,
+    "coload": "none",
+    "cpu_counter_source": "psutil.Process.cpu_times user+system",
+    "observed_nonzero_quantum_s": {"S12": 0.03125, "S11": 0.03125, "F12": 0.046875, "F11": 0.03125},
+    "arms": {
+      "S12": {"process_cpu_s": 2.765625, "process_cpu_per_request_s": 0.086426, "receipt_ms": {"median": 43.9459, "p95": 44.9557, "worst": 45.3362}},
+      "S11": {"process_cpu_s": 1.859375, "process_cpu_per_request_s": 0.058105, "receipt_ms": {"median": 80.6134, "p95": 82.0165, "worst": 84.0105}},
+      "F12": {"process_cpu_s": 2.234375, "process_cpu_per_request_s": 0.069824, "receipt_ms": {"median": 43.6059, "p95": 44.516, "worst": 44.7237}},
+      "F11": {"process_cpu_s": 2.09375, "process_cpu_per_request_s": 0.06543, "receipt_ms": {"median": 80.2825, "p95": 81.4777, "worst": 81.526}}
+    }
+  },
+  "selected_baseline_recheck": {
+    "artifact": ".data/smartturn-179/recheck_post_contract.json",
+    "command": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --out .data/smartturn-179/recheck_post_contract.json recheck --arms S12,F12 --calls 32 --warmup 5",
+    "warmed_calls": 5,
+    "measured_calls": 32,
+    "sequence_sha256": "81570408ef3e75e79ee53f7c39302591531a03c06702ddba967470fd8bbdc63f",
+    "cpu_counter_observed_quantum_s": {"S12": 0.015625, "F12": 0.03125},
+    "arms": {
+      "S12": {"process_cpu_s": 1.703125, "process_cpu_per_request_s": 0.053223, "receipt_ms": {"median": 43.2099, "p95": 44.6271, "worst": 51.5678}},
+      "F12": {"process_cpu_s": 2.3125, "process_cpu_per_request_s": 0.072266, "receipt_ms": {"median": 43.8235, "p95": 46.1012, "worst": 49.2295}}
+    },
+    "admissions": {"S12": {"started": 32, "busy": 0, "unavailable": 0}, "F12": {"started": 32, "busy": 0, "unavailable": 0}}
+  },
+  "hann_probe": {
+    "artifact": ".data/smartturn-179/hann_post_contract.json",
+    "command": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --out .data/smartturn-179/hann_post_contract.json hann --repeats 30",
+    "repeats": 30,
+    "max_abs_output_diff": 0.0,
+    "baseline_full_features_ms": {"median": 3.103, "p95": 3.631, "worst": 3.8777},
+    "cached_hann_full_features_ms": {"median": 3.06305, "p95": 3.8491, "worst": 3.8616},
+    "full_feature_delta_ms": {"median": -0.03995, "p95": 0.2181},
+    "hann_cast_only_ms": {"median": 0.0003, "p95": 0.0004, "worst": 0.002},
+    "disposition": "reject as negligible and noisy relative to SmartTurn inference; no production allocation change"
+  },
+  "disposition": {
+    "selected": "retain S12 (ORT 1/2 split); no production optimization adopted",
+    "reason": "F12 has no consistent benefit in the corrected recheck. 1/1 adds about 37 ms/request with lower CPU in some samples; S12 CPU varied from 0.086426 to 0.053223 s/request across batches, so no stable CPU percentage or universal winner is established.",
+    "dedicated_executor": "no-change: matrix queue waits sub-millisecond and all admissions started",
+    "spinning": "no-change: ORT accepted allow_spinning=0, while paced idle-gap CPU was 0.0 s",
+    "hann": "reject: bounded probe measured negligible/noisy end-to-end delta",
+    "r6_state": "Director-selected supported tradeoff/inconclusive investigation; current production configuration retained without adopting a new latency target"
+  },
+  "handoff": {
+    "issue_177": "Retain ORT_SEQUENTIAL/ORT_ENABLE_ALL/CPUExecutionProvider, inter-op 1/intra-op 2, split dispatch and unchanged preprocessing; no BLAS/env/model/endpoint/settings change. Optional investigation does not block migration.",
+    "rollback": "retain current S12 path",
+    "packaged_embedded_python": "not exercised; measurements use source-checkout CPython venv"
+  },
+  "reproducibility": {
+    "probe_dependencies": "uv pip install --python .venv/Scripts/python.exe numpy==2.5.1 onnxruntime==1.28.0 psutil==7.2.2 threadpoolctl==3.7.0 pyarrow==25.0.1 soundfile pytest pytest-asyncio",
+    "fetch": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py fetch",
+    "power": "powercfg /getactivescheme recorded and checked for drift; no global setting changed",
+    "raw_artifacts": ".data/smartturn-179/ (git-ignored)",
+    "tracked_summary": "docs/smartturn-cpu-179-evidence.json"
+  },
+  "verification": {
+    "lifecycle_focused_tests": "91 focused SmartTurn tests plus 54 existing peer-capture tests: 145 passed together after shared formatting",
+    "probe_lint": "ruff check scripts/bench_smart_turn_179.py passed",
+    "probe_syntax": "ast.parse passed",
+    "ort_spin_support": "both intra/inter allow_spinning=0 accepted",
+    "artifact_assertions": "corrected controller pause/seal fields, CPU admissions, paced zero missed slots, Hann parity, and JSON parse passed"
+  }
+}
