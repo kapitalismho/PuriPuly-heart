@@ -1,13 +1,15 @@
-# SmartTurn CPU execution probe (issue #179)
+# SmartTurn CPU execution (issue #179): ADOPT-F12-2026-09-23
 
-This is the corrected post-lifecycle evidence packet for the Windows
-SmartTurn four-arm probe (S12/S11/F12/F11). Director R6 disposition:
-supported **TRADEOFF/INCONCLUSIVE investigation**, retaining production S12
-unchanged (ORT 1/2 split). This is not a rejection of 1/1 or a universal
-winner; future adoption would require maintainer willingness to spend roughly
-37 ms/request for the observed CPU reduction. No production source, test,
-dependency, model, or user setting was changed by this probe.
+Production after this change is P12/F12: `SmartTurnOnnxInference` with ORT
+1/2 (ORT_SEQUENTIAL, ORT_ENABLE_ALL, CPUExecutionProvider, inter-op 1,
+intra-op 2) performing one default-executor `asyncio.to_thread` blocking
+operation (`prepare_smart_turn_audio` -> `compute_whisper_log_mel_features` ->
+`session.run` -> scalar extraction). The completion callback and controller
+stay on the original event loop. This adoption is a structural simplification,
+not a measured speedup or CPU-gain claim.
 
+Historical #179 measurements and the earlier retain-S12 disposition below are
+retained unchanged for audit and are not rewritten as production acceptance.
 The tracked sanitized packet is `docs/smartturn-cpu-179-evidence.json`.
 Raw per-call records are under ignored `.data/smartturn-179/`.
 
@@ -58,16 +60,17 @@ uv pip install --python .venv/Scripts/python.exe numpy==2.5.1 onnxruntime==1.28.
 PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py fetch
 ```
 
-## Measurement contract
+## Measurement contract (historical probe)
 
-The probe wraps the exact production numerical functions
+The historical probe wrapped the exact production numerical functions
 `prepare_smart_turn_audio`, `compute_whisper_log_mel_features`, and
 `session.run`, recording worker boundaries, queue waits, callback entry, and
 input hashes without adding production logging.
 
-- S12 is the production split path with ORT 1/2. S11 changes only intra-op to
-  1. F12 fuses the same numerical operations into one owned offload with ORT
-  1/2. F11 is F12 with intra-op 1.
+Historical arms (experimental comparators, not production after ADOPT-F12):
+S12 was the pre-adoption split path with ORT 1/2; S11 changed only intra-op
+to 1; F12 fused the same numerical operations into one owned offload with ORT
+1/2; F11 was F12 with intra-op 1.
 - Matrix timing is retained from the corrected post-lifecycle run because its
   source path is independent of the controller source-time and active-RSS
   fixes. Each round uses the same fixture for all arms and rotates execution
@@ -99,7 +102,7 @@ inspection, including the retained matrix's unchanged measurement path; an
 exact historical script hash cannot be reconstructed and is not backfilled.
 New probe outputs record the actual script SHA-256 and checkout HEAD.
 
-## Corrected matrix (retained)
+## Corrected matrix (retained historical)
 
 Artifact: `.data/smartturn-179/matrix_post_lifecycle.json`.
 Command:
@@ -123,7 +126,7 @@ fixture-keyed comparisons have score maximum absolute difference 0.0 and exact
 prepared-audio, feature, and model-input hashes. The 1/1 change adds about
 37 ms/request without a queue or admission benefit in this workload.
 
-## Corrected production-LISTEN controller
+## Corrected LISTEN controller (retained historical)
 
 Artifact: `.data/smartturn-179/controller_post_contract.json`.
 Command:
@@ -152,7 +155,7 @@ recorded separately (ranges 0.0532–0.1090 ms across arms); the old
 scenario-start-to-submit field was removed. Seal records include
 `pause_ms_at_seal`, and no post-hoc decision fill is used.
 
-## Isolated process CPU and finalist recheck
+## Isolated process CPU and finalist recheck (retained historical)
 
 Four-arm artifact: `.data/smartturn-179/cpu_post_contract.json`.
 Command:
@@ -187,7 +190,7 @@ ms. This recheck does not establish a F12 benefit. S12 process CPU varied from
 0.086426 to 0.053223 s/request between the two batches, so these small samples
 do not establish a stable CPU reduction percentage or a universal winner.
 
-## Corrected concurrent Silero co-load
+## Corrected concurrent Silero co-load (retained historical)
 
 Artifact: `.data/smartturn-179/paced_post_contract.json`.
 Command:
@@ -213,7 +216,7 @@ Capture lag was 5.58–5.78 ms median and 12.05–12.13 ms p95, with no missed
 slots. Idle-gap CPU was 0.0 s for every arm. Active RSS values are watcher
 samples taken while compute was live, not the earlier pre-request samples.
 
-## Bounded Hann allocation probe
+## Bounded Hann allocation probe (retained historical)
 
 Artifact: `.data/smartturn-179/hann_post_contract.json`.
 Command:
@@ -230,7 +233,47 @@ cost was 3.103 ms versus 3.063 ms median; the delta was -0.040 ms median and
 bounded, noisy end-to-end result is negligible relative to SmartTurn inference;
 disposition: explicitly reject this allocation change, with no production edit.
 
-## Selected disposition and migration handoff
+## ADOPT-F12-2026-09-23 production evidence
+
+Production `SmartTurnOnnxInference` now performs one default-executor blocking
+operation per request. ORT SEQUENTIAL, ENABLE_ALL, CPU, inter 1/intra 2 and the
+numerical functions are unchanged. Adoption is structural simplification only;
+no speedup or CPU-gain claim is made.
+
+Authority: the maintainer explicitly selected `1/2 + single offload` in the
+conversation after reviewing the tradeoff. This supersedes the historical
+retain-S12 disposition, not its measured results or limitations. Adoption
+baseline: `c33692591a76cb6790f4cd2abad2c2a0501ac63d`.
+
+Current #177 handoff: ORT 1/2, single default-executor offload, unchanged input
+snapshots, preparation, feature precision, spinning and numerical-library
+settings. This remains independent of embedded-package acceptance.
+Rollback: restore the split `SmartTurnOnnxInference.predict` implementation
+from the adoption baseline; do not change controller policy or preprocessing.
+
+```text
+PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/adopt_f12_parity.json matrix --calls 13 --warmup 2
+PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/adopt_f12_controller.json controller --arms P12,S12,F12
+```
+
+Matrix (13 measured calls/arm, 2 warmup, rotated order, Python 3.14.7 /
+NumPy 2.5.1 / ORT 1.28.0, model SHA
+`2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f`):
+all arms started 13/13 with outcome complete. Score max abs diff 0.0 and exact
+prepared/feature/model-input hashes for P12 vs S12/S11/F12/F11.
+Submit-to-receipt median/p95/worst ms: P12 44.545/52.748/52.748,
+S12 44.011/47.713/47.713, F12 43.879/48.227/48.227. Descriptive only.
+
+Controller (8 real-clock probes/arm, P12 actual production owner):
+decision parity true; early 1, incomplete 7, seal delivery_pause 8, late 0 on
+every arm. Receipt median/p95/worst ms: P12 45.122/49.317/49.317
+(slack 223.236 ms), S12 45.184/52.316/52.316 (slack 227.907 ms),
+F12 44.961/47.401/47.401 (slack 225.983 ms). Scores identical per fixture
+(range 0.0102628-0.9829914, observed output only).
+All 13 guards+speech production owner scores complete; direct predict checks
+confirm sample-rate/shape validation, no-outputs and closed-session errors.
+
+## Selected disposition and migration handoff (historical retain-S12)
 
 - **R6 disposition:** supported tradeoff/inconclusive investigation; retain
   S12 (ORT 1/2, split offloads). No production changes need rollback.
@@ -266,7 +309,7 @@ isolation now observes the submitted reference, not a stub-created copy.
 
 ```text
 .venv/Scripts/python.exe -m pytest tests/core/test_smart_turn_runtime.py tests/core/test_smart_turn_delivery.py tests/core/runtime/test_peer_capture_session.py -o addopts= -q
-.venv/Scripts/python.exe -m ruff check scripts/bench_smart_turn_179.py tests/core/test_smart_turn_runtime.py tests/core/test_smart_turn_delivery.py
+.venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/audio/smart_turn.py scripts/bench_smart_turn_179.py tests/core/test_smart_turn_runtime.py tests/core/test_smart_turn_delivery.py
 ```
 
 The unchanged golden feature hash passed on NumPy 2.5.1. Regression coverage
@@ -281,5 +324,6 @@ second-machine result, stable CPU percentage, packaged embedded-Python
 performance, or speech-quality claim follows from these measurements.
 Background system load was not sampled per batch. Coarse CPU counters and
 unrecorded background variation limit attribution of the cross-batch CPU
-differences; the unchanged-production disposition does not assume a stable gain.
+differences; neither the historical disposition nor this adoption establishes
+a stable CPU or latency gain.
 No architecture ownership or dependency boundary changed.

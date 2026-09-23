@@ -1,24 +1,27 @@
-"""Measured Windows SmartTurn S12/S11/F12/F11 probe for issue #179.
+"""Measured Windows SmartTurn production + experimental probe for issue #179.
 
-Owns NO production code and NO tests. Reuses the exact production numerical
-functions and snapshot contract for every arm:
+Production after ADOPT-F12-2026-09-23 is P12: SmartTurnOnnxInference (ORT 1/2,
+fused single offload). Historical split arms remain only as experimental
+comparators and are not production:
 
-- S12: production SmartTurnOnnxInference unchanged (ORT 1/2, split offloads).
-- S11: same split dispatch, ORT 1/1 (probe-local session, identical predict).
-- F12/F11: preparation + features + ONNX in ONE blocking offload after the
-  owner snapshot, returning a scalar to the same event loop.
+- P12: actual production SmartTurnOnnxInference (ORT 1/2, fused single offload).
+- S12: historical split offloads with ORT 1/2 (experimental comparator).
+- S11: same split dispatch, ORT 1/1 (experimental comparator).
+- F12/F11: probe-local fused clones of the production shape with ORT 1/2 and
+  1/1 (experimental comparators).
+
+All arms reuse the exact production numerical functions and snapshot contract:
+`prepare_smart_turn_audio`, `compute_whisper_log_mel_features`, `session.run`.
+
 
 Subcommands:
   fetch       download lawful public speech clips + write sha256 manifest
   smoke       tiny end-to-end validation (NOT a benchmark)
-  stages      synchronous stage micro-profile per arm (prepare/features/ONNX)
-  matrix      rotated four-arm owner comparison, 30-50 measured calls/arm
-  controller  production LISTEN owner/controller exercise, real receipt/deadline
+  matrix      rotated owner comparison, 30-50 measured calls/arm
+  controller  LISTEN owner/controller exercise, real receipt/deadline
   paced       paced replay with idle gaps + Silero VAD co-load, loop-lag/CPU
-  cpu         warmed isolated four-arm process-CPU accounting
-  recheck     warmed isolated selected-vs-baseline process-CPU recheck
-  hann        bounded Hann allocation micro-probe
-  support     ORT spinning-config support check (no benchmark)
+  cpu         warmed isolated process-CPU accounting
+  recheck     warmed isolated production-vs-comparator recheck
 
 Machine-readable JSON goes to --out (default under ignored .data/).
 """
@@ -437,11 +440,14 @@ class ProbeFusedInference:
         self._session = None
 
 
-ARMS = ("S12", "S11", "F12", "F11")
+ARMS = ("P12", "S12", "S11", "F12", "F11")
 
 
 def make_owner(arm: str, model_path: Path) -> SmartTurnInferenceOwner:
+    from puripuly_heart.core.audio.smart_turn import SmartTurnOnnxInference
+
     factories = {
+        "P12": SmartTurnOnnxInference,
         "S12": lambda path: ProbeSplitInference(path, inter=1, intra=2),
         "S11": lambda path: ProbeSplitInference(path, inter=1, intra=1),
         "F12": lambda path: ProbeFusedInference(path, inter=1, intra=2),
@@ -711,11 +717,11 @@ async def run_matrix(args) -> dict:
         }
     base = {
         (record["round"], record["fixture"]): record
-        for record in results["S12"]
+        for record in results["P12"]
         if record.get("outcome") == "complete"
     }
     parity = {}
-    for arm in ("S11", "F12", "F11"):
+    for arm in [arm for arm in ARMS if arm != "P12"]:
         matching = [
             (base[(record["round"], record["fixture"])], record)
             for record in results[arm]
@@ -757,6 +763,7 @@ def cmd_stages(args) -> int:
     report = {"schema": SCHEMA, "mode": "stages", "runtime": runtime_record(), "arms": {}}
     for arm in ARMS:
         sessions = {
+            "P12": (1, 2),
             "S12": (1, 2),
             "S11": (1, 1),
             "F12": (1, 2),
@@ -1518,18 +1525,18 @@ def main() -> int:
     matrix.add_argument("--calls", type=int, default=40)
     matrix.add_argument("--warmup", type=int, default=5)
     controller = sub.add_parser("controller")
-    controller.add_argument("--arms", default="S12,S11,F12,F11")
+    controller.add_argument("--arms", default="P12,S12,F12")
     paced = sub.add_parser("paced")
-    paced.add_argument("--arms", default="S12")
+    paced.add_argument("--arms", default="P12")
     paced.add_argument("--rounds", type=int, default=2)
     paced.add_argument("--gap", type=float, default=2.0)
     paced.add_argument("--coload", default="silero", choices=["none", "silero"])
     cpu = sub.add_parser("cpu")
-    cpu.add_argument("--arms", default="S12,S11,F12,F11")
+    cpu.add_argument("--arms", default="P12,S12,F12")
     cpu.add_argument("--calls", type=int, default=24)
     cpu.add_argument("--warmup", type=int, default=5)
     recheck = sub.add_parser("recheck")
-    recheck.add_argument("--arms", default="S12,F12")
+    recheck.add_argument("--arms", default="P12,S12")
     recheck.add_argument("--calls", type=int, default=24)
     recheck.add_argument("--warmup", type=int, default=5)
     hann = sub.add_parser("hann")

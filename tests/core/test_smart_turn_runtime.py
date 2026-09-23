@@ -792,7 +792,7 @@ async def test_close_while_preparing_reclaims_and_repeated_close_is_idempotent(
 
 
 @pytest.mark.asyncio
-async def test_owner_cancel_during_production_features_abandons_owned_attempt(
+async def test_owner_cancel_during_production_blocking_abandons_owned_attempt(
     tmp_path, monkeypatch
 ) -> None:
     model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
@@ -863,29 +863,28 @@ async def test_owner_cancel_during_production_features_abandons_owned_attempt(
 
 
 @pytest.mark.asyncio
-async def test_owner_cancel_during_production_onnx_abandons_owned_attempt(
+async def test_owner_cancel_during_production_prepare_abandons_owned_attempt(
     tmp_path, monkeypatch
 ) -> None:
     model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
     model_path.write_bytes(b"fixture")
-    entered_onnx = threading.Event()
-    release_onnx = threading.Event()
-    calls = {"features": 0, "onnx": 0}
+    entered_prepare = threading.Event()
+    release_prepare = threading.Event()
+    calls = {"prepare": 0, "onnx": 0}
+    real_prepare = smart_turn.prepare_smart_turn_audio
 
-    def gated_features(prepared):
-        from puripuly_heart.core.audio import smart_turn_features as features_module
-
-        calls["features"] += 1
-        return features_module.compute_whisper_log_mel_features(prepared)
+    def gated_prepare(audio, *, sample_rate_hz):
+        calls["prepare"] += 1
+        entered_prepare.set()
+        assert release_prepare.wait(10.0)
+        return real_prepare(audio, sample_rate_hz=sample_rate_hz)
 
     class GatedSession:
         def run(self, _names, feeds):
             calls["onnx"] += 1
-            entered_onnx.set()
-            assert release_onnx.wait(10.0)
             return [np.asarray([0.2], dtype=np.float32)]
 
-    monkeypatch.setattr(smart_turn, "compute_whisper_log_mel_features", gated_features)
+    monkeypatch.setattr(smart_turn, "prepare_smart_turn_audio", gated_prepare)
 
     def inference_factory(_path):
         inference = SmartTurnOnnxInference.__new__(SmartTurnOnnxInference)
@@ -914,20 +913,20 @@ async def test_owner_cancel_during_production_onnx_abandons_owned_attempt(
         completions.append(completion)
 
     assert owner.submit(identity, np.zeros(3584, dtype=np.float32), receive) == "started"
-    assert await asyncio.to_thread(entered_onnx.wait, 10.0)
+    assert await asyncio.to_thread(entered_prepare.wait, 10.0)
     task = owner._execution_task
     assert task is not None
     task.cancel()
     task.cancel()
     await asyncio.sleep(0)
     assert not task.done()
-    release_onnx.set()
+    release_prepare.set()
     with pytest.raises(asyncio.CancelledError):
         async with asyncio.timeout(30.0):
             await task
     assert completions == []
-    assert calls == {"features": 1, "onnx": 1}
     assert owner.snapshot.inference_count == 0
     assert owner._execution_task is None
+    assert calls == {"prepare": 1, "onnx": 1}
     await owner.close()
     assert owner.snapshot.availability == "closed"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import math
 import time
@@ -140,25 +141,46 @@ class SmartTurnOnnxInference:
         self._session = ort.InferenceSession(
             str(model_path), sess_options=options, providers=["CPUExecutionProvider"]
         )
+        self.last_trace: dict[str, object] = {}
+
+    def _predict_blocking(self, trace: dict[str, object], audio: np.ndarray) -> float:
+        trace["worker_start_perf"] = time.perf_counter()
+        try:
+            prepared = prepare_smart_turn_audio(audio, sample_rate_hz=SMART_TURN_SAMPLE_RATE_HZ)
+            trace["prepared_sha256"] = hashlib.sha256(prepared.tobytes()).hexdigest()
+            trace["prepare_worker_end_perf"] = time.perf_counter()
+            features = compute_whisper_log_mel_features(prepared)
+            trace["features_sha256"] = hashlib.sha256(features.tobytes()).hexdigest()
+            trace["features_worker_end_perf"] = time.perf_counter()
+            session = self._session
+            if session is None:
+                raise RuntimeError("Smart Turn ONNX session is closed")
+            model_input = np.expand_dims(features, axis=0)
+            trace["model_input_sha256"] = hashlib.sha256(model_input.tobytes()).hexdigest()
+            outputs = session.run(None, {"input_features": model_input})
+            trace["onnx_worker_end_perf"] = time.perf_counter()
+            if not outputs:
+                raise RuntimeError("Smart Turn ONNX model returned no outputs")
+            return float(np.asarray(outputs[0]).reshape(-1)[0])
+        finally:
+            trace["worker_end_perf"] = time.perf_counter()
 
     async def predict(self, audio: np.ndarray, *, sample_rate_hz: int) -> float:
-        prepared = prepare_smart_turn_audio(audio, sample_rate_hz=sample_rate_hz)
-        features = await _await_owned_operation(
-            asyncio.to_thread(compute_whisper_log_mel_features, prepared)
-        )
-        session = self._session
-        if session is None:
-            raise RuntimeError("Smart Turn ONNX session is closed")
-        outputs = await _await_owned_operation(
-            asyncio.to_thread(
-                session.run,
-                None,
-                {"input_features": np.expand_dims(features, axis=0)},
-            )
-        )
-        if not outputs:
-            raise RuntimeError("Smart Turn ONNX model returned no outputs")
-        return float(np.asarray(outputs[0]).reshape(-1)[0])
+        if sample_rate_hz != SMART_TURN_SAMPLE_RATE_HZ:
+            raise ValueError("Smart Turn audio must use 16 kHz sampling")
+        trace: dict[str, object] = {
+            "predict_enter_perf": time.perf_counter(),
+            "queue_submit_perf": time.perf_counter(),
+        }
+        self.last_trace = trace
+
+        def run() -> float:
+            return self._predict_blocking(trace, audio)
+
+        result = await _await_owned_operation(asyncio.to_thread(run))
+        trace["loop_return_perf"] = time.perf_counter()
+        trace["predict_return_perf"] = trace["loop_return_perf"]
+        return result
 
     def close(self) -> None:
         self._session = None
