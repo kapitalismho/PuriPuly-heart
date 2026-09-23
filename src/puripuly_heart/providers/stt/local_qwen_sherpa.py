@@ -333,6 +333,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
     _scoped_job_identities: dict[int, STTProviderTurnIdentity] = field(
         init=False, default_factory=dict, repr=False
     )
+    _retired_scoped_job_sequences: set[int] = field(init=False, default_factory=set, repr=False)
     _scoped_watchdogs: dict[int, asyncio.Task[None]] = field(
         init=False, default_factory=dict, repr=False
     )
@@ -445,6 +446,8 @@ class _LocalQwenSherpaSession(STTBackendSession):
         self._scoped_watchdogs.pop(sequence, None)
         owner = self._scoped_job_identities.pop(sequence, None)
         if owner == identity:
+            self._retired_scoped_job_sequences.add(sequence)
+        if owner == identity:
             self._terminalize_scoped(
                 identity,
                 outcome="failed",
@@ -455,11 +458,12 @@ class _LocalQwenSherpaSession(STTBackendSession):
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         self._event_projection.require_open(identity)
         self._buffer_f32.clear()
-        self._scoped_job_identities = {
-            sequence: owner
-            for sequence, owner in self._scoped_job_identities.items()
-            if owner != identity
+        retired_sequences = {
+            sequence for sequence, owner in self._scoped_job_identities.items() if owner == identity
         }
+        self._retired_scoped_job_sequences.update(retired_sequences)
+        for sequence in retired_sequences:
+            self._scoped_job_identities.pop(sequence, None)
         self._terminalize_scoped(
             identity,
             outcome="cancelled",
@@ -535,8 +539,11 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 queue_wait_ms=completion.queue_wait_ms,
                 result="success",
             )
-        identity = self._scoped_job_identities.pop(completion.job.sequence, None)
-        if identity is None:
+        sequence = completion.job.sequence
+        retired_scoped = sequence in self._retired_scoped_job_sequences
+        self._retired_scoped_job_sequences.discard(sequence)
+        identity = self._scoped_job_identities.pop(sequence, None)
+        if identity is None and not retired_scoped:
             self._event_projection.put_legacy(STTBackendTranscriptEvent(text=text, is_final=True))
         watchdog = self._scoped_watchdogs.pop(completion.job.sequence, None)
         if watchdog is not None:
@@ -550,7 +557,10 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 self._terminalize_scoped(identity, outcome="empty")
 
     def _preserve_queued_after_failure(self, job: LocalDecodeJob) -> bool:
-        return job.sequence in self._scoped_job_identities
+        return (
+            job.sequence in self._scoped_job_identities
+            or job.sequence in self._retired_scoped_job_sequences
+        )
 
     async def _handle_decode_failure(self, failure: LocalDecodeFailure) -> None:
         if failure.job.audio_ms > 0:
@@ -563,11 +573,13 @@ class _LocalQwenSherpaSession(STTBackendSession):
         retired_jobs = (failure.job, *failure.discarded_jobs)
         legacy_failure = False
         for job in retired_jobs:
+            retired_scoped = job.sequence in self._retired_scoped_job_sequences
+            self._retired_scoped_job_sequences.discard(job.sequence)
             identity = self._scoped_job_identities.pop(job.sequence, None)
             watchdog = self._scoped_watchdogs.pop(job.sequence, None)
             if watchdog is not None:
                 watchdog.cancel()
-            if identity is None:
+            if identity is None and not retired_scoped:
                 legacy_failure = True
                 self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
             else:
@@ -582,8 +594,11 @@ class _LocalQwenSherpaSession(STTBackendSession):
             self._event_projection.put_legacy(failure.error)
 
     async def _handle_decode_expired(self, expired: LocalDecodeExpired) -> None:
-        identity = self._scoped_job_identities.pop(expired.job.sequence, None)
-        if identity is None:
+        sequence = expired.job.sequence
+        retired_scoped = sequence in self._retired_scoped_job_sequences
+        self._retired_scoped_job_sequences.discard(sequence)
+        identity = self._scoped_job_identities.pop(sequence, None)
+        if identity is None and not retired_scoped:
             self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
         watchdog = self._scoped_watchdogs.pop(expired.job.sequence, None)
         if watchdog is not None:
@@ -650,6 +665,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
             for watchdog in self._scoped_watchdogs.values():
                 watchdog.cancel()
             self._scoped_watchdogs.clear()
+            self._retired_scoped_job_sequences.clear()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         self._events_started = True

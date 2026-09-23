@@ -266,6 +266,86 @@ async def test_local_cpu_overlap_preserves_queued_successor_after_predecessor_de
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("late_a_result", ["failure", "success"])
+async def test_local_cpu_timed_out_decode_keeps_queued_successor_classified_and_serial(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    late_a_result: str,
+) -> None:
+    backend = LocalQwenSherpaSTTBackend(
+        model_dir=tmp_path,
+        active_decode_timeout_s=0.01,
+    )
+    first_started = asyncio.Event()
+    first_release = asyncio.Event()
+    decode_calls = 0
+
+    async def ensure() -> object:
+        return object()
+
+    async def decode(_samples: np.ndarray) -> str:
+        nonlocal decode_calls
+        decode_calls += 1
+        if decode_calls == 1:
+            first_started.set()
+            await first_release.wait()
+            if late_a_result == "failure":
+                raise RuntimeError("late first decode failure")
+            return "late-a"
+        return "b-text"
+
+    async def submit(request: STTProviderTurnRequest) -> None:
+        await session.begin_turn(request)
+        await session.send_turn_audio(
+            request.identity,
+            b"\x00\x40" * 160,
+            payload_sequence=1,
+            source_ranges=(),
+            context_only=False,
+        )
+        await session.seal_turn(
+            request.identity,
+            sealed_content_ranges=(),
+            seal_reason="silence",
+            observed_trailing_silence_ms=800,
+        )
+
+    monkeypatch.setattr(backend, "_ensure_recognizer", ensure)
+    monkeypatch.setattr(backend, "decode_f32", decode)
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    first = _scoped_request(1)
+    second = _scoped_request(2)
+    events = session.turn_events()
+
+    await submit(first)
+    await asyncio.wait_for(first_started.wait(), timeout=1)
+    await asyncio.sleep(0)
+    backend.active_decode_timeout_s = 10
+    await submit(second)
+
+    first_terminal = await asyncio.wait_for(events.__anext__(), timeout=1)
+    assert (
+        first_terminal.identity,
+        first_terminal.outcome,
+        first_terminal.failure_reason,
+        first_terminal.epoch_disposition,
+    ) == (first.identity, "failed", "local_decode_timeout", "retire")
+
+    first_release.set()
+    second_terminal = await asyncio.wait_for(events.__anext__(), timeout=1)
+    assert decode_calls == 2
+    assert (second_terminal.identity, second_terminal.outcome, second_terminal.text) == (
+        second.identity,
+        "final",
+        "b-text",
+    )
+    await asyncio.wait_for(session.close(), timeout=1)
+    with pytest.raises(StopAsyncIteration):
+        await events.__anext__()
+    await asyncio.wait_for(backend.close(), timeout=1)
+
+
+@pytest.mark.asyncio
 async def test_local_cpu_scoped_empty_error_and_close_terminal_matrix(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
