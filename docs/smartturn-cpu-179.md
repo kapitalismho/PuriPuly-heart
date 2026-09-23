@@ -10,8 +10,11 @@ not a measured speedup or CPU-gain claim.
 
 Historical #179 measurements and the earlier retain-S12 disposition below are
 retained unchanged for audit and are not rewritten as production acceptance.
-The tracked sanitized packet is `docs/smartturn-cpu-179-evidence.json`.
-Raw per-call records are under ignored `.data/smartturn-179/`.
+The tracked sanitized packet is `docs/smartturn-cpu-179-evidence.json`, a
+hand-assembled summary of selected raw records. The probe emits per-run
+artifacts only; each measured section below names the artifact and command
+behind its numbers. Raw per-call records are under ignored
+`.data/smartturn-179/`.
 
 ## Authority, setup, and superseded evidence
 
@@ -56,7 +59,7 @@ Probe-only setup and fetch commands:
 
 ```text
 uv venv .venv --python 3.14
-uv pip install --python .venv/Scripts/python.exe numpy==2.5.1 onnxruntime==1.28.0 psutil==7.2.2 threadpoolctl==3.7.0 pyarrow==25.0.1 soundfile pytest pytest-asyncio
+uv pip install --python .venv/Scripts/python.exe numpy==2.5.1 onnxruntime==1.28.0 psutil==7.2.2 threadpoolctl==3.7.0 pyarrow==25.0.1 soundfile huggingface-hub==1.26.0 pytest pytest-asyncio
 PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py fetch
 ```
 
@@ -249,9 +252,12 @@ Authority: the maintainer explicitly chose `1/2 + single offload` in this
 conversation. This supersedes only the historical retain-S12 disposition.
 Adoption baseline: `c33692591a76cb6790f4cd2abad2c2a0501ac63d`.
 Current #177 handoff is ORT 1/2 with a single default-executor operation and
-unchanged snapshots, numerical functions and spinning settings; packaged-host
-acceptance remains separate. Rollback restores split `predict` from that
-baseline without changing controller policy or preprocessing.
+unchanged snapshot isolation, numerical functions and spinning settings;
+packaged-host acceptance remains separate. The bounded allocation cleanup
+recorded below changes only how the owned snapshot and the short-input padding
+buffer are constructed, not ownership, isolation or numerical results.
+Rollback restores split `predict` from that baseline without changing
+controller policy or preprocessing.
 
 The earlier instrumented production run (`adopt_f12_parity.json` /
 `adopt_f12_controller.json`, probe script
@@ -314,10 +320,11 @@ prior instrumented run.
   Zero observed idle-gap CPU is subject to Windows counter granularity, not
   proof of zero CPU use. Retain the existing configuration.
 - **Hann allocation:** reject as negligible/noisy; no production change.
-- **#177 handoff:** retain ORT_SEQUENTIAL, ORT_ENABLE_ALL, CPUExecutionProvider,
-  inter-op 1/intra-op 2 and the current split dispatch, unchanged numerical
-  functions and pinned preprocessing fixture. No BLAS/environment, model,
-  precision, endpoint, setting, or production dependency change. This optional
+- **#177 handoff (historical, superseded by ADOPT-F12 above):** retain
+  ORT_SEQUENTIAL, ORT_ENABLE_ALL, CPUExecutionProvider, inter-op 1/intra-op 2
+  and the then-current split dispatch, unchanged numerical functions and
+  pinned preprocessing fixture. No BLAS/environment, model, precision,
+  endpoint, setting, or production dependency change. This optional
   investigation does not block the migration, already landed through #181.
   Source-checkout CPython evidence does not claim embedded/native-package
   performance; that composition's acceptance remains separate.

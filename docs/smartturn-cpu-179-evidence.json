@@ -1,6 +1,7 @@
 {
   "schema": "smartturn-cpu-179-evidence-v3",
   "status": "adopted_f12_structural_simplification",
+  "assembly": "hand-assembled by the Director from probe raw records under git-ignored .data/smartturn-179/; no probe mode emits this packet, which uses its own summary schema",
   "baseline_sha": "c33692591a76cb6790f4cd2abad2c2a0501ac63d",
   "repair_baseline_sha": "1c4aca5ed020eb7cfce2b9868e54c864a940e9c3",
   "probe": "scripts/bench_smart_turn_179.py",
@@ -877,12 +878,12 @@
     "r6_state": "superseded by ADOPT-F12-2026-09-23; historical retain-S12 disposition preserved for audit"
   },
   "handoff": {
-    "issue_177": "Retain ORT_SEQUENTIAL/ORT_ENABLE_ALL/CPUExecutionProvider, inter-op 1/intra-op 2, fused single offload and unchanged preprocessing; no BLAS/env/model/endpoint/settings change.",
+    "issue_177": "Retain ORT_SEQUENTIAL/ORT_ENABLE_ALL/CPUExecutionProvider, inter-op 1/intra-op 2, fused single offload and byte-identical preprocessing (see direct_review_allocation_cleanup); no BLAS/env/model/endpoint/settings change.",
     "rollback": "restore pre-adoption split predict from the adoption baseline; do not change controller policy or preprocessing",
     "packaged_embedded_python": "not exercised; measurements use source-checkout CPython venv"
   },
   "reproducibility": {
-    "probe_dependencies": "uv pip install --python .venv/Scripts/python.exe numpy==2.5.1 onnxruntime==1.28.0 psutil==7.2.2 threadpoolctl==3.7.0 pyarrow==25.0.1 soundfile pytest pytest-asyncio",
+    "probe_dependencies": "uv pip install --python .venv/Scripts/python.exe numpy==2.5.1 onnxruntime==1.28.0 psutil==7.2.2 threadpoolctl==3.7.0 pyarrow==25.0.1 soundfile huggingface-hub==1.26.0 pytest pytest-asyncio",
     "fetch": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py fetch",
     "power": "powercfg /getactivescheme recorded and checked for drift; no global setting changed",
     "raw_artifacts": ".data/smartturn-179/ (git-ignored)",
@@ -1132,6 +1133,7 @@
       }
     },
     "clean_scores_artifact": ".data/smartturn-179/repair_f12_clean_scores.json",
+    "clean_scores_provenance": "ad-hoc direct-owner score/hash dump (name, kind, score, outcome, prepared_sha256, features_sha256 per fixture); its 13 scores, outcomes and prepared/feature hashes equal the committed_f12_parity.json P12 records",
     "p12_coload": {
       "artifact": ".data/smartturn-179/repair_f12_coload.json",
       "command": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/repair_f12_coload.json paced --arms P12 --rounds 1 --gap 1.0 --coload silero",
