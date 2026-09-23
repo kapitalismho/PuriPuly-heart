@@ -233,45 +233,68 @@ cost was 3.103 ms versus 3.063 ms median; the delta was -0.040 ms median and
 bounded, noisy end-to-end result is negligible relative to SmartTurn inference;
 disposition: explicitly reject this allocation change, with no production edit.
 
-## ADOPT-F12-2026-09-23 production evidence
+## ADOPT-F12-2026-09-23 production evidence (clean production path)
 
-Production `SmartTurnOnnxInference` now performs one default-executor blocking
-operation per request. ORT SEQUENTIAL, ENABLE_ALL, CPU, inter 1/intra 2 and the
-numerical functions are unchanged. Adoption is structural simplification only;
-no speedup or CPU-gain claim is made.
+Production `SmartTurnOnnxInference` performs one default-executor blocking
+operation per request with no production tracing, hashing, or perf timing:
+`predict` validates the sample rate, then one
+`asyncio.to_thread(_predict_blocking)` runs `prepare_smart_turn_audio` ->
+`compute_whisper_log_mel_features` -> `session.run` -> scalar extraction.
+ORT SEQUENTIAL, ENABLE_ALL, CPU, inter 1/intra 2 and the numerical functions
+are unchanged. No extra copies, buffers, executors, BLAS changes, or spinning
+changes. Adoption is structural simplification only; no speedup or CPU-gain
+claim is made.
 
-Authority: the maintainer explicitly selected `1/2 + single offload` in the
-conversation after reviewing the tradeoff. This supersedes the historical
-retain-S12 disposition, not its measured results or limitations. Adoption
-baseline: `c33692591a76cb6790f4cd2abad2c2a0501ac63d`.
+Authority: the maintainer explicitly chose `1/2 + single offload` in this
+conversation. This supersedes only the historical retain-S12 disposition.
+Adoption baseline: `c33692591a76cb6790f4cd2abad2c2a0501ac63d`.
+Current #177 handoff is ORT 1/2 with a single default-executor operation and
+unchanged snapshots, numerical functions and spinning settings; packaged-host
+acceptance remains separate. Rollback restores split `predict` from that
+baseline without changing controller policy or preprocessing.
 
-Current #177 handoff: ORT 1/2, single default-executor offload, unchanged input
-snapshots, preparation, feature precision, spinning and numerical-library
-settings. This remains independent of embedded-package acceptance.
-Rollback: restore the split `SmartTurnOnnxInference.predict` implementation
-from the adoption baseline; do not change controller policy or preprocessing.
+The earlier instrumented production run (`adopt_f12_parity.json` /
+`adopt_f12_controller.json`, probe script
+`b51c2a6a3d3a483a3ca36d992be00151381551724a90b9a13aad5a4c58a88ed9`,
+checkout `c33692591a76cb6790f4cd2abad2c2a0501ac63d` uncommitted) is superseded
+as timing evidence because production then carried probe-only hashing/timing.
+Its score/hash observations are retained for audit; its timings are not clean
+production timings and are not claimed as such.
 
 ```text
-PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/adopt_f12_parity.json matrix --calls 13 --warmup 2
-PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/adopt_f12_controller.json controller --arms P12,S12,F12
+PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/repair_f12_parity.json matrix --calls 13 --warmup 2
+PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/repair_f12_controller.json controller --arms P12,S12,F12
+PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/repair_f12_coload.json paced --arms P12 --rounds 1 --gap 1.0 --coload silero
 ```
 
 Matrix (13 measured calls/arm, 2 warmup, rotated order, Python 3.14.7 /
 NumPy 2.5.1 / ORT 1.28.0, model SHA
-`2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f`):
-all arms started 13/13 with outcome complete. Score max abs diff 0.0 and exact
-prepared/feature/model-input hashes for P12 vs S12/S11/F12/F11.
-Submit-to-receipt median/p95/worst ms: P12 44.545/52.748/52.748,
-S12 44.011/47.713/47.713, F12 43.879/48.227/48.227. Descriptive only.
+`2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f`,
+probe script `3b9338028ecae9d9e16f1e47287575852897c838af1ff4d8ed812bf1e9b8f9cb`):
+The repair artifacts recorded checkout HEAD `1c4aca5e` while the repaired
+source was uncommitted; that HEAD identifies their checkout, not the clean
+implementation commit. Committed-candidate checks are recorded separately.
+P12 is the actual clean production path observed through a probe-only wrapper
+that records hashes/timing outside production. All arms started 13/13 with
+outcome complete. Score max abs diff 0.0 and exact prepared/feature/model-input
+hashes observed (not missing) for P12 vs S12/S11/F12/F11.
 
-Controller (8 real-clock probes/arm, P12 actual production owner):
-decision parity true; early 1, incomplete 7, seal delivery_pause 8, late 0 on
-every arm. Receipt median/p95/worst ms: P12 45.122/49.317/49.317
-(slack 223.236 ms), S12 45.184/52.316/52.316 (slack 227.907 ms),
-F12 44.961/47.401/47.401 (slack 225.983 ms). Scores identical per fixture
-(range 0.0102628-0.9829914, observed output only).
-All 13 guards+speech production owner scores complete; direct predict checks
+Controller (8 real-clock probes/arm, P12 actual production owner via the
+probe-only wrapper): decision parity true; early 1, incomplete 7, seal
+delivery_pause 8, late 0 on every arm. Receipt median/p95/worst ms:
+P12 48.706/55.489/55.489 (slack 224.852 ms),
+S12 45.543/47.194/47.194 (slack 227.779 ms),
+F12 44.459/46.428/46.428 (slack 230.346 ms). Scores identical per fixture
+(range 0.0102628-0.9829914, observed output only). Descriptive only.
+All 13 guards+speech clean production owner scores complete and exactly match
+the matrix P12 prepared/feature hashes and scores; direct predict checks
 confirm sample-rate/shape validation, no-outputs and closed-session errors.
+
+Clean P12 co-load operational check (1 round, 8 fixtures, Silero co-load):
+8/8 complete, 1,522 VAD frames, 1 missed 32 ms slot, endpoints 8 SpeechStart /
+0 SpeechEnd, receipt median 72.561 / p95 115.502 ms. Operational only; compared
+against the retained initial/paired evidence, not as a timing claim for the
+prior instrumented run.
 
 ## Selected disposition and migration handoff (historical retain-S12)
 
@@ -309,8 +332,12 @@ isolation now observes the submitted reference, not a stub-created copy.
 
 ```text
 .venv/Scripts/python.exe -m pytest tests/core/test_smart_turn_runtime.py tests/core/test_smart_turn_delivery.py tests/core/runtime/test_peer_capture_session.py -o addopts= -q
-.venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/audio/smart_turn.py scripts/bench_smart_turn_179.py tests/core/test_smart_turn_runtime.py tests/core/test_smart_turn_delivery.py
+.venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/audio/smart_turn.py scripts/bench_smart_turn_179.py tests/core/test_smart_turn_runtime.py
 ```
+
+Repair re-verification ran the same 144 focused/integration checks after
+removing all production tracing; production carries no `last_trace`, hashlib,
+or perf timing. The selected profile text now states no production tracing.
 
 The unchanged golden feature hash passed on NumPy 2.5.1. Regression coverage
 includes snapshot isolation, natural reset and synthetic-rollover continuity,
@@ -328,10 +355,12 @@ differences; neither the historical disposition nor this adoption establishes
 a stable CPU or latency gain.
 No architecture ownership or dependency boundary changed.
 
-## Adopted production path: current co-load validation
+## Historical instrumented adoption: co-load observations
 
-These operational checks use actual production P12 at
-`bda5b565361125ef9e8ee9556cba2cbfe8e96de7`, not the probe-local F12 prototype.
+These earlier operational checks used the intermediate production P12 at
+`bda5b565361125ef9e8ee9556cba2cbfe8e96de7`, which still included diagnostic
+hashing. They are retained as historical scheduling observations, not timing
+evidence for the final instrumentation-free production implementation.
 Each arm processes eight requests and 1,522 concurrently paced Silero frames.
 The machine's background load was not sampled; power-scheme drift was false.
 

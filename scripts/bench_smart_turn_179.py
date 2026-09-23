@@ -4,24 +4,30 @@ Production after ADOPT-F12-2026-09-23 is P12: SmartTurnOnnxInference (ORT 1/2,
 fused single offload). Historical split arms remain only as experimental
 comparators and are not production:
 
-- P12: actual production SmartTurnOnnxInference (ORT 1/2, fused single offload).
+- P12: actual production SmartTurnOnnxInference (ORT 1/2, fused single offload),
+  observed through a probe-only wrapper that records hashes/timing outside
+  production. Production itself carries no tracing.
 - S12: historical split offloads with ORT 1/2 (experimental comparator).
 - S11: same split dispatch, ORT 1/1 (experimental comparator).
 - F12/F11: probe-local fused clones of the production shape with ORT 1/2 and
   1/1 (experimental comparators).
 
-All arms reuse the exact production numerical functions and snapshot contract:
+All arms use the same numerical functions and snapshot contract:
 `prepare_smart_turn_audio`, `compute_whisper_log_mel_features`, `session.run`.
+Stages mode covers historical arms only, not P12.
 
 
 Subcommands:
   fetch       download lawful public speech clips + write sha256 manifest
   smoke       tiny end-to-end validation (NOT a benchmark)
+  stages      synchronous stage micro-profile per historical arm (prepare/features/ONNX)
   matrix      rotated owner comparison, 30-50 measured calls/arm
   controller  LISTEN owner/controller exercise, real receipt/deadline
   paced       paced replay with idle gaps + Silero VAD co-load, loop-lag/CPU
   cpu         warmed isolated process-CPU accounting
   recheck     warmed isolated production-vs-comparator recheck
+  hann        bounded Hann allocation micro-probe
+  support     ORT spinning-config support check (no benchmark)
 
 Machine-readable JSON goes to --out (default under ignored .data/).
 """
@@ -441,13 +447,37 @@ class ProbeFusedInference:
 
 
 ARMS = ("P12", "S12", "S11", "F12", "F11")
+STAGE_ARMS = ("S12", "S11", "F12", "F11")
+
+
+class ProbeProductionInference:
+    def __init__(self, model_path: Path) -> None:
+        from puripuly_heart.core.audio.smart_turn import SmartTurnOnnxInference
+
+        self._production = SmartTurnOnnxInference(model_path)
+        self.last_trace: dict[str, object] = {}
+
+    async def predict(self, audio: np.ndarray, *, sample_rate_hz: int) -> float:
+        trace: dict[str, object] = {"predict_enter_perf": time.perf_counter()}
+        self.last_trace = trace
+        result = await self._production.predict(audio, sample_rate_hz=sample_rate_hz)
+        trace["predict_return_perf"] = time.perf_counter()
+        prepared = prepare_smart_turn_audio(audio, sample_rate_hz=sample_rate_hz)
+        trace["prepared_sha256"] = hashlib.sha256(prepared.tobytes()).hexdigest()
+        features = compute_whisper_log_mel_features(prepared)
+        trace["features_sha256"] = hashlib.sha256(features.tobytes()).hexdigest()
+        trace["model_input_sha256"] = hashlib.sha256(
+            np.expand_dims(features, axis=0).tobytes()
+        ).hexdigest()
+        return result
+
+    def close(self) -> None:
+        self._production.close()
 
 
 def make_owner(arm: str, model_path: Path) -> SmartTurnInferenceOwner:
-    from puripuly_heart.core.audio.smart_turn import SmartTurnOnnxInference
-
     factories = {
-        "P12": SmartTurnOnnxInference,
+        "P12": ProbeProductionInference,
         "S12": lambda path: ProbeSplitInference(path, inter=1, intra=2),
         "S11": lambda path: ProbeSplitInference(path, inter=1, intra=1),
         "F12": lambda path: ProbeFusedInference(path, inter=1, intra=2),
@@ -734,16 +764,22 @@ async def run_matrix(args) -> dict:
                 if matching
                 else None
             ),
-            "prepared_equal": all(
-                left.get("prepared_sha256") == right.get("prepared_sha256")
+            "prepared_equal": bool(matching)
+            and all(
+                left.get("prepared_sha256") is not None
+                and left.get("prepared_sha256") == right.get("prepared_sha256")
                 for left, right in matching
             ),
-            "features_equal": all(
-                left.get("features_sha256") == right.get("features_sha256")
+            "features_equal": bool(matching)
+            and all(
+                left.get("features_sha256") is not None
+                and left.get("features_sha256") == right.get("features_sha256")
                 for left, right in matching
             ),
-            "model_input_equal": all(
-                left.get("model_input_sha256") == right.get("model_input_sha256")
+            "model_input_equal": bool(matching)
+            and all(
+                left.get("model_input_sha256") is not None
+                and left.get("model_input_sha256") == right.get("model_input_sha256")
                 for left, right in matching
             ),
         }
@@ -761,9 +797,8 @@ def cmd_stages(args) -> int:
     fixtures = load_fixtures(Path(args.audio_dir))
     model_path = bundled_smart_turn_onnx_path()
     report = {"schema": SCHEMA, "mode": "stages", "runtime": runtime_record(), "arms": {}}
-    for arm in ARMS:
+    for arm in STAGE_ARMS:
         sessions = {
-            "P12": (1, 2),
             "S12": (1, 2),
             "S11": (1, 1),
             "F12": (1, 2),

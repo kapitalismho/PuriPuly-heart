@@ -1,7 +1,7 @@
 {
   "schema": "smartturn-cpu-179-evidence-v3",
   "status": "adopted_f12_structural_simplification",
-  "baseline_sha": "c33692591a76cb6790f4cd2abad2c2a0501ac63d",
+  "baseline_sha": "1c4aca5ed020eb7cfce2b9868e54c864a940e9c3",
   "probe": "scripts/bench_smart_turn_179.py",
   "production_changes": true,
   "production_coload_validation": {
@@ -14,11 +14,44 @@
     "initial_artifact": ".data/smartturn-179/adopt_f12_coload.json",
     "paired_artifact": ".data/smartturn-179/adopt_f12_coload_paired.json",
     "runs": [
-      {"run": "initial", "arm": "P12", "complete": 8, "receipt_ms": {"median": 63.47965, "p95": 129.956, "worst": 129.956}, "frames_at_least_32ms_late": 3},
-      {"run": "paired", "arm": "S12", "complete": 8, "receipt_ms": {"median": 71.1896, "p95": 89.642, "worst": 89.642}, "frames_at_least_32ms_late": 8},
-      {"run": "paired", "arm": "P12", "complete": 8, "receipt_ms": {"median": 70.7364, "p95": 99.097, "worst": 99.097}, "frames_at_least_32ms_late": 0}
+      {
+        "run": "initial",
+        "arm": "P12",
+        "complete": 8,
+        "receipt_ms": {
+          "median": 63.47965,
+          "p95": 129.956,
+          "worst": 129.956
+        },
+        "frames_at_least_32ms_late": 3
+      },
+      {
+        "run": "paired",
+        "arm": "S12",
+        "complete": 8,
+        "receipt_ms": {
+          "median": 71.1896,
+          "p95": 89.642,
+          "worst": 89.642
+        },
+        "frames_at_least_32ms_late": 8
+      },
+      {
+        "run": "paired",
+        "arm": "P12",
+        "complete": 8,
+        "receipt_ms": {
+          "median": 70.7364,
+          "p95": 99.097,
+          "worst": 99.097
+        },
+        "frames_at_least_32ms_late": 0
+      }
     ],
-    "endpoint_counts_each": {"SpeechStart": 8, "SpeechEnd": 0},
+    "endpoint_counts_each": {
+      "SpeechStart": 8,
+      "SpeechEnd": 0
+    },
     "interpretation": "All frames processed; lateness is replay scheduling, not hardware audio loss. Paired sequential S12/P12 run did not reproduce a candidate-specific regression. No speedup, scheduling superiority, or absence-of-interference claim; initial P12 lateness retained."
   },
   "policy": {
@@ -805,15 +838,15 @@
   },
   "disposition": {
     "selected": "adopt F12 (ORT 1/2 fused single offload) as structural simplification",
-    "reason": "User-selected production F12 after completed #179 investigation. Historical measurements retained unchanged for audit; adoption is not a measured speedup/CPU-gain claim.",
+    "reason": "User-selected production F12 after completed #179 investigation. Clean production path carries no tracing. Historical measurements retained unchanged for audit; adoption is not a measured speedup/CPU-gain claim.",
     "dedicated_executor": "no-change: default executor retained; no new executor lifecycle",
     "spinning": "no-change: existing ORT config retained",
     "hann": "reject retained: no production allocation change",
-    "r6_state": "superseded by ADOPT-F12-2026-09-23; historical retain-S12 disposition preserved below for audit"
+    "r6_state": "superseded by ADOPT-F12-2026-09-23; historical retain-S12 disposition preserved for audit"
   },
   "handoff": {
     "issue_177": "Retain ORT_SEQUENTIAL/ORT_ENABLE_ALL/CPUExecutionProvider, inter-op 1/intra-op 2, fused single offload and unchanged preprocessing; no BLAS/env/model/endpoint/settings change.",
-    "rollback": "restore pre-adoption split predict (two to_thread offloads) in SmartTurnOnnxInference; probe S12 arm remains the comparator",
+    "rollback": "restore pre-adoption split predict from the adoption baseline; do not change controller policy or preprocessing",
     "packaged_embedded_python": "not exercised; measurements use source-checkout CPython venv"
   },
   "reproducibility": {
@@ -827,19 +860,20 @@
   "verification": {
     "focused_tests": "90 SmartTurn runtime/delivery + 54 peer-capture = 144 passed",
     "probe_lint": "ruff check src/puripuly_heart/core/audio/smart_turn.py scripts/bench_smart_turn_179.py passed",
-    "production_validation": "direct predict sample-rate/shape, no-outputs, closed-session errors confirmed; 13/13 guards+speech owner scores complete with exact hashes",
-    "controller": "P12 actual production owner exercised; decision parity true; outcomes/receipt/frontier valid pacing"
+    "production_validation": "clean production: direct predict sample-rate/shape, no-outputs, closed-session errors; 13/13 guards+speech owner scores complete with exact hash parity to matrix P12; no production last_trace/hashlib/perf instrumentation",
+    "controller": "P12 actual production owner via probe-only wrapper; decision parity true; outcomes/receipt/frontier valid pacing",
+    "coload": "clean P12 paced operational check 8/8 complete vs retained initial/paired evidence; no timing claim for prior instrumented run"
   },
   "historical_baseline_sha": "13274569769d3c1ec7a896a2d15b919b76136a6e",
-  "production_profile": "P12/F12 fused single default-executor offload, ORT_SEQUENTIAL/ORT_ENABLE_ALL/CPU inter1/intra2, same numerical functions",
+  "production_profile": "P12/F12 fused single default-executor offload, ORT_SEQUENTIAL/ORT_ENABLE_ALL/CPU inter1/intra2, same numerical functions, no production tracing/hashing/perf timing, no extra copies/buffers/executors/BLAS/spinning changes",
   "adoption_claim": "structural simplification only; no measured speedup or CPU-gain claim",
   "historical_disposition": {
     "selected": "retain S12 (ORT 1/2 split); no production optimization adopted",
     "reason": "F12 has no consistent benefit in the corrected recheck. 1/1 adds about 37 ms/request; S12 CPU varied 0.086426 to 0.053223 s/request across batches."
   },
   "adopt_f12_evidence": {
-    "matrix_artifact": ".data/smartturn-179/adopt_f12_parity.json",
-    "matrix_command": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/adopt_f12_parity.json matrix --calls 13 --warmup 2",
+    "matrix_artifact": ".data/smartturn-179/repair_f12_parity.json",
+    "matrix_command": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/repair_f12_parity.json matrix --calls 13 --warmup 2",
     "matrix_calls_per_arm": 13,
     "matrix_warmup": 2,
     "matrix_admissions": {
@@ -902,82 +936,82 @@
     "matrix_receipt_ms": {
       "P12": {
         "n": 13,
-        "median": 44.54490001080558,
-        "p95": 52.74759999883827,
-        "worst": 52.74759999883827,
-        "best": 42.77290000754874,
+        "median": 47.39520000293851,
+        "p95": 55.2633000042988,
+        "worst": 55.2633000042988,
+        "best": 46.54139999183826,
         "values": [
-          47.6327,
-          52.7476,
-          44.7081,
-          42.7729,
-          43.0789,
-          43.5443,
-          46.8188,
-          43.4214,
-          43.6348,
-          45.067,
-          43.3131,
-          44.5449,
-          51.7617
+          47.5225,
+          46.5979,
+          55.2633,
+          46.8897,
+          47.8752,
+          46.5414,
+          46.951,
+          47.874,
+          47.3952,
+          49.013,
+          51.7415,
+          46.5521,
+          47.0216
         ]
       },
       "S12": {
         "n": 13,
-        "median": 44.01080000388902,
-        "p95": 47.71259998960886,
-        "worst": 47.71259998960886,
-        "best": 43.32260000228416,
+        "median": 44.54410000471398,
+        "p95": 49.58729998907074,
+        "worst": 49.58729998907074,
+        "best": 42.70160000305623,
         "values": [
-          44.2279,
-          46.5125,
-          43.7611,
-          43.6167,
-          44.0449,
-          44.0108,
-          44.6858,
-          43.3226,
-          43.8095,
-          46.1781,
-          43.3796,
-          47.7126,
-          43.995
+          44.3051,
+          44.5956,
+          43.4115,
+          42.7016,
+          43.7125,
+          44.5441,
+          48.3689,
+          43.1916,
+          44.4429,
+          49.5873,
+          48.4639,
+          44.605,
+          45.813
         ]
       },
       "F12": {
         "n": 13,
-        "median": 43.87920000590384,
-        "p95": 48.22660000354517,
-        "worst": 48.22660000354517,
-        "best": 42.726300001959316,
+        "median": 44.00819999864325,
+        "p95": 49.03270000068005,
+        "worst": 49.03270000068005,
+        "best": 42.714800001704134,
         "values": [
-          44.5674,
-          45.1356,
-          43.7768,
-          42.7263,
-          44.3842,
-          43.8792,
-          43.6202,
-          43.3458,
-          43.2384,
-          45.2898,
-          43.3735,
-          48.2266,
-          44.4639
+          43.8683,
+          44.0082,
+          43.8895,
+          43.0971,
+          45.0234,
+          43.83,
+          43.4919,
+          44.5066,
+          42.7148,
+          49.0327,
+          47.5501,
+          44.0512,
+          44.8626
         ]
       }
     },
-    "controller_artifact": ".data/smartturn-179/adopt_f12_controller.json",
-    "controller_command": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/adopt_f12_controller.json controller --arms P12,S12,F12",
+    "controller_artifact": ".data/smartturn-179/repair_f12_controller.json",
+    "controller_command": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/repair_f12_controller.json controller --arms P12,S12,F12",
     "controller_decision_parity": true,
     "controller_arms": {
       "P12": {
         "receipt_ms": {
           "n": 8,
-          "median": 45.122100003936794,
-          "p95": 49.3166999949608,
-          "worst": 49.3166999949608,
-          "best": 43.55499999655876
+          "median": 48.705799992603716,
+          "p95": 55.48929999349639,
+          "worst": 55.48929999349639,
+          "best": 47.06159999477677
         },
         "decision_at_pause_512": {
           "early": 1,
@@ -990,7 +1024,7 @@
           "null": 0
         },
         "late": 0,
-        "slack": 223.236,
+        "slack": 224.852,
         "scores": [
           0.9829913973808289,
           0.01199302077293396,
@@ -1005,10 +1039,10 @@
       "S12": {
         "receipt_ms": {
           "n": 8,
-          "median": 45.18415000347886,
-          "p95": 52.31579999963287,
-          "worst": 52.31579999963287,
-          "best": 44.25130000163335
+          "median": 45.543299995188136,
+          "p95": 47.19350000959821,
+          "worst": 47.19350000959821,
+          "best": 44.11729999992531
         },
         "decision_at_pause_512": {
           "early": 1,
@@ -1021,7 +1055,7 @@
           "null": 0
         },
         "late": 0,
-        "slack": 227.907,
+        "slack": 227.779,
         "scores": [
           0.9829913973808289,
           0.01199302077293396,
@@ -1036,10 +1070,10 @@
       "F12": {
         "receipt_ms": {
           "n": 8,
-          "median": 44.961150000744965,
-          "p95": 47.40119999041781,
-          "worst": 47.40119999041781,
-          "best": 43.87280000082683
+          "median": 44.45889999624342,
+          "p95": 46.42829998920206,
+          "worst": 46.42829998920206,
+          "best": 43.493899996974505
         },
         "decision_at_pause_512": {
           "early": 1,
@@ -1052,7 +1086,7 @@
           "null": 0
         },
         "late": 0,
-        "slack": 225.983,
+        "slack": 230.346,
         "scores": [
           0.9829913973808289,
           0.01199302077293396,
@@ -1065,8 +1099,46 @@
         ]
       }
     },
-    "probe_sha256": "b51c2a6a3d3a483a3ca36d992be00151381551724a90b9a13aad5a4c58a88ed9",
-    "checkout_head": "c33692591a76cb6790f4cd2abad2c2a0501ac63d",
+    "clean_scores_artifact": ".data/smartturn-179/repair_f12_clean_scores.json",
+    "p12_coload": {
+      "artifact": ".data/smartturn-179/repair_f12_coload.json",
+      "command": "PYTHONPATH=src .venv/Scripts/python.exe scripts/bench_smart_turn_179.py --audio-dir .data/smartturn-179/audio --out .data/smartturn-179/repair_f12_coload.json paced --arms P12 --rounds 1 --gap 1.0 --coload silero",
+      "receipt_ms": {
+        "n": 8,
+        "median": 72.56140000390587,
+        "p95": 115.502300002845,
+        "worst": 115.502300002845,
+        "best": 58.56770000536926,
+        "values": [
+          69.773,
+          115.5023,
+          83.4792,
+          62.8049,
+          58.5677,
+          75.3498,
+          65.3069,
+          81.5084
+        ]
+      },
+      "missed_slots": 1,
+      "vad_calls": 1522,
+      "endpoints": {
+        "SpeechStart": 8,
+        "SpeechEnd": 0
+      },
+      "outcomes": [
+        "complete",
+        "complete",
+        "complete",
+        "complete",
+        "complete",
+        "complete",
+        "complete",
+        "complete"
+      ]
+    },
+    "probe_sha256": "3b9338028ecae9d9e16f1e47287575852897c838af1ff4d8ed812bf1e9b8f9cb",
+    "checkout_head": "1c4aca5ed020eb7cfce2b9868e54c864a940e9c3",
     "runtime": {
       "python": "3.14.7",
       "numpy": "2.5.1",
@@ -1074,5 +1146,15 @@
       "model_sha256": "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f",
       "model_bytes": 8679182
     }
+  },
+  "adoption_baseline_sha": "c33692591a76cb6790f4cd2abad2c2a0501ac63d",
+  "superseded_instrumented_production": {
+    "artifacts": [
+      ".data/smartturn-179/adopt_f12_parity.json",
+      ".data/smartturn-179/adopt_f12_controller.json"
+    ],
+    "reason": "production then carried probe-only hashing/timing; score/hash observations retained for audit, timings not clean production timings",
+    "probe_sha256": "b51c2a6a3d3a483a3ca36d992be00151381551724a90b9a13aad5a4c58a88ed9",
+    "checkout_head": "c33692591a76cb6790f4cd2abad2c2a0501ac63d (uncommitted source)"
   }
 }
