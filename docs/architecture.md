@@ -293,13 +293,11 @@ Execution options:
 `ScopedRecognitionEngine` owns recognition for both channels (`core/stt/scoped_engine.py`).
 
 - Channels retain separate provider epochs, bounded buffers, cancellation, and retention policies.
-- A provider epoch has at most one open audio-input turn. Sessions that explicitly permit sealed-turn overlap may retain bounded, identity-scoped sealed turns while the next turn captures; terminal normalization and publication remain in source order.
-- Local CPU decode stays serialized by `LocalDecodeCoordinator`; if an admitted turn's decode fails, its already-queued successor remains serialized and is decoded without retrying the failed turn. Timed-out or aborted scoped jobs retain bounded classification only until their in-flight worker callback settles, so a late result cannot duplicate the terminal or make queued scoped work look like fatal legacy work. The shared GPU runtime retains its bounded work admission and explicitly terminalizes queued work when fatal worker recovery fails. Remote sessions do not overlap turns unless their protocol adapter can unambiguously bind acknowledgements and results.
 - Physical CPU/GPU resources remain shared through their runtime owners.
-- `STTSessionEventProjection` keeps payload/update sequences and terminal authority per admitted identity (`core/stt/session_projection.py`). Explicit epoch retirement rejects late callbacks; a terminal that retires an overlap-capable epoch retains terminal-only authority for successors admitted before that failure.
+- `STTSessionEventProjection` defines per-turn scoped updates and terminal receipts (`core/stt/session_projection.py`).
 - `STTScopedTurnNormalizer` assembles text, language runs, and session-scoped speaker runs per identity. Provider updates are not final application transcripts.
 
-Provider replacement preserves frozen settings for every admitted turn and waits for the epoch boundary. Abort invalidates turn and epoch authority before native cleanup; graceful close drains or boundedly terminalizes admitted work.
+Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
 GPU worker split:
 
@@ -355,7 +353,6 @@ Delivery boundaries:
 - Output handoff releases translation ordering without waiting for display. Sink failure does not replay recognition or translation.
 - Peer publications retain activation generation and source order through output. Retiring an activation cancels its deliveries and rejects late work.
 - Destination admission and presenter application receipts are explicit; neither is a remote display acknowledgement.
-- Unmanaged Self original-overlay publications and their source-only close events use an admission lane separate from managed Self translation-parent lifetime. Original B can apply and release its projection while A translation is pending; A translation and close still carry A's managed identity and cannot retire, reorder, or clear B.
 
 Caption and overlay settings control destinations, not peer capture. Conversation errors share publication identity; runtime session status uses a separate path.
 
