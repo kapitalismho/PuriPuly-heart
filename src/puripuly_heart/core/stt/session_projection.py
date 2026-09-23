@@ -22,8 +22,14 @@ LegacySTTEvent = STTBackendTranscriptEvent | BaseException | None
 
 
 class STTSessionEventProjection:
-    def __init__(self, projection: STTSessionProjection) -> None:
+    def __init__(
+        self,
+        projection: STTSessionProjection,
+        *,
+        allows_sealed_turn_overlap: bool = False,
+    ) -> None:
         self._projection = projection
+        self._allows_sealed_turn_overlap = allows_sealed_turn_overlap
         self._legacy_events: asyncio.Queue[LegacySTTEvent] | None = None
         self._scoped_events: STTProviderEventBuffer | None = None
         if projection.mode == "legacy":
@@ -31,9 +37,9 @@ class STTSessionEventProjection:
         else:
             self._scoped_events = STTProviderEventBuffer()
         self._active_identity: STTProviderTurnIdentity | None = None
-        self._payload_sequence = 0
-        self._update_sequence = 0
-        self._sealed = False
+        self._payload_sequences: dict[STTProviderTurnIdentity, int] = {}
+        self._update_sequences: dict[STTProviderTurnIdentity, int] = {}
+        self._sealed_identities: set[STTProviderTurnIdentity] = set()
         self._retired = False
         self._epoch_ended = False
         self._closed = False
@@ -59,8 +65,17 @@ class STTSessionEventProjection:
         return self._active_identity
 
     @property
+    def identities(self) -> tuple[STTProviderTurnIdentity, ...]:
+        return tuple(self._payload_sequences)
+
+    @property
     def sealed(self) -> bool:
-        return self._sealed
+        identity = self._active_identity
+        return (
+            identity in self._sealed_identities
+            if identity is not None
+            else bool(self._sealed_identities)
+        )
 
     @property
     def retired(self) -> bool:
@@ -78,16 +93,20 @@ class STTSessionEventProjection:
             raise RuntimeError("STT provider epoch is retired")
         if request.identity.provider_epoch_id != self.provider_epoch_id:
             raise RuntimeError("STT turn belongs to a different provider epoch")
-        if self._active_identity is not None:
+        active = self._active_identity
+        if active is not None and (
+            not self._allows_sealed_turn_overlap or active not in self._sealed_identities
+        ):
             raise RuntimeError("STT session already has an unresolved turn")
+        if request.identity in self._payload_sequences:
+            raise RuntimeError("STT provider turn identity is already active")
         self._active_identity = request.identity
-        self._payload_sequence = 0
-        self._update_sequence = 0
-        self._sealed = False
+        self._payload_sequences[request.identity] = 0
+        self._update_sequences[request.identity] = 0
 
     def require_open(self, identity: STTProviderTurnIdentity) -> None:
         self._require_scoped_projection()
-        if self._active_identity != identity:
+        if identity not in self._payload_sequences:
             raise RuntimeError("unknown or retired STT provider turn")
 
     def validate_payload(
@@ -96,9 +115,9 @@ class STTSessionEventProjection:
         payload_sequence: int,
     ) -> None:
         self.require_open(identity)
-        if self._sealed:
+        if identity in self._sealed_identities:
             raise RuntimeError("STT provider turn is already sealed")
-        if payload_sequence != self._payload_sequence + 1:
+        if payload_sequence != self._payload_sequences[identity] + 1:
             raise ValueError("payload_sequence must be contiguous")
 
     def payload_written(
@@ -107,22 +126,23 @@ class STTSessionEventProjection:
         payload_sequence: int,
     ) -> None:
         self.validate_payload(identity, payload_sequence)
-        self._payload_sequence = payload_sequence
+        self._payload_sequences[identity] = payload_sequence
 
     def seal(self, identity: STTProviderTurnIdentity) -> None:
         self.require_open(identity)
-        if self._sealed:
+        if identity in self._sealed_identities:
             raise RuntimeError("STT provider turn is already sealed")
-        self._sealed = True
+        self._sealed_identities.add(identity)
 
     def next_update_sequence(self, identity: STTProviderTurnIdentity) -> int | None:
         if not self.is_current(identity):
             return None
-        self._update_sequence += 1
-        return self._update_sequence
+        sequence = self._update_sequences[identity] + 1
+        self._update_sequences[identity] = sequence
+        return sequence
 
     def is_current(self, identity: STTProviderTurnIdentity) -> bool:
-        return not self._retired and self._active_identity == identity
+        return identity in self._payload_sequences
 
     def put_legacy(self, event: LegacySTTEvent) -> bool:
         queue = self._legacy_events
@@ -163,11 +183,11 @@ class STTSessionEventProjection:
             accepted = False
         if event.epoch_disposition == "retire" or not accepted:
             self._retired = True
+        self._payload_sequences.pop(event.identity, None)
+        self._update_sequences.pop(event.identity, None)
+        self._sealed_identities.discard(event.identity)
         if self._active_identity == event.identity:
             self._active_identity = None
-            self._payload_sequence = 0
-            self._update_sequence = 0
-            self._sealed = False
         return accepted
 
     def retire(self) -> None:
@@ -238,11 +258,11 @@ class STTSessionEventProjection:
 
     def _retire_after_overflow(self, identity: STTProviderTurnIdentity) -> None:
         self._retired = True
+        self._payload_sequences.pop(identity, None)
+        self._update_sequences.pop(identity, None)
+        self._sealed_identities.discard(identity)
         if self._active_identity == identity:
             self._active_identity = None
-            self._payload_sequence = 0
-            self._update_sequence = 0
-            self._sealed = False
 
 
 __all__ = ["STTSessionEventProjection"]

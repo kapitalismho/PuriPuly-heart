@@ -43,6 +43,7 @@ from puripuly_heart.core.runtime.peer_channel import (
     _CaptureGeneration,
     _GenerationGuardedVadSink,
 )
+from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.self_capture import (
     _CaptureGeneration as _SelfCaptureGeneration,
 )
@@ -62,6 +63,23 @@ from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 
 EXPECTED_SHA = "13274569769d3c1ec7a896a2d15b919b76136a6e"
+APPROVED_IMPLEMENTATION_BASELINE = "9c630d3cb1528d63b3cb6e06ddf4c7c1fe012832"
+APPROVED_IMPLEMENTATION_PATHS = frozenset(
+    {
+        "docs/architecture.md",
+        "experiments/issue_180/probe.py",
+        "experiments/issue_180/report.md",
+        "experiments/issue_180/trace_after.jsonl",
+        "src/puripuly_heart/core/runtime/output_batch.py",
+        "src/puripuly_heart/core/stt/scoped_engine.py",
+        "src/puripuly_heart/core/stt/session_projection.py",
+        "src/puripuly_heart/providers/stt/local_gpu.py",
+        "src/puripuly_heart/providers/stt/local_qwen_sherpa.py",
+        "tests/core/runtime/test_output_runtime.py",
+        "tests/core/test_stt_scoped_engine.py",
+        "tests/core/test_stt_session_projection.py",
+    }
+)
 NAMESPACE = UUID("79ba997d-9247-4a88-b850-a24db11de180")
 
 
@@ -93,12 +111,13 @@ class RelativeRealClock:
 
 
 class DeterministicScopedSession:
-    def __init__(self, trace: Trace) -> None:
+    def __init__(self, trace: Trace, *, allows_sealed_turn_overlap: bool = False) -> None:
         self.trace = trace
         self.buffer = STTProviderEventBuffer()
         self.requests: list[STTProviderTurnRequest] = []
         self.sealed: dict[int, asyncio.Event] = {1: asyncio.Event(), 2: asyncio.Event()}
         self.identities: dict[int, STTProviderTurnIdentity] = {}
+        self.allows_sealed_turn_overlap = allows_sealed_turn_overlap
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         order = request.identity.segment.segment_order
@@ -286,10 +305,20 @@ def stt_turn(
     return start, end
 
 
-async def run_stt_case(delayed: bool) -> list[dict[str, Any]]:
+async def run_stt_case(
+    delayed: bool,
+    *,
+    allows_sealed_turn_overlap: bool = False,
+) -> list[dict[str, Any]]:
     clock = FakeClock(_now=0.0)
-    trace = Trace("stt_delayed_terminal" if delayed else "stt_immediate_terminal", clock)
-    session = DeterministicScopedSession(trace)
+    scenario = "stt_delayed_terminal" if delayed else "stt_immediate_terminal"
+    if allows_sealed_turn_overlap:
+        scenario = f"{scenario}_overlap"
+    trace = Trace(scenario, clock)
+    session = DeterministicScopedSession(
+        trace,
+        allows_sealed_turn_overlap=allows_sealed_turn_overlap,
+    )
 
     async def on_engine_event(event: STTProviderTurnEvent) -> None:
         if isinstance(event, STTProviderTurnTerminal):
@@ -302,7 +331,6 @@ async def run_stt_case(delayed: bool) -> list[dict[str, Any]]:
     engine = ScopedRecognitionEngine(
         session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
         channel="peer",
-        event_sink=on_engine_event,
         watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(
             readiness_timeout_s=1,
             write_timeout_s=1,
@@ -315,6 +343,12 @@ async def run_stt_case(delayed: bool) -> list[dict[str, Any]]:
         ),
         monotonic_clock=clock.now,
     )
+    provider_handle = ProviderRuntimeHandle(
+        name=f"issue_180_{trace.scenario}",
+        provider=engine,
+        event_handler=on_engine_event,
+    )
+    await provider_handle.start()
     guarded = _GenerationGuardedVadSink(
         sink=TracedEngineSink(engine, trace),
         runtime=cast(Any, ProbeCaptureRuntime()),
@@ -346,13 +380,13 @@ async def run_stt_case(delayed: bool) -> list[dict[str, Any]]:
     clock.advance(0.050)
     trace.add("source_available", turn=2, kind="SpeechStart", buffered_content_samples=8)
     await guarded.handle_owned_vad_event(b_start)
-    if not delayed:
-        await spin_until(lambda: 2 in session.identities, "B immediate begin")
+    if not delayed or allows_sealed_turn_overlap:
+        await spin_until(lambda: 2 in session.identities, "B begin")
         await spin_until(
             lambda: any(
                 row["event"] == "provider_write" and row.get("turn") == 2 for row in trace.rows
             ),
-            "B immediate first write",
+            "B first write",
         )
     clock.advance(0.150)
     trace.add("local_seal", turn=2)
@@ -365,7 +399,7 @@ async def run_stt_case(delayed: bool) -> list[dict[str, Any]]:
     session.terminal(2)
     await spin_until(lambda: engine.is_at_turn_boundary, "B release")
     await guarded.finish()
-    await engine.close()
+    await provider_handle.close()
     return trace.rows
 
 
@@ -1023,7 +1057,7 @@ async def run_self_end_to_end(
         )
 
     harness.output_runtime.routing_observer = observe
-    session = DeterministicScopedSession(cast(Any, trace))
+    session = DeterministicScopedSession(cast(Any, trace), allows_sealed_turn_overlap=True)
 
     async def on_engine_event(event: STTProviderTurnEvent) -> None:
         if isinstance(event, STTProviderTurnTerminal):
@@ -1046,7 +1080,6 @@ async def run_self_end_to_end(
     engine = ScopedRecognitionEngine(
         session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
         channel="self",
-        event_sink=on_engine_event,
         watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(
             readiness_timeout_s=1,
             write_timeout_s=1,
@@ -1059,6 +1092,12 @@ async def run_self_end_to_end(
         ),
         monotonic_clock=clock.now,
     )
+    provider_handle = ProviderRuntimeHandle(
+        name=f"issue_180_{scenario}",
+        provider=engine,
+        event_handler=on_engine_event,
+    )
+    await provider_handle.start()
     bridge = SelfEngineRuntimeBridge(engine, trace)
     harness.self_owner.local_asr_runtime = cast(Any, bridge)
     adapter = SelfCaptureVadSinkAdapter(runtime_provider=lambda: harness.self_owner)
@@ -1136,7 +1175,7 @@ async def run_self_end_to_end(
     await harness.translation_turns.wait_for_idle()
     assert not dispatch_owner.failures
     await harness.stop()
-    await engine.close()
+    await provider_handle.close()
     await presenter.close()
     return trace.rows
 
@@ -1180,6 +1219,28 @@ def assert_probe_contract(rows: list[dict[str, Any]]) -> None:
         for row in rows
         if row["scenario"] == "output_burst" and row["event"] == "application_receipt_ready"
     ]
+    overlap_begin = one_row(
+        rows,
+        "stt_delayed_terminal_overlap",
+        "provider_begin",
+        turn=2,
+    )
+    assert overlap_begin["t_ms"] == 150
+    overlap_a_terminal = one_row(
+        rows,
+        "stt_delayed_terminal_overlap",
+        "provider_terminal_receipt",
+        turn=1,
+    )
+    assert overlap_begin["t_ms"] < overlap_a_terminal["t_ms"]
+    overlap_writes = [
+        (row["samples"], row["context_only"])
+        for row in rows
+        if row["scenario"] == "stt_delayed_terminal_overlap"
+        and row["event"] == "provider_write"
+        and row.get("turn") == 2
+    ]
+    assert overlap_writes == [(2, True), (8, False)]
     assert burst_applied == [0, 0, 1000, 2000, 3000]
     protection_applied = one_row(
         rows,
@@ -1201,10 +1262,10 @@ def assert_probe_contract(rows: list[dict[str, Any]]) -> None:
     self_delayed = "self_successive_delayed_terminal"
     immediate_self_begin = one_row(rows, self_immediate, "provider_begin", turn=2)
     delayed_self_begin = one_row(rows, self_delayed, "provider_begin", turn=2)
-    assert delayed_self_begin["t_us"] - immediate_self_begin["t_us"] >= 70_000
+    assert abs(delayed_self_begin["t_us"] - immediate_self_begin["t_us"]) <= 30_000
     immediate_self_release = one_row(rows, self_immediate, "engine_turn_release", turn=2)
     delayed_self_release = one_row(rows, self_delayed, "engine_turn_release", turn=2)
-    assert delayed_self_release["t_us"] - immediate_self_release["t_us"] >= 30_000
+    assert delayed_self_release["t_us"] - immediate_self_release["t_us"] >= 20_000
 
     for scenario in (self_immediate, self_delayed):
         writes = [
@@ -1214,7 +1275,6 @@ def assert_probe_contract(rows: list[dict[str, Any]]) -> None:
             and row["event"] == "provider_write"
             and row.get("turn") == 2
         ]
-        a_source_id = one_row(rows, scenario, "self_source_available", turn=1)["source_id"]
         b_source_id = one_row(rows, scenario, "self_source_available", turn=2)["source_id"]
         b_original = one_row(
             rows,
@@ -1224,24 +1284,23 @@ def assert_probe_contract(rows: list[dict[str, Any]]) -> None:
             occupant=b_source_id,
         )
         b_publication_id = b_original["publication_id"]
-        b_batch_wait = one_row(
+        b_original_batch = one_row(
             rows,
             scenario,
             "destination_batch_insert",
             parent_id=b_publication_id,
-            active=False,
+            active=True,
         )
-        assert b_batch_wait["scope"] == "self"
-        assert b_batch_wait["active_parent_id"] == a_source_id
-        a_batch_release = one_row(
+        assert b_original_batch["scope"] == "self:original"
+        assert b_original_batch["active_parent_id"] == b_publication_id
+        one_row(
             rows,
             scenario,
             "destination_batch_release",
-            parent_id=a_source_id,
+            parent_id=b_publication_id,
             disposition="applied",
-            activated_successor_parent_id=b_publication_id,
+            activated_successor_parent_id=None,
         )
-        assert a_batch_release["was_active"] is True
         one_row(
             rows,
             scenario,
@@ -1249,6 +1308,10 @@ def assert_probe_contract(rows: list[dict[str, Any]]) -> None:
             turn=2,
         )
         assert writes == [(2, True), (8, False)]
+        assert (
+            b_original["t_us"] - one_row(rows, scenario, "engine_turn_release", turn=2)["t_us"]
+            <= 50_000
+        )
         a_translation_done = one_row(rows, scenario, "translation_completion", source_text="turn-1")
         b_translation_start = one_row(rows, scenario, "translation_start", source_text="turn-2")
         assert b_translation_start["t_us"] >= a_translation_done["t_us"]
@@ -1300,31 +1363,33 @@ def assert_probe_contract(rows: list[dict[str, Any]]) -> None:
         and row["event"] == "application_receipt_ready"
         and row["event_type"] == "self_transcript_final"
     ]
-    delayed_b_release = one_row(rows, self_immediate, "engine_turn_release", turn=2)
-    delayed_original_applies = [
+    normal_b_release = one_row(rows, self_immediate, "engine_turn_release", turn=2)
+    normal_original_applies = [
         row
         for row in rows
         if row["scenario"] == self_immediate
         and row["event"] == "application_receipt_ready"
         and row["event_type"] == "self_transcript_final"
     ]
-    assert len(fast_original_applies) == len(delayed_original_applies) == 2
+    assert len(fast_original_applies) == len(normal_original_applies) == 2
     assert fast_original_applies[1]["t_us"] - fast_b_release["t_us"] <= 50_000
-    assert delayed_original_applies[1]["t_us"] - delayed_b_release["t_us"] >= 50_000
+    assert normal_original_applies[1]["t_us"] - normal_b_release["t_us"] <= 50_000
 
 
 def verify_source_revision() -> tuple[str, tuple[str, ...]]:
     actual_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    ancestry = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", EXPECTED_SHA, actual_sha],
-        check=False,
-    )
-    if ancestry.returncode != 0:
-        raise RuntimeError(
-            f"probe HEAD {actual_sha} does not descend from production baseline {EXPECTED_SHA}"
+    for required_ancestor in (EXPECTED_SHA, APPROVED_IMPLEMENTATION_BASELINE):
+        ancestry = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", required_ancestor, actual_sha],
+            check=False,
         )
+        if ancestry.returncode != 0:
+            raise RuntimeError(
+                f"probe HEAD {actual_sha} does not descend from required baseline "
+                f"{required_ancestor}"
+            )
     tracked_changes = subprocess.check_output(
-        ["git", "diff", "--name-only", EXPECTED_SHA, "--"], text=True
+        ["git", "diff", "--name-only", APPROVED_IMPLEMENTATION_BASELINE, "--"], text=True
     ).splitlines()
     untracked_changes = subprocess.check_output(
         ["git", "ls-files", "--others", "--exclude-standard"], text=True
@@ -1338,10 +1403,10 @@ def verify_source_revision() -> tuple[str, tuple[str, ...]]:
             }
         )
     )
-    unexpected = [path for path in changed if not path.startswith("experiments/issue_180/")]
+    unexpected = [path for path in changed if path not in APPROVED_IMPLEMENTATION_PATHS]
     if unexpected:
         raise RuntimeError(
-            "production baseline differs outside the issue-180 experiment: " + ", ".join(unexpected)
+            "implementation probe differs outside its approved paths: " + ", ".join(unexpected)
         )
     return actual_sha, changed
 
@@ -1356,13 +1421,19 @@ def summarize(
     scenarios = sorted({row["scenario"] for row in rows})
     return {
         "ambient_head": ambient_head,
-        "verified_production_baseline": EXPECTED_SHA,
+        "historical_production_baseline": EXPECTED_SHA,
+        "approved_implementation_baseline": APPROVED_IMPLEMENTATION_BASELINE,
         "executed_probe_path": "experiments/issue_180/probe.py",
         "executed_probe_sha256": executed_probe_sha256,
         "artifact_content_note": (
-            "SHA256 binds the executed working-tree harness content; ambient_head does not "
-            "imply experiment artifacts are committed"
+            "SHA256 binds the executed harness and verified_changes records the explicit "
+            "approved implementation delta; historical trace.jsonl remains a separate record"
         ),
+        "verified_change_sha256": {
+            path: hashlib.sha256(Path(path).read_bytes()).hexdigest()
+            for path in verified_changes
+            if Path(path).is_file() and path != "experiments/issue_180/trace_after.jsonl"
+        },
         "verified_changes": verified_changes,
         "python": platform.python_version(),
         "platform": platform.platform(),
@@ -1406,6 +1477,7 @@ async def main(output_path: Path) -> None:
         ),
         *(await run_stt_case(False)),
         *(await run_stt_case(True)),
+        *(await run_stt_case(True, allows_sealed_turn_overlap=True)),
         *(await run_output_control()),
         *(await run_output_burst()),
         *(await run_output_protection()),

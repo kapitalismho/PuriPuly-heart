@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -108,4 +109,52 @@ async def test_scoped_projection_owns_sequences_terminal_and_epoch_end_once() ->
 
     with pytest.raises(RuntimeError, match="epoch is retired"):
         projection.begin(_request())
+    projection.close()
+
+
+@pytest.mark.asyncio
+async def test_overlap_projection_keeps_sealed_identity_until_its_own_terminal() -> None:
+    projection = STTSessionEventProjection(
+        STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1"),
+        allows_sealed_turn_overlap=True,
+    )
+    first = _request()
+    second = replace(
+        first,
+        identity=replace(
+            first.identity,
+            segment=replace(
+                first.identity.segment,
+                segment_order=2,
+                segment_id=uuid4(),
+            ),
+            provider_turn_id="turn-2",
+        ),
+    )
+
+    projection.begin(first)
+    projection.payload_written(first.identity, 1)
+    projection.seal(first.identity)
+    projection.begin(second)
+    projection.payload_written(second.identity, 1)
+    projection.seal(second.identity)
+
+    second_terminal = STTProviderTurnTerminal(
+        identity=second.identity,
+        outcome="final",
+        text="second",
+        text_authority="authoritative",
+    )
+    first_terminal = replace(
+        second_terminal,
+        identity=first.identity,
+        text="first",
+    )
+    assert projection.terminal(second_terminal)
+    assert projection.is_current(first.identity)
+    assert projection.terminal(first_terminal)
+
+    stream = projection.turn_events()
+    assert await stream.__anext__() == second_terminal
+    assert await stream.__anext__() == first_terminal
     projection.close()

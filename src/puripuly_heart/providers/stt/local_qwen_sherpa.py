@@ -338,7 +338,10 @@ class _LocalQwenSherpaSession(STTBackendSession):
 
     def __post_init__(self) -> None:
         self._buffer_f32 = []
-        self._event_projection = STTSessionEventProjection(self.projection)
+        self._event_projection = STTSessionEventProjection(
+            self.projection,
+            allows_sealed_turn_overlap=True,
+        )
         self._handoff_complete = asyncio.Event()
         self._close_complete = asyncio.Event()
         self._decode_coordinator = LocalDecodeCoordinator(
@@ -358,6 +361,10 @@ class _LocalQwenSherpaSession(STTBackendSession):
     @property
     def handoff_complete_event(self) -> asyncio.Event:
         return self._handoff_complete
+
+    @property
+    def allows_sealed_turn_overlap(self) -> bool:
+        return True
 
     async def send_audio(self, pcm16le: bytes) -> None:
         if self._closed or self._stopping or not self._decode_coordinator.accepting:
@@ -609,13 +616,13 @@ class _LocalQwenSherpaSession(STTBackendSession):
             return
         self._closed = True
         self._buffer_f32.clear()
-        identity = self._event_projection.active_identity
-        if identity is not None:
+        identities = self._event_projection.identities
+        for index, identity in enumerate(identities):
             self._terminalize_scoped(
                 identity,
                 outcome="failed",
                 failure_reason="session_closed",
-                retire=True,
+                retire=index == 0,
             )
         try:
             if self._decode_coordinator.pending_jobs:

@@ -1,5 +1,54 @@
 # Issue 180 — Self end-to-end and Peer software-latency diagnosis
 
+## Approved implementation outcome (2026-09-23)
+
+The maintainer subsequently approved implementation with “수행”. That approval creates a new implementation outcome and does not retroactively change issue #180's investigation-only authority or the historical observations below. The implementation baseline is `9c630d3cb1528d63b3cb6e06ddf4c7c1fe012832`; the earlier production comparator remains `13274569769d3c1ec7a896a2d15b919b76136a6e`.
+
+### Probe-fidelity correction
+
+The historical Self/Peer probe constructed `ScopedRecognitionEngine(event_sink=...)`. Production STT composition instead uses `ProviderRuntimeHandle.start()`, which calls `engine.bind_event_sink(...)` and sends engine output through the bounded `STTProviderEventBuffer` and its FIFO dispatch task. The direct fixture therefore incorrectly allowed output-callback time to propagate into capture-handler time. The historical trace remains preserved as the record that was executed, but its claim that production capture awaited the translation/output callback is withdrawn.
+
+The corrected harness now starts a real `ProviderRuntimeHandle` around the engine. It separates:
+
+- the provider-terminal boundary, which can still hold a non-overlap-capable session's sealed A turn;
+- engine terminal retirement and source-ordered enqueue into the bounded event buffer; and
+- later FIFO callback delivery, which cannot hold capture after enqueue.
+
+The implementation probe accepts only the explicit approved implementation paths, records the clean implementation baseline plus per-file content hashes, and writes [`trace_after.jsonl`](trace_after.jsonl). Command:
+
+```text
+uv run python experiments/issue_180/probe.py --output experiments/issue_180/trace_after.jsonl
+```
+
+The retained run used CPython 3.14.7 on Windows 11, exited 0, asserted 478 rows across twelve scenarios, and bound the harness as SHA-256 `a39802b5673e60333a6a7fc4e4ed5f2e3791897b85264b1c4b9c264c2dac2536`.
+
+### Implemented STT boundary
+
+`ScopedRecognitionEngine` now distinguishes one open audio-input turn from identity-scoped sealed turns awaiting terminal. A session must explicitly expose `allows_sealed_turn_overlap`; the engine otherwise preserves the terminal wait. `STTSessionEventProjection` owns payload/update sequences, sealing, terminal authority, and retirement per admitted identity. Engine terminals are drained in source order even when provider completions arrive out of order, and bound output delivery remains FIFO and generation-fenced.
+
+The local Qwen/Parakeet CPU family and local GPU adapter declare sealed-turn overlap after their seal methods transfer the whole audio segment into owned bounded work. CPU inference remains serialized by `LocalDecodeCoordinator`; the GPU path continues through the shared bounded runtime. The engine does not create parallel local CPU decode. Abort invalidates authority first and terminalizes all admitted identities; close, provider retirement, settings changes, retention accounting, and terminal deduplication cover the full admitted set.
+
+The corrected controlled Peer comparison retains the non-capable boundary as a control: with delayed A terminal, B begins at 350 logical ms. The overlap-capable case uses the same source schedule and true deferred provider binding: B begins and writes at 150 ms, before A's terminal at 350 ms, with the same 2 context + 8 content samples. Self delayed-A similarly begins B at 80.337 ms while A terminal is not received until 171.643 ms.
+
+Remaining provider waits are intentional and exact: every remote protocol adapter currently remains non-overlap-capable, because its acknowledgement/result correlation has not been proven safe for a second open turn. Those adapters still wait for A terminal or protocol retirement before B. Provider `begin_turn`, audio writes, and `seal_turn` themselves remain bounded awaited operations. Backend queue/resource admission and source retention limits remain in force.
+
+### Implemented Self original-output boundary
+
+Unmanaged `SelfTranscriptFinal` overlay events now use the `self:original` destination-admission lane rather than the managed `self` translation-parent lane. They still route through `OutputRuntime`; no presenter, authority, duplicate, expiry, generation, receipt, or destination policy is bypassed. Managed translation UI, chatbox, overlay, and close work retain their original parent identity and ordering.
+
+In the corrected immediate case, B terminal is delivered at 152.270 ms, B original is inserted active in `self:original` at 152.424 ms, and its application receipt arrives at 152.578 ms while A translation remains pending until 226.150 ms. In the delayed-terminal case, B terminal is delivered at 201.432 ms and B original applies at 201.881 ms while A translation remains pending until 352.663 ms. A's later translation updates A, and A close leaves B intact under the presenter's existing identity/tombstone rules. Managed B translation still follows managed A translation order; only B's original subtitle was separated from A's parent lifetime.
+
+Peer one-second replacement pacing, protected rows, source ordering, and multi-destination translation behavior are unchanged. The retained output controls still apply at logical 0, 0, 1000, 2000, and 3000 ms, and the real-clock pacing control remains within its asserted 0.9–1.5 second bound.
+
+### Focused regression evidence
+
+- `tests/core/test_stt_scoped_engine.py`: successor admission after seal, B-before-A completion, source-ordered terminals, deferred sink delivery, abort authority, retention, timeouts, settings rotation, and drain behavior.
+- `tests/core/test_stt_session_projection.py`: multiple sealed identities retain independent sequence and terminal authority.
+- `tests/providers/test_local_qwen_sherpa.py`, `tests/providers/test_local_cpu_backends.py`, and `tests/providers/test_local_gpu_backend.py`: local adapter compatibility and bounded lifecycle behavior.
+- `tests/providers/test_protocol_a_scoped_sessions.py` and `tests/integration/test_stt_connection_reuse.py`: remote adapters retain their conservative one-turn protocol boundary.
+- `tests/core/runtime/test_output_runtime.py` and existing presenter/projection suites: B original advances while A parent is pending; late/removed identity, ordering, duplicate, destination, and tombstone behavior stays owned by the existing output and presenter contracts.
+
+
 ## Scope clarification and disposition
 
 Issue #180's first boundary (STT handoff) was channel-agnostic; its second boundary (overlay pacing) was Peer-display-specific. The earlier experiment exercised the first boundary only through Peer capture and therefore omitted Self from boundary A. After the maintainer clarified that the observed symptom is **Self speech feeling slow until overlay subtitles appear** and requested “self까지 포함해서 다 조사해줘” (“investigate all, including Self”), this run adds Self coverage to the channel-agnostic handoff boundary and expands through full Self output. The prior Peer findings remain valid. Original safety constraints and non-goals remain unchanged: this is not a production fix, policy change, provider benchmark, private-speech capture, device/native-renderer investigation, or claim of a field regression.

@@ -293,11 +293,13 @@ Execution options:
 `ScopedRecognitionEngine` owns recognition for both channels (`core/stt/scoped_engine.py`).
 
 - Channels retain separate provider epochs, bounded buffers, cancellation, and retention policies.
+- A provider epoch has at most one open audio-input turn. Sessions that explicitly permit sealed-turn overlap may retain bounded, identity-scoped sealed turns while the next turn captures; terminal normalization and publication remain in source order.
+- Local CPU decode stays serialized by `LocalDecodeCoordinator`; the shared GPU runtime retains its bounded work admission. Remote sessions do not overlap turns unless their protocol adapter can unambiguously bind acknowledgements and results.
 - Physical CPU/GPU resources remain shared through their runtime owners.
-- `STTSessionEventProjection` defines scoped turn updates and terminal receipts (`core/stt/backend.py`).
-- `STTScopedTurnNormalizer` assembles text, language runs, and session-scoped speaker runs. Provider updates are not final application transcripts.
+- `STTSessionEventProjection` keeps payload/update sequences and terminal authority per admitted identity (`core/stt/session_projection.py`).
+- `STTScopedTurnNormalizer` assembles text, language runs, and session-scoped speaker runs per identity. Provider updates are not final application transcripts.
 
-Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
+Provider replacement preserves frozen settings for every admitted turn and waits for the epoch boundary. Abort invalidates turn and epoch authority before native cleanup; graceful close drains or boundedly terminalizes admitted work.
 
 GPU worker split:
 
@@ -353,6 +355,7 @@ Delivery boundaries:
 - Output handoff releases translation ordering without waiting for display. Sink failure does not replay recognition or translation.
 - Peer publications retain activation generation and source order through output. Retiring an activation cancels its deliveries and rejects late work.
 - Destination admission and presenter application receipts are explicit; neither is a remote display acknowledgement.
+- Unmanaged Self original-overlay publications use an admission lane separate from managed Self translation-parent lifetime. Original B can apply while A translation is pending; A translation and close still carry A's managed identity and cannot retire, reorder, or clear B.
 
 Caption and overlay settings control destinations, not peer capture. Conversation errors share publication identity; runtime session status uses a separate path.
 

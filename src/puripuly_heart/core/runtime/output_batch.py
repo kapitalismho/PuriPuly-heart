@@ -11,6 +11,7 @@ from puripuly_heart.core.overlay.sink import (
     OverlayEventUnion,
     SelfActiveClear,
     SelfActiveUpdate,
+    SelfTranscriptFinal,
 )
 from puripuly_heart.domain.models import ChannelId
 
@@ -420,6 +421,12 @@ class DestinationBatchAdmission:
             and isinstance(event, (SelfActiveUpdate, SelfActiveClear))
         ):
             return "preview:self"
+        if (
+            event.turn_kind is None
+            and event.parent_utterance_id is None
+            and isinstance(event, SelfTranscriptFinal)
+        ):
+            return "self:original"
         return event.turn_kind or str(event.channel)
 
     def _scope_is_pressured(

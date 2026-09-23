@@ -17,6 +17,7 @@ from puripuly_heart.core.overlay.sink import (
     OverlayApplicationReceipt,
     OverlayEventAdapter,
     OverlayEventUnion,
+    OverlayPublicationScope,
     UtteranceClosed,
 )
 from puripuly_heart.core.runtime.output_batch import OUTPUT_BATCH_MAX_UNSENT
@@ -1438,6 +1439,70 @@ async def test_output_runtime_preview_uses_latest_slot_without_evicting_speech_p
     assert results[-1].decision.decision == "published"
     assert [result.decision.reason for result in results[1:-1]] == ["preview_superseded"] * 9
     await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_self_original_does_not_wait_for_previous_translation_parent() -> None:
+    OutputRuntime = _output_runtime_class()
+    sink = RecordingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=sink,
+    )
+    adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
+    a_parent = uuid4()
+    b_parent = uuid4()
+    assert await owner.admit_translation_parent(
+        parent_id=str(a_parent),
+        channel="self",
+        origin="self",
+        turn_generation=0,
+        turn_order=0,
+        retained_payloads=("a",),
+        destination_targets={"overlay": frozenset({0})},
+    ) == frozenset({"overlay"})
+
+    b_original = adapter.transcript_final(
+        Transcript(
+            utterance_id=b_parent,
+            channel="self",
+            text="b",
+            is_final=True,
+            created_at=10.0,
+        ),
+        source_language="en",
+        target_language="ko",
+    )
+    original_result = await asyncio.wait_for(
+        owner.publish_overlay_event(b_original),
+        timeout=0.1,
+    )
+
+    a_scope = OverlayPublicationScope(
+        turn_kind="self",
+        parent_utterance_id=a_parent,
+        turn_generation=0,
+        turn_order=0,
+    )
+    a_translation = adapter.translation_final(
+        utterance_id=a_parent,
+        channel="self",
+        text="translated a",
+        source_text="a",
+        source_language="en",
+        target_language="ko",
+        applied_context_mode=None,
+        output_scope=a_scope,
+    )
+    translation_result = await owner.publish_overlay_event(a_translation)
+
+    assert original_result.decision.decision == "published"
+    assert translation_result.decision.decision == "published"
+    assert [event.event_id for event in sink.events] == [
+        b_original.event_id,
+        a_translation.event_id,
+    ]
 
 
 @pytest.mark.asyncio
