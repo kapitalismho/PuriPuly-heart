@@ -91,25 +91,6 @@ use crate::presentation::{
 
 #[cfg(windows)]
 const GPU_READINESS_TIMEOUT: Duration = Duration::from_millis(50);
-const SPEAKER_BOUNDARY_WIDTH_PX: f32 = 196.0;
-const SPEAKER_BOUNDARY_HEIGHT_PX: f32 = 14.0;
-
-#[cfg(windows)]
-fn speaker_boundary_rect(
-    text_scale: f32,
-    strip_horizontal_padding_px: f32,
-    first_line_ink_bounds: super::types::VisualBounds,
-) -> D2D_RECT_F {
-    let scale = text_scale.max(0.1);
-    let ink_width = (first_line_ink_bounds.right_px - first_line_ink_bounds.left_px).max(0.0);
-    let width = (SPEAKER_BOUNDARY_WIDTH_PX * scale).min(ink_width);
-    D2D_RECT_F {
-        left: strip_horizontal_padding_px + first_line_ink_bounds.left_px,
-        top: 0.0,
-        right: strip_horizontal_padding_px + first_line_ink_bounds.left_px + width,
-        bottom: SPEAKER_BOUNDARY_HEIGHT_PX * scale,
-    }
-}
 
 #[cfg(windows)]
 #[derive(Default)]
@@ -1212,29 +1193,6 @@ impl WindowsCaptionRenderer {
 
         let mut visual_bounds: Option<super::types::VisualBounds> = None;
         let build_result = (|| {
-            if block.speaker_boundary {
-                let first_line =
-                    block_lines(block).find(|(_role, line)| !line.text.trim().is_empty());
-                if let Some((role, line)) = first_line {
-                    let cached = self.prepared_line_visual(prepared, block, line, role)?;
-                    let text_scale = block.layout_cache_key.text_scale_key as f32 / 100.0;
-                    let marker = speaker_boundary_rect(
-                        text_scale,
-                        policy.strip_horizontal_padding_px() as f32,
-                        cached.visual_bounds,
-                    );
-                    unsafe {
-                        self.d2d_context
-                            .FillRectangle(&marker, &self.cache_peer_text_brush);
-                    }
-                    visual_bounds = Some(super::types::VisualBounds::new(
-                        marker.left,
-                        marker.top,
-                        marker.right,
-                        marker.bottom,
-                    ));
-                }
-            }
             for (role, line) in block_lines(block) {
                 if line.text.trim().is_empty() {
                     continue;
@@ -2448,65 +2406,6 @@ fn bounds_intersect_damage_band(bounds: BlockBounds, damage_band: DamageBand) ->
 
 #[cfg(test)]
 mod tests {
-    #[cfg(windows)]
-    #[test]
-    fn speaker_boundary_uses_layout_produced_scale_and_rendered_ink_metrics() {
-        let mut renderer = super::WindowsCaptionRenderer::new(None).unwrap();
-        let policy = CaptionLayoutPolicy::default();
-        let block = CaptionBlock::new(
-            "peer:scale",
-            "A sufficiently long reply keeps the selected speaker boundary at its full length",
-        )
-        .with_channel(CaptionChannel::PeerChannel)
-        .with_variant(CaptionBlockVariant::Finalized)
-        .with_speaker_boundary(true);
-
-        for scale in [0.5_f32, 1.0, 1.5] {
-            let presentation = CaptionPresentation {
-                text_scale: scale,
-                ..CaptionPresentation::default()
-            };
-            let layout = policy
-                .resolve_blocks_for_presentation_windows_cached(
-                    vec![block.clone()],
-                    super::DEFAULT_SURFACE_WIDTH_PX,
-                    super::DEFAULT_SURFACE_HEIGHT_PX,
-                    &presentation,
-                    &renderer.layout_engine,
-                    None,
-                )
-                .unwrap();
-            let resolved = &layout.visible_blocks[0];
-            assert_eq!(
-                resolved.layout_cache_key.text_scale_key,
-                (scale * 100.0).round() as u32
-            );
-            let mut diagnostics = super::RenderDiagnostics::default();
-            let prepared = renderer
-                .prepare_line_visuals(&policy, &layout, &mut diagnostics)
-                .unwrap();
-            let (role, line) = super::block_lines(resolved)
-                .find(|(_role, line)| !line.text.trim().is_empty())
-                .unwrap();
-            let cached = renderer
-                .prepared_line_visual(&prepared, resolved, line, role)
-                .unwrap();
-            let produced_scale = resolved.layout_cache_key.text_scale_key as f32 / 100.0;
-            let marker = super::speaker_boundary_rect(
-                produced_scale,
-                policy.strip_horizontal_padding_px() as f32,
-                cached.visual_bounds,
-            );
-
-            assert_eq!(produced_scale, scale);
-            assert_eq!(marker.bottom - marker.top, 14.0 * scale);
-            assert_eq!(
-                super::stable_line_origin_y(resolved, line) - marker.bottom,
-                18.0 * scale
-            );
-            assert_eq!(marker.right - marker.left, 196.0 * scale);
-        }
-    }
 
     #[cfg(windows)]
     fn texture_pixels(renderer: &super::WindowsCaptionRenderer) -> Vec<u8> {
@@ -2544,94 +2443,6 @@ mod tests {
             }
             renderer.d3d_context.Unmap(&staging, 0);
             pixels
-        }
-    }
-    #[cfg(windows)]
-    #[tokio::test]
-    async fn windows_graphics_renders_scaled_boundary_with_reserved_gap() {
-        let mut renderer = super::WindowsCaptionRenderer::new(None).unwrap();
-        let policy = CaptionLayoutPolicy::default();
-        let base = CaptionBlock::new("peer:short", "Short reply")
-            .with_channel(CaptionChannel::PeerChannel)
-            .with_variant(CaptionBlockVariant::Finalized);
-        let row_bytes = super::DEFAULT_SURFACE_WIDTH_PX as usize * 4;
-
-        for scale in [0.5_f32, 1.0, 1.5] {
-            let presentation = CaptionPresentation {
-                text_scale: scale,
-                ..CaptionPresentation::default()
-            };
-            let resolved = policy
-                .resolve_blocks_for_presentation_windows_cached(
-                    vec![base.clone().with_speaker_boundary(true)],
-                    super::DEFAULT_SURFACE_WIDTH_PX,
-                    super::DEFAULT_SURFACE_HEIGHT_PX,
-                    &presentation,
-                    &renderer.layout_engine,
-                    None,
-                )
-                .unwrap();
-            let resolved_block = &resolved.visible_blocks[0];
-            assert_eq!(
-                resolved_block.layout_cache_key.text_scale_key,
-                (scale * 100.0).round() as u32
-            );
-            let first_line = resolved_block.primary_lines.first().unwrap();
-            let marker_top = resolved_block.bounds.top_px.round() as usize;
-            let expected_height = (14.0 * scale) as usize;
-            assert_eq!(
-                super::stable_line_origin_y(resolved_block, first_line) - 14.0 * scale,
-                18.0 * scale
-            );
-
-            renderer
-                .render(
-                    &policy,
-                    &presentation,
-                    vec![base.clone()],
-                    super::DEFAULT_SURFACE_WIDTH_PX,
-                    super::DEFAULT_SURFACE_HEIGHT_PX,
-                    None,
-                )
-                .unwrap();
-            assert_eq!(
-                renderer
-                    .prepare_frame_for_submission(&ReadinessCancellation::default())
-                    .await,
-                ReadinessOutcome::Ready
-            );
-            let without_boundary = texture_pixels(&renderer);
-
-            renderer
-                .render(
-                    &policy,
-                    &presentation,
-                    vec![base.clone().with_speaker_boundary(true)],
-                    super::DEFAULT_SURFACE_WIDTH_PX,
-                    super::DEFAULT_SURFACE_HEIGHT_PX,
-                    None,
-                )
-                .unwrap();
-            assert_eq!(
-                renderer
-                    .prepare_frame_for_submission(&ReadinessCancellation::default())
-                    .await,
-                ReadinessOutcome::Ready
-            );
-            let with_boundary = texture_pixels(&renderer);
-            let changed_rows = without_boundary
-                .chunks_exact(row_bytes)
-                .zip(with_boundary.chunks_exact(row_bytes))
-                .enumerate()
-                .filter_map(|(row, (without, with))| (without != with).then_some(row))
-                .collect::<Vec<_>>();
-
-            assert_eq!(changed_rows.len(), expected_height);
-            assert_eq!(changed_rows.first().copied(), Some(marker_top));
-            assert_eq!(
-                changed_rows.last().copied(),
-                Some(marker_top + expected_height - 1)
-            );
         }
     }
 
@@ -2832,7 +2643,6 @@ mod tests {
             block_variant: CaptionBlockVariant::Finalized,
             secondary_enabled: false,
             secondary_reserved: false,
-            speaker_boundary: false,
             primary_font_size_key: 132,
             secondary_font_size_key: 82,
             content_width_key: 1024,
@@ -2850,7 +2660,6 @@ mod tests {
             primary_lines: Vec::new(),
             secondary_line: None,
             secondary_reserved: false,
-            speaker_boundary: false,
             bounds,
             visual_bounds: VisualBounds::new(
                 bounds.left_px,

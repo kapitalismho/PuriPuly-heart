@@ -1,13 +1,78 @@
-# Overlay speaker-transition implementation and visual comparison
+# Overlay speaker-transition validation
 
-Status: repaired implementation and working designs A2/C1/E1, based on candidate `4ac0f34b6683f793e94bcbb36bd6f037ac5a9ce3`. Browser comparison, deterministic production replay, live Soniox synthetic-audio plumbing, actual retained desktop controls and Windows native texture checks are recorded separately below. Human interpretation and actual SteamVR/HMD evaluation remain not run; this is not completed issue acceptance.
+Status: production is unified on the owner's markerless temporary-emphasis decision in
+[issue #178](https://github.com/kapitalismho/PuriPuly-heart/issues/178). The source cutover starts
+from `a9f9b0fb6ca5d16792aeade2beb645a3f07045fb`; fetched `origin/dev`
+`653d73a235d8112e4af52804241f6d12abad296d` was not merged without owner approval.
+SELF is White `#FFFFFF`, ordinary PEER is Gold `#FFD700`, and an applicable confirmed local
+transition makes the incoming readable PEER logical turn Sky `#33D6FF`. The next distinct readable
+SELF or PEER turn returns that body to Gold. There is no marker, separate emphasis timer, mode
+selector, or saved mode preference; normal caption lifetime remains unchanged.
 
-- Issue: https://github.com/kapitalismho/PuriPuly-heart/issues/178
-- Repair baseline: `4ac0f34b6683f793e94bcbb36bd6f037ac5a9ce3`; input baseline pinned in scenario: `13274569769d3c1ec7a896a2d15b919b76136a6e`
-- Evidence paths: `experiments/overlay_speaker_transition/**` and this document.
-- Director decisions applied: default absent/invalid is A; simple localized selector/persistence with no elaborate migration; A/C/E all retained in current scope; settings are disposable owner-comparison controls that the owner plans to remove before official release, so public UX effort is minimized.
-- Director-selected working designs pending real native/HMD verification: **A2, C1, E1**. C2/E2/A1/baseline remain in the prototype as comparators only. Working selection is not final validation and not a global winner claim.
-- Design adjustment U2: A2/E1 gap 28→18 reference px fits existing native 32px top padding (14px height + 18px gap); geometry scales with text, length 196px is capped to the first rendered line's ink width, and the marker follows that line's centered text origin. Text positions and slot sizes are unchanged.
+- Settings schema: 48. Loading an old `intent.overlay.speaker_transition_mode` discards only that
+  retired path; unrelated known and compatibility-extension settings remain.
+- Overlay wire contract: 11. The retained capability key is
+  `speaker_transition_presentation={"version":2,"policy":"temporary_turn_emphasis"}`. Renderers
+  exposing the old A/C/E capability fail the existing handshake.
+- Native release built at `C:/t/ovr178/release/PuriPulyHeartOverlay.exe`: SHA256
+  `983377f9f9c0880f3e0db569256d15f11f786a510b8b6f3e84b9e615af313328`. Its startup-contract
+  output reports app 2.7.0, overlay 11, execution r2, exclusive native retry ownership, and the
+  version-2 temporary-emphasis policy.
+- Live Soniox synthetic-audio production-path smoke used the existing nonprivate David/Zira WAVs
+  under `C:/t/ovr178/audio`, loaded the key through the configured in-memory secret store, and
+  routed live scoped terminals through Peer translation ownership, output projection, and the
+  presenter. Translation remained an explicit deterministic stand-in. The resulting two PEER
+  turns were Gold then Sky; the sanitized result is
+  `experiments/overlay_speaker_transition/runtime_validation/live_production_path_result.json`.
+- Automated verification: 214 relevant core/provider/integration cases were collected: 213 passed
+  and one opt-in Soniox integration case skipped. All 739 relevant config/app/UI cases passed; the
+  full native suite passed 270 tests with one opt-in probe ignored, including Windows graphics;
+  formatting checks passed.
+- `scripts/check_speaker_modes_desktop.py --once --step-delay 0.1` launched the actual desktop
+  child and exercised initial Gold PEER, transition Sky PEER, a same-identity text revision that
+  stays Sky, readable White SELF expiration, and another Sky transition. The matching native
+  release was subsequently staged under `build/overlay/`;
+  its startup check passed wire 11 and policy v2. The SteamVR entry point then exited 2 with
+  `steamvr_not_running` (native child exit 20, exit confirmed, readers cleaned), not a stale-build
+  or successful-HMD result.
+- Actual SteamVR/HMD and human interpretation observation remain blocked because SteamVR/HMD and
+  an observer were unavailable. No HMD readability, bright/busy-scene, scale, multilingual-wrap,
+  gaze-away, distraction, or before/after-explanation result is claimed.
+
+## Current reproducible checks
+
+Core/provider/integration selection (213 passed, one opt-in live test skipped; the separate live
+synthetic-audio smoke was run):
+
+```text
+uv run pytest -q tests/core/test_speaker_transition.py tests/core/test_overlay_speaker_modes.py tests/core/test_overlay_bridge.py tests/core/test_overlay_manifest.py tests/core/test_soniox_multilingual_release_readiness.py tests/core/test_translation_turn_owner.py tests/core/test_translation_output_projection_owner.py tests/providers/test_soniox_backend.py tests/providers/test_soniox_reuse.py tests/integration/test_speaker_transition_pipeline.py tests/integration/test_soniox_stt_integration.py tests/integration/test_stt_connection_reuse.py -rs
+```
+
+Config/application/UI selection (739 passed):
+
+```text
+uv run pytest -q tests/config/test_overlay_settings.py tests/config/test_settings_vnext_migration_serialization.py tests/config/test_public_compatibility_surfaces.py tests/app/test_overlay_process_manager.py tests/app/test_overlay_translation_enabled_sync.py tests/app/test_settings_mutation_legacy.py tests/ui/test_desktop_overlay_renderer.py tests/ui/test_settings_surface_contract.py tests/ui/test_settings_view_branches.py tests/ui/test_i18n_key_usage.py -rs
+```
+
+Native suite (270 passed, one opt-in probe ignored), isolated desktop demonstration, and the live
+provider smoke:
+
+```text
+cargo test --manifest-path native/overlay/Cargo.toml --target-dir C:/t/ovr178
+uv run python scripts/check_speaker_modes_desktop.py --once --step-delay 2
+uv run python scripts/check_speaker_modes_steamvr.py --once --step-delay 2
+uv run python experiments/overlay_speaker_transition/runtime_validation/live_soniox_production_path_smoke.py --audio-dir <local-synthetic-wav-directory>
+```
+
+The two `check_speaker_modes_*` filenames are retained for the owner's existing commands; neither
+contains a selectable strategy or mode cycle. Both preview the single current policy. Successful
+synthetic plumbing and native texture checks do not establish actual HMD readability.
+
+## Historical comparison evidence
+
+Everything below this heading records the superseded A/C/E comparison and its earlier checks. It
+is preserved as prior decision evidence, not as the current product contract or a claim that its
+unperformed HMD/human criteria passed.
 
 ## 1. What was built
 

@@ -308,7 +308,6 @@ class DesktopCaptionSlot:
     appearance_seq: int
     lines: tuple[DesktopCaptionLine, ...]
     secondary_enabled: bool
-    speaker_boundary: bool = False
     card_width: float = 0.0
     card_text_width: float = 0.0
     active: bool = False
@@ -423,8 +422,6 @@ class _RetainedDesktopCaptionSurface:
     slot_containers: tuple[Any, ...]
     cards: tuple[Any, ...]
     text_layers: tuple[Any, ...]
-    card_stacks: tuple[Any, ...]
-    speaker_boundary_markers: tuple[Any, ...]
     primary_regions: tuple[Any, ...]
     secondary_regions: tuple[Any, ...]
     primary_texts: tuple[Any, ...]

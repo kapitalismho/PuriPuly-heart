@@ -30,14 +30,8 @@ def _peer_event(
 
 
 def _self_event(adapter: OverlayEventAdapter, turn_id: UUID, text: str):
-
     return adapter.transcript_final(
-        Transcript(
-            utterance_id=turn_id,
-            text=text,
-            is_final=True,
-            channel="self",
-        ),
+        Transcript(turn_id, text, True, channel="self"),
         source_language="en",
         target_language="ko",
         logical_turn_key=f"self:{turn_id}",
@@ -45,40 +39,51 @@ def _self_event(adapter: OverlayEventAdapter, turn_id: UUID, text: str):
 
 
 @pytest.mark.asyncio
-async def test_mode_c_assigns_stable_run_colors_once_across_revisions_and_uncertainty() -> None:
-    clock = FakeClock(_now=10.0)
+async def test_transition_emphasis_expires_on_next_distinct_readable_turn_not_revision() -> None:
+    clock = FakeClock(_now=20.0)
     adapter = OverlayEventAdapter(clock=clock)
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-        clock=clock,
-        speaker_transition_mode="C",
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    changed, self_turn = uuid4(), uuid4()
+
+    await presenter.emit(_peer_event(adapter, changed, "changed", "transition"))
+    entry = presenter._entries[("peer", changed)]
+    visible_since = entry.visible_since
+    assert presenter.snapshot().blocks[-1].speaker_style == "cyan"
+
+    await presenter.emit(_peer_event(adapter, changed, "changed revision", "transition"))
+    assert presenter.snapshot().blocks[-1].speaker_style == "cyan"
+    assert entry.visible_since == visible_since
+
+    await presenter.emit(_self_event(adapter, self_turn, "self"))
+    peer = next(block for block in presenter.snapshot().blocks if block.id == f"peer:{changed}")
+    self_block = next(
+        block for block in presenter.snapshot().blocks if block.id == f"self:{self_turn}"
     )
-    first, changed, uncertain = uuid4(), uuid4(), uuid4()
-
-    await presenter.emit(_peer_event(adapter, first, "same", "context_reset"))
-    await presenter.emit(_peer_event(adapter, changed, "same", "transition"))
-    assert [(block.id, block.speaker_style) for block in presenter.snapshot().blocks] == [
-        (f"peer:{first}", "gold"),
-        (f"peer:{changed}", "cyan"),
-    ]
-
-    await presenter.emit(_peer_event(adapter, changed, "revised", "transition"))
-    assert presenter.snapshot().blocks[-1].speaker_style == "cyan"
-
-    await presenter.emit(_peer_event(adapter, uncertain, "new", "context_reset"))
-    assert presenter.snapshot().blocks[-1].speaker_style == "cyan"
-    assert all(not block.speaker_boundary for block in presenter.snapshot().blocks)
+    assert peer.speaker_style == "gold"
+    assert self_block.speaker_style is None
+    assert entry.visible_since == visible_since
 
 
 @pytest.mark.asyncio
-async def test_late_transition_claim_on_readable_revision_is_withheld_without_replay() -> None:
-    clock = FakeClock(_now=15.0)
+async def test_consecutive_transitions_move_emphasis_to_incoming_turn() -> None:
+    clock = FakeClock(_now=30.0)
     adapter = OverlayEventAdapter(clock=clock)
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-        clock=clock,
-        speaker_transition_mode="C",
-    )
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    first, second = uuid4(), uuid4()
+
+    await presenter.emit(_peer_event(adapter, first, "first", "transition"))
+    await presenter.emit(_peer_event(adapter, second, "second", "transition"))
+
+    blocks = {block.id: block for block in presenter.snapshot().blocks}
+    assert blocks[f"peer:{first}"].speaker_style == "gold"
+    assert blocks[f"peer:{second}"].speaker_style == "cyan"
+
+
+@pytest.mark.asyncio
+async def test_uncertainty_and_late_transition_revision_do_not_emphasize() -> None:
+    clock = FakeClock(_now=40.0)
+    adapter = OverlayEventAdapter(clock=clock)
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
     turn_id = uuid4()
 
     await presenter.emit(_peer_event(adapter, turn_id, "first", "unavailable"))
@@ -88,66 +93,15 @@ async def test_late_transition_claim_on_readable_revision_is_withheld_without_re
 
     block = presenter.snapshot().blocks[-1]
     assert block.speaker_style == "gold"
-    assert block.speaker_boundary is False
     assert entry.speaker_transition == "unavailable"
     assert entry.visible_since == visible_since
 
 
 @pytest.mark.asyncio
-async def test_mode_e_expires_on_next_distinct_readable_turn_not_revision() -> None:
-    clock = FakeClock(_now=20.0)
-    adapter = OverlayEventAdapter(clock=clock)
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-        clock=clock,
-        speaker_transition_mode="E",
-    )
-    changed, self_turn = uuid4(), uuid4()
-
-    await presenter.emit(_peer_event(adapter, changed, "changed", "transition"))
-    entry = presenter._entries[("peer", changed)]
-    visible_since = entry.visible_since
-    assert presenter.snapshot().blocks[-1].speaker_style == "cyan"
-    assert presenter.snapshot().blocks[-1].speaker_boundary is True
-
-    await presenter.emit(_peer_event(adapter, changed, "changed revision", "transition"))
-    assert presenter.snapshot().blocks[-1].speaker_style == "cyan"
-    assert entry.visible_since == visible_since
-
-    await presenter.emit(_self_event(adapter, self_turn, "self"))
-    peer = next(block for block in presenter.snapshot().blocks if block.id == f"peer:{changed}")
-    assert peer.speaker_style == "gold"
-    assert peer.speaker_boundary is True
-    assert entry.visible_since == visible_since
-
-
-@pytest.mark.asyncio
-async def test_entering_mode_e_reprojects_boundary_without_replaying_emphasis() -> None:
-    clock = FakeClock(_now=30.0)
+async def test_source_only_claim_is_not_reattached_by_later_translation_revision() -> None:
+    clock = FakeClock(_now=50.0)
     adapter = OverlayEventAdapter(clock=clock)
     presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
-    turn_id = uuid4()
-
-    await presenter.emit(_peer_event(adapter, turn_id, "changed", "transition"))
-    entry = presenter._entries[("peer", turn_id)]
-    visible_since = entry.visible_since
-    await presenter.update_speaker_transition_mode("E")
-
-    block = presenter.snapshot().blocks[-1]
-    assert block.speaker_boundary is True
-    assert block.speaker_style == "gold"
-    assert entry.visible_since == visible_since
-
-
-@pytest.mark.asyncio
-async def test_source_only_claim_is_not_reattached_by_later_translation_revision() -> None:
-    clock = FakeClock(_now=40.0)
-    adapter = OverlayEventAdapter(clock=clock)
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-        clock=clock,
-        speaker_transition_mode="E",
-    )
     turn_id = uuid4()
 
     await presenter.emit(
@@ -164,8 +118,7 @@ async def test_source_only_claim_is_not_reattached_by_later_translation_revision
     visible_since = entry.visible_since
     assert presenter.snapshot().blocks[-1].speaker_style == "cyan"
 
-    self_turn = uuid4()
-    await presenter.emit(_self_event(adapter, self_turn, "self"))
+    await presenter.emit(_self_event(adapter, uuid4(), "self"))
     await presenter.emit(
         adapter.translation_final(
             utterance_id=turn_id,
@@ -183,6 +136,5 @@ async def test_source_only_claim_is_not_reattached_by_later_translation_revision
 
     block = next(block for block in presenter.snapshot().blocks if block.id == f"peer:{turn_id}")
     assert block.speaker_style == "gold"
-    assert block.speaker_boundary is True
     assert entry.speaker_transition_claim_id == "source-claim"
     assert entry.visible_since == visible_since

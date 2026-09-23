@@ -1197,7 +1197,6 @@ fn layout_cache_key_for_block(
         block_variant: block.block_variant,
         secondary_enabled: block.secondary_enabled,
         secondary_reserved: block_reserves_secondary_row(block),
-        speaker_boundary: block.speaker_boundary,
         primary_font_size_key: scalar_key(DEFAULT_FONT_SIZE_PX * text_scale),
         secondary_font_size_key: scalar_key(
             DEFAULT_FONT_SIZE_PX * text_scale * SECONDARY_FONT_SCALE,
@@ -1265,7 +1264,6 @@ fn materialize_resolved_block_layout(
         primary_lines,
         secondary_line,
         secondary_reserved: template.secondary_reserved,
-        speaker_boundary: block.speaker_boundary,
         bounds,
         visual_bounds,
         content_width_px: template.content_width_px,

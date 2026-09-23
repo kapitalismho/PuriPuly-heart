@@ -1,19 +1,15 @@
-"""SteamVR speaker-transition visual check for modes A, C, E."""
+"""SteamVR markerless speaker-transition emphasis visual check."""
 
 from __future__ import annotations
 
 import argparse
 import asyncio
-import csv
-import io
 import math
-import os
 import secrets
-import subprocess
 import sys
 import time
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -33,7 +29,6 @@ from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.core.speaker_transition import PeerSpeakerTransitionInterpreter
 from puripuly_heart.domain.models import FinalSpeakerRun, Transcript
 
-MODES = ("A", "C", "E")
 SEQUENCE = (
     {
         "kind": "peer",
@@ -49,6 +44,12 @@ SEQUENCE = (
         "ko": "다른 목소리로 이어집니다",
         "en": "Continued in another voice",
     },
+    {
+        "kind": "revision",
+        "key": "p2r",
+        "ko": "다른 목소리로 계속 이어집니다",
+        "en": "Continued in another voice with revised text",
+    },
     {"kind": "self", "key": "s1", "ko": "내 목소리 확인합니다", "en": "My voice check"},
     {
         "kind": "peer",
@@ -58,24 +59,12 @@ SEQUENCE = (
         "en": "Changed again and continued",
     },
 )
-MODE_GUIDE = {
-    "A": "Peer는 항상 Gold, 전환된 블록에만 금색 상단 마커가 붙습니다.",
-    "C": "마커 없음, 전환마다 Gold와 Sky가 교대로 바뀝니다.",
-    "E": "전환 직후 본문이 Sky로 강조되고 금색 마커가 붙고, 다음 턴에 본문은 Gold로 돌아오고 마커는 남습니다.",
-}
 STEP_CUE = {
-    ("A", "p1"): "Gold, 마커 없음",
-    ("A", "p2"): "Gold + 금색 상단 마커",
-    ("A", "s1"): "SELF 흰색, 직전 Peer Gold+마커 유지",
-    ("A", "p3"): "Gold + 금색 상단 마커",
-    ("C", "p1"): "Gold, 마커 없음",
-    ("C", "p2"): "Sky로 전환, 마커 없음",
-    ("C", "s1"): "SELF 흰색, 직전 Peer Sky 유지",
-    ("C", "p3"): "Gold로 토글백, 마커 없음",
-    ("E", "p1"): "Gold, 마커 없음",
-    ("E", "p2"): "Sky + 금색 마커",
-    ("E", "s1"): "SELF 흰색, 직전 Peer 본문 Gold로, 마커 유지",
-    ("E", "p3"): "Sky + 금색 마커",
+    "p1": "Peer Gold, no marker",
+    "p2": "incoming Peer whole turn Sky, no marker",
+    "p2r": "same logical Peer revision stays Sky, no marker",
+    "s1": "SELF White; previous Peer returns to Gold",
+    "p3": "incoming Peer whole turn Sky, no marker",
 }
 
 
@@ -92,7 +81,7 @@ def _step_delay(value: str) -> float:
 def build_parser(surface: str) -> argparse.ArgumentParser:
     target = "SteamVR" if surface == "steamvr" else "데스크탑"
     return argparse.ArgumentParser(
-        description=f"{target} A/C/E 화자 전환 확인. 실제 presenter와 {target} 자막 경로로 같은 자막 순서를 A→C→E로 보여줍니다.",
+        description=f"{target} markerless temporary speaker emphasis check using the production presenter.",
     )
 
 
@@ -101,27 +90,8 @@ def _parser(surface: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--step-delay", type=_step_delay, default=2.0, help="자막 단계 사이 대기 초 (기본 2.0)"
     )
-    parser.add_argument("--once", action="store_true", help="A/C/E 한 바퀴만 재생하고 종료")
+    parser.add_argument("--once", action="store_true", help="한 번 재생하고 종료")
     return parser
-
-
-def _process_names() -> set[str]:
-    if os.name != "nt":
-        raise RuntimeError("현재 OS에서는 실행 중인 오버레이 충돌을 확인할 수 없습니다")
-    try:
-        completed = subprocess.run(
-            ["tasklist", "/FO", "CSV", "/NH"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise RuntimeError(f"실행 중인 프로세스 확인 실패: {exc}") from exc
-    if completed.returncode != 0 or not completed.stdout.strip():
-        raise RuntimeError("실행 중인 프로세스 확인 실패")
-    rows = list(csv.reader(io.StringIO(completed.stdout)))
-    return {row[0].strip().lower() for row in rows if row and row[0].strip()}
 
 
 def _desktop_controls() -> list[dict[str, object]]:
@@ -143,16 +113,15 @@ async def _emit_peer(
     adapter: OverlayEventAdapter,
     interpreter: PeerSpeakerTransitionInterpreter,
     counters: dict[str, int],
-    mode: str,
     step: dict[str, str],
     session_scope: str,
-) -> None:
+) -> tuple[UUID, str, str]:
     uid = uuid4()
     counters["order"] += 1
     counters["child"] += 1
     start_ms = counters["order"] * 100
-    ko = f"[{mode}] {step['ko']}"
-    en = f"[{mode}] {step['en']}"
+    ko = step["ko"]
+    en = step["en"]
     transcript = Transcript(
         uid,
         en,
@@ -188,17 +157,42 @@ async def _emit_peer(
     receipt = await presenter.emit(event)
     if receipt.outcome != "applied":
         raise RuntimeError(f"{step['key']} 적용 실패: {receipt.outcome} {receipt.cause}")
+    return uid, claim.comparison, claim.claim_id
+
+
+async def _emit_peer_revision(
+    presenter: OverlayPresenter,
+    adapter: OverlayEventAdapter,
+    step: dict[str, str],
+    peer_identity: tuple[UUID, str, str],
+) -> None:
+    uid, comparison, claim_id = peer_identity
+    receipt = await presenter.emit(
+        adapter.translation_final(
+            utterance_id=uid,
+            channel="peer",
+            text=step["ko"],
+            source_text=step["en"],
+            source_language="en",
+            target_language="ko",
+            applied_context_mode="integrated",
+            logical_turn_key=f"peer:{uid}",
+            speaker_transition=comparison,
+            speaker_transition_claim_id=claim_id,
+        )
+    )
+    if receipt.outcome != "applied":
+        raise RuntimeError(f"{step['key']} 적용 실패: {receipt.outcome} {receipt.cause}")
 
 
 async def _emit_self(
     presenter: OverlayPresenter,
     adapter: OverlayEventAdapter,
-    mode: str,
     step: dict[str, str],
 ) -> None:
     uid = uuid4()
-    ko = f"[{mode}] {step['ko']}"
-    en = f"[{mode}] {step['en']}"
+    ko = step["ko"]
+    en = step["en"]
     receipt = await presenter.emit(
         adapter.transcript_final(
             Transcript(uid, ko, True, channel="self"),
@@ -226,15 +220,6 @@ async def _emit_self(
 
 
 async def _run_surface(surface: str, step_delay: float, once: bool) -> int:
-    if surface == "steamvr":
-        try:
-            names = _process_names()
-        except RuntimeError as exc:
-            print(str(exc), flush=True)
-            return 2
-        if "puripulyheartoverlay.exe" in names:
-            print("이미 실행 중인 PuriPuly 오버레이가 있어 시작하지 않습니다.", flush=True)
-            return 2
     runtime = OverlayRuntimeHandle(
         overlay_instance_id=f"overlay-check-{uuid4().hex[:8]}",
         shutdown_grace_s=3.0,
@@ -302,37 +287,33 @@ async def _run_surface(surface: str, step_delay: float, once: bool) -> int:
             exit_code = 0
             while not stop:
                 round_index += 1
-                print(f"라운드 {round_index}: A→C→E", flush=True)
-                for mode in MODES:
-                    if stop:
+                print(f"라운드 {round_index}: markerless temporary emphasis", flush=True)
+                interpreter = PeerSpeakerTransitionInterpreter()
+                peer_identity: tuple[UUID, str, str] | None = None
+                for step in SEQUENCE:
+                    if manager.state != "connected":
+                        print(f"자식이 닫혔습니다: {manager.failure_reason}", flush=True)
+                        exit_code = 2
+                        stop = True
                         break
-                    await presenter.update_speaker_transition_mode(mode)
-                    print(f"모드 {mode}: {MODE_GUIDE[mode]}", flush=True)
-                    interpreter = PeerSpeakerTransitionInterpreter()
-                    for step in SEQUENCE:
-                        if manager.state != "connected":
-                            print(f"자식이 닫혔습니다: {manager.failure_reason}", flush=True)
-                            exit_code = 2
-                            stop = True
-                            break
-                        if step["kind"] == "peer":
-                            await _emit_peer(
-                                presenter, adapter, interpreter, counters, mode, step, session_scope
-                            )
-                        else:
-                            await _emit_self(presenter, adapter, mode, step)
-                        print(
-                            f"[{mode}] {step['key']}: {STEP_CUE[(mode, step['key'])]}", flush=True
+                    if step["kind"] == "peer":
+                        peer_identity = await _emit_peer(
+                            presenter, adapter, interpreter, counters, step, session_scope
                         )
-                        await asyncio.sleep(step_delay)
-                        if manager.state != "connected":
-                            print(f"자식이 닫혔습니다: {manager.failure_reason}", flush=True)
-                            exit_code = 2
-                            stop = True
-                            break
-                if stop:
-                    break
-                if once:
+                    elif step["kind"] == "revision":
+                        if peer_identity is None:
+                            raise RuntimeError("revision 대상 Peer 턴이 없습니다")
+                        await _emit_peer_revision(presenter, adapter, step, peer_identity)
+                    else:
+                        await _emit_self(presenter, adapter, step)
+                    print(f"{step['key']}: {STEP_CUE[step['key']]}", flush=True)
+                    await asyncio.sleep(step_delay)
+                    if manager.state != "connected":
+                        print(f"자식이 닫혔습니다: {manager.failure_reason}", flush=True)
+                        exit_code = 2
+                        stop = True
+                        break
+                if stop or once:
                     break
                 print("반복 중. 종료는 Ctrl+C.", flush=True)
     except KeyboardInterrupt:

@@ -43,7 +43,6 @@ def overlay_runtime_intent_from_vnext(
         target=overlay.target,
         show_translation=overlay.show_translation,
         show_peer_original=overlay.show_peer_original,
-        speaker_transition_mode=overlay.speaker_transition_mode,
         calibration=overlay.calibration.to_dict(),
         desktop_overlay_options=_desktop_overlay_options_from_vnext(
             overlay.desktop_flet,

@@ -108,7 +108,6 @@ class OverlaySettingsSnapshot:
     target: str
     show_translation: bool
     show_peer_original: bool
-    speaker_transition_mode: str
     desktop_size_preset: str
     desktop_background_alpha: float
     desktop_swap_caption_languages: bool
@@ -208,11 +207,6 @@ class OverlayPeerOriginalSettingsIntent:
 
 
 @dataclass(frozen=True, slots=True)
-class OverlaySpeakerTransitionModeIntent:
-    mode: str
-
-
-@dataclass(frozen=True, slots=True)
 class DesktopOverlayBackgroundAlphaIntent:
     background_alpha: float
 
@@ -253,7 +247,6 @@ ImmediateSettingsIntent: TypeAlias = (
     | OverlayTargetSettingsIntent
     | OverlayTranslationSettingsIntent
     | OverlayPeerOriginalSettingsIntent
-    | OverlaySpeakerTransitionModeIntent
     | DesktopOverlayBackgroundAlphaIntent
     | DesktopOverlaySwapCaptionLanguagesIntent
     | DesktopOverlaySizeIntent
@@ -417,7 +410,6 @@ __all__ = [
     "OverlayCalibrationSettingsIntent",
     "OverlayPeerOriginalSettingsIntent",
     "OverlaySettingsSnapshot",
-    "OverlaySpeakerTransitionModeIntent",
     "OverlayTargetSettingsIntent",
     "OverlayTranslationSettingsIntent",
     "PeerExpectedLanguagesIntent",

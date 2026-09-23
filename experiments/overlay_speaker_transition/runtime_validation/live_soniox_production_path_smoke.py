@@ -6,7 +6,7 @@ presentation path:
 
   WAV -> live scoped Soniox session (begin_turn/send_turn_audio/seal_turn,
   turn_events terminal) -> PeerTranslationChannelOwner.handle_provider_turn_terminal
-  -> translation turns/output projection -> OverlayPresenter (modes A/C/E)
+  -> translation turns/output projection -> OverlayPresenter
 
 Construction mirrors tests/integration/test_speaker_transition_pipeline.py;
 the only substitution is live scoped terminal events for synthetic
@@ -370,11 +370,9 @@ def _terminal_from_live(record: dict, *, generation: int) -> tuple[object, STTPr
     return receipt, terminal
 
 
-async def run_mode(records: list[dict], mode: str) -> dict:
+async def run_policy(records: list[dict]) -> dict:
     clock = FakeClock(_now=100.0)
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(), clock=clock, speaker_transition_mode=mode
-    )
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
     provider = _EchoTranslationProvider()
     overlay = _RecordingOverlaySink(presenter)
     harness = compose_translation_test_harness(
@@ -416,7 +414,6 @@ async def run_mode(records: list[dict], mode: str) -> dict:
                     "id_tail": block.id[-8:],
                     "channel": block.channel,
                     "speaker_style": block.speaker_style,
-                    "speaker_boundary": block.speaker_boundary,
                     "primary_text": block.primary_text,
                 }
                 for block in presenter.snapshot().blocks
@@ -438,7 +435,6 @@ async def main() -> int:
         / "experiments/overlay_speaker_transition/runtime_validation"
         / "live_production_path_result.json",
     )
-    parser.add_argument("--modes", default="A,C,E")
     args = parser.parse_args()
 
     wav_paths = ensure_synthetic_audio(args.audio_dir)
@@ -460,8 +456,7 @@ async def main() -> int:
     records, scope = await live_scoped_terminals(api_key, wav_paths)
     del api_key
 
-    modes = [mode.strip() for mode in args.modes.split(",") if mode.strip()]
-    per_mode = {mode: await run_mode(records, mode) for mode in modes}
+    policy_result = await run_policy(records)
 
     result = {
         "method": "live scoped Soniox ingress -> PeerTranslationChannelOwner."
@@ -474,10 +469,11 @@ async def main() -> int:
         "audio": audio_meta,
         "live_terminals": records,
         "single_session_scope": len({record["session_scope_head"] for record in records}) == 1,
-        "per_mode": per_mode,
+        "policy": "temporary_turn_emphasis",
+        "presentation": policy_result,
     }
     args.out.write_text(json.dumps(result, indent=1), encoding="utf-8")
-    print(json.dumps({mode: per_mode[mode]["blocks"] for mode in modes}, indent=1))
+    print(json.dumps(policy_result["blocks"], indent=1))
     print(f"wrote {args.out}")
     return 0
 

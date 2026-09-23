@@ -63,7 +63,6 @@ class OverlayPresentationBlock:
     publication_generation: int | None = None
     publication_order: int | None = None
     speaker_style: Literal["gold", "cyan"] | None = None
-    speaker_boundary: bool = False
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -100,8 +99,6 @@ class OverlayPresentationBlock:
             payload["publication_order"] = self.publication_order
         if self.speaker_style is not None:
             payload["speaker_style"] = self.speaker_style
-        if self.speaker_boundary:
-            payload["speaker_boundary"] = True
         return payload
 
     @classmethod
@@ -143,7 +140,6 @@ class OverlayPresentationBlock:
             publication_generation=_optional_non_negative_int_field(data, "publication_generation"),
             publication_order=_optional_non_negative_int_field(data, "publication_order"),
             speaker_style=_optional_speaker_style(data),
-            speaker_boundary=_optional_bool_field(data, "speaker_boundary", default=False),
         )
 
 

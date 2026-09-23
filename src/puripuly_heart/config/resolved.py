@@ -446,12 +446,9 @@ class ResolvedOverlayConfig:
     show_peer_original: bool
     calibration: Mapping[str, ResolvedOptionValue]
     desktop_overlay_options: Mapping[str, ResolvedOptionValue]
-    speaker_transition_mode: str = "A"
 
     def __post_init__(self) -> None:
         _ensure_known_value(self.target, OVERLAY_TARGETS, field_name="target")
-        if self.speaker_transition_mode not in {"A", "C", "E"}:
-            raise ValueError("invalid speaker transition mode")
         object.__setattr__(self, "calibration", _freeze_option_mapping(self.calibration))
         object.__setattr__(
             self,

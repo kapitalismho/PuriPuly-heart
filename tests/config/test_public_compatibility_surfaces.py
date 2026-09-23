@@ -1322,7 +1322,6 @@ def test_overlay_contract_snapshot_matches_manifest_and_protocol_wire_shape() ->
         source_text_len=5,
         logical_turn_key="peer:1",
         speaker_style="cyan",
-        speaker_boundary=True,
     )
     presentation_snapshot = OverlayPresentationSnapshot(blocks=[block]).to_dict()
 

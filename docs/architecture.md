@@ -390,11 +390,12 @@ Each generation owns its tasks and shutdown. Python owns caption lifetime; nativ
 
 `OverlayPresenter` owns provider-independent Peer subtitle admission and pacing (`core/overlay/presenter.py`); output retains bounded waiting work.
 
-`OverlayPresenter` also owns A/C/E speaker-transition projection over its canonical two-block
-window. It assigns stable per-turn color and boundary state, expires E emphasis on the next
-distinct readable logical turn, and reprojects a persisted mode change without changing caption
-age, ordering, spatial identity, or expiry. Native and desktop render the resulting Gold/Cyan and
-boundary fields without interpreting speaker evidence.
+`OverlayPresenter` also owns the single markerless speaker-transition presentation policy over
+its canonical two-block window. SELF is White, PEER is normally Gold, and a confirmed local
+transition emphasizes the incoming readable Peer logical turn in Sky. A revision or replay of
+that logical turn does not replay emphasis; the next distinct readable SELF or PEER turn returns
+the prior Peer body to Gold. Native and desktop render only the resulting Gold/Sky style and do
+not interpret speaker evidence or draw transition markers.
 
 Behavior tests: `tests/core/test_overlay_presenter.py`.
 

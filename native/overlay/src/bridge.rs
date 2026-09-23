@@ -71,7 +71,7 @@ impl BridgeClient {
             "capabilities": {
                 "execution_contract": {"version": 1, "revision": "r2"},
                 "native_presentation_retry": {"version": 1, "ownership": "exclusive"},
-                "speaker_transition_presentation": {"version": 1, "modes": ["A", "C", "E"]}
+                "speaker_transition_presentation": {"version": 2, "policy": "temporary_turn_emphasis"}
             }
         });
         stream

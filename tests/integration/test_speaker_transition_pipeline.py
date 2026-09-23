@@ -194,11 +194,7 @@ async def _terminal_from_soniox_tokens(
 @pytest.mark.asyncio
 async def test_soniox_tokens_replay_through_translation_publication_and_presenter() -> None:
     clock = FakeClock(_now=100.0)
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-        clock=clock,
-        speaker_transition_mode="C",
-    )
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
     provider = _EchoTranslationProvider()
     overlay = _RecordingOverlaySink(presenter)
     harness = compose_translation_test_harness(
@@ -210,7 +206,7 @@ async def test_soniox_tokens_replay_through_translation_publication_and_presente
         clock=clock,
     )
     session = _soniox_session()
-    observed: list[tuple[str, str, bool]] = []
+    observed: list[tuple[str, str]] = []
 
     async def publish_peer(speaker: str, order: int, start_ms: int) -> None:
         receipt, terminal = await _terminal_from_soniox_tokens(
@@ -239,7 +235,7 @@ async def test_soniox_tokens_replay_through_translation_publication_and_presente
             (block for block in presenter.snapshot().blocks if block.channel == "peer"),
             key=lambda block: block.appearance_seq,
         )
-        observed.append((speaker, block.speaker_style or "", block.speaker_boundary))
+        observed.append((speaker, block.speaker_style or ""))
 
     harness.output_runtime.activate_peer_generation(1)
 
@@ -272,13 +268,13 @@ async def test_soniox_tokens_replay_through_translation_publication_and_presente
         await publish_peer("A", 7, 700)
 
         assert observed == [
-            ("A", "gold", False),
-            ("A", "gold", False),
-            ("B", "cyan", False),
-            ("B", "cyan", False),
-            ("B", "cyan", False),
-            ("C", "gold", False),
-            ("A", "cyan", False),
+            ("A", "gold"),
+            ("A", "gold"),
+            ("B", "cyan"),
+            ("B", "gold"),
+            ("B", "gold"),
+            ("C", "cyan"),
+            ("A", "cyan"),
         ]
         assert provider.calls == [
             "A-1",
@@ -346,10 +342,7 @@ async def test_soniox_tokens_replay_through_translation_publication_and_presente
         assert [
             overlap_blocks[f"peer:{event.utterance_id}"].speaker_style
             for event in overlap_translations
-        ] == [
-            "cyan",
-            "cyan",
-        ]
+        ] == ["gold", "gold"]
 
         reset_receipt, reset_terminal = await _terminal_from_soniox_tokens(
             session,
@@ -369,7 +362,7 @@ async def test_soniox_tokens_replay_through_translation_publication_and_presente
             (block for block in presenter.snapshot().blocks if block.channel == "peer"),
             key=lambda block: block.appearance_seq,
         )
-        assert reset_block.speaker_style == "cyan"
+        assert reset_block.speaker_style == "gold"
 
         reconnect = _soniox_session()
         reconnect_receipt, reconnect_terminal = await _terminal_from_soniox_tokens(
@@ -391,25 +384,19 @@ async def test_soniox_tokens_replay_through_translation_publication_and_presente
             (block for block in presenter.snapshot().blocks if block.channel == "peer"),
             key=lambda block: block.appearance_seq,
         )
-        assert reconnect_block.speaker_style == "cyan"
+        assert reconnect_block.speaker_style == "gold"
     finally:
         await harness.stop()
         await presenter.close()
 
 
-@pytest.mark.parametrize("mode", ("A", "C", "E"))
 @pytest.mark.parametrize("fallback", ("translation_disabled", "translation_failed"))
 @pytest.mark.asyncio
 async def test_source_only_peer_transition_claim_reaches_first_readable_content(
-    mode: str,
     fallback: str,
 ) -> None:
     clock = FakeClock(_now=100.0)
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-        clock=clock,
-        speaker_transition_mode=mode,
-    )
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
     provider = (
         None
         if fallback == "translation_disabled"
@@ -461,9 +448,8 @@ async def test_source_only_peer_transition_claim_reaches_first_readable_content(
     try:
         _a_id, first = await publish_peer("A", 1, 100)
         changed_id, changed = await publish_peer("B", 2, 200)
-        assert getattr(first, "speaker_boundary") is False
-        assert getattr(changed, "speaker_style") == ("cyan" if mode in {"C", "E"} else "gold")
-        assert getattr(changed, "speaker_boundary") is (mode in {"A", "E"})
+        assert getattr(first, "speaker_style") == "gold"
+        assert getattr(changed, "speaker_style") == "cyan"
 
         changed_event = next(
             event
@@ -484,13 +470,10 @@ async def test_source_only_peer_transition_claim_reaches_first_readable_content(
         retained_changed = next(
             block for block in presenter.snapshot().blocks if block.id == changed_id
         )
-        if mode == "E":
-            assert retained_changed.speaker_style == "gold"
-            assert retained_changed.speaker_boundary is True
+        assert retained_changed.speaker_style == "gold"
 
         _same_id, same = await publish_peer("B", 3, 300)
-        assert getattr(same, "speaker_boundary") is False
-        assert getattr(same, "speaker_style") == ("cyan" if mode == "C" else "gold")
+        assert getattr(same, "speaker_style") == "gold"
     finally:
         await harness.stop()
         await presenter.close()

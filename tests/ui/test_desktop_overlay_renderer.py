@@ -80,7 +80,6 @@ def _block(
     primary_language: str | None = None,
     secondary_language: str | None = None,
     speaker_style: str | None = None,
-    speaker_boundary: bool = False,
 ) -> OverlayPresentationBlock:
     return OverlayPresentationBlock(
         id=block_id,
@@ -94,66 +93,31 @@ def _block(
         primary_language=primary_language,
         secondary_language=secondary_language,
         speaker_style=speaker_style,  # type: ignore[arg-type]
-        speaker_boundary=speaker_boundary,
     )
 
 
 @pytest.mark.asyncio
-async def test_desktop_overlay_retained_surface_applies_and_clears_speaker_boundary() -> None:
+async def test_desktop_overlay_retained_surface_renders_markerless_whole_turn_emphasis() -> None:
     app = FakeFletApp()
-    boundary_block = _block(
+    emphasized = _block(
         "peer-transition",
         channel="peer",
-        block_variant="translated_peer",
+        block_variant="finalized",
         appearance_seq=1,
         primary_text="translated peer",
         secondary_text="peer source",
         secondary_enabled=True,
         speaker_style="cyan",
-        speaker_boundary=True,
     )
     window = desktop_overlay.FletDesktopRendererWindow(app_runner=app.run)
 
     try:
-        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[boundary_block]))
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[emphasized]))
         model = window._retained_caption_surface
         assert model is not None
-        marker = model.speaker_boundary_markers[0]
-        card = model.cards[0]
-        original_slot_height = card.height
-        assert marker.visible is True
-        assert marker.bgcolor == _DESKTOP_CAPTION_GOLD
-        assert marker.width > 0
-        assert marker.height > 0
-
-        await window.dispatch_snapshot(
-            OverlayPresentationSnapshot(
-                revision=2,
-                blocks=[replace(boundary_block, speaker_boundary=False)],
-            )
-        )
-        assert window._retained_caption_surface is model
-        assert marker.visible is False
-        assert card.height == original_slot_height
-
-        await window.dispatch_snapshot(
-            OverlayPresentationSnapshot(
-                revision=3,
-                blocks=[
-                    _block(
-                        "self-turn",
-                        channel="self",
-                        block_variant="finalized",
-                        appearance_seq=2,
-                        primary_text="self",
-                    )
-                ],
-            )
-        )
-        assert marker.visible is False
-
-        await window.dispatch_snapshot(OverlayPresentationSnapshot(revision=4, blocks=[]))
-        assert marker.visible is False
+        assert not hasattr(model, "speaker_boundary_markers")
+        assert model.primary_texts[0].color == "#33D6FF"
+        assert model.secondary_texts[0].color == "#33D6FF"
     finally:
         await window.close()
 

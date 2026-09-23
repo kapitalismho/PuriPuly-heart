@@ -928,7 +928,6 @@ class OverlayRuntimeIntent:
     target: str = OVERLAY_TARGET_STEAMVR
     show_translation: bool = True
     show_peer_original: bool = True
-    speaker_transition_mode: str = "A"
     calibration: Mapping[str, ResolvedOptionValue] = field(default_factory=_empty_options)
     desktop_overlay_options: Mapping[str, ResolvedOptionValue] = field(
         default_factory=_empty_options
@@ -944,15 +943,6 @@ class OverlayRuntimeIntent:
         object.__setattr__(self, "enabled", bool(self.enabled))
         object.__setattr__(self, "show_translation", bool(self.show_translation))
         object.__setattr__(self, "show_peer_original", bool(self.show_peer_original))
-        object.__setattr__(
-            self,
-            "speaker_transition_mode",
-            (
-                self.speaker_transition_mode
-                if self.speaker_transition_mode in {"A", "C", "E"}
-                else "A"
-            ),
-        )
         object.__setattr__(
             self,
             "calibration",
@@ -1460,7 +1450,6 @@ def resolve_overlay_config(intent: OverlayRuntimeIntent) -> ResolvedOverlayConfi
         target=cast(str, intent.target),
         show_translation=intent.show_translation,
         show_peer_original=intent.show_peer_original,
-        speaker_transition_mode=intent.speaker_transition_mode,
         calibration=intent.calibration,
         desktop_overlay_options=intent.desktop_overlay_options,
     )

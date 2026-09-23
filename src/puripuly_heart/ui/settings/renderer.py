@@ -146,11 +146,6 @@ def compose_settings_overlay_surface(
         slots.overlay_translation,
         slots.overlay_peer_original,
     )
-    speaker_transition_row = compose_settings_triple_row(
-        slots.speaker_transition_mode,
-        placeholder_factory(),
-        placeholder_factory(),
-    )
     vr_anchor_row = compose_settings_triple_row(slots.anchor, slots.distance, slots.offset_x)
     vr_offset_row = compose_settings_triple_row(slots.offset_y, slots.text_scale, slots.vr_reset)
     desktop_controls_row = compose_settings_triple_row(
@@ -173,7 +168,6 @@ def compose_settings_overlay_surface(
     return SettingsOverlaySurfaceRegions(
         rows=(
             target_row,
-            speaker_transition_row,
             vr_anchor_row,
             vr_offset_row,
             desktop_controls_row,

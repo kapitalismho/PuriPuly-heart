@@ -244,7 +244,6 @@ class SettingsOverlaySurfaceSlots:
     overlay_target: ft.Control
     overlay_translation: ft.Control
     overlay_peer_original: ft.Control
-    speaker_transition_mode: ft.Control
     anchor: ft.Control
     distance: ft.Control
     offset_x: ft.Control

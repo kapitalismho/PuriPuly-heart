@@ -301,7 +301,6 @@ struct LogicalCaptionBlockIdentity {
     primary_language: Option<String>,
     secondary_language: Option<String>,
     speaker_style: Option<String>,
-    speaker_boundary: bool,
 }
 
 fn retain_semantically_current_blocks(snapshot: &mut OverlayPresentationSnapshot) {
@@ -689,8 +688,8 @@ impl PresentationRuntime {
                     "ownership": "exclusive"
                 },
                 "speaker_transition_presentation": {
-                    "version": 1,
-                    "modes": ["A", "C", "E"]
+                    "version": 2,
+                    "policy": "temporary_turn_emphasis"
                 }
             }
         });
@@ -1319,7 +1318,6 @@ fn frame_content_identity(blocks: &[CaptionBlock], presentation: &CaptionPresent
         block.primary_text.hash(&mut hasher);
         block.secondary_text.hash(&mut hasher);
         block.secondary_enabled.hash(&mut hasher);
-        block.speaker_boundary.hash(&mut hasher);
         block.primary_language.hash(&mut hasher);
         block.secondary_language.hash(&mut hasher);
         block.block_variant.hash(&mut hasher);
@@ -2383,7 +2381,6 @@ fn logical_caption_identity(state: &OverlayState) -> LogicalCaptionIdentity {
                 primary_language: slot.primary_language.clone(),
                 secondary_language: slot.secondary_language.clone(),
                 speaker_style: slot.speaker_style.clone(),
-                speaker_boundary: slot.speaker_boundary,
             })
             .collect(),
     )
@@ -2543,7 +2540,7 @@ pub async fn run_cli(args: &[String]) -> i32 {
                 "app_version": env!("CARGO_PKG_VERSION"),
                 "execution_contract": {"version": 1, "revision": "r2"},
                 "native_presentation_retry": {"version": 1, "ownership": "exclusive"},
-                "speaker_transition_presentation": {"version": 1, "modes": ["A", "C", "E"]},
+                "speaker_transition_presentation": {"version": 2, "policy": "temporary_turn_emphasis"},
             })
         );
         return 0;
@@ -2696,7 +2693,6 @@ fn caption_block_for_strip(strip: &OverlaySlot) -> CaptionBlock {
         .with_channel(channel)
         .with_variant(variant)
         .with_secondary_text(strip.secondary_text.clone(), strip.secondary_enabled)
-        .with_speaker_boundary(strip.speaker_boundary)
         .with_language_metadata(
             strip.primary_language.clone(),
             strip.secondary_language.clone(),

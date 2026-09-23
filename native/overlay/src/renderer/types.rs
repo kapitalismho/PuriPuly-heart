@@ -59,7 +59,6 @@ pub struct CaptionBlock {
     pub opacity: f32,
     pub offset_y_px: f32,
     pub height_scale: f32,
-    pub speaker_boundary: bool,
     pub slot_index: usize,
     pub slot_top_px: f32,
     pub slot_assigned: bool,
@@ -95,7 +94,6 @@ impl CaptionBlock {
             opacity: 1.0,
             offset_y_px: 0.0,
             height_scale: 1.0,
-            speaker_boundary: false,
             slot_index: 0,
             slot_top_px: 0.0,
             slot_assigned: false,
@@ -148,11 +146,6 @@ impl CaptionBlock {
         self.opacity = opacity.clamp(0.0, 1.0);
         self.offset_y_px = offset_y_px;
         self.height_scale = height_scale.clamp(0.35, 4.0);
-        self
-    }
-
-    pub fn with_speaker_boundary(mut self, speaker_boundary: bool) -> Self {
-        self.speaker_boundary = speaker_boundary;
         self
     }
 
@@ -384,7 +377,6 @@ pub struct ResolvedBlockLayout {
     pub primary_lines: Vec<ResolvedLineLayout>,
     pub secondary_line: Option<ResolvedLineLayout>,
     pub secondary_reserved: bool,
-    pub speaker_boundary: bool,
     pub bounds: BlockBounds,
     pub visual_bounds: VisualBounds,
     pub content_width_px: f32,
@@ -466,7 +458,6 @@ pub struct LayoutCacheKey {
     pub block_variant: CaptionBlockVariant,
     pub secondary_enabled: bool,
     pub secondary_reserved: bool,
-    pub speaker_boundary: bool,
     pub primary_font_size_key: u32,
     pub secondary_font_size_key: u32,
     pub content_width_key: u32,

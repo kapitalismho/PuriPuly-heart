@@ -1,4 +1,4 @@
-"""Desktop speaker-transition visual check for modes A, C, E."""
+"""Desktop markerless speaker-transition emphasis visual check."""
 
 from __future__ import annotations
 

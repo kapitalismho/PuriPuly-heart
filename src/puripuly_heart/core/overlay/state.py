@@ -1037,7 +1037,6 @@ class OverlayPresentationState:
             block.source_text_len if include_translation_metadata else None,
             block.logical_turn_key if include_translation_metadata else None,
             block.speaker_style,
-            block.speaker_boundary,
         )
 
     def rendered_blocks_signature(
@@ -1516,7 +1515,6 @@ class OverlayPresentationState:
                     source_text_len=entry.translation_source_text_len,
                     logical_turn_key=entry.translation_logical_turn_key,
                     speaker_style=None,
-                    speaker_boundary=False,
                 )
             active_text = entry.live_text.strip()
             if active_text:

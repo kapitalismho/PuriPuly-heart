@@ -665,7 +665,7 @@
     ]
   },
   "overlay": {
-    "contract_version": 10,
+    "contract_version": 11,
     "manifest_fields": [
       "app_version",
       "bridge_url",
@@ -738,8 +738,7 @@
       "source_text_hash",
       "source_text_len",
       "logical_turn_key",
-      "speaker_style",
-      "speaker_boundary"
+      "speaker_style"
     ],
     "channels": [
       "self",
