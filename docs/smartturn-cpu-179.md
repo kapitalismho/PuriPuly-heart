@@ -327,3 +327,34 @@ unrecorded background variation limit attribution of the cross-batch CPU
 differences; neither the historical disposition nor this adoption establishes
 a stable CPU or latency gain.
 No architecture ownership or dependency boundary changed.
+
+## Adopted production path: current co-load validation
+
+These operational checks use actual production P12 at
+`bda5b565361125ef9e8ee9556cba2cbfe8e96de7`, not the probe-local F12 prototype.
+Each arm processes eight requests and 1,522 concurrently paced Silero frames.
+The machine's background load was not sampled; power-scheme drift was false.
+
+```text
+.venv/Scripts/python.exe scripts/bench_smart_turn_179.py --out .data/smartturn-179/adopt_f12_coload.json paced --arms P12 --rounds 1 --gap 1.0 --coload silero
+.venv/Scripts/python.exe scripts/bench_smart_turn_179.py --out .data/smartturn-179/adopt_f12_coload_paired.json paced --arms S12,P12 --rounds 1 --gap 1.0 --coload silero
+```
+
+| Run | Arm | Receipt median / p95 / worst ms | Frames processed at least 32 ms late |
+| --- | --- | ---: | ---: |
+| Initial adopted-path check | P12 | 63.480 / 129.956 / 129.956 | 3 |
+| Contemporaneous comparison | S12 | 71.190 / 89.642 / 89.642 | 8 |
+| Contemporaneous comparison | P12 | 70.736 / 99.097 / 99.097 | 0 |
+
+Every request completed; all frames were processed. All three runs recorded
+eight speech starts with clips ending at external replay boundaries, not
+natural endpoints. The late-frame counter is replay scheduling lateness,
+not evidence of lost audio or a hardware-drop measurement. The paired run
+uses sequential arms in one process, not randomized repeated batches.
+
+The initial P12 lateness is retained, not discarded. This check did not
+reproduce a candidate-specific scheduling regression: lateness also appeared
+on S12 and was absent on the paired P12 run. It does not prove that fusion
+improves scheduling or that application-wide interference is absent. The
+earlier zero-late historical runs do not characterize current machine load.
+Controller decision/receipt parity is covered separately above.

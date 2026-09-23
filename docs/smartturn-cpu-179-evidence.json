@@ -4,6 +4,23 @@
   "baseline_sha": "c33692591a76cb6790f4cd2abad2c2a0501ac63d",
   "probe": "scripts/bench_smart_turn_179.py",
   "production_changes": true,
+  "production_coload_validation": {
+    "candidate_sha": "bda5b565361125ef9e8ee9556cba2cbfe8e96de7",
+    "probe_sha256": "b51c2a6a3d3a483a3ca36d992be00151381551724a90b9a13aad5a4c58a88ed9",
+    "background_load": "not sampled",
+    "power_scheme_drift": false,
+    "requests_per_arm": 8,
+    "processed_vad_frames_per_arm": 1522,
+    "initial_artifact": ".data/smartturn-179/adopt_f12_coload.json",
+    "paired_artifact": ".data/smartturn-179/adopt_f12_coload_paired.json",
+    "runs": [
+      {"run": "initial", "arm": "P12", "complete": 8, "receipt_ms": {"median": 63.47965, "p95": 129.956, "worst": 129.956}, "frames_at_least_32ms_late": 3},
+      {"run": "paired", "arm": "S12", "complete": 8, "receipt_ms": {"median": 71.1896, "p95": 89.642, "worst": 89.642}, "frames_at_least_32ms_late": 8},
+      {"run": "paired", "arm": "P12", "complete": 8, "receipt_ms": {"median": 70.7364, "p95": 99.097, "worst": 99.097}, "frames_at_least_32ms_late": 0}
+    ],
+    "endpoint_counts_each": {"SpeechStart": 8, "SpeechEnd": 0},
+    "interpretation": "All frames processed; lateness is replay scheduling, not hardware audio loss. Paired sequential S12/P12 run did not reproduce a candidate-specific regression. No speedup, scheduling superiority, or absence-of-interference claim; initial P12 lateness retained."
+  },
   "policy": {
     "name": "POLICY-179-CURRENT",
     "maintainer_approval": "Conversation approval confirmed by CURRENT-LISTEN-SMARTTURN-2026-09-23; no policy repair in this probe.",
