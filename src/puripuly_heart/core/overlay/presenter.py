@@ -185,6 +185,8 @@ class OverlayPresenter(OverlaySink):
         self._retired_preview_self_seqs.clear()
         self._live_self_turn_key = None
         self._live_peer_turn_key = None
+        self._speaker_seen_readable.clear()
+        self._speaker_emphasis_id = None
         self._revision += 1
         self._retry_projection.clear_scene()
         snapshot = self._presentation_state.generate_snapshot(

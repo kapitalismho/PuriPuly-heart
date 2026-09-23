@@ -24,10 +24,15 @@ selector, or saved mode preference; normal caption lifetime remains unchanged.
   presenter. Translation remained an explicit deterministic stand-in. The resulting two PEER
   turns were Gold then Sky; the sanitized result is
   `experiments/overlay_speaker_transition/runtime_validation/live_production_path_result.json`.
-- Automated verification: 214 relevant core/provider/integration cases were collected: 213 passed
-  and one opt-in Soniox integration case skipped. All 739 relevant config/app/UI cases passed; the
-  full native suite passed 270 tests with one opt-in probe ignored, including Windows graphics;
-  formatting checks passed.
+- Initial cutover candidate `a15cb478aa7859562f9f64868919fa57f628ccc3` automated verification:
+  214 relevant core/provider/integration cases were collected: 213 passed and one opt-in Soniox
+  integration case skipped. All 739 relevant config/app/UI cases passed; the full native suite
+  passed 270 tests with one opt-in probe ignored, including Windows graphics; formatting passed.
+- Review repairs require the same exact version-2 capability in the active desktop repro ingress
+  and clear temporary-emphasis metadata on runtime detach. The focused presenter, bridge,
+  desktop repro, and process-manager selection passed 257 tests, including missing/retired
+  capability rejection and same-ID detach/reuse followed by a valid new transition.
+  The actual desktop demonstration was rerun after these repairs and exited successfully.
 - `scripts/check_speaker_modes_desktop.py --once --step-delay 0.1` launched the actual desktop
   child and exercised initial Gold PEER, transition Sky PEER, a same-identity text revision that
   stays Sky, readable White SELF expiration, and another Sky transition. The matching native
@@ -41,18 +46,24 @@ selector, or saved mode preference; normal caption lifetime remains unchanged.
 
 ## Current reproducible checks
 
-Core/provider/integration selection (213 passed, one opt-in live test skipped; the separate live
-synthetic-audio smoke was run):
+Initial cutover core/provider/integration selection (213 passed, one opt-in live test skipped;
+the separate live synthetic-audio smoke was run):
 
 ```text
 uv run pytest -q tests/core/test_speaker_transition.py tests/core/test_overlay_speaker_modes.py tests/core/test_overlay_bridge.py tests/core/test_overlay_manifest.py tests/core/test_soniox_multilingual_release_readiness.py tests/core/test_translation_turn_owner.py tests/core/test_translation_output_projection_owner.py tests/providers/test_soniox_backend.py tests/providers/test_soniox_reuse.py tests/integration/test_speaker_transition_pipeline.py tests/integration/test_soniox_stt_integration.py tests/integration/test_stt_connection_reuse.py -rs
 ```
 
-Config/application/UI selection (739 passed):
+Initial cutover config/application/UI selection (739 passed):
 
 ```text
 uv run pytest -q tests/config/test_overlay_settings.py tests/config/test_settings_vnext_migration_serialization.py tests/config/test_public_compatibility_surfaces.py tests/app/test_overlay_process_manager.py tests/app/test_overlay_translation_enabled_sync.py tests/app/test_settings_mutation_legacy.py tests/ui/test_desktop_overlay_renderer.py tests/ui/test_settings_surface_contract.py tests/ui/test_settings_view_branches.py tests/ui/test_i18n_key_usage.py -rs
 ```
+Post-review repair selection (257 passed):
+
+```text
+uv run pytest -q tests/core/test_overlay_speaker_modes.py tests/core/test_overlay_presenter.py tests/core/test_overlay_bridge.py tests/app/test_desktop_overlay_repro.py tests/app/test_overlay_process_manager.py --junitxml=C:/t/ovr178/u3-review-repair.xml -rs
+```
+
 
 Native suite (270 passed, one opt-in probe ignored), isolated desktop demonstration, and the live
 provider smoke:

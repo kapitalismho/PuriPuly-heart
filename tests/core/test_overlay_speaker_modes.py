@@ -80,6 +80,26 @@ async def test_consecutive_transitions_move_emphasis_to_incoming_turn() -> None:
 
 
 @pytest.mark.asyncio
+async def test_runtime_detach_clears_stale_emphasis_without_disabling_next_transition() -> None:
+    clock = FakeClock(_now=35.0)
+    adapter = OverlayEventAdapter(clock=clock)
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    reused, next_changed = uuid4(), uuid4()
+
+    await presenter.emit(_peer_event(adapter, reused, "changed", "transition"))
+    assert presenter.snapshot().blocks[-1].speaker_style == "cyan"
+
+    await presenter.clear_for_runtime_detach()
+    await presenter.emit(_peer_event(adapter, reused, "reused after detach", "context_reset"))
+    assert presenter.snapshot().blocks[-1].speaker_style == "gold"
+
+    await presenter.emit(_peer_event(adapter, next_changed, "next transition", "transition"))
+    blocks = {block.id: block for block in presenter.snapshot().blocks}
+    assert blocks[f"peer:{reused}"].speaker_style == "gold"
+    assert blocks[f"peer:{next_changed}"].speaker_style == "cyan"
+
+
+@pytest.mark.asyncio
 async def test_uncertainty_and_late_transition_revision_do_not_emphasize() -> None:
     clock = FakeClock(_now=40.0)
     adapter = OverlayEventAdapter(clock=clock)
