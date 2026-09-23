@@ -415,6 +415,13 @@ This binds the observations to committed source rather than a pre-edit HEAD.
   Production contains no diagnostic tracing; these measurements still include
   **probe-only** observation overhead and are not uninstrumented performance
   estimates or speedup claims. Background load was not sampled.
+  Specifically, P12 repeats preparation, feature extraction and three hashes
+  on the event loop **after** production inference returns but **before** the
+  owner records completion. Its `worker_to_loop_return_ms` therefore includes
+  that recomputation, not just scheduling; `submit_to_receipt_ms` includes it
+  too. These P12 fields are not like-for-like timing comparisons with the
+  historical arms. P12 hashes are recomputed reference tensors, not captures
+  of the actual native feed. Actual production scores are compared separately.
 - Shared formatting/lint passed, and the integrated regression suite again
   passed all 144 tests after removal of production instrumentation.
 
@@ -455,3 +462,116 @@ Reviewed source SHA-256:
 Spinning, ORT 1/2, numerical precision, thresholds, single-flight ownership
 and cancellation/cleanup shields remain unchanged. Prior F12 timing evidence
 predates this cleanup; no whole-request performance improvement is claimed.
+
+### Allocation cleanup reproduction
+
+The original numbers above are one local observation, not expected thresholds.
+The recipe below uses the current production preparation function and the
+previous `np.pad` algorithm; snapshot microbenchmarks isolate the old/new
+expressions rather than timing owner admission. Fetch the lawful fixtures with
+the existing probe first. Save this code to a temporary file outside the repo
+and run `.venv/Scripts/python.exe <temporary-file>` from the repository root.
+It reproduces the protocol, byte/isolation checks and real-model comparison;
+timings and allocation peaks may vary between runs.
+
+```python
+import asyncio
+import statistics
+import sys
+import time
+import tracemalloc
+from pathlib import Path
+
+sys.path[:0] = ["src", "scripts"]
+import numpy as np
+import bench_smart_turn_179 as probe
+from puripuly_heart.core.audio.smart_turn import (
+    SmartTurnOnnxInference,
+    bundled_smart_turn_onnx_path,
+    prepare_smart_turn_audio,
+)
+from puripuly_heart.core.audio.smart_turn_features import compute_whisper_log_mel_features
+
+
+def old_prepare(audio):
+    value = np.asarray(audio, dtype=np.float32)
+    if value.size > 128000:
+        return value[-128000:].copy()
+    if value.size < 128000:
+        return np.pad(value, (128000 - value.size, 0), mode="constant")
+    return value.copy()
+
+
+def new_prepare(audio):
+    return prepare_smart_turn_audio(audio, sample_rate_hz=16000)
+
+
+def old_snapshot(audio):
+    return np.asarray(audio, dtype=np.float32).reshape(-1).copy()
+
+
+def new_snapshot(audio):
+    return np.array(audio, dtype=np.float32, order="C", copy=True).reshape(-1)
+
+
+for size in (0, 1, 3584, 16000, 127999, 128000, 160000):
+    for audio in (np.arange(size, dtype=np.float32), np.arange(size, dtype=np.float64)[::-1]):
+        before, after = old_prepare(audio), new_prepare(audio)
+        assert before.tobytes() == after.tobytes()
+        assert not np.shares_memory(audio, after)
+
+for audio in (
+    np.arange(128000, dtype=np.float32),
+    np.arange(128000, dtype=np.float64),
+    np.arange(128000, dtype=np.float32)[::2],
+    np.arange(12, dtype=np.float64).reshape(3, 4).T,
+):
+    before, after = old_snapshot(audio), new_snapshot(audio)
+    assert before.tobytes() == after.tobytes()
+    assert after.flags.c_contiguous and not np.shares_memory(audio, after)
+    peaks = []
+    for fn in (old_snapshot, new_snapshot):
+        tracemalloc.start()
+        result = fn(audio)
+        peaks.append(tracemalloc.get_traced_memory()[1])
+        tracemalloc.stop()
+    print("snapshot", audio.dtype, audio.shape, "peak bytes", peaks)
+
+for size in (3584, 16000, 96000):
+    audio = np.arange(size, dtype=np.float32)
+    functions = (old_prepare, new_prepare)
+    timings = [[], []]
+    for fn in functions:
+        for _ in range(100):
+            fn(audio)
+    for batch in range(20):
+        for index in (batch % 2, 1 - batch % 2):
+            start = time.perf_counter_ns()
+            for _ in range(500):
+                functions[index](audio)
+            timings[index].append((time.perf_counter_ns() - start) / 500 / 1000)
+    print("prepare", size, "median us old/new", [statistics.median(t) for t in timings])
+
+
+async def real_parity():
+    inference = SmartTurnOnnxInference(bundled_smart_turn_onnx_path())
+    try:
+        fixtures = probe.load_fixtures(Path(".data/smartturn-179/audio"))
+        for fixture in fixtures:
+            audio = fixture["audio"]
+            before, after = old_prepare(audio), new_prepare(audio)
+            assert before.tobytes() == after.tobytes(), fixture["name"]
+            before_features = compute_whisper_log_mel_features(before)
+            after_features = compute_whisper_log_mel_features(after)
+            assert before_features.tobytes() == after_features.tobytes(), fixture["name"]
+            feed = {"input_features": np.expand_dims(before_features, 0)}
+            expected = float(np.asarray(inference._session.run(None, feed)[0]).reshape(-1)[0])
+            actual = await inference.predict(audio, sample_rate_hz=16000)
+            assert actual == expected, fixture["name"]
+        print("PASS", len(fixtures), "real-model fixtures; byte parity; score difference 0.0")
+    finally:
+        inference.close()
+
+
+asyncio.run(real_parity())
+```

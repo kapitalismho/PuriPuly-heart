@@ -20,6 +20,7 @@
     "prepared_and_feature_bytes_equal": true,
     "score_max_abs_diff": 0.0,
     "integrated_tests_passed": 144,
+    "reproduction": "docs/smartturn-cpu-179.md#allocation-cleanup-reproduction",
     "limits": "microbenchmark only, not end-to-end speedup; existing full-request F12 timings predate allocation cleanup; no spinning or lifecycle changes"
   },
   "committed_clean_validation": {
@@ -27,10 +28,10 @@
     "probe_sha256": "3b9338028ecae9d9e16f1e47287575852897c838af1ff4d8ed812bf1e9b8f9cb",
     "artifacts": ["committed_f12_parity.json", "committed_f12_controller.json", "committed_f12_coload.json"],
     "artifact_directory": ".data/smartturn-179/",
-    "matrix": {"fixtures_per_arm": 13, "P12_started": 13, "P12_complete": 13, "busy": 0, "unavailable": 0, "error": 0, "nonfinite": 0, "comparison_arms": ["S12", "S11", "F12", "F11"], "all_prepared_feature_model_input_hashes_observed_and_equal": true, "score_max_abs_diff": 0.0},
+    "matrix": {"fixtures_per_arm": 13, "P12_started": 13, "P12_complete": 13, "busy": 0, "unavailable": 0, "error": 0, "nonfinite": 0, "comparison_arms": ["S12", "S11", "F12", "F11"], "all_prepared_feature_model_input_hashes_observed_and_equal": true, "P12_hash_scope": "post-call recomputed reference tensors, not captured native-feed tensors; actual production scores compared separately", "score_max_abs_diff": 0.0},
     "controller": {"arms": ["P12", "S12", "F12"], "requests_per_arm": 8, "each_arm_decisions": {"early": 1, "incomplete": 7}, "each_arm_late": 0, "seal_pause_ms": [512, 800], "P12_min_deadline_slack_ms": 222.747},
     "coload": {"arm": "P12", "requests_complete": 8, "vad_frames_processed": 1522, "frames_at_least_32ms_late": 0, "endpoint_counts": {"SpeechStart": 8, "SpeechEnd": 0}, "receipt_ms": {"median": 81.4784, "p95": 96.7886, "worst": 96.7886}},
-    "measurement_scope": "Actual instrumentation-free production implementation observed by probe-only wrappers. Timings include external probe observation overhead and are operational checks, not uninstrumented performance claims.",
+    "measurement_scope": "Actual instrumentation-free production observed by probe-only wrappers. P12 recomputes preparation, features and three hashes on the event loop after production returns and before owner completion. Its worker_to_loop_return_ms and submit_to_receipt_ms include this extra recomputation and are not like-for-like comparisons with other arms, pure scheduling measurements or uninstrumented production timings. Operational checks only; no speedup claim.",
     "power_scheme_drift": false,
     "background_load": "not sampled"
   },
