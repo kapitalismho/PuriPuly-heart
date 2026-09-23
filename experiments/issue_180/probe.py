@@ -75,9 +75,11 @@ APPROVED_IMPLEMENTATION_PATHS = frozenset(
         "src/puripuly_heart/core/stt/session_projection.py",
         "src/puripuly_heart/providers/stt/local_gpu.py",
         "src/puripuly_heart/providers/stt/local_qwen_sherpa.py",
+        "src/puripuly_heart/providers/stt/local_decode.py",
         "tests/core/runtime/test_output_runtime.py",
         "tests/core/test_stt_scoped_engine.py",
         "tests/core/test_stt_session_projection.py",
+        "tests/providers/test_local_cpu_backends.py",
     }
 )
 NAMESPACE = UUID("79ba997d-9247-4a88-b850-a24db11de180")

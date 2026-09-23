@@ -470,6 +470,60 @@ async def test_sealed_overlap_admits_successor_and_orders_out_of_order_terminals
 
 
 @pytest.mark.asyncio
+async def test_successor_begin_failure_drains_predecessor_terminal_from_retiring_epoch() -> None:
+    class FailingSuccessorSession(ControlledScopedSession):
+        async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+            await super().begin_turn(request)
+            if len(self.requests) == 2:
+                raise RuntimeError("successor begin failed")
+
+        async def stop(self) -> None:
+            self.calls.append(("stop",))
+            first = self.requests[0].identity
+            self.emit(
+                STTProviderTurnTerminal(
+                    identity=first,
+                    outcome="final",
+                    text="a-final-text",
+                    text_authority="authoritative",
+                )
+            )
+
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=1,
+        settings=settings("local_qwen"),
+    )
+    a_start, _a_chunk, a_end = segment_events(ledger, start_sample=100, now=1.0)
+    b_start, _b_chunk, _b_end = segment_events(ledger, start_sample=200, now=2.0)
+    session = FailingSuccessorSession()
+    session.allows_sealed_turn_overlap = True
+    emitted: list[STTProviderTurnTerminal] = []
+    engine = ScopedRecognitionEngine(
+        channel="self",
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        event_sink=lambda event: (
+            emitted.append(event) if isinstance(event, STTProviderTurnTerminal) else None
+        ),
+        watchdog_resolver=lambda _settings: watchdogs(final_timeout_s=0.1),
+    )
+
+    await engine.handle_owned_vad_event(a_start)
+    await engine.handle_owned_vad_event(a_end)
+    await engine.handle_owned_vad_event(b_start)
+    await wait_until(lambda: len(emitted) == 2, timeout=0.5)
+
+    assert [(item.outcome, item.text, item.failure_reason) for item in emitted] == [
+        ("final", "a-final-text", None),
+        ("failed", "", "provider_begin_failed:RuntimeError"),
+    ]
+    assert [item.identity for item in emitted] == [
+        session.requests[0].identity,
+        session.requests[1].identity,
+    ]
+    await engine.close()
+
+
+@pytest.mark.asyncio
 async def test_empty_a_late_a_and_duplicates_cannot_shift_b() -> None:
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
     a_start, _a_chunk, a_end = segment_events(ledger, start_sample=100, now=1.0)

@@ -1453,6 +1453,7 @@ async def test_self_original_does_not_wait_for_previous_translation_parent() -> 
     adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
     a_parent = uuid4()
     b_parent = uuid4()
+    c_parent = uuid4()
     assert await owner.admit_translation_parent(
         parent_id=str(a_parent),
         channel="self",
@@ -1478,6 +1479,31 @@ async def test_self_original_does_not_wait_for_previous_translation_parent() -> 
         owner.publish_overlay_event(b_original),
         timeout=0.1,
     )
+    b_close = adapter.utterance_closed(utterance_id=b_parent, channel="self")
+    b_close_result = await asyncio.wait_for(
+        owner.publish_overlay_event(b_close),
+        timeout=0.1,
+    )
+    c_original = adapter.transcript_final(
+        Transcript(
+            utterance_id=c_parent,
+            channel="self",
+            text="c",
+            is_final=True,
+            created_at=10.0,
+        ),
+        source_language="en",
+        target_language="ko",
+    )
+    c_original_result = await asyncio.wait_for(
+        owner.publish_overlay_event(c_original),
+        timeout=0.1,
+    )
+    c_close = adapter.utterance_closed(utterance_id=c_parent, channel="self")
+    c_close_result = await asyncio.wait_for(
+        owner.publish_overlay_event(c_close),
+        timeout=0.1,
+    )
 
     a_scope = OverlayPublicationScope(
         turn_kind="self",
@@ -1496,13 +1522,30 @@ async def test_self_original_does_not_wait_for_previous_translation_parent() -> 
         output_scope=a_scope,
     )
     translation_result = await owner.publish_overlay_event(a_translation)
+    a_close = adapter.utterance_closed(
+        utterance_id=a_parent,
+        channel="self",
+        output_scope=a_scope,
+    )
+    close_result = await owner.publish_overlay_event(a_close)
+    duplicate_close_result = await owner.publish_overlay_event(a_close)
 
     assert original_result.decision.decision == "published"
+    assert b_close_result.decision.decision == "published"
+    assert c_original_result.decision.decision == "published"
+    assert c_close_result.decision.decision == "published"
     assert translation_result.decision.decision == "published"
+    assert close_result.decision.decision == "published"
+    assert duplicate_close_result.decision.reason == "duplicate_publication"
     assert [event.event_id for event in sink.events] == [
         b_original.event_id,
+        b_close.event_id,
+        c_original.event_id,
+        c_close.event_id,
         a_translation.event_id,
+        a_close.event_id,
     ]
+    await owner.close()
 
 
 @pytest.mark.asyncio

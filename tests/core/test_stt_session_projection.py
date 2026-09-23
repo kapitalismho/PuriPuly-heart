@@ -158,3 +158,29 @@ async def test_overlap_projection_keeps_sealed_identity_until_its_own_terminal()
     assert await stream.__anext__() == second_terminal
     assert await stream.__anext__() == first_terminal
     projection.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retirement", ["retire", "end_epoch"])
+async def test_explicit_retirement_rejects_late_callbacks(retirement: str) -> None:
+    projection = STTSessionEventProjection(
+        STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
+    )
+    request = _request()
+    projection.begin(request)
+    projection.seal(request.identity)
+
+    if retirement == "retire":
+        projection.retire()
+    else:
+        assert projection.end_epoch(orderly=False, reason="connection_closed")
+
+    terminal = STTProviderTurnTerminal(
+        identity=request.identity,
+        outcome="final",
+        text="late",
+        text_authority="authoritative",
+    )
+    assert projection.is_current(request.identity) is False
+    assert projection.terminal(terminal) is False
+    projection.close()

@@ -50,6 +50,7 @@ from puripuly_heart.providers.stt.local_decode import (
     LocalDecodeCoordinator,
     LocalDecodeExpired,
     LocalDecodeFailure,
+    LocalDecodeJob,
 )
 
 DEFAULT_SHERPA_NUM_THREADS = 3
@@ -351,6 +352,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
             on_completion=self._handle_decode_completion,
             on_failure=self._handle_decode_failure,
             on_expired=self._handle_decode_expired,
+            preserve_queued_after_failure=self._preserve_queued_after_failure,
             on_backlog_warning=self._log_decode_backlog_warning,
             start_after=self.decode_start_after,
             pending_ttl_s=self.backend.pending_ttl_s,
@@ -478,7 +480,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
         failure_reason: str | None = None,
         retire: bool = False,
     ) -> None:
-        if not self._event_projection.is_current(identity):
+        if not self._event_projection.can_terminal(identity):
             return
         authority = "authoritative" if outcome in ("final", "empty") else "none"
         if outcome == "degraded":
@@ -546,6 +548,9 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 self._terminalize_scoped(identity, outcome="final", text=text)
             else:
                 self._terminalize_scoped(identity, outcome="empty")
+
+    def _preserve_queued_after_failure(self, job: LocalDecodeJob) -> bool:
+        return job.sequence in self._scoped_job_identities
 
     async def _handle_decode_failure(self, failure: LocalDecodeFailure) -> None:
         if failure.job.audio_ms > 0:

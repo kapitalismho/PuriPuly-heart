@@ -40,6 +40,7 @@ class STTSessionEventProjection:
         self._payload_sequences: dict[STTProviderTurnIdentity, int] = {}
         self._update_sequences: dict[STTProviderTurnIdentity, int] = {}
         self._sealed_identities: set[STTProviderTurnIdentity] = set()
+        self._draining_identities: set[STTProviderTurnIdentity] = set()
         self._retired = False
         self._epoch_ended = False
         self._closed = False
@@ -142,7 +143,10 @@ class STTSessionEventProjection:
         return sequence
 
     def is_current(self, identity: STTProviderTurnIdentity) -> bool:
-        return identity in self._payload_sequences
+        return not self._retired and identity in self._payload_sequences
+
+    def can_terminal(self, identity: STTProviderTurnIdentity) -> bool:
+        return self.is_current(identity) or identity in self._draining_identities
 
     def put_legacy(self, event: LegacySTTEvent) -> bool:
         queue = self._legacy_events
@@ -174,7 +178,7 @@ class STTSessionEventProjection:
         return accepted
 
     def terminal(self, event: STTProviderTurnTerminal) -> bool:
-        if not self.is_current(event.identity):
+        if not self.can_terminal(event.identity):
             return False
         buffer = self._scoped_buffer()
         try:
@@ -183,15 +187,19 @@ class STTSessionEventProjection:
             accepted = False
         if event.epoch_disposition == "retire" or not accepted:
             self._retired = True
+            self._draining_identities.update(self._payload_sequences)
+            self._draining_identities.discard(event.identity)
         self._payload_sequences.pop(event.identity, None)
         self._update_sequences.pop(event.identity, None)
         self._sealed_identities.discard(event.identity)
+        self._draining_identities.discard(event.identity)
         if self._active_identity == event.identity:
             self._active_identity = None
         return accepted
 
     def retire(self) -> None:
         self._retired = True
+        self._draining_identities.clear()
 
     def end_epoch(
         self,
@@ -207,6 +215,7 @@ class STTSessionEventProjection:
             raise RuntimeError("scoped STT projection is missing its provider epoch")
         self._retired = True
         self._epoch_ended = True
+        self._draining_identities.clear()
         event = STTProviderEpochEnded(
             provider_epoch_id=epoch_id,
             orderly=orderly,
@@ -261,6 +270,7 @@ class STTSessionEventProjection:
         self._payload_sequences.pop(identity, None)
         self._update_sequences.pop(identity, None)
         self._sealed_identities.discard(identity)
+        self._draining_identities.discard(identity)
         if self._active_identity == identity:
             self._active_identity = None
 

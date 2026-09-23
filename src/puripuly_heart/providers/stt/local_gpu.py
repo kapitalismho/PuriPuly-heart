@@ -211,7 +211,7 @@ class _LocalGpuSTTSession(STTBackendSession):
         failure_reason: str | None = None,
         retire: bool = False,
     ) -> None:
-        if not self._event_projection.is_current(identity):
+        if not self._event_projection.can_terminal(identity):
             return
         self._event_projection.terminal(
             STTProviderTurnTerminal(

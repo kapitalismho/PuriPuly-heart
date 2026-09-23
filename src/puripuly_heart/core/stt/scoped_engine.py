@@ -152,6 +152,7 @@ class ScopedRecognitionEngine:
         repr=False,
     )
     _ended_provider_epoch_id: str | None = field(init=False, default=None, repr=False)
+    _retiring_provider_epoch_ids: set[str] = field(init=False, default_factory=set, repr=False)
     _turn: _ActiveTurn | None = field(init=False, default=None, repr=False)
     _turns: dict[STTProviderTurnIdentity, _ActiveTurn] = field(
         init=False, default_factory=dict, repr=False
@@ -773,7 +774,10 @@ class ScopedRecognitionEngine:
     ) -> None:
         try:
             async for event in session.turn_events():
-                if epoch_id != self._provider_epoch_id:
+                if (
+                    epoch_id != self._provider_epoch_id
+                    and epoch_id not in self._retiring_provider_epoch_ids
+                ):
                     continue
                 if isinstance(event, STTProviderEpochEnded):
                     if event.provider_epoch_id != epoch_id:
@@ -822,7 +826,7 @@ class ScopedRecognitionEngine:
         except asyncio.CancelledError:
             raise
         except BaseException as exc:
-            if epoch_id == self._provider_epoch_id:
+            if epoch_id == self._provider_epoch_id or epoch_id in self._retiring_provider_epoch_ids:
                 self._session_retirement_requested = True
                 for turn in tuple(self._turns.values()):
                     self._set_turn_failure(
@@ -1031,6 +1035,9 @@ class ScopedRecognitionEngine:
             watchdogs = (
                 pending_turn.watchdogs if pending_turn is not None else STTRecognitionWatchdogs()
             )
+        epoch_id = self._provider_epoch_id
+        if epoch_id is not None:
+            self._retiring_provider_epoch_ids.add(epoch_id)
         self._session = None
         self._session_consumer = None
         self._session_opened_at_s = None
@@ -1041,7 +1048,12 @@ class ScopedRecognitionEngine:
         if cleanup_consumer is asyncio.current_task():
             cleanup_consumer = None
         task = asyncio.create_task(
-            self._cleanup_session(session, cleanup_consumer, watchdogs),
+            self._cleanup_session(
+                session,
+                cleanup_consumer,
+                watchdogs,
+                retiring_epoch_id=epoch_id,
+            ),
             name="scoped-stt-cleanup",
         )
         self._cleanup_tasks.add(task)
@@ -1153,16 +1165,45 @@ class ScopedRecognitionEngine:
         session: STTScopedTurnSession,
         consumer: asyncio.Task[None] | None,
         watchdogs: STTRecognitionWatchdogs,
+        *,
+        retiring_epoch_id: str | None = None,
     ) -> None:
         operations = tuple(self._operation_tasks.pop(id(session), ()))
         if operations:
             await asyncio.gather(*operations, return_exceptions=True)
         await self._bounded_cleanup_call(session.stop(), watchdogs.drain_timeout_s)
+        if retiring_epoch_id is not None:
+            drained = await self._await_retiring_epoch_terminals(
+                retiring_epoch_id,
+                watchdogs.drain_timeout_s,
+            )
+            if not drained:
+                for turn in tuple(self._turns.values()):
+                    if turn.identity.provider_epoch_id == retiring_epoch_id:
+                        self._set_turn_failure(turn, "provider_retirement_drain_timeout")
+                await self._drain_completed_turns()
         await self._bounded_cleanup_call(session.close(), watchdogs.drain_timeout_s)
         if consumer is not None and not consumer.done():
             consumer.cancel()
         if consumer is not None:
             await asyncio.gather(consumer, return_exceptions=True)
+        if retiring_epoch_id is not None:
+            self._retiring_provider_epoch_ids.discard(retiring_epoch_id)
+
+    async def _await_retiring_epoch_terminals(
+        self,
+        epoch_id: str,
+        timeout: float,
+    ) -> bool:
+        pending = {
+            turn.terminal_ready
+            for turn in self._turns.values()
+            if turn.identity.provider_epoch_id == epoch_id and not turn.terminal_ready.done()
+        }
+        if not pending:
+            return True
+        _done, unresolved = await asyncio.wait(pending, timeout=timeout)
+        return not unresolved
 
     async def _bounded_cleanup_call(self, awaitable: Awaitable[None], timeout: float) -> None:
         task = asyncio.create_task(awaitable)

@@ -204,6 +204,68 @@ async def test_local_cpu_scoped_decode_snapshots_pcm_and_emits_one_terminal(
 
 
 @pytest.mark.asyncio
+async def test_local_cpu_overlap_preserves_queued_successor_after_predecessor_decode_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    backend = LocalQwenSherpaSTTBackend(model_dir=tmp_path)
+    decode_gate = asyncio.Event()
+    decode_calls = 0
+
+    async def ensure() -> object:
+        return object()
+
+    async def decode(_samples: np.ndarray) -> str:
+        nonlocal decode_calls
+        decode_calls += 1
+        await decode_gate.wait()
+        if decode_calls == 1:
+            raise RuntimeError("first decode failed")
+        return "b-text"
+
+    monkeypatch.setattr(backend, "_ensure_recognizer", ensure)
+    monkeypatch.setattr(backend, "decode_f32", decode)
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    first = _scoped_request(1)
+    second = _scoped_request(2)
+
+    for request in (first, second):
+        await session.begin_turn(request)
+        await session.send_turn_audio(
+            request.identity,
+            b"\x00\x40" * 160,
+            payload_sequence=1,
+            source_ranges=(),
+            context_only=False,
+        )
+        await session.seal_turn(
+            request.identity,
+            sealed_content_ranges=(),
+            seal_reason="silence",
+            observed_trailing_silence_ms=800,
+        )
+
+    decode_gate.set()
+    events = session.turn_events()
+    first_terminal = await asyncio.wait_for(events.__anext__(), timeout=1)
+    second_terminal = await asyncio.wait_for(events.__anext__(), timeout=1)
+
+    assert decode_calls == 2
+    assert (
+        first_terminal.identity,
+        first_terminal.outcome,
+        first_terminal.epoch_disposition,
+    ) == (first.identity, "failed", "retire")
+    assert (second_terminal.identity, second_terminal.outcome, second_terminal.text) == (
+        second.identity,
+        "final",
+        "b-text",
+    )
+    await session.close()
+    await backend.close()
+
+
+@pytest.mark.asyncio
 async def test_local_cpu_scoped_empty_error_and_close_terminal_matrix(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

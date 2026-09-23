@@ -12,6 +12,7 @@ from puripuly_heart.core.overlay.sink import (
     SelfActiveClear,
     SelfActiveUpdate,
     SelfTranscriptFinal,
+    UtteranceClosed,
 )
 from puripuly_heart.domain.models import ChannelId
 
@@ -424,7 +425,8 @@ class DestinationBatchAdmission:
         if (
             event.turn_kind is None
             and event.parent_utterance_id is None
-            and isinstance(event, SelfTranscriptFinal)
+            and event.channel == "self"
+            and isinstance(event, (SelfTranscriptFinal, UtteranceClosed))
         ):
             return "self:original"
         return event.turn_kind or str(event.channel)
