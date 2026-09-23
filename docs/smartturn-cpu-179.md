@@ -387,3 +387,33 @@ on S12 and was absent on the paired P12 run. It does not prove that fusion
 improves scheduling or that application-wide interference is absent. The
 earlier zero-late historical runs do not characterize current machine load.
 Controller decision/receipt parity is covered separately above.
+
+## Committed instrumentation-free candidate verification
+
+The final source and probe were exercised at committed implementation
+`451e2e08c3f437f8f9d2a627c47b44ba63dfa524`; all three raw outputs record that
+HEAD and probe SHA-256
+`3b9338028ecae9d9e16f1e47287575852897c838af1ff4d8ed812bf1e9b8f9cb`.
+This binds the observations to committed source rather than a pre-edit HEAD.
+
+```text
+.venv/Scripts/python.exe scripts/bench_smart_turn_179.py --out .data/smartturn-179/committed_f12_parity.json matrix --calls 13 --warmup 2
+.venv/Scripts/python.exe scripts/bench_smart_turn_179.py --out .data/smartturn-179/committed_f12_controller.json controller --arms P12,S12,F12
+.venv/Scripts/python.exe scripts/bench_smart_turn_179.py --out .data/smartturn-179/committed_f12_coload.json paced --arms P12 --rounds 1 --gap 1.0 --coload silero
+```
+
+- P12 completed all 13 speech/guard fixtures. Prepared, feature and model-input
+  hashes were present and equal to every comparator; maximum score difference
+  was 0.0. No busy, unavailable, error or nonfinite outcomes.
+- P12/S12/F12 each produced one early and seven incomplete decisions across
+  eight production-controller cases; seal pauses remained 512/800 ms and no
+  result was late. P12 minimum receipt-to-deadline slack was 222.747 ms.
+- P12 co-load completed eight requests and processed 1,522 VAD frames with
+  zero frames at least 32 ms late in this run. The earlier late-frame
+  observations remain above; this is not a universal no-interference claim.
+- The co-load receipt median/p95/worst was 81.478/96.789/96.789 ms.
+  Production contains no diagnostic tracing; these measurements still include
+  **probe-only** observation overhead and are not uninstrumented performance
+  estimates or speedup claims. Background load was not sampled.
+- Shared formatting/lint passed, and the integrated regression suite again
+  passed all 144 tests after removal of production instrumentation.

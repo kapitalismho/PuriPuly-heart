@@ -1,10 +1,24 @@
 {
   "schema": "smartturn-cpu-179-evidence-v3",
   "status": "adopted_f12_structural_simplification",
-  "baseline_sha": "1c4aca5ed020eb7cfce2b9868e54c864a940e9c3",
+  "baseline_sha": "c33692591a76cb6790f4cd2abad2c2a0501ac63d",
+  "repair_baseline_sha": "1c4aca5ed020eb7cfce2b9868e54c864a940e9c3",
   "probe": "scripts/bench_smart_turn_179.py",
   "production_changes": true,
+  "committed_clean_validation": {
+    "implementation_sha": "451e2e08c3f437f8f9d2a627c47b44ba63dfa524",
+    "probe_sha256": "3b9338028ecae9d9e16f1e47287575852897c838af1ff4d8ed812bf1e9b8f9cb",
+    "artifacts": ["committed_f12_parity.json", "committed_f12_controller.json", "committed_f12_coload.json"],
+    "artifact_directory": ".data/smartturn-179/",
+    "matrix": {"fixtures_per_arm": 13, "P12_started": 13, "P12_complete": 13, "busy": 0, "unavailable": 0, "error": 0, "nonfinite": 0, "comparison_arms": ["S12", "S11", "F12", "F11"], "all_prepared_feature_model_input_hashes_observed_and_equal": true, "score_max_abs_diff": 0.0},
+    "controller": {"arms": ["P12", "S12", "F12"], "requests_per_arm": 8, "each_arm_decisions": {"early": 1, "incomplete": 7}, "each_arm_late": 0, "seal_pause_ms": [512, 800], "P12_min_deadline_slack_ms": 222.747},
+    "coload": {"arm": "P12", "requests_complete": 8, "vad_frames_processed": 1522, "frames_at_least_32ms_late": 0, "endpoint_counts": {"SpeechStart": 8, "SpeechEnd": 0}, "receipt_ms": {"median": 81.4784, "p95": 96.7886, "worst": 96.7886}},
+    "measurement_scope": "Actual instrumentation-free production implementation observed by probe-only wrappers. Timings include external probe observation overhead and are operational checks, not uninstrumented performance claims.",
+    "power_scheme_drift": false,
+    "background_load": "not sampled"
+  },
   "production_coload_validation": {
+    "status": "historical intermediate instrumented production; not final clean-production timing evidence",
     "candidate_sha": "bda5b565361125ef9e8ee9556cba2cbfe8e96de7",
     "probe_sha256": "b51c2a6a3d3a483a3ca36d992be00151381551724a90b9a13aad5a4c58a88ed9",
     "background_load": "not sampled",
