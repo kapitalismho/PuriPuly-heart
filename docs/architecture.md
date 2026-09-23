@@ -299,12 +299,7 @@ Execution options:
 
 Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
-Peer speaker-transition presentation uses `core/speaker_transition.py` to interpret conserved,
-session-scoped speaker runs into content-bound continuity, transition, reset, or unavailable
-claims. Provider speaker identifiers stop at this interpreter. Output transports the semantic
-claim with the existing publication generation and source order and attaches it once to the
-logical turn's first readable Peer output, whether translated or original-only. Renderers receive
-only the presenter's anonymous visual style.
+The semantic interpreter in `core/speaker_transition.py` owns session-scoped speaker-evidence interpretation.
 
 GPU worker split:
 
@@ -390,12 +385,7 @@ Each generation owns its tasks and shutdown. Python owns caption lifetime; nativ
 
 `OverlayPresenter` owns provider-independent Peer subtitle admission and pacing (`core/overlay/presenter.py`); output retains bounded waiting work.
 
-`OverlayPresenter` also owns the single markerless speaker-transition presentation policy over
-its canonical two-block window. SELF is White, PEER is normally Gold, and a confirmed local
-transition emphasizes the incoming readable Peer logical turn in Sky. A revision or replay of
-that logical turn does not replay emphasis; the next distinct readable SELF or PEER turn returns
-the prior Peer body to Gold. Native and desktop render only the resulting Gold/Sky style and do
-not interpret speaker evidence or draw transition markers.
+`OverlayPresenter` owns cue state; native and desktop renderers consume only its derived style.
 
 Behavior tests: `tests/core/test_overlay_presenter.py`.
 
