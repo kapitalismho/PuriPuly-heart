@@ -126,7 +126,14 @@ class _LocalGpuSTTSession(STTBackendSession):
     _stopping: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._event_projection = STTSessionEventProjection(self.projection)
+        self._event_projection = STTSessionEventProjection(
+            self.projection,
+            allows_sealed_turn_overlap=True,
+        )
+
+    @property
+    def allows_sealed_turn_overlap(self) -> bool:
+        return True
 
     async def send_audio(self, pcm16le: bytes) -> None:
         await self.send_audio_f32(pcm16le_bytes_to_float32(pcm16le))
@@ -204,7 +211,7 @@ class _LocalGpuSTTSession(STTBackendSession):
         failure_reason: str | None = None,
         retire: bool = False,
     ) -> None:
-        if not self._event_projection.is_current(identity):
+        if not self._event_projection.can_terminal(identity):
             return
         self._event_projection.terminal(
             STTProviderTurnTerminal(
@@ -352,13 +359,13 @@ class _LocalGpuSTTSession(STTBackendSession):
 
     async def abort_for_toggle_off(self) -> None:
         self._stopping = True
-        identity = self._event_projection.active_identity
-        if identity is not None:
+        identities = self._event_projection.identities
+        for index, identity in enumerate(identities):
             self._terminalize_scoped(
                 identity,
                 outcome="cancelled",
                 failure_reason="toggle_off",
-                retire=True,
+                retire=index == 0,
             )
         await self.close()
 
@@ -367,13 +374,13 @@ class _LocalGpuSTTSession(STTBackendSession):
             return
         self._closed = True
         self._buffer.clear()
-        identity = self._event_projection.active_identity
-        if identity is not None:
+        identities = self._event_projection.identities
+        for index, identity in enumerate(identities):
             self._terminalize_scoped(
                 identity,
                 outcome="failed",
                 failure_reason="session_closed",
-                retire=True,
+                retire=index == 0,
             )
         tasks = tuple(self._tasks)
         for task in tasks:
