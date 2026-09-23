@@ -80,7 +80,11 @@ def prepare_smart_turn_audio(audio: np.ndarray, *, sample_rate_hz: int) -> np.nd
     if value.size > SMART_TURN_WINDOW_SAMPLES:
         return value[-SMART_TURN_WINDOW_SAMPLES:].copy()
     if value.size < SMART_TURN_WINDOW_SAMPLES:
-        return np.pad(value, (SMART_TURN_WINDOW_SAMPLES - value.size, 0), mode="constant")
+        prepared = np.empty(SMART_TURN_WINDOW_SAMPLES, dtype=np.float32)
+        padding = SMART_TURN_WINDOW_SAMPLES - value.size
+        prepared[:padding] = 0.0
+        prepared[padding:] = value
+        return prepared
     return value.copy()
 
 
@@ -235,7 +239,7 @@ class SmartTurnInferenceOwner:
         if self._inference is None:
             self.request_prepare()
             return "unavailable"
-        owned_audio = np.asarray(audio, dtype=np.float32).reshape(-1).copy()
+        owned_audio = np.array(audio, dtype=np.float32, order="C", copy=True).reshape(-1)
         self._active_request = identity
         self._execution_task = asyncio.create_task(
             self._execute(identity, owned_audio, completion),

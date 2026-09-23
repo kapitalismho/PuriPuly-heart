@@ -417,3 +417,41 @@ This binds the observations to committed source rather than a pre-edit HEAD.
   estimates or speedup claims. Background load was not sampled.
 - Shared formatting/lint passed, and the integrated regression suite again
   passed all 144 tests after removal of production instrumentation.
+
+## Maintainer-requested direct review: bounded allocation cleanup
+
+After F12 adoption, the maintainer requested a direct review and adjustment
+of `smart_turn.py`. Against baseline
+`82884728e75fa15bfc885837f28d2784d696dda2`, the Director made two additional
+bounded changes, without removing any snapshot-isolation boundary:
+
+- Short input preparation replaces generic `np.pad` with one float32 buffer:
+  initialize its prefix to zero and copy the audio into the tail. Empty,
+  short, exact and over-window behavior remains identical; no uninitialized
+  sample escapes.
+- Owner admission uses `np.array(..., dtype=np.float32, order="C", copy=True)`
+  before flattening. It still owns an independent contiguous snapshot, but a
+  float64/non-contiguous caller no longer needs conversion followed by another
+  full copy. The normal contiguous-float32 path still requires one copy.
+
+A local Windows microprobe alternated old/new preparation order across
+20 batches of 500 calls, after 100 warmups per function. Median microseconds:
+3,584 samples 9.621 -> 2.980; 16,000 samples 9.744 -> 3.469;
+96,000 samples 12.523 -> 5.860. These are preparation microbenchmarks,
+not end-to-end inference speedup claims. `tracemalloc` observed snapshot peak
+bytes 1,024,288 -> 512,192 for a 128,000-sample float64 array; contiguous
+float32 was effectively unchanged (512,192 -> 512,208 bytes).
+
+Direct byte-parity/isolation checks covered sizes 0, 1, 3,584, 16,000,
+127,999, 128,000 and 160,000 with float32 and reversed float64 inputs.
+Snapshot checks also covered strided and transposed inputs in C flatten order.
+The 13 lawful speech/guard fixtures produced byte-identical prepared audio
+and features against the previous `np.pad` implementation, with maximum
+real-model score difference 0.0. The 144-test integrated suite and formatter/
+lint passed again. No golden hash changed.
+
+Reviewed source SHA-256:
+`34a14e208936925f74f8b1d1495844ab0960926e89ef5c14872b5ed788582736`.
+Spinning, ORT 1/2, numerical precision, thresholds, single-flight ownership
+and cancellation/cleanup shields remain unchanged. Prior F12 timing evidence
+predates this cleanup; no whole-request performance improvement is claimed.

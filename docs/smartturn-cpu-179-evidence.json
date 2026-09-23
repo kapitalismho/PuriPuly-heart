@@ -5,6 +5,23 @@
   "repair_baseline_sha": "1c4aca5ed020eb7cfce2b9868e54c864a940e9c3",
   "probe": "scripts/bench_smart_turn_179.py",
   "production_changes": true,
+  "direct_review_allocation_cleanup": {
+    "authority": "Maintainer requested Director directly review and optimize smart_turn.py after F12 adoption",
+    "baseline_sha": "82884728e75fa15bfc885837f28d2784d696dda2",
+    "source_sha256": "34a14e208936925f74f8b1d1495844ab0960926e89ef5c14872b5ed788582736",
+    "changes": ["one fixed-size short-input buffer with explicit zero prefix and copied tail instead of generic np.pad", "single explicit C-order float32 snapshot conversion/copy instead of conversion then copy"],
+    "snapshot_isolation": "preserved; no shared input storage",
+    "microprobe_protocol": "100 warmups each; 20 alternating batches of 500 preparation calls per implementation, same Windows runtime",
+    "prepare_median_us_old_new": {"3584": [9.621, 2.980], "16000": [9.744, 3.469], "96000": [12.523, 5.860]},
+    "snapshot_tracemalloc_peak_bytes_old_new": {"float64_128000": [1024288, 512192], "float32_128000": [512192, 512208]},
+    "parity_sizes": [0, 1, 3584, 16000, 127999, 128000, 160000],
+    "parity_layouts": ["float32", "reversed float64", "strided snapshot", "transposed snapshot C flatten"],
+    "real_model_fixtures": 13,
+    "prepared_and_feature_bytes_equal": true,
+    "score_max_abs_diff": 0.0,
+    "integrated_tests_passed": 144,
+    "limits": "microbenchmark only, not end-to-end speedup; existing full-request F12 timings predate allocation cleanup; no spinning or lifecycle changes"
+  },
   "committed_clean_validation": {
     "implementation_sha": "451e2e08c3f437f8f9d2a627c47b44ba63dfa524",
     "probe_sha256": "3b9338028ecae9d9e16f1e47287575852897c838af1ff4d8ed812bf1e9b8f9cb",
