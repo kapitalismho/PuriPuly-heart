@@ -230,6 +230,8 @@ refactoring/
 .tmp/
 /scripts/*
 !/scripts/bench_*.py
+!/scripts/check_speaker_modes_steamvr.py
+!/scripts/check_speaker_modes_desktop.py
 !/scripts/ci/
 /scripts/ci/*
 !/scripts/ci/build-release-artifacts.ps1
