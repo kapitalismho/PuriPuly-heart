@@ -95,6 +95,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_WINDOW_WIDTH = FOUNDATION_DESIGN_TOKENS.window.width
 DEFAULT_WINDOW_HEIGHT = FOUNDATION_DESIGN_TOKENS.window.height
 APP_CONTENT_PADDING = FOUNDATION_DESIGN_TOKENS.spacing.page
+APP_LOGS_CONTENT_PADDING = ft.Padding.symmetric(vertical=APP_CONTENT_PADDING)
 FOUNDER_CONTACT_URL = "https://x.com/kapitalismho"
 FOUNDER_README_BASE_URL = "https://github.com/kapitalismho/PuriPuly-heart/blob/main"
 FOUNDER_README_PATH_BY_LOCALE = {
@@ -1034,8 +1035,12 @@ class TranslatorApp:
 
         self._run_page_task(_worker)
 
-    def _content_padding_for_index(self, index: int) -> int:
-        return 0 if index == 1 else APP_CONTENT_PADDING
+    def _content_padding_for_index(self, index: int) -> int | ft.Padding:
+        if index == 1:
+            return 0
+        if index == 2:
+            return APP_LOGS_CONTENT_PADDING
+        return APP_CONTENT_PADDING
 
     def _on_nav_change(self, index: int):
         # Track previous tab for Settings auto-apply
