@@ -304,8 +304,6 @@ GPU worker split:
 - Python adapter: process launch, authentication, requests, heartbeat, cancellation, shutdown.
 - Rust worker: device discovery, model activation, native transcription.
 
-`SharedGpuASRRuntime` publishes fenced recognition results before temporary WAV deletion. The runtime owns one outstanding file-cleanup task and backpressures the next dequeue until it settles; shutdown and recovery retain cleanup ownership. Scoped local GPU input retains immutable PCM16 until WAV staging while preserving the existing quantized sample values. Local CPU adapters retain owned float32 input; remote PCM16 transport is unchanged.
-
 ### Translation
 
 Provider adapters own:
@@ -322,8 +320,6 @@ The managed local Gemma adapter remains behind `LLMProvider`; its application/ru
 
 Cloud translation may use bounded hedged attempts according to resolved runtime policy, not persisted fallback selections (`config/runtime_resolution.py`, `core/llm/fallback_racing.py`).
 
-The racing provider releases a selected result independently of loser grace and cancellation. Its tracked operation owns remaining attempts and cleanup; `SemaphoreLLMProvider` retains the provider-wide admission permit until that work actually finishes. Provider closure drains retiring work before closing the underlying providers.
-
 Translation owners retain:
 
 - turn lifecycle,
@@ -333,7 +329,7 @@ Translation owners retain:
 
 `TranslationTurnLifecycleOwner` owns bounded Self and Peer admission and the lifecycle of parent turns and child translations. `TranslationRequestOwner` owns request preparation and provider-generation authority.
 
-Self single-target speech and Peer translations may execute concurrently after ordered request/context preparation, within their existing channel limits. Publication remains source-ordered; manual and dual-target behavior retain their separate lifecycle rules. Channel execution limits remain separate from provider-wide admission shared by Self and Peer.
+Peer translations may execute concurrently, but source-context preparation and publication preserve source order. Channel execution limits remain separate from provider-wide admission shared by Self and Peer.
 
 Self speculative selection remains in the Self owner. Once a turn is admitted, the turn lifecycle owns subsequent translation and publication.
 
