@@ -415,6 +415,11 @@ class TranslatorApp:
         if self._window_close_requested:
             return
         self._window_close_requested = True
+        try:
+            self.page.window.visible = False
+            self.page.update()
+        except Exception as exc:
+            logger.warning("Failed to hide the main window during shutdown: %s", type(exc).__name__)
         self._ensure_foundation_runtime().run_application_shutdown_task(
             self._close_after_window_request
         )
