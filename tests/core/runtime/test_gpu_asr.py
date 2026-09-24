@@ -1156,8 +1156,11 @@ async def test_scoped_gpu_transcript_precedes_owned_file_cleanup(
         process_factory=FakeGpuWorkerFactory([client]), diagnostic_sink=diagnostics.append
     )
     backend = LocalGpuSTTBackend(
-        runtime=runtime, channel="self", model_path=tmp_path / "model.gguf",
-        model_id="qwen-gpu", device_id="vulkan:0",
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "model.gguf",
+        model_id="qwen-gpu",
+        device_id="vulkan:0",
     )
     session = await backend.open_session(projection=STTSessionProjection("scoped", "probe"))
     request = _scoped_gpu_request("self", "probe")
@@ -1169,7 +1172,9 @@ async def test_scoped_gpu_transcript_precedes_owned_file_cleanup(
     )
     raw[:] = b"\0" * len(raw)
     await session.seal_turn(
-        request.identity, sealed_content_ranges=(), seal_reason="end",
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="end",
         observed_trailing_silence_ms=800,
     )
     entered = threading.Event()
@@ -1192,10 +1197,15 @@ async def test_scoped_gpu_transcript_precedes_owned_file_cleanup(
         result = await asyncio.wait_for(terminal, timeout=0.5)
         assert result.identity == request.identity
         assert (result.outcome, result.text) == ("final", "self-1")
-        assert client.wav_samples == np.rint(
-            np.clip(np.frombuffer(original, dtype="<i2").astype(np.float32) / 32768.0, -1, 1)
-            * 32767.0
-        ).astype("<i2").tobytes()
+        assert (
+            client.wav_samples
+            == np.rint(
+                np.clip(np.frombuffer(original, dtype="<i2").astype(np.float32) / 32768.0, -1, 1)
+                * 32767.0
+            )
+            .astype("<i2")
+            .tobytes()
+        )
         shutdown = asyncio.create_task(backend.close())
         await asyncio.sleep(0)
         assert not shutdown.done()
@@ -1208,7 +1218,8 @@ async def test_scoped_gpu_transcript_precedes_owned_file_cleanup(
         timing = [event for event in diagnostics if event.kind == "decode_timing"]
         assert len(timing) == 1
         assert set(timing[0].fields) >= {
-            "gpu_queue_wait_seconds", "wav_stage_seconds",
+            "gpu_queue_wait_seconds",
+            "wav_stage_seconds",
             "worker_request_to_response_seconds",
             "worker_response_to_transcript_publish_seconds",
         }
@@ -1265,6 +1276,157 @@ async def test_gpu_cleanup_debt_blocks_next_dispatch_without_blocking_first_resu
             assert len(client.transcribe_calls) == 1
         else:
             assert (await asyncio.wait_for(second, timeout=3)).text == "peer-2"
+    finally:
+        release.set()
+        monkeypatch.setattr(Path, "unlink", original_unlink)
+        await runtime.close()
+
+
+async def test_published_gpu_result_releases_runtime_pcm_while_unlink_is_held(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import threading
+    import weakref
+
+    worker_gate = asyncio.Event()
+    client = FakeGpuWorkerClient(transcribe_gate=worker_gate)
+    runtime = SharedGpuASRRuntime(process_factory=FakeGpuWorkerFactory([client]))
+    await _activate(runtime)
+    unlink_entered = threading.Event()
+    unlink_release = threading.Event()
+    original_unlink = Path.unlink
+    original_write = gpu_asr_module._write_pcm16_wav
+    stage_entered = threading.Event()
+    stage_release = threading.Event()
+
+    def gated_writer(path: Path, samples: np.ndarray) -> None:
+        original_write(path, samples)
+        stage_entered.set()
+        if not stage_release.wait(3):
+            raise TimeoutError("WAV staging gate expired")
+
+    def gated_unlink(path: Path, *args, **kwargs):
+        if path.suffix == ".wav":
+            unlink_entered.set()
+            if not unlink_release.wait(3):
+                raise TimeoutError("unlink gate expired")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", gated_unlink)
+    monkeypatch.setattr(gpu_asr_module, "_write_pcm16_wav", gated_writer)
+    try:
+        samples = np.ones(320_000, dtype=np.float32)
+        pending = asyncio.create_task(
+            runtime.submit("self", samples, speech_end_at=runtime._clock.now())
+        )
+        await asyncio.wait_for(asyncio.to_thread(stage_entered.wait, 2), timeout=3)
+        assert runtime._active_work is not None
+        allocation = weakref.ref(runtime._active_work.audio_payload)
+        stage_release.set()
+        await asyncio.wait_for(client.started.wait(), timeout=3)
+        worker_gate.set()
+        await asyncio.wait_for(asyncio.to_thread(unlink_entered.wait, 2), timeout=3)
+        assert (await asyncio.wait_for(pending, timeout=0.5)).text == "self-1"
+        assert allocation() is None
+    finally:
+        unlink_release.set()
+        stage_release.set()
+        monkeypatch.setattr(Path, "unlink", original_unlink)
+        await runtime.close()
+
+
+@pytest.mark.parametrize("rejoin", [False, True])
+async def test_cancelled_close_waiter_does_not_abandon_gpu_shutdown(
+    monkeypatch: pytest.MonkeyPatch, rejoin: bool
+) -> None:
+    import threading
+
+    client = FakeGpuWorkerClient()
+    runtime = SharedGpuASRRuntime(process_factory=FakeGpuWorkerFactory([client]))
+    await _activate(runtime)
+    entered = threading.Event()
+    release = threading.Event()
+    original_unlink = Path.unlink
+
+    def gated_unlink(path: Path, *args, **kwargs):
+        if path.suffix == ".wav":
+            entered.set()
+            if not release.wait(3):
+                raise TimeoutError("unlink gate expired")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", gated_unlink)
+    try:
+        assert (
+            await runtime.submit(
+                "self", np.ones(1600, dtype=np.float32), speech_end_at=runtime._clock.now()
+            )
+        ).text == "self-1"
+        await asyncio.wait_for(asyncio.to_thread(entered.wait, 2), timeout=3)
+        waiter = asyncio.create_task(runtime.close())
+        await asyncio.sleep(0)
+        waiter.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await waiter
+        another = asyncio.create_task(runtime.close()) if rejoin else runtime._shutdown_task
+        assert another is not None
+        await asyncio.sleep(0)
+        assert not another.done()
+        release.set()
+        await asyncio.wait_for(asyncio.shield(another), timeout=3)
+        assert runtime.state == GpuASRRuntimeState.CLOSED
+        assert client.close_calls == 1
+        assert runtime._scope.is_closed
+    finally:
+        release.set()
+        monkeypatch.setattr(Path, "unlink", original_unlink)
+        await runtime.close()
+
+
+async def test_cancelled_last_channel_waiter_retains_cleanup_before_reactivation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import threading
+
+    old_client = FakeGpuWorkerClient()
+    replacement = FakeGpuWorkerClient()
+    factory = FakeGpuWorkerFactory([old_client, replacement])
+    runtime = SharedGpuASRRuntime(process_factory=factory)
+    await _activate(runtime)
+    entered = threading.Event()
+    release = threading.Event()
+    original_unlink = Path.unlink
+
+    def gated_unlink(path: Path, *args, **kwargs):
+        if path.suffix == ".wav":
+            entered.set()
+            if not release.wait(3):
+                raise TimeoutError("unlink gate expired")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", gated_unlink)
+    try:
+        assert (
+            await runtime.submit(
+                "self", np.ones(1600, dtype=np.float32), speech_end_at=runtime._clock.now()
+            )
+        ).text == "self-1"
+        await asyncio.wait_for(asyncio.to_thread(entered.wait, 2), timeout=3)
+        waiter = asyncio.create_task(runtime.deactivate_channel("self"))
+        await asyncio.sleep(0)
+        waiter.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await waiter
+        with pytest.raises(RuntimeError, match="stopping"):
+            await _activate(runtime)
+        release.set()
+        assert runtime._shutdown_task is not None
+        await asyncio.wait_for(asyncio.shield(runtime._shutdown_task), timeout=3)
+        assert runtime.state == GpuASRRuntimeState.STOPPED
+        await _activate(runtime)
+        assert old_client.close_calls == 1
+        assert len(factory.modes) == 2
+        assert runtime.worker_pid == replacement.pid
     finally:
         release.set()
         monkeypatch.setattr(Path, "unlink", original_unlink)

@@ -1,5 +1,5 @@
 {
-  "revision": "78d588a5998ca3486c0ea2e8e469aa3b90e43de5",
+  "revision": "78d90ca9722d3c88e05448bbe7c958892c5b11ec",
   "platform": "Windows-11-10.0.22631-SP0",
   "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
   "versions": {
@@ -133,7 +133,7 @@
       "opened": {
         "requested": {
           "samplerate": null,
-          "channels": 2,
+          "channels": 1,
           "dtype": "float32",
           "callback": "SoundDeviceAudioSource callback",
           "device": 33,
@@ -142,22 +142,6 @@
         "rate": 44100.0,
         "latency_s": 0.08532879818594104,
         "blocksize": 0
-      },
-      "channel_decision": {
-        "internal_channels": 1,
-        "preferred_capture_channels": 2,
-        "metadata_status": "ok",
-        "max_input_channels": 2
-      },
-      "channel_attempts": [
-        {
-          "channels": 2
-        }
-      ],
-      "effective_channels": {
-        "requested": 2,
-        "opened": 2,
-        "frame": 2
       },
       "callbacks": 30,
       "callback_sizes": {
@@ -176,13 +160,13 @@
       "raw_clock_examples": [
         {
           "adc": 0.0,
-          "current": 41539.8354608,
-          "host": 41539.8355185
+          "current": 39474.0925801,
+          "host": 39474.0926392
         },
         {
           "adc": 0.08532879818594105,
-          "current": 41539.9254582,
-          "host": 41539.9254919
+          "current": 39474.182582299996,
+          "host": 39474.1826143
         }
       ],
       "clock_validity_counts": {
@@ -191,10 +175,10 @@
       },
       "adc_minus_current_ms": {
         "n": 30,
-        "min": -41539840.877925396,
-        "p50": -41539834.90063083,
-        "p95": -41539799.41310249,
-        "max": -41539767.87822811
+        "min": -39474097.981325395,
+        "p50": -39474092.015630834,
+        "p95": -39474056.52810249,
+        "max": -39474024.98142811
       },
       "callback_statuses": {},
       "source_status_count": 0,
@@ -205,57 +189,57 @@
       "host_minus_pa_current_ms": {
         "n": 30,
         "min": 0.024000000848900527,
-        "p50": 0.033700001949910074,
-        "p95": 0.1514999967184849,
-        "max": 0.40240000089397654
+        "p50": 0.047299996367655694,
+        "p95": 0.22500000341096893,
+        "max": 0.41110000165645033
       },
-      "offset_drift_ms": -0.03099998866673559,
+      "offset_drift_ms": 0.001400003384333104,
       "pa_end_frontier_age_ms": {
         "n": 0
       },
       "callback_interval_ms": {
         "n": 29,
-        "min": 0.08119999984046444,
-        "p50": 80.02090000081807,
-        "p95": 90.00360000209184,
-        "max": 90.02499999769498
+        "min": 0.09119999594986439,
+        "p50": 80.0398999999743,
+        "p95": 90.00050000031479,
+        "max": 90.00760000344599
       },
       "callback_interval_minus_median_block_ms": {
         "n": 29,
-        "min": -85.24759818610057,
-        "p50": -5.307898185122966,
-        "p95": 4.674801816150804,
-        "max": 4.696201811753937
+        "min": -85.23759818999117,
+        "p50": -5.288898185966744,
+        "p95": 4.671701814373748,
+        "max": 4.678801817504947
       },
       "queue_age_at_dequeue_ms": {
         "n": 29,
-        "min": 0.10019999899668619,
-        "p50": 0.1764999979059212,
-        "p95": 0.21379999816417694,
-        "max": 0.5086000019218773
+        "min": 0.07030000415397808,
+        "p50": 0.16940000205067918,
+        "p95": 0.24809999740682542,
+        "max": 0.36359999648993835
       },
-      "source_to_vad_512_frontier_ready_ms": {
-        "n": 62,
-        "min": 11.173209350090474,
-        "p50": 65.71285667450866,
-        "p95": 109.80075741827022,
-        "max": 120.6761194698629
+      "source_to_vad_ready_proxy_ms": {
+        "n": 28,
+        "min": 6.732709938660264,
+        "p50": 25.669919879874215,
+        "p95": 37.54992976610083,
+        "max": 39.39487732714042
       },
       "source_to_frame_consumer_ms": {
         "n": 29,
-        "min": 0.10019999899668619,
-        "p50": 0.1764999979059212,
-        "p95": 0.21379999816417694,
-        "max": 0.5086000019218773
+        "min": 0.07030000415397808,
+        "p50": 0.16940000205067918,
+        "p95": 0.24809999740682542,
+        "max": 0.36359999648993835
       },
-      "notes": "Each completed 512-sample block uses the production VAD capture-prefix split; callback-end host mapping is not acoustic sample age or a Silero invocation timestamp. Reject ADC/current pairs with reversed order or >1s apparent difference as invalid for this short diagnostic; host-minus-current pairing alone does not validate ADC. A callback may lack an admitted frame, so callback sequence pairing for computed age is valid only when all callbacks admit frames. Callback PCM stays transient."
+      "notes": "Reject ADC/current pairs with reversed order or >1s apparent difference as invalid for this short diagnostic; host-minus-current pairing alone does not validate ADC. One callback may lack an admitted frame, so callback sequence pairing for computed age is valid only when all callbacks admit frames. VAD-ready proxy follows mapped end span, not acoustic-time truth. Callback PCM stays transient."
     },
     {
       "latency_request": "low",
       "opened": {
         "requested": {
           "samplerate": null,
-          "channels": 2,
+          "channels": 1,
           "dtype": "float32",
           "callback": "SoundDeviceAudioSource callback",
           "device": 33,
@@ -265,22 +249,6 @@
         "rate": 44100.0,
         "latency_s": 0.01,
         "blocksize": 0
-      },
-      "channel_decision": {
-        "internal_channels": 1,
-        "preferred_capture_channels": 2,
-        "metadata_status": "ok",
-        "max_input_channels": 2
-      },
-      "channel_attempts": [
-        {
-          "channels": 2
-        }
-      ],
-      "effective_channels": {
-        "requested": 2,
-        "opened": 2,
-        "frame": 2
       },
       "callbacks": 243,
       "callback_sizes": {
@@ -375,13 +343,13 @@
       "raw_clock_examples": [
         {
           "adc": 0.0,
-          "current": 41541.9884853,
-          "host": 41541.9885492
+          "current": 39476.2445922,
+          "host": 39476.2446614
         },
         {
           "adc": 0.01,
-          "current": 41541.9984717,
-          "host": 41541.9984959
+          "current": 39476.2545838,
+          "host": 39476.2546063
         }
       ],
       "clock_validity_counts": {
@@ -390,10 +358,10 @@
       },
       "adc_minus_current_ms": {
         "n": 243,
-        "min": -41541988.553399995,
-        "p50": -41541988.4898,
-        "p95": -41541981.72883038,
-        "max": -41541978.88281179
+        "min": -39476244.6334,
+        "p50": -39476244.589499995,
+        "p95": -39476237.82993038,
+        "max": -39476234.981811784
       },
       "callback_statuses": {},
       "source_status_count": 0,
@@ -403,58 +371,58 @@
       "clock_invalid_pairs": 243,
       "host_minus_pa_current_ms": {
         "n": 243,
-        "min": 0.016500001947861165,
-        "p50": 0.019599996448960155,
-        "p95": 0.167199999850709,
-        "max": 0.2595999976620078
+        "min": 0.01670000347075984,
+        "p50": 0.01900000643217936,
+        "p95": 0.152900000102818,
+        "max": 0.3150999982608482
       },
-      "offset_drift_ms": -0.0242000023717992,
+      "offset_drift_ms": -0.025600005756132305,
       "pa_end_frontier_age_ms": {
         "n": 0
       },
       "callback_interval_ms": {
         "n": 242,
-        "min": 0.02050000330200419,
-        "p50": 9.98960000288207,
-        "p95": 10.027399999671616,
-        "max": 10.066199996799696
+        "min": 0.02439999661874026,
+        "p50": 9.990000005927868,
+        "p95": 10.022099995694589,
+        "max": 10.054500002297573
       },
       "callback_interval_minus_median_block_ms": {
         "n": 242,
-        "min": -9.979499996697996,
-        "p50": -0.01039999711792916,
-        "p95": 0.02739999967161566,
-        "max": 0.06619999679969624
+        "min": -9.97560000338126,
+        "p50": -0.009999994072131813,
+        "p95": 0.02209999569458887,
+        "max": 0.05450000229757279
       },
       "queue_age_at_dequeue_ms": {
         "n": 241,
-        "min": 0.07270000060088933,
-        "p50": 0.12789999891538173,
-        "p95": 0.22059999901102856,
-        "max": 0.3069000013056211
+        "min": 0.05339999916031957,
+        "p50": 0.1255999959539622,
+        "p95": 0.21640000340994447,
+        "max": 0.301499996567145
       },
-      "source_to_vad_512_frontier_ready_ms": {
-        "n": 61,
-        "min": 8.150056193699129,
-        "p50": 26.241938416205812,
-        "p95": 44.14877126691863,
-        "max": 50.086687406292185
+      "source_to_vad_ready_proxy_ms": {
+        "n": 55,
+        "min": 5.681538881617598,
+        "p50": 10.257138790620957,
+        "p95": 14.713779106386937,
+        "max": 15.409722880576737
       },
       "source_to_frame_consumer_ms": {
         "n": 241,
-        "min": 0.07270000060088933,
-        "p50": 0.12789999891538173,
-        "p95": 0.22059999901102856,
-        "max": 0.3069000013056211
+        "min": 0.05339999916031957,
+        "p50": 0.1255999959539622,
+        "p95": 0.21640000340994447,
+        "max": 0.301499996567145
       },
-      "notes": "Each completed 512-sample block uses the production VAD capture-prefix split; callback-end host mapping is not acoustic sample age or a Silero invocation timestamp. Reject ADC/current pairs with reversed order or >1s apparent difference as invalid for this short diagnostic; host-minus-current pairing alone does not validate ADC. A callback may lack an admitted frame, so callback sequence pairing for computed age is valid only when all callbacks admit frames. Callback PCM stays transient."
+      "notes": "Reject ADC/current pairs with reversed order or >1s apparent difference as invalid for this short diagnostic; host-minus-current pairing alone does not validate ADC. One callback may lack an admitted frame, so callback sequence pairing for computed age is valid only when all callbacks admit frames. VAD-ready proxy follows mapped end span, not acoustic-time truth. Callback PCM stays transient."
     },
     {
       "latency_request": "omitted(default high)",
       "opened": {
         "requested": {
           "samplerate": null,
-          "channels": 2,
+          "channels": 1,
           "dtype": "float32",
           "callback": "SoundDeviceAudioSource callback",
           "device": 33,
@@ -463,22 +431,6 @@
         "rate": 44100.0,
         "latency_s": 0.08532879818594104,
         "blocksize": 0
-      },
-      "channel_decision": {
-        "internal_channels": 1,
-        "preferred_capture_channels": 2,
-        "metadata_status": "ok",
-        "max_input_channels": 2
-      },
-      "channel_attempts": [
-        {
-          "channels": 2
-        }
-      ],
-      "effective_channels": {
-        "requested": 2,
-        "opened": 2,
-        "frame": 2
       },
       "callbacks": 30,
       "callback_sizes": {
@@ -497,13 +449,13 @@
       "raw_clock_examples": [
         {
           "adc": 0.0,
-          "current": 41544.1505254,
-          "host": 41544.1506075
+          "current": 39478.4066061,
+          "host": 39478.4066729
         },
         {
           "adc": 0.08532879818594105,
-          "current": 41544.2405308,
-          "host": 41544.2405914
+          "current": 39478.4966132,
+          "host": 39478.4966651
         }
       ],
       "clock_validity_counts": {
@@ -512,10 +464,10 @@
       },
       "adc_minus_current_ms": {
         "n": 30,
-        "min": -41544155.92662539,
-        "p50": -41544149.94813083,
-        "p95": -41544114.46060249,
-        "max": -41544082.93282812
+        "min": -39478412.026625395,
+        "p50": -39478406.030230835,
+        "p95": -39478370.54270249,
+        "max": -39478339.045128115
       },
       "callback_statuses": {},
       "source_status_count": 0,
@@ -525,58 +477,58 @@
       "clock_invalid_pairs": 30,
       "host_minus_pa_current_ms": {
         "n": 30,
-        "min": 0.024299995857290924,
-        "p50": 0.05360000068321824,
-        "p95": 0.16560000221943483,
-        "max": 0.4104000036022626
+        "min": 0.026399997295811772,
+        "p50": 0.05170000804355368,
+        "p95": 0.24390000180574134,
+        "max": 0.4078999991179444
       },
-      "offset_drift_ms": -0.04939999780617654,
+      "offset_drift_ms": -0.018799997633323073,
       "pa_end_frontier_age_ms": {
         "n": 0
       },
       "callback_interval_ms": {
         "n": 29,
-        "min": 0.09150000551017001,
-        "p50": 80.00679999531712,
-        "p95": 90.01960000023246,
-        "max": 90.03260000463342
+        "min": 0.11559999984456226,
+        "p50": 80.02329999726498,
+        "p95": 90.01970000099391,
+        "max": 90.03510000184178
       },
       "callback_interval_minus_median_block_ms": {
         "n": 29,
-        "min": -85.23729818043087,
-        "p50": -5.3219981906239155,
-        "p95": 4.690801814291419,
-        "max": 4.703801818692384
+        "min": -85.21319818609648,
+        "p50": -5.305498188676054,
+        "p95": 4.690901815052868,
+        "max": 4.706301815900744
       },
       "queue_age_at_dequeue_ms": {
         "n": 29,
-        "min": 0.03869999636663124,
-        "p50": 0.1747999995131977,
-        "p95": 0.2179000002797693,
-        "max": 0.26760000037029386
+        "min": 0.10290000500390306,
+        "p50": 0.1798999946913682,
+        "p95": 0.25350000214530155,
+        "max": 0.27459999546408653
       },
-      "source_to_vad_512_frontier_ready_ms": {
-        "n": 62,
-        "min": 11.052220273995772,
-        "p50": 65.82070201693568,
-        "p95": 109.7100693223183,
-        "max": 120.61956943216501
+      "source_to_vad_ready_proxy_ms": {
+        "n": 28,
+        "min": 6.560612775501795,
+        "p50": 25.664787281129975,
+        "p95": 37.57106007105904,
+        "max": 39.446935574233066
       },
       "source_to_frame_consumer_ms": {
         "n": 29,
-        "min": 0.03869999636663124,
-        "p50": 0.1747999995131977,
-        "p95": 0.2179000002797693,
-        "max": 0.26760000037029386
+        "min": 0.10290000500390306,
+        "p50": 0.1798999946913682,
+        "p95": 0.25350000214530155,
+        "max": 0.27459999546408653
       },
-      "notes": "Each completed 512-sample block uses the production VAD capture-prefix split; callback-end host mapping is not acoustic sample age or a Silero invocation timestamp. Reject ADC/current pairs with reversed order or >1s apparent difference as invalid for this short diagnostic; host-minus-current pairing alone does not validate ADC. A callback may lack an admitted frame, so callback sequence pairing for computed age is valid only when all callbacks admit frames. Callback PCM stays transient."
+      "notes": "Reject ADC/current pairs with reversed order or >1s apparent difference as invalid for this short diagnostic; host-minus-current pairing alone does not validate ADC. One callback may lack an admitted frame, so callback sequence pairing for computed age is valid only when all callbacks admit frames. VAD-ready proxy follows mapped end span, not acoustic-time truth. Callback PCM stays transient."
     },
     {
       "latency_request": "low",
       "opened": {
         "requested": {
           "samplerate": null,
-          "channels": 2,
+          "channels": 1,
           "dtype": "float32",
           "callback": "SoundDeviceAudioSource callback",
           "device": 33,
@@ -586,22 +538,6 @@
         "rate": 44100.0,
         "latency_s": 0.01,
         "blocksize": 0
-      },
-      "channel_decision": {
-        "internal_channels": 1,
-        "preferred_capture_channels": 2,
-        "metadata_status": "ok",
-        "max_input_channels": 2
-      },
-      "channel_attempts": [
-        {
-          "channels": 2
-        }
-      ],
-      "effective_channels": {
-        "requested": 2,
-        "opened": 2,
-        "frame": 2
       },
       "callbacks": 243,
       "callback_sizes": {
@@ -696,13 +632,13 @@
       "raw_clock_examples": [
         {
           "adc": 0.0,
-          "current": 41546.301551,
-          "host": 41546.3015944
+          "current": 39480.558634,
+          "host": 39480.5586912
         },
         {
           "adc": 0.01,
-          "current": 41546.311521799995,
-          "host": 41546.3115423
+          "current": 39480.5686424,
+          "host": 39480.5686634
         }
       ],
       "clock_validity_counts": {
@@ -711,10 +647,10 @@
       },
       "adc_minus_current_ms": {
         "n": 243,
-        "min": -41546301.611,
-        "p50": -41546301.5414,
-        "p95": -41546294.78283038,
-        "max": -41546291.93861178
+        "min": -39480558.6848,
+        "p50": -39480558.636599995,
+        "p95": -39480551.88903038,
+        "max": -39480549.00751179
       },
       "callback_statuses": {},
       "source_status_count": 0,
@@ -724,51 +660,51 @@
       "clock_invalid_pairs": 243,
       "host_minus_pa_current_ms": {
         "n": 243,
-        "min": 0.01840000186348334,
-        "p50": 0.019800005247816443,
-        "p95": 0.15020000137155876,
-        "max": 0.42950000351993367
+        "min": 0.01799999881768599,
+        "p50": 0.018900005670730025,
+        "p95": 0.1587000078870915,
+        "max": 0.4079999998793937
       },
-      "offset_drift_ms": 0.03079999441979453,
+      "offset_drift_ms": -0.016699996194802225,
       "pa_end_frontier_age_ms": {
         "n": 0
       },
       "callback_interval_ms": {
         "n": 242,
-        "min": 0.03989999822806567,
-        "p50": 9.979100002965424,
-        "p95": 10.044199996627867,
-        "max": 10.076300000946503
+        "min": 0.021699997887481004,
+        "p50": 9.984899996197782,
+        "p95": 10.034200000518467,
+        "max": 10.06779999443097
       },
       "callback_interval_minus_median_block_ms": {
         "n": 242,
-        "min": -9.960100001771934,
-        "p50": -0.02089999703457579,
-        "p95": 0.04419999662786722,
-        "max": 0.07630000094650313
+        "min": -9.978300002112519,
+        "p50": -0.015100003802217543,
+        "p95": 0.03420000051846728,
+        "max": 0.0677999944309704
       },
       "queue_age_at_dequeue_ms": {
         "n": 241,
-        "min": 0.055999997130129486,
-        "p50": 0.12679999781539664,
-        "p95": 0.20709999807877466,
-        "max": 0.33650000113993883
+        "min": 0.04429999535204843,
+        "p50": 0.12199999764561653,
+        "p95": 0.19669999892357737,
+        "max": 0.28899999597342685
       },
-      "source_to_vad_512_frontier_ready_ms": {
-        "n": 61,
-        "min": 8.17660712345969,
-        "p50": 26.17386587371584,
-        "p95": 44.151862122816965,
-        "max": 50.11832931631943
+      "source_to_vad_ready_proxy_ms": {
+        "n": 55,
+        "min": 5.631982057821006,
+        "p50": 10.265001234074589,
+        "p95": 14.700885840284172,
+        "max": 15.458629364729859
       },
       "source_to_frame_consumer_ms": {
         "n": 241,
-        "min": 0.055999997130129486,
-        "p50": 0.12679999781539664,
-        "p95": 0.20709999807877466,
-        "max": 0.33650000113993883
+        "min": 0.04429999535204843,
+        "p50": 0.12199999764561653,
+        "p95": 0.19669999892357737,
+        "max": 0.28899999597342685
       },
-      "notes": "Each completed 512-sample block uses the production VAD capture-prefix split; callback-end host mapping is not acoustic sample age or a Silero invocation timestamp. Reject ADC/current pairs with reversed order or >1s apparent difference as invalid for this short diagnostic; host-minus-current pairing alone does not validate ADC. A callback may lack an admitted frame, so callback sequence pairing for computed age is valid only when all callbacks admit frames. Callback PCM stays transient."
+      "notes": "Reject ADC/current pairs with reversed order or >1s apparent difference as invalid for this short diagnostic; host-minus-current pairing alone does not validate ADC. One callback may lack an admitted frame, so callback sequence pairing for computed age is valid only when all callbacks admit frames. VAD-ready proxy follows mapped end span, not acoustic-time truth. Callback PCM stays transient."
     }
   ]
 }

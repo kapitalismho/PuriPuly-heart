@@ -8,7 +8,6 @@ import json
 import math
 import platform
 import statistics
-import subprocess
 import sys
 import time
 from collections import Counter
@@ -17,8 +16,12 @@ from pathlib import Path
 
 import sounddevice as sd
 
-from puripuly_heart.core.audio.source import SoundDeviceAudioSource
+from puripuly_heart.core.audio.source import (
+    SoundDeviceAudioSource,
+    determine_self_mic_capture_channels,
+)
 from puripuly_heart.core.audio.streaming_resampler import CaptureMappedStreamingResampler
+from puripuly_heart.core.runtime.audio_vad_loop import _capture_prefix
 
 
 def distribution(values):
@@ -32,6 +35,50 @@ def distribution(values):
         "p95": values[int((len(values) - 1) * 0.95)],
         "max": values[-1],
     }
+
+
+def completed_vad_frontiers(mapped, output_count, capture_buffer, available, ready_at):
+    """Apply the production VAD capture-prefix split to each completed 512-sample block."""
+    if output_count:
+        if mapped is None:
+            raise RuntimeError("Normalized output has no mapped capture")
+        capture_buffer.append(mapped)
+    available += output_count
+    ages = []
+    while available >= 512:
+        block_capture = _capture_prefix(capture_buffer, 512)
+        if not block_capture:
+            raise RuntimeError("VAD block has no capture frontier")
+        ages.append((ready_at - block_capture[-1].source_end_monotonic_s) * 1000)
+        available -= 512
+    return available, ages
+
+
+def open_with_production_channels(device, wrapped):
+    """Mirror Self's preferred-channel open and conditional mono retry on this device."""
+    decision = determine_self_mic_capture_channels(device_idx=device, internal_channels=1)
+    attempts = []
+    original = sd.InputStream
+    sd.InputStream = wrapped
+    try:
+        preferred = decision.preferred_capture_channels
+        attempts.append({"channels": preferred})
+        try:
+            source = SoundDeviceAudioSource(
+                device=device, channels=preferred, blocksize=0, sample_rate_hz=None
+            )
+        except Exception as exc:
+            attempts[-1]["error"] = repr(exc)
+            if preferred <= decision.internal_channels:
+                raise
+            fallback = decision.internal_channels
+            attempts.append({"channels": fallback})
+            source = SoundDeviceAudioSource(
+                device=device, channels=fallback, blocksize=0, sample_rate_hz=None
+            )
+        return source, decision, attempts
+    finally:
+        sd.InputStream = original
 
 
 async def measure(device, seconds, latency):
@@ -67,14 +114,12 @@ async def measure(device, seconds, latency):
         )
         return stream
 
-    sd.InputStream = wrapped
-    try:
-        source = SoundDeviceAudioSource(device=device, channels=1, blocksize=0, sample_rate_hz=None)
-    finally:
-        sd.InputStream = original
-    resampler = CaptureMappedStreamingResampler(source.actual_sample_rate_hz)
+    source, decision, channel_attempts = open_with_production_channels(device, wrapped)
+    resampler = None
+    source_format = None
     input_ages, vad_ages, queue_ages, frame_ages = [], [], [], []
     available = 0
+    capture_buffer = []
     statuses = Counter()
     start = time.monotonic()
     try:
@@ -98,17 +143,26 @@ async def measure(device, seconds, latency):
                     )
                 if obs["status"]:
                     statuses[obs["status"]] += 1
+            frame_format = (frame.sample_rate_hz, frame.channels)
+            if source_format is None:
+                source_format = frame_format
+                resampler = CaptureMappedStreamingResampler(
+                    input_sample_rate_hz=frame.sample_rate_hz,
+                    output_sample_rate_hz=16000,
+                    input_channels=frame.channels,
+                )
+            elif frame_format != source_format:
+                raise ValueError(f"Capture format changed: {source_format} -> {frame_format}")
+            assert resampler is not None
             frame_ages.append((now - span.source_end_monotonic_s) * 1000)
             output, mapped, discarded = resampler.process(frame.samples, span)
-            if discarded:
+            if discarded or span.discontinuity_before is not None:
                 available = 0
-            available += output.size
-            if available >= 512:
-                # The actual VAD loop drains complete 512-sample blocks after normalization.
-                # This is an end-frontier age upper-bound proxy, not a VAD invocation timestamp.
-                if mapped is not None:
-                    vad_ages.append((time.monotonic() - mapped.source_end_monotonic_s) * 1000)
-                available %= 512
+                capture_buffer.clear()
+            available, completed = completed_vad_frontiers(
+                mapped, int(output.size), capture_buffer, available, time.monotonic()
+            )
+            vad_ages.extend(completed)
             if time.monotonic() - start >= seconds:
                 break
     finally:
@@ -149,6 +203,18 @@ async def measure(device, seconds, latency):
     expected_ms = (statistics.median(rates.elements()) / opened["rate"] * 1000) if rates else 0
     return {
         "opened": opened,
+        "channel_decision": {
+            "internal_channels": decision.internal_channels,
+            "preferred_capture_channels": decision.preferred_capture_channels,
+            "metadata_status": decision.metadata.metadata_status,
+            "max_input_channels": decision.metadata.max_input_channels,
+        },
+        "channel_attempts": channel_attempts,
+        "effective_channels": {
+            "requested": source.requested_channels,
+            "opened": source.opened_channels,
+            "frame": source.frame_channels,
+        },
         "callbacks": len(observations),
         "callback_sizes": dict(rates),
         "raw_clock_examples": raw_clock_examples,
@@ -172,9 +238,9 @@ async def measure(device, seconds, latency):
             [(b - a) * 1000 - expected_ms for a, b in zip(callbacks, callbacks[1:])]
         ),
         "queue_age_at_dequeue_ms": distribution(queue_ages),
-        "source_to_vad_ready_proxy_ms": distribution(vad_ages),
+        "source_to_vad_512_frontier_ready_ms": distribution(vad_ages),
         "source_to_frame_consumer_ms": distribution(frame_ages),
-        "notes": "Reject ADC/current pairs with reversed order or >1s apparent difference as invalid for this short diagnostic; host-minus-current pairing alone does not validate ADC. One callback may lack an admitted frame, so callback sequence pairing for computed age is valid only when all callbacks admit frames. VAD-ready proxy follows mapped end span, not acoustic-time truth. Callback PCM stays transient.",
+        "notes": "Each completed 512-sample block uses the production VAD capture-prefix split; callback-end host mapping is not acoustic sample age or a Silero invocation timestamp. Reject ADC/current pairs with reversed order or >1s apparent difference as invalid for this short diagnostic; host-minus-current pairing alone does not validate ADC. A callback may lack an admitted frame, so callback sequence pairing for computed age is valid only when all callbacks admit frames. Callback PCM stays transient.",
     }
 
 
@@ -193,8 +259,13 @@ async def main(args):
         if d["max_input_channels"]
     ]
     selected = int(sd.default.device[0] if args.device is None else args.device)
-    if selected < 0 or devices[selected]["max_input_channels"] < 1:
+    if selected < 0 or selected >= len(devices) or devices[selected]["max_input_channels"] < 1:
         raise RuntimeError("No usable input device selected")
+    if args.expected_name and devices[selected]["name"] != args.expected_name:
+        raise RuntimeError(f"Selected device changed: {devices[selected]['name']!r}")
+    selected_hostapi = apis[devices[selected]["hostapi"]]["name"]
+    if args.expected_hostapi and selected_hostapi != args.expected_hostapi:
+        raise RuntimeError(f"Selected host API changed: {selected_hostapi!r}")
     import psutil
 
     vrchat = [
@@ -203,13 +274,13 @@ async def main(args):
         if p.info["name"] and "vrchat" in p.info["name"].lower()
     ]
     result = {
-        "revision": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        "revision": args.revision,
         "platform": platform.platform(),
         "python": sys.version,
         "versions": {x: version(x) for x in ("numpy", "soxr", "sounddevice", "janus", "psutil")},
         "device_inventory": inventory,
         "selected_device": selected,
-        "selected_hostapi": apis[devices[selected]["hostapi"]]["name"],
+        "selected_hostapi": selected_hostapi,
         "vrchat_processes_at_start": vrchat,
         "seconds_each": args.seconds,
         "runs": [],
@@ -237,7 +308,7 @@ async def main(args):
                         "request": r["latency_request"],
                         "callbacks": r.get("callbacks"),
                         "error": r.get("error"),
-                        "age": r.get("pa_end_frontier_age_ms"),
+                        "age": r.get("source_to_vad_512_frontier_ready_ms"),
                     }
                     for r in result["runs"]
                 ]
@@ -249,6 +320,9 @@ async def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--revision", required=True, help="Reviewed source revision for this run")
+    parser.add_argument("--expected-name", help="Require this exact device inventory name")
+    parser.add_argument("--expected-hostapi", help="Require this host API inventory name")
     parser.add_argument("--device", type=int)
     parser.add_argument("--seconds", type=float, default=3)
     parser.add_argument("--output", type=Path, default=Path(__file__).with_name("d_results.json"))
