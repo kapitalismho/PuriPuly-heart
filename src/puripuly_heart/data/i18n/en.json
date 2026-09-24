@@ -417,7 +417,7 @@
   "local_stt.language_fallback_qwen": "The selected ASR model does not support this language. Local Qwen3 ASR 0.6B will be used.",
   "local_stt.installation_fallback_qwen": "CPU Auto requires all three ASR models. Local Qwen3 ASR 0.6B will be used.",
   "local_stt.language_unsupported": "The selected local ASR option does not support this language.",
-  "provider.qwen_audio": "Qwen Audio 3.0 ASR Flash Streaming",
+  "provider.qwen_audio": "Qwen Audio 3.1 ASR Flash Streaming",
   "provider.custom_offline": "Custom ASR (Offline)",
   "provider.custom_realtime": "Custom ASR (Realtime)",
   "settings.custom_stt.title": "OpenAI-compatible STT server",

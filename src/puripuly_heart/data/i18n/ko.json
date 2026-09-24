@@ -417,7 +417,7 @@
   "local_stt.language_fallback_qwen": "선택한 ASR 모델은 이 언어를 지원하지 않습니다. 로컬 Qwen3 ASR 0.6B를 사용합니다.",
   "local_stt.installation_fallback_qwen": "CPU 자동 선택에 필요한 ASR 모델 3개가 모두 설치되지 않았습니다. 로컬 Qwen3 ASR 0.6B를 사용합니다.",
   "local_stt.language_unsupported": "선택한 로컬 ASR 옵션은 이 언어를 지원하지 않습니다.",
-  "provider.qwen_audio": "Qwen Audio 3.0 ASR Flash Streaming",
+  "provider.qwen_audio": "Qwen Audio 3.1 ASR Flash Streaming",
   "provider.custom_offline": "Custom ASR (Offline)",
   "provider.custom_realtime": "Custom ASR (Realtime)",
   "settings.custom_stt.title": "OpenAI 호환 음성 인식 서버",
