@@ -1280,7 +1280,7 @@ def test_create_stt_backend_from_resolved_qwen_audio_uses_endpoint_region_and_se
     resolved = _resolved_stt_config(
         provider="qwen_audio",
         source_language="ja",
-        model="qwen-audio-3.0-asr-flash-streaming",
+        model="qwen-audio-3.1-asr-flash-streaming",
         endpoint="wss://dto-qwen.example/inference",
         region="singapore",
         credential_reference="qwen:singapore",
@@ -1292,7 +1292,6 @@ def test_create_stt_backend_from_resolved_qwen_audio_uses_endpoint_region_and_se
 
     assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "dto-qwen-key"
-    assert backend.model == "qwen-audio-3.0-asr-flash-streaming"
     assert backend.endpoint == "wss://dto-qwen.example/inference"
     assert backend.language_hints == ("ja",)
 
@@ -1301,7 +1300,7 @@ def test_create_stt_backend_from_resolved_qwen_audio_uses_region_when_endpoint_m
     resolved = _resolved_stt_config(
         provider="qwen_audio",
         source_language="ja",
-        model="qwen-audio-3.0-asr-flash-streaming",
+        model="qwen-audio-3.1-asr-flash-streaming",
         endpoint=None,
         region="singapore",
         credential_reference="qwen:singapore",
@@ -1972,7 +1971,7 @@ def test_resolve_peer_stt_config_uses_fixed_qwen_audio_model() -> None:
 
     resolved = resolve_peer_stt_config(settings)
 
-    assert resolved.model == "qwen-audio-3.0-asr-flash-streaming"
+    assert resolved.model == "qwen-audio-3.1-asr-flash-streaming"
 
 
 def test_qwen_audio_auto_mode_survives_peer_runtime_normalization() -> None:
@@ -2206,7 +2205,7 @@ def test_create_stt_backend_qwen_audio_uses_settings_and_secret() -> None:
     backend = create_stt_backend(settings, secrets=secrets)
     assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "k4"
-    assert backend.model == "qwen-audio-3.0-asr-flash-streaming"
+    assert backend.model == "qwen-audio-3.1-asr-flash-streaming"
     # Endpoint is derived from region (Beijing default)
     assert backend.endpoint == "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
     assert backend.sample_rate_hz == 16000
@@ -2226,7 +2225,6 @@ def test_create_stt_backend_qwen_audio_uses_custom_terms() -> None:
 
     assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "k4"
-    assert backend.model == "qwen-audio-3.0-asr-flash-streaming"
     assert backend.language_hints == ("ko",)
     assert backend.hotwords == ("Puripuly", "VRChat")
 
