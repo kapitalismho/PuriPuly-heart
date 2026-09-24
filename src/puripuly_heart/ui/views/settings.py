@@ -212,7 +212,6 @@ _DESKTOP_OVERLAY_REOPEN_FAILURE_REASONS = frozenset(
 )
 _CUSTOM_VOCAB_DELIMITER_RE = re.compile(r"\s+")
 _STT_UI_PROVIDERS = (
-    STTProviderName.QWEN_AUDIO,
     STTProviderName.DEEPGRAM,
     STTProviderName.LOCAL_CPU_AUTO,
     STTProviderName.LOCAL_PARAKEET_V3,
@@ -223,6 +222,7 @@ _STT_UI_PROVIDERS = (
     STTProviderName.ELEVENLABS_SCRIBE,
     STTProviderName.GEMINI_TRANSCRIBE,
     STTProviderName.SONIOX,
+    STTProviderName.QWEN_AUDIO,
     STTProviderName.CUSTOM_OFFLINE,
     STTProviderName.CUSTOM_REALTIME,
 )
@@ -243,7 +243,7 @@ _ROLLING_MEMBER_STT_PROVIDERS = frozenset(
 )
 _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.ROLLING_FREE: "settings.stt.section.recommended_cloud",
-    STTProviderName.QWEN_AUDIO: "settings.stt.section.cloud",
+    STTProviderName.QWEN_AUDIO: "settings.stt.section.recommended_cloud",
     STTProviderName.DEEPGRAM: "settings.stt.section.cloud",
     STTProviderName.GEMINI_TRANSCRIBE: "settings.stt.section.cloud",
     STTProviderName.ELEVENLABS_SCRIBE: "settings.stt.section.cloud",

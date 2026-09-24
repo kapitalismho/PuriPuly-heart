@@ -139,6 +139,25 @@ def test_i18n_bundles_share_the_same_keys() -> None:
     assert mismatches == {}
 
 
+def test_qwen_audio_and_speaker_recognition_copy_is_consistent_for_every_locale() -> None:
+    bundles = _load_bundles()
+    expected = {
+        "en": ("Good at recognizing Chinese", "Speaker Recognition"),
+        "ja": ("中国語の認識が得意です", "話者認識"),
+        "ko": ("중국어를 잘해요", "화자 인식"),
+        "ru": ("Хорошо распознаёт китайскую речь", "Распознавание говорящего"),
+        "zh-CN": ("中文识别效果好", "说话人识别"),
+    }
+
+    assert set(bundles) == set(expected)
+    for locale, (qwen_audio_description, speaker_recognition_label) in expected.items():
+        assert bundles[locale]["provider.qwen_audio"] == "Qwen Audio 3.1"
+        assert bundles[locale]["provider.qwen_audio.description"] == qwen_audio_description
+        assert bundles[locale]["settings.soniox_speaker_diarization"] == (
+            speaker_recognition_label
+        )
+
+
 def test_i18n_bundles_do_not_keep_unused_runtime_keys() -> None:
     bundles = _load_bundles()
     all_keys = sorted(set().union(*(bundle.keys() for bundle in bundles.values())))

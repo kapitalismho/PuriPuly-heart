@@ -2493,6 +2493,7 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
         option for option in options if option.value == STTProviderName.QWEN_AUDIO.value
     )
     assert qwen_audio_option.label == t("provider.qwen_audio")
+    assert qwen_audio_option.description == t("provider.qwen_audio.description")
     assert soniox_option.description == t("provider.soniox.description")
 
 
@@ -6424,28 +6425,31 @@ def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_rolling_
     assert view._elevenlabs_scribe_key.visible is False
 
 
-def test_cloud_modal_section_leads_with_qwen_audio_then_deepgram(
+def test_recommended_cloud_modal_places_qwen_audio_below_soniox(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert STTProviderName.ROLLING_FREE in settings_view._STT_UI_PROVIDERS
-    assert (
-        settings_view._STT_SECTION_BY_PROVIDER[STTProviderName.ROLLING_FREE]
-        == "settings.stt.section.recommended_cloud"
+    assert settings_view._STT_SECTION_BY_PROVIDER[STTProviderName.SONIOX] == (
+        "settings.stt.section.recommended_cloud"
+    )
+    assert settings_view._STT_SECTION_BY_PROVIDER[STTProviderName.QWEN_AUDIO] == (
+        "settings.stt.section.recommended_cloud"
     )
     for provider in (
-        STTProviderName.QWEN_AUDIO,
         STTProviderName.DEEPGRAM,
         STTProviderName.GEMINI_TRANSCRIBE,
         STTProviderName.ELEVENLABS_SCRIBE,
     ):
         assert settings_view._STT_SECTION_BY_PROVIDER[provider] == "settings.stt.section.cloud"
-    cloud_providers = [
+    recommended_cloud_providers = [
         provider
         for provider in settings_view._STT_UI_PROVIDERS
-        if settings_view._STT_SECTION_BY_PROVIDER.get(provider) == "settings.stt.section.cloud"
+        if settings_view._STT_SECTION_BY_PROVIDER.get(provider)
+        == "settings.stt.section.recommended_cloud"
     ]
-    assert cloud_providers[0] is STTProviderName.QWEN_AUDIO
-    assert cloud_providers[1] is STTProviderName.DEEPGRAM
+    assert recommended_cloud_providers.index(STTProviderName.QWEN_AUDIO) == (
+        recommended_cloud_providers.index(STTProviderName.SONIOX) + 1
+    )
 
     view, _ = _make_settings_view(monkeypatch)
     for provider in (
@@ -6454,7 +6458,9 @@ def test_cloud_modal_section_leads_with_qwen_audio_then_deepgram(
         STTProviderName.ELEVENLABS_SCRIBE,
     ):
         assert view._stt_option_item(provider).description == ""
-    assert view._stt_option_item(STTProviderName.QWEN_AUDIO).description == ""
+    assert view._stt_option_item(STTProviderName.QWEN_AUDIO).description == t(
+        "provider.qwen_audio.description"
+    )
     rolling_option = view._stt_option_item(STTProviderName.ROLLING_FREE)
     assert "\n" not in rolling_option.label
     assert rolling_option.label == t("provider.rolling_free").replace("\n", " ")
