@@ -300,6 +300,7 @@ struct LogicalCaptionBlockIdentity {
     secondary_enabled: bool,
     primary_language: Option<String>,
     secondary_language: Option<String>,
+    speaker_style: Option<String>,
 }
 
 fn retain_semantically_current_blocks(snapshot: &mut OverlayPresentationSnapshot) {
@@ -685,6 +686,10 @@ impl PresentationRuntime {
                 "native_presentation_retry": {
                     "version": 1,
                     "ownership": "exclusive"
+                },
+                "speaker_transition_presentation": {
+                    "version": 2,
+                    "policy": "temporary_turn_emphasis"
                 }
             }
         });
@@ -2375,6 +2380,7 @@ fn logical_caption_identity(state: &OverlayState) -> LogicalCaptionIdentity {
                 secondary_enabled: slot.secondary_enabled,
                 primary_language: slot.primary_language.clone(),
                 secondary_language: slot.secondary_language.clone(),
+                speaker_style: slot.speaker_style.clone(),
             })
             .collect(),
     )
@@ -2533,7 +2539,8 @@ pub async fn run_cli(args: &[String]) -> i32 {
                 "contract_version": EXPECTED_CONTRACT_VERSION,
                 "app_version": env!("CARGO_PKG_VERSION"),
                 "execution_contract": {"version": 1, "revision": "r2"},
-                "native_presentation_retry": {"version": 1, "ownership": "exclusive"}
+                "native_presentation_retry": {"version": 1, "ownership": "exclusive"},
+                "speaker_transition_presentation": {"version": 2, "policy": "temporary_turn_emphasis"},
             })
         );
         return 0;
@@ -2664,7 +2671,11 @@ impl PresentationRuntime {
 
 fn caption_block_for_strip(strip: &OverlaySlot) -> CaptionBlock {
     let channel = if strip.channel == "peer" {
-        CaptionChannel::PeerChannel
+        if strip.speaker_style.as_deref() == Some("cyan") {
+            CaptionChannel::PeerCyan
+        } else {
+            CaptionChannel::PeerChannel
+        }
     } else {
         CaptionChannel::SelfChannel
     };

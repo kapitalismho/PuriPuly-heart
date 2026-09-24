@@ -27,6 +27,9 @@ pub(crate) const TEXT_OUTLINE_OVERHANG_PX: f32 = 5.0;
 pub(crate) const SELF_TEXT_FILL_COLOR: (f32, f32, f32, f32) = (1.0, 1.0, 1.0, 1.0);
 #[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) const PEER_TEXT_FILL_COLOR: (f32, f32, f32, f32) = (1.0, 215.0 / 255.0, 0.0, 1.0);
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) const PEER_CYAN_TEXT_FILL_COLOR: (f32, f32, f32, f32) =
+    (51.0 / 255.0, 214.0 / 255.0, 1.0, 1.0);
 #[cfg(windows)]
 pub(crate) const TEXT_OUTLINE_COLOR: (f32, f32, f32, f32) = (0.0, 0.0, 0.0, 1.0);
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -74,6 +77,7 @@ pub enum CaptionBlockVariant {
 pub enum CaptionChannel {
     SelfChannel,
     PeerChannel,
+    PeerCyan,
 }
 
 impl CaptionBlock {
@@ -561,6 +565,7 @@ pub(crate) fn fill_color_for_channel(channel: CaptionChannel) -> (f32, f32, f32,
     match channel {
         CaptionChannel::SelfChannel => SELF_TEXT_FILL_COLOR,
         CaptionChannel::PeerChannel => PEER_TEXT_FILL_COLOR,
+        CaptionChannel::PeerCyan => PEER_CYAN_TEXT_FILL_COLOR,
     }
 }
 

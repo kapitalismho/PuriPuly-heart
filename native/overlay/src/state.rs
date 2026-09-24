@@ -77,6 +77,8 @@ pub struct OverlayPresentationBlock {
     pub publication_generation: Option<u64>,
     #[serde(default)]
     pub publication_order: Option<u64>,
+    #[serde(default)]
+    pub speaker_style: Option<String>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct NativeFreshRenderGenerations {
@@ -232,6 +234,7 @@ pub struct OverlaySlot {
     pub update_id: Option<String>,
     pub origin_wall_clock_ms: Option<u64>,
     pub session_scope: Option<String>,
+    pub speaker_style: Option<String>,
     pub slot_entry_order: u64,
 }
 
@@ -257,6 +260,7 @@ impl OverlaySlot {
             update_id: block.update_id.clone(),
             origin_wall_clock_ms: block.origin_wall_clock_ms,
             session_scope: block.session_scope.clone(),
+            speaker_style: block.speaker_style.clone(),
             slot_entry_order,
         }
     }
@@ -275,6 +279,7 @@ impl OverlaySlot {
         self.update_id = block.update_id.clone();
         self.origin_wall_clock_ms = block.origin_wall_clock_ms;
         self.session_scope = block.session_scope.clone();
+        self.speaker_style = block.speaker_style.clone();
     }
 }
 

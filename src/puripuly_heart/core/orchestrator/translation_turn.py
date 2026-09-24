@@ -4,7 +4,7 @@ import asyncio
 import logging
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal, Protocol
 from uuid import UUID, uuid5
 
@@ -64,6 +64,10 @@ class _FinalTranscriptSegment:
     language: str
     speaker_id: str | None = None
     speaker_session_scope: str = ""
+    source_start_ms: int | None = None
+    source_end_ms: int | None = None
+    speaker_confidence: float | None = None
+    overlaps_previous: bool = False
 
 
 def _final_transcript_segments(
@@ -114,6 +118,10 @@ def _final_transcript_segments(
             language,
             speaker.speaker_id,
             speaker.session_scope,
+            speaker.source_start_ms,
+            speaker.source_end_ms,
+            speaker.speaker_confidence,
+            speaker.overlaps_previous,
         )
         if (
             raw
@@ -122,11 +130,17 @@ def _final_transcript_segments(
             and raw[-1].speaker_session_scope == segment.speaker_session_scope
         ):
             previous = raw[-1]
-            raw[-1] = _FinalTranscriptSegment(
-                previous.text + piece,
-                segment.language,
-                segment.speaker_id,
-                segment.speaker_session_scope,
+            raw[-1] = replace(
+                previous,
+                text=previous.text + piece,
+                source_end_ms=segment.source_end_ms,
+                speaker_confidence=(
+                    min(previous.speaker_confidence, segment.speaker_confidence)
+                    if previous.speaker_confidence is not None
+                    and segment.speaker_confidence is not None
+                    else None
+                ),
+                overlaps_previous=previous.overlaps_previous or segment.overlaps_previous,
             )
         else:
             raw.append(segment)
@@ -136,32 +150,17 @@ def _final_transcript_segments(
         if not any(character.isalnum() for character in segment.text):
             if segments:
                 previous = segments[-1]
-                segments[-1] = _FinalTranscriptSegment(
-                    previous.text + segment.text,
-                    previous.language,
-                    previous.speaker_id,
-                    previous.speaker_session_scope,
-                )
+                segments[-1] = replace(previous, text=previous.text + segment.text)
             else:
                 leading += segment.text
             continue
         if leading:
-            segment = _FinalTranscriptSegment(
-                leading + segment.text,
-                segment.language,
-                segment.speaker_id,
-                segment.speaker_session_scope,
-            )
+            segment = replace(segment, text=leading + segment.text)
             leading = ""
         segments.append(segment)
     if leading and segments:
         previous = segments[-1]
-        segments[-1] = _FinalTranscriptSegment(
-            previous.text + leading,
-            previous.language,
-            previous.speaker_id,
-            previous.speaker_session_scope,
-        )
+        segments[-1] = replace(previous, text=previous.text + leading)
     return tuple(segments)
 
 
@@ -293,6 +292,8 @@ class TranslationOutputSubmission:
     turn_kind: TranslationTurnKind | None = None
     parent_output_count: int = 1
     context_texts: tuple[str, ...] | None = None
+    speaker_transition: str | None = None
+    speaker_transition_claim_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.outcome == "translated" and self.translation is None:
@@ -320,6 +321,12 @@ class TranslationOutputSubmission:
             raise ValueError("publication generation and source order must be provided together")
         if self.publication_generation is not None and self.channel != "peer":
             raise ValueError("publication generation is only valid for Peer output")
+        if self.channel != "peer" and self.speaker_transition is not None:
+            raise ValueError("speaker transition evidence is only valid for Peer output")
+        if (self.speaker_transition is None) != (self.speaker_transition_claim_id is None):
+            raise ValueError(
+                "speaker transition comparison and claim identity must be provided together"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -809,6 +816,10 @@ class TranslationTurnLifecycleOwner:
                                     segment.text,
                                     segment.speaker_id,
                                     segment.speaker_session_scope,
+                                    source_start_ms=segment.source_start_ms,
+                                    source_end_ms=segment.source_end_ms,
+                                    speaker_confidence=segment.speaker_confidence,
+                                    overlaps_previous=segment.overlaps_previous,
                                 ),
                             )
                             if segment.speaker_session_scope

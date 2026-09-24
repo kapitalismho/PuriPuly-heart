@@ -62,6 +62,7 @@ class OverlayPresentationBlock:
     publication_scope: str | None = None
     publication_generation: int | None = None
     publication_order: int | None = None
+    speaker_style: Literal["gold", "cyan"] | None = None
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -96,6 +97,8 @@ class OverlayPresentationBlock:
             payload["publication_generation"] = self.publication_generation
         if self.publication_order is not None:
             payload["publication_order"] = self.publication_order
+        if self.speaker_style is not None:
+            payload["speaker_style"] = self.speaker_style
         return payload
 
     @classmethod
@@ -136,6 +139,7 @@ class OverlayPresentationBlock:
             publication_scope=_optional_non_empty_string_field(data, "publication_scope"),
             publication_generation=_optional_non_negative_int_field(data, "publication_generation"),
             publication_order=_optional_non_negative_int_field(data, "publication_order"),
+            speaker_style=_optional_speaker_style(data),
         )
 
 
@@ -389,6 +393,27 @@ def _optional_string_field(data: dict[str, object], key: str) -> str | None:
         return None
     if not isinstance(value, str):
         raise ValueError(f"{key} must be a string")
+    return value
+
+
+def _optional_bool_field(
+    data: dict[str, object],
+    key: str,
+    *,
+    default: bool,
+) -> bool:
+    value = data.get(key, default)
+    if not isinstance(value, bool):
+        raise ValueError(f"{key} must be a bool")
+    return value
+
+
+def _optional_speaker_style(data: dict[str, object]) -> Literal["gold", "cyan"] | None:
+    value = data.get("speaker_style")
+    if value is None:
+        return None
+    if value not in ("gold", "cyan"):
+        raise ValueError("speaker_style must be 'gold' or 'cyan'")
     return value
 
 

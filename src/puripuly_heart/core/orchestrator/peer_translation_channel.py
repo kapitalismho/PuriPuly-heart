@@ -43,6 +43,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnProcessResult,
     TranslationTurnRequest,
 )
+from puripuly_heart.core.speaker_transition import PeerSpeakerTransitionInterpreter
 from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
 from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import (
@@ -75,6 +76,9 @@ class PeerTranslationChannelOwner:
     _peer_parent_speech_end_times: dict[UUID, float] = field(default_factory=dict)
     _peer_translation_parent_ids: set[UUID] = field(default_factory=set)
     _prepared_requests: dict[UUID, PreparedTranslationRequest] = field(default_factory=dict)
+    _speaker_transitions: PeerSpeakerTransitionInterpreter = field(
+        default_factory=PeerSpeakerTransitionInterpreter
+    )
     _accepting_events: bool = field(init=False, default=True)
 
     def __post_init__(self) -> None:
@@ -99,6 +103,7 @@ class PeerTranslationChannelOwner:
         await self.translation_turns.cancel_pending(channel="peer")
         await self.runtime.reset_runtime_state()
         self._prepared_requests.clear()
+        self._speaker_transitions.reset()
         self._clear_peer_logical_turn_state()
         self.diagnostics.clear_latency_state(channel="peer")
 
@@ -178,6 +183,7 @@ class PeerTranslationChannelOwner:
         self._peer_parent_turn_ids.clear()
         self._peer_completed_turn_ids.clear()
         self._peer_parent_speech_end_times.clear()
+        self._speaker_transitions.reset()
         self._peer_translation_parent_ids.clear()
 
     def _peer_parent_speech_end_time(self, parent_utterance_id: UUID) -> float | None:
@@ -580,6 +586,10 @@ class PeerTranslationChannelOwner:
             parent_utterance_id=child.parent_utterance_id,
             peer_turn_id=child.utterance_id,
         )
+        self._speaker_transitions.observe(
+            child.transcript,
+            child_sequence=child.sequence,
+        )
         await self._handle_peer_final_transcript(
             child.transcript,
             parent_utterance_id=child.parent_utterance_id,
@@ -762,12 +772,15 @@ class PeerTranslationChannelOwner:
             and not output_submitted
         ):
             configuration = child.config_snapshot.value
+            claim = self._speaker_transitions.claim_for(child.utterance_id)
             await self.output_projection.project_peer_source_only(
                 transcript=child.transcript,
                 source_language=self._source_language_for(runtime, configuration),
                 target_language=self._target_language_for(runtime, configuration),
                 close_is_final=outcome == "source_only",
                 finalize_latency=True,
+                speaker_transition=None if claim is None else claim.comparison,
+                speaker_transition_claim_id=None if claim is None else claim.claim_id,
             )
             await self.output_projection.publish_peer_chatbox_denial(child.utterance_id)
             self._clear_runtime_latency_bookkeeping(
@@ -786,6 +799,7 @@ class PeerTranslationChannelOwner:
             child.utterance_id,
             preserve_parent_speech_end_time=True,
         )
+        self._speaker_transitions.retire(child.utterance_id)
 
     async def on_parent_closed(self, parent_utterance_id: UUID) -> None:
         if parent_utterance_id in self._peer_translation_parent_ids:
@@ -893,6 +907,22 @@ class PeerTranslationChannelOwner:
     ) -> TranslationResultProjectionReceipt:
         if submission.channel != "peer":
             raise ValueError("Peer translation owner received non-Peer output")
+        claim = self._speaker_transitions.claim_for(submission.child_utterance_id)
+        if claim is not None:
+            submission = replace(
+                submission,
+                speaker_transition=claim.comparison,
+                speaker_transition_claim_id=claim.claim_id,
+                translation=(
+                    None
+                    if submission.translation is None
+                    else replace(
+                        submission.translation,
+                        speaker_transition=claim.comparison,
+                        speaker_transition_claim_id=claim.claim_id,
+                    )
+                ),
+            )
         return await self._publish_translation_result(self._with_prepared_context(submission))
 
     async def _publish_translation_result(

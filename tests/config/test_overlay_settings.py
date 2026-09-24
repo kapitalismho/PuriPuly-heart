@@ -96,3 +96,18 @@ def test_overlay_settings_desktop_flet_swap_caption_languages_round_trips() -> N
     assert settings.intent.overlay.desktop_flet.swap_caption_languages is True
     assert data["intent"]["overlay"]["desktop_flet"]["swap_caption_languages"] is True
     assert round_tripped.intent.overlay.desktop_flet.swap_caption_languages is True
+
+
+def test_overlay_speaker_transition_preference_is_discarded_without_losing_extensions() -> None:
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["overlay"]["speaker_transition_mode"] = "E"
+    raw["intent"]["overlay"]["future_overlay_option"] = {"enabled": True}
+    raw["intent"]["ui"]["future_ui_option"] = "keep"
+
+    settings = serialization.from_dict(raw)
+    persisted = serialization.to_dict(settings)
+
+    assert not hasattr(settings.intent.overlay, "speaker_transition_mode")
+    assert "speaker_transition_mode" not in persisted["intent"]["overlay"]
+    assert persisted["intent"]["overlay"]["future_overlay_option"] == {"enabled": True}
+    assert persisted["intent"]["ui"]["future_ui_option"] == "keep"

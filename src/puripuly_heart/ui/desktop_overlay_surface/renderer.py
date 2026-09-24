@@ -960,7 +960,7 @@ def _caption_line(
         text=text,
         role=role,
         slot=slot,
-        color=_desktop_caption_color_for_channel(block.channel),
+        color=_desktop_caption_color_for_channel(block.channel, block.speaker_style),
         priority=priority,
         block_id=block.id,
         channel=block.channel,
@@ -1162,8 +1162,9 @@ def _build_flet_caption_slot(ft: Any, plan: DesktopCaptionPlan, slot: DesktopCap
         tight=True,
         scroll=None,
     )
+    text_content: Any = column
     text_layer = ft.Container(
-        content=column,
+        content=text_content,
         width=card_text_width,
         bgcolor=ft.Colors.TRANSPARENT,
         alignment=(
@@ -1172,18 +1173,20 @@ def _build_flet_caption_slot(ft: Any, plan: DesktopCaptionPlan, slot: DesktopCap
             else ft.Alignment.CENTER
         ),
     )
+    card_content: Any = text_layer
+    card_padding: Any = ft.Padding.symmetric(
+        horizontal=plan.padding_horizontal,
+        vertical=plan.padding_vertical,
+    )
     inner_card = ft.Container(
-        content=text_layer,
+        content=card_content,
         width=card_width,
         height=plan.slot_height,
         bgcolor=(
             ft.Colors.TRANSPARENT if plan.full_window_background_visible else plan.background_color
         ),
         border_radius=plan.border_radius,
-        padding=ft.Padding.symmetric(
-            horizontal=plan.padding_horizontal,
-            vertical=plan.padding_vertical,
-        ),
+        padding=card_padding,
         alignment=ft.Alignment.CENTER,
     )
     return ft.Container(

@@ -691,6 +691,7 @@ struct WindowsCaptionRenderer {
     cache_outline_brush: ID2D1SolidColorBrush,
     cache_self_text_brush: ID2D1SolidColorBrush,
     cache_peer_text_brush: ID2D1SolidColorBrush,
+    cache_peer_cyan_text_brush: ID2D1SolidColorBrush,
     target_bitmap: ID2D1Bitmap1,
     texture: ID3D11Texture2D,
     caches: WindowsRendererCaches,
@@ -782,6 +783,14 @@ impl WindowsCaptionRenderer {
                 )
                 .map_err(|error| CaptionRenderError::Init(error.to_string()))?
         };
+        let cache_peer_cyan_text_brush = unsafe {
+            d2d_context
+                .CreateSolidColorBrush(
+                    &d2d_color(fill_color_for_channel(CaptionChannel::PeerCyan)),
+                    None,
+                )
+                .map_err(|error| CaptionRenderError::Init(error.to_string()))?
+        };
         let mut renderer = Self {
             d2d_factory,
             dwrite_factory,
@@ -794,6 +803,7 @@ impl WindowsCaptionRenderer {
             cache_outline_brush,
             cache_self_text_brush,
             cache_peer_text_brush,
+            cache_peer_cyan_text_brush,
             target_bitmap,
             texture,
             caches: WindowsRendererCaches::default(),
@@ -946,6 +956,7 @@ impl WindowsCaptionRenderer {
         match channel {
             CaptionChannel::SelfChannel => self.cache_self_text_brush.clone(),
             CaptionChannel::PeerChannel => self.cache_peer_text_brush.clone(),
+            CaptionChannel::PeerCyan => self.cache_peer_cyan_text_brush.clone(),
         }
     }
 
@@ -2395,6 +2406,7 @@ fn bounds_intersect_damage_band(bounds: BlockBounds, damage_band: DamageBand) ->
 
 #[cfg(test)]
 mod tests {
+
     #[cfg(windows)]
     fn texture_pixels(renderer: &super::WindowsCaptionRenderer) -> Vec<u8> {
         use windows::Win32::Graphics::Direct3D11::{

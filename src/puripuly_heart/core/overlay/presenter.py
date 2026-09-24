@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -97,6 +97,8 @@ class OverlayPresenter(OverlaySink):
     _last_new_occupant_at: float | None = field(init=False, default=None)
     _peer_admission_changed: asyncio.Event = field(init=False, default_factory=asyncio.Event)
     _closed: bool = field(init=False, default=False)
+    _speaker_seen_readable: set[str] = field(init=False, default_factory=set)
+    _speaker_emphasis_id: str | None = field(init=False, default=None)
 
     def __post_init__(self) -> None:
         self._presentation_state = OverlayPresentationState()
@@ -165,6 +167,8 @@ class OverlayPresenter(OverlaySink):
         self._last_new_occupant_at = None
         self._signal_peer_admission_change()
         self._appearance_seq = 0
+        self._speaker_seen_readable.clear()
+        self._speaker_emphasis_id = None
         self._retry_projection.clear_scene()
         self._presentation_state.generate_snapshot(
             revision=0,
@@ -181,6 +185,8 @@ class OverlayPresenter(OverlaySink):
         self._retired_preview_self_seqs.clear()
         self._live_self_turn_key = None
         self._live_peer_turn_key = None
+        self._speaker_seen_readable.clear()
+        self._speaker_emphasis_id = None
         self._revision += 1
         self._retry_projection.clear_scene()
         snapshot = self._presentation_state.generate_snapshot(
@@ -659,6 +665,7 @@ class OverlayPresenter(OverlaySink):
             if active_entry is not None:
                 active_entry.ever_visible = True
         rendered_entries = selection.rendered_entries
+        rendered_entries = self._apply_speaker_presentation(rendered_entries)
         next_blocks = [block for _, block in rendered_entries]
         next_calibration = _calibration_from_overlay(self.calibration)
         fresh_render_channel = self._eligible_fresh_render_channel(
@@ -782,6 +789,41 @@ class OverlayPresenter(OverlaySink):
                     entry.window_evicted_at = None
                     self._schedule_expiration(key, entry)
                 entry.ever_visible = True
+
+    def _apply_speaker_presentation(
+        self,
+        rendered_entries: list[tuple[tuple[str, UUID], OverlayPresentationBlock]],
+    ) -> list[tuple[tuple[str, UUID], OverlayPresentationBlock]]:
+        for key, block in rendered_entries:
+            if block.id in self._speaker_seen_readable:
+                continue
+            self._speaker_seen_readable.add(block.id)
+            self._speaker_emphasis_id = None
+            if block.channel != "peer":
+                continue
+            entry = self._entries.get(key)
+            if entry is not None and entry.speaker_transition == "transition":
+                self._speaker_emphasis_id = block.id
+
+        styled: list[tuple[tuple[str, UUID], OverlayPresentationBlock]] = []
+        for key, block in rendered_entries:
+            if block.channel != "peer":
+                styled.append((key, block))
+                continue
+            styled.append(
+                (
+                    key,
+                    replace(
+                        block,
+                        speaker_style=("cyan" if self._speaker_emphasis_id == block.id else "gold"),
+                    ),
+                )
+            )
+        live_ids = {entry.block_id for entry in self._entries.values()}
+        if self._speaker_emphasis_id not in live_ids:
+            self._speaker_emphasis_id = None
+        self._speaker_seen_readable.intersection_update(live_ids)
+        return styled
 
     def _next_appearance_seq(self) -> int:
         self._appearance_seq += 1

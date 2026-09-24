@@ -36,6 +36,7 @@ from puripuly_heart.core.orchestrator.configuration import (
 from puripuly_heart.core.overlay.manifest import (
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_NATIVE_RETRY_CONTRACT,
+    OVERLAY_SPEAKER_TRANSITION_CONTRACT,
 )
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter
@@ -273,6 +274,7 @@ class _TestManagedProcess:
                     "capabilities": {
                         "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                         "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+                        "speaker_transition_presentation": OVERLAY_SPEAKER_TRANSITION_CONTRACT,
                     },
                 }
             )

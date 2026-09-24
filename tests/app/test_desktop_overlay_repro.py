@@ -318,6 +318,45 @@ def test_verifier_rejects_semantically_invalid_rfc3339_utc(tmp_path: Path, wall_
     assert artifacts.verify_desktop_overlay_repro(output_dir=tmp_path) == 1
 
 
+def test_raw_ingress_requires_current_speaker_transition_capability() -> None:
+    ingress = repro.LocalAuthenticatedRawIngress(
+        "token",
+        repro.OverlayPresentationSnapshot(),
+        "overlay-repro",
+    )
+    base = {
+        "type": "auth",
+        "session_token": "token",
+        "contract_version": repro.OVERLAY_CONTRACT_VERSION,
+        "overlay_instance_id": "overlay-repro",
+        "runtime_generation": 1,
+        "capabilities": {
+            "execution_contract": repro.OVERLAY_EXECUTION_CONTRACT,
+            "speaker_transition_presentation": repro.OVERLAY_SPEAKER_TRANSITION_CONTRACT,
+        },
+    }
+
+    assert ingress._is_matched_desktop_auth(base)
+    missing = {
+        **base,
+        "capabilities": {
+            "execution_contract": repro.OVERLAY_EXECUTION_CONTRACT,
+        },
+    }
+    retired = {
+        **base,
+        "capabilities": {
+            "execution_contract": repro.OVERLAY_EXECUTION_CONTRACT,
+            "speaker_transition_presentation": {
+                "version": 1,
+                "modes": ["A", "C", "E"],
+            },
+        },
+    }
+    assert not ingress._is_matched_desktop_auth(missing)
+    assert not ingress._is_matched_desktop_auth(retired)
+
+
 def test_owner_drives_raw_authenticated_fifo_gate_through_shipping_renderer(tmp_path: Path) -> None:
     from puripuly_heart.ui import desktop_overlay as desktop_module
 

@@ -619,15 +619,15 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
             assert all(
                 block.channel == "peer" and block.block_variant == "finalized" for block in blocks
             )
+            forbidden_raw_speaker_fields = {
+                "speaker_id",
+                "speaker_label",
+                "speaker_session_scope",
+            }
+            assert all(forbidden_raw_speaker_fields.isdisjoint(block.to_dict()) for block in blocks)
             assert all(
-                "label" not in field_name and "speaker" not in field_name
-                for block in blocks
-                for field_name in block.to_dict()
-            )
-            assert all(
-                "label" not in field_name and "speaker" not in field_name
+                forbidden_raw_speaker_fields.isdisjoint(event.__dataclass_fields__)
                 for event in translations
-                for field_name in event.__dataclass_fields__
             )
             assert osc.messages == []
             decision = next(

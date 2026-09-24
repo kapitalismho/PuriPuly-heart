@@ -380,7 +380,7 @@ def test_prompt_surface_preserves_the_accepted_card_order() -> None:
     assert surface.rows == (vocabulary, peer_expected_language, persona)
 
 
-def test_overlay_surface_preserves_the_accepted_six_rows_and_recovery_visibility() -> None:
+def test_overlay_surface_preserves_target_specific_and_recovery_visibility() -> None:
     placeholders: list[ft.Control] = []
     slots = _overlay_slots()
     surface = compose_settings_overlay_surface(

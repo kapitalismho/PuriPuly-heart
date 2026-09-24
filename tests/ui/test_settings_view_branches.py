@@ -5151,8 +5151,8 @@ def test_overlay_tab_uses_target_specific_unit_card_rows(
         t("settings.overlay.desktop.swap_caption_languages.title"),
         t("settings.overlay.position_reset.desktop.title"),
     ]
-    assert len(_layout_cards(overlay_controls[4])) == 3
-    assert [getattr(card, "visible", True) for card in _layout_cards(overlay_controls[4])] == [
+    assert len(_layout_cards(overlay_controls[5])) == 3
+    assert [getattr(card, "visible", True) for card in _layout_cards(overlay_controls[5])] == [
         True,
         True,
         True,

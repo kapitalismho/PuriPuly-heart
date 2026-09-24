@@ -1305,10 +1305,10 @@ def test_broker_v1_snapshot_freezes_request_success_and_error_envelopes() -> Non
 def test_overlay_contract_snapshot_matches_manifest_and_protocol_wire_shape() -> None:
     snapshot = _load_snapshot()["overlay"]
     block = OverlayPresentationBlock(
-        id="self:1",
-        occupant_key="self:1",
+        id="peer:1",
+        occupant_key="peer:1",
         appearance_seq=1,
-        channel="self",
+        channel="peer",
         block_variant="finalized",
         primary_text="hello",
         secondary_text="안녕",
@@ -1317,10 +1317,11 @@ def test_overlay_contract_snapshot_matches_manifest_and_protocol_wire_shape() ->
         secondary_language="ko",
         update_id="update-1",
         origin_wall_clock_ms=1712345678901,
-        session_scope="session:self",
+        session_scope="session:peer",
         source_text_hash="abc123",
         source_text_len=5,
-        logical_turn_key="self:1",
+        logical_turn_key="peer:1",
+        speaker_style="cyan",
     )
     presentation_snapshot = OverlayPresentationSnapshot(blocks=[block]).to_dict()
 

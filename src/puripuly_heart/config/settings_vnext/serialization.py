@@ -184,6 +184,11 @@ def _drop_removed_settings_extensions(
     cleaned.pop("system_prompt", None)
     intent = cleaned.get("intent")
     if isinstance(intent, dict):
+        overlay = intent.get("overlay")
+        if isinstance(overlay, dict):
+            overlay.pop("speaker_transition_mode", None)
+            if not overlay:
+                intent.pop("overlay", None)
         desktop_audio = intent.get("desktop_audio")
         if isinstance(desktop_audio, dict):
             desktop_audio.pop("smart_turn_enabled", None)
