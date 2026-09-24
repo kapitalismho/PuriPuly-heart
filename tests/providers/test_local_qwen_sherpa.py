@@ -877,7 +877,6 @@ async def test_local_qwen_speech_end_queues_fifo_decode_without_blocking(
     np.testing.assert_array_equal(decoded[1], second)
 
 
-
 @pytest.mark.asyncio
 async def test_local_qwen_queued_payload_survives_mutable_producer_reuse(
     monkeypatch: pytest.MonkeyPatch,
@@ -915,6 +914,7 @@ async def test_local_qwen_queued_payload_survives_mutable_producer_reuse(
         np.array([-1.0, -1 / 32768, 0, 0.5, 32767 / 32768, 0.125, -0.625], dtype=np.float32),
     )
     await session.close()
+
 
 @pytest.mark.asyncio
 async def test_local_qwen_sessions_handoff_finals_before_next_session_decodes(

@@ -88,6 +88,7 @@ class FakeSharedGpuRuntime:
             decode_seconds=0.02,
             rtf=2.0,
         )
+
     async def submit_pcm16(
         self,
         channel: str,
