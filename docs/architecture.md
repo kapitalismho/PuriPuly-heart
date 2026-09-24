@@ -299,8 +299,6 @@ Execution options:
 
 Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
-The semantic interpreter in `core/speaker_transition.py` owns session-scoped speaker-evidence interpretation.
-
 GPU worker split:
 
 - Python adapter: process launch, authentication, requests, heartbeat, cancellation, shutdown.
@@ -384,8 +382,6 @@ Implementation: `core/runtime/output.py`. Behavior tests: `tests/core/runtime/te
 Each generation owns its tasks and shutdown. Python owns caption lifetime; native owns presentation retries.
 
 `OverlayPresenter` owns provider-independent Peer subtitle admission and pacing (`core/overlay/presenter.py`); output retains bounded waiting work.
-
-`OverlayPresenter` owns cue state; native and desktop renderers consume only its derived style.
 
 Behavior tests: `tests/core/test_overlay_presenter.py`.
 
