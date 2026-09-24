@@ -102,19 +102,19 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 E4B (Local)** | Unlimited | Unlimited | 5,000 | 3,660 |
-| **Gemma 4 26B A4B + 31B** | 13,940 | 13,940 | 3,680 | 2,900 |
-| **DeepSeek V4 Flash (OpenRouter)** | 17,020 | 17,020 | 3,860 | 3,010 |
-| **DeepSeek V4.1 Flash** | 16,800 | 16,800 | 3,860 | 3,000 |
+| **Gemma 4 E4B (Local)** | Unlimited | Unlimited | 5,000 | 7,260 |
+| **Gemma 4 26B A4B + 31B** | 13,940 | 13,940 | 3,680 | 4,770 |
+| **DeepSeek V4 Flash (OpenRouter)** | 17,020 | 17,020 | 3,860 | 5,090 |
+| **DeepSeek V4.1 Flash** | 16,800 | 16,800 | 3,860 | 5,070 |
 
 #### Other Models
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | 14,380 | 14,380 | 3,710 | 2,920 |
-| **Gemma 4 31B** | 10,940 | 10,940 | 3,430 | 2,740 |
-| **Gemini 3.8 Flash** | 1,160 | 1,160 | 940 | 880 |
-| **Qwen 3.8 Flash** | 7,460 | 7,460 | 2,990 | 2,460 |
+| **Gemma 4 26B A4B** | 14,380 | 14,380 | 3,710 | 4,820 |
+| **Gemma 4 31B** | 10,940 | 10,940 | 3,430 | 4,360 |
+| **Gemini 3.8 Flash** | 1,160 | 1,160 | 940 | 1,000 |
+| **Qwen 3.8 Flash** | 7,460 | 7,460 | 2,990 | 3,680 |
 
 ### Cost per Utterance
 
@@ -122,26 +122,26 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 E4B (Local)** | $0 | $0 | ~$0.0002 | ~$0.0003 |
-| **Gemma 4 26B A4B + 31B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.0003 |
-| **DeepSeek V4 Flash (OpenRouter)** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.0003 |
-| **DeepSeek V4.1 Flash** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.0003 |
+| **Gemma 4 E4B (Local)** | $0 | $0 | ~$0.0002 | ~$0.00014 |
+| **Gemma 4 26B A4B + 31B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.00021 |
+| **DeepSeek V4 Flash (OpenRouter)** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.00020 |
+| **DeepSeek V4.1 Flash** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.00020 |
 
 #### Other Models
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.0003 |
-| **Gemma 4 31B** | ~$0.00009 | ~$0.00009 | ~$0.0003 | ~$0.0003 |
-| **Gemini 3.8 Flash** | ~$0.0009 | ~$0.0009 | ~$0.0011 | ~$0.0011 |
-| **Qwen 3.8 Flash** | ~$0.0001 | ~$0.0001 | ~$0.0003 | ~$0.0004 |
+| **Gemma 4 26B A4B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.00021 |
+| **Gemma 4 31B** | ~$0.00009 | ~$0.00009 | ~$0.0003 | ~$0.00023 |
+| **Gemini 3.8 Flash** | ~$0.0009 | ~$0.0009 | ~$0.0011 | ~$0.0010 |
+| **Qwen 3.8 Flash** | ~$0.0001 | ~$0.0001 | ~$0.0003 | ~$0.00027 |
 
 *   *Based on (Input 900 tokens + Output 12 tokens) × 1.2 avg LLM calls per utterance.*
 *   *Uses per Dollar is derived from the un-rounded values in the Cost per Utterance table.*
 *   *All costs and usage counts are approximate.*
 *   *DeepSeek V4.1 Flash assumes a 70% cache hit rate; V4 Flash (OpenRouter) assumes 60%.*
 *   *Qwen API costs are based on the Beijing region.*
-*   *Pricing as of September 14, 2026.*
+*   *Pricing as of September 25, 2026.*
 
 ### Free Credits
 

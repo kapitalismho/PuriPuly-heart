@@ -86,7 +86,7 @@
 | 9 | Custom Speech Recognition (Realtime) |
 | 10 | Gemini Transcribe (Live) |
 | 11 | ElevenLabs Scribe |
-| 12 | Qwen Audio 3.0 ASR Flash Streaming |
+| 12 | Qwen Audio 3.1 ASR Flash Streaming |
 | 13 | Free cloud ASR auto-selection (ElevenLabs Scribe → Gemini → Deepgram) |
 
 - Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`

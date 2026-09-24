@@ -32,7 +32,7 @@ from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
 
-QWEN_AUDIO_MODEL = "qwen-audio-3.0-asr-flash-streaming"
+QWEN_AUDIO_MODEL = "qwen-audio-3.1-asr-flash-streaming"
 QWEN_AUDIO_DEFAULT_ENDPOINT = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
 QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT = 4
 QWEN_AUDIO_LANGUAGE_HINTS_LIMIT = 4
