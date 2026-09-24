@@ -152,7 +152,19 @@ class ScopedRecognitionEngine:
         repr=False,
     )
     _ended_provider_epoch_id: str | None = field(init=False, default=None, repr=False)
+    _retiring_provider_epoch_ids: set[str] = field(init=False, default_factory=set, repr=False)
     _turn: _ActiveTurn | None = field(init=False, default=None, repr=False)
+    _turns: dict[STTProviderTurnIdentity, _ActiveTurn] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    _turn_order: deque[STTProviderTurnIdentity] = field(
+        init=False, default_factory=deque, repr=False
+    )
+    _terminal_wait_tasks: set[asyncio.Task[None]] = field(
+        init=False, default_factory=set, repr=False
+    )
+    _terminal_drain_lock: asyncio.Lock = field(init=False, repr=False)
+    _session_retirement_requested: bool = field(init=False, default=False, repr=False)
     _source_speech_active: bool = field(init=False, default=False, repr=False)
     _last_source_speech_at_s: float | None = field(init=False, default=None, repr=False)
     _source_work_pending: bool = field(init=False, default=False, repr=False)
@@ -210,6 +222,7 @@ class ScopedRecognitionEngine:
 
     def __post_init__(self) -> None:
         self._input_lock = asyncio.Lock()
+        self._terminal_drain_lock = asyncio.Lock()
         self._abort_lock = asyncio.Lock()
         self._turn_resolved = asyncio.Event()
         self._turn_resolved.set()
@@ -219,7 +232,7 @@ class ScopedRecognitionEngine:
 
     @property
     def is_at_turn_boundary(self) -> bool:
-        return self._turn is None
+        return not self._turns
 
     @property
     def cleanup_debt(self) -> int:
@@ -248,10 +261,9 @@ class ScopedRecognitionEngine:
 
     @property
     def retention_snapshot(self) -> STTRetentionSnapshot:
-        turn = self._turn
         return STTRetentionSnapshot(
-            retained_samples=turn.retained_samples if turn is not None else 0,
-            retained_bytes=turn.retained_bytes if turn is not None else 0,
+            retained_samples=sum(turn.retained_samples for turn in self._turns.values()),
+            retained_bytes=sum(turn.retained_bytes for turn in self._turns.values()),
             high_water_samples=self._retained_high_water_samples,
             high_water_bytes=self._retained_high_water_bytes,
         )
@@ -284,7 +296,7 @@ class ScopedRecognitionEngine:
                 async with self._input_lock:
                     if self._closed or authority_generation != self._authority_generation:
                         return
-                    if self._turn is None:
+                    if self._can_start_turn(owned.segment.settings):
                         await self._handle_start(owned, event, authority_generation)
                         return
                     resolved = self._turn_resolved
@@ -355,14 +367,11 @@ class ScopedRecognitionEngine:
         self._schedule_rotation_check()
 
     async def abort(self, *, reason: str = "cancelled") -> None:
-        # Invalidate provider authority before waiting for any in-flight
-        # open/write/seal/final operation. Native work may continue under
-        # cleanup ownership, but it can no longer publish into this engine.
         self._authority_generation += 1
         async with self._abort_lock:
-            turn = self._turn
+            turns = tuple(self._turns.values())
             session = self._session
-            if turn is not None:
+            for turn in turns:
                 turn.local_sealed = True
                 terminal = STTProviderTurnTerminal(
                     identity=turn.identity,
@@ -379,8 +388,8 @@ class ScopedRecognitionEngine:
                         name=f"scoped-stt-abort:{turn.identity.provider_turn_id}",
                     )
                     self._operation_tasks.setdefault(id(session), set()).add(task)
-                await self._finish_turn(turn, terminal)
-            else:
+            await self._drain_completed_turns()
+            if not turns:
                 self._retire_current_session()
 
     async def stop(self) -> None:
@@ -405,7 +414,11 @@ class ScopedRecognitionEngine:
             )
             if event_task not in done:
                 event_task.cancel()
-        pending = tuple(self._cleanup_tasks) + tuple(self._factory_tasks)
+        pending = (
+            tuple(self._cleanup_tasks)
+            + tuple(self._factory_tasks)
+            + tuple(self._terminal_wait_tasks)
+        )
         if pending:
             done, _pending = await asyncio.wait(
                 pending,
@@ -440,7 +453,7 @@ class ScopedRecognitionEngine:
         if authority_generation != self._authority_generation:
             return
         if self._turn is not None:
-            raise RuntimeError("one unresolved provider turn is allowed per provider epoch")
+            raise RuntimeError("one capturing provider turn is allowed per provider epoch")
         settings = owned.segment.settings
         watchdogs = self.watchdog_resolver(settings)
         open_failure: BaseException | None = None
@@ -479,6 +492,8 @@ class ScopedRecognitionEngine:
             retention_budget=(owned.retention.budget if owned.retention is not None else None),
         )
         self._turn = turn
+        self._turns[identity] = turn
+        self._turn_order.append(identity)
         self._turn_resolved.clear()
         if open_failure is not None or session is None or self._provider_epoch_id is None:
             self._set_turn_failure(
@@ -559,11 +574,20 @@ class ScopedRecognitionEngine:
                 ),
             )
             if sent and self._has_write_authority(session, turn):
+                if self._session_allows_sealed_turn_overlap(session):
+                    self._turn = None
+                    self._turn_resolved.set()
+                    task = asyncio.create_task(
+                        self._await_and_finish_turn(turn),
+                        name=f"scoped-stt-terminal:{turn.identity.provider_turn_id}",
+                    )
+                    self._terminal_wait_tasks.add(task)
+                    task.add_done_callback(self._terminal_wait_done)
+                    return
                 await self._await_terminal(turn)
         if not turn.terminal_ready.done():
             self._set_turn_failure(turn, "provider_turn_failed_before_terminal")
-        terminal = turn.terminal_ready.result()
-        await self._finish_turn(turn, terminal)
+        await self._drain_completed_turns()
 
     async def _send_payload(
         self,
@@ -668,7 +692,10 @@ class ScopedRecognitionEngine:
         if self.channel != "self" and not turn.local_sealed:
             return
         turn.local_sealed = True
-        await self._finish_turn(turn, turn.terminal_ready.result())
+        if turn is self._turn:
+            self._turn = None
+            self._turn_resolved.set()
+        await self._drain_completed_turns()
 
     async def _ensure_session(
         self,
@@ -725,6 +752,7 @@ class ScopedRecognitionEngine:
                     self._session_opened_at_s = self.monotonic_clock()
                     self._session_watchdogs = watchdogs
                     self._ended_provider_epoch_id = None
+                    self._session_retirement_requested = False
                     self._session_consumer = asyncio.create_task(
                         self._consume_session_events(session, epoch_id),
                         name=f"scoped-stt-events:{epoch_id}",
@@ -746,23 +774,28 @@ class ScopedRecognitionEngine:
     ) -> None:
         try:
             async for event in session.turn_events():
-                if epoch_id != self._provider_epoch_id:
+                if (
+                    epoch_id != self._provider_epoch_id
+                    and epoch_id not in self._retiring_provider_epoch_ids
+                ):
                     continue
                 if isinstance(event, STTProviderEpochEnded):
                     if event.provider_epoch_id != epoch_id:
                         continue
                     self._ended_provider_epoch_id = epoch_id
-                    turn = self._turn
-                    if turn is not None and not turn.terminal_ready.done():
-                        self._set_turn_failure(turn, event.reason or "provider_epoch_ended")
+                    self._session_retirement_requested = True
+                    for turn in tuple(self._turns.values()):
+                        if not turn.terminal_ready.done():
+                            self._set_turn_failure(turn, event.reason or "provider_epoch_ended")
+                    await self._drain_completed_turns()
                     await self._emit(event)
-                    if turn is None:
+                    if not self._turns:
                         async with self._input_lock:
-                            if epoch_id == self._provider_epoch_id and self._turn is None:
+                            if epoch_id == self._provider_epoch_id and not self._turns:
                                 self._retire_current_session()
                     return
-                turn = self._turn
-                if turn is None or event.identity != turn.identity:
+                turn = self._turns.get(event.identity)
+                if turn is None:
                     continue
                 if isinstance(event, STTProviderTurnUpdate):
                     try:
@@ -786,16 +819,20 @@ class ScopedRecognitionEngine:
                             failure_reason=exc.reason,
                             epoch_disposition="retire",
                         )
+                    if terminal.epoch_disposition == "retire":
+                        self._session_retirement_requested = True
                     turn.terminal_ready.set_result(terminal)
+                    await self._drain_completed_turns()
         except asyncio.CancelledError:
             raise
         except BaseException as exc:
-            if epoch_id == self._provider_epoch_id:
-                turn = self._turn
-                if turn is not None:
+            if epoch_id == self._provider_epoch_id or epoch_id in self._retiring_provider_epoch_ids:
+                self._session_retirement_requested = True
+                for turn in tuple(self._turns.values()):
                     self._set_turn_failure(
                         turn, f"provider_event_stream_failed:{type(exc).__name__}"
                     )
+                await self._drain_completed_turns()
 
     async def _await_terminal(self, turn: _ActiveTurn) -> None:
         done, _pending = await asyncio.wait(
@@ -815,6 +852,14 @@ class ScopedRecognitionEngine:
             "provider_final_timeout",
             allow_provisional=allow_interim,
         )
+
+    async def _await_and_finish_turn(self, turn: _ActiveTurn) -> None:
+        await self._await_terminal(turn)
+        await self._drain_completed_turns()
+
+    def _terminal_wait_done(self, task: asyncio.Task[None]) -> None:
+        self._terminal_wait_tasks.discard(task)
+        self._consume_task_result(task)
 
     async def _run_write(
         self,
@@ -887,12 +932,25 @@ class ScopedRecognitionEngine:
             )
         turn.terminal_ready.set_result(terminal)
 
+    async def _drain_completed_turns(self) -> None:
+        async with self._terminal_drain_lock:
+            while self._turn_order:
+                identity = self._turn_order[0]
+                turn = self._turns.get(identity)
+                if turn is None:
+                    self._turn_order.popleft()
+                    continue
+                if not turn.local_sealed or not turn.terminal_ready.done():
+                    break
+                self._turn_order.popleft()
+                await self._finish_turn(turn, turn.terminal_ready.result())
+
     async def _finish_turn(
         self,
         turn: _ActiveTurn,
         terminal: STTProviderTurnTerminal,
     ) -> None:
-        if turn is not self._turn or turn.terminal_emitted:
+        if self._turns.get(turn.identity) is not turn or turn.terminal_emitted:
             return
         if not turn.local_sealed:
             return
@@ -910,7 +968,9 @@ class ScopedRecognitionEngine:
                 self._terminal_turn_ids.discard(self._terminal_turn_order.popleft())
         turn.retained_samples = 0
         turn.retained_bytes = 0
-        self._turn = None
+        self._turns.pop(turn.identity, None)
+        if turn is self._turn:
+            self._turn = None
         self._turn_resolved.set()
         if terminal.outcome in ("final", "empty"):
             self._episode_failures = 0
@@ -922,10 +982,34 @@ class ScopedRecognitionEngine:
             or terminal.outcome in ("failed", "expired", "cancelled")
             or self._ended_provider_epoch_id == turn.identity.provider_epoch_id
         ):
-            self._retire_current_session(turn.watchdogs)
+            self._session_retirement_requested = True
         if should_emit:
             await self._emit(terminal)
+        if self._session_retirement_requested and not self._turns:
+            self._retire_current_session(turn.watchdogs)
         self._schedule_rotation_check()
+
+    def _can_start_turn(self, settings: AudioSegmentSettingsSnapshot) -> bool:
+        if self._turn is not None:
+            self._turn_resolved.clear()
+            return False
+        if not self._turns:
+            return True
+        session = self._session
+        allowed = (
+            session is not None
+            and self._session_allows_sealed_turn_overlap(session)
+            and not self._session_retirement_requested
+            and self._ended_provider_epoch_id != self._provider_epoch_id
+            and self._session_scope == self._settings_scope(settings)
+        )
+        if not allowed:
+            self._turn_resolved.clear()
+        return allowed
+
+    @staticmethod
+    def _session_allows_sealed_turn_overlap(session: STTScopedTurnSession) -> bool:
+        return bool(getattr(session, "allows_sealed_turn_overlap", False))
 
     def _matching_turn(self, owned: OwnedVadEvent) -> _ActiveTurn | None:
         turn = self._turn
@@ -947,9 +1031,13 @@ class ScopedRecognitionEngine:
         if watchdogs is None:
             watchdogs = self._session_watchdogs
         if watchdogs is None:
+            pending_turn = next(iter(self._turns.values()), None)
             watchdogs = (
-                self._turn.watchdogs if self._turn is not None else STTRecognitionWatchdogs()
+                pending_turn.watchdogs if pending_turn is not None else STTRecognitionWatchdogs()
             )
+        epoch_id = self._provider_epoch_id
+        if epoch_id is not None:
+            self._retiring_provider_epoch_ids.add(epoch_id)
         self._session = None
         self._session_consumer = None
         self._session_opened_at_s = None
@@ -960,7 +1048,12 @@ class ScopedRecognitionEngine:
         if cleanup_consumer is asyncio.current_task():
             cleanup_consumer = None
         task = asyncio.create_task(
-            self._cleanup_session(session, cleanup_consumer, watchdogs),
+            self._cleanup_session(
+                session,
+                cleanup_consumer,
+                watchdogs,
+                retiring_epoch_id=epoch_id,
+            ),
             name="scoped-stt-cleanup",
         )
         self._cleanup_tasks.add(task)
@@ -1012,14 +1105,14 @@ class ScopedRecognitionEngine:
                     self._last_source_speech_at_s is not None
                     and now < self._last_source_speech_at_s + watchdogs.recent_speech_window_s
                 )
-                work_protected = self._source_work_pending or self._turn is not None
+                work_protected = self._source_work_pending or bool(self._turns)
                 if age_due and not speech_protected and not work_protected:
                     self._retire_current_session(watchdogs)
                     return
                 if not age_due or (
                     not self._source_speech_active
                     and not self._source_work_pending
-                    and self._turn is None
+                    and not self._turns
                 ):
                     self._schedule_rotation_check()
         except asyncio.CancelledError:
@@ -1072,16 +1165,45 @@ class ScopedRecognitionEngine:
         session: STTScopedTurnSession,
         consumer: asyncio.Task[None] | None,
         watchdogs: STTRecognitionWatchdogs,
+        *,
+        retiring_epoch_id: str | None = None,
     ) -> None:
         operations = tuple(self._operation_tasks.pop(id(session), ()))
         if operations:
             await asyncio.gather(*operations, return_exceptions=True)
         await self._bounded_cleanup_call(session.stop(), watchdogs.drain_timeout_s)
+        if retiring_epoch_id is not None:
+            drained = await self._await_retiring_epoch_terminals(
+                retiring_epoch_id,
+                watchdogs.drain_timeout_s,
+            )
+            if not drained:
+                for turn in tuple(self._turns.values()):
+                    if turn.identity.provider_epoch_id == retiring_epoch_id:
+                        self._set_turn_failure(turn, "provider_retirement_drain_timeout")
+                await self._drain_completed_turns()
         await self._bounded_cleanup_call(session.close(), watchdogs.drain_timeout_s)
         if consumer is not None and not consumer.done():
             consumer.cancel()
         if consumer is not None:
             await asyncio.gather(consumer, return_exceptions=True)
+        if retiring_epoch_id is not None:
+            self._retiring_provider_epoch_ids.discard(retiring_epoch_id)
+
+    async def _await_retiring_epoch_terminals(
+        self,
+        epoch_id: str,
+        timeout: float,
+    ) -> bool:
+        pending = {
+            turn.terminal_ready
+            for turn in self._turns.values()
+            if turn.identity.provider_epoch_id == epoch_id and not turn.terminal_ready.done()
+        }
+        if not pending:
+            return True
+        _done, unresolved = await asyncio.wait(pending, timeout=timeout)
+        return not unresolved
 
     async def _bounded_cleanup_call(self, awaitable: Awaitable[None], timeout: float) -> None:
         task = asyncio.create_task(awaitable)

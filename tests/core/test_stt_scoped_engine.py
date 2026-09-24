@@ -50,6 +50,7 @@ class ControlledScopedSession:
     calls: list[tuple[object, ...]]
     terminal_on_seal: tuple[str, str] | None = None
     allows_interim_timeout_fallback: bool = False
+    allows_sealed_turn_overlap: bool = False
 
     def __init__(self) -> None:
         self.buffer = STTProviderEventBuffer()
@@ -63,6 +64,7 @@ class ControlledScopedSession:
         self.calls = []
         self.terminal_on_seal = None
         self.allows_interim_timeout_fallback = False
+        self.allows_sealed_turn_overlap = False
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         self.requests.append(request)
@@ -403,6 +405,121 @@ async def test_successor_start_waits_without_holding_ingress_lock_for_predecesso
 
     session.terminal_on_seal = ("empty", "")
     await engine.handle_owned_vad_event(b_end)
+    await engine.close()
+
+
+@pytest.mark.asyncio
+async def test_sealed_overlap_admits_successor_and_orders_out_of_order_terminals_before_delivery() -> (
+    None
+):
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("local_qwen"))
+    a_start, _a_chunk, a_end = segment_events(ledger, start_sample=100, now=1.0)
+    b_start, _b_chunk, b_end = segment_events(ledger, start_sample=200, now=2.0)
+    session = ControlledScopedSession()
+    session.allows_sealed_turn_overlap = True
+    delivered: list[STTProviderTurnTerminal] = []
+    delivery_gate = asyncio.Event()
+
+    async def receive(event: object) -> None:
+        if isinstance(event, STTProviderTurnTerminal):
+            delivered.append(event)
+            if len(delivered) == 1:
+                await delivery_gate.wait()
+
+    engine = ScopedRecognitionEngine(
+        channel="self",
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        watchdog_resolver=lambda _settings: watchdogs(),
+    )
+    engine.bind_event_sink(receive)
+
+    await engine.handle_owned_vad_event(a_start)
+    a_identity = session.requests[0].identity
+    await engine.handle_owned_vad_event(a_end)
+    await engine.handle_owned_vad_event(b_start)
+    b_identity = session.requests[1].identity
+    await engine.handle_owned_vad_event(b_end)
+
+    session.emit(
+        STTProviderTurnTerminal(
+            identity=b_identity,
+            outcome="final",
+            text="b",
+            text_authority="authoritative",
+        )
+    )
+    await asyncio.sleep(0)
+    assert delivered == []
+
+    session.emit(
+        STTProviderTurnTerminal(
+            identity=a_identity,
+            outcome="final",
+            text="a",
+            text_authority="authoritative",
+        )
+    )
+    await wait_until(lambda: len(delivered) == 1)
+    assert delivered[0].identity == a_identity
+    assert engine.is_at_turn_boundary
+
+    delivery_gate.set()
+    await wait_until(lambda: len(delivered) == 2)
+    assert [terminal.identity for terminal in delivered] == [a_identity, b_identity]
+    await engine.close()
+
+
+@pytest.mark.asyncio
+async def test_successor_begin_failure_drains_predecessor_terminal_from_retiring_epoch() -> None:
+    class FailingSuccessorSession(ControlledScopedSession):
+        async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+            await super().begin_turn(request)
+            if len(self.requests) == 2:
+                raise RuntimeError("successor begin failed")
+
+        async def stop(self) -> None:
+            self.calls.append(("stop",))
+            first = self.requests[0].identity
+            self.emit(
+                STTProviderTurnTerminal(
+                    identity=first,
+                    outcome="final",
+                    text="a-final-text",
+                    text_authority="authoritative",
+                )
+            )
+
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=1,
+        settings=settings("local_qwen"),
+    )
+    a_start, _a_chunk, a_end = segment_events(ledger, start_sample=100, now=1.0)
+    b_start, _b_chunk, _b_end = segment_events(ledger, start_sample=200, now=2.0)
+    session = FailingSuccessorSession()
+    session.allows_sealed_turn_overlap = True
+    emitted: list[STTProviderTurnTerminal] = []
+    engine = ScopedRecognitionEngine(
+        channel="self",
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        event_sink=lambda event: (
+            emitted.append(event) if isinstance(event, STTProviderTurnTerminal) else None
+        ),
+        watchdog_resolver=lambda _settings: watchdogs(final_timeout_s=0.1),
+    )
+
+    await engine.handle_owned_vad_event(a_start)
+    await engine.handle_owned_vad_event(a_end)
+    await engine.handle_owned_vad_event(b_start)
+    await wait_until(lambda: len(emitted) == 2, timeout=0.5)
+
+    assert [(item.outcome, item.text, item.failure_reason) for item in emitted] == [
+        ("final", "a-final-text", None),
+        ("failed", "", "provider_begin_failed:RuntimeError"),
+    ]
+    assert [item.identity for item in emitted] == [
+        session.requests[0].identity,
+        session.requests[1].identity,
+    ]
     await engine.close()
 
 

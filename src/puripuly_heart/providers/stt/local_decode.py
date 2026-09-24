@@ -72,6 +72,7 @@ class LocalDecodeCoordinator:
     on_failure: Callable[[LocalDecodeFailure], Awaitable[None]]
     on_backlog_warning: Callable[[LocalDecodeBacklog], object] | None = None
     on_expired: Callable[[LocalDecodeExpired], Awaitable[None]] | None = None
+    preserve_queued_after_failure: Callable[[LocalDecodeJob], bool] | None = None
     start_after: asyncio.Event | None = None
     backlog_warn_size: int = DEFAULT_LOCAL_DECODE_BACKLOG_WARN_SIZE
     pending_ttl_s: float | None = None
@@ -278,19 +279,27 @@ class LocalDecodeCoordinator:
                         if decode_started_at is not None and not decode_finished
                         else inference_ms
                     )
-                    self._failed = True
-                    self._accepting = False
+                    preserve_queued = bool(
+                        self._queue
+                        and self.preserve_queued_after_failure is not None
+                        and self.preserve_queued_after_failure(job)
+                    )
+                    discarded_jobs = () if preserve_queued else tuple(self._queue)
                     failure = LocalDecodeFailure(
                         job=job,
                         error=exc,
-                        discarded_jobs=tuple(self._queue),
+                        discarded_jobs=discarded_jobs,
                         inference_ms=inference_ms,
                         queue_wait_ms=queue_wait_ms,
                     )
-                    self._queue.clear()
-                    self._queued_audio_ms = 0.0
+                    if not preserve_queued:
+                        self._failed = True
+                        self._accepting = False
+                        self._queue.clear()
+                        self._queued_audio_ms = 0.0
                     await self._notify_failure(failure)
-                    return
+                    if not preserve_queued:
+                        return
                 finally:
                     self._active_job = None
                     self._update_backlog_warning()

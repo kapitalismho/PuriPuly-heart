@@ -294,8 +294,8 @@ Execution options:
 
 - Channels retain separate provider epochs, bounded buffers, cancellation, and retention policies.
 - Physical CPU/GPU resources remain shared through their runtime owners.
-- `STTSessionEventProjection` defines scoped turn updates and terminal receipts (`core/stt/backend.py`).
-- `STTScopedTurnNormalizer` assembles text, language runs, and session-scoped speaker runs. Provider updates are not final application transcripts.
+- `STTSessionEventProjection` defines per-turn scoped updates and terminal receipts (`core/stt/session_projection.py`).
+- `STTScopedTurnNormalizer` assembles text, language runs, and session-scoped speaker runs per identity. Provider updates are not final application transcripts.
 
 Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 

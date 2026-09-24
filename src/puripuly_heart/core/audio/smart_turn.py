@@ -80,7 +80,11 @@ def prepare_smart_turn_audio(audio: np.ndarray, *, sample_rate_hz: int) -> np.nd
     if value.size > SMART_TURN_WINDOW_SAMPLES:
         return value[-SMART_TURN_WINDOW_SAMPLES:].copy()
     if value.size < SMART_TURN_WINDOW_SAMPLES:
-        return np.pad(value, (SMART_TURN_WINDOW_SAMPLES - value.size, 0), mode="constant")
+        prepared = np.empty(SMART_TURN_WINDOW_SAMPLES, dtype=np.float32)
+        padding = SMART_TURN_WINDOW_SAMPLES - value.size
+        prepared[:padding] = 0.0
+        prepared[padding:] = value
+        return prepared
     return value.copy()
 
 
@@ -141,24 +145,21 @@ class SmartTurnOnnxInference:
             str(model_path), sess_options=options, providers=["CPUExecutionProvider"]
         )
 
-    async def predict(self, audio: np.ndarray, *, sample_rate_hz: int) -> float:
-        prepared = prepare_smart_turn_audio(audio, sample_rate_hz=sample_rate_hz)
-        features = await _await_owned_operation(
-            asyncio.to_thread(compute_whisper_log_mel_features, prepared)
-        )
+    def _predict_blocking(self, audio: np.ndarray) -> float:
+        prepared = prepare_smart_turn_audio(audio, sample_rate_hz=SMART_TURN_SAMPLE_RATE_HZ)
+        features = compute_whisper_log_mel_features(prepared)
         session = self._session
         if session is None:
             raise RuntimeError("Smart Turn ONNX session is closed")
-        outputs = await _await_owned_operation(
-            asyncio.to_thread(
-                session.run,
-                None,
-                {"input_features": np.expand_dims(features, axis=0)},
-            )
-        )
+        outputs = session.run(None, {"input_features": np.expand_dims(features, axis=0)})
         if not outputs:
             raise RuntimeError("Smart Turn ONNX model returned no outputs")
         return float(np.asarray(outputs[0]).reshape(-1)[0])
+
+    async def predict(self, audio: np.ndarray, *, sample_rate_hz: int) -> float:
+        if sample_rate_hz != SMART_TURN_SAMPLE_RATE_HZ:
+            raise ValueError("Smart Turn audio must use 16 kHz sampling")
+        return await _await_owned_operation(asyncio.to_thread(self._predict_blocking, audio))
 
     def close(self) -> None:
         self._session = None
@@ -238,7 +239,7 @@ class SmartTurnInferenceOwner:
         if self._inference is None:
             self.request_prepare()
             return "unavailable"
-        owned_audio = np.asarray(audio, dtype=np.float32).reshape(-1).copy()
+        owned_audio = np.array(audio, dtype=np.float32, order="C", copy=True).reshape(-1)
         self._active_request = identity
         self._execution_task = asyncio.create_task(
             self._execute(identity, owned_audio, completion),
