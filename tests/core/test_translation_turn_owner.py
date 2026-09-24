@@ -1258,44 +1258,6 @@ async def test_blocked_peer_parent_does_not_serialize_self_parent() -> None:
 
 
 @pytest.mark.asyncio
-async def test_self_parents_run_in_submission_order() -> None:
-    first_entered = asyncio.Event()
-    release_first = asyncio.Event()
-    started_texts: list[str] = []
-
-    async def process(child, _cancellation_requested):
-        started_texts.append(child.transcript.text)
-        if child.transcript.text == "first":
-            first_entered.set()
-            await release_first.wait()
-        return "translated"
-
-    owner = _owner(process_child=process)
-    try:
-        await owner.submit(
-            _request(
-                parent_id=uuid4(),
-                turn_kind="self",
-                runs=(FinalLanguageRun("first", "en"),),
-            )
-        )
-        await owner.submit(
-            _request(
-                parent_id=uuid4(),
-                turn_kind="self",
-                runs=(FinalLanguageRun("second", "en"),),
-            )
-        )
-        await first_entered.wait()
-        assert started_texts == ["first"]
-        release_first.set()
-        await owner.wait_for_idle()
-        assert started_texts == ["first", "second"]
-    finally:
-        await owner.close()
-
-
-@pytest.mark.asyncio
 async def test_owner_submits_typed_output_before_terminal_callback() -> None:
     trace: list[tuple[object, ...]] = []
     output = RecordingOutput(trace)
@@ -1399,37 +1361,178 @@ async def test_terminal_adapter_failure_does_not_strand_parent() -> None:
 
 
 @pytest.mark.asyncio
-async def test_single_target_self_predecessor_wait_is_observed_without_source_text() -> None:
+@pytest.mark.parametrize("first_kind", ["self", "manual"])
+async def test_self_speech_executes_after_ordered_admission_before_predecessor_completes(
+    first_kind: str,
+) -> None:
     release_first = asyncio.Event()
-    waits: list[tuple[str, dict[str, object]]] = []
-
-    async def process(child, _cancellation_requested):
-        if child.parent_utterance_id == first_id:
-            await release_first.wait()
-        return "translated"
-
-    def observe(event: str, fields) -> None:
-        waits.append((event, dict(fields)))
-
+    second_started = asyncio.Event()
+    events: list[str] = []
+    output = RecordingOutput()
     first_id = uuid4()
     second_id = uuid4()
-    owner = _owner(process_child=process, predecessor_wait_observer=observe)
+
+    async def admitted(children: tuple[TranslationTurnChild, ...]) -> None:
+        events.append(f"admit:{children[0].transcript.text}")
+
+    async def process(child, _cancellation_requested):
+        text = child.transcript.text
+        events.append(f"provider:{text}")
+        if child.parent_utterance_id == first_id:
+            await release_first.wait()
+        else:
+            second_started.set()
+        return _translated_result(child)
+
+    owner = _owner(process_child=process, output=output)
+    owner.on_parent_admitted = admitted
     try:
-        await owner.submit(_request(parent_id=first_id, turn_kind="self"))
-        await owner.submit(_request(parent_id=second_id, turn_kind="self"))
-        await asyncio.sleep(0)
-        assert [event for event, _fields in waits] == ["predecessor_wait_start"]
-        assert waits[0][1]["parent_utterance_id"] == str(second_id)
-        assert waits[0][1]["predecessor_utterance_id"] == str(first_id)
-        assert "hello" not in str(waits)
+        await owner.submit(
+            _request(
+                parent_id=first_id,
+                turn_kind=first_kind,
+                runs=(FinalLanguageRun("first", "en"),),
+            )
+        )
+        await owner.submit(
+            _request(
+                parent_id=second_id,
+                turn_kind="self",
+                runs=(FinalLanguageRun("second", "en"),),
+            )
+        )
+        await asyncio.wait_for(second_started.wait(), timeout=1)
+        assert events == ["admit:first", "provider:first", "admit:second", "provider:second"]
+        assert output.submissions == []
         release_first.set()
         await owner.wait_for_idle()
     finally:
+        release_first.set()
         await owner.close()
-    assert [event for event, _fields in waits] == [
-        "predecessor_wait_start",
-        "predecessor_wait_end",
-    ]
+    assert [submission.source_text for submission in output.submissions] == ["first", "second"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("first_outcome", ["failed", "source_only"])
+async def test_self_speech_terminal_predecessor_releases_ready_successor(
+    first_outcome: str,
+) -> None:
+    first_release = asyncio.Event()
+    second_ready = asyncio.Event()
+    first_id, second_id = uuid4(), uuid4()
+    output = RecordingOutput()
+
+    async def process(child: TranslationTurnChild, _cancellation_requested):
+        if child.parent_utterance_id == first_id:
+            await first_release.wait()
+            return TranslationTurnProcessResult(first_outcome)
+        second_ready.set()
+        return _translated_result(child)
+
+    owner = _owner(process_child=process, output=output)
+    try:
+        await owner.submit(_request(parent_id=first_id, turn_kind="self"))
+        await owner.submit(_request(parent_id=second_id, turn_kind="self"))
+        await asyncio.wait_for(second_ready.wait(), timeout=1)
+        assert output.submissions == []
+        first_release.set()
+        await asyncio.wait_for(owner.wait_for_idle(), timeout=1)
+        assert owner.is_parent_closed(first_id)
+        assert owner.is_parent_closed(second_id)
+        assert [submission.parent_utterance_id for submission in output.submissions] == [second_id]
+    finally:
+        first_release.set()
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_empty_self_speech_parent_releases_following_execution_and_output() -> None:
+    empty_id, next_id = uuid4(), uuid4()
+    output = RecordingOutput()
+
+    async def process(child: TranslationTurnChild, _cancellation_requested):
+        return _translated_result(child)
+
+    owner = _owner(process_child=process, output=output)
+    try:
+        empty = replace(
+            _request(parent_id=empty_id, turn_kind="self"),
+            transcript=Transcript(empty_id, "", is_final=True, channel="self"),
+        )
+        assert await owner.submit(empty) == ()
+        await owner.submit(_request(parent_id=next_id, turn_kind="self"))
+        await asyncio.wait_for(owner.wait_for_idle(), timeout=1)
+    finally:
+        await owner.close()
+    assert owner.is_parent_closed(empty_id)
+    assert [submission.parent_utterance_id for submission in output.submissions] == [next_id]
+
+
+@pytest.mark.asyncio
+async def test_self_speech_abort_retires_order_without_publishing_cancelled_work() -> None:
+    both_started = asyncio.Event()
+    started: list[UUID] = []
+    output = RecordingOutput()
+    first_id, second_id, next_id = uuid4(), uuid4(), uuid4()
+
+    async def process(child: TranslationTurnChild, _cancellation_requested):
+        started.append(child.parent_utterance_id)
+        if len(started) == 2:
+            both_started.set()
+        if child.parent_utterance_id in (first_id, second_id):
+            await asyncio.Event().wait()
+        return _translated_result(child)
+
+    owner = _owner(process_child=process, output=output)
+    try:
+        await owner.submit(_request(parent_id=first_id, turn_kind="self"))
+        await owner.submit(_request(parent_id=second_id, turn_kind="self"))
+        await asyncio.wait_for(both_started.wait(), timeout=1)
+        await owner.cancel_pending(channel="self", turn_kinds=frozenset({"self"}))
+        assert owner.is_parent_closed(first_id) and owner.is_parent_closed(second_id)
+        await owner.submit(_request(parent_id=next_id, turn_kind="self"))
+        await asyncio.wait_for(owner.wait_for_idle(), timeout=1)
+    finally:
+        await owner.close()
+    assert started == [first_id, second_id, next_id]
+    assert [submission.parent_utterance_id for submission in output.submissions] == [next_id]
+
+
+@pytest.mark.asyncio
+async def test_self_speech_generation_reset_rejects_old_ready_successor() -> None:
+    first_release = asyncio.Event()
+    successor_ready = asyncio.Event()
+    first_id, successor_id, new_id = uuid4(), uuid4(), uuid4()
+    output = RecordingOutput()
+    generations: list[tuple[str, int]] = []
+
+    async def process(child: TranslationTurnChild, _cancellation_requested):
+        if child.parent_utterance_id == first_id:
+            await first_release.wait()
+        elif child.parent_utterance_id == successor_id:
+            successor_ready.set()
+        return _translated_result(child)
+
+    owner = _owner(
+        process_child=process,
+        output=output,
+        turn_generation_observer=lambda channel, generation: generations.append(
+            (channel, generation)
+        ),
+    )
+    try:
+        await owner.submit(_request(parent_id=first_id, turn_kind="self"))
+        await owner.submit(_request(parent_id=successor_id, turn_kind="self"))
+        await asyncio.wait_for(successor_ready.wait(), timeout=1)
+        assert output.submissions == []
+        await owner.cancel_pending(channel="self")
+        await owner.submit(_request(parent_id=new_id, turn_kind="self"))
+        await asyncio.wait_for(owner.wait_for_idle(), timeout=1)
+    finally:
+        first_release.set()
+        await owner.close()
+    assert generations[0] == ("self", 1)
+    assert [submission.parent_utterance_id for submission in output.submissions] == [new_id]
 
 
 @pytest.mark.asyncio
@@ -1844,7 +1947,10 @@ async def test_peer_waiting_queue_retires_oldest_above_exact_capacity() -> None:
 
 
 @pytest.mark.asyncio
-async def test_self_speech_queue_has_two_running_and_eight_waiting_parents() -> None:
+@pytest.mark.parametrize("targets", [("ko",), ("ko", "ja")])
+async def test_self_speech_queue_has_two_running_and_eight_waiting_parents(
+    targets: tuple[str, ...],
+) -> None:
     release = asyncio.Event()
     started: list[UUID] = []
     trace: list[tuple] = []
@@ -1863,7 +1969,7 @@ async def test_self_speech_queue_has_two_running_and_eight_waiting_parents() -> 
                 _request(
                     parent_id=parent_id,
                     turn_kind="self",
-                    targets=("ko", "ja"),
+                    targets=targets,
                 )
             )
             await asyncio.sleep(0)
@@ -1872,7 +1978,7 @@ async def test_self_speech_queue_has_two_running_and_eight_waiting_parents() -> 
         assert owner.self_speech_waiting_capacity == 8
         assert len(set(started)) == 2
         retired = [event for event in trace if event[0] == "terminal" and event[2] == "source_only"]
-        assert len(retired) == 4
+        assert len(retired) == 2 * len(targets)
         closed_before_release = [event[1] for event in trace if event[0] == "closed"]
         assert closed_before_release == parent_ids[2:4]
         assert {item.parent_utterance_id for item in output.submissions} == set(parent_ids[2:4])
@@ -1888,7 +1994,10 @@ async def test_self_speech_queue_has_two_running_and_eight_waiting_parents() -> 
 
 
 @pytest.mark.asyncio
-async def test_self_speech_waiting_parent_expires_to_observable_source_only() -> None:
+@pytest.mark.parametrize("targets", [("ko",), ("ko", "ja")])
+async def test_self_speech_waiting_parent_expires_to_observable_source_only(
+    targets: tuple[str, ...],
+) -> None:
     release = asyncio.Event()
     started: list[UUID] = []
     output = RecordingOutput()
@@ -1900,28 +2009,31 @@ async def test_self_speech_waiting_parent_expires_to_observable_source_only() ->
 
     owner = _owner(process_child=process, output=output)
     owner.self_speech_waiting_ttl_s = 0.01
-    parent_ids = [uuid4() for _ in range(3)]
+    parent_ids = [uuid4() for _ in range(4)]
     try:
-        for parent_id in parent_ids:
+        for parent_id in parent_ids[:3]:
             await owner.submit(
                 _request(
                     parent_id=parent_id,
                     turn_kind="self",
-                    targets=("ko", "ja"),
+                    targets=targets,
                 )
             )
             await asyncio.sleep(0)
         await owner.wait_for_parent(parent_ids[2])
 
         assert set(started) == set(parent_ids[:2])
-        assert len(output.submissions) == 2
+        assert len(output.submissions) == len(targets)
         assert {item.parent_utterance_id for item in output.submissions} == {parent_ids[2]}
         assert all(item.outcome == "source_only" for item in output.submissions)
         assert all(item.failure_code == "translation_timeout" for item in output.submissions)
+        await owner.submit(_request(parent_id=parent_ids[3], turn_kind="self", targets=targets))
         release.set()
         await owner.wait_for_idle()
     finally:
         await owner.close()
+    assert parent_ids[3] in started
+    assert owner.is_parent_closed(parent_ids[3])
 
 
 @pytest.mark.asyncio

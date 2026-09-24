@@ -372,7 +372,9 @@ class _LocalQwenSherpaSession(STTBackendSession):
     async def send_audio(self, pcm16le: bytes) -> None:
         if self._closed or self._stopping or not self._decode_coordinator.accepting:
             return
-        await self.send_audio_f32(pcm16le_bytes_to_float32(pcm16le))
+        samples = pcm16le_bytes_to_float32(pcm16le)
+        if samples.size:
+            self._buffer_f32.append(samples)
 
     async def send_audio_f32(self, samples_f32: np.ndarray) -> None:
         if self._closed or self._stopping or not self._decode_coordinator.accepting:

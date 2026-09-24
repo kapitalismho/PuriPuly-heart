@@ -523,6 +523,7 @@ def test_qwen_audio_backend_contract_constants() -> None:
         resolve_stt_config,
     )
 
+    assert QWEN_AUDIO_MODEL == "qwen-audio-3.1-asr-flash-streaming"
     assert QWEN_AUDIO_STT_MODEL == QWEN_AUDIO_MODEL
     resolved = resolve_stt_config(
         STTRuntimeIntent(
@@ -530,8 +531,56 @@ def test_qwen_audio_backend_contract_constants() -> None:
             qwen_region="singapore",
         )
     )
+    assert resolved.model == "qwen-audio-3.1-asr-flash-streaming"
+    assert resolved.provider == "qwen_audio"
     assert resolved.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
     assert resolved.region == "singapore"
+
+
+def _run_task_payload(socket: FakeWebSocket, index: int = 0) -> dict:
+    payload = json.loads(socket.sent[index])
+    assert payload["header"]["action"] == "run-task"
+    assert payload["header"]["streaming"] == "duplex"
+    return payload
+
+
+def _assert_baseline_run_task(payload: dict, *, vocabulary: dict[str, int] | None) -> None:
+    body = payload["payload"]
+    parameters = body["parameters"]
+    expected = {
+        "format": "pcm",
+        "sample_rate": 16000,
+        "semantic_punctuation_enabled": False,
+        "max_sentence_silence": 6000,
+        "multi_threshold_mode_enabled": False,
+        "heartbeat": True,
+    }
+    if vocabulary is not None:
+        expected["vocabulary"] = vocabulary
+    assert body["task_group"] == "audio"
+    assert body["task"] == "asr"
+    assert body["function"] == "recognition"
+    assert body["model"] == "qwen-audio-3.1-asr-flash-streaming"
+    assert body["input"] == {}
+    assert "context" not in body
+    assert parameters == expected
+
+
+@pytest.mark.asyncio
+async def test_run_task_omits_context_and_vocabulary_when_hotwords_are_off() -> None:
+    _, session, socket, _ = await open_fake(language_hints=(), hotwords=())
+    _assert_baseline_run_task(_run_task_payload(socket), vocabulary=None)
+    await session.abort_for_toggle_off()
+
+
+@pytest.mark.asyncio
+async def test_run_task_maps_instant_hotwords_without_context_or_31_controls() -> None:
+    _, session, socket, _ = await open_fake(language_hints=(), hotwords=["PuriPuly", "VRChat"])
+    _assert_baseline_run_task(
+        _run_task_payload(socket),
+        vocabulary={"PuriPuly": 4, "VRChat": 4},
+    )
+    await session.abort_for_toggle_off()
 
 
 def _run_task_parameters(socket: FakeWebSocket, index: int = 0) -> dict:

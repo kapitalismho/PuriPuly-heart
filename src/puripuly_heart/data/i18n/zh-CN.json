@@ -417,7 +417,7 @@
   "local_stt.language_fallback_qwen": "所选 ASR 模型不支持此语言。将使用本地 Qwen3 ASR 0.6B。",
   "local_stt.installation_fallback_qwen": "CPU 自动选择需要安装全部三个 ASR 模型。将使用本地 Qwen3 ASR 0.6B。",
   "local_stt.language_unsupported": "所选本地 ASR 选项不支持此语言。",
-  "provider.qwen_audio": "Qwen Audio 3.0 ASR Flash Streaming",
+  "provider.qwen_audio": "Qwen Audio 3.1 ASR Flash Streaming",
   "provider.custom_offline": "Custom ASR (Offline)",
   "provider.custom_realtime": "Custom ASR (Realtime)",
   "settings.custom_stt.title": "OpenAI 兼容语音识别服务器",

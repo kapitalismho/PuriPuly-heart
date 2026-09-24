@@ -176,7 +176,8 @@ def test_stt_runtime_resolution_resolves_qwen_region_endpoint_and_custom_terms()
     assert config.channel == resolved.RUNTIME_CHANNEL_SELF
     assert config.source_language == "ko-KR"
     assert config.provider == runtime_resolution.STT_PROVIDER_QWEN_AUDIO
-    assert config.model == runtime_resolution.QWEN_AUDIO_STT_MODEL
+    assert config.model == "qwen-audio-3.1-asr-flash-streaming"
+    assert runtime_resolution.QWEN_AUDIO_STT_MODEL == "qwen-audio-3.1-asr-flash-streaming"
     assert config.region == runtime_resolution.QWEN_REGION_SINGAPORE
     assert config.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
     assert config.input_host_api == "Windows WASAPI"

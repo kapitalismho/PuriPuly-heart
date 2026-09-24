@@ -120,6 +120,7 @@ class _LocalGpuSTTSession(STTBackendSession):
     backend: LocalGpuSTTBackend
     projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
     _buffer: list[np.ndarray] = field(init=False, default_factory=list, repr=False)
+    _pcm_buffer: list[bytes] = field(init=False, default_factory=list, repr=False)
     _event_projection: STTSessionEventProjection = field(init=False, repr=False)
     _tasks: set[asyncio.Task[None]] = field(init=False, default_factory=set, repr=False)
     _closed: bool = field(init=False, default=False, repr=False)
@@ -148,6 +149,7 @@ class _LocalGpuSTTSession(STTBackendSession):
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if self._closed or self._stopping:
             raise RuntimeError("local GPU STT session is unavailable")
+        self._pcm_buffer.clear()
         self._event_projection.begin(request)
         self._buffer.clear()
 
@@ -162,7 +164,12 @@ class _LocalGpuSTTSession(STTBackendSession):
     ) -> None:
         _ = source_ranges, context_only
         self._event_projection.validate_payload(identity, payload_sequence)
-        await self.send_audio(pcm16le)
+        if self._closed or self._stopping:
+            return
+        if len(pcm16le) % 2:
+            raise ValueError("local GPU PCM16 payload must contain complete samples")
+        if pcm16le:
+            self._pcm_buffer.append(pcm16le if type(pcm16le) is bytes else bytes(pcm16le))
         self._event_projection.payload_written(identity, payload_sequence)
 
     async def seal_turn(
@@ -175,13 +182,13 @@ class _LocalGpuSTTSession(STTBackendSession):
     ) -> None:
         _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
         self._event_projection.seal(identity)
-        samples = np.concatenate(self._buffer) if self._buffer else np.empty((0,), dtype=np.float32)
-        self._buffer.clear()
-        if not samples.size:
+        pcm = b"".join(self._pcm_buffer)
+        self._pcm_buffer.clear()
+        if not pcm:
             self._terminalize_scoped(identity, outcome="empty")
             return
         task = asyncio.create_task(
-            self._transcribe(samples, self.backend.speech_end_clock(), identity),
+            self._transcribe(pcm, self.backend.speech_end_clock(), identity),
             name=f"gpu-asr-{self.backend.channel}-scoped",
         )
         self._tasks.add(task)
@@ -190,6 +197,7 @@ class _LocalGpuSTTSession(STTBackendSession):
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         self._event_projection.require_open(identity)
         self._buffer.clear()
+        self._pcm_buffer.clear()
         self._terminalize_scoped(
             identity,
             outcome="cancelled",
@@ -248,7 +256,7 @@ class _LocalGpuSTTSession(STTBackendSession):
 
     async def _transcribe(
         self,
-        samples: np.ndarray,
+        samples: np.ndarray | bytes,
         speech_end_at: float,
         scoped_identity: STTProviderTurnIdentity | None = None,
     ) -> None:
@@ -262,7 +270,7 @@ class _LocalGpuSTTSession(STTBackendSession):
                 )
             else:
                 submit_task = asyncio.create_task(
-                    self.backend.runtime.submit(
+                    self.backend.runtime.submit_pcm16(
                         self.backend.channel,
                         samples,
                         speech_end_at=speech_end_at,
@@ -373,6 +381,7 @@ class _LocalGpuSTTSession(STTBackendSession):
         if self._closed:
             return
         self._closed = True
+        self._pcm_buffer.clear()
         self._buffer.clear()
         identities = self._event_projection.identities
         for index, identity in enumerate(identities):

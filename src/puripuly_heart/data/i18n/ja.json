@@ -417,7 +417,7 @@
   "local_stt.language_fallback_qwen": "選択したASRモデルはこの言語に対応していません。ローカルQwen3 ASR 0.6Bを使用します。",
   "local_stt.installation_fallback_qwen": "CPU自動選択に必要な3つのASRモデルがすべてインストールされていません。ローカルQwen3 ASR 0.6Bを使用します。",
   "local_stt.language_unsupported": "選択したローカルASRオプションはこの言語に対応していません。",
-  "provider.qwen_audio": "Qwen Audio 3.0 ASR Flash Streaming",
+  "provider.qwen_audio": "Qwen Audio 3.1 ASR Flash Streaming",
   "provider.custom_offline": "Custom ASR (Offline)",
   "provider.custom_realtime": "Custom ASR (Realtime)",
   "settings.custom_stt.title": "OpenAI互換音声認識サーバー",
