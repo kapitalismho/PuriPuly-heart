@@ -1,0 +1,241 @@
+{
+  "revision": "78d90ca9722d3c88e05448bbe7c958892c5b11ec",
+  "platform": "Windows-11-10.0.22631-SP0",
+  "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+  "versions": {
+    "janus": "2.0.0",
+    "numpy": "2.5.1",
+    "sounddevice": "0.5.5",
+    "soxr": "1.1.0"
+  },
+  "owner": "SoundDeviceAudioSource callback -> janus.Queue(64) -> Source.frames instrumentation -> run_audio_vad_loop -> CaptureMappedStreamingResampler -> VadGating",
+  "scenarios": [
+    {
+      "delay_each_vad_chunk_ms": 2.0,
+      "callback_spacing_ms": 10,
+      "producer_duration_s": 2.4,
+      "total_elapsed_s": 2.444167399997241,
+      "produced": 240,
+      "consumed": 240,
+      "callback_dropped": 0,
+      "drop_ranges": [],
+      "known_dropped_frames_before_resumed": 0,
+      "trailing_dropped_frames": 0,
+      "highwater_frames": 4,
+      "vad_chunks": 75,
+      "queue_depth_at_dequeue": {
+        "n": 240,
+        "min": 1,
+        "p50": 2.0,
+        "p95": 3,
+        "max": 4
+      },
+      "oldest_frame_age_ms": {
+        "n": 240,
+        "min": 0.05129999772179872,
+        "p50": 15.40585000111605,
+        "p95": 30.93790000275476,
+        "max": 46.23009999340866
+      },
+      "newest_frame_age_ms": {
+        "n": 240,
+        "min": 0.03460000152699649,
+        "p50": 0.22769999850424938,
+        "p95": 15.617199998814613,
+        "max": 16.18900000175927
+      },
+      "capture_to_vad_at_dequeue_lower_bound_ms": {
+        "n": 240,
+        "min": 0.05129999772179872,
+        "p50": 15.40585000111605,
+        "p95": 30.93790000275476,
+        "max": 46.23009999340866
+      },
+      "capture_to_vad_observation_ms": {
+        "n": 75,
+        "min": 9.77959999727318,
+        "p50": 36.69261060713325,
+        "p95": 52.72094878455391,
+        "max": 66.1017095844727
+      },
+      "producer_scheduling_lag_ms": {
+        "n": 240,
+        "min": 0.0035999983083456755,
+        "p50": 7.713900002272567,
+        "p95": 14.977400001953356,
+        "max": 15.419900002598297
+      },
+      "note": "Capture-to-VAD observation uses last actual mapped source span of each 512-sample chunk. Source-frame dequeue is a distinct lower bound. No raw PCM persisted. Gap ranges derive actual PhysicalCaptureProgression, not synthetic silence."
+    },
+    {
+      "delay_each_vad_chunk_ms": 55.0,
+      "callback_spacing_ms": 10,
+      "producer_duration_s": 2.4,
+      "total_elapsed_s": 2.952625799996895,
+      "produced": 240,
+      "consumed": 192,
+      "callback_dropped": 48,
+      "drop_ranges": [
+        {
+          "seq": 139,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 66720,
+          "missing_samples": 960
+        },
+        {
+          "seq": 147,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 70560,
+          "missing_samples": 1920
+        },
+        {
+          "seq": 153,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 73440,
+          "missing_samples": 1440
+        },
+        {
+          "seq": 157,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 75360,
+          "missing_samples": 480
+        },
+        {
+          "seq": 165,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 79200,
+          "missing_samples": 2400
+        },
+        {
+          "seq": 170,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 81600,
+          "missing_samples": 480
+        },
+        {
+          "seq": 178,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 85440,
+          "missing_samples": 2400
+        },
+        {
+          "seq": 182,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 87360,
+          "missing_samples": 480
+        },
+        {
+          "seq": 184,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 88320,
+          "missing_samples": 480
+        },
+        {
+          "seq": 190,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 91200,
+          "missing_samples": 1920
+        },
+        {
+          "seq": 196,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 94080,
+          "missing_samples": 960
+        },
+        {
+          "seq": 202,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 96960,
+          "missing_samples": 1440
+        },
+        {
+          "seq": 209,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 100320,
+          "missing_samples": 1920
+        },
+        {
+          "seq": 220,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 105600,
+          "missing_samples": 1920
+        },
+        {
+          "seq": 226,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 108480,
+          "missing_samples": 1440
+        },
+        {
+          "seq": 234,
+          "epoch": 0,
+          "kind": "known_loss",
+          "source_start": 112320,
+          "missing_samples": 2400
+        }
+      ],
+      "known_dropped_frames_before_resumed": 48,
+      "trailing_dropped_frames": 0,
+      "highwater_frames": 64,
+      "vad_chunks": 47,
+      "queue_depth_at_dequeue": {
+        "n": 192,
+        "min": 1,
+        "p50": 45.0,
+        "p95": 64,
+        "max": 64
+      },
+      "oldest_frame_age_ms": {
+        "n": 192,
+        "min": 0.1286000042455271,
+        "p50": 715.849550000712,
+        "p95": 1213.0827000000863,
+        "max": 1274.3293000021367
+      },
+      "newest_frame_age_ms": {
+        "n": 192,
+        "min": 0.04810000245925039,
+        "p50": 31.010750000859844,
+        "p95": 497.78060000244295,
+        "max": 559.7846000018762
+      },
+      "capture_to_vad_at_dequeue_lower_bound_ms": {
+        "n": 192,
+        "min": 0.1286000042455271,
+        "p50": 715.849550000712,
+        "p95": 1213.0827000000863,
+        "max": 1274.3293000021367
+      },
+      "capture_to_vad_observation_ms": {
+        "n": 47,
+        "min": 8.343559995410033,
+        "p50": 665.3976359521039,
+        "p95": 1176.0509018713492,
+        "max": 1240.9392145855236
+      },
+      "producer_scheduling_lag_ms": {
+        "n": 240,
+        "min": 0.002800006768666208,
+        "p50": 7.46765000076266,
+        "p95": 14.350799996464048,
+        "max": 15.48680000269087
+      },
+      "note": "Capture-to-VAD observation uses last actual mapped source span of each 512-sample chunk. Source-frame dequeue is a distinct lower bound. No raw PCM persisted. Gap ranges derive actual PhysicalCaptureProgression, not synthetic silence."
+    }
+  ]
+}

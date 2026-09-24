@@ -877,6 +877,45 @@ async def test_local_qwen_speech_end_queues_fifo_decode_without_blocking(
     np.testing.assert_array_equal(decoded[1], second)
 
 
+
+@pytest.mark.asyncio
+async def test_local_qwen_queued_payload_survives_mutable_producer_reuse(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    decoded: list[np.ndarray] = []
+    hold = asyncio.Event()
+    started = asyncio.Event()
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        decoded.append(samples_f32.copy())
+        started.set()
+        await hold.wait()
+        return "valid"
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+    backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
+    session = await backend.open_session()
+    pcm = bytearray(np.array([-32768, -1, 0, 16384, 32767], dtype="<i2").tobytes())
+    direct = np.array([0.125, -0.625], dtype=np.float32)
+    await session.send_audio(pcm)
+    await session.send_audio_f32(direct)
+    pcm[:] = b"\x00" * len(pcm)
+    direct[:] = 0
+    await session.on_speech_end()
+    await asyncio.wait_for(started.wait(), timeout=1)
+    hold.set()
+    assert (await asyncio.wait_for(anext(session.events()), timeout=1)).text == "valid"
+    np.testing.assert_array_equal(
+        decoded[0],
+        np.array([-1.0, -1 / 32768, 0, 0.5, 32767 / 32768, 0.125, -0.625], dtype=np.float32),
+    )
+    await session.close()
+
 @pytest.mark.asyncio
 async def test_local_qwen_sessions_handoff_finals_before_next_session_decodes(
     monkeypatch: pytest.MonkeyPatch,

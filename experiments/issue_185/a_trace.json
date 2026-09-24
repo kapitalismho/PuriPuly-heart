@@ -1,0 +1,77 @@
+{
+  "revision": "78d90ca9722d3c88e05448bbe7c958892c5b11ec",
+  "python": "3.14.7",
+  "platform": "Windows-11-10.0.22631-SP0",
+  "profile": {
+    "source_language": "en",
+    "target_languages": [
+      "ja"
+    ],
+    "context_max_entries": 3,
+    "system_prompt_template": "${sourceName}|${targetName}",
+    "first_provider_gate_s": 0.02
+  },
+  "scenario": "gated Self single-target synthetic speech; real Self admission/request/output owners; no device/provider/display",
+  "rows": [
+    {
+      "event": "ordered_admission_complete",
+      "t_us": 2750,
+      "parent": "27faf11d-e6bf-549c-a5d6-75aa6948853e",
+      "prepared_context": "",
+      "prompt_sha256": "0dc270e52da2fee9d6b9f744dd49bd3b7e688199d6ea1e6d1f100d53c58bcb93",
+      "provider_generation": 0,
+      "configuration_revision": 0
+    },
+    {
+      "event": "provider_invoked",
+      "t_us": 2866,
+      "parent": "27faf11d-e6bf-549c-a5d6-75aa6948853e",
+      "text": "synthetic first",
+      "context": "",
+      "target": "ja",
+      "prompt_sha256": "0dc270e52da2fee9d6b9f744dd49bd3b7e688199d6ea1e6d1f100d53c58bcb93",
+      "provider_generation": 0
+    },
+    {
+      "event": "ordered_admission_complete",
+      "t_us": 2975,
+      "parent": "cc731a4a-35e1-5d04-98c0-400db3c01740",
+      "prepared_context": "- [self] \"synthetic first\"",
+      "prompt_sha256": "0dc270e52da2fee9d6b9f744dd49bd3b7e688199d6ea1e6d1f100d53c58bcb93",
+      "provider_generation": 0,
+      "configuration_revision": 0
+    },
+    {
+      "event": "provider_invoked",
+      "t_us": 3038,
+      "parent": "cc731a4a-35e1-5d04-98c0-400db3c01740",
+      "text": "synthetic second",
+      "context": "- [self] \"synthetic first\"",
+      "target": "ja",
+      "prompt_sha256": "0dc270e52da2fee9d6b9f744dd49bd3b7e688199d6ea1e6d1f100d53c58bcb93",
+      "provider_generation": 0
+    },
+    {
+      "event": "provider_ready",
+      "t_us": 3041,
+      "parent": "cc731a4a-35e1-5d04-98c0-400db3c01740"
+    },
+    {
+      "event": "provider_ready",
+      "t_us": 36349,
+      "parent": "27faf11d-e6bf-549c-a5d6-75aa6948853e"
+    },
+    {
+      "event": "ordered_output_handoff",
+      "t_us": 36476,
+      "parent": "27faf11d-e6bf-549c-a5d6-75aa6948853e",
+      "outcome": "translated"
+    },
+    {
+      "event": "ordered_output_handoff",
+      "t_us": 36747,
+      "parent": "cc731a4a-35e1-5d04-98c0-400db3c01740",
+      "outcome": "translated"
+    }
+  ]
+}

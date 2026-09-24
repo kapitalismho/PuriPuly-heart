@@ -1,0 +1,958 @@
+{
+  "baseline": "78d90ca9722d3c88e05448bbe7c958892c5b11ec",
+  "case_count": 38,
+  "cases": [
+    {
+      "adapter": "deepgram",
+      "b_while_unresolved": {
+        "error": "RuntimeError",
+        "message": "STT session already has an unresolved turn",
+        "ok": false
+      },
+      "case": "delayed_a_then_late_ack_on_next_seal",
+      "events": [
+        {
+          "kind": "update",
+          "stability": "stable",
+          "text": "ALPHA",
+          "turn": "A"
+        },
+        {
+          "authority": "authoritative",
+          "barriers": [
+            null,
+            "finalize_ack"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "final",
+          "reason": null,
+          "text": "ALPHA",
+          "turn": "A"
+        },
+        {
+          "kind": "update",
+          "stability": "stable",
+          "text": "LATE-ACTIVE",
+          "turn": "B"
+        },
+        {
+          "authority": "authoritative",
+          "barriers": [
+            "finalize_ack",
+            "finalize_ack"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "final",
+          "reason": null,
+          "text": "LATE-ACTIVE",
+          "turn": "B"
+        }
+      ],
+      "observation": "B cannot begin while A awaits from_finalize. speech_final/is_final is not the barrier. A retired identity ignores a late ack, but a from_finalize captured against the then-active identity is attributed to B. The connection request_id is not a turn key.",
+      "overlap_flag": false,
+      "status": "passed"
+    },
+    {
+      "adapter": "deepgram",
+      "case": "empty_and_duplicate_unsolicited",
+      "events": [
+        {
+          "authority": "authoritative",
+          "barriers": [
+            "finalize_ack"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "empty",
+          "reason": null,
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "deepgram_idle_result",
+          "turn": null
+        }
+      ],
+      "observation": "Empty from_finalize is authoritative empty for A. A later ack with no active turn retires the epoch.",
+      "status": "passed"
+    },
+    {
+      "adapter": "deepgram",
+      "case": "failure_timeout",
+      "events": [
+        {
+          "authority": "none",
+          "barriers": [],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "failed",
+          "reason": "deepgram_finalize_ack_missing",
+          "text": "",
+          "turn": "A"
+        }
+      ],
+      "observation": "Missing from_finalize follows the production CloseStream drain and retires A.",
+      "status": "passed"
+    },
+    {
+      "adapter": "deepgram",
+      "case": "cancel_config_change_and_late_after_reconnect",
+      "new_events": [],
+      "observation": "Abort/config change retires the old epoch. A late ack there does not enter the replacement session.",
+      "old_events": [
+        {
+          "authority": "none",
+          "barriers": [],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "cancelled",
+          "reason": "config_changed",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "config_changed",
+          "turn": "A"
+        }
+      ],
+      "status": "passed"
+    },
+    {
+      "adapter": "deepgram",
+      "case": "simultaneous_pending_work",
+      "observation": "The production projection rejects a second begin before seal or terminal.",
+      "second": {
+        "error": "RuntimeError",
+        "message": "STT session already has an unresolved turn",
+        "ok": false
+      },
+      "status": "passed"
+    },
+    {
+      "adapter": "soniox",
+      "b_while_unresolved": {
+        "error": "RuntimeError",
+        "message": "STT session already has an unresolved turn",
+        "ok": false
+      },
+      "case": "delayed_a_then_late_token_on_b",
+      "events": [
+        {
+          "kind": "update",
+          "stability": "stable",
+          "text": "ALPHA",
+          "turn": "A"
+        },
+        {
+          "authority": "authoritative",
+          "barriers": [
+            null,
+            "manual_finalize"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "final",
+          "reason": null,
+          "text": "ALPHA",
+          "turn": "A"
+        },
+        {
+          "kind": "update",
+          "stability": "stable",
+          "text": "LATE-A",
+          "turn": "B"
+        }
+      ],
+      "observation": "<end> is not the barrier. <fin> terminals A. A final token arriving after B begins is appended to B; the message request_id is session-scoped, not per finalize.",
+      "overlap_flag": false,
+      "status": "passed"
+    },
+    {
+      "adapter": "soniox",
+      "case": "empty_and_duplicate_fin",
+      "events": [
+        {
+          "authority": "authoritative",
+          "barriers": [
+            "manual_finalize"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "empty",
+          "reason": null,
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "soniox_protocol_ambiguity",
+          "turn": null
+        }
+      ],
+      "observation": "Empty <fin> is authoritative empty for A. A second <fin> is ambiguity and retires the epoch.",
+      "status": "passed"
+    },
+    {
+      "adapter": "soniox",
+      "case": "unsolicited_fin_and_failure",
+      "events": [
+        {
+          "authority": "none",
+          "barriers": [],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "failed",
+          "reason": "soniox_protocol_ambiguity",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "soniox_protocol_ambiguity",
+          "turn": "A"
+        }
+      ],
+      "observation": "An unsealed <fin> fails A and retires the epoch. It is not an application final. The adapter has no local final timer.",
+      "status": "passed"
+    },
+    {
+      "adapter": "soniox",
+      "case": "cancel_config_change_and_late_after_reconnect",
+      "new_events": [],
+      "observation": "Cancellation retires the old epoch. Late tokens there do not enter the replacement session.",
+      "old_events": [
+        {
+          "authority": "none",
+          "barriers": [],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "cancelled",
+          "reason": "config_changed",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "config_changed",
+          "turn": "A"
+        }
+      ],
+      "status": "passed"
+    },
+    {
+      "adapter": "soniox",
+      "case": "simultaneous_pending_work",
+      "observation": "A second begin is rejected. pending_finalize is a counter, not a turn id.",
+      "second": {
+        "error": "RuntimeError",
+        "message": "STT session already has an unresolved turn",
+        "ok": false
+      },
+      "status": "passed"
+    },
+    {
+      "adapter": "gemini_transcribe",
+      "b_while_unresolved": {
+        "error": "RuntimeError",
+        "message": "Gemini allows one unresolved scoped turn",
+        "ok": false
+      },
+      "case": "delayed_a_terminal_b_ready",
+      "events": [
+        {
+          "kind": "update",
+          "stability": "stable",
+          "text": "ALPHA",
+          "turn": "A"
+        },
+        {
+          "authority": "authoritative",
+          "barriers": [
+            null,
+            "activity_end"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "final",
+          "reason": null,
+          "text": "ALPHA",
+          "turn": "A"
+        }
+      ],
+      "observation": "Authoritative text alone does not release A. ActivityEnd plus that text does. A second authoritative message is not applied to another turn. ActivityStart/End have no turn id.",
+      "overlap_flag": false,
+      "status": "passed"
+    },
+    {
+      "adapter": "gemini_transcribe",
+      "case": "empty_and_unsolicited_activity_end",
+      "events": [
+        {
+          "kind": "update",
+          "stability": "stable",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "authority": "authoritative",
+          "barriers": [
+            null,
+            "activity_end"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "empty",
+          "reason": null,
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "gemini_unsolicited_activity_end",
+          "turn": null
+        }
+      ],
+      "observation": "Empty authoritative text is an empty terminal for A. A later ActivityEnd retires the idle epoch.",
+      "status": "passed"
+    },
+    {
+      "adapter": "gemini_transcribe",
+      "case": "failure_timeout",
+      "events": [
+        {
+          "kind": "update",
+          "stability": "provisional",
+          "text": "PARTIAL",
+          "turn": "A"
+        },
+        {
+          "authority": "degraded",
+          "barriers": [],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "degraded",
+          "reason": "gemini_finalize_timeout",
+          "text": "PARTIAL",
+          "turn": "A"
+        }
+      ],
+      "observation": "Finalize timeout keeps interim text only as degraded A and retires the epoch.",
+      "status": "passed"
+    },
+    {
+      "adapter": "gemini_transcribe",
+      "case": "cancel_config_change_and_late_after_reconnect",
+      "new_events": [],
+      "observation": "Abort retires A. A late final on that failed session is not published on the replacement epoch.",
+      "old_events": [
+        {
+          "authority": "none",
+          "barriers": [],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "cancelled",
+          "reason": "config_changed",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "config_changed",
+          "turn": "A"
+        }
+      ],
+      "status": "passed"
+    },
+    {
+      "adapter": "gemini_transcribe",
+      "case": "simultaneous_pending_work",
+      "observation": "Production begin rejects a second scoped turn. The handler would otherwise take the first pending turn.",
+      "second": {
+        "error": "RuntimeError",
+        "message": "Gemini allows one unresolved scoped turn",
+        "ok": false
+      },
+      "status": "passed"
+    },
+    {
+      "adapter": "elevenlabs_scribe",
+      "b_while_unresolved": {
+        "error": "RuntimeError",
+        "message": "STT session already has an unresolved turn",
+        "ok": false
+      },
+      "case": "delayed_a_then_late_commit_on_b",
+      "events": [
+        {
+          "kind": "update",
+          "stability": "provisional",
+          "text": "stamped-A",
+          "turn": "A"
+        },
+        {
+          "authority": "authoritative",
+          "barriers": [
+            null,
+            null,
+            "committed_transcript"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "final",
+          "reason": null,
+          "text": "ALPHA",
+          "turn": "A"
+        },
+        {
+          "authority": "authoritative",
+          "barriers": [
+            "committed_transcript"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "final",
+          "reason": null,
+          "text": "LATE-A",
+          "turn": "B"
+        }
+      ],
+      "observation": "Partials and timestamp transcripts do not resolve A. committed_transcript does. A later committed event has no commit id, so after B is sealed it is attributed to B.",
+      "overlap_flag": false,
+      "status": "passed"
+    },
+    {
+      "adapter": "elevenlabs_scribe",
+      "case": "empty_and_unsolicited_committed",
+      "events": [
+        {
+          "authority": "authoritative",
+          "barriers": [
+            "committed_transcript"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "empty",
+          "reason": null,
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "scribe_unsolicited_committed_transcript",
+          "turn": null
+        }
+      ],
+      "observation": "Empty committed text is authoritative empty. A committed event with no active turn retires the epoch.",
+      "status": "passed"
+    },
+    {
+      "adapter": "elevenlabs_scribe",
+      "case": "duplicate_committed_during_commit_write",
+      "events": [
+        {
+          "authority": "none",
+          "barriers": [],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "failed",
+          "reason": "scribe_duplicate_committed_transcript",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "scribe_duplicate_committed_transcript",
+          "turn": "A"
+        }
+      ],
+      "observation": "Two committed events while the commit write is in flight fail the epoch instead of opening another turn.",
+      "status": "passed"
+    },
+    {
+      "adapter": "elevenlabs_scribe",
+      "case": "failure_timeout",
+      "events": [
+        {
+          "authority": "none",
+          "barriers": [],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "failed",
+          "reason": "scribe_commit_failed",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "scribe_commit_failed",
+          "turn": "A"
+        }
+      ],
+      "observation": "Commit failure terminalizes A and retires the epoch. There is no separate final-wait timer in this adapter.",
+      "status": "passed"
+    },
+    {
+      "adapter": "elevenlabs_scribe",
+      "case": "cancel_config_change_and_late_after_reconnect",
+      "new_events": [],
+      "observation": "Cancellation retires the old epoch. A late committed event there does not enter the replacement session.",
+      "old_events": [
+        {
+          "authority": "none",
+          "barriers": [],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "cancelled",
+          "reason": "config_changed",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "config_changed",
+          "turn": "A"
+        }
+      ],
+      "status": "passed"
+    },
+    {
+      "adapter": "elevenlabs_scribe",
+      "case": "simultaneous_pending_work",
+      "observation": "Only one scoped turn can be open. The adapter reads committed text and ignores any other event fields.",
+      "second": {
+        "error": "RuntimeError",
+        "message": "STT session already has an unresolved turn",
+        "ok": false
+      },
+      "status": "passed"
+    },
+    {
+      "adapter": "qwen_audio",
+      "b_while_unresolved": {
+        "error": "RuntimeError",
+        "message": "Qwen Audio task is not active",
+        "ok": false
+      },
+      "case": "delayed_a_terminal_b_ready",
+      "events": [
+        {
+          "kind": "update",
+          "stability": "stable",
+          "text": "ALPHA",
+          "turn": "A"
+        },
+        {
+          "authority": "authoritative",
+          "barriers": [
+            "task-finished"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "final",
+          "reason": null,
+          "text": "ALPHA",
+          "turn": "A"
+        }
+      ],
+      "observation": "sentence_end is not the turn barrier. task-finished for task-a terminals A. Stale task-a results after the next task starts are ignored.",
+      "overlap_flag": false,
+      "status": "passed"
+    },
+    {
+      "adapter": "qwen_audio",
+      "case": "empty_a",
+      "events": [
+        {
+          "authority": "authoritative",
+          "barriers": [
+            "task-finished"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "empty",
+          "reason": null,
+          "text": "",
+          "turn": "A"
+        }
+      ],
+      "observation": "task-finished with no sentence text is authoritative empty for A.",
+      "status": "passed"
+    },
+    {
+      "adapter": "qwen_audio",
+      "case": "failure_timeout",
+      "events": [
+        {
+          "authority": "none",
+          "barriers": [
+            "task-failed"
+          ],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "failed",
+          "reason": "QwenAudioProtocolError",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "QwenAudioProtocolError",
+          "turn": "A"
+        }
+      ],
+      "observation": "Missing task-finished fails A and retires the epoch.",
+      "status": "passed"
+    },
+    {
+      "adapter": "qwen_audio",
+      "case": "cancel_config_change_and_late_after_reconnect",
+      "new_events": [],
+      "observation": "Abort retires A. A replacement session with its own task id does not consume the old task-finished.",
+      "old_events": [
+        {
+          "authority": "none",
+          "barriers": [
+            "abort"
+          ],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "cancelled",
+          "reason": "config_changed",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "config_changed",
+          "turn": "A"
+        }
+      ],
+      "status": "passed"
+    },
+    {
+      "adapter": "qwen_audio",
+      "case": "simultaneous_pending_work",
+      "observation": "One client task id is bound to the active turn. A second begin is rejected.",
+      "second": {
+        "error": "RuntimeError",
+        "message": "STT session already has an unresolved turn",
+        "ok": false
+      },
+      "status": "passed"
+    },
+    {
+      "adapter": "custom_offline",
+      "b_while_unresolved": {
+        "error": "RuntimeError",
+        "message": "STT session already has an unresolved turn",
+        "ok": false
+      },
+      "case": "delayed_a_terminal_b_ready",
+      "events": [
+        {
+          "authority": "authoritative",
+          "barriers": [],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "final",
+          "reason": null,
+          "text": "ALPHA",
+          "turn": "A"
+        }
+      ],
+      "observation": "The HTTP body is snapshotted into A's task, but begin and a second seal are rejected while that task is unresolved.",
+      "overlap_flag": false,
+      "second_seal": {
+        "error": "RuntimeError",
+        "message": "STT provider turn is already sealed",
+        "ok": false
+      },
+      "status": "passed"
+    },
+    {
+      "adapter": "custom_offline",
+      "case": "empty_a",
+      "events": [
+        {
+          "authority": "authoritative",
+          "barriers": [],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "empty",
+          "reason": null,
+          "text": "",
+          "turn": "A"
+        }
+      ],
+      "observation": "Whitespace-only HTTP text is authoritative empty for the requesting identity.",
+      "status": "passed"
+    },
+    {
+      "adapter": "custom_offline",
+      "case": "failure_http",
+      "events": [
+        {
+          "authority": "none",
+          "barriers": [],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "failed",
+          "reason": "unreachable",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "unreachable",
+          "turn": "A"
+        }
+      ],
+      "observation": "HTTP failure is a failed terminal for A, not empty text. The 50s total timeout was not waited out.",
+      "status": "passed"
+    },
+    {
+      "adapter": "custom_offline",
+      "case": "cancel_config_change_and_late_after_reconnect",
+      "new_events": [
+        {
+          "authority": "authoritative",
+          "barriers": [],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "final",
+          "reason": null,
+          "text": "BETA",
+          "turn": "B"
+        }
+      ],
+      "observation": "Abort cancels A's task and retires the epoch. A new session's response stays on B.",
+      "old_events": [
+        {
+          "authority": "none",
+          "barriers": [],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "cancelled",
+          "reason": "config_changed",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "config_changed",
+          "turn": "A"
+        }
+      ],
+      "status": "passed"
+    },
+    {
+      "adapter": "custom_offline",
+      "case": "simultaneous_pending_work",
+      "observation": "Each HTTP response belongs to its call, but the current session admits only one turn and one scoped task.",
+      "second": {
+        "error": "RuntimeError",
+        "message": "STT session already has an unresolved turn",
+        "ok": false
+      },
+      "status": "passed"
+    },
+    {
+      "adapter": "custom_realtime",
+      "b_after_early_completion": {
+        "error": "RuntimeError",
+        "message": "STT provider epoch is retired",
+        "ok": false
+      },
+      "b_while_unresolved": {
+        "error": "RuntimeError",
+        "message": "Custom realtime commit barrier is unresolved",
+        "ok": false
+      },
+      "case": "delayed_a_completion_before_commit",
+      "events": [
+        {
+          "authority": "none",
+          "barriers": [
+            "receive_error"
+          ],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "failed",
+          "reason": "provider_protocol_error",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "provider_protocol_error",
+          "turn": "A"
+        }
+      ],
+      "observation": "B is rejected while the commit barrier is unresolved. A completed event before the committed item id fails correlation and retires the epoch.",
+      "overlap_flag": false,
+      "status": "passed"
+    },
+    {
+      "adapter": "custom_realtime",
+      "case": "late_item_after_next_commit",
+      "events": [
+        {
+          "authority": "authoritative",
+          "barriers": [
+            "conversation.item.input_audio_transcription.completed"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "final",
+          "reason": null,
+          "text": "ALPHA",
+          "turn": "A"
+        }
+      ],
+      "observation": "A late item-a completion does not become B's text. This is not overlap approval: B cannot begin before A's barrier, and audio appended before committed is not client-keyed.",
+      "status": "passed"
+    },
+    {
+      "adapter": "custom_realtime",
+      "case": "empty_and_unkeyed_duplicate",
+      "events": [
+        {
+          "authority": "authoritative",
+          "barriers": [
+            "conversation.item.input_audio_transcription.completed"
+          ],
+          "epoch_disposition": "reuse",
+          "kind": "terminal",
+          "outcome": "empty",
+          "reason": null,
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "ambiguous_unkeyed_terminal",
+          "turn": null
+        }
+      ],
+      "observation": "Empty keyed completion is authoritative empty. A later unkeyed completion retires the epoch.",
+      "status": "passed"
+    },
+    {
+      "adapter": "custom_realtime",
+      "case": "failure_timeout",
+      "events": [
+        {
+          "authority": "none",
+          "barriers": [
+            "commit_timeout"
+          ],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "failed",
+          "reason": "final_timeout",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "final_timeout",
+          "turn": "A"
+        }
+      ],
+      "observation": "The production final-wait path fails A and retires the epoch. Only the in-process constant was shortened.",
+      "status": "passed"
+    },
+    {
+      "adapter": "custom_realtime",
+      "case": "cancel_config_change_and_late_after_reconnect",
+      "new_events": [],
+      "observation": "Abort closes and retires the old epoch. The replacement session has its own item scope.",
+      "old_events": [
+        {
+          "authority": "none",
+          "barriers": [
+            "abort"
+          ],
+          "epoch_disposition": "retire",
+          "kind": "terminal",
+          "outcome": "cancelled",
+          "reason": "config_changed",
+          "text": "",
+          "turn": "A"
+        },
+        {
+          "kind": "epoch_end",
+          "orderly": false,
+          "reason": "config_changed",
+          "turn": "A"
+        }
+      ],
+      "status": "passed"
+    },
+    {
+      "adapter": "custom_realtime",
+      "case": "simultaneous_pending_work",
+      "observation": "The session stores one scoped item id and one pending commit.",
+      "second": {
+        "error": "RuntimeError",
+        "message": "STT session already has an unresolved turn",
+        "ok": false
+      },
+      "status": "passed"
+    },
+    {
+      "adapter": "rolling_free",
+      "case": "composition_has_no_independent_correlation",
+      "first": {
+        "ok": true
+      },
+      "forwarded": [
+        "A",
+        "B"
+      ],
+      "observation": "Rolling forwards begin to the selected member and adds no turn id or overlap flag.",
+      "second": {
+        "error": "RuntimeError",
+        "message": "STT session already has an unresolved turn",
+        "ok": false
+      },
+      "status": "passed"
+    }
+  ],
+  "failed_count": 0,
+  "live_provider_calls": "not run",
+  "probe_errors": [],
+  "product_changes": "none",
+  "revision": "78d90ca9722d3c88e05448bbe7c958892c5b11ec",
+  "versions": {
+    "dashscope": "1.26.4",
+    "deepgram-sdk": "5.3.4",
+    "elevenlabs": "2.65.0",
+    "google-genai": "2.21.0",
+    "httpx": "0.28.1",
+    "python": "3.14.7",
+    "websockets": "16.1.1"
+  }
+}

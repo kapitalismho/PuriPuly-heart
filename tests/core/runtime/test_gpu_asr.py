@@ -579,8 +579,8 @@ async def test_channel_disable_discards_only_its_work_and_retains_shared_worker(
     await runtime.close()
 
 
-async def test_channel_disable_is_atomic_with_success_publication() -> None:
-    client = FakeGpuWorkerClient()
+async def test_channel_disable_rejects_unresolved_worker_result() -> None:
+    client = FakeGpuWorkerClient(transcribe_gate=asyncio.Event())
     runtime = SharedGpuASRRuntime(
         process_factory=FakeGpuWorkerFactory([client]),
         clock=FakeClock(_now=100.0),
@@ -594,8 +594,7 @@ async def test_channel_disable_is_atomic_with_success_publication() -> None:
             speech_end_at=99.0,
         )
     )
-    await client.transcribe_returning.wait()
-
+    await client.started.wait()
     await runtime.deactivate_channel("self")
 
     with pytest.raises(GpuASRWorkDiscarded, match="channel_disabled"):
@@ -701,12 +700,12 @@ async def test_ttl_is_rechecked_after_wav_staging_before_worker_request(
 
     assert client.transcribe_calls == []
     assert len(staged_paths) == 1
-    assert not staged_paths[0].exists()
     expiry = [item for item in diagnostics if item.kind == "work_expired"]
     assert expiry[-1].fields["queue_wait_seconds"] == 12.0
     assert "rtf" not in expiry[-1].fields
     assert [item for item in diagnostics if item.kind == "decode_attempt"] == []
     await runtime.close()
+    assert not staged_paths[0].exists()
 
 
 @pytest.mark.parametrize(
@@ -1134,3 +1133,139 @@ async def test_real_shared_gpu_runtime_serves_two_scoped_concrete_adapters(
     await peer_backend.close()
     assert runtime.state == GpuASRRuntimeState.STOPPED
     await runtime.close()
+
+
+@pytest.mark.parametrize("delete_fails", [False, True])
+async def test_scoped_gpu_transcript_precedes_owned_file_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, delete_fails: bool
+) -> None:
+    import threading
+    import wave
+
+    class InspectingClient(FakeGpuWorkerClient):
+        wav_samples: bytes | None = None
+
+        async def transcribe(self, *, audio_path: Path, **kwargs):
+            with wave.open(str(audio_path), "rb") as wav:
+                self.wav_samples = wav.readframes(wav.getnframes())
+            return await super().transcribe(audio_path=audio_path, **kwargs)
+
+    client = InspectingClient()
+    diagnostics = []
+    runtime = SharedGpuASRRuntime(
+        process_factory=FakeGpuWorkerFactory([client]), diagnostic_sink=diagnostics.append
+    )
+    backend = LocalGpuSTTBackend(
+        runtime=runtime, channel="self", model_path=tmp_path / "model.gguf",
+        model_id="qwen-gpu", device_id="vulkan:0",
+    )
+    session = await backend.open_session(projection=STTSessionProjection("scoped", "probe"))
+    request = _scoped_gpu_request("self", "probe")
+    raw = bytearray(np.array([-32768, -16385, -1, 0, 1, 16385, 32767], dtype="<i2").tobytes())
+    original = bytes(raw)
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        request.identity, raw, payload_sequence=1, source_ranges=(), context_only=False
+    )
+    raw[:] = b"\0" * len(raw)
+    await session.seal_turn(
+        request.identity, sealed_content_ranges=(), seal_reason="end",
+        observed_trailing_silence_ms=800,
+    )
+    entered = threading.Event()
+    release = threading.Event()
+    original_unlink = Path.unlink
+
+    def blocked_unlink(path: Path, *args, **kwargs):
+        if path.suffix == ".wav":
+            entered.set()
+            if not release.wait(3):
+                raise TimeoutError("deletion gate expired")
+            if delete_fails:
+                raise OSError("injected unlink failure")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", blocked_unlink)
+    try:
+        terminal = asyncio.create_task(anext(session.turn_events()))
+        await asyncio.wait_for(asyncio.to_thread(entered.wait, 2), timeout=3)
+        result = await asyncio.wait_for(terminal, timeout=0.5)
+        assert result.identity == request.identity
+        assert (result.outcome, result.text) == ("final", "self-1")
+        assert client.wav_samples == np.rint(
+            np.clip(np.frombuffer(original, dtype="<i2").astype(np.float32) / 32768.0, -1, 1)
+            * 32767.0
+        ).astype("<i2").tobytes()
+        shutdown = asyncio.create_task(backend.close())
+        await asyncio.sleep(0)
+        assert not shutdown.done()
+        release.set()
+        await asyncio.wait_for(shutdown, timeout=3)
+        await runtime.close()
+        cleanup = [event for event in diagnostics if event.kind == "file_cleanup"]
+        assert len(cleanup) == 1
+        assert cleanup[0].fields["failure"] == ("OSError" if delete_fails else None)
+        timing = [event for event in diagnostics if event.kind == "decode_timing"]
+        assert len(timing) == 1
+        assert set(timing[0].fields) >= {
+            "gpu_queue_wait_seconds", "wav_stage_seconds",
+            "worker_request_to_response_seconds",
+            "worker_response_to_transcript_publish_seconds",
+        }
+    finally:
+        release.set()
+        monkeypatch.setattr(Path, "unlink", original_unlink)
+        await session.close()
+        await runtime.close()
+
+
+@pytest.mark.parametrize("delete_fails", [False, True])
+async def test_gpu_cleanup_debt_blocks_next_dispatch_without_blocking_first_result(
+    monkeypatch: pytest.MonkeyPatch, delete_fails: bool
+) -> None:
+    import threading
+
+    client = FakeGpuWorkerClient()
+    runtime = SharedGpuASRRuntime(
+        process_factory=FakeGpuWorkerFactory([client]), clock=FakeClock(_now=100.0)
+    )
+    await _activate(runtime, "self")
+    await _activate(runtime, "peer")
+    entered = threading.Event()
+    release = threading.Event()
+    original_unlink = Path.unlink
+
+    def gated_unlink(path: Path, *args, **kwargs):
+        if path.suffix == ".wav" and not entered.is_set():
+            entered.set()
+            if not release.wait(3):
+                raise TimeoutError("deletion gate expired")
+            if delete_fails:
+                raise OSError("injected unlink failure")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", gated_unlink)
+    try:
+        first = asyncio.create_task(
+            runtime.submit("self", np.zeros(1600, dtype=np.float32), speech_end_at=99.0)
+        )
+        await asyncio.wait_for(asyncio.to_thread(entered.wait, 2), timeout=3)
+        assert (await asyncio.wait_for(first, timeout=0.5)).text == "self-1"
+        second = asyncio.create_task(
+            runtime.submit("peer", np.ones(1600, dtype=np.float32), speech_end_at=99.1)
+        )
+        await asyncio.sleep(0)
+        assert runtime.pending_count == 1
+        assert len(client.transcribe_calls) == 1
+        release.set()
+        if delete_fails:
+            with pytest.raises(GpuASRWorkDiscarded, match="worker_failed"):
+                await asyncio.wait_for(second, timeout=3)
+            assert runtime.state == GpuASRRuntimeState.FAILED
+            assert len(client.transcribe_calls) == 1
+        else:
+            assert (await asyncio.wait_for(second, timeout=3)).text == "peer-2"
+    finally:
+        release.set()
+        monkeypatch.setattr(Path, "unlink", original_unlink)
+        await runtime.close()

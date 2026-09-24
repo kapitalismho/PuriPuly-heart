@@ -1,0 +1,1 @@
+{"gpu_quantized_codes_equal":65536,"numpy":"2.5.1","platform":"Windows-11-10.0.22631-SP0","profile":"100 Qwen 16002-sample PCM16 conversions; GPU all 65536 PCM16 codes","python":"3.14.7","qwen_after_median_us":20.8,"qwen_after_peak_bytes":128420,"qwen_before_median_us":22.15,"qwen_before_peak_bytes":128420,"revision":"78d90ca9722d3c88e05448bbe7c958892c5b11ec"}

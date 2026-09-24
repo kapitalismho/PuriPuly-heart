@@ -64,6 +64,13 @@ class SemaphoreLLMProvider(LLMProvider):
         }
         if max_output_tokens is not None:
             kwargs["max_output_tokens"] = max_output_tokens
+        # A race can publish its winner before a started loser releases the
+        # provider resource. Transfer this permit to the race's tracked cleanup.
+        from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
+
+        if isinstance(self.inner, FallbackRacingLLMProvider):
+            await self.semaphore.acquire()
+            return await self.inner._translate(**kwargs, release_permit=self.semaphore.release)
         async with self.semaphore:
             return await self.inner.translate(**kwargs)  # type: ignore[arg-type]
 

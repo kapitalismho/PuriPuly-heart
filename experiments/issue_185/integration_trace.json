@@ -1,0 +1,5430 @@
+{
+  "ambient_head": "78d90ca9722d3c88e05448bbe7c958892c5b11ec",
+  "baseline_revision": "78d90ca9722d3c88e05448bbe7c958892c5b11ec",
+  "configuration": {
+    "low_latency_mode": false,
+    "peer_replacement_policy_ms": 1000,
+    "post_end_grace_policy_ms": 400,
+    "racing_attempts_per_operation": 2,
+    "racing_loser_grace_ms": 10,
+    "racing_semaphore_capacity": 2,
+    "self_provider_delays_s": {
+      "A": 0.18,
+      "B": 0.04
+    },
+    "self_targets": [
+      "ja"
+    ],
+    "synthetic_audio_hz": 16000,
+    "translation_mode": "single-target"
+  },
+  "environment": {
+    "janus": "2.0.0",
+    "numpy": "2.5.1",
+    "onnxruntime": "1.28.0",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "python": "3.14.7",
+    "sounddevice": "0.5.5",
+    "soxr": "1.1.0"
+  },
+  "owner_interaction": {
+    "attempt_counts": {
+      "A": 2,
+      "B": 2,
+      "C": 1
+    },
+    "rows": [
+      {
+        "config_revision": 0,
+        "context": "",
+        "event": "ordered_admission",
+        "provider_generation": 0,
+        "t_us": 451,
+        "text": "A"
+      },
+      {
+        "config_revision": 0,
+        "context": "- [self] \"synthetic first\"",
+        "event": "ordered_admission",
+        "provider_generation": 0,
+        "t_us": 639,
+        "text": "B"
+      },
+      {
+        "context": "",
+        "event": "attempt_start",
+        "index": 0,
+        "t_us": 714,
+        "text": "A"
+      },
+      {
+        "context": "- [self] \"synthetic first\"",
+        "event": "attempt_start",
+        "index": 0,
+        "t_us": 727,
+        "text": "B"
+      },
+      {
+        "context": "",
+        "event": "attempt_start",
+        "index": 1,
+        "t_us": 801,
+        "text": "A"
+      },
+      {
+        "context": "- [self] \"synthetic first\"",
+        "event": "attempt_start",
+        "index": 1,
+        "t_us": 803,
+        "text": "B"
+      },
+      {
+        "event": "attempt_ready",
+        "index": 1,
+        "t_us": 816,
+        "text": "B"
+      },
+      {
+        "event": "b_loser_cancelled",
+        "t_us": 14458
+      },
+      {
+        "event": "attempt_ready",
+        "index": 0,
+        "t_us": 44985,
+        "text": "A"
+      },
+      {
+        "event": "attempt_ready",
+        "index": 1,
+        "t_us": 45020,
+        "text": "A"
+      },
+      {
+        "event": "ordered_handoff",
+        "outcome": "translated",
+        "parent": "385b19a9-6c45-596b-a745-7cf7b8ffa41b",
+        "t_us": 45103
+      },
+      {
+        "event": "ordered_handoff",
+        "outcome": "translated",
+        "parent": "fec286eb-1ce4-5e5f-be67-75892e650c1d",
+        "t_us": 45303
+      },
+      {
+        "context": "",
+        "event": "attempt_start",
+        "index": 0,
+        "t_us": 45439,
+        "text": "C"
+      },
+      {
+        "event": "attempt_ready",
+        "index": 0,
+        "t_us": 45441,
+        "text": "C"
+      },
+      {
+        "event": "b_loser_finished",
+        "t_us": 45648
+      },
+      {
+        "event": "attempt_close",
+        "index": 0,
+        "t_us": 45684
+      },
+      {
+        "event": "attempt_close",
+        "index": 1,
+        "t_us": 45686
+      }
+    ],
+    "scenario": "Self A/B production translation owner + racing provider + semaphore(2), direct C capacity control"
+  },
+  "scenario_rows": [
+    {
+      "buffered_content_samples": 8,
+      "event": "self_source_available",
+      "kind": "SpeechStart",
+      "scenario": "self_first_isolated",
+      "source_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "t_ms": 3,
+      "t_us": 2717,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_first_isolated",
+      "t_ms": 3,
+      "t_us": 2794
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechStart",
+      "scenario": "self_first_isolated",
+      "source_age_ms": 3,
+      "source_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "t_ms": 3,
+      "t_us": 2833,
+      "turn": 1
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "8ee0d26df7d44a6e88e3cc372d0db819",
+      "scenario": "self_first_isolated",
+      "t_ms": 3,
+      "t_us": 3100,
+      "turn": 1
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "8ee0d26df7d44a6e88e3cc372d0db819",
+      "samples": 2,
+      "scenario": "self_first_isolated",
+      "source_end_ms": 40308425,
+      "source_start_ms": 40308420,
+      "t_ms": 3,
+      "t_us": 3193,
+      "turn": 1
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "8ee0d26df7d44a6e88e3cc372d0db819",
+      "samples": 8,
+      "scenario": "self_first_isolated",
+      "source_end_ms": 40308465,
+      "source_start_ms": 40308425,
+      "t_ms": 3,
+      "t_us": 3230,
+      "turn": 1
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechStart",
+      "scenario": "self_first_isolated",
+      "source_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "t_ms": 3,
+      "t_us": 3242,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_first_isolated",
+      "t_ms": 3,
+      "t_us": 3250
+    },
+    {
+      "event": "acoustic_last_sample",
+      "scenario": "self_first_isolated",
+      "source_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "source_offset_ms": 20,
+      "t_ms": 55,
+      "t_us": 55157,
+      "turn": 1
+    },
+    {
+      "endpoint_delay_ms": 20,
+      "event": "local_seal",
+      "scenario": "self_first_isolated",
+      "source_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "t_ms": 55,
+      "t_us": 55163,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_first_isolated",
+      "t_ms": 55,
+      "t_us": 55249
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechEnd",
+      "scenario": "self_first_isolated",
+      "source_age_ms": 0,
+      "source_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "t_ms": 55,
+      "t_us": 55461,
+      "turn": 1
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "self_first_isolated",
+      "seal_reason": "silence",
+      "t_ms": 56,
+      "t_us": 55527,
+      "turn": 1
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechEnd",
+      "scenario": "self_first_isolated",
+      "source_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "t_ms": 56,
+      "t_us": 55570,
+      "turn": 1
+    },
+    {
+      "event": "self_handoff_commit",
+      "scenario": "self_first_isolated",
+      "t_ms": 56,
+      "t_us": 55573
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_first_isolated",
+      "t_ms": 56,
+      "t_us": 55583
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "8ee0d26df7d44a6e88e3cc372d0db819",
+      "scenario": "self_first_isolated",
+      "t_ms": 86,
+      "t_us": 86074,
+      "turn": 1
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "provider_turn_id": "8ee0d26df7d44a6e88e3cc372d0db819",
+      "scenario": "self_first_isolated",
+      "source_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "t_ms": 86,
+      "t_us": 86166,
+      "turn": 1
+    },
+    {
+      "event": "self_callback_terminal_noted",
+      "outcome": "final",
+      "provider_turn_id": "8ee0d26df7d44a6e88e3cc372d0db819",
+      "scenario": "self_first_isolated",
+      "source_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "t_ms": 86,
+      "t_us": 86247,
+      "turn": 1
+    },
+    {
+      "active": true,
+      "active_parent_id": "evt-1",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "evt-1",
+      "scenario": "self_first_isolated",
+      "scope": "self:original",
+      "t_ms": 86,
+      "t_us": 86409,
+      "turn_generation": null,
+      "turn_order": null,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "self_transcript_final",
+      "occupant": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "publication_id": "evt-1",
+      "scenario": "self_first_isolated",
+      "t_ms": 86,
+      "t_us": 86453
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "self_transcript_final",
+      "occupant": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "publication_id": "evt-1",
+      "scenario": "self_first_isolated",
+      "scene_revision": 1,
+      "t_ms": 87,
+      "t_us": 86578
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "evt-1",
+      "scenario": "self_first_isolated",
+      "scope": "self:original",
+      "t_ms": 87,
+      "t_us": 86599,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 1,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-1",
+      "reason": null,
+      "scenario": "self_first_isolated",
+      "status": "published",
+      "t_ms": 87,
+      "t_us": 86607
+    },
+    {
+      "active": true,
+      "active_parent_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "destination": "ui",
+      "event": "destination_batch_insert",
+      "parent_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "scenario": "self_first_isolated",
+      "scope": "self:ui",
+      "t_ms": 87,
+      "t_us": 86715,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "active": true,
+      "active_parent_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "scenario": "self_first_isolated",
+      "scope": "self",
+      "t_ms": 87,
+      "t_us": 86722,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "active": true,
+      "active_parent_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "destination": "chatbox",
+      "event": "destination_batch_insert",
+      "parent_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "scenario": "self_first_isolated",
+      "scope": "self:chatbox",
+      "t_ms": 87,
+      "t_us": 86727,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "translation_start",
+      "scenario": "self_first_isolated",
+      "source_language": "en",
+      "source_text": "turn-1",
+      "t_ms": 87,
+      "t_us": 86881,
+      "target_language": "ja",
+      "translation_id": "af0b593f-2f36-53dd-b097-2591d573af10"
+    },
+    {
+      "event": "translation_admission_return",
+      "provider_turn_id": "8ee0d26df7d44a6e88e3cc372d0db819",
+      "scenario": "self_first_isolated",
+      "source_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "t_ms": 87,
+      "t_us": 86897,
+      "turn": 1
+    },
+    {
+      "event": "translation_completion",
+      "scenario": "self_first_isolated",
+      "source_text": "turn-1",
+      "t_ms": 267,
+      "t_us": 266903,
+      "translation_id": "af0b593f-2f36-53dd-b097-2591d573af10"
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "translation_final",
+      "occupant": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "publication_id": "evt-2",
+      "scenario": "self_first_isolated",
+      "t_ms": 267,
+      "t_us": 267206
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "translation_final",
+      "occupant": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "publication_id": "evt-2",
+      "scenario": "self_first_isolated",
+      "scene_revision": 2,
+      "t_ms": 267,
+      "t_us": 267316
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 2,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-2",
+      "reason": null,
+      "scenario": "self_first_isolated",
+      "status": "published",
+      "t_ms": 267,
+      "t_us": 267334
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "utterance_closed",
+      "occupant": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "publication_id": "evt-3",
+      "scenario": "self_first_isolated",
+      "t_ms": 267,
+      "t_us": 267381
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "utterance_closed",
+      "occupant": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "publication_id": "evt-3",
+      "scenario": "self_first_isolated",
+      "scene_revision": 2,
+      "t_ms": 267,
+      "t_us": 267422
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "scenario": "self_first_isolated",
+      "scope": "self",
+      "t_ms": 267,
+      "t_us": 267441,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 2,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-3",
+      "reason": null,
+      "scenario": "self_first_isolated",
+      "status": "published",
+      "t_ms": 267,
+      "t_us": 267445
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "chatbox",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "scenario": "self_first_isolated",
+      "scope": "self:chatbox",
+      "t_ms": 268,
+      "t_us": 267522,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "ui",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "af0b593f-2f36-53dd-b097-2591d573af10",
+      "scenario": "self_first_isolated",
+      "scope": "self:ui",
+      "t_ms": 268,
+      "t_us": 267529,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "self_source_available",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "t_ms": 0,
+      "t_us": 276,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 0,
+      "t_us": 333
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_immediate_terminal",
+      "source_age_ms": 0,
+      "source_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "t_ms": 0,
+      "t_us": 358,
+      "turn": 1
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "f758d4f5970b4bd8b2de2487f6849970",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 0,
+      "t_us": 437,
+      "turn": 1
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "f758d4f5970b4bd8b2de2487f6849970",
+      "samples": 2,
+      "scenario": "self_successive_immediate_terminal",
+      "source_end_ms": 40308693,
+      "source_start_ms": 40308688,
+      "t_ms": 0,
+      "t_us": 496,
+      "turn": 1
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "f758d4f5970b4bd8b2de2487f6849970",
+      "samples": 8,
+      "scenario": "self_successive_immediate_terminal",
+      "source_end_ms": 40308733,
+      "source_start_ms": 40308693,
+      "t_ms": 1,
+      "t_us": 522,
+      "turn": 1
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "t_ms": 1,
+      "t_us": 531,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 1,
+      "t_us": 536
+    },
+    {
+      "event": "acoustic_last_sample",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "source_offset_ms": 20,
+      "t_ms": 52,
+      "t_us": 52105,
+      "turn": 1
+    },
+    {
+      "endpoint_delay_ms": 20,
+      "event": "local_seal",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "t_ms": 52,
+      "t_us": 52114,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 52,
+      "t_us": 52225
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_immediate_terminal",
+      "source_age_ms": 0,
+      "source_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "t_ms": 52,
+      "t_us": 52430,
+      "turn": 1
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "self_successive_immediate_terminal",
+      "seal_reason": "silence",
+      "t_ms": 52,
+      "t_us": 52496,
+      "turn": 1
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "f758d4f5970b4bd8b2de2487f6849970",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 53,
+      "t_us": 52518,
+      "turn": 1
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "t_ms": 53,
+      "t_us": 52554,
+      "turn": 1
+    },
+    {
+      "event": "self_handoff_commit",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 53,
+      "t_us": 52557
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 53,
+      "t_us": 52567
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "provider_turn_id": "f758d4f5970b4bd8b2de2487f6849970",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "t_ms": 53,
+      "t_us": 52690,
+      "turn": 1
+    },
+    {
+      "event": "self_callback_terminal_noted",
+      "outcome": "final",
+      "provider_turn_id": "f758d4f5970b4bd8b2de2487f6849970",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "t_ms": 53,
+      "t_us": 52760,
+      "turn": 1
+    },
+    {
+      "active": true,
+      "active_parent_id": "evt-1",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "evt-1",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:original",
+      "t_ms": 53,
+      "t_us": 52952,
+      "turn_generation": null,
+      "turn_order": null,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "self_transcript_final",
+      "occupant": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "publication_id": "evt-1",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 53,
+      "t_us": 53005
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "self_transcript_final",
+      "occupant": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "publication_id": "evt-1",
+      "scenario": "self_successive_immediate_terminal",
+      "scene_revision": 1,
+      "t_ms": 53,
+      "t_us": 53169
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "evt-1",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:original",
+      "t_ms": 53,
+      "t_us": 53193,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 1,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-1",
+      "reason": null,
+      "scenario": "self_successive_immediate_terminal",
+      "status": "published",
+      "t_ms": 53,
+      "t_us": 53201
+    },
+    {
+      "active": true,
+      "active_parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "destination": "ui",
+      "event": "destination_batch_insert",
+      "parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:ui",
+      "t_ms": 53,
+      "t_us": 53316,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "active": true,
+      "active_parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self",
+      "t_ms": 53,
+      "t_us": 53324,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "active": true,
+      "active_parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "destination": "chatbox",
+      "event": "destination_batch_insert",
+      "parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:chatbox",
+      "t_ms": 53,
+      "t_us": 53327,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "translation_start",
+      "scenario": "self_successive_immediate_terminal",
+      "source_language": "en",
+      "source_text": "turn-1",
+      "t_ms": 54,
+      "t_us": 53500,
+      "target_language": "ja",
+      "translation_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8"
+    },
+    {
+      "event": "translation_admission_return",
+      "provider_turn_id": "f758d4f5970b4bd8b2de2487f6849970",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "t_ms": 54,
+      "t_us": 53516,
+      "turn": 1
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "self_source_available",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "t_ms": 83,
+      "t_us": 83080,
+      "turn": 2
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 83,
+      "t_us": 83187
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_immediate_terminal",
+      "source_age_ms": 13,
+      "source_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "t_ms": 83,
+      "t_us": 83228,
+      "turn": 2
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "1db1fa9678c94f779989291ea2d53d2c",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 83,
+      "t_us": 83282,
+      "turn": 2
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "1db1fa9678c94f779989291ea2d53d2c",
+      "samples": 2,
+      "scenario": "self_successive_immediate_terminal",
+      "source_end_ms": 40308763,
+      "source_start_ms": 40308758,
+      "t_ms": 83,
+      "t_us": 83349,
+      "turn": 2
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "1db1fa9678c94f779989291ea2d53d2c",
+      "samples": 8,
+      "scenario": "self_successive_immediate_terminal",
+      "source_end_ms": 40308803,
+      "source_start_ms": 40308763,
+      "t_ms": 83,
+      "t_us": 83377,
+      "turn": 2
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "t_ms": 83,
+      "t_us": 83386,
+      "turn": 2
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 83,
+      "t_us": 83390
+    },
+    {
+      "event": "acoustic_last_sample",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "source_offset_ms": 90,
+      "t_ms": 114,
+      "t_us": 114001,
+      "turn": 2
+    },
+    {
+      "endpoint_delay_ms": 20,
+      "event": "local_seal",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "t_ms": 114,
+      "t_us": 114004,
+      "turn": 2
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 114,
+      "t_us": 114031
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_immediate_terminal",
+      "source_age_ms": 0,
+      "source_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "t_ms": 114,
+      "t_us": 114121,
+      "turn": 2
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "self_successive_immediate_terminal",
+      "seal_reason": "silence",
+      "t_ms": 114,
+      "t_us": 114196,
+      "turn": 2
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "t_ms": 114,
+      "t_us": 114241,
+      "turn": 2
+    },
+    {
+      "event": "self_handoff_commit",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 114,
+      "t_us": 114244
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 114,
+      "t_us": 114252
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "1db1fa9678c94f779989291ea2d53d2c",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 161,
+      "t_us": 161096,
+      "turn": 2
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "provider_turn_id": "1db1fa9678c94f779989291ea2d53d2c",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "t_ms": 161,
+      "t_us": 161211,
+      "turn": 2
+    },
+    {
+      "event": "self_callback_terminal_noted",
+      "outcome": "final",
+      "provider_turn_id": "1db1fa9678c94f779989291ea2d53d2c",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "t_ms": 161,
+      "t_us": 161219,
+      "turn": 2
+    },
+    {
+      "active": true,
+      "active_parent_id": "evt-2",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "evt-2",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:original",
+      "t_ms": 161,
+      "t_us": 161374,
+      "turn_generation": null,
+      "turn_order": null,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "self_transcript_final",
+      "occupant": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "publication_id": "evt-2",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 161,
+      "t_us": 161435
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "self_transcript_final",
+      "occupant": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "publication_id": "evt-2",
+      "scenario": "self_successive_immediate_terminal",
+      "scene_revision": 2,
+      "t_ms": 162,
+      "t_us": 161583
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "evt-2",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:original",
+      "t_ms": 162,
+      "t_us": 161610,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 2,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-2",
+      "reason": null,
+      "scenario": "self_successive_immediate_terminal",
+      "status": "published",
+      "t_ms": 162,
+      "t_us": 161623
+    },
+    {
+      "active": false,
+      "active_parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "destination": "ui",
+      "event": "destination_batch_insert",
+      "parent_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:ui",
+      "t_ms": 162,
+      "t_us": 161741,
+      "turn_generation": 0,
+      "turn_order": 1,
+      "waiting_parent_ids": [
+        "ee76676e-b391-5a64-bbb8-9b2a8fd73399"
+      ]
+    },
+    {
+      "active": false,
+      "active_parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self",
+      "t_ms": 162,
+      "t_us": 161755,
+      "turn_generation": 0,
+      "turn_order": 1,
+      "waiting_parent_ids": [
+        "ee76676e-b391-5a64-bbb8-9b2a8fd73399"
+      ]
+    },
+    {
+      "active": false,
+      "active_parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "destination": "chatbox",
+      "event": "destination_batch_insert",
+      "parent_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:chatbox",
+      "t_ms": 162,
+      "t_us": 161765,
+      "turn_generation": 0,
+      "turn_order": 1,
+      "waiting_parent_ids": [
+        "ee76676e-b391-5a64-bbb8-9b2a8fd73399"
+      ]
+    },
+    {
+      "event": "translation_start",
+      "scenario": "self_successive_immediate_terminal",
+      "source_language": "en",
+      "source_text": "turn-2",
+      "t_ms": 162,
+      "t_us": 161937,
+      "target_language": "ja",
+      "translation_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399"
+    },
+    {
+      "event": "translation_admission_return",
+      "provider_turn_id": "1db1fa9678c94f779989291ea2d53d2c",
+      "scenario": "self_successive_immediate_terminal",
+      "source_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "t_ms": 162,
+      "t_us": 161957,
+      "turn": 2
+    },
+    {
+      "event": "translation_completion",
+      "scenario": "self_successive_immediate_terminal",
+      "source_text": "turn-2",
+      "t_ms": 202,
+      "t_us": 201956,
+      "translation_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399"
+    },
+    {
+      "event": "translation_completion",
+      "scenario": "self_successive_immediate_terminal",
+      "source_text": "turn-1",
+      "t_ms": 234,
+      "t_us": 233520,
+      "translation_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8"
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "translation_final",
+      "occupant": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "publication_id": "evt-3",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 234,
+      "t_us": 233730
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "translation_final",
+      "occupant": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "publication_id": "evt-3",
+      "scenario": "self_successive_immediate_terminal",
+      "scene_revision": 3,
+      "t_ms": 234,
+      "t_us": 233816
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 3,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-3",
+      "reason": null,
+      "scenario": "self_successive_immediate_terminal",
+      "status": "published",
+      "t_ms": 234,
+      "t_us": 233827
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "utterance_closed",
+      "occupant": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "publication_id": "evt-4",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 234,
+      "t_us": 233868
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "utterance_closed",
+      "occupant": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "publication_id": "evt-4",
+      "scenario": "self_successive_immediate_terminal",
+      "scene_revision": 3,
+      "t_ms": 234,
+      "t_us": 233915
+    },
+    {
+      "activated_successor_parent_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self",
+      "t_ms": 234,
+      "t_us": 233932,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 3,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-4",
+      "reason": null,
+      "scenario": "self_successive_immediate_terminal",
+      "status": "published",
+      "t_ms": 234,
+      "t_us": 233936
+    },
+    {
+      "activated_successor_parent_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "destination": "chatbox",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:chatbox",
+      "t_ms": 234,
+      "t_us": 234013,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "activated_successor_parent_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "destination": "ui",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "8c4d6668-fb65-50ed-ba47-9e72465fbbd8",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:ui",
+      "t_ms": 234,
+      "t_us": 234018,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "translation_final",
+      "occupant": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "publication_id": "evt-5",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 234,
+      "t_us": 234148
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "translation_final",
+      "occupant": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "publication_id": "evt-5",
+      "scenario": "self_successive_immediate_terminal",
+      "scene_revision": 4,
+      "t_ms": 234,
+      "t_us": 234217
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 4,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-5",
+      "reason": null,
+      "scenario": "self_successive_immediate_terminal",
+      "status": "published",
+      "t_ms": 234,
+      "t_us": 234224
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "utterance_closed",
+      "occupant": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "publication_id": "evt-6",
+      "scenario": "self_successive_immediate_terminal",
+      "t_ms": 234,
+      "t_us": 234256
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "utterance_closed",
+      "occupant": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "publication_id": "evt-6",
+      "scenario": "self_successive_immediate_terminal",
+      "scene_revision": 4,
+      "t_ms": 234,
+      "t_us": 234291
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self",
+      "t_ms": 234,
+      "t_us": 234300,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 4,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-6",
+      "reason": null,
+      "scenario": "self_successive_immediate_terminal",
+      "status": "published",
+      "t_ms": 234,
+      "t_us": 234303
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "chatbox",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:chatbox",
+      "t_ms": 234,
+      "t_us": 234345,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "ui",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "ee76676e-b391-5a64-bbb8-9b2a8fd73399",
+      "scenario": "self_successive_immediate_terminal",
+      "scope": "self:ui",
+      "t_ms": 234,
+      "t_us": 234351,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "self_source_available",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "t_ms": 0,
+      "t_us": 241,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 0,
+      "t_us": 287
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_fast_translation",
+      "source_age_ms": 0,
+      "source_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "t_ms": 0,
+      "t_us": 313,
+      "turn": 1
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "b01800061ace4d359c18db041b1c3ed7",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 0,
+      "t_us": 381,
+      "turn": 1
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "b01800061ace4d359c18db041b1c3ed7",
+      "samples": 2,
+      "scenario": "self_successive_fast_translation",
+      "source_end_ms": 40308928,
+      "source_start_ms": 40308923,
+      "t_ms": 0,
+      "t_us": 438,
+      "turn": 1
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "b01800061ace4d359c18db041b1c3ed7",
+      "samples": 8,
+      "scenario": "self_successive_fast_translation",
+      "source_end_ms": 40308968,
+      "source_start_ms": 40308928,
+      "t_ms": 0,
+      "t_us": 463,
+      "turn": 1
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "t_ms": 0,
+      "t_us": 472,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 0,
+      "t_us": 477
+    },
+    {
+      "event": "acoustic_last_sample",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "source_offset_ms": 20,
+      "t_ms": 50,
+      "t_us": 50049,
+      "turn": 1
+    },
+    {
+      "endpoint_delay_ms": 20,
+      "event": "local_seal",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "t_ms": 50,
+      "t_us": 50055,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 50,
+      "t_us": 50106
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_fast_translation",
+      "source_age_ms": 0,
+      "source_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "t_ms": 50,
+      "t_us": 50244,
+      "turn": 1
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "self_successive_fast_translation",
+      "seal_reason": "silence",
+      "t_ms": 50,
+      "t_us": 50293,
+      "turn": 1
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "b01800061ace4d359c18db041b1c3ed7",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 50,
+      "t_us": 50312,
+      "turn": 1
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "t_ms": 50,
+      "t_us": 50337,
+      "turn": 1
+    },
+    {
+      "event": "self_handoff_commit",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 50,
+      "t_us": 50339
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 50,
+      "t_us": 50347
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "provider_turn_id": "b01800061ace4d359c18db041b1c3ed7",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "t_ms": 50,
+      "t_us": 50429,
+      "turn": 1
+    },
+    {
+      "event": "self_callback_terminal_noted",
+      "outcome": "final",
+      "provider_turn_id": "b01800061ace4d359c18db041b1c3ed7",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "t_ms": 50,
+      "t_us": 50465,
+      "turn": 1
+    },
+    {
+      "active": true,
+      "active_parent_id": "evt-1",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "evt-1",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:original",
+      "t_ms": 51,
+      "t_us": 50567,
+      "turn_generation": null,
+      "turn_order": null,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "self_transcript_final",
+      "occupant": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "publication_id": "evt-1",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 51,
+      "t_us": 50610
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "self_transcript_final",
+      "occupant": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "publication_id": "evt-1",
+      "scenario": "self_successive_fast_translation",
+      "scene_revision": 1,
+      "t_ms": 51,
+      "t_us": 50715
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "evt-1",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:original",
+      "t_ms": 51,
+      "t_us": 50737,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 1,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-1",
+      "reason": null,
+      "scenario": "self_successive_fast_translation",
+      "status": "published",
+      "t_ms": 51,
+      "t_us": 50748
+    },
+    {
+      "active": true,
+      "active_parent_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "destination": "ui",
+      "event": "destination_batch_insert",
+      "parent_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:ui",
+      "t_ms": 51,
+      "t_us": 50850,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "active": true,
+      "active_parent_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self",
+      "t_ms": 51,
+      "t_us": 50876,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "active": true,
+      "active_parent_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "destination": "chatbox",
+      "event": "destination_batch_insert",
+      "parent_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:chatbox",
+      "t_ms": 51,
+      "t_us": 50886,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "translation_start",
+      "scenario": "self_successive_fast_translation",
+      "source_language": "en",
+      "source_text": "turn-1",
+      "t_ms": 51,
+      "t_us": 51138,
+      "target_language": "ja",
+      "translation_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53"
+    },
+    {
+      "event": "translation_admission_return",
+      "provider_turn_id": "b01800061ace4d359c18db041b1c3ed7",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "t_ms": 51,
+      "t_us": 51161,
+      "turn": 1
+    },
+    {
+      "event": "translation_completion",
+      "scenario": "self_successive_fast_translation",
+      "source_text": "turn-1",
+      "t_ms": 51,
+      "t_us": 51213,
+      "translation_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53"
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "translation_final",
+      "occupant": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "publication_id": "evt-2",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 51,
+      "t_us": 51377
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "translation_final",
+      "occupant": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "publication_id": "evt-2",
+      "scenario": "self_successive_fast_translation",
+      "scene_revision": 2,
+      "t_ms": 51,
+      "t_us": 51437
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 2,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-2",
+      "reason": null,
+      "scenario": "self_successive_fast_translation",
+      "status": "published",
+      "t_ms": 51,
+      "t_us": 51447
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "utterance_closed",
+      "occupant": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "publication_id": "evt-3",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 51,
+      "t_us": 51482
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "utterance_closed",
+      "occupant": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "publication_id": "evt-3",
+      "scenario": "self_successive_fast_translation",
+      "scene_revision": 2,
+      "t_ms": 52,
+      "t_us": 51514
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self",
+      "t_ms": 52,
+      "t_us": 51525,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 2,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-3",
+      "reason": null,
+      "scenario": "self_successive_fast_translation",
+      "status": "published",
+      "t_ms": 52,
+      "t_us": 51528
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "chatbox",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:chatbox",
+      "t_ms": 52,
+      "t_us": 51579,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "ui",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "d03214bf-3312-5cc8-9b5c-3afe457f6c53",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:ui",
+      "t_ms": 52,
+      "t_us": 51583,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "self_source_available",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "t_ms": 81,
+      "t_us": 81262,
+      "turn": 2
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 81,
+      "t_us": 81361
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_fast_translation",
+      "source_age_ms": 11,
+      "source_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "t_ms": 81,
+      "t_us": 81435,
+      "turn": 2
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "5bb2871a132f43359edb8bb9c2a30273",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 82,
+      "t_us": 81517,
+      "turn": 2
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "5bb2871a132f43359edb8bb9c2a30273",
+      "samples": 2,
+      "scenario": "self_successive_fast_translation",
+      "source_end_ms": 40308998,
+      "source_start_ms": 40308993,
+      "t_ms": 82,
+      "t_us": 81612,
+      "turn": 2
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "5bb2871a132f43359edb8bb9c2a30273",
+      "samples": 8,
+      "scenario": "self_successive_fast_translation",
+      "source_end_ms": 40309038,
+      "source_start_ms": 40308998,
+      "t_ms": 82,
+      "t_us": 81664,
+      "turn": 2
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "t_ms": 82,
+      "t_us": 81686,
+      "turn": 2
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 82,
+      "t_us": 81694
+    },
+    {
+      "event": "acoustic_last_sample",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "source_offset_ms": 90,
+      "t_ms": 112,
+      "t_us": 112052,
+      "turn": 2
+    },
+    {
+      "endpoint_delay_ms": 20,
+      "event": "local_seal",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "t_ms": 112,
+      "t_us": 112060,
+      "turn": 2
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 112,
+      "t_us": 112118
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_fast_translation",
+      "source_age_ms": 0,
+      "source_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "t_ms": 112,
+      "t_us": 112230,
+      "turn": 2
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "self_successive_fast_translation",
+      "seal_reason": "silence",
+      "t_ms": 112,
+      "t_us": 112286,
+      "turn": 2
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "t_ms": 112,
+      "t_us": 112326,
+      "turn": 2
+    },
+    {
+      "event": "self_handoff_commit",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 112,
+      "t_us": 112328
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 112,
+      "t_us": 112335
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "5bb2871a132f43359edb8bb9c2a30273",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 159,
+      "t_us": 158652,
+      "turn": 2
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "provider_turn_id": "5bb2871a132f43359edb8bb9c2a30273",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "t_ms": 159,
+      "t_us": 158769,
+      "turn": 2
+    },
+    {
+      "event": "self_callback_terminal_noted",
+      "outcome": "final",
+      "provider_turn_id": "5bb2871a132f43359edb8bb9c2a30273",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "t_ms": 159,
+      "t_us": 158777,
+      "turn": 2
+    },
+    {
+      "active": true,
+      "active_parent_id": "evt-4",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "evt-4",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:original",
+      "t_ms": 159,
+      "t_us": 158934,
+      "turn_generation": null,
+      "turn_order": null,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "self_transcript_final",
+      "occupant": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "publication_id": "evt-4",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 159,
+      "t_us": 158995
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "self_transcript_final",
+      "occupant": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "publication_id": "evt-4",
+      "scenario": "self_successive_fast_translation",
+      "scene_revision": 3,
+      "t_ms": 159,
+      "t_us": 159184
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "evt-4",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:original",
+      "t_ms": 159,
+      "t_us": 159217,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 3,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-4",
+      "reason": null,
+      "scenario": "self_successive_fast_translation",
+      "status": "published",
+      "t_ms": 159,
+      "t_us": 159225
+    },
+    {
+      "active": true,
+      "active_parent_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "destination": "ui",
+      "event": "destination_batch_insert",
+      "parent_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:ui",
+      "t_ms": 159,
+      "t_us": 159300,
+      "turn_generation": 0,
+      "turn_order": 1,
+      "waiting_parent_ids": []
+    },
+    {
+      "active": true,
+      "active_parent_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self",
+      "t_ms": 159,
+      "t_us": 159304,
+      "turn_generation": 0,
+      "turn_order": 1,
+      "waiting_parent_ids": []
+    },
+    {
+      "active": true,
+      "active_parent_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "destination": "chatbox",
+      "event": "destination_batch_insert",
+      "parent_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:chatbox",
+      "t_ms": 159,
+      "t_us": 159308,
+      "turn_generation": 0,
+      "turn_order": 1,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "translation_start",
+      "scenario": "self_successive_fast_translation",
+      "source_language": "en",
+      "source_text": "turn-2",
+      "t_ms": 159,
+      "t_us": 159428,
+      "target_language": "ja",
+      "translation_id": "b0ede130-d408-5f66-b122-6d212e51c3cf"
+    },
+    {
+      "event": "translation_admission_return",
+      "provider_turn_id": "5bb2871a132f43359edb8bb9c2a30273",
+      "scenario": "self_successive_fast_translation",
+      "source_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "t_ms": 159,
+      "t_us": 159440,
+      "turn": 2
+    },
+    {
+      "event": "translation_completion",
+      "scenario": "self_successive_fast_translation",
+      "source_text": "turn-2",
+      "t_ms": 199,
+      "t_us": 199445,
+      "translation_id": "b0ede130-d408-5f66-b122-6d212e51c3cf"
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "translation_final",
+      "occupant": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "publication_id": "evt-5",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 200,
+      "t_us": 199641
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "translation_final",
+      "occupant": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "publication_id": "evt-5",
+      "scenario": "self_successive_fast_translation",
+      "scene_revision": 4,
+      "t_ms": 200,
+      "t_us": 199719
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 4,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-5",
+      "reason": null,
+      "scenario": "self_successive_fast_translation",
+      "status": "published",
+      "t_ms": 200,
+      "t_us": 199730
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "utterance_closed",
+      "occupant": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "publication_id": "evt-6",
+      "scenario": "self_successive_fast_translation",
+      "t_ms": 200,
+      "t_us": 199767
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "utterance_closed",
+      "occupant": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "publication_id": "evt-6",
+      "scenario": "self_successive_fast_translation",
+      "scene_revision": 4,
+      "t_ms": 200,
+      "t_us": 199805
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self",
+      "t_ms": 200,
+      "t_us": 199818,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 4,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-6",
+      "reason": null,
+      "scenario": "self_successive_fast_translation",
+      "status": "published",
+      "t_ms": 200,
+      "t_us": 199821
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "chatbox",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:chatbox",
+      "t_ms": 200,
+      "t_us": 199881,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "ui",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "b0ede130-d408-5f66-b122-6d212e51c3cf",
+      "scenario": "self_successive_fast_translation",
+      "scope": "self:ui",
+      "t_ms": 200,
+      "t_us": 199887,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "self_source_available",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "t_ms": 0,
+      "t_us": 235,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 0,
+      "t_us": 280
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_delayed_terminal",
+      "source_age_ms": 0,
+      "source_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "t_ms": 0,
+      "t_us": 302,
+      "turn": 1
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "ee13bae27bce41cd9b0d82432b76ec51",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 0,
+      "t_us": 371,
+      "turn": 1
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "ee13bae27bce41cd9b0d82432b76ec51",
+      "samples": 2,
+      "scenario": "self_successive_delayed_terminal",
+      "source_end_ms": 40309129,
+      "source_start_ms": 40309124,
+      "t_ms": 0,
+      "t_us": 426,
+      "turn": 1
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "ee13bae27bce41cd9b0d82432b76ec51",
+      "samples": 8,
+      "scenario": "self_successive_delayed_terminal",
+      "source_end_ms": 40309169,
+      "source_start_ms": 40309129,
+      "t_ms": 0,
+      "t_us": 453,
+      "turn": 1
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "t_ms": 0,
+      "t_us": 463,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 0,
+      "t_us": 468
+    },
+    {
+      "event": "acoustic_last_sample",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "source_offset_ms": 20,
+      "t_ms": 51,
+      "t_us": 51144,
+      "turn": 1
+    },
+    {
+      "endpoint_delay_ms": 20,
+      "event": "local_seal",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "t_ms": 51,
+      "t_us": 51150,
+      "turn": 1
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 51,
+      "t_us": 51197
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_delayed_terminal",
+      "source_age_ms": 0,
+      "source_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "t_ms": 51,
+      "t_us": 51309,
+      "turn": 1
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "self_successive_delayed_terminal",
+      "seal_reason": "silence",
+      "t_ms": 51,
+      "t_us": 51352,
+      "turn": 1
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "t_ms": 51,
+      "t_us": 51385,
+      "turn": 1
+    },
+    {
+      "event": "self_handoff_commit",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 51,
+      "t_us": 51388
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 51,
+      "t_us": 51395
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "self_source_available",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "t_ms": 82,
+      "t_us": 82364,
+      "turn": 2
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 82,
+      "t_us": 82487
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_delayed_terminal",
+      "source_age_ms": 13,
+      "source_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "t_ms": 83,
+      "t_us": 82572,
+      "turn": 2
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "c8a17ca49911441c8abd3dec483cdcc5",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 83,
+      "t_us": 82653,
+      "turn": 2
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "c8a17ca49911441c8abd3dec483cdcc5",
+      "samples": 2,
+      "scenario": "self_successive_delayed_terminal",
+      "source_end_ms": 40309199,
+      "source_start_ms": 40309194,
+      "t_ms": 83,
+      "t_us": 82738,
+      "turn": 2
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "c8a17ca49911441c8abd3dec483cdcc5",
+      "samples": 8,
+      "scenario": "self_successive_delayed_terminal",
+      "source_end_ms": 40309239,
+      "source_start_ms": 40309199,
+      "t_ms": 83,
+      "t_us": 82788,
+      "turn": 2
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechStart",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "t_ms": 83,
+      "t_us": 82805,
+      "turn": 2
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 83,
+      "t_us": 82813
+    },
+    {
+      "event": "acoustic_last_sample",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "source_offset_ms": 90,
+      "t_ms": 114,
+      "t_us": 113909,
+      "turn": 2
+    },
+    {
+      "endpoint_delay_ms": 20,
+      "event": "local_seal",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "t_ms": 114,
+      "t_us": 113915,
+      "turn": 2
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": true,
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 114,
+      "t_us": 113965
+    },
+    {
+      "event": "self_owner_to_engine_dispatch",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_delayed_terminal",
+      "source_age_ms": 0,
+      "source_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "t_ms": 114,
+      "t_us": 114082,
+      "turn": 2
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "self_successive_delayed_terminal",
+      "seal_reason": "silence",
+      "t_ms": 114,
+      "t_us": 114134,
+      "turn": 2
+    },
+    {
+      "event": "self_owner_engine_return",
+      "kind": "SpeechEnd",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "t_ms": 114,
+      "t_us": 114171,
+      "turn": 2
+    },
+    {
+      "event": "self_handoff_commit",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 114,
+      "t_us": 114173
+    },
+    {
+      "event": "self_pending_source_work",
+      "pending": false,
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 114,
+      "t_us": 114179
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "ee13bae27bce41cd9b0d82432b76ec51",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 160,
+      "t_us": 160358,
+      "turn": 1
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "provider_turn_id": "ee13bae27bce41cd9b0d82432b76ec51",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "t_ms": 160,
+      "t_us": 160497,
+      "turn": 1
+    },
+    {
+      "event": "self_callback_terminal_noted",
+      "outcome": "final",
+      "provider_turn_id": "ee13bae27bce41cd9b0d82432b76ec51",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "t_ms": 161,
+      "t_us": 160558,
+      "turn": 1
+    },
+    {
+      "active": true,
+      "active_parent_id": "evt-1",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "evt-1",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:original",
+      "t_ms": 161,
+      "t_us": 160717,
+      "turn_generation": null,
+      "turn_order": null,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "self_transcript_final",
+      "occupant": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "publication_id": "evt-1",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 161,
+      "t_us": 160777
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "self_transcript_final",
+      "occupant": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "publication_id": "evt-1",
+      "scenario": "self_successive_delayed_terminal",
+      "scene_revision": 1,
+      "t_ms": 161,
+      "t_us": 160911
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "evt-1",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:original",
+      "t_ms": 161,
+      "t_us": 160929,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 1,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-1",
+      "reason": null,
+      "scenario": "self_successive_delayed_terminal",
+      "status": "published",
+      "t_ms": 161,
+      "t_us": 160937
+    },
+    {
+      "active": true,
+      "active_parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "destination": "ui",
+      "event": "destination_batch_insert",
+      "parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:ui",
+      "t_ms": 161,
+      "t_us": 161024,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "active": true,
+      "active_parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self",
+      "t_ms": 161,
+      "t_us": 161030,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "active": true,
+      "active_parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "destination": "chatbox",
+      "event": "destination_batch_insert",
+      "parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:chatbox",
+      "t_ms": 161,
+      "t_us": 161034,
+      "turn_generation": 0,
+      "turn_order": 0,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "translation_start",
+      "scenario": "self_successive_delayed_terminal",
+      "source_language": "en",
+      "source_text": "turn-1",
+      "t_ms": 161,
+      "t_us": 161168,
+      "target_language": "ja",
+      "translation_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec"
+    },
+    {
+      "event": "translation_admission_return",
+      "provider_turn_id": "ee13bae27bce41cd9b0d82432b76ec51",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "t_ms": 161,
+      "t_us": 161183,
+      "turn": 1
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "c8a17ca49911441c8abd3dec483cdcc5",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 207,
+      "t_us": 207183,
+      "turn": 2
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "provider_turn_id": "c8a17ca49911441c8abd3dec483cdcc5",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "t_ms": 207,
+      "t_us": 207310,
+      "turn": 2
+    },
+    {
+      "event": "self_callback_terminal_noted",
+      "outcome": "final",
+      "provider_turn_id": "c8a17ca49911441c8abd3dec483cdcc5",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "t_ms": 207,
+      "t_us": 207318,
+      "turn": 2
+    },
+    {
+      "active": true,
+      "active_parent_id": "evt-2",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "evt-2",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:original",
+      "t_ms": 207,
+      "t_us": 207470,
+      "turn_generation": null,
+      "turn_order": null,
+      "waiting_parent_ids": []
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "self_transcript_final",
+      "occupant": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "publication_id": "evt-2",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 208,
+      "t_us": 207540
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "self_transcript_final",
+      "occupant": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "publication_id": "evt-2",
+      "scenario": "self_successive_delayed_terminal",
+      "scene_revision": 2,
+      "t_ms": 208,
+      "t_us": 207710
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "evt-2",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:original",
+      "t_ms": 208,
+      "t_us": 207728,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 2,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-2",
+      "reason": null,
+      "scenario": "self_successive_delayed_terminal",
+      "status": "published",
+      "t_ms": 208,
+      "t_us": 207736
+    },
+    {
+      "active": false,
+      "active_parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "destination": "ui",
+      "event": "destination_batch_insert",
+      "parent_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:ui",
+      "t_ms": 208,
+      "t_us": 207796,
+      "turn_generation": 0,
+      "turn_order": 1,
+      "waiting_parent_ids": [
+        "7c0f1699-2b8e-5034-9977-a20f4cde53c0"
+      ]
+    },
+    {
+      "active": false,
+      "active_parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "destination": "overlay",
+      "event": "destination_batch_insert",
+      "parent_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self",
+      "t_ms": 208,
+      "t_us": 207802,
+      "turn_generation": 0,
+      "turn_order": 1,
+      "waiting_parent_ids": [
+        "7c0f1699-2b8e-5034-9977-a20f4cde53c0"
+      ]
+    },
+    {
+      "active": false,
+      "active_parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "destination": "chatbox",
+      "event": "destination_batch_insert",
+      "parent_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:chatbox",
+      "t_ms": 208,
+      "t_us": 207806,
+      "turn_generation": 0,
+      "turn_order": 1,
+      "waiting_parent_ids": [
+        "7c0f1699-2b8e-5034-9977-a20f4cde53c0"
+      ]
+    },
+    {
+      "event": "translation_start",
+      "scenario": "self_successive_delayed_terminal",
+      "source_language": "en",
+      "source_text": "turn-2",
+      "t_ms": 208,
+      "t_us": 207897,
+      "target_language": "ja",
+      "translation_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0"
+    },
+    {
+      "event": "translation_admission_return",
+      "provider_turn_id": "c8a17ca49911441c8abd3dec483cdcc5",
+      "scenario": "self_successive_delayed_terminal",
+      "source_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "t_ms": 208,
+      "t_us": 207908,
+      "turn": 2
+    },
+    {
+      "event": "translation_completion",
+      "scenario": "self_successive_delayed_terminal",
+      "source_text": "turn-2",
+      "t_ms": 248,
+      "t_us": 247913,
+      "translation_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0"
+    },
+    {
+      "event": "translation_completion",
+      "scenario": "self_successive_delayed_terminal",
+      "source_text": "turn-1",
+      "t_ms": 341,
+      "t_us": 341189,
+      "translation_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec"
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "translation_final",
+      "occupant": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "publication_id": "evt-3",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 341,
+      "t_us": 341378
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "translation_final",
+      "occupant": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "publication_id": "evt-3",
+      "scenario": "self_successive_delayed_terminal",
+      "scene_revision": 3,
+      "t_ms": 341,
+      "t_us": 341455
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 3,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-3",
+      "reason": null,
+      "scenario": "self_successive_delayed_terminal",
+      "status": "published",
+      "t_ms": 341,
+      "t_us": 341465
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "utterance_closed",
+      "occupant": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "publication_id": "evt-4",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 342,
+      "t_us": 341506
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "utterance_closed",
+      "occupant": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "publication_id": "evt-4",
+      "scenario": "self_successive_delayed_terminal",
+      "scene_revision": 3,
+      "t_ms": 342,
+      "t_us": 341545
+    },
+    {
+      "activated_successor_parent_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self",
+      "t_ms": 342,
+      "t_us": 341559,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 3,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-4",
+      "reason": null,
+      "scenario": "self_successive_delayed_terminal",
+      "status": "published",
+      "t_ms": 342,
+      "t_us": 341563
+    },
+    {
+      "activated_successor_parent_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "destination": "chatbox",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:chatbox",
+      "t_ms": 342,
+      "t_us": 341622,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "activated_successor_parent_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "destination": "ui",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "4cf9c507-da45-5151-b5e1-8bc60680b6ec",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:ui",
+      "t_ms": 342,
+      "t_us": 341628,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "translation_final",
+      "occupant": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "publication_id": "evt-5",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 342,
+      "t_us": 341744
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "translation_final",
+      "occupant": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "publication_id": "evt-5",
+      "scenario": "self_successive_delayed_terminal",
+      "scene_revision": 4,
+      "t_ms": 342,
+      "t_us": 341804
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 4,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-5",
+      "reason": null,
+      "scenario": "self_successive_delayed_terminal",
+      "status": "published",
+      "t_ms": 342,
+      "t_us": 341812
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "utterance_closed",
+      "occupant": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "publication_id": "evt-6",
+      "scenario": "self_successive_delayed_terminal",
+      "t_ms": 342,
+      "t_us": 341843
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "utterance_closed",
+      "occupant": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "publication_id": "evt-6",
+      "scenario": "self_successive_delayed_terminal",
+      "scene_revision": 4,
+      "t_ms": 342,
+      "t_us": 341877
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "overlay",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self",
+      "t_ms": 342,
+      "t_us": 341886,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "event": "self_output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 4,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-6",
+      "reason": null,
+      "scenario": "self_successive_delayed_terminal",
+      "status": "published",
+      "t_ms": 342,
+      "t_us": 341889
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "chatbox",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:chatbox",
+      "t_ms": 342,
+      "t_us": 341928,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "activated_successor_parent_id": null,
+      "destination": "ui",
+      "disposition": "applied",
+      "event": "destination_batch_release",
+      "parent_id": "7c0f1699-2b8e-5034-9977-a20f4cde53c0",
+      "scenario": "self_successive_delayed_terminal",
+      "scope": "self:ui",
+      "t_ms": 342,
+      "t_us": 341935,
+      "waiting_parent_ids": [],
+      "was_active": true
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "source_available",
+      "kind": "SpeechStart",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechStart",
+      "scenario": "stt_immediate_terminal",
+      "source_age_ms": 0,
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "c55008b518bb49d69641e0a0103fc4c2",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "c55008b518bb49d69641e0a0103fc4c2",
+      "samples": 2,
+      "scenario": "stt_immediate_terminal",
+      "source_end_ms": 0,
+      "source_start_ms": -10,
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "event": "local_seal",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 100,
+      "t_us": 100000
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "c55008b518bb49d69641e0a0103fc4c2",
+      "samples": 8,
+      "scenario": "stt_immediate_terminal",
+      "source_end_ms": 100,
+      "source_start_ms": 0,
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "event": "dispatch_return",
+      "kind": "SpeechStart",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 100,
+      "t_us": 100000
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechEnd",
+      "scenario": "stt_immediate_terminal",
+      "source_age_ms": 0,
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "stt_immediate_terminal",
+      "seal_reason": "silence",
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "c55008b518bb49d69641e0a0103fc4c2",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "source_available",
+      "kind": "SpeechStart",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 150,
+      "t_us": 150000
+    },
+    {
+      "event": "end_handler_return",
+      "kind": "SpeechEnd",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 150,
+      "t_us": 150000
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechStart",
+      "scenario": "stt_immediate_terminal",
+      "source_age_ms": 0,
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 2
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 1
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "d2cc1788854949e9885bcecaad80c18e",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 2
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "d2cc1788854949e9885bcecaad80c18e",
+      "samples": 2,
+      "scenario": "stt_immediate_terminal",
+      "source_end_ms": 150,
+      "source_start_ms": 140,
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 2
+    },
+    {
+      "event": "local_seal",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 300,
+      "t_us": 300000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 300,
+      "t_us": 300000
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "d2cc1788854949e9885bcecaad80c18e",
+      "samples": 8,
+      "scenario": "stt_immediate_terminal",
+      "source_end_ms": 300,
+      "source_start_ms": 150,
+      "t_ms": 300,
+      "t_us": 300000,
+      "turn": 2
+    },
+    {
+      "event": "dispatch_return",
+      "kind": "SpeechStart",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 300,
+      "t_us": 300000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 300,
+      "t_us": 300000
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechEnd",
+      "scenario": "stt_immediate_terminal",
+      "source_age_ms": 0,
+      "t_ms": 300,
+      "t_us": 300000,
+      "turn": 2
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "stt_immediate_terminal",
+      "seal_reason": "silence",
+      "t_ms": 300,
+      "t_us": 300000,
+      "turn": 2
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "d2cc1788854949e9885bcecaad80c18e",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "event": "end_handler_return",
+      "kind": "SpeechEnd",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": false,
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 350,
+      "t_us": 350000
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "scenario": "stt_immediate_terminal",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "source_available",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal",
+      "source_age_ms": 0,
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "a0dd450bc7a7433b844694fdca3b0736",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "a0dd450bc7a7433b844694fdca3b0736",
+      "samples": 2,
+      "scenario": "stt_delayed_terminal",
+      "source_end_ms": 0,
+      "source_start_ms": -10,
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "event": "local_seal",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 100,
+      "t_us": 100000
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "a0dd450bc7a7433b844694fdca3b0736",
+      "samples": 8,
+      "scenario": "stt_delayed_terminal",
+      "source_end_ms": 100,
+      "source_start_ms": 0,
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "event": "dispatch_return",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 100,
+      "t_us": 100000
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechEnd",
+      "scenario": "stt_delayed_terminal",
+      "source_age_ms": 0,
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "stt_delayed_terminal",
+      "seal_reason": "silence",
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "source_available",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 150,
+      "t_us": 150000
+    },
+    {
+      "event": "local_seal",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 300,
+      "t_us": 300000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 300,
+      "t_us": 300000
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "a0dd450bc7a7433b844694fdca3b0736",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 1
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 1
+    },
+    {
+      "event": "end_handler_return",
+      "kind": "SpeechEnd",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 350,
+      "t_us": 350000
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal",
+      "source_age_ms": 200,
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "be951c23329346dda22126840792ea17",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "be951c23329346dda22126840792ea17",
+      "samples": 2,
+      "scenario": "stt_delayed_terminal",
+      "source_end_ms": 150,
+      "source_start_ms": 140,
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "be951c23329346dda22126840792ea17",
+      "samples": 8,
+      "scenario": "stt_delayed_terminal",
+      "source_end_ms": 300,
+      "source_start_ms": 150,
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "event": "dispatch_return",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 350,
+      "t_us": 350000
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechEnd",
+      "scenario": "stt_delayed_terminal",
+      "source_age_ms": 50,
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "stt_delayed_terminal",
+      "seal_reason": "silence",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "be951c23329346dda22126840792ea17",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 400,
+      "t_us": 400000,
+      "turn": 2
+    },
+    {
+      "event": "end_handler_return",
+      "kind": "SpeechEnd",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 400,
+      "t_us": 400000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": false,
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 400,
+      "t_us": 400000
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "scenario": "stt_delayed_terminal",
+      "t_ms": 400,
+      "t_us": 400000,
+      "turn": 2
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "source_available",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal_overlap",
+      "source_age_ms": 0,
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "c91394bcac9a4c32b92913bce4d202b9",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "c91394bcac9a4c32b92913bce4d202b9",
+      "samples": 2,
+      "scenario": "stt_delayed_terminal_overlap",
+      "source_end_ms": 0,
+      "source_start_ms": -10,
+      "t_ms": 0,
+      "t_us": 0,
+      "turn": 1
+    },
+    {
+      "event": "local_seal",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 100,
+      "t_us": 100000
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "c91394bcac9a4c32b92913bce4d202b9",
+      "samples": 8,
+      "scenario": "stt_delayed_terminal_overlap",
+      "source_end_ms": 100,
+      "source_start_ms": 0,
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "event": "dispatch_return",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 100,
+      "t_us": 100000
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechEnd",
+      "scenario": "stt_delayed_terminal_overlap",
+      "source_age_ms": 0,
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "stt_delayed_terminal_overlap",
+      "seal_reason": "silence",
+      "t_ms": 100,
+      "t_us": 100000,
+      "turn": 1
+    },
+    {
+      "buffered_content_samples": 8,
+      "event": "source_available",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 150,
+      "t_us": 150000
+    },
+    {
+      "event": "end_handler_return",
+      "kind": "SpeechEnd",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 1
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 150,
+      "t_us": 150000
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal_overlap",
+      "source_age_ms": 0,
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 2
+    },
+    {
+      "event": "provider_begin",
+      "provider_turn_id": "137f014106e341cf95e08862f853d3f9",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 2
+    },
+    {
+      "context_only": true,
+      "event": "provider_write",
+      "payload_sequence": 1,
+      "provider_turn_id": "137f014106e341cf95e08862f853d3f9",
+      "samples": 2,
+      "scenario": "stt_delayed_terminal_overlap",
+      "source_end_ms": 150,
+      "source_start_ms": 140,
+      "t_ms": 150,
+      "t_us": 150000,
+      "turn": 2
+    },
+    {
+      "event": "local_seal",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 300,
+      "t_us": 300000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 300,
+      "t_us": 300000
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "c91394bcac9a4c32b92913bce4d202b9",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 1
+    },
+    {
+      "context_only": false,
+      "event": "provider_write",
+      "payload_sequence": 2,
+      "provider_turn_id": "137f014106e341cf95e08862f853d3f9",
+      "samples": 8,
+      "scenario": "stt_delayed_terminal_overlap",
+      "source_end_ms": 300,
+      "source_start_ms": 150,
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 1
+    },
+    {
+      "event": "dispatch_return",
+      "kind": "SpeechStart",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": true,
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 350,
+      "t_us": 350000
+    },
+    {
+      "event": "dispatch_attempt",
+      "kind": "SpeechEnd",
+      "scenario": "stt_delayed_terminal_overlap",
+      "source_age_ms": 50,
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "content_samples": 8,
+      "event": "provider_seal",
+      "scenario": "stt_delayed_terminal_overlap",
+      "seal_reason": "silence",
+      "t_ms": 350,
+      "t_us": 350000,
+      "turn": 2
+    },
+    {
+      "event": "provider_terminal_receipt",
+      "provider_turn_id": "137f014106e341cf95e08862f853d3f9",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 400,
+      "t_us": 400000,
+      "turn": 2
+    },
+    {
+      "event": "end_handler_return",
+      "kind": "SpeechEnd",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 400,
+      "t_us": 400000,
+      "turn": 2
+    },
+    {
+      "event": "upstream_pending",
+      "pending": false,
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 400,
+      "t_us": 400000
+    },
+    {
+      "event": "engine_turn_release",
+      "outcome": "final",
+      "scenario": "stt_delayed_terminal_overlap",
+      "t_ms": 400,
+      "t_us": 400000,
+      "turn": 2
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 1,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-1",
+      "reason": "accepted_handoff",
+      "scenario": "output_replacement_control",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 2,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 2,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-2",
+      "reason": "accepted_handoff",
+      "scenario": "output_replacement_control",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "db811eac-e0fe-59fe-944f-36abfc4fb41c",
+      "publication_id": "evt-1",
+      "remaining_ms": 0,
+      "scenario": "output_replacement_control",
+      "selected": [],
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "db811eac-e0fe-59fe-944f-36abfc4fb41c",
+      "publication_id": "evt-1",
+      "scenario": "output_replacement_control",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "db811eac-e0fe-59fe-944f-36abfc4fb41c",
+      "publication_id": "evt-1",
+      "scenario": "output_replacement_control",
+      "scene_revision": 1,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "outcome": "applied",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 1,
+        "source_order": 1,
+        "stage": "application_accepted",
+        "utterance_id": "db811eac-e0fe-59fe-944f-36abfc4fb41c"
+      },
+      "publication_id": "evt-1",
+      "reason": "application_applied",
+      "scenario": "output_replacement_control",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-2",
+      "remaining_ms": 0,
+      "scenario": "output_replacement_control",
+      "selected": [
+        "peer:db811eac-e0fe-59fe-944f-36abfc4fb41c"
+      ],
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-2",
+      "scenario": "output_replacement_control",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-2",
+      "scenario": "output_replacement_control",
+      "scene_revision": 2,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "outcome": "applied",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 2,
+        "source_order": 2,
+        "stage": "application_accepted",
+        "utterance_id": "bcd858ba-ebd8-5758-91ab-067ff5f26378"
+      },
+      "publication_id": "evt-2",
+      "reason": "application_applied",
+      "scenario": "output_replacement_control",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 2,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-3",
+      "reason": "accepted_handoff",
+      "scenario": "output_replacement_control",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 2,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-4",
+      "reason": "accepted_handoff",
+      "scenario": "output_replacement_control",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-3",
+      "remaining_ms": 0,
+      "scenario": "output_replacement_control",
+      "selected": [
+        "peer:db811eac-e0fe-59fe-944f-36abfc4fb41c",
+        "peer:bcd858ba-ebd8-5758-91ab-067ff5f26378"
+      ],
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-3",
+      "scenario": "output_replacement_control",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-3",
+      "scenario": "output_replacement_control",
+      "scene_revision": 3,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "outcome": "applied",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 3,
+        "source_order": 2,
+        "stage": "application_accepted",
+        "utterance_id": "bcd858ba-ebd8-5758-91ab-067ff5f26378"
+      },
+      "publication_id": "evt-3",
+      "reason": "application_applied",
+      "scenario": "output_replacement_control",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "utterance_closed",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-4",
+      "scenario": "output_replacement_control",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "utterance_closed",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-4",
+      "scenario": "output_replacement_control",
+      "scene_revision": 3,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "utterance_closed",
+        "outcome": "applied",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 3,
+        "source_order": 2,
+        "stage": "application_accepted",
+        "utterance_id": "bcd858ba-ebd8-5758-91ab-067ff5f26378"
+      },
+      "publication_id": "evt-4",
+      "reason": "application_applied",
+      "scenario": "output_replacement_control",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "control_complete",
+      "scenario": "output_replacement_control",
+      "t_ms": 0,
+      "t_us": 0,
+      "visible": [
+        "peer:db811eac-e0fe-59fe-944f-36abfc4fb41c",
+        "peer:bcd858ba-ebd8-5758-91ab-067ff5f26378"
+      ]
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 1,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-1",
+      "reason": "accepted_handoff",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "translation_ready_and_enqueued",
+      "occupant": "db811eac-e0fe-59fe-944f-36abfc4fb41c",
+      "publication_id": "evt-1",
+      "queue_result": "accepted_handoff",
+      "scenario": "output_burst",
+      "source_order": 1,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 2,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 2,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-2",
+      "reason": "accepted_handoff",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "translation_ready_and_enqueued",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-2",
+      "queue_result": "accepted_handoff",
+      "scenario": "output_burst",
+      "source_order": 2,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 3,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 3,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-3",
+      "reason": "accepted_handoff",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "translation_ready_and_enqueued",
+      "occupant": "c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+      "publication_id": "evt-3",
+      "queue_result": "accepted_handoff",
+      "scenario": "output_burst",
+      "source_order": 3,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 4,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 4,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-4",
+      "reason": "accepted_handoff",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "translation_ready_and_enqueued",
+      "occupant": "de1e230f-65c1-5804-8e93-9da1c3776f9d",
+      "publication_id": "evt-4",
+      "queue_result": "accepted_handoff",
+      "scenario": "output_burst",
+      "source_order": 4,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 5,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 5,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-5",
+      "reason": "accepted_handoff",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "translation_ready_and_enqueued",
+      "occupant": "9a61206d-8baf-58cb-81a6-1b52ff8a6a54",
+      "publication_id": "evt-5",
+      "queue_result": "accepted_handoff",
+      "scenario": "output_burst",
+      "source_order": 5,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "db811eac-e0fe-59fe-944f-36abfc4fb41c",
+      "publication_id": "evt-1",
+      "remaining_ms": 0,
+      "scenario": "output_burst",
+      "selected": [],
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "db811eac-e0fe-59fe-944f-36abfc4fb41c",
+      "publication_id": "evt-1",
+      "scenario": "output_burst",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "db811eac-e0fe-59fe-944f-36abfc4fb41c",
+      "publication_id": "evt-1",
+      "scenario": "output_burst",
+      "scene_revision": 1,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "outcome": "applied",
+        "pending_batches": 4,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 1,
+        "source_order": 1,
+        "stage": "application_accepted",
+        "utterance_id": "db811eac-e0fe-59fe-944f-36abfc4fb41c"
+      },
+      "publication_id": "evt-1",
+      "reason": "application_applied",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-2",
+      "remaining_ms": 0,
+      "scenario": "output_burst",
+      "selected": [
+        "peer:db811eac-e0fe-59fe-944f-36abfc4fb41c"
+      ],
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-2",
+      "scenario": "output_burst",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-2",
+      "scenario": "output_burst",
+      "scene_revision": 2,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "outcome": "applied",
+        "pending_batches": 3,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 2,
+        "source_order": 2,
+        "stage": "application_accepted",
+        "utterance_id": "bcd858ba-ebd8-5758-91ab-067ff5f26378"
+      },
+      "publication_id": "evt-2",
+      "reason": "application_applied",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "replacement_gate",
+      "occupant": "c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+      "publication_id": "evt-3",
+      "remaining_ms": 1000,
+      "scenario": "output_burst",
+      "selected": [
+        "peer:db811eac-e0fe-59fe-944f-36abfc4fb41c",
+        "peer:bcd858ba-ebd8-5758-91ab-067ff5f26378"
+      ],
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "channel": "peer",
+        "outcome": "waiting",
+        "pending_batches": 2,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 3,
+        "stage": "logical_pacing",
+        "wait_reason": "replacement_gate"
+      },
+      "publication_id": "evt-3",
+      "reason": "logical_pacing_wait",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "delay_ms": 1000,
+      "event": "presenter_sleep",
+      "scenario": "output_burst",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+      "publication_id": "evt-3",
+      "remaining_ms": 0,
+      "scenario": "output_burst",
+      "selected": [
+        "peer:db811eac-e0fe-59fe-944f-36abfc4fb41c",
+        "peer:bcd858ba-ebd8-5758-91ab-067ff5f26378"
+      ],
+      "t_ms": 1000,
+      "t_us": 1000000
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+      "publication_id": "evt-3",
+      "scenario": "output_burst",
+      "t_ms": 1000,
+      "t_us": 1000000
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+      "publication_id": "evt-3",
+      "scenario": "output_burst",
+      "scene_revision": 3,
+      "t_ms": 1000,
+      "t_us": 1000000
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "handoff_wait_ms": 1000,
+        "outcome": "applied",
+        "pending_batches": 2,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 3,
+        "source_order": 3,
+        "stage": "application_accepted",
+        "utterance_id": "c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+        "wait_reason": "replacement_gate"
+      },
+      "publication_id": "evt-3",
+      "reason": "application_applied",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 1000,
+      "t_us": 1000000
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "replacement_gate",
+      "occupant": "de1e230f-65c1-5804-8e93-9da1c3776f9d",
+      "publication_id": "evt-4",
+      "remaining_ms": 1000,
+      "scenario": "output_burst",
+      "selected": [
+        "peer:bcd858ba-ebd8-5758-91ab-067ff5f26378",
+        "peer:c2e9b4d7-9297-5769-b9c0-e71fdea48790"
+      ],
+      "t_ms": 1000,
+      "t_us": 1000000
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "channel": "peer",
+        "outcome": "waiting",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 4,
+        "stage": "logical_pacing",
+        "wait_reason": "replacement_gate"
+      },
+      "publication_id": "evt-4",
+      "reason": "logical_pacing_wait",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 1000,
+      "t_us": 1000000
+    },
+    {
+      "delay_ms": 1000,
+      "event": "presenter_sleep",
+      "scenario": "output_burst",
+      "t_ms": 1000,
+      "t_us": 1000000
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "de1e230f-65c1-5804-8e93-9da1c3776f9d",
+      "publication_id": "evt-4",
+      "remaining_ms": 0,
+      "scenario": "output_burst",
+      "selected": [
+        "peer:bcd858ba-ebd8-5758-91ab-067ff5f26378",
+        "peer:c2e9b4d7-9297-5769-b9c0-e71fdea48790"
+      ],
+      "t_ms": 2000,
+      "t_us": 2000000
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "de1e230f-65c1-5804-8e93-9da1c3776f9d",
+      "publication_id": "evt-4",
+      "scenario": "output_burst",
+      "t_ms": 2000,
+      "t_us": 2000000
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "de1e230f-65c1-5804-8e93-9da1c3776f9d",
+      "publication_id": "evt-4",
+      "scenario": "output_burst",
+      "scene_revision": 4,
+      "t_ms": 2000,
+      "t_us": 2000000
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "handoff_wait_ms": 1000,
+        "outcome": "applied",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 4,
+        "source_order": 4,
+        "stage": "application_accepted",
+        "utterance_id": "de1e230f-65c1-5804-8e93-9da1c3776f9d",
+        "wait_reason": "replacement_gate"
+      },
+      "publication_id": "evt-4",
+      "reason": "application_applied",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 2000,
+      "t_us": 2000000
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "replacement_gate",
+      "occupant": "9a61206d-8baf-58cb-81a6-1b52ff8a6a54",
+      "publication_id": "evt-5",
+      "remaining_ms": 1000,
+      "scenario": "output_burst",
+      "selected": [
+        "peer:c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+        "peer:de1e230f-65c1-5804-8e93-9da1c3776f9d"
+      ],
+      "t_ms": 2000,
+      "t_us": 2000000
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "channel": "peer",
+        "outcome": "waiting",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 5,
+        "stage": "logical_pacing",
+        "wait_reason": "replacement_gate"
+      },
+      "publication_id": "evt-5",
+      "reason": "logical_pacing_wait",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 2000,
+      "t_us": 2000000
+    },
+    {
+      "delay_ms": 1000,
+      "event": "presenter_sleep",
+      "scenario": "output_burst",
+      "t_ms": 2000,
+      "t_us": 2000000
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "9a61206d-8baf-58cb-81a6-1b52ff8a6a54",
+      "publication_id": "evt-5",
+      "remaining_ms": 0,
+      "scenario": "output_burst",
+      "selected": [
+        "peer:c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+        "peer:de1e230f-65c1-5804-8e93-9da1c3776f9d"
+      ],
+      "t_ms": 3000,
+      "t_us": 3000000
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "9a61206d-8baf-58cb-81a6-1b52ff8a6a54",
+      "publication_id": "evt-5",
+      "scenario": "output_burst",
+      "t_ms": 3000,
+      "t_us": 3000000
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "9a61206d-8baf-58cb-81a6-1b52ff8a6a54",
+      "publication_id": "evt-5",
+      "scenario": "output_burst",
+      "scene_revision": 5,
+      "t_ms": 3000,
+      "t_us": 3000000
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "handoff_wait_ms": 1000,
+        "outcome": "applied",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 5,
+        "source_order": 5,
+        "stage": "application_accepted",
+        "utterance_id": "9a61206d-8baf-58cb-81a6-1b52ff8a6a54",
+        "wait_reason": "replacement_gate"
+      },
+      "publication_id": "evt-5",
+      "reason": "application_applied",
+      "scenario": "output_burst",
+      "status": "published",
+      "t_ms": 3000,
+      "t_us": 3000000
+    },
+    {
+      "event": "burst_complete",
+      "scenario": "output_burst",
+      "t_ms": 3000,
+      "t_us": 3000000,
+      "visible": [
+        "peer:de1e230f-65c1-5804-8e93-9da1c3776f9d",
+        "peer:9a61206d-8baf-58cb-81a6-1b52ff8a6a54"
+      ]
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "self_active_update",
+      "occupant": "717191e9-e073-54a4-ba94-89f69845f85e",
+      "publication_id": "evt-1",
+      "scenario": "output_protection_release",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "self_active_update",
+      "occupant": "717191e9-e073-54a4-ba94-89f69845f85e",
+      "publication_id": "evt-1",
+      "scenario": "output_protection_release",
+      "scene_revision": 1,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 1,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-1",
+      "reason": null,
+      "scenario": "output_protection_release",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 1,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-2",
+      "reason": "accepted_handoff",
+      "scenario": "output_protection_release",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "protected_rows",
+      "occupant": "4ed244a7-da95-56ca-9448-9bbbaa5ba33f",
+      "publication_id": "evt-2",
+      "remaining_ms": null,
+      "scenario": "output_protection_release",
+      "selected": [
+        "self:717191e9-e073-54a4-ba94-89f69845f85e"
+      ],
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "channel": "peer",
+        "outcome": "waiting",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 1,
+        "stage": "logical_pacing",
+        "wait_reason": "protected_rows"
+      },
+      "publication_id": "evt-2",
+      "reason": "logical_pacing_wait",
+      "scenario": "output_protection_release",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "self_active_clear",
+      "occupant": "None",
+      "publication_id": "evt-3",
+      "scenario": "output_protection_release",
+      "t_ms": 400,
+      "t_us": 400000
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "self_active_clear",
+      "occupant": "None",
+      "publication_id": "evt-3",
+      "scenario": "output_protection_release",
+      "scene_revision": 2,
+      "t_ms": 400,
+      "t_us": 400000
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "channel": "self",
+        "outcome": "applied",
+        "scene_revision": 2,
+        "stage": "application_accepted"
+      },
+      "publication_id": "evt-3",
+      "reason": null,
+      "scenario": "output_protection_release",
+      "status": "published",
+      "t_ms": 400,
+      "t_us": 400000
+    },
+    {
+      "event": "protection_release_event",
+      "event_type": "self_active_clear",
+      "publication_id": "evt-3",
+      "result": null,
+      "scenario": "output_protection_release",
+      "t_ms": 400,
+      "t_us": 400000
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "4ed244a7-da95-56ca-9448-9bbbaa5ba33f",
+      "publication_id": "evt-2",
+      "remaining_ms": 0,
+      "scenario": "output_protection_release",
+      "selected": [],
+      "t_ms": 400,
+      "t_us": 400000
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "4ed244a7-da95-56ca-9448-9bbbaa5ba33f",
+      "publication_id": "evt-2",
+      "scenario": "output_protection_release",
+      "t_ms": 400,
+      "t_us": 400000
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "4ed244a7-da95-56ca-9448-9bbbaa5ba33f",
+      "publication_id": "evt-2",
+      "scenario": "output_protection_release",
+      "scene_revision": 3,
+      "t_ms": 400,
+      "t_us": 400000
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "handoff_wait_ms": 400,
+        "outcome": "applied",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 3,
+        "source_order": 1,
+        "stage": "application_accepted",
+        "utterance_id": "4ed244a7-da95-56ca-9448-9bbbaa5ba33f",
+        "wait_reason": "protected_rows"
+      },
+      "publication_id": "evt-2",
+      "reason": "application_applied",
+      "scenario": "output_protection_release",
+      "status": "published",
+      "t_ms": 400,
+      "t_us": 400000
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 1,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-1",
+      "reason": "accepted_handoff",
+      "scenario": "output_head_of_line",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 2,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 2,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-2",
+      "reason": "accepted_handoff",
+      "scenario": "output_head_of_line",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "db811eac-e0fe-59fe-944f-36abfc4fb41c",
+      "publication_id": "evt-1",
+      "remaining_ms": 0,
+      "scenario": "output_head_of_line",
+      "selected": [],
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "db811eac-e0fe-59fe-944f-36abfc4fb41c",
+      "publication_id": "evt-1",
+      "scenario": "output_head_of_line",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "db811eac-e0fe-59fe-944f-36abfc4fb41c",
+      "publication_id": "evt-1",
+      "scenario": "output_head_of_line",
+      "scene_revision": 1,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "outcome": "applied",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 1,
+        "source_order": 1,
+        "stage": "application_accepted",
+        "utterance_id": "db811eac-e0fe-59fe-944f-36abfc4fb41c"
+      },
+      "publication_id": "evt-1",
+      "reason": "application_applied",
+      "scenario": "output_head_of_line",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-2",
+      "remaining_ms": 0,
+      "scenario": "output_head_of_line",
+      "selected": [
+        "peer:db811eac-e0fe-59fe-944f-36abfc4fb41c"
+      ],
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-2",
+      "scenario": "output_head_of_line",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "bcd858ba-ebd8-5758-91ab-067ff5f26378",
+      "publication_id": "evt-2",
+      "scenario": "output_head_of_line",
+      "scene_revision": 2,
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "outcome": "applied",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 2,
+        "source_order": 2,
+        "stage": "application_accepted",
+        "utterance_id": "bcd858ba-ebd8-5758-91ab-067ff5f26378"
+      },
+      "publication_id": "evt-2",
+      "reason": "application_applied",
+      "scenario": "output_head_of_line",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 3,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-3",
+      "reason": "accepted_handoff",
+      "scenario": "output_head_of_line",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "replacement_gate",
+      "occupant": "c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+      "publication_id": "evt-3",
+      "remaining_ms": 1000,
+      "scenario": "output_head_of_line",
+      "selected": [
+        "peer:db811eac-e0fe-59fe-944f-36abfc4fb41c",
+        "peer:bcd858ba-ebd8-5758-91ab-067ff5f26378"
+      ],
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "channel": "peer",
+        "outcome": "waiting",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 3,
+        "stage": "logical_pacing",
+        "wait_reason": "replacement_gate"
+      },
+      "publication_id": "evt-3",
+      "reason": "logical_pacing_wait",
+      "scenario": "output_head_of_line",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "delay_ms": 1000,
+      "event": "presenter_sleep_held",
+      "scenario": "output_head_of_line",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "channel": "peer"
+      },
+      "publication_id": "evt-4",
+      "reason": "stale_source_order",
+      "scenario": "output_head_of_line",
+      "status": "skipped",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "channel": "peer"
+      },
+      "publication_id": "evt-5",
+      "reason": "stale_source_order",
+      "scenario": "output_head_of_line",
+      "status": "skipped",
+      "t_ms": 0,
+      "t_us": 0
+    },
+    {
+      "close_reason": "stale_source_order",
+      "event": "head_of_line_contract",
+      "latest_source_order": 3,
+      "paced_head": "c2e9b4d792975769b9c0e71fdea48790",
+      "remembered_source_order": 2,
+      "scenario": "output_head_of_line",
+      "t_ms": 0,
+      "t_us": 0,
+      "update_reason": "stale_source_order",
+      "visible_occupant": "bcd858baebd8575891ab067ff5f26378"
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+      "publication_id": "evt-3",
+      "remaining_ms": 0,
+      "scenario": "output_head_of_line",
+      "selected": [
+        "peer:db811eac-e0fe-59fe-944f-36abfc4fb41c",
+        "peer:bcd858ba-ebd8-5758-91ab-067ff5f26378"
+      ],
+      "t_ms": 1000,
+      "t_us": 1000000
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+      "publication_id": "evt-3",
+      "scenario": "output_head_of_line",
+      "t_ms": 1000,
+      "t_us": 1000000
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+      "publication_id": "evt-3",
+      "scenario": "output_head_of_line",
+      "scene_revision": 3,
+      "t_ms": 1000,
+      "t_us": 1000000
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "handoff_wait_ms": 1000,
+        "outcome": "applied",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 3,
+        "source_order": 3,
+        "stage": "application_accepted",
+        "utterance_id": "c2e9b4d7-9297-5769-b9c0-e71fdea48790",
+        "wait_reason": "replacement_gate"
+      },
+      "publication_id": "evt-3",
+      "reason": "application_applied",
+      "scenario": "output_head_of_line",
+      "status": "published",
+      "t_ms": 1000,
+      "t_us": 1000000
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 1,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-1",
+      "reason": "accepted_handoff",
+      "scenario": "output_real_clock_pacing",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 64
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "9e4e2237-30e0-5e86-b0fe-652c72bf5154",
+      "publication_id": "evt-1",
+      "remaining_ms": 0,
+      "scenario": "output_real_clock_pacing",
+      "selected": [],
+      "t_ms": 0,
+      "t_us": 113
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "9e4e2237-30e0-5e86-b0fe-652c72bf5154",
+      "publication_id": "evt-1",
+      "scenario": "output_real_clock_pacing",
+      "t_ms": 0,
+      "t_us": 114
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "9e4e2237-30e0-5e86-b0fe-652c72bf5154",
+      "publication_id": "evt-1",
+      "scenario": "output_real_clock_pacing",
+      "scene_revision": 1,
+      "t_ms": 0,
+      "t_us": 162
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "outcome": "applied",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 1,
+        "source_order": 1,
+        "stage": "application_accepted",
+        "utterance_id": "9e4e2237-30e0-5e86-b0fe-652c72bf5154"
+      },
+      "publication_id": "evt-1",
+      "reason": "application_applied",
+      "scenario": "output_real_clock_pacing",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 174
+    },
+    {
+      "event": "real_clock_item_ready",
+      "publication_id": "evt-2",
+      "scenario": "output_real_clock_pacing",
+      "t_ms": 0,
+      "t_us": 189
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "outcome": "pending",
+        "pending_batches": 1,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 2,
+        "stage": "admission_accepted"
+      },
+      "publication_id": "evt-2",
+      "reason": "accepted_handoff",
+      "scenario": "output_real_clock_pacing",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 206
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "replacement_gate",
+      "occupant": "f534b517-0aa9-5af0-b489-1326a01a0b5c",
+      "publication_id": "evt-2",
+      "remaining_ms": 1000,
+      "scenario": "output_real_clock_pacing",
+      "selected": [
+        "peer:9e4e2237-30e0-5e86-b0fe-652c72bf5154"
+      ],
+      "t_ms": 0,
+      "t_us": 248
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "channel": "peer",
+        "outcome": "waiting",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "source_order": 2,
+        "stage": "logical_pacing",
+        "wait_reason": "replacement_gate"
+      },
+      "publication_id": "evt-2",
+      "reason": "logical_pacing_wait",
+      "scenario": "output_real_clock_pacing",
+      "status": "published",
+      "t_ms": 0,
+      "t_us": 251
+    },
+    {
+      "event": "presenter_gate",
+      "event_type": "peer_transcript_final",
+      "gate": "eligible",
+      "occupant": "f534b517-0aa9-5af0-b489-1326a01a0b5c",
+      "publication_id": "evt-2",
+      "remaining_ms": 0,
+      "scenario": "output_real_clock_pacing",
+      "selected": [
+        "peer:9e4e2237-30e0-5e86-b0fe-652c72bf5154"
+      ],
+      "t_ms": 1011,
+      "t_us": 1010588
+    },
+    {
+      "event": "presenter_apply_begin",
+      "event_type": "peer_transcript_final",
+      "occupant": "f534b517-0aa9-5af0-b489-1326a01a0b5c",
+      "publication_id": "evt-2",
+      "scenario": "output_real_clock_pacing",
+      "t_ms": 1011,
+      "t_us": 1010595
+    },
+    {
+      "event": "application_receipt_ready",
+      "event_type": "peer_transcript_final",
+      "occupant": "f534b517-0aa9-5af0-b489-1326a01a0b5c",
+      "publication_id": "evt-2",
+      "scenario": "output_real_clock_pacing",
+      "scene_revision": 2,
+      "t_ms": 1011,
+      "t_us": 1010776
+    },
+    {
+      "event": "output_decision",
+      "metadata": {
+        "accepted_handoff": true,
+        "channel": "peer",
+        "event_type": "peer_transcript_final",
+        "handoff_wait_ms": 1010,
+        "outcome": "applied",
+        "pending_batches": 0,
+        "physical_ack": false,
+        "publication_generation": 1,
+        "scene_revision": 2,
+        "source_order": 2,
+        "stage": "application_accepted",
+        "utterance_id": "f534b517-0aa9-5af0-b489-1326a01a0b5c",
+        "wait_reason": "replacement_gate"
+      },
+      "publication_id": "evt-2",
+      "reason": "application_applied",
+      "scenario": "output_real_clock_pacing",
+      "status": "published",
+      "t_ms": 1011,
+      "t_us": 1010857
+    },
+    {
+      "eligibility_to_application_us": 188,
+      "event": "real_clock_bound",
+      "publication_id": "evt-2",
+      "ready_to_application_us": 1010587,
+      "scenario": "output_real_clock_pacing",
+      "t_ms": 1011,
+      "t_us": 1010924
+    }
+  ],
+  "scope": "controlled production owners; no microphone, GPU native inference, network, renderer or HMD; monotonic-process application receipt is not physical display",
+  "sha256": {
+    "experiments/issue_180/probe.py": "05010e9ba8aa90054ca986fa34ed51c7f157988079904e136fb1a51d43bd5f75",
+    "experiments/issue_185/integration_probe.py": "7c435daa094372273998127a2cfe967b8c330635189f45975460794e86c0aafc",
+    "src/puripuly_heart/core/llm/fallback_racing.py": "00ef613a999dd81049135b9f294f4d46a9e1ad800b18e5c9a672eff88c3d5a30",
+    "src/puripuly_heart/core/llm/provider.py": "1111f873cf117c44e4684017fa023df087bb27dd9f80c1b121a5d5f8b54076a9",
+    "src/puripuly_heart/core/orchestrator/configuration.py": "b129cb4c42996a7a8a61a71880200d7a29f9807de6af95007c43cb24d9a496e7",
+    "src/puripuly_heart/core/orchestrator/self_translation_channel.py": "85684f85166d14a616596694dd2b7d771dc872343d0b45a065384f3b7718b42c",
+    "src/puripuly_heart/core/orchestrator/translation_turn.py": "0794b005d700b772c7683ae54104bfaa6b74a090eb1a107dc87b6932b18bcb65",
+    "src/puripuly_heart/core/overlay/presenter.py": "777fd5d518ae557f682c2af342807aeb30ab9591a182b34143f9d07c9f69ffec",
+    "src/puripuly_heart/core/runtime/gpu_asr.py": "a9fb88d2bdc560311ddcb1f8c67e39317b026b0061eb4a90edc96ecffea80f9e",
+    "src/puripuly_heart/core/runtime/output.py": "d55d59f252be6a9e293055ce83bb66032f0a108332f9c5dc53e8a2600b071235",
+    "src/puripuly_heart/core/runtime/output_batch.py": "1ba75d8e68e75f69b366a350fdb9fac6033e8d020b5d030dc1ef15ebc14d312f",
+    "src/puripuly_heart/core/runtime/peer_channel.py": "004ef7657ada94cf76cf575204fc20da393cb96aa991b3909653ca0b168dc546",
+    "src/puripuly_heart/core/runtime/provider_handle.py": "0fabd6fe672ceeaf8b0eb0b0cc2c2e98b878f5c3e4b461e78ef50f682116394f",
+    "src/puripuly_heart/core/runtime/self_capture.py": "c4f10ea593abcac1d9293dd40ac0639bb9efd7583f03bdc9637a04c21f1ea877",
+    "src/puripuly_heart/core/stt/scoped_engine.py": "cc3aa9aa86660ace349032f1c43413b1a99ee27720e04bf4bf4199ffdbc4c779",
+    "src/puripuly_heart/core/stt/session_projection.py": "1608980771a18d0558a38e74f04e384a8a01b26d9cf395f8d0a2388d6b84b5b6",
+    "src/puripuly_heart/core/translation_policy.py": "8ffadfc8e22db8881dff150d83cba61d8fb8ab75f7b7aba4b61b60087c913e23",
+    "src/puripuly_heart/providers/stt/local_gpu.py": "a64b561269fe6d9aa2c187618efc1c9fbf8c8851183924cc5ab0c5a162c37227",
+    "src/puripuly_heart/providers/stt/local_qwen_sherpa.py": "59dafa871e4c4eb9203984ddf2bf87e59ed21db79b732689f59a63a40f787460",
+    "tests/helpers/translation_owners.py": "2fa61fdfc3f2700fc357fd81e622d316c365838ce36d8fdc71d59b6a2f32daf3"
+  },
+  "status": "passed",
+  "summary": {
+    "peer_real_clock_us": {
+      "eligible_recheck_to_application": 188,
+      "ready_to_application": 1010587
+    },
+    "rows": 478,
+    "scenarios": [
+      "output_burst",
+      "output_head_of_line",
+      "output_protection_release",
+      "output_real_clock_pacing",
+      "output_replacement_control",
+      "self_first_isolated",
+      "self_successive_delayed_terminal",
+      "self_successive_fast_translation",
+      "self_successive_immediate_terminal",
+      "stt_delayed_terminal",
+      "stt_delayed_terminal_overlap",
+      "stt_immediate_terminal"
+    ],
+    "self_intervals_us": {
+      "self_successive_delayed_terminal": {
+        "b_computation_ready_to_ordered_application": 93891,
+        "b_eligible_to_internal_application": 245,
+        "b_order_eligible_at": 341559,
+        "b_predecessor_order_release": 341559,
+        "b_provider_dispatch_to_ready": 40016
+      },
+      "self_successive_immediate_terminal": {
+        "b_computation_ready_to_ordered_application": 32261,
+        "b_eligible_to_internal_application": 285,
+        "b_order_eligible_at": 233932,
+        "b_predecessor_order_release": 233932,
+        "b_provider_dispatch_to_ready": 40019
+      }
+    }
+  }
+}
