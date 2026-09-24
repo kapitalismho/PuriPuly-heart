@@ -89,6 +89,23 @@ class FakeSharedGpuRuntime:
             rtf=2.0,
         )
 
+    async def submit_pcm16(
+        self,
+        channel: str,
+        pcm16le: bytes,
+        *,
+        speech_end_at: float,
+        language_hint: str | None = None,
+    ) -> GpuWorkerTranscription:
+        from puripuly_heart.core.audio.format import pcm16le_bytes_to_float32
+
+        return await self.submit(
+            channel,
+            pcm16le_bytes_to_float32(pcm16le),
+            speech_end_at=speech_end_at,
+            language_hint=language_hint,
+        )
+
     async def deactivate_channel(self, channel: str) -> None:
         if self.deactivation_failures > 0:
             self.deactivation_failures -= 1

@@ -864,7 +864,12 @@ class TranslationTurnLifecycleOwner:
                 and len({child.target_language for child in parent.children}) > 1
             )
             is_self_speech = any(child.turn_kind == "self" for child in parent.children)
-            if parent.channel != "peer" and not is_dual_target_self and predecessor is not None:
+            if (
+                parent.channel != "peer"
+                and not is_dual_target_self
+                and not is_self_speech
+                and predecessor is not None
+            ):
                 self._observe_predecessor_wait(
                     "predecessor_wait_start",
                     parent=parent,

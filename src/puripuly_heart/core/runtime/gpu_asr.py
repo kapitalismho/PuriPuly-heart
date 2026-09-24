@@ -14,6 +14,7 @@ from uuid import uuid4
 
 import numpy as np
 
+from puripuly_heart.core.audio.format import pcm16le_bytes_to_float32
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.gpu_worker import (
     GpuWorkerActivation,
@@ -100,9 +101,10 @@ class _PendingWork:
     sequence: int
     request_id: str = field(compare=False)
     channel: GpuASRChannel = field(compare=False)
-    samples_f32: np.ndarray = field(compare=False)
+    audio_payload: np.ndarray | bytes | None = field(compare=False)
     language_hint: str | None = field(compare=False)
     future: asyncio.Future[GpuWorkerTranscription] = field(compare=False)
+    queued_at: float = field(compare=False)
     request_sent: asyncio.Event = field(
         compare=False,
         default_factory=asyncio.Event,
@@ -164,6 +166,10 @@ class SharedGpuASRRuntime:
         self._reaper_task: asyncio.Task[None] | None = None
         self._activation_task: asyncio.Task[_ActivationOutcome] | None = None
         self._temporary_directory: tempfile.TemporaryDirectory[str] | None = None
+        self._file_cleanup_task: asyncio.Task[None] | None = None
+        self._shutdown_task: asyncio.Task[None] | None = None
+        self._close_requested = False
+        self._file_cleanup_failure: str | None = None
         self._state = GpuASRRuntimeState.STOPPED
         self._discovery_state = GpuDiscoveryState.IDLE
         self._last_failure_code: str | None = None
@@ -234,6 +240,8 @@ class SharedGpuASRRuntime:
         model_id: str,
         device_id: str,
     ) -> GpuWorkerActivation:
+        if self._shutdown_task is not None and not self._shutdown_task.done():
+            raise GpuASRRuntimeError("GPU runtime is stopping")
         config = _ActivationConfig(
             model_path=model_path.resolve(),
             model_id=model_id,
@@ -241,6 +249,8 @@ class SharedGpuASRRuntime:
         )
         async with self._lock:
             self._ensure_open()
+            if self._state == GpuASRRuntimeState.STOPPING:
+                raise GpuASRRuntimeError("GPU runtime is stopping")
             if self._config is not None and self._config != config:
                 raise GpuASRRuntimeError("active GPU channels must share one model and device")
             self._active_channels.add(channel)
@@ -266,6 +276,8 @@ class SharedGpuASRRuntime:
                 raise GpuASRRuntimeError("GPU runtime is not awaiting manual retry")
             if not self._active_channels or self._config is None:
                 raise GpuASRRuntimeError("no active GPU channel remains")
+            if self._temporary_directory is not None:
+                await self._cleanup_temporary_directory_locked()
             task = self._begin_activation_locked(self._config)
         return await self._await_activation(task)
 
@@ -280,6 +292,35 @@ class SharedGpuASRRuntime:
         samples = np.asarray(samples_f32, dtype=np.float32)
         if samples.ndim != 1 or samples.size == 0:
             raise ValueError("GPU ASR audio must be a non-empty mono array")
+        return await self._submit_owned(
+            channel, samples, speech_end_at=speech_end_at, language_hint=language_hint
+        )
+
+    async def submit_pcm16(
+        self,
+        channel: GpuASRChannel,
+        pcm16le: bytes,
+        *,
+        speech_end_at: float,
+        language_hint: str | None = None,
+    ) -> GpuWorkerTranscription:
+        if len(pcm16le) < 2 or len(pcm16le) % 2:
+            raise ValueError("GPU ASR PCM16 must contain non-empty complete mono samples")
+        return await self._submit_owned(
+            channel,
+            pcm16le if type(pcm16le) is bytes else bytes(pcm16le),
+            speech_end_at=speech_end_at,
+            language_hint=language_hint,
+        )
+
+    async def _submit_owned(
+        self,
+        channel: GpuASRChannel,
+        payload: np.ndarray | bytes,
+        *,
+        speech_end_at: float,
+        language_hint: str | None,
+    ) -> GpuWorkerTranscription:
         async with self._lock:
             self._ensure_open()
             if channel not in self._active_channels:
@@ -296,7 +337,9 @@ class SharedGpuASRRuntime:
             channel_pending = sum(work.channel == channel for work in self._queue)
             if channel_pending >= self._pending_limit_per_channel:
                 raise GpuASRWorkDiscarded("pending_capacity")
-            samples = np.ascontiguousarray(samples).copy()
+            samples = (
+                np.ascontiguousarray(payload).copy() if isinstance(payload, np.ndarray) else payload
+            )
             self._sequence += 1
             future: asyncio.Future[GpuWorkerTranscription] = (
                 asyncio.get_running_loop().create_future()
@@ -306,51 +349,43 @@ class SharedGpuASRRuntime:
                 sequence=self._sequence,
                 request_id=uuid4().hex,
                 channel=channel,
-                samples_f32=samples,
+                audio_payload=samples,
                 language_hint=language_hint,
                 future=future,
+                queued_at=self._clock.now(),
             )
             heapq.heappush(self._queue, work)
             self._queue_event.set()
         return await future
 
     async def deactivate_channel(self, channel: GpuASRChannel) -> None:
-        tasks: tuple[asyncio.Task[None], ...] = ()
-        stop_error: Exception | None = None
-        stopped = False
         active: _PendingWork | None = None
         client: GpuWorkerClientPort | None = None
         pending_discarded = 0
+        shutdown: asyncio.Task[None] | None = None
         async with self._lock:
-            self._active_channels.discard(channel)
-            pending_discarded = self._discard_channel_pending_locked(
-                channel,
-                "channel_disabled",
-            )
-            if self._active_channels or self._state in {
-                GpuASRRuntimeState.STOPPED,
-                GpuASRRuntimeState.CLOSED,
-            }:
-                candidate = self._active_work
-                if candidate is not None and candidate.channel == channel:
-                    candidate.discard_reason = "channel_disabled"
-                    if not candidate.future.done():
-                        candidate.future.set_exception(GpuASRWorkDiscarded("channel_disabled"))
-                    active = candidate
-                    client = self._client
+            if self._shutdown_task is not None and not self._shutdown_task.done():
+                shutdown = self._shutdown_task
             else:
-                stopped = True
-                tasks, stop_error, _terminal = await self._stop_locked(
-                    final_state=GpuASRRuntimeState.STOPPED,
-                    reason="last_channel_disabled",
+                self._active_channels.discard(channel)
+                pending_discarded = self._discard_channel_pending_locked(
+                    channel, "channel_disabled"
                 )
-                self._config = None
-                self._last_failure_code = None
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
-        if stop_error is not None:
-            raise stop_error
-        if stopped:
+                if self._active_channels or self._state in {
+                    GpuASRRuntimeState.STOPPED,
+                    GpuASRRuntimeState.CLOSED,
+                }:
+                    candidate = self._active_work
+                    if candidate is not None and candidate.channel == channel:
+                        candidate.discard_reason = "channel_disabled"
+                        if not candidate.future.done():
+                            candidate.future.set_exception(GpuASRWorkDiscarded("channel_disabled"))
+                        active = candidate
+                        client = self._client
+                else:
+                    shutdown = self._begin_shutdown("last_channel_disabled")
+        if shutdown is not None:
+            await asyncio.shield(shutdown)
             return
         active_cancelled = False
         if active is not None and client is not None:
@@ -366,27 +401,41 @@ class SharedGpuASRRuntime:
         )
 
     async def close(self) -> None:
-        tasks: tuple[asyncio.Task[None], ...] = ()
-        stop_error: Exception | None = None
-        terminal = True
+        self._close_requested = True
+        self._closed = True
+        shutdown = self._shutdown_task
+        if shutdown is None or (shutdown.done() and self._state != GpuASRRuntimeState.CLOSED):
+            shutdown = self._begin_shutdown("application_shutdown")
+        await asyncio.shield(shutdown)
+
+    def _begin_shutdown(self, reason: str) -> asyncio.Task[None]:
+        self._state = GpuASRRuntimeState.STOPPING
+        task = asyncio.create_task(self._run_shutdown(reason), name="shared-gpu-asr-shutdown")
+        self._shutdown_task = task
+        task.add_done_callback(lambda done: done.exception() if not done.cancelled() else None)
+        return task
+
+    async def _run_shutdown(self, reason: str) -> None:
         async with self._lock:
-            if self._closed:
-                return
-            self._closed = True
-            self._active_channels.clear()
+            if self._close_requested:
+                self._active_channels.clear()
             tasks, stop_error, terminal = await self._stop_locked(
-                final_state=GpuASRRuntimeState.CLOSED,
-                reason="application_shutdown",
+                final_state=GpuASRRuntimeState.STOPPED, reason=reason
             )
             self._config = None
+            if terminal:
+                self._last_failure_code = None
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+        if self._close_requested and terminal:
+            async with self._lock:
+                self._active_channels.clear()
+                self._state = GpuASRRuntimeState.CLOSED
+            await self._scope.close()
         if stop_error is not None:
             if not terminal:
-                async with self._lock:
-                    self._closed = False
+                self._closed = False
             raise stop_error
-        await self._scope.close()
 
     def _begin_activation_locked(
         self,
@@ -394,6 +443,7 @@ class SharedGpuASRRuntime:
     ) -> asyncio.Task[_ActivationOutcome]:
         self._state = GpuASRRuntimeState.STARTING
         self._last_failure_code = None
+        self._file_cleanup_failure = None
         self._decode_recovery_armed = False
         self._generation += 1
         generation = self._generation
@@ -708,6 +758,12 @@ class SharedGpuASRRuntime:
             await self._queue_event.wait()
             self._queue_event.clear()
             while True:
+                await self._await_file_cleanup()
+                if self._file_cleanup_failure is not None:
+                    await self._fail_worker(
+                        generation, client, GpuASRRuntimeError("wav_cleanup_failed")
+                    )
+                    return
                 initial_expiry: tuple[_PendingWork, float, str] | None = None
                 async with self._lock:
                     if not self._is_current_ready(generation, client):
@@ -715,7 +771,9 @@ class SharedGpuASRRuntime:
                     if not self._queue:
                         break
                     work = heapq.heappop(self._queue)
-                    queue_wait = max(0.0, self._clock.now() - work.speech_end_at)
+                    dequeued_at = self._clock.now()
+                    queue_wait = max(0.0, dequeued_at - work.speech_end_at)
+                    gpu_queue_wait = max(0.0, dequeued_at - work.queued_at)
                     if queue_wait >= self._pending_ttl_seconds:
                         if not work.future.done():
                             work.future.set_exception(GpuASRWorkExpired("speech_end_ttl"))
@@ -744,27 +802,31 @@ class SharedGpuASRRuntime:
                     )
                     return
                 audio_path = Path(temporary_directory.name) / f"{work.request_id}.wav"
-                final_queue_wait = queue_wait
+                stage_started = self._clock.now()
+                worker_started = stage_started
+                worker_responded = stage_started
+                stage_seconds = 0.0
+                payload = work.audio_payload
                 transcription: GpuWorkerTranscription | None = None
+                published = False
                 expired_after_staging = False
                 restart_failure: GpuWorkerRequestError | None = None
                 terminal_failure: BaseException | None = None
                 try:
-                    await run_owned_thread_call(
-                        lambda: _write_pcm16_wav(audio_path, work.samples_f32)
-                    )
-                    final_queue_wait = max(
-                        0.0,
-                        self._clock.now() - work.speech_end_at,
-                    )
+                    await run_owned_thread_call(lambda: _write_pcm16_wav(audio_path, payload))
+                    payload = None
+                    work.audio_payload = None
+                    worker_started = self._clock.now()
+                    stage_seconds = max(0.0, worker_started - stage_started)
+                    staged_age = max(0.0, worker_started - work.speech_end_at)
                     if work.discard_reason is not None:
                         continue
-                    if final_queue_wait >= self._pending_ttl_seconds:
+                    if staged_age >= self._pending_ttl_seconds:
                         expired_after_staging = True
                         await self._emit_work_expired(
                             work,
                             model_id=config.model_id,
-                            queue_wait=final_queue_wait,
+                            queue_wait=staged_age,
                         )
                         continue
                     transcription = await client.transcribe(
@@ -774,6 +836,7 @@ class SharedGpuASRRuntime:
                         language_hint=work.language_hint,
                         on_request_sent=work.request_sent.set,
                     )
+                    worker_responded = self._clock.now()
                 except BaseException as exc:
                     if isinstance(exc, asyncio.CancelledError):
                         if not work.future.done():
@@ -788,7 +851,7 @@ class SharedGpuASRRuntime:
                         await self._emit_attempt_failure(
                             work=work,
                             model_id=config.model_id,
-                            queue_wait=final_queue_wait,
+                            queue_wait=queue_wait,
                             exception=exc,
                         )
                     elif work.discard_reason is None:
@@ -799,7 +862,7 @@ class SharedGpuASRRuntime:
                                 "model": config.model_id,
                                 "provider": "gpu_qwen",
                                 **_failure_diagnostic_fields(exc),
-                                "queue_wait_seconds": final_queue_wait,
+                                "queue_wait_seconds": queue_wait,
                             },
                         )
                     recoverable_decode_failure = (
@@ -816,16 +879,17 @@ class SharedGpuASRRuntime:
                     elif not work.future.done():
                         work.future.set_exception(exc)
                 finally:
-                    await run_owned_thread_call(lambda: audio_path.unlink(missing_ok=True))
                     async with self._lock:
-                        if transcription is not None:
+                        if transcription is not None and self._is_current_ready(generation, client):
                             self._decode_recovery_armed = False
                         if transcription is not None and not work.future.done():
                             if (
-                                work.discard_reason is None
+                                self._is_current_ready(generation, client)
+                                and work.discard_reason is None
                                 and work.channel in self._active_channels
                             ):
                                 work.future.set_result(transcription)
+                                published = True
                             else:
                                 work.future.set_exception(
                                     GpuASRWorkDiscarded(work.discard_reason or "channel_disabled")
@@ -838,7 +902,13 @@ class SharedGpuASRRuntime:
                             and terminal_failure is None
                         ):
                             self._active_work = None
+                    published_at = self._clock.now()
                     work.settled.set()
+                    self._file_cleanup_task = start_lifecycle_task(
+                        self._scope,
+                        self._cleanup_audio_file(audio_path, work.channel),
+                        name=f"wav-cleanup-{work.request_id}",
+                    )
                 if restart_failure is not None:
                     await self._restart_after_decode_failure(
                         generation,
@@ -860,8 +930,26 @@ class SharedGpuASRRuntime:
                             "audio_seconds": transcription.audio_seconds,
                             "decode_seconds": transcription.decode_seconds,
                             "rtf": transcription.rtf,
-                            "result": work.discard_reason or "success",
-                            "queue_wait_seconds": final_queue_wait,
+                            "result": (
+                                "success" if published else work.discard_reason or "discarded"
+                            ),
+                            "queue_wait_seconds": queue_wait,
+                        },
+                    )
+                    await self._emit(
+                        "decode_timing",
+                        {
+                            "channel": work.channel,
+                            "gpu_queue_wait_seconds": gpu_queue_wait,
+                            "speech_end_to_dequeue_seconds": queue_wait,
+                            "wav_stage_seconds": stage_seconds,
+                            "worker_request_to_response_seconds": max(
+                                0.0, worker_responded - worker_started
+                            ),
+                            "worker_response_to_transcript_publish_seconds": (
+                                max(0.0, published_at - worker_responded) if published else None
+                            ),
+                            "published": published,
                         },
                     )
 
@@ -945,6 +1033,7 @@ class SharedGpuASRRuntime:
             if stale_tasks:
                 await asyncio.gather(*stale_tasks, return_exceptions=True)
             if temporary_directory is not None:
+                await self._await_file_cleanup()
                 await run_owned_thread_call(temporary_directory.cleanup)
         except asyncio.CancelledError:
             raise
@@ -1205,6 +1294,7 @@ class SharedGpuASRRuntime:
                 await asyncio.wait_for(force_close(), timeout=self._force_close_seconds)
             close_task.cancel()
         await asyncio.gather(close_task, *tasks, return_exceptions=True)
+        await self._await_file_cleanup()
         if temporary_directory is not None:
             await run_owned_thread_call(temporary_directory.cleanup)
         await self._emit(
@@ -1257,11 +1347,40 @@ class SharedGpuASRRuntime:
             work.settled.set()
         return len(discarded)
 
+    async def _cleanup_audio_file(self, path: Path, channel: GpuASRChannel) -> None:
+        started = self._clock.now()
+        failure: str | None = None
+        try:
+            await run_owned_thread_call(lambda: path.unlink(missing_ok=True))
+        except Exception as exc:
+            failure = type(exc).__name__
+            self._file_cleanup_failure = failure
+        try:
+            await self._emit(
+                "file_cleanup",
+                {
+                    "channel": channel,
+                    "file_cleanup_seconds": max(0.0, self._clock.now() - started),
+                    "failure": failure,
+                },
+            )
+        except Exception:
+            pass
+
+    async def _await_file_cleanup(self) -> None:
+        task = self._file_cleanup_task
+        if task is not None:
+            await asyncio.shield(task)
+            if self._file_cleanup_task is task:
+                self._file_cleanup_task = None
+
     async def _cleanup_temporary_directory_locked(self) -> None:
+        await self._await_file_cleanup()
         temporary_directory = self._temporary_directory
-        self._temporary_directory = None
         if temporary_directory is not None:
             await run_owned_thread_call(temporary_directory.cleanup)
+            if self._temporary_directory is temporary_directory:
+                self._temporary_directory = None
 
     def _is_current_generation(self, generation: int, client: GpuWorkerClientPort) -> bool:
         return generation == self._generation and self._client is client
@@ -1284,7 +1403,9 @@ class SharedGpuASRRuntime:
             await result
 
 
-def _write_pcm16_wav(path: Path, samples_f32: np.ndarray) -> None:
+def _write_pcm16_wav(path: Path, samples_f32: np.ndarray | bytes) -> None:
+    if isinstance(samples_f32, bytes):
+        samples_f32 = pcm16le_bytes_to_float32(samples_f32)
     pcm16 = np.rint(np.clip(samples_f32, -1.0, 1.0) * 32767.0).astype("<i2")
     with wave.open(str(path), "wb") as wav_file:
         wav_file.setnchannels(1)

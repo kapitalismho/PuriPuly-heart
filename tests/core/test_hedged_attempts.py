@@ -205,7 +205,7 @@ async def test_loser_grace_cancels_slow_attempt_and_close_is_not_duplicated() ->
     result = await asyncio.wait_for(provider.translate(**_kwargs()), timeout=0.2)
 
     assert result.text == "winner"
-    assert primary.cancelled.is_set()
+    await asyncio.wait_for(primary.cancelled.wait(), timeout=0.2)
     await provider.close()
     await provider.close()
     assert primary.close_calls == 1

@@ -1012,6 +1012,10 @@ async def test_window_close_awaits_application_shutdown_before_destroy(
         application_factory=_construction_application_factory,
     )
     transitions: list[str] = []
+    page.window.visible = True
+
+    def update() -> None:
+        transitions.append("hidden" if page.window.visible is False else "visible")
 
     async def shutdown() -> None:
         transitions.append("shutdown")
@@ -1020,6 +1024,7 @@ async def test_window_close_awaits_application_shutdown_before_destroy(
         transitions.append("destroy")
 
     app.shutdown = shutdown
+    page.update = update
     page.window.destroy = destroy
 
     app._on_window_event(SimpleNamespace(type=ft.WindowEventType.RESIZE))
@@ -1030,6 +1035,40 @@ async def test_window_close_awaits_application_shutdown_before_destroy(
     app._on_window_event(SimpleNamespace(type=ft.WindowEventType.CLOSE))
     assert len(page.tasks) == 1
 
+    await page.tasks[0]()
+
+    assert transitions == ["hidden", "shutdown", "destroy"]
+
+
+@pytest.mark.asyncio
+async def test_window_close_continues_shutdown_when_hiding_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_app_construction(monkeypatch)
+    page = DummyPage()
+    app = TranslatorApp(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
+    transitions: list[str] = []
+
+    def fail_update() -> None:
+        raise RuntimeError("window unavailable")
+
+    async def shutdown() -> None:
+        transitions.append("shutdown")
+
+    async def destroy() -> None:
+        transitions.append("destroy")
+
+    page.update = fail_update
+    page.window.destroy = destroy
+    app.shutdown = shutdown
+
+    app._request_window_close()
+    app._request_window_close()
+    assert len(page.tasks) == 1
     await page.tasks[0]()
 
     assert transitions == ["shutdown", "destroy"]
