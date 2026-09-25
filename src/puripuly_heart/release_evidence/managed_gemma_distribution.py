@@ -22,6 +22,7 @@ from puripuly_heart.core.local_translation.runtime_profile import (
     LLAMA_CPP_CPU_ARCHIVE_SHA256,
     LLAMA_CPP_CPU_ARCHIVE_SIZE,
     LLAMA_CPP_RUNTIME_DIRNAME,
+    LLAMA_CPP_SOURCE_RELATIVE_DIR,
     LLAMA_CPP_VULKAN_ARCHIVE,
     LLAMA_CPP_VULKAN_ARCHIVE_SHA256,
     LLAMA_CPP_VULKAN_ARCHIVE_SIZE,
@@ -471,7 +472,7 @@ def prepare_runtime(repo_root: Path, cache_dir: Path, output_root: Path) -> dict
 
 def pyinstaller_data_entries(repo_root: Path) -> list[tuple[str, str]]:
     repo_root = repo_root.resolve()
-    runtime_root = repo_root / "build" / "llama.cpp" / LLAMA_CPP_RUNTIME_DIRNAME
+    runtime_root = repo_root / "build" / LLAMA_CPP_SOURCE_RELATIVE_DIR
     manifest_path = runtime_root / "manifest.json"
     manifest = _validate_runtime_tree(manifest_path, runtime_root)
     provenance = _validate_provenance(repo_root)
@@ -495,9 +496,7 @@ def validate_runtime_root(runtime_root: Path) -> dict[str, object]:
 
 
 def normalize_pyinstaller_binaries(binaries: list[tuple[str, str, str]], repo_root: Path) -> None:
-    prepared_root = (
-        repo_root.resolve() / "build" / "llama.cpp" / LLAMA_CPP_RUNTIME_DIRNAME
-    ).resolve()
+    prepared_root = (repo_root.resolve() / "build" / LLAMA_CPP_SOURCE_RELATIVE_DIR).resolve()
     packaged_prefix = f"{PACKAGED_RUNTIME_RELATIVE_DIR.as_posix().casefold()}/"
     retained = []
     for binary in binaries:
@@ -634,9 +633,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "prepare":
         repo_root = arguments.repo_root.resolve()
         cache_dir = arguments.cache_dir or repo_root / "build" / "download-cache" / "llama.cpp"
-        output_root = (
-            arguments.output_root or repo_root / "build" / "llama.cpp" / LLAMA_CPP_RUNTIME_DIRNAME
-        )
+        output_root = arguments.output_root or repo_root / "build" / LLAMA_CPP_SOURCE_RELATIVE_DIR
         result = prepare_runtime(repo_root, cache_dir, output_root)
     elif arguments.command == "verify-package":
         result = verify_package(arguments.package_root, launch=arguments.launch)

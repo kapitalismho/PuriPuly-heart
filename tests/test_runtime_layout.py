@@ -27,7 +27,10 @@ def test_source_layout_is_independent_of_working_directory(
     assert (layout.app_resource_root / "pyproject.toml").is_file()
     assert get_prompts_dir() == layout.resource("prompts")
     assert get_prompts_dir().is_dir()
-    assert default_llama_runtime_root() == layout.native(LLAMA_CPP_RUNTIME_DIRNAME)
+    assert (
+        default_llama_runtime_root()
+        == layout.app_resource_root / "build" / "llama.cpp" / LLAMA_CPP_RUNTIME_DIRNAME
+    )
     assert layout.user_data_root != unrelated
     assert layout.model_cache_root.parent == layout.user_data_root
     assert layout.log_root.parent == layout.user_data_root

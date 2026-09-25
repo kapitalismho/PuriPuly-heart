@@ -23,6 +23,7 @@ LLAMA_CPP_VULKAN_ARCHIVE = "llama-b10423-bin-win-vulkan-x64.zip"
 LLAMA_CPP_VULKAN_ARCHIVE_SIZE = 34_563_676
 LLAMA_CPP_VULKAN_ARCHIVE_SHA256 = "510447fb021c80a264b2181c885b5f2ce9cc5b66c65d447cd1f9ce7ba81dc222"
 LLAMA_CPP_RUNTIME_DIRNAME = "llama.cpp-b10423"
+LLAMA_CPP_SOURCE_RELATIVE_DIR = Path("llama.cpp") / LLAMA_CPP_RUNTIME_DIRNAME
 MANAGED_GEMMA_MODEL_ALIAS = "puripuly-gemma-4-e4b-q4"
 THREADS_PROFILE_FILENAME = "llama_cpp_threads.json"
 
@@ -132,7 +133,7 @@ def default_llama_runtime_root() -> Path:
         return Path(configured).resolve()
     layout = current_runtime_layout()
     if layout.host_kind == "source":
-        return layout.native(LLAMA_CPP_RUNTIME_DIRNAME)
+        return layout.native(*LLAMA_CPP_SOURCE_RELATIVE_DIR.parts)
     return layout.native("_runtime", LLAMA_CPP_RUNTIME_DIRNAME)
 
 
@@ -262,6 +263,7 @@ __all__ = [
     "LLAMA_CPP_CPU_ARCHIVE_SHA256",
     "LLAMA_CPP_CPU_ARCHIVE_SIZE",
     "LLAMA_CPP_RUNTIME_DIRNAME",
+    "LLAMA_CPP_SOURCE_RELATIVE_DIR",
     "LLAMA_CPP_VULKAN_ARCHIVE",
     "LLAMA_CPP_VULKAN_ARCHIVE_SHA256",
     "LLAMA_CPP_VULKAN_ARCHIVE_SIZE",
