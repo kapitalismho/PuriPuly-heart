@@ -914,6 +914,97 @@ def test_conversation_source_identity_dedupes_dual_target_per_semantic_segment()
         runtime_logging.close()
 
 
+def _conversation_messages(log_stream) -> list[str]:
+    return [
+        message
+        for message in _runtime_log_messages(log_stream)
+        if message.startswith("[Conversation]")
+    ]
+
+
+def test_self_conversation_without_detected_language_uses_configured_source() -> None:
+    owner, _chatbox, _ui_messages, config_owner = make_owner(
+        configuration=TranslationRuntimeConfig(source_language="ko", target_language="ja")
+    )
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    owner.diagnostics.runtime_logging = runtime_logging
+    child = replace(self_children(config_owner)[0], detected_language=None)
+    submission = self_submission(child)
+    assert submission.translation is not None
+    submission = replace(
+        submission,
+        translation=replace(submission.translation, source_language=""),
+    )
+
+    try:
+        owner._record_conversation_submission(submission)
+
+        conversation = _conversation_messages(log_stream)
+        assert conversation
+        assert all("Unknown language" not in message for message in conversation)
+        assert any("Original (Korean)" in message for message in conversation)
+    finally:
+        runtime_logging.close()
+
+
+def test_self_terminal_conversation_without_detected_language_uses_configured_source() -> None:
+    owner, _chatbox, _ui_messages, config_owner = make_owner(
+        configuration=TranslationRuntimeConfig(source_language="ko", target_language="ja")
+    )
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    owner.diagnostics.runtime_logging = runtime_logging
+    child = replace(self_children(config_owner)[0], detected_language=None)
+
+    try:
+        owner.record_child_terminal_conversation(child, "cancelled")
+
+        conversation = _conversation_messages(log_stream)
+        assert len(conversation) == 1
+        assert "Original (Korean)" in conversation[0]
+    finally:
+        runtime_logging.close()
+
+
+def test_peer_auto_conversation_without_detected_language_stays_unknown() -> None:
+    owner, _chatbox, _ui_messages, config_owner = make_owner(
+        configuration=TranslationRuntimeConfig(
+            source_language="ko",
+            target_language="ja",
+            peer_source_mode="auto",
+        )
+    )
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    owner.diagnostics.runtime_logging = runtime_logging
+    child_id = uuid4()
+
+    try:
+        owner._record_conversation_submission(
+            TranslationOutputSubmission(
+                parent_utterance_id=uuid4(),
+                child_utterance_id=child_id,
+                sequence=0,
+                channel="peer",
+                source="Peer",
+                source_text="peer text",
+                source_language=None,
+                target_language="ko",
+                outcome="source_only",
+                config_snapshot=config_owner.snapshot(),
+                failure_code="translation_unavailable",
+                turn_generation=0,
+                turn_order=0,
+                turn_kind="peer",
+            )
+        )
+
+        conversation = _conversation_messages(log_stream)
+        assert len(conversation) == 1
+        assert "Unknown language" in conversation[0]
+        assert "Korean" not in conversation[0]
+    finally:
+        runtime_logging.close()
+
+
 def test_conversation_source_writes_file_only_context_once_for_dual_target(tmp_path) -> None:
     configuration = TranslationRuntimeConfig(
         target_language="zh-CN",

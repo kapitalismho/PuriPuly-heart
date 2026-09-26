@@ -2342,7 +2342,11 @@ class TranslationOutputProjectionOwner:
             channel=child.channel,
             source_text=child.transcript.text,
             translation_text=None,
-            source_language=child.detected_language,
+            source_language=self._conversation_source_language(
+                child.channel,
+                child.detected_language,
+                child.config_snapshot.value,
+            ),
             target_language=None,
             source=child.source,
             turn_kind=child.turn_kind,
@@ -2380,13 +2384,18 @@ class TranslationOutputProjectionOwner:
             channel=submission.channel,
             configuration=submission.config_snapshot.value,
         )
+        source_language = self._conversation_source_language(
+            submission.channel,
+            submission.source_language,
+            submission.config_snapshot.value,
+        )
         self._record_conversation(
             utterance_id=submission.parent_utterance_id,
             parent_utterance_id=submission.parent_utterance_id,
             channel=submission.channel,
             source_text=submission.source_text,
             translation_text=None,
-            source_language=submission.source_language,
+            source_language=source_language,
             target_language=None,
             source=submission.source,
             turn_kind=submission.turn_kind or submission.channel,
@@ -2413,7 +2422,7 @@ class TranslationOutputProjectionOwner:
             channel=submission.channel,
             source_text=None,
             translation_text=translation.text,
-            source_language=translation.source_language or submission.source_language,
+            source_language=translation.source_language or source_language,
             target_language=translation.target_language or submission.target_language,
             source=submission.source,
             turn_kind=submission.turn_kind or submission.channel,
@@ -2734,6 +2743,19 @@ class TranslationOutputProjectionOwner:
         if language is not None and language.strip():
             return language
         return fallback
+
+    @classmethod
+    def _conversation_source_language(
+        cls,
+        channel: ChannelId,
+        detected_language: str | None,
+        configuration: TranslationRuntimeConfig,
+    ) -> str | None:
+        if detected_language is not None and detected_language.strip():
+            return detected_language
+        if channel == "peer" and configuration.peer_source_mode == "auto":
+            return None
+        return cls._source_language_for(channel, configuration)
 
     @staticmethod
     def _source_language_for(
