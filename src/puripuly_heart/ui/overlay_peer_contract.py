@@ -37,13 +37,22 @@ def build_overlay_peer_consumer_contract(
     peer_warning_reason: str | None = None,
     peer_activation_starting: bool = False,
     desktop_first_visible: bool = False,
+    overlay_activation_pending: bool = False,
 ) -> OverlayPeerConsumerContract:
     overlay_contract = OverlayPeerToggleContract(
         intent_enabled=overlay_intent_enabled,
         effective_enabled=overlay_state == "connected",
         action_enabled=True,
-        state=_overlay_surface_state(overlay_intent_enabled, overlay_state),
-        warning_reason=_overlay_warning_reason(overlay_intent_enabled, overlay_state),
+        state=(
+            "starting"
+            if overlay_intent_enabled and overlay_activation_pending
+            else _overlay_surface_state(overlay_intent_enabled, overlay_state)
+        ),
+        warning_reason=(
+            None
+            if overlay_activation_pending
+            else _overlay_warning_reason(overlay_intent_enabled, overlay_state)
+        ),
         failure_reason=overlay_failure_reason,
     )
     resolved_peer_warning_reason = _resolve_peer_warning_reason(
@@ -91,6 +100,7 @@ def build_overlay_peer_consumer_contract_from_state(
         peer_warning_reason=state.peer_warning_reason,
         peer_activation_starting=state.peer_activation_starting,
         desktop_first_visible=bool(getattr(state, "desktop_first_visible", False)),
+        overlay_activation_pending=state.overlay_activation_pending,
     )
 
 

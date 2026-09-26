@@ -203,6 +203,7 @@ class CaptureRuntime:
 class PeerOverlayHarness:
     def __init__(self) -> None:
         self.overlay_state = "starting"
+        self.overlay_intent_enabled = True
         self.peer_intent_enabled = False
         self.states: list[tuple[str, str | None]] = []
         self.peer_surface_states: list[str] = []
@@ -238,12 +239,12 @@ class PeerOverlayHarness:
         self.overlay = OverlayApplicationOwner(
             state_provider=lambda: OverlayApplicationState(
                 settings_available=True,
-                overlay_intent_enabled=True,
+                overlay_intent_enabled=self.overlay_intent_enabled,
                 configured_target="steamvr",
                 locale="en",
             ),
             config_provider=lambda: cast(ResolvedOverlayConfig, object()),
-            overlay_intent_sink=lambda _enabled: None,
+            overlay_intent_sink=lambda enabled: setattr(self, "overlay_intent_enabled", enabled),
             output_provider=lambda: None,
             diagnostics_provider=lambda: None,
             peer_snapshot_provider=self.peer.snapshot,
@@ -391,15 +392,16 @@ class RecordingStartTransition:
 
 
 def make_owner(recorder: Recorder) -> OverlayApplicationOwner:
+    intent = SimpleNamespace(enabled=True)
     return OverlayApplicationOwner(
         state_provider=lambda: OverlayApplicationState(
             settings_available=True,
-            overlay_intent_enabled=True,
+            overlay_intent_enabled=intent.enabled,
             configured_target="steamvr",
             locale="en",
         ),
         config_provider=lambda: cast(ResolvedOverlayConfig, object()),
-        overlay_intent_sink=lambda _enabled: None,
+        overlay_intent_sink=lambda enabled: setattr(intent, "enabled", enabled),
         output_provider=lambda: None,
         diagnostics_provider=lambda: None,
         peer_snapshot_provider=recorder.peer_snapshot,
@@ -950,8 +952,10 @@ async def test_desktop_fallback_starts_while_retired_vr_cleanup_is_blocked(
         assert all(not task.done() for task in reapers)
         if cleanup_action == "off":
             stop_task = asyncio.create_task(owner.set_enabled(False))
-            await asyncio.sleep(0)
-            assert not stop_task.done()
+            await asyncio.wait_for(asyncio.shield(stop_task), timeout=1.0)
+            assert owner.state == "off"
+            assert old_runtime.has_resources()
+            assert owner._retired_runtimes
         release_cleanup.set()
         await asyncio.wait_for(asyncio.gather(*reapers), timeout=1.0)
         if stop_task is not None:
@@ -966,6 +970,7 @@ async def test_desktop_fallback_starts_while_retired_vr_cleanup_is_blocked(
             assert owner._retired_runtimes
             await owner.set_enabled(False)
             assert owner.state == "off"
+            await owner.close()
         assert not owner._retired_runtimes
         assert not old_runtime.has_resources()
     finally:
@@ -975,7 +980,10 @@ async def test_desktop_fallback_starts_while_retired_vr_cleanup_is_blocked(
         await owner.close()
 
 
-async def test_off_during_fallback_retirement_never_starts_desktop(monkeypatch) -> None:
+@pytest.mark.parametrize("enable_again", [False, True])
+async def test_latest_toggle_during_fallback_retirement_wins(
+    monkeypatch, enable_again: bool
+) -> None:
     owner = make_owner(Recorder())
     runtime = owner.new_runtime()
     runtime.set_overlay_instance_id("retiring-vr")
@@ -984,6 +992,7 @@ async def test_off_during_fallback_retirement_never_starts_desktop(monkeypatch) 
     output = SimpleNamespace(overlay_sink=presenter)
     detach_entered = asyncio.Event()
     detach_cancelled = asyncio.Event()
+    release_cancellation = asyncio.Event()
     block_detach = True
 
     async def replace_sink(sink, *, expected_current=None, require_match=False):
@@ -995,6 +1004,7 @@ async def test_off_during_fallback_retirement_never_starts_desktop(monkeypatch) 
                 await asyncio.Event().wait()
             finally:
                 detach_cancelled.set()
+                await release_cancellation.wait()
         if require_match and output.overlay_sink is not expected_current:
             return False
         output.overlay_sink = sink
@@ -1011,15 +1021,28 @@ async def test_off_during_fallback_retirement_never_starts_desktop(monkeypatch) 
         starts.append(replacement)
 
     monkeypatch.setattr(OverlayApplicationOwner, "run_start", start_desktop)
+    toggles = []
     try:
         await asyncio.wait_for(owner.handle_start_failure("steamvr_not_running"), timeout=1.0)
         await asyncio.wait_for(detach_entered.wait(), timeout=1.0)
-        await asyncio.wait_for(owner.set_enabled(False), timeout=1.0)
-        assert detach_cancelled.is_set()
-        assert owner.state == "off"
-        assert output.overlay_sink is None
+        toggles.append(asyncio.create_task(owner.set_enabled(False)))
+        await asyncio.wait_for(detach_cancelled.wait(), timeout=1)
+        if enable_again:
+            toggles.append(asyncio.create_task(owner.set_enabled(True)))
+            await asyncio.sleep(0)
+        release_cancellation.set()
+        await asyncio.wait_for(asyncio.gather(*toggles), timeout=1)
+        if enable_again:
+            assert starts == [owner.runtime]
+            assert owner.runtime is not runtime
+            assert owner.active_target == "steamvr"
+        else:
+            assert owner.state == "off"
+            assert output.overlay_sink is None
+            assert not starts
         assert not runtime.has_resources()
-        assert not starts
         assert not owner._retired_runtimes
     finally:
+        release_cancellation.set()
+        await asyncio.gather(*toggles, return_exceptions=True)
         await owner.close()

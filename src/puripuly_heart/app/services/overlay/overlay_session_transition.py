@@ -8,8 +8,8 @@ from typing import Literal
 
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 
-OverlaySessionStartStatus = Literal["already_active", "teardown_failed", "started"]
-OverlaySessionShutdownStatus = Literal["already_off", "failed", "stopped"]
+OverlaySessionStartStatus = Literal["already_active", "teardown_failed", "started", "superseded"]
+OverlaySessionShutdownStatus = Literal["already_off", "failed", "stopped", "superseded"]
 OverlaySessionTeardown = Callable[[], Awaitable[bool]]
 OverlaySessionRuntimeFactory = Callable[[], OverlayRuntimeHandle]
 OverlaySessionTargetFactory = Callable[[], str]
@@ -34,6 +34,7 @@ class OverlaySessionStartExecution:
     run_start: OverlaySessionStartOperation
     replace_starting: bool = False
     retire_previous: Callable[[], Awaitable[object | None]] | None = None
+    is_current: Callable[[], bool] = field(default=lambda: True, repr=False)
 
 
 OverlaySessionStartExecutionFactory = Callable[[], OverlaySessionStartExecution]
@@ -48,6 +49,7 @@ class OverlaySessionShutdownExecution:
     on_stopping: OverlaySessionStateHandler
     on_failed: OverlaySessionCompletionHandler
     on_stopped: OverlaySessionCompletionHandler
+    is_current: Callable[[], bool] = field(default=lambda: True, repr=False)
 
 
 OverlaySessionShutdownExecutionFactory = Callable[[], OverlaySessionShutdownExecution]
@@ -64,6 +66,7 @@ class OverlaySessionTransitionDiagnostic:
         "started",
         "stopped",
         "teardown_failed",
+        "superseded",
     ]
     failure_type: str | None = None
     stage: str | None = None
@@ -93,6 +96,11 @@ class OverlaySessionTransitionOwner:
     ) -> OverlaySessionStartStatus:
         async with self._serialization_lock():
             execution = execution_factory()
+            if not execution.is_current():
+                self._emit(
+                    OverlaySessionTransitionDiagnostic(operation="start", outcome="superseded")
+                )
+                return "superseded"
             if execution.state == "connected" or (
                 execution.state == "starting" and not execution.replace_starting
             ):
@@ -120,6 +128,13 @@ class OverlaySessionTransitionOwner:
                             )
                         )
                         return "teardown_failed"
+                    if not execution.is_current():
+                        self._emit(
+                            OverlaySessionTransitionDiagnostic(
+                                operation="start", outcome="superseded"
+                            )
+                        )
+                        return "superseded"
                     previous_runtime = execution.previous_runtime
                     if previous_runtime is not None and previous_runtime.is_closed:
                         stage = "detach_presenter"
@@ -129,6 +144,11 @@ class OverlaySessionTransitionOwner:
                 if preserved_presenter is not None:
                     stage = "adopt_presenter"
                     runtime.adopt_presenter(preserved_presenter)
+                if not execution.is_current():
+                    self._emit(
+                        OverlaySessionTransitionDiagnostic(operation="start", outcome="superseded")
+                    )
+                    return "superseded"
                 stage = "resolve_target"
                 target = execution.resolve_target()
                 stage = "mark_starting"
@@ -167,6 +187,11 @@ class OverlaySessionTransitionOwner:
     ) -> OverlaySessionShutdownStatus:
         async with self._serialization_lock():
             execution = execution_factory()
+            if not execution.is_current():
+                self._emit(
+                    OverlaySessionTransitionDiagnostic(operation="shutdown", outcome="superseded")
+                )
+                return "superseded"
             if not execution.has_resources and execution.state == "off":
                 self._emit(
                     OverlaySessionTransitionDiagnostic(

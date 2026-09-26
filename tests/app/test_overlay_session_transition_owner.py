@@ -18,6 +18,7 @@ from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 class StartHarness:
     state: str = "off"
     replace_starting: bool = False
+    current: bool = True
     teardown_result: bool = True
     events: list[str] = field(default_factory=list)
     teardown_started: asyncio.Event = field(default_factory=asyncio.Event)
@@ -59,6 +60,7 @@ class StartHarness:
             on_starting=self.on_starting,
             run_start=self.run_start,
             replace_starting=self.replace_starting,
+            is_current=lambda: self.current,
         )
 
 
@@ -244,7 +246,6 @@ async def test_cancelled_transition_releases_admission_lock_and_reports_metadata
     assert diagnostics[0].outcome == "cancelled"
     assert diagnostics[1].outcome == "already_off"
 
-
 def test_owner_declares_cross_generation_transition_policy() -> None:
     assert OverlaySessionTransitionOwner().lifecycle_owner_snapshot() == {
         "owner": "OverlaySessionTransitionOwner",
@@ -255,3 +256,21 @@ def test_owner_declares_cross_generation_transition_policy() -> None:
             "delegate generation teardown to OverlayRuntimeHandle before publishing completion"
         ),
     }
+
+
+@pytest.mark.asyncio
+async def test_start_superseded_during_teardown_does_not_launch_replacement() -> None:
+    harness = StartHarness(state="failed")
+    owner = OverlaySessionTransitionOwner()
+    task = asyncio.create_task(owner.begin_start(harness.execution))
+    try:
+        await asyncio.wait_for(harness.teardown_started.wait(), timeout=1)
+        harness.current = False
+        harness.teardown_release.set()
+        assert await asyncio.wait_for(task, timeout=1) == "superseded"
+        assert not harness.start_started.is_set()
+        assert not harness.runtime.has_resources()
+    finally:
+        harness.teardown_release.set()
+        harness.start_release.set()
+        await task

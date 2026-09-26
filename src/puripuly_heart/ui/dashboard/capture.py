@@ -59,11 +59,14 @@ def capture_presentation_from_contract(
             warning=peer.state == "warning",
         ),
         overlay=CaptureChannelPresentation(
-            enabled=overlay.state == "on",
+            enabled=overlay.state in {"on", "starting"},
             starting=(
-                overlay.state == "on"
-                and not overlay.effective_enabled
-                and not desktop_first_visible
+                overlay.state == "starting"
+                or (
+                    overlay.state == "on"
+                    and not overlay.effective_enabled
+                    and not desktop_first_visible
+                )
             ),
             warning=overlay.state == "warning",
         ),

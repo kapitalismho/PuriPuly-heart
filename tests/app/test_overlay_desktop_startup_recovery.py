@@ -126,7 +126,7 @@ class Harness:
                 locale="en",
             ),
             config_provider=lambda: cast(ResolvedOverlayConfig, object()),
-            overlay_intent_sink=lambda _enabled: None,
+            overlay_intent_sink=lambda enabled: setattr(self, "intent_enabled", enabled),
             output_provider=lambda: None,
             diagnostics_provider=lambda: None,
             peer_snapshot_provider=lambda: PeerApplicationSnapshot(

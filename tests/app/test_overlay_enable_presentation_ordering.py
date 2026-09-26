@@ -160,7 +160,6 @@ async def test_enable_from_off_first_draws_starting_spinner_without_warning() ->
 
     assert harness.intent_enabled is True
     assert harness.owner.state == "starting"
-    assert len(draws) == 1
     first = draws[0]
     assert first.warning is False
     assert first.starting is True
@@ -174,7 +173,6 @@ async def test_enable_from_off_first_draws_starting_spinner_without_warning() ->
     harness.owner.mark_connected()
     draws = harness.draw_new_presentations(marked)
 
-    assert len(draws) == 1
     final = draws[0]
     assert final.warning is False
     assert final.starting is False
@@ -193,8 +191,7 @@ async def test_blocked_start_stays_warning_actionable() -> None:
     draws = harness.draw_new_presentations(marked)
 
     assert harness.intent_enabled is True
-    assert len(draws) == 1
-    only = draws[0]
+    only = draws[-1]
     assert only.warning is True
     assert only.starting is False
     assert only.bgcolor == COLOR_WARNING
@@ -211,9 +208,8 @@ async def test_start_exception_still_publishes_intent_truth() -> None:
     draws = harness.draw_new_presentations(marked)
 
     assert harness.intent_enabled is True
-    assert len(draws) == 1
-    assert draws[0].warning is True
-    assert draws[0].bgcolor == COLOR_WARNING
+    assert draws[-1].warning is True
+    assert draws[-1].bgcolor == COLOR_WARNING
 
 
 async def test_reopen_from_failure_draws_spinner_before_any_warning() -> None:
@@ -228,7 +224,6 @@ async def test_reopen_from_failure_draws_spinner_before_any_warning() -> None:
     draws = harness.draw_new_presentations(base)
 
     assert harness.owner.state == "starting"
-    assert len(draws) == 1
     assert draws[0].warning is False
     assert draws[0].starting is True
     assert draws[0].bgcolor == COLOR_SURFACE
@@ -248,7 +243,6 @@ async def test_disable_while_starting_clears_spinner_immediately() -> None:
 
     assert harness.intent_enabled is False
     assert harness.owner.state == "off"
-    assert len(draws) >= 1
     assert draws[0].starting is False
     assert draws[0].warning is False
     assert draws[0].spinner_visible is False
@@ -268,7 +262,122 @@ async def test_redundant_enable_while_connected_keeps_connected_without_warning(
     await asyncio.sleep(0)
 
     assert harness.owner.state == "connected"
-    assert len(draws) == 1
     assert draws[0].warning is False
     assert draws[0].enabled is True
     assert draws[0].bgcolor == COLOR_PRIMARY
+
+
+@pytest.mark.parametrize("latest_enabled", [False, True])
+async def test_toggle_during_desktop_shutdown_updates_button_before_cleanup_and_honors_latest_intent(
+    monkeypatch: pytest.MonkeyPatch, latest_enabled: bool
+) -> None:
+    harness = Harness()
+    owner = harness.owner
+    harness.intent_enabled = True
+    owner.state = "connected"
+    owner.active_target = "desktop"
+    previous = owner.new_runtime()
+    stop_entered = asyncio.Event()
+    release_stop = asyncio.Event()
+    intent_received = asyncio.Event()
+    started = asyncio.Event()
+    starts = []
+
+    async def stop_previous() -> None:
+        stop_entered.set()
+        await release_stop.wait()
+
+    def accept_intent(enabled: bool) -> None:
+        harness.intent_enabled = enabled
+        intent_received.set()
+
+    async def start_replacement(self, runtime) -> None:
+        assert release_stop.is_set()
+        starts.append(runtime)
+        self.mark_connected()
+        started.set()
+
+    previous.attach_process_manager(
+        SimpleNamespace(stop=stop_previous, desktop_first_visible=True, state="connected")
+    )
+    owner.overlay_intent_sink = accept_intent
+    monkeypatch.setattr(OverlayApplicationOwner, "run_start", start_replacement)
+    tasks = [asyncio.create_task(owner.set_enabled(False))]
+    try:
+        await asyncio.wait_for(stop_entered.wait(), timeout=1)
+        marked = len(harness.presentations)
+        intent_received.clear()
+        tasks.append(asyncio.create_task(owner.set_enabled(True)))
+        await asyncio.wait_for(intent_received.wait(), timeout=1)
+        waiting = harness.draw_new_presentations(marked)[-1]
+        assert waiting.spinner_visible is True
+        assert waiting.warning is False
+        assert owner.state == "stopping"
+        assert not starts
+        if not latest_enabled:
+            marked = len(harness.presentations)
+            intent_received.clear()
+            tasks.append(asyncio.create_task(owner.set_enabled(False)))
+            await asyncio.wait_for(intent_received.wait(), timeout=1)
+            off = harness.draw_new_presentations(marked)[-1]
+            assert off.spinner_visible is False
+            assert off.enabled is False
+        release_stop.set()
+        await asyncio.wait_for(asyncio.gather(*tasks), timeout=1)
+        if latest_enabled:
+            await asyncio.wait_for(started.wait(), timeout=1)
+            assert owner.state == "connected"
+            assert owner.runtime is starts[0]
+            assert owner.runtime is not previous
+        else:
+            assert not starts
+            assert owner.runtime is None
+            assert owner.state == "off"
+    finally:
+        release_stop.set()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await owner.close()
+
+
+async def test_retired_vr_cleanup_does_not_block_toggle_but_is_owned_until_app_close() -> None:
+    harness = Harness()
+    owner = harness.owner
+    owner._transition_owner = cast(Any, PendingStartTransition())
+    retired = owner.new_runtime()
+    owner.runtime = None
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def stop_retired() -> None:
+        entered.set()
+        await release.wait()
+
+    retired.attach_process_manager(SimpleNamespace(stop=stop_retired))
+    reaper = asyncio.create_task(owner._close_retired_runtime(retired))
+    owner._retired_runtimes[retired] = reaper
+    close_task = None
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        await asyncio.wait_for(owner.set_enabled(True), timeout=1)
+        await asyncio.wait_for(owner.set_enabled(False), timeout=1)
+        await asyncio.wait_for(owner.set_enabled(True), timeout=1)
+        replacement = owner.runtime
+        assert replacement is not None
+        owner.mark_connected()
+        assert owner.state == "connected"
+        assert not reaper.done()
+        close_task = asyncio.create_task(owner.close())
+        await asyncio.sleep(0)
+        assert not close_task.done()
+        assert retired.has_resources()
+        release.set()
+        await asyncio.wait_for(close_task, timeout=1)
+        assert not owner._retired_runtimes
+        assert not retired.has_resources()
+        assert not replacement.has_resources()
+        assert owner.state == "off"
+    finally:
+        release.set()
+        if close_task is not None:
+            await close_task
+        await owner.close()

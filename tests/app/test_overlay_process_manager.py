@@ -1789,20 +1789,32 @@ async def test_native_startup_failure_can_be_reported_before_cleanup_finishes() 
 
 
 @pytest.mark.asyncio
-async def test_exited_native_failure_does_not_wait_for_an_impossible_shutdown_ack() -> None:
+@pytest.mark.parametrize("defer_cleanup", [False, True])
+async def test_exited_native_failure_does_not_wait_for_an_impossible_shutdown_ack(
+    defer_cleanup: bool,
+) -> None:
     runner = FakeProcessRunner(startup_error="steamvr_not_running", exit_code=20)
     manager = OverlayProcessManager(
         process_runner=runner,
         selected_target="steamvr",
+        bridge_messages=asyncio.Queue(),
+        bridge_messages_authenticated=True,
+        defer_startup_cleanup=defer_cleanup,
         graceful_shutdown_request=lambda: asyncio.sleep(0),
         graceful_shutdown_timeout_s=60.0,
     )
     try:
         await asyncio.wait_for(manager.start(), timeout=1.0)
+        await asyncio.wait_for(manager.stop(), timeout=1.0)
         assert manager.failure_reason == "steamvr_not_running"
         assert manager.shutdown_receipt()["acknowledged"] is False
         assert runner.last_process.returncode == 20
         assert not runner.last_process.terminated
+        receipt = manager.shutdown_receipt()
+        assert receipt["exit_confirmed"] is True
+        assert receipt["reader_cleanup"] == "complete"
+        assert receipt["graceful_completed"] is False
+        assert receipt["terminal_cause"] == "steamvr_not_running"
     finally:
         await manager.stop()
 
@@ -3120,3 +3132,40 @@ async def test_cached_frame_experiment_never_qualifies_restart_refill() -> None:
     assert manager._qualified_health_started_at is None
     await manager._handle_lifecycle_event(status(2), allow_ready=False)
     assert manager.restart_refill_ready is False
+
+
+@pytest.mark.asyncio
+async def test_failed_desktop_start_still_waits_for_authenticated_ack_after_exit() -> None:
+    process = FakeOverlayManagedProcess()
+    bridge_messages: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+    exit_observed = asyncio.Event()
+
+    async def request_shutdown() -> None:
+        process._exit_future.set_result(0)
+        exit_observed.set()
+
+    manager = OverlayProcessManager(
+        bridge_messages=bridge_messages,
+        bridge_messages_authenticated=True,
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=60,
+        selected_target="desktop",
+    )
+    manager.state = "failed"
+    manager.failure_reason = "window_reveal_lost"
+    manager._process = process
+    task = asyncio.create_task(manager.stop())
+    try:
+        await asyncio.wait_for(exit_observed.wait(), timeout=1)
+        assert not task.done()
+        await bridge_messages.put(
+            {"type": "shutdown_ack", "overlay_instance_id": manager.overlay_instance_id}
+        )
+        await asyncio.wait_for(task, timeout=1)
+        assert manager.shutdown_receipt()["acknowledged"] is True
+        assert manager.shutdown_receipt()["exit_confirmed"] is True
+        assert manager.desktop_cleanup_complete is True
+    finally:
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)

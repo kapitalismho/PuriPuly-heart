@@ -1594,13 +1594,22 @@ class OverlayProcessManager:
             )
             self._active_process_exit_task = exit_task
         acknowledged = self._shutdown_acknowledged
+        failed_native_startup = (
+            self.selected_target == "steamvr"
+            and self.failure_reason is not None
+            and self._last_transition not in {"overlay_ready", "bridge_ready"}
+        )
         process_exited = self._process_exit_confirmed(process, exit_task)
         try:
             while True:
                 if process_exited:
                     await self._finish_process_readers(process)
                     if ack_task is not None:
-                        if self.bridge_messages_authenticated and not ack_task.done():
+                        if (
+                            self.bridge_messages_authenticated
+                            and not ack_task.done()
+                            and not failed_native_startup
+                        ):
                             await asyncio.wait(
                                 {ack_task},
                                 timeout=max(0.0, deadline - loop.time()),

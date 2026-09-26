@@ -199,6 +199,8 @@ class OverlayApplicationOwner:
     _shutting_down: bool = field(init=False, default=False, repr=False)
     _active_target: str | None = field(init=False, default=None, repr=False)
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
+    _intent_generation: int = field(init=False, default=0, repr=False)
+    _pending_enable_generation: int | None = field(init=False, default=None, repr=False)
     _translation_sync_generation: int = field(init=False, default=0, repr=False)
     _desktop_startup_recovery_attempted: bool = field(init=False, default=False, repr=False)
     _startup_recovery: dict[str, object] | None = field(init=False, default=None, repr=False)
@@ -354,6 +356,7 @@ class OverlayApplicationOwner:
             peer_warning_reason=peer.process_warning_reason,
             peer_activation_starting=peer.activation_starting or peer.model_loading,
             desktop_first_visible=self._current_desktop_first_visible(),
+            overlay_activation_pending=self._pending_enable_generation is not None,
         )
 
     def _current_desktop_first_visible(self) -> bool:
@@ -401,20 +404,40 @@ class OverlayApplicationOwner:
             f"overlay_instance_id={runtime.overlay_instance_id if runtime is not None else 'none'}",
             logging.INFO,
         )
+        self._intent_generation += 1
+        generation = self._intent_generation
         self.overlay_intent_sink(bool(enabled))
+        self._pending_enable_generation = (
+            generation
+            if enabled
+            and (self._shutting_down or self._state not in {"starting", "recovering", "connected"})
+            else None
+        )
+        self.publish_presentation()
         if not enabled:
             self.clear_fallback()
             self._cancel_startup_recovery()
-            self.publish_presentation()
-            await self.shutdown(preserve_failure_reason=True)
+            await self.shutdown(
+                preserve_failure_reason=True,
+                drain_retired=False,
+                intent_generation=generation,
+            )
             return
         try:
-            status = await self.begin_start()
-        except Exception:
-            self.publish_presentation()
-            raise
-        if status != "started":
-            self.publish_presentation()
+            await self.begin_start(intent_generation=generation)
+        finally:
+            if self._pending_enable_generation == generation:
+                self._pending_enable_generation = None
+                self.publish_presentation()
+
+    def _intent_is_current(self, generation: int, *, enabled: bool) -> bool:
+        state = self.state_provider()
+        return bool(
+            not self._ingress_stopped
+            and generation == self._intent_generation
+            and state.settings_available
+            and state.overlay_intent_enabled == enabled
+        )
 
     def new_runtime(self) -> OverlayRuntimeHandle:
         runtime = OverlayRuntimeHandle(shutdown_grace_s=OVERLAY_SHUTDOWN_GRACE_S)
@@ -595,26 +618,40 @@ class OverlayApplicationOwner:
             if not diagnostic_emitted:
                 self.log_basic(message, logging.WARNING)
 
-    async def begin_start(self) -> OverlaySessionStartStatus | None:
+    async def begin_start(
+        self, *, intent_generation: int | None = None
+    ) -> OverlaySessionStartStatus | None:
         if self._ingress_stopped:
             return None
+        generation = self._intent_generation if intent_generation is None else intent_generation
+        replace_starting = self._shutting_down
         self._cancel_startup_recovery()
         await self._drain_startup_recovery_task()
-        return await self._transition_owner.begin_start(self._start_execution)
+        return await self._transition_owner.begin_start(
+            lambda: self._start_execution(
+                replace_starting=replace_starting, intent_generation=generation
+            )
+        )
 
     async def _begin_fallback_start(self) -> None:
         generation = self._fallback_owner.generation
+        intent_generation = self._intent_generation
         reason = self._fallback_owner.reason
         try:
+            await self._drain_retired_runtimes()
+            if not self._fallback_owner.is_current(generation):
+                return
             status = await self._transition_owner.begin_start(
-                lambda: self._start_execution(replace_starting=True)
+                lambda: self._start_execution(
+                    replace_starting=True, intent_generation=intent_generation
+                )
             )
         except asyncio.CancelledError:
             raise
         except Exception:
             await self._complete_fallback_failure(reason, generation=generation)
             raise
-        if status == "started":
+        if status in {"started", "superseded"}:
             return
         if status == "already_active" and self._state in {"starting", "recovering", "connected"}:
             return
@@ -639,6 +676,7 @@ class OverlayApplicationOwner:
         self,
         *,
         replace_starting: bool = False,
+        intent_generation: int | None = None,
     ) -> OverlaySessionStartExecution:
         return OverlaySessionStartExecution(
             state=self._state,
@@ -656,6 +694,11 @@ class OverlayApplicationOwner:
                 and self._active_target == OVERLAY_TARGET_STEAMVR
                 and self._runtime is not None
                 else None
+            ),
+            is_current=(
+                (lambda: self._intent_is_current(intent_generation, enabled=True))
+                if intent_generation is not None
+                else lambda: not self._ingress_stopped
             ),
         )
 
@@ -707,8 +750,7 @@ class OverlayApplicationOwner:
             if self._retired_runtimes.get(runtime) is task:
                 self._retired_runtimes.pop(runtime)
 
-    async def _teardown_all_runtimes(self) -> bool:
-        succeeded = await self.teardown(preserve_presenter_state=False, emit_shutdown=True)
+    async def _drain_retired_runtimes(self) -> None:
         for runtime, task in tuple(self._retired_runtimes.items()):
             try:
                 closed = await asyncio.shield(task)
@@ -719,8 +761,7 @@ class OverlayApplicationOwner:
             if closed:
                 self._retired_runtimes.pop(runtime, None)
             else:
-                succeeded = False
-        return succeeded
+                raise RuntimeError("retired overlay runtime cleanup failed")
 
     def _mark_starting(self, runtime: OverlayRuntimeHandle, target: str) -> None:
         if self._runtime is not runtime:
@@ -1289,7 +1330,13 @@ class OverlayApplicationOwner:
     def on_runtime_crashed(self) -> None:
         self.on_start_failed("runtime_crashed")
 
-    async def shutdown(self, *, preserve_failure_reason: bool) -> None:
+    async def shutdown(
+        self,
+        *,
+        preserve_failure_reason: bool,
+        drain_retired: bool = True,
+        intent_generation: int | None = None,
+    ) -> None:
         runtime = self._runtime
         self.log_basic(
             "[Overlay] Shutdown: "
@@ -1304,9 +1351,12 @@ class OverlayApplicationOwner:
             await self._transition_owner.shutdown(
                 lambda: self._shutdown_execution(
                     preserve_failure_reason=preserve_failure_reason,
+                    intent_generation=intent_generation,
                 )
             )
             await self._drain_startup_recovery_task()
+            if drain_retired:
+                await self._drain_retired_runtimes()
         finally:
             self._shutting_down = False
 
@@ -1314,22 +1364,24 @@ class OverlayApplicationOwner:
         self,
         *,
         preserve_failure_reason: bool,
+        intent_generation: int | None = None,
     ) -> OverlaySessionShutdownExecution:
         return OverlaySessionShutdownExecution(
             state=self._state,
-            has_resources=(
-                self.runtime_has_resources(self._runtime) or bool(self._retired_runtimes)
-            ),
-            teardown=self._teardown_all_runtimes,
-            has_resources_after_teardown=lambda: (
-                self.runtime_has_resources(self._runtime) or bool(self._retired_runtimes)
-            ),
+            has_resources=self.runtime_has_resources(self._runtime),
+            teardown=lambda: self.teardown(preserve_presenter_state=False, emit_shutdown=True),
+            has_resources_after_teardown=lambda: self.runtime_has_resources(self._runtime),
             on_stopping=self._mark_stopping,
             on_failed=lambda: self._complete_shutdown_failure(
                 preserve_failure_reason=preserve_failure_reason,
             ),
             on_stopped=lambda: self._complete_shutdown(
                 preserve_failure_reason=preserve_failure_reason,
+            ),
+            is_current=(
+                (lambda: self._intent_is_current(intent_generation, enabled=False))
+                if intent_generation is not None
+                else lambda: True
             ),
         )
 
@@ -1554,6 +1606,8 @@ class OverlayApplicationOwner:
 
     def stop_ingress(self) -> None:
         self._ingress_stopped = True
+        self._intent_generation += 1
+        self._pending_enable_generation = None
         self._cancel_startup_recovery()
         self._fallback_owner.stop_ingress()
 
