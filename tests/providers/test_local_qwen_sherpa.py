@@ -79,10 +79,10 @@ async def test_local_qwen_synchronous_heavy_stage_runs_inside_to_thread_heartbea
     assert worker_threads and worker_threads[0] != threading.get_ident()
 
 
-def test_local_qwen_backend_uses_thread_count_3_by_default() -> None:
-    assert local_qwen_module.DEFAULT_SHERPA_NUM_THREADS == 3
+def test_local_qwen_backend_uses_thread_count_2_by_default() -> None:
+    assert local_qwen_module.DEFAULT_SHERPA_NUM_THREADS == 2
     backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
-    assert backend.num_threads == 3
+    assert backend.num_threads == 2
 
 
 def _installed_manifest() -> InstalledLocalSTTManifest:

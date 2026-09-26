@@ -53,7 +53,7 @@ from puripuly_heart.providers.stt.local_decode import (
     LocalDecodeJob,
 )
 
-DEFAULT_SHERPA_NUM_THREADS = 3
+DEFAULT_SHERPA_NUM_THREADS = 2
 LOCAL_QWEN_RECOGNIZER_SAMPLE_RATE_HZ = 16000
 LOCAL_ASR_PENDING_TTL_S = 12.0
 _KNOWN_HALLUCINATION_LOG_REDACTION = "<known-local-qwen-hallucination>"
