@@ -1,0 +1,3401 @@
+{
+  "schema_version": 1,
+  "baseline_revision": "4dc46fdac8c771d3bb58e46bd44304b86fde9c47",
+  "baseline_authority": "Director-supplied clean baseline; no Git inspection performed",
+  "command": "python experiments/ami_benchmark/providers/soniox/gap/consumption_probe.py --output experiments/ami_benchmark/providers/soniox/gap/consumption_evidence.json",
+  "environment": {
+    "python": "3.14.7",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "numpy": "2.3.5"
+  },
+  "source_sha256": {
+    "src/puripuly_heart/providers/stt/soniox.py": "dff7a5d444b30ca80e2abd413f80b04f2e2a06bcb7c0366fdfb8ad2643dbdbd1",
+    "src/puripuly_heart/core/stt/scoped_engine.py": "35fb40cbe8153795d45158f05fcf6d936567ee2a2535ac66cc7c149c96aade8d",
+    "src/puripuly_heart/core/stt/scoped_normalizer.py": "d96c9729c016a932b2d678091df97722094bf4717731053341a6c8711a555e98",
+    "src/puripuly_heart/core/orchestrator/peer_translation_channel.py": "7cc61e64063f0fcab78da2f02498465f8bddc0113ce7d92bb78ecd9b4ae529e3",
+    "src/puripuly_heart/core/runtime/peer_channel.py": "f92a1e892b3a6898149c700978706a79152725f6b38e13072f43122a0077066d",
+    "src/puripuly_heart/core/orchestrator/translation_channel_callbacks.py": "7ae15734697f396520f5b28777b45869bcfda5a80c3ea4824e07c1c51c209544",
+    "src/puripuly_heart/core/orchestrator/translation_turn.py": "b2d6122265d1cbc0a785b4cc018378071f6116544fa70111df5cd69674b3d30d",
+    "src/puripuly_heart/core/speaker_identity.py": "8b669937bd580cb4db477a337b849d932020c26257c0053b487d18962c199110",
+    "src/puripuly_heart/core/runtime/output.py": "d55d59f252be6a9e293055ce83bb66032f0a108332f9c5dc53e8a2600b071235",
+    "src/puripuly_heart/core/overlay/presenter.py": "11949233efb52b6b248ea87c536bfa20ad924351b2bd5c59bbe9a2696999bc30",
+    "tests/helpers/translation_owners.py": "2fa61fdfc3f2700fc357fd81e622d316c365838ce36d8fdc71d59b6a2f32daf3",
+    "experiments/ami_benchmark/providers/soniox/gap/consumption_probe.py": "064c0594a91b9ad8619fd54fe639496d318541fa4c64b7836b65c17429a3a997"
+  },
+  "fixture_input_kind": "Synthetic PCM and scripted native tokens; no acoustic inference, no provider network calls",
+  "measurement_kind": "Measured monotonic application execution around modeled source/token coordinates; injected receive policy, no microphone/VRChat/HMD",
+  "passed_checks": 16,
+  "fixtures": [
+    {
+      "name": "A_B_A",
+      "status": "passed",
+      "text": "Alice Beto Alice",
+      "expected_text": "Alice Beto Alice",
+      "source_map": {
+        "content": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 1,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 160000,
+            "source_end_sample": 161600,
+            "source_start_monotonic_s": 10.0,
+            "source_end_monotonic_s": 10.1,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 160000,
+            "normalized_end_sample": 161600
+          }
+        ],
+        "context": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 0,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 159200,
+            "source_end_sample": 160000,
+            "source_start_monotonic_s": 9.95,
+            "source_end_monotonic_s": 10.0,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 159200,
+            "normalized_end_sample": 160000
+          }
+        ],
+        "coordinate_kind": "modeled canonical source, not physical microphone time"
+      },
+      "provider_sample_map": [
+        {
+          "provider_start_sample": 0,
+          "provider_end_sample": 800,
+          "kind": "context",
+          "source_start_sample": 159200,
+          "source_end_sample": 160000
+        },
+        {
+          "provider_start_sample": 800,
+          "provider_end_sample": 2400,
+          "kind": "content",
+          "source_start_sample": 160000,
+          "source_end_sample": 161600
+        }
+      ],
+      "stages": {
+        "first_stable_text_ms": 5.022600000302191,
+        "first_usable_speaker_ms": 5.022600000302191,
+        "source_speech_end_modeled_ms": 10100,
+        "local_seal_ms": 5.408799999713665,
+        "actual_finalize_write_ms": 5.518699999811361,
+        "terminal_fixture_injection_ms": 5.589800000961986,
+        "first_terminal_receipt_ms": 5.854400000316673,
+        "first_readable_publication_ms": 8.759599999393686,
+        "finalize_to_terminal_application_ms": 0.33570000050531235,
+        "terminal_to_first_readable_application_ms": 2.9051999990770128
+      },
+      "normalized": [
+        {
+          "kind": "stable",
+          "at_ms": 5.022600000302191,
+          "text": "Alice",
+          "speaker_runs": [
+            {
+              "text": "Alice",
+              "speaker_id": "A",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "stable",
+          "at_ms": 5.135800000061863,
+          "text": "Alice Beto",
+          "speaker_runs": [
+            {
+              "text": "Alice ",
+              "speaker_id": "A",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "Beto",
+              "speaker_id": "B",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "stable",
+          "at_ms": 5.23819999943953,
+          "text": "Alice Beto Alice",
+          "speaker_runs": [
+            {
+              "text": "Alice ",
+              "speaker_id": "A",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "Beto ",
+              "speaker_id": "B",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "Alice",
+              "speaker_id": "A",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 300,
+              "source_end_ms": 390,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "terminal",
+          "at_ms": 5.854400000316673,
+          "outcome": "final",
+          "text": "Alice Beto Alice",
+          "epoch_disposition": "reuse",
+          "speaker_runs": [
+            {
+              "text": "Alice ",
+              "speaker_id": "A",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "Beto ",
+              "speaker_id": "B",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "Alice",
+              "speaker_id": "A",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 300,
+              "source_end_ms": 390,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "children": [
+        {
+          "text": "Alice ",
+          "ranges": [
+            0,
+            6
+          ],
+          "speaker_runs": [
+            {
+              "text": "Alice ",
+              "speaker_id": "A",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "text": "Beto ",
+          "ranges": [
+            6,
+            11
+          ],
+          "speaker_runs": [
+            {
+              "text": "Beto ",
+              "speaker_id": "B",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "text": "Alice",
+          "ranges": [
+            11,
+            16
+          ],
+          "speaker_runs": [
+            {
+              "text": "Alice",
+              "speaker_id": "A",
+              "session_scope": "08aa503a420a44b48a58edd0621be70d",
+              "source_start_ms": 300,
+              "source_end_ms": 390,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "first_readable": [
+        {
+          "at_ms": 8.759599999393686,
+          "text": "",
+          "style": "gold"
+        },
+        {
+          "at_ms": 9.385900000779657,
+          "text": "",
+          "style": "cyan"
+        },
+        {
+          "at_ms": 10.102800000822754,
+          "text": "",
+          "style": "gold"
+        }
+      ],
+      "output_events": [
+        {
+          "type": "peer_transcript_final",
+          "text": "Alice ",
+          "source_text": "",
+          "at_ms": 8.458899999823188,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "08aa503a420a44b48a58edd0621be70d",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "08aa503a420a44b48a58edd0621be70d"
+            },
+            "scope_order": [
+              1,
+              1,
+              0
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              0,
+              6
+            ],
+            "source_text_revision": "b30d7e5965edbb0e"
+          }
+        },
+        {
+          "type": "peer_transcript_final",
+          "text": "Beto ",
+          "source_text": "",
+          "at_ms": 9.112100000493228,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "08aa503a420a44b48a58edd0621be70d",
+                "local_speaker_id": "B"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "08aa503a420a44b48a58edd0621be70d"
+            },
+            "scope_order": [
+              1,
+              1,
+              1
+            ],
+            "palette_index": 1,
+            "palette_overflow": false,
+            "source_text_range": [
+              6,
+              11
+            ],
+            "source_text_revision": "b30d7e5965edbb0e"
+          }
+        },
+        {
+          "type": "peer_transcript_final",
+          "text": "Alice",
+          "source_text": "",
+          "at_ms": 9.796700000151759,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "08aa503a420a44b48a58edd0621be70d",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "08aa503a420a44b48a58edd0621be70d"
+            },
+            "scope_order": [
+              1,
+              1,
+              2
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              11,
+              16
+            ],
+            "source_text_revision": "b30d7e5965edbb0e"
+          }
+        }
+      ],
+      "wire_writes": [
+        {
+          "at_ms": 4.398400000354741,
+          "kind": "pcm",
+          "bytes": 1600,
+          "sha256": "6701e5dfd98a6b61e4221f5b4fbe074678ede7adddec6f638d32cda49caea905",
+          "all_zero": false
+        },
+        {
+          "at_ms": 4.55820000024687,
+          "kind": "pcm",
+          "bytes": 3200,
+          "sha256": "7ee1df2efcf00363ae801dcbcd2c6940225c9606f7c77e2057434fca0989394f",
+          "all_zero": false
+        },
+        {
+          "at_ms": 5.518699999811361,
+          "kind": "control",
+          "payload": "{\"type\": \"finalize\"}"
+        },
+        {
+          "at_ms": 10.872099999687634,
+          "kind": "control",
+          "payload": ""
+        }
+      ],
+      "native_receives": [
+        {
+          "at_ms": 4.654200000004494,
+          "payload": {
+            "tokens": [
+              {
+                "text": "provisional ignored",
+                "start_ms": 0,
+                "end_ms": 1,
+                "language": "en",
+                "is_final": false,
+                "speaker": "B"
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 4.744100000607432,
+          "payload": {
+            "tokens": [
+              {
+                "text": "Alice ",
+                "start_ms": 100,
+                "end_ms": 190,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              },
+              {
+                "text": "Beto ",
+                "start_ms": 200,
+                "end_ms": 290,
+                "language": "en",
+                "is_final": true,
+                "speaker": "B"
+              },
+              {
+                "text": "Alice",
+                "start_ms": 300,
+                "end_ms": 390,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        },
+        {
+          "at_ms": 5.56950000100187,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<end>",
+                "is_final": true
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 5.627500000628061,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<fin>",
+                "is_final": true
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        }
+      ],
+      "resources": {
+        "transmitted_pcm_seconds": 0.15,
+        "provider_calls": 0,
+        "local_transport_doubles": 1,
+        "translation_double_calls": 0,
+        "translation_double_peak": 0,
+        "audio_queue_capacity": 258,
+        "engine_retention": {
+          "retained_samples": 0,
+          "retained_bytes": 0,
+          "high_water_samples": 1600,
+          "high_water_bytes": 3200
+        }
+      },
+      "findings": {
+        "text_conserved": true,
+        "pending_fin_blocks_successor": false,
+        "first_readable_styles": [
+          "gold",
+          "cyan",
+          "gold"
+        ],
+        "native_timestamps_are_literal": true
+      }
+    },
+    {
+      "name": "A_missing_A",
+      "status": "passed",
+      "text": "one unknown again",
+      "expected_text": "one unknown again",
+      "source_map": {
+        "content": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 1,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 160000,
+            "source_end_sample": 161600,
+            "source_start_monotonic_s": 10.0,
+            "source_end_monotonic_s": 10.1,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 160000,
+            "normalized_end_sample": 161600
+          }
+        ],
+        "context": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 0,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 159200,
+            "source_end_sample": 160000,
+            "source_start_monotonic_s": 9.95,
+            "source_end_monotonic_s": 10.0,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 159200,
+            "normalized_end_sample": 160000
+          }
+        ],
+        "coordinate_kind": "modeled canonical source, not physical microphone time"
+      },
+      "provider_sample_map": [
+        {
+          "provider_start_sample": 0,
+          "provider_end_sample": 800,
+          "kind": "context",
+          "source_start_sample": 159200,
+          "source_end_sample": 160000
+        },
+        {
+          "provider_start_sample": 800,
+          "provider_end_sample": 2400,
+          "kind": "content",
+          "source_start_sample": 160000,
+          "source_end_sample": 161600
+        }
+      ],
+      "stages": {
+        "first_stable_text_ms": 1.3629999994009268,
+        "first_usable_speaker_ms": 1.3629999994009268,
+        "source_speech_end_modeled_ms": 10100,
+        "local_seal_ms": 1.7083000002457993,
+        "actual_finalize_write_ms": 1.8034999993687961,
+        "terminal_fixture_injection_ms": 1.870500000222819,
+        "first_terminal_receipt_ms": 2.110900000843685,
+        "first_readable_publication_ms": 4.65749999966647,
+        "finalize_to_terminal_application_ms": 0.307400001474889,
+        "terminal_to_first_readable_application_ms": 2.546599998822785
+      },
+      "normalized": [
+        {
+          "kind": "stable",
+          "at_ms": 1.3629999994009268,
+          "text": "one",
+          "speaker_runs": [
+            {
+              "text": "one",
+              "speaker_id": "A",
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "stable",
+          "at_ms": 1.4633999999205116,
+          "text": "one unknown",
+          "speaker_runs": [
+            {
+              "text": "one ",
+              "speaker_id": "A",
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "unknown",
+              "speaker_id": null,
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "missing"
+            }
+          ]
+        },
+        {
+          "kind": "stable",
+          "at_ms": 1.568300000144518,
+          "text": "one unknown again",
+          "speaker_runs": [
+            {
+              "text": "one ",
+              "speaker_id": "A",
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "unknown ",
+              "speaker_id": null,
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "missing"
+            },
+            {
+              "text": "again",
+              "speaker_id": "A",
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 300,
+              "source_end_ms": 390,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "terminal",
+          "at_ms": 2.110900000843685,
+          "outcome": "final",
+          "text": "one unknown again",
+          "epoch_disposition": "reuse",
+          "speaker_runs": [
+            {
+              "text": "one ",
+              "speaker_id": "A",
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "unknown ",
+              "speaker_id": null,
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "missing"
+            },
+            {
+              "text": "again",
+              "speaker_id": "A",
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 300,
+              "source_end_ms": 390,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "children": [
+        {
+          "text": "one ",
+          "ranges": [
+            0,
+            4
+          ],
+          "speaker_runs": [
+            {
+              "text": "one ",
+              "speaker_id": "A",
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "text": "unknown ",
+          "ranges": [
+            4,
+            12
+          ],
+          "speaker_runs": [
+            {
+              "text": "unknown ",
+              "speaker_id": null,
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "missing"
+            }
+          ]
+        },
+        {
+          "text": "again",
+          "ranges": [
+            12,
+            17
+          ],
+          "speaker_runs": [
+            {
+              "text": "again",
+              "speaker_id": "A",
+              "session_scope": "4e495e15d1f34384bada32d541103266",
+              "source_start_ms": 300,
+              "source_end_ms": 390,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "first_readable": [
+        {
+          "at_ms": 4.65749999966647,
+          "text": "",
+          "style": "gold"
+        },
+        {
+          "at_ms": 5.192900000110967,
+          "text": "",
+          "style": "gray"
+        },
+        {
+          "at_ms": 5.775600000561099,
+          "text": "",
+          "style": "gold"
+        }
+      ],
+      "output_events": [
+        {
+          "type": "peer_transcript_final",
+          "text": "one ",
+          "source_text": "",
+          "at_ms": 4.427899999427609,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "4e495e15d1f34384bada32d541103266",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "4e495e15d1f34384bada32d541103266"
+            },
+            "scope_order": [
+              1,
+              1,
+              0
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              0,
+              4
+            ],
+            "source_text_revision": "e55357c7bf59e9e1"
+          }
+        },
+        {
+          "type": "peer_transcript_final",
+          "text": "unknown ",
+          "source_text": "",
+          "at_ms": 4.940299999361741,
+          "assignment": {
+            "attribution": {
+              "state": "missing",
+              "key": null,
+              "source": "soniox",
+              "speaker_scope_id": "4e495e15d1f34384bada32d541103266"
+            },
+            "scope_order": [
+              1,
+              1,
+              1
+            ],
+            "palette_index": null,
+            "palette_overflow": false,
+            "source_text_range": [
+              4,
+              12
+            ],
+            "source_text_revision": "e55357c7bf59e9e1"
+          }
+        },
+        {
+          "type": "peer_transcript_final",
+          "text": "again",
+          "source_text": "",
+          "at_ms": 5.49950000095123,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "4e495e15d1f34384bada32d541103266",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "4e495e15d1f34384bada32d541103266"
+            },
+            "scope_order": [
+              1,
+              1,
+              2
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              12,
+              17
+            ],
+            "source_text_revision": "e55357c7bf59e9e1"
+          }
+        }
+      ],
+      "wire_writes": [
+        {
+          "at_ms": 0.8758999993006,
+          "kind": "pcm",
+          "bytes": 1600,
+          "sha256": "6701e5dfd98a6b61e4221f5b4fbe074678ede7adddec6f638d32cda49caea905",
+          "all_zero": false
+        },
+        {
+          "at_ms": 0.9821000003285008,
+          "kind": "pcm",
+          "bytes": 3200,
+          "sha256": "7ee1df2efcf00363ae801dcbcd2c6940225c9606f7c77e2057434fca0989394f",
+          "all_zero": false
+        },
+        {
+          "at_ms": 1.8034999993687961,
+          "kind": "control",
+          "payload": "{\"type\": \"finalize\"}"
+        },
+        {
+          "at_ms": 6.480300000475836,
+          "kind": "control",
+          "payload": ""
+        }
+      ],
+      "native_receives": [
+        {
+          "at_ms": 1.0559000002103858,
+          "payload": {
+            "tokens": [
+              {
+                "text": "provisional ignored",
+                "start_ms": 0,
+                "end_ms": 1,
+                "language": "en",
+                "is_final": false,
+                "speaker": "B"
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 1.1283999992883764,
+          "payload": {
+            "tokens": [
+              {
+                "text": "one ",
+                "start_ms": 100,
+                "end_ms": 190,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              },
+              {
+                "text": "unknown ",
+                "start_ms": 200,
+                "end_ms": 290,
+                "language": "en",
+                "is_final": true
+              },
+              {
+                "text": "again",
+                "start_ms": 300,
+                "end_ms": 390,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        },
+        {
+          "at_ms": 1.852100000178325,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<end>",
+                "is_final": true
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 1.907500000015716,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<fin>",
+                "is_final": true
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        }
+      ],
+      "resources": {
+        "transmitted_pcm_seconds": 0.15,
+        "provider_calls": 0,
+        "local_transport_doubles": 1,
+        "translation_double_calls": 0,
+        "translation_double_peak": 0,
+        "audio_queue_capacity": 258,
+        "engine_retention": {
+          "retained_samples": 0,
+          "retained_bytes": 0,
+          "high_water_samples": 1600,
+          "high_water_bytes": 3200
+        }
+      },
+      "findings": {
+        "text_conserved": true,
+        "pending_fin_blocks_successor": false,
+        "first_readable_styles": [
+          "gold",
+          "gray",
+          "gold"
+        ],
+        "native_timestamps_are_literal": true
+      }
+    },
+    {
+      "name": "legitimate_repeated_text_and_reuse",
+      "status": "passed",
+      "text": "samesame",
+      "expected_text": "samesame",
+      "source_map": {
+        "content": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 1,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 160000,
+            "source_end_sample": 161600,
+            "source_start_monotonic_s": 10.0,
+            "source_end_monotonic_s": 10.1,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 160000,
+            "normalized_end_sample": 161600
+          }
+        ],
+        "context": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 0,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 159200,
+            "source_end_sample": 160000,
+            "source_start_monotonic_s": 9.95,
+            "source_end_monotonic_s": 10.0,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 159200,
+            "normalized_end_sample": 160000
+          }
+        ],
+        "coordinate_kind": "modeled canonical source, not physical microphone time"
+      },
+      "provider_sample_map": [
+        {
+          "provider_start_sample": 0,
+          "provider_end_sample": 800,
+          "kind": "context",
+          "source_start_sample": 159200,
+          "source_end_sample": 160000
+        },
+        {
+          "provider_start_sample": 800,
+          "provider_end_sample": 2400,
+          "kind": "content",
+          "source_start_sample": 160000,
+          "source_end_sample": 161600
+        },
+        {
+          "provider_start_sample": 2400,
+          "provider_end_sample": 4000,
+          "kind": "successor_content",
+          "source_start_sample": 161600,
+          "source_end_sample": 163200
+        }
+      ],
+      "stages": {
+        "first_stable_text_ms": 1.4473999999609077,
+        "first_usable_speaker_ms": 1.4473999999609077,
+        "source_speech_end_modeled_ms": 10100,
+        "local_seal_ms": 1.6081000012491131,
+        "actual_finalize_write_ms": 1.7127000010077609,
+        "successor_input_attempt_ms": 1.942500000950531,
+        "terminal_fixture_injection_ms": 30.07410000100208,
+        "successor_pcm_write_ms": 32.92490000058024,
+        "first_terminal_receipt_ms": 30.53120000004128,
+        "first_readable_publication_ms": 32.453800000439514,
+        "finalize_to_terminal_application_ms": 28.81849999903352,
+        "terminal_to_first_readable_application_ms": 1.9226000003982335
+      },
+      "normalized": [
+        {
+          "kind": "stable",
+          "at_ms": 1.4473999999609077,
+          "text": "same",
+          "speaker_runs": [
+            {
+              "text": "same",
+              "speaker_id": "A",
+              "session_scope": "8812ef6fb0f44d239d199153f3196779",
+              "source_start_ms": 100,
+              "source_end_ms": 100,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "terminal",
+          "at_ms": 30.53120000004128,
+          "outcome": "final",
+          "text": "same",
+          "epoch_disposition": "reuse",
+          "speaker_runs": [
+            {
+              "text": "same",
+              "speaker_id": "A",
+              "session_scope": "8812ef6fb0f44d239d199153f3196779",
+              "source_start_ms": 100,
+              "source_end_ms": 100,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "stable",
+          "at_ms": 33.160099999804515,
+          "text": "same",
+          "speaker_runs": [
+            {
+              "text": "same",
+              "speaker_id": "A",
+              "session_scope": "8812ef6fb0f44d239d199153f3196779",
+              "source_start_ms": 100,
+              "source_end_ms": 100,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "terminal",
+          "at_ms": 33.57839999989665,
+          "outcome": "final",
+          "text": "same",
+          "epoch_disposition": "reuse",
+          "speaker_runs": [
+            {
+              "text": "same",
+              "speaker_id": "A",
+              "session_scope": "8812ef6fb0f44d239d199153f3196779",
+              "source_start_ms": 100,
+              "source_end_ms": 100,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "children": [
+        {
+          "text": "same",
+          "ranges": [
+            0,
+            4
+          ],
+          "speaker_runs": [
+            {
+              "text": "same",
+              "speaker_id": "A",
+              "session_scope": "8812ef6fb0f44d239d199153f3196779",
+              "source_start_ms": 100,
+              "source_end_ms": 100,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "text": "same",
+          "ranges": [
+            0,
+            4
+          ],
+          "speaker_runs": [
+            {
+              "text": "same",
+              "speaker_id": "A",
+              "session_scope": "8812ef6fb0f44d239d199153f3196779",
+              "source_start_ms": 100,
+              "source_end_ms": 100,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "first_readable": [
+        {
+          "at_ms": 32.453800000439514,
+          "text": "",
+          "style": "gold"
+        },
+        {
+          "at_ms": 34.984600000825594,
+          "text": "",
+          "style": "gold"
+        }
+      ],
+      "output_events": [
+        {
+          "type": "peer_transcript_final",
+          "text": "same",
+          "source_text": "",
+          "at_ms": 32.2083000010025,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "8812ef6fb0f44d239d199153f3196779",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "8812ef6fb0f44d239d199153f3196779"
+            },
+            "scope_order": [
+              1,
+              1,
+              0
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              0,
+              4
+            ],
+            "source_text_revision": "0967115f2813a354"
+          }
+        },
+        {
+          "type": "peer_transcript_final",
+          "text": "same",
+          "source_text": "",
+          "at_ms": 34.70550000020012,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "8812ef6fb0f44d239d199153f3196779",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "8812ef6fb0f44d239d199153f3196779"
+            },
+            "scope_order": [
+              1,
+              2,
+              0
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              0,
+              4
+            ],
+            "source_text_revision": "0967115f2813a354"
+          }
+        }
+      ],
+      "wire_writes": [
+        {
+          "at_ms": 1.0192000008828472,
+          "kind": "pcm",
+          "bytes": 1600,
+          "sha256": "6701e5dfd98a6b61e4221f5b4fbe074678ede7adddec6f638d32cda49caea905",
+          "all_zero": false
+        },
+        {
+          "at_ms": 1.1561999999685213,
+          "kind": "pcm",
+          "bytes": 3200,
+          "sha256": "7ee1df2efcf00363ae801dcbcd2c6940225c9606f7c77e2057434fca0989394f",
+          "all_zero": false
+        },
+        {
+          "at_ms": 1.7127000010077609,
+          "kind": "control",
+          "payload": "{\"type\": \"finalize\"}"
+        },
+        {
+          "at_ms": 32.92490000058024,
+          "kind": "pcm",
+          "bytes": 3200,
+          "sha256": "9a4c6b7e809c0ebc8a3ca8c4833c3a0c95955ca439589adbaaed6d755c75ff7d",
+          "all_zero": false
+        },
+        {
+          "at_ms": 33.392100000128266,
+          "kind": "control",
+          "payload": "{\"type\": \"finalize\"}"
+        },
+        {
+          "at_ms": 35.67110000039975,
+          "kind": "control",
+          "payload": ""
+        }
+      ],
+      "native_receives": [
+        {
+          "at_ms": 1.2337000007391907,
+          "payload": {
+            "tokens": [
+              {
+                "text": "provisional ignored",
+                "start_ms": 0,
+                "end_ms": 1,
+                "language": "en",
+                "is_final": false,
+                "speaker": "B"
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 1.2961000011273427,
+          "payload": {
+            "tokens": [
+              {
+                "text": "same",
+                "start_ms": 100,
+                "end_ms": 100,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        },
+        {
+          "at_ms": 1.7631999999139225,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<end>",
+                "is_final": true
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 30.192100000931532,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<fin>",
+                "is_final": true
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        },
+        {
+          "at_ms": 33.017300000210525,
+          "payload": {
+            "tokens": [
+              {
+                "text": "same",
+                "start_ms": 100,
+                "end_ms": 100,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 33.43549999954121,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<fin>",
+                "is_final": true
+              }
+            ]
+          }
+        }
+      ],
+      "resources": {
+        "transmitted_pcm_seconds": 0.25,
+        "provider_calls": 0,
+        "local_transport_doubles": 1,
+        "translation_double_calls": 0,
+        "translation_double_peak": 0,
+        "audio_queue_capacity": 258,
+        "engine_retention": {
+          "retained_samples": 0,
+          "retained_bytes": 0,
+          "high_water_samples": 1600,
+          "high_water_bytes": 3200
+        }
+      },
+      "findings": {
+        "text_conserved": true,
+        "pending_fin_blocks_successor": true,
+        "first_readable_styles": [
+          "gold",
+          "gold"
+        ],
+        "native_timestamps_are_literal": true
+      }
+    },
+    {
+      "name": "overlap_and_zero_duration",
+      "status": "passed",
+      "text": "first brief yes",
+      "expected_text": "first brief yes",
+      "source_map": {
+        "content": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 1,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 160000,
+            "source_end_sample": 161600,
+            "source_start_monotonic_s": 10.0,
+            "source_end_monotonic_s": 10.1,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 160000,
+            "normalized_end_sample": 161600
+          }
+        ],
+        "context": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 0,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 159200,
+            "source_end_sample": 160000,
+            "source_start_monotonic_s": 9.95,
+            "source_end_monotonic_s": 10.0,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 159200,
+            "normalized_end_sample": 160000
+          }
+        ],
+        "coordinate_kind": "modeled canonical source, not physical microphone time"
+      },
+      "provider_sample_map": [
+        {
+          "provider_start_sample": 0,
+          "provider_end_sample": 800,
+          "kind": "context",
+          "source_start_sample": 159200,
+          "source_end_sample": 160000
+        },
+        {
+          "provider_start_sample": 800,
+          "provider_end_sample": 2400,
+          "kind": "content",
+          "source_start_sample": 160000,
+          "source_end_sample": 161600
+        }
+      ],
+      "stages": {
+        "first_stable_text_ms": 1.3238999999884982,
+        "first_usable_speaker_ms": 1.3238999999884982,
+        "source_speech_end_modeled_ms": 10100,
+        "local_seal_ms": 1.9501000006130198,
+        "actual_finalize_write_ms": 2.044900000328198,
+        "terminal_fixture_injection_ms": 2.1128999997017672,
+        "first_terminal_receipt_ms": 2.3462999997718725,
+        "first_readable_publication_ms": 4.720000000816071,
+        "finalize_to_terminal_application_ms": 0.30139999944367446,
+        "terminal_to_first_readable_application_ms": 2.373700001044199
+      },
+      "normalized": [
+        {
+          "kind": "stable",
+          "at_ms": 1.3238999999884982,
+          "text": "first",
+          "speaker_runs": [
+            {
+              "text": "first",
+              "speaker_id": "A",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 100,
+              "source_end_ms": 250,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "stable",
+          "at_ms": 1.426799999535433,
+          "text": "first brief",
+          "speaker_runs": [
+            {
+              "text": "first ",
+              "speaker_id": "A",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 100,
+              "source_end_ms": 250,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "brief",
+              "speaker_id": "B",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 200,
+              "source_end_ms": 260,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "stable",
+          "at_ms": 1.5275000005203765,
+          "text": "first brief yes",
+          "speaker_runs": [
+            {
+              "text": "first ",
+              "speaker_id": "A",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 100,
+              "source_end_ms": 250,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "brief ",
+              "speaker_id": "B",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 200,
+              "source_end_ms": 260,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "yes",
+              "speaker_id": "A",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 260,
+              "source_end_ms": 260,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "terminal",
+          "at_ms": 2.3462999997718725,
+          "outcome": "final",
+          "text": "first brief yes",
+          "epoch_disposition": "reuse",
+          "speaker_runs": [
+            {
+              "text": "first ",
+              "speaker_id": "A",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 100,
+              "source_end_ms": 250,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "brief ",
+              "speaker_id": "B",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 200,
+              "source_end_ms": 260,
+              "overlaps_previous": true,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "yes",
+              "speaker_id": "A",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 260,
+              "source_end_ms": 260,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "children": [
+        {
+          "text": "first ",
+          "ranges": [
+            0,
+            6
+          ],
+          "speaker_runs": [
+            {
+              "text": "first ",
+              "speaker_id": "A",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 100,
+              "source_end_ms": 250,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "text": "brief ",
+          "ranges": [
+            6,
+            12
+          ],
+          "speaker_runs": [
+            {
+              "text": "brief ",
+              "speaker_id": "B",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 200,
+              "source_end_ms": 260,
+              "overlaps_previous": true,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "text": "yes",
+          "ranges": [
+            12,
+            15
+          ],
+          "speaker_runs": [
+            {
+              "text": "yes",
+              "speaker_id": "A",
+              "session_scope": "062e35969c0f4c2589b7f67a7e105854",
+              "source_start_ms": 260,
+              "source_end_ms": 260,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "first_readable": [
+        {
+          "at_ms": 4.720000000816071,
+          "text": "",
+          "style": "gold"
+        },
+        {
+          "at_ms": 5.25500000003376,
+          "text": "",
+          "style": "cyan"
+        },
+        {
+          "at_ms": 5.816500000946689,
+          "text": "",
+          "style": "gold"
+        }
+      ],
+      "output_events": [
+        {
+          "type": "peer_transcript_final",
+          "text": "first ",
+          "source_text": "",
+          "at_ms": 4.492399999435293,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "062e35969c0f4c2589b7f67a7e105854",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "062e35969c0f4c2589b7f67a7e105854"
+            },
+            "scope_order": [
+              1,
+              1,
+              0
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              0,
+              6
+            ],
+            "source_text_revision": "4d4a293d4c6613cc"
+          }
+        },
+        {
+          "type": "peer_transcript_final",
+          "text": "brief ",
+          "source_text": "",
+          "at_ms": 5.001900000934256,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "062e35969c0f4c2589b7f67a7e105854",
+                "local_speaker_id": "B"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "062e35969c0f4c2589b7f67a7e105854"
+            },
+            "scope_order": [
+              1,
+              1,
+              1
+            ],
+            "palette_index": 1,
+            "palette_overflow": false,
+            "source_text_range": [
+              6,
+              12
+            ],
+            "source_text_revision": "4d4a293d4c6613cc"
+          }
+        },
+        {
+          "type": "peer_transcript_final",
+          "text": "yes",
+          "source_text": "",
+          "at_ms": 5.551599999307655,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "062e35969c0f4c2589b7f67a7e105854",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "062e35969c0f4c2589b7f67a7e105854"
+            },
+            "scope_order": [
+              1,
+              1,
+              2
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              12,
+              15
+            ],
+            "source_text_revision": "4d4a293d4c6613cc"
+          }
+        }
+      ],
+      "wire_writes": [
+        {
+          "at_ms": 0.8412999995925929,
+          "kind": "pcm",
+          "bytes": 1600,
+          "sha256": "6701e5dfd98a6b61e4221f5b4fbe074678ede7adddec6f638d32cda49caea905",
+          "all_zero": false
+        },
+        {
+          "at_ms": 0.940699999773642,
+          "kind": "pcm",
+          "bytes": 3200,
+          "sha256": "7ee1df2efcf00363ae801dcbcd2c6940225c9606f7c77e2057434fca0989394f",
+          "all_zero": false
+        },
+        {
+          "at_ms": 2.044900000328198,
+          "kind": "control",
+          "payload": "{\"type\": \"finalize\"}"
+        },
+        {
+          "at_ms": 6.503900000097929,
+          "kind": "control",
+          "payload": ""
+        }
+      ],
+      "native_receives": [
+        {
+          "at_ms": 1.0115000004589092,
+          "payload": {
+            "tokens": [
+              {
+                "text": "provisional ignored",
+                "start_ms": 0,
+                "end_ms": 1,
+                "language": "en",
+                "is_final": false,
+                "speaker": "B"
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 1.0861999999178806,
+          "payload": {
+            "tokens": [
+              {
+                "text": "first ",
+                "start_ms": 100,
+                "end_ms": 250,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              },
+              {
+                "text": "brief ",
+                "start_ms": 200,
+                "end_ms": 260,
+                "language": "en",
+                "is_final": true,
+                "speaker": "B"
+              },
+              {
+                "text": "yes",
+                "start_ms": 260,
+                "end_ms": 260,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        },
+        {
+          "at_ms": 2.0934000003762776,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<end>",
+                "is_final": true
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 2.1493000003829366,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<fin>",
+                "is_final": true
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        }
+      ],
+      "resources": {
+        "transmitted_pcm_seconds": 0.15,
+        "provider_calls": 0,
+        "local_transport_doubles": 1,
+        "translation_double_calls": 0,
+        "translation_double_peak": 0,
+        "audio_queue_capacity": 258,
+        "engine_retention": {
+          "retained_samples": 0,
+          "retained_bytes": 0,
+          "high_water_samples": 1600,
+          "high_water_bytes": 3200
+        }
+      },
+      "findings": {
+        "text_conserved": true,
+        "pending_fin_blocks_successor": false,
+        "first_readable_styles": [
+          "gold",
+          "cyan",
+          "gold"
+        ],
+        "native_timestamps_are_literal": true
+      }
+    },
+    {
+      "name": "repeated_context_and_padding",
+      "status": "passed",
+      "text": "echo echo",
+      "expected_text": "echo echo",
+      "source_map": {
+        "content": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 1,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 160000,
+            "source_end_sample": 161600,
+            "source_start_monotonic_s": 10.0,
+            "source_end_monotonic_s": 10.1,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 160000,
+            "normalized_end_sample": 161600
+          }
+        ],
+        "context": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 0,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 159200,
+            "source_end_sample": 160000,
+            "source_start_monotonic_s": 9.95,
+            "source_end_monotonic_s": 10.0,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 159200,
+            "normalized_end_sample": 160000
+          }
+        ],
+        "coordinate_kind": "modeled canonical source, not physical microphone time"
+      },
+      "provider_sample_map": [
+        {
+          "provider_start_sample": 0,
+          "provider_end_sample": 800,
+          "kind": "context",
+          "source_start_sample": 159200,
+          "source_end_sample": 160000
+        },
+        {
+          "provider_start_sample": 800,
+          "provider_end_sample": 2400,
+          "kind": "content",
+          "source_start_sample": 160000,
+          "source_end_sample": 161600
+        },
+        {
+          "provider_start_sample": 2400,
+          "provider_end_sample": 3200,
+          "kind": "replayed_context",
+          "source_start_sample": 159200,
+          "source_end_sample": 160000
+        },
+        {
+          "provider_start_sample": 3200,
+          "provider_end_sample": 6400,
+          "kind": "S200",
+          "source_start_sample": null,
+          "source_end_sample": null
+        }
+      ],
+      "stages": {
+        "first_stable_text_ms": 1.2514999998529674,
+        "first_usable_speaker_ms": 1.2514999998529674,
+        "source_speech_end_modeled_ms": 10100,
+        "local_seal_ms": 1.481099998272839,
+        "actual_finalize_write_ms": 1.595199999428587,
+        "terminal_fixture_injection_ms": 1.6602999985479983,
+        "first_terminal_receipt_ms": 1.8735999983618967,
+        "first_readable_publication_ms": 3.3208999993803445,
+        "finalize_to_terminal_application_ms": 0.2783999989333097,
+        "terminal_to_first_readable_application_ms": 1.4473000010184478
+      },
+      "normalized": [
+        {
+          "kind": "stable",
+          "at_ms": 1.2514999998529674,
+          "text": "echo",
+          "speaker_runs": [
+            {
+              "text": "echo",
+              "speaker_id": "A",
+              "session_scope": "dee67ec88ee1477f9ea6f06111da257f",
+              "source_start_ms": 9000,
+              "source_end_ms": 9090,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "stable",
+          "at_ms": 1.3459999991027871,
+          "text": "echo echo",
+          "speaker_runs": [
+            {
+              "text": "echo echo",
+              "speaker_id": "A",
+              "session_scope": "dee67ec88ee1477f9ea6f06111da257f",
+              "source_start_ms": 9000,
+              "source_end_ms": 9090,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "terminal",
+          "at_ms": 1.8735999983618967,
+          "outcome": "final",
+          "text": "echo echo",
+          "epoch_disposition": "reuse",
+          "speaker_runs": [
+            {
+              "text": "echo echo",
+              "speaker_id": "A",
+              "session_scope": "dee67ec88ee1477f9ea6f06111da257f",
+              "source_start_ms": 9000,
+              "source_end_ms": 9090,
+              "overlaps_previous": true,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "children": [
+        {
+          "text": "echo echo",
+          "ranges": [
+            0,
+            9
+          ],
+          "speaker_runs": [
+            {
+              "text": "echo echo",
+              "speaker_id": "A",
+              "session_scope": "dee67ec88ee1477f9ea6f06111da257f",
+              "source_start_ms": 9000,
+              "source_end_ms": 9090,
+              "overlaps_previous": true,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "first_readable": [
+        {
+          "at_ms": 3.3208999993803445,
+          "text": "",
+          "style": "gold"
+        }
+      ],
+      "output_events": [
+        {
+          "type": "peer_transcript_final",
+          "text": "echo echo",
+          "source_text": "",
+          "at_ms": 3.072099998462363,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "dee67ec88ee1477f9ea6f06111da257f",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "dee67ec88ee1477f9ea6f06111da257f"
+            },
+            "scope_order": [
+              1,
+              1,
+              0
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              0,
+              9
+            ],
+            "source_text_revision": "51e04812dab5b72b"
+          }
+        }
+      ],
+      "wire_writes": [
+        {
+          "at_ms": 0.7753999998385552,
+          "kind": "pcm",
+          "bytes": 1600,
+          "sha256": "6701e5dfd98a6b61e4221f5b4fbe074678ede7adddec6f638d32cda49caea905",
+          "all_zero": false
+        },
+        {
+          "at_ms": 0.8753999991313322,
+          "kind": "pcm",
+          "bytes": 3200,
+          "sha256": "7ee1df2efcf00363ae801dcbcd2c6940225c9606f7c77e2057434fca0989394f",
+          "all_zero": false
+        },
+        {
+          "at_ms": 0.9279999994760146,
+          "kind": "pcm",
+          "bytes": 1600,
+          "sha256": "e61f41d57db208c5f92a35c4ce7198570924a3fc87eeba83441fceee5d6a2865",
+          "all_zero": true
+        },
+        {
+          "at_ms": 1.5615999982401263,
+          "kind": "pcm",
+          "bytes": 6400,
+          "sha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+          "all_zero": true
+        },
+        {
+          "at_ms": 1.595199999428587,
+          "kind": "control",
+          "payload": "{\"type\": \"finalize\"}"
+        },
+        {
+          "at_ms": 4.073999998581712,
+          "kind": "control",
+          "payload": ""
+        }
+      ],
+      "native_receives": [
+        {
+          "at_ms": 0.9862999995675636,
+          "payload": {
+            "tokens": [
+              {
+                "text": "provisional ignored",
+                "start_ms": 0,
+                "end_ms": 1,
+                "language": "en",
+                "is_final": false,
+                "speaker": "B"
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 1.053199999660137,
+          "payload": {
+            "tokens": [
+              {
+                "text": "echo ",
+                "start_ms": 9000,
+                "end_ms": 9090,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              },
+              {
+                "text": "echo",
+                "start_ms": 9000,
+                "end_ms": 9090,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        },
+        {
+          "at_ms": 1.6419999992649537,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<end>",
+                "is_final": true
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 1.6956999988906318,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<fin>",
+                "is_final": true
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        }
+      ],
+      "resources": {
+        "transmitted_pcm_seconds": 0.4,
+        "provider_calls": 0,
+        "local_transport_doubles": 1,
+        "translation_double_calls": 0,
+        "translation_double_peak": 0,
+        "audio_queue_capacity": 258,
+        "engine_retention": {
+          "retained_samples": 0,
+          "retained_bytes": 0,
+          "high_water_samples": 1600,
+          "high_water_bytes": 3200
+        }
+      },
+      "findings": {
+        "text_conserved": true,
+        "pending_fin_blocks_successor": false,
+        "first_readable_styles": [
+          "gold"
+        ],
+        "native_timestamps_are_literal": true
+      }
+    },
+    {
+      "name": "boundary_whitespace",
+      "status": "passed",
+      "text": "alpha beta",
+      "expected_text": "alpha beta",
+      "source_map": {
+        "content": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 1,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 160000,
+            "source_end_sample": 161600,
+            "source_start_monotonic_s": 10.0,
+            "source_end_monotonic_s": 10.1,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 160000,
+            "normalized_end_sample": 161600
+          }
+        ],
+        "context": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 0,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 159200,
+            "source_end_sample": 160000,
+            "source_start_monotonic_s": 9.95,
+            "source_end_monotonic_s": 10.0,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 159200,
+            "normalized_end_sample": 160000
+          }
+        ],
+        "coordinate_kind": "modeled canonical source, not physical microphone time"
+      },
+      "provider_sample_map": [
+        {
+          "provider_start_sample": 0,
+          "provider_end_sample": 800,
+          "kind": "context",
+          "source_start_sample": 159200,
+          "source_end_sample": 160000
+        },
+        {
+          "provider_start_sample": 800,
+          "provider_end_sample": 2400,
+          "kind": "content",
+          "source_start_sample": 160000,
+          "source_end_sample": 161600
+        }
+      ],
+      "stages": {
+        "first_stable_text_ms": 1.2979999992239755,
+        "first_usable_speaker_ms": 1.2979999992239755,
+        "source_speech_end_modeled_ms": 10100,
+        "local_seal_ms": 1.60419999883743,
+        "actual_finalize_write_ms": 1.6973999991023447,
+        "terminal_fixture_injection_ms": 1.7631999999139225,
+        "first_terminal_receipt_ms": 2.006299999266048,
+        "first_readable_publication_ms": 4.096999999092077,
+        "finalize_to_terminal_application_ms": 0.3089000001637032,
+        "terminal_to_first_readable_application_ms": 2.090699999826029
+      },
+      "normalized": [
+        {
+          "kind": "stable",
+          "at_ms": 1.2979999992239755,
+          "text": "alpha",
+          "speaker_runs": [
+            {
+              "text": "alpha",
+              "speaker_id": "A",
+              "session_scope": "2301466aef924b5fbbc3ec659d939144",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "stable",
+          "at_ms": 1.4726999997947132,
+          "text": "alpha beta",
+          "speaker_runs": [
+            {
+              "text": "alpha ",
+              "speaker_id": "A",
+              "session_scope": "2301466aef924b5fbbc3ec659d939144",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "beta",
+              "speaker_id": "B",
+              "session_scope": "2301466aef924b5fbbc3ec659d939144",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "terminal",
+          "at_ms": 2.006299999266048,
+          "outcome": "final",
+          "text": "alpha beta",
+          "epoch_disposition": "reuse",
+          "speaker_runs": [
+            {
+              "text": "alpha ",
+              "speaker_id": "A",
+              "session_scope": "2301466aef924b5fbbc3ec659d939144",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "beta",
+              "speaker_id": "B",
+              "session_scope": "2301466aef924b5fbbc3ec659d939144",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "children": [
+        {
+          "text": "alpha ",
+          "ranges": [
+            0,
+            6
+          ],
+          "speaker_runs": [
+            {
+              "text": "alpha ",
+              "speaker_id": "A",
+              "session_scope": "2301466aef924b5fbbc3ec659d939144",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "text": "beta",
+          "ranges": [
+            6,
+            10
+          ],
+          "speaker_runs": [
+            {
+              "text": "beta",
+              "speaker_id": "B",
+              "session_scope": "2301466aef924b5fbbc3ec659d939144",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "first_readable": [
+        {
+          "at_ms": 4.096999999092077,
+          "text": "",
+          "style": "gold"
+        },
+        {
+          "at_ms": 4.633000000467291,
+          "text": "",
+          "style": "cyan"
+        }
+      ],
+      "output_events": [
+        {
+          "type": "peer_transcript_final",
+          "text": "alpha ",
+          "source_text": "",
+          "at_ms": 3.859599999486818,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "2301466aef924b5fbbc3ec659d939144",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "2301466aef924b5fbbc3ec659d939144"
+            },
+            "scope_order": [
+              1,
+              1,
+              0
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              0,
+              6
+            ],
+            "source_text_revision": "1a989ea86150171c"
+          }
+        },
+        {
+          "type": "peer_transcript_final",
+          "text": "beta",
+          "source_text": "",
+          "at_ms": 4.382400000395137,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "2301466aef924b5fbbc3ec659d939144",
+                "local_speaker_id": "B"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "2301466aef924b5fbbc3ec659d939144"
+            },
+            "scope_order": [
+              1,
+              1,
+              1
+            ],
+            "palette_index": 1,
+            "palette_overflow": false,
+            "source_text_range": [
+              6,
+              10
+            ],
+            "source_text_revision": "1a989ea86150171c"
+          }
+        }
+      ],
+      "wire_writes": [
+        {
+          "at_ms": 0.8280000001832377,
+          "kind": "pcm",
+          "bytes": 1600,
+          "sha256": "6701e5dfd98a6b61e4221f5b4fbe074678ede7adddec6f638d32cda49caea905",
+          "all_zero": false
+        },
+        {
+          "at_ms": 0.9368999999423977,
+          "kind": "pcm",
+          "bytes": 3200,
+          "sha256": "7ee1df2efcf00363ae801dcbcd2c6940225c9606f7c77e2057434fca0989394f",
+          "all_zero": false
+        },
+        {
+          "at_ms": 1.6973999991023447,
+          "kind": "control",
+          "payload": "{\"type\": \"finalize\"}"
+        },
+        {
+          "at_ms": 5.307100000209175,
+          "kind": "control",
+          "payload": ""
+        }
+      ],
+      "native_receives": [
+        {
+          "at_ms": 1.0139000005437993,
+          "payload": {
+            "tokens": [
+              {
+                "text": "provisional ignored",
+                "start_ms": 0,
+                "end_ms": 1,
+                "language": "en",
+                "is_final": false,
+                "speaker": "B"
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 1.082999999198364,
+          "payload": {
+            "tokens": [
+              {
+                "text": "  alpha ",
+                "start_ms": 100,
+                "end_ms": 190,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              },
+              {
+                "text": "beta  ",
+                "start_ms": 200,
+                "end_ms": 290,
+                "language": "en",
+                "is_final": true,
+                "speaker": "B"
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        },
+        {
+          "at_ms": 1.7448999988118885,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<end>",
+                "is_final": true
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 1.7993000001297332,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<fin>",
+                "is_final": true
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        }
+      ],
+      "resources": {
+        "transmitted_pcm_seconds": 0.15,
+        "provider_calls": 0,
+        "local_transport_doubles": 1,
+        "translation_double_calls": 0,
+        "translation_double_peak": 0,
+        "audio_queue_capacity": 258,
+        "engine_retention": {
+          "retained_samples": 0,
+          "retained_bytes": 0,
+          "high_water_samples": 1600,
+          "high_water_bytes": 3200
+        }
+      },
+      "findings": {
+        "text_conserved": true,
+        "pending_fin_blocks_successor": false,
+        "first_readable_styles": [
+          "gold",
+          "cyan"
+        ],
+        "native_timestamps_are_literal": true
+      }
+    },
+    {
+      "name": "translated_out_of_order",
+      "status": "passed",
+      "text": "Alice Beto Alice",
+      "expected_text": "Alice Beto Alice",
+      "source_map": {
+        "content": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 1,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 160000,
+            "source_end_sample": 161600,
+            "source_start_monotonic_s": 10.0,
+            "source_end_monotonic_s": 10.1,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 160000,
+            "normalized_end_sample": 161600
+          }
+        ],
+        "context": [
+          {
+            "capture_epoch": 1,
+            "callback_sequence": 0,
+            "source_sample_rate_hz": 16000,
+            "source_start_sample": 159200,
+            "source_end_sample": 160000,
+            "source_start_monotonic_s": 9.95,
+            "source_end_monotonic_s": 10.0,
+            "discontinuity_before": null,
+            "normalized_sample_rate_hz": 16000,
+            "normalized_start_sample": 159200,
+            "normalized_end_sample": 160000
+          }
+        ],
+        "coordinate_kind": "modeled canonical source, not physical microphone time"
+      },
+      "provider_sample_map": [
+        {
+          "provider_start_sample": 0,
+          "provider_end_sample": 800,
+          "kind": "context",
+          "source_start_sample": 159200,
+          "source_end_sample": 160000
+        },
+        {
+          "provider_start_sample": 800,
+          "provider_end_sample": 2400,
+          "kind": "content",
+          "source_start_sample": 160000,
+          "source_end_sample": 161600
+        }
+      ],
+      "stages": {
+        "first_stable_text_ms": 1.3041999991401099,
+        "first_usable_speaker_ms": 1.3041999991401099,
+        "source_speech_end_modeled_ms": 10100,
+        "local_seal_ms": 1.6443999993498437,
+        "actual_finalize_write_ms": 1.7336999990220647,
+        "terminal_fixture_injection_ms": 1.8000999989453703,
+        "earlier_publication_with_later_translation_pending_ms": 4.3126000000484055,
+        "first_terminal_receipt_ms": 2.0272000001568813,
+        "first_readable_publication_ms": 4.57520000054501,
+        "finalize_to_terminal_application_ms": 0.29350000113481656,
+        "terminal_to_first_readable_application_ms": 2.5480000003881287
+      },
+      "normalized": [
+        {
+          "kind": "stable",
+          "at_ms": 1.3041999991401099,
+          "text": "Alice",
+          "speaker_runs": [
+            {
+              "text": "Alice",
+              "speaker_id": "A",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "stable",
+          "at_ms": 1.4045999996596947,
+          "text": "Alice Beto",
+          "speaker_runs": [
+            {
+              "text": "Alice ",
+              "speaker_id": "A",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "Beto",
+              "speaker_id": "B",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "stable",
+          "at_ms": 1.5032999999675667,
+          "text": "Alice Beto Alice",
+          "speaker_runs": [
+            {
+              "text": "Alice ",
+              "speaker_id": "A",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "Beto ",
+              "speaker_id": "B",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "Alice",
+              "speaker_id": "A",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 300,
+              "source_end_ms": 390,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "kind": "terminal",
+          "at_ms": 2.0272000001568813,
+          "outcome": "final",
+          "text": "Alice Beto Alice",
+          "epoch_disposition": "reuse",
+          "speaker_runs": [
+            {
+              "text": "Alice ",
+              "speaker_id": "A",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "Beto ",
+              "speaker_id": "B",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            },
+            {
+              "text": "Alice",
+              "speaker_id": "A",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 300,
+              "source_end_ms": 390,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "children": [
+        {
+          "text": "Alice ",
+          "ranges": [
+            0,
+            6
+          ],
+          "speaker_runs": [
+            {
+              "text": "Alice ",
+              "speaker_id": "A",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 100,
+              "source_end_ms": 190,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "text": "Beto ",
+          "ranges": [
+            6,
+            11
+          ],
+          "speaker_runs": [
+            {
+              "text": "Beto ",
+              "speaker_id": "B",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 200,
+              "source_end_ms": 290,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        },
+        {
+          "text": "Alice",
+          "ranges": [
+            11,
+            16
+          ],
+          "speaker_runs": [
+            {
+              "text": "Alice",
+              "speaker_id": "A",
+              "session_scope": "a9dbd77d75954413afbfa3d9d1560fe2",
+              "source_start_ms": 300,
+              "source_end_ms": 390,
+              "overlaps_previous": false,
+              "source": "soniox",
+              "attribution_state": "identified"
+            }
+          ]
+        }
+      ],
+      "first_readable": [
+        {
+          "at_ms": 4.57520000054501,
+          "text": "Translated Alice",
+          "style": "gold"
+        },
+        {
+          "at_ms": 6.207799999174313,
+          "text": "Translated Beto",
+          "style": "cyan"
+        },
+        {
+          "at_ms": 6.850699999631615,
+          "text": "Translated Alice",
+          "style": "gold"
+        }
+      ],
+      "output_events": [
+        {
+          "type": "translation_final",
+          "text": "Translated Alice",
+          "source_text": "Alice ",
+          "at_ms": 4.3126000000484055,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "a9dbd77d75954413afbfa3d9d1560fe2",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "a9dbd77d75954413afbfa3d9d1560fe2"
+            },
+            "scope_order": [
+              1,
+              1,
+              0
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              0,
+              6
+            ],
+            "source_text_revision": "b30d7e5965edbb0e"
+          }
+        },
+        {
+          "type": "translation_final",
+          "text": "Translated Beto",
+          "source_text": "Beto ",
+          "at_ms": 5.883800000447081,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "a9dbd77d75954413afbfa3d9d1560fe2",
+                "local_speaker_id": "B"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "a9dbd77d75954413afbfa3d9d1560fe2"
+            },
+            "scope_order": [
+              1,
+              1,
+              1
+            ],
+            "palette_index": 1,
+            "palette_overflow": false,
+            "source_text_range": [
+              6,
+              11
+            ],
+            "source_text_revision": "b30d7e5965edbb0e"
+          }
+        },
+        {
+          "type": "translation_final",
+          "text": "Translated Alice",
+          "source_text": "Alice",
+          "at_ms": 6.526600000142935,
+          "assignment": {
+            "attribution": {
+              "state": "identified",
+              "key": {
+                "source": "soniox",
+                "speaker_scope_id": "a9dbd77d75954413afbfa3d9d1560fe2",
+                "local_speaker_id": "A"
+              },
+              "source": "soniox",
+              "speaker_scope_id": "a9dbd77d75954413afbfa3d9d1560fe2"
+            },
+            "scope_order": [
+              1,
+              1,
+              2
+            ],
+            "palette_index": 0,
+            "palette_overflow": false,
+            "source_text_range": [
+              11,
+              16
+            ],
+            "source_text_revision": "b30d7e5965edbb0e"
+          }
+        }
+      ],
+      "wire_writes": [
+        {
+          "at_ms": 0.8183999998436775,
+          "kind": "pcm",
+          "bytes": 1600,
+          "sha256": "6701e5dfd98a6b61e4221f5b4fbe074678ede7adddec6f638d32cda49caea905",
+          "all_zero": false
+        },
+        {
+          "at_ms": 0.922799999898416,
+          "kind": "pcm",
+          "bytes": 3200,
+          "sha256": "7ee1df2efcf00363ae801dcbcd2c6940225c9606f7c77e2057434fca0989394f",
+          "all_zero": false
+        },
+        {
+          "at_ms": 1.7336999990220647,
+          "kind": "control",
+          "payload": "{\"type\": \"finalize\"}"
+        },
+        {
+          "at_ms": 8.072200000242447,
+          "kind": "control",
+          "payload": ""
+        }
+      ],
+      "native_receives": [
+        {
+          "at_ms": 0.9964000000763917,
+          "payload": {
+            "tokens": [
+              {
+                "text": "provisional ignored",
+                "start_ms": 0,
+                "end_ms": 1,
+                "language": "en",
+                "is_final": false,
+                "speaker": "B"
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 1.0700000002543675,
+          "payload": {
+            "tokens": [
+              {
+                "text": "Alice ",
+                "start_ms": 100,
+                "end_ms": 190,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              },
+              {
+                "text": "Beto ",
+                "start_ms": 200,
+                "end_ms": 290,
+                "language": "en",
+                "is_final": true,
+                "speaker": "B"
+              },
+              {
+                "text": "Alice",
+                "start_ms": 300,
+                "end_ms": 390,
+                "language": "en",
+                "is_final": true,
+                "speaker": "A"
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        },
+        {
+          "at_ms": 1.7821000001276843,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<end>",
+                "is_final": true
+              }
+            ]
+          }
+        },
+        {
+          "at_ms": 1.8359000005148118,
+          "payload": {
+            "tokens": [
+              {
+                "text": "<fin>",
+                "is_final": true
+              }
+            ],
+            "request_id": "one-stream-request-not-a-turn-key"
+          }
+        }
+      ],
+      "resources": {
+        "transmitted_pcm_seconds": 0.15,
+        "provider_calls": 0,
+        "local_transport_doubles": 1,
+        "translation_double_calls": 3,
+        "translation_double_peak": 3,
+        "audio_queue_capacity": 258,
+        "engine_retention": {
+          "retained_samples": 0,
+          "retained_bytes": 0,
+          "high_water_samples": 1600,
+          "high_water_bytes": 3200
+        }
+      },
+      "findings": {
+        "text_conserved": true,
+        "pending_fin_blocks_successor": false,
+        "first_readable_styles": [
+          "gold",
+          "cyan",
+          "gold"
+        ],
+        "native_timestamps_are_literal": true
+      }
+    }
+  ],
+  "fences": [
+    {
+      "name": "empty",
+      "status": "passed",
+      "terminal": {
+        "identity": {
+          "segment": {
+            "activation_generation": 1,
+            "segment_order": 1,
+            "segment_id": "a029fcf9-a175-49ff-a647-c9e089d0caed",
+            "capture_epoch": 1
+          },
+          "provider_epoch_id": "fence-epoch",
+          "provider_turn_id": "first",
+          "settings_scope": []
+        },
+        "outcome": "empty",
+        "text": "",
+        "final_language_runs": [],
+        "final_speaker_runs": [],
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse",
+        "failure_retryable": false,
+        "recovery_pending": false,
+        "provenance": [
+          {
+            "native_event_id": null,
+            "native_request_id": null,
+            "native_item_id": null,
+            "native_task_id": null,
+            "barrier": "manual_finalize",
+            "from_finalize": null
+          }
+        ],
+        "included_contributions": []
+      },
+      "successor_text": "fresh",
+      "modeled_ambiguity": false,
+      "conclusion": "Empty completion clears before successor"
+    },
+    {
+      "name": "failed",
+      "status": "passed",
+      "terminal": {
+        "identity": {
+          "segment": {
+            "activation_generation": 1,
+            "segment_order": 1,
+            "segment_id": "fe645ece-3bbf-4dd7-961a-33f8b1f70a4f",
+            "capture_epoch": 1
+          },
+          "provider_epoch_id": "fence-epoch",
+          "provider_turn_id": "first",
+          "settings_scope": []
+        },
+        "outcome": "failed",
+        "text": "",
+        "final_language_runs": [],
+        "final_speaker_runs": [],
+        "text_authority": "none",
+        "failure_reason": "soniox_request_failed",
+        "epoch_disposition": "retire",
+        "failure_retryable": false,
+        "recovery_pending": false,
+        "provenance": [],
+        "included_contributions": []
+      },
+      "epoch_end": {
+        "provider_epoch_id": "fence-epoch",
+        "orderly": false,
+        "reason": "soniox_request_failed",
+        "provider_turn_id": "first",
+        "failure_retryable": false
+      },
+      "late_output_suppressed": true,
+      "true_replacement_distinct_scope": true,
+      "cross_epoch_terminal_rejected": true
+    },
+    {
+      "name": "cancelled",
+      "status": "passed",
+      "terminal": {
+        "identity": {
+          "segment": {
+            "activation_generation": 1,
+            "segment_order": 1,
+            "segment_id": "a633c9b3-5cbe-40e0-8581-f35da8d800fc",
+            "capture_epoch": 1
+          },
+          "provider_epoch_id": "fence-epoch",
+          "provider_turn_id": "first",
+          "settings_scope": []
+        },
+        "outcome": "cancelled",
+        "text": "",
+        "final_language_runs": [],
+        "final_speaker_runs": [],
+        "text_authority": "none",
+        "failure_reason": "cancelled",
+        "epoch_disposition": "retire",
+        "failure_retryable": false,
+        "recovery_pending": false,
+        "provenance": [],
+        "included_contributions": []
+      },
+      "epoch_end": {
+        "provider_epoch_id": "fence-epoch",
+        "orderly": false,
+        "reason": "cancelled",
+        "provider_turn_id": "first",
+        "failure_retryable": false
+      },
+      "late_output_suppressed": true,
+      "true_replacement_distinct_scope": true,
+      "cross_epoch_terminal_rejected": true
+    },
+    {
+      "name": "source_discontinuity",
+      "status": "passed",
+      "terminal": {
+        "identity": {
+          "segment": {
+            "activation_generation": 1,
+            "segment_order": 1,
+            "segment_id": "6f414467-d949-4810-9443-f4b8778fc388",
+            "capture_epoch": 1
+          },
+          "provider_epoch_id": "fence-epoch",
+          "provider_turn_id": "first",
+          "settings_scope": []
+        },
+        "outcome": "cancelled",
+        "text": "",
+        "final_language_runs": [],
+        "final_speaker_runs": [],
+        "text_authority": "none",
+        "failure_reason": "source_discontinuity",
+        "epoch_disposition": "retire",
+        "failure_retryable": false,
+        "recovery_pending": false,
+        "provenance": [],
+        "included_contributions": []
+      },
+      "epoch_end": {
+        "provider_epoch_id": "fence-epoch",
+        "orderly": false,
+        "reason": "source_discontinuity",
+        "provider_turn_id": "first",
+        "failure_retryable": false
+      },
+      "late_output_suppressed": true,
+      "true_replacement_distinct_scope": true,
+      "cross_epoch_terminal_rejected": true
+    },
+    {
+      "name": "late_idle_text",
+      "status": "passed",
+      "terminal": {
+        "identity": {
+          "segment": {
+            "activation_generation": 1,
+            "segment_order": 1,
+            "segment_id": "56c3f825-f0fd-4343-b0dc-029429db9a70",
+            "capture_epoch": 1
+          },
+          "provider_epoch_id": "fence-epoch",
+          "provider_turn_id": "first",
+          "settings_scope": []
+        },
+        "outcome": "empty",
+        "text": "",
+        "final_language_runs": [],
+        "final_speaker_runs": [],
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse",
+        "failure_retryable": false,
+        "recovery_pending": false,
+        "provenance": [
+          {
+            "native_event_id": null,
+            "native_request_id": null,
+            "native_item_id": null,
+            "native_task_id": null,
+            "barrier": "manual_finalize",
+            "from_finalize": null
+          }
+        ],
+        "included_contributions": []
+      },
+      "epoch_end": {
+        "provider_epoch_id": "fence-epoch",
+        "orderly": false,
+        "reason": "soniox_idle_authoritative_text",
+        "provider_turn_id": null,
+        "failure_retryable": false
+      },
+      "late_output_suppressed": true,
+      "true_replacement_distinct_scope": true,
+      "cross_epoch_terminal_rejected": true
+    },
+    {
+      "name": "late_idle_fin",
+      "status": "passed",
+      "terminal": {
+        "identity": {
+          "segment": {
+            "activation_generation": 1,
+            "segment_order": 1,
+            "segment_id": "7306a73e-017b-4dc0-a610-70410f9e83f5",
+            "capture_epoch": 1
+          },
+          "provider_epoch_id": "fence-epoch",
+          "provider_turn_id": "first",
+          "settings_scope": []
+        },
+        "outcome": "empty",
+        "text": "",
+        "final_language_runs": [],
+        "final_speaker_runs": [],
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse",
+        "failure_retryable": false,
+        "recovery_pending": false,
+        "provenance": [
+          {
+            "native_event_id": null,
+            "native_request_id": null,
+            "native_item_id": null,
+            "native_task_id": null,
+            "barrier": "manual_finalize",
+            "from_finalize": null
+          }
+        ],
+        "included_contributions": []
+      },
+      "epoch_end": {
+        "provider_epoch_id": "fence-epoch",
+        "orderly": false,
+        "reason": "soniox_protocol_ambiguity",
+        "provider_turn_id": null,
+        "failure_retryable": false
+      },
+      "late_output_suppressed": true,
+      "true_replacement_distinct_scope": true,
+      "cross_epoch_terminal_rejected": true
+    },
+    {
+      "name": "late_after_successor_active",
+      "status": "passed",
+      "terminal": {
+        "identity": {
+          "segment": {
+            "activation_generation": 1,
+            "segment_order": 1,
+            "segment_id": "606c7ebd-5f9c-49e5-9b9d-12dfee17656d",
+            "capture_epoch": 1
+          },
+          "provider_epoch_id": "fence-epoch",
+          "provider_turn_id": "first",
+          "settings_scope": []
+        },
+        "outcome": "empty",
+        "text": "",
+        "final_language_runs": [],
+        "final_speaker_runs": [],
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse",
+        "failure_retryable": false,
+        "recovery_pending": false,
+        "provenance": [
+          {
+            "native_event_id": null,
+            "native_request_id": null,
+            "native_item_id": null,
+            "native_task_id": null,
+            "barrier": "manual_finalize",
+            "from_finalize": null
+          }
+        ],
+        "included_contributions": []
+      },
+      "successor_text": "unkeyed late old text",
+      "modeled_ambiguity": true,
+      "conclusion": "Unkeyed native text binds to active turn; no per-turn correlation guarantee"
+    },
+    {
+      "name": "immutable_color_and_scope_handoff",
+      "status": "passed",
+      "late_identified_style": "gray",
+      "readable_lifetime_unchanged": true,
+      "old_scope_style": "gold",
+      "new_scope_style": "gray",
+      "identical_local_id_is_not_same_key": true
+    },
+    {
+      "name": "engine_source_discontinuity_generation_fence",
+      "status": "passed",
+      "source_loss_outcome": "failed",
+      "cancellation": {
+        "identity": {
+          "segment": {
+            "activation_generation": 1,
+            "segment_order": 1,
+            "segment_id": "1655251b-3955-4fa6-a933-7604de530ac9",
+            "capture_epoch": 1
+          },
+          "provider_epoch_id": "dfd5e3fe6a2748f7ae85f10e4d381d8a",
+          "provider_turn_id": "93e6c4632b0b42528535665f77815fa2",
+          "settings_scope": [
+            "soniox",
+            [
+              "soniox"
+            ],
+            [
+              "soniox"
+            ]
+          ]
+        },
+        "outcome": "cancelled",
+        "text": "",
+        "final_language_runs": [],
+        "final_speaker_runs": [],
+        "text_authority": "none",
+        "failure_reason": "source_discontinuity",
+        "epoch_disposition": "retire",
+        "failure_retryable": false,
+        "recovery_pending": false,
+        "provenance": [],
+        "included_contributions": []
+      },
+      "retained_after_abort": 0,
+      "successor_text": "after loss",
+      "successor_capture_epoch": 2,
+      "late_old_output_suppressed": true,
+      "fresh_provider_epoch": true,
+      "fresh_speaker_scope": true
+    }
+  ],
+  "resources": {
+    "provider_calls": 0,
+    "actual_websocket_duration_s": null,
+    "whole_probe_wall_s": 0.13187660000039614,
+    "python_tracemalloc_current_bytes": 542396,
+    "python_tracemalloc_peak_bytes": 756072,
+    "allocation_scope": "whole probe after imports including evidence capture, not isolated product RSS"
+  },
+  "unavailable": {
+    "provider_stable_arrival_latency": "no authorized live call or retained arrival trace",
+    "source_speech_end_to_publication": "source speech is modeled, not recorded physical timing",
+    "provider_processing_latency": "scripted receive, no service processing",
+    "active_websocket_duration": "in-memory transport double, no socket",
+    "quality_der_wer": "scripted words and speaker IDs cannot measure acoustic quality",
+    "live_pcm_memory_backlog": "finite fixture workload only; no sustained live load",
+    "cost_invoice": "zero paid calls; vendor billing/rate/quota not measured",
+    "continuous_candidate": "not run: causal live comparison and supported ownership amendment unavailable"
+  },
+  "disposition": "defer; current serial finalize consumer verified, no supported quality-latency production candidate"
+}

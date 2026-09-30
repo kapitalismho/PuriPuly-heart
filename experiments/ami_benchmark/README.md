@@ -92,3 +92,11 @@ experiments/ami_benchmark/.venv/bin/python experiments/ami_benchmark/compare_pro
 This checks input, native-result and prediction digests, rejects the obsolete Soniox projection method, and reproduces every complete-arm score. The default strict command now succeeds with all seven Qwen predictions and their full provenance; no incomplete-mode exception is needed. `--allow-incomplete` remains available only for explicitly declared partial Qwen evidence and cannot supply a missing case or aggregate. `score.py` still requires all seven predictions; standard DER, references, UEM and the existing Qwen/Nemotron interval-construction policies are unchanged.
 
 Provider JSON, JSONL and RTTM evidence has byte-preserving Git attributes so line-ending conversion cannot silently invalidate retained digest chains. Existing benchmark audio, references, Nemotron output and production application behavior are unchanged.
+
+## Soniox segmented-input investigation (#204)
+
+The [retained-output diagnosis](providers/soniox/gap/offline_report.md) reproduces the corrected baseline without provider calls and adds a reference-aligned lexical speaker diagnostic with explicit unmatched, ambiguous, overlap, and short-interjection coverage. DER and conditional recognized-word identity are distinct measurements; neither is live caption-color accuracy. Public word/turn references and acquisition identities are retained with the report.
+
+The [application-consumption probe](providers/soniox/gap/consumption_report.md) exercises actual scoped recognition, peer terminal admission, translation ownership, output, and first-readable presentation with scripted native responses. It verifies text/scope behavior, not acoustic model quality or physical microphone/VRChat/HMD operation. On the current Soniox path, `FinalSpeakerRun.source_*_ms` remains native stream time; stable updates do not bypass the terminal-driven peer publication contract.
+
+These offline findings do not establish a causal finalization/PCM effect or authorize a production change. Timestamp drift remains unresolved; no guessed per-finalize correction or reference-fitted timing adjustment is applied.

@@ -1,0 +1,367 @@
+{
+  "repository_revision": "a249db53de253a3a0a864c93a51d613159dfec7c",
+  "license": "CC BY 4.0",
+  "official_download_page": "https://groups.inf.ed.ac.uk/ami/download/",
+  "official_release": "AMI manual annotations v1.6.2; unchanged annotations since 2014, CC BY 4.0 since 2017",
+  "attribution": "AMI Consortium; Carletta et al. (2005), The AMI Meeting Corpus: A Pre-Announcement",
+  "independence": "Published AMI lexical/speaker annotations anchored in original meeting coordinates, not fitted to Soniox native times or token widths. Not newly listener-calibrated waveform/event anchors.",
+  "files": [
+    {
+      "path": "ami_words/EN2002a.A.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002a.A.words.xml",
+      "sha256": "a85a5b87b81b93e4d424fd6c6c8ab5b90df93a515f6d83aa37f7c7eb9d9a9492",
+      "bytes": 216647,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002a.B.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002a.B.words.xml",
+      "sha256": "b27dfc1d2854810bd5923ca3967b1df6167ef0eccce1b6308aa3e57725f9953a",
+      "bytes": 158878,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002a.C.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002a.C.words.xml",
+      "sha256": "d15c35bac773b389763ded48df784133684806b5db37f9e3343fa29ec37ec6e0",
+      "bytes": 289023,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002a.D.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002a.D.words.xml",
+      "sha256": "d5f610babf78b48dad6d98357ca8cf2ca6bcb396690c079570c2ebb45eea4d5f",
+      "bytes": 180395,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002b.A.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002b.A.words.xml",
+      "sha256": "9690a5ad6eefeee14c5be6f9d019a1daa9fbba24467a03faf4d960c7abd16984",
+      "bytes": 78720,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002b.B.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002b.B.words.xml",
+      "sha256": "b9265cb5ac3391b6aefefc4d19f12a9b525650cbdda951f5252cd2725a0ca819",
+      "bytes": 136872,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002b.C.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002b.C.words.xml",
+      "sha256": "efe80687926259f6f0318d4e08f885f54a502b275ce51e0dab1777e084a09bbc",
+      "bytes": 155966,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002b.D.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002b.D.words.xml",
+      "sha256": "19a9d749879609f5f019446eede56a66c28ff993944edb891e0712edaa447622",
+      "bytes": 285583,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002c.A.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002c.A.words.xml",
+      "sha256": "9528abd7adde4a95bd5b740aba984b6e4996dbc4a11aa06cf4a35e2d1802e6af",
+      "bytes": 329941,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002c.B.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002c.B.words.xml",
+      "sha256": "33981270e5c678564f63807257b2d45fde160232633866036d313047be19e7ae",
+      "bytes": 429979,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002c.C.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002c.C.words.xml",
+      "sha256": "6cfff82fa6dfebf6b7eaeeeb19766c47b3cd0ba4a181b4fb9fd0964329d76f44",
+      "bytes": 372744,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002c.D.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002c.D.words.xml",
+      "sha256": "fc5f8b8ad568870ca61dbbe63b946c1a316486d4a45d692ee8f7ffe94cd0b8c8",
+      "bytes": 132,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002d.A.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002d.A.words.xml",
+      "sha256": "f0876699592389ae0557a12f28eeb37bc425525e7991ede21bd8a5a357ed25a4",
+      "bytes": 101985,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002d.B.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002d.B.words.xml",
+      "sha256": "b36811ef1e4a584db032d6ab4df6080da2300d4238b5828ab879d7ac0081c761",
+      "bytes": 216311,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002d.C.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002d.C.words.xml",
+      "sha256": "b3f295e2c0fc901d3dc091dc6d63e337a36eaa5fb9240262e5bb056f37eeb51b",
+      "bytes": 224988,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002d.D.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/EN2002d.D.words.xml",
+      "sha256": "c1292bb5a0e33f95f6030f8ba304e699fd357bc10ee96d1deac5600c5ebf0838",
+      "bytes": 322918,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/ES2004b.A.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/ES2004b.A.words.xml",
+      "sha256": "ad20241dea29b969b793efb75698bb074518e4a4c6328229833ca31e2ed569a1",
+      "bytes": 103845,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/ES2004b.B.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/ES2004b.B.words.xml",
+      "sha256": "7ad3102b35c57a9f8a9c8aa0b6ac76b84ab3703a5b54d492b26975d734cab3bb",
+      "bytes": 198360,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/ES2004b.C.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/ES2004b.C.words.xml",
+      "sha256": "b8fdfed824a4e09440c86f4b8e32af04b28b79c0ec9160310e985a4d960f91f8",
+      "bytes": 153316,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/ES2004b.D.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/ES2004b.D.words.xml",
+      "sha256": "67c2cd59f26df56727d814c3646f693178443e6fc85afee288209a69ea4ad777",
+      "bytes": 201050,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/IS1009b.A.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/IS1009b.A.words.xml",
+      "sha256": "f7ff17ddfcf4b40b3a4420ced4abdaefb86f669259f0bb98b65f14bd35dc84cc",
+      "bytes": 143123,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/IS1009b.B.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/IS1009b.B.words.xml",
+      "sha256": "2a612ee0514cb11e32e85841592f720af6f19d75b30807b058db74f84f454574",
+      "bytes": 92690,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/IS1009b.C.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/IS1009b.C.words.xml",
+      "sha256": "5058eaaf1b13f8272455745f3ff8b52e84dd798a38a939e11397f83e2784c5db",
+      "bytes": 158930,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/IS1009b.D.words.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/words/IS1009b.D.words.xml",
+      "sha256": "d142766bd0cf1bdab96bbe226367c319ae4a5b9536175c187a05375fc50fd242",
+      "bytes": 182847,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002a.A.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002a.A.segments.xml",
+      "sha256": "c57fc0527a128eb95445c70264a2ea7d99ff7cf04333061eeea0f9fefb8891a0",
+      "bytes": 47437,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002a.B.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002a.B.segments.xml",
+      "sha256": "d114d743d0f7b60b85f3b7f6f23ef7a0c3c5606bc0a122edb0bd71207f94caa3",
+      "bytes": 49409,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002a.C.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002a.C.segments.xml",
+      "sha256": "44784d571a862c0f4bcc0578cd134b432a329ab559fa546bbbc61a6be8aa1735",
+      "bytes": 46272,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002a.D.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002a.D.segments.xml",
+      "sha256": "de37046d3f59b787db4d7e3f34551167b328b59683c337fbafe322cbfc49e58f",
+      "bytes": 36328,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002b.A.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002b.A.segments.xml",
+      "sha256": "a7a3a786c0fa1f3d0f68eddfb84d3b1d9058b0a4d22d181085f62ef0ac094902",
+      "bytes": 21929,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002b.B.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002b.B.segments.xml",
+      "sha256": "ff67e672097453fb9307a6b616e5ed527c78d7b243b4beefdc24cbe09afffeb4",
+      "bytes": 24840,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002b.C.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002b.C.segments.xml",
+      "sha256": "c0bb221705ce2bea0ec07b24631f53cf3970ed0b4345dca531ff69ee0aee05eb",
+      "bytes": 32041,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002b.D.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002b.D.segments.xml",
+      "sha256": "5a6ceed9d6be4a03b642cf61c9e005be31a5c66a74d1092e2f6d77552c6db4bc",
+      "bytes": 38794,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002c.A.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002c.A.segments.xml",
+      "sha256": "21877b1be48f5434df2cea510f3f08b2683c088e858fc1d57f0360a1d105c31a",
+      "bytes": 48078,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002c.B.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002c.B.segments.xml",
+      "sha256": "00d858b3268d0eb65f929e7e3c82c5dc2b6c17c03095106020f684ce81a7ef4d",
+      "bytes": 41489,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002c.C.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002c.C.segments.xml",
+      "sha256": "7a8c4b820e78fb223780870c8dc018b885fefc643c2bac15f374fd88e4095cec",
+      "bytes": 56752,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002c.D.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002c.D.segments.xml",
+      "sha256": "f19d29d048d582d14b4dd0bd65c10b10541ea2094c5bfead567059d85169ae42",
+      "bytes": 131,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002d.A.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002d.A.segments.xml",
+      "sha256": "9c5d25ffb30cb93d31f294f599b89a036e53579506c6c1c75116e2ab38e034e6",
+      "bytes": 34304,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002d.B.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002d.B.segments.xml",
+      "sha256": "9a52999632afacb4c5c311f3ef53380a39ac58f107e46ff43dd1d69aac462cbc",
+      "bytes": 52937,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002d.C.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002d.C.segments.xml",
+      "sha256": "3ebaac8cc0ec3b7eddcdb5bbe0da5697189cd8bb9bd39aa1e879b3ee260640a8",
+      "bytes": 30189,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/EN2002d.D.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/EN2002d.D.segments.xml",
+      "sha256": "1d137fad256db51315782b21ff1b5e80fd74a53acd0d8e750162debbbf188fbb",
+      "bytes": 53876,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/ES2004b.A.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/ES2004b.A.segments.xml",
+      "sha256": "fea4592efa0df6d2cfe9418d4dacba169f8b0d5d17b08568fbc288fc3df299f8",
+      "bytes": 21001,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/ES2004b.B.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/ES2004b.B.segments.xml",
+      "sha256": "4b854e381f15bf15a135d4fa598451cee9e246cc366bdd4e80cb6963e48434ca",
+      "bytes": 30875,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/ES2004b.C.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/ES2004b.C.segments.xml",
+      "sha256": "dd0168e181920e76b909ebfcf501fa488d9a06df72e5a1d984f909cbbe5458c9",
+      "bytes": 24672,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/ES2004b.D.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/ES2004b.D.segments.xml",
+      "sha256": "d9e0e84970e6582042d1a4c5d27febd3c4956550894c5d60f7dc503f5ba69d3d",
+      "bytes": 28629,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/IS1009b.A.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/IS1009b.A.segments.xml",
+      "sha256": "ce8274aff7a99170f9021c50edab0f635522c217860c95abcbce0f573a006af1",
+      "bytes": 24273,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/IS1009b.B.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/IS1009b.B.segments.xml",
+      "sha256": "abb566affa72d8c8f9de79073be780c0e981d96889350305e0fb7acaf0b05e22",
+      "bytes": 15854,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/IS1009b.C.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/IS1009b.C.segments.xml",
+      "sha256": "a390c9e685b789dce2117b94e3ea11181af6da128e613190381891e5cf9668d0",
+      "bytes": 26290,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/IS1009b.D.segments.xml",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/segments/IS1009b.D.segments.xml",
+      "sha256": "0a328de04dc37ef80336cdc0d1a70768c646f2f90130a6180c06db90b495b1c0",
+      "bytes": 21689,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/CCBY4.0.txt",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/CCBY4.0.txt",
+      "sha256": "511b44e9dcdbb4a6492efd45ee1171a102e24ccd20bd51377f63fcda6b7fc14f",
+      "bytes": 17026,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/LICENCE.txt",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/LICENCE.txt",
+      "sha256": "d52fd9c7c19eec9f0bec3107554c10937203e261259d73b01637a61501fec7f7",
+      "bytes": 13197,
+      "status": "available"
+    },
+    {
+      "path": "ami_words/00README_MANUAL.txt",
+      "url": "https://huggingface.co/datasets/ggfox00000/dia-AMICorpus-all/resolve/a249db53de253a3a0a864c93a51d613159dfec7c/ami_public_manual_1.6.2/00README_MANUAL.txt",
+      "sha256": "001292e9082f0f403a155dd5e7e4a8d5ac6542dbf37b19a12c7b6030fabdd350",
+      "bytes": 2394,
+      "status": "available"
+    }
+  ]
+}

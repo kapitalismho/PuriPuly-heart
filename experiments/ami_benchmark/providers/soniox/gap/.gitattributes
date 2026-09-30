@@ -1,0 +1,2 @@
+ami_words/*.xml -text
+ami_words/*.txt -text
