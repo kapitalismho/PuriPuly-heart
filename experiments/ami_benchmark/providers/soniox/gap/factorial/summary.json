@@ -1,0 +1,3406 @@
+{
+  "subset_only": true,
+  "single_run_no_significance_claim": true,
+  "pooled": {
+    "A": {
+      "total": 894.8919999999995,
+      "missed detection": 167.5819999999995,
+      "false alarm": 176.11000000000007,
+      "confusion": 36.247000000000426,
+      "der": 0.42456408147575375
+    },
+    "B": {
+      "total": 894.8919999999994,
+      "missed detection": 208.88899999999944,
+      "false alarm": 204.3970000000001,
+      "confusion": 151.77899999999974,
+      "der": 0.6314337372554449
+    },
+    "C": {
+      "total": 894.8919999997178,
+      "missed detection": 172.83499999995823,
+      "false alarm": 162.514999999945,
+      "confusion": 30.7279999999918,
+      "der": 0.40907506157168744
+    },
+    "D": {
+      "total": 894.8919999997293,
+      "missed detection": 204.9219999999555,
+      "false alarm": 188.6499999999333,
+      "confusion": 174.44399999991998,
+      "der": 0.6347313418825742
+    }
+  },
+  "contrasts": {
+    "long_context": {
+      "AB": {
+        "der_difference_percentage_points_right_minus_left": 30.934240321568456,
+        "missed detection_seconds_difference": 35.74799999999989,
+        "false alarm_seconds_difference": 24.22800000000001,
+        "confusion_seconds_difference": 110.10199999999932
+      },
+      "CD": {
+        "der_difference_percentage_points_right_minus_left": 28.667436636622107,
+        "missed detection_seconds_difference": 23.015999999997206,
+        "false alarm_seconds_difference": 20.619999999989048,
+        "confusion_seconds_difference": 113.97899999993194
+      },
+      "AC": {
+        "der_difference_percentage_points_right_minus_left": 0.3905020871055709,
+        "missed detection_seconds_difference": 4.386999999960963,
+        "false alarm_seconds_difference": -0.7810000000479533,
+        "confusion_seconds_difference": -1.4590000000068635
+      },
+      "BD": {
+        "der_difference_percentage_points_right_minus_left": -1.8763015978407793,
+        "missed detection_seconds_difference": -8.345000000041722,
+        "false alarm_seconds_difference": -4.389000000058914,
+        "confusion_seconds_difference": 2.4179999999257547
+      }
+    },
+    "brief_interjections": {
+      "AB": {
+        "der_difference_percentage_points_right_minus_left": 7.238033690189716,
+        "missed detection_seconds_difference": 2.863999999999997,
+        "false alarm_seconds_difference": 2.4439999999999884,
+        "confusion_seconds_difference": 3.2040000000000184
+      },
+      "CD": {
+        "der_difference_percentage_points_right_minus_left": 24.815265176316025,
+        "missed detection_seconds_difference": 7.303000000000026,
+        "false alarm_seconds_difference": 3.2949999999995008,
+        "confusion_seconds_difference": 18.584999999998118
+      },
+      "AC": {
+        "der_difference_percentage_points_right_minus_left": -4.159828572885371,
+        "missed detection_seconds_difference": -0.424000000001449,
+        "false alarm_seconds_difference": -0.4000000000009578,
+        "confusion_seconds_difference": -4.0680000000017635
+      },
+      "BD": {
+        "der_difference_percentage_points_right_minus_left": 13.417402913240938,
+        "missed detection_seconds_difference": 4.0149999999985795,
+        "false alarm_seconds_difference": 0.45099999999855456,
+        "confusion_seconds_difference": 11.312999999996336
+      }
+    },
+    "low_overlap": {
+      "AB": {
+        "der_difference_percentage_points_right_minus_left": 2.651034349110998,
+        "missed detection_seconds_difference": 0.7259999999999991,
+        "false alarm_seconds_difference": 1.445999999999998,
+        "confusion_seconds_difference": 0.5640000000000072
+      },
+      "CD": {
+        "der_difference_percentage_points_right_minus_left": 2.6103386463833673,
+        "missed detection_seconds_difference": 0.6270000000000095,
+        "false alarm_seconds_difference": 1.5029999999998154,
+        "confusion_seconds_difference": 0.5639999999999219
+      },
+      "AC": {
+        "der_difference_percentage_points_right_minus_left": 2.4398042730490124,
+        "missed detection_seconds_difference": 0.03900000000000148,
+        "false alarm_seconds_difference": 2.478999999998724,
+        "confusion_seconds_difference": 0.0
+      },
+      "BD": {
+        "der_difference_percentage_points_right_minus_left": 2.3991085703213817,
+        "missed detection_seconds_difference": -0.05999999999998806,
+        "false alarm_seconds_difference": 2.535999999998541,
+        "confusion_seconds_difference": -8.526512829121202e-14
+      }
+    },
+    "long_return_gap": {
+      "AB": {
+        "der_difference_percentage_points_right_minus_left": 3.057587241814941,
+        "missed detection_seconds_difference": 1.9690000000000438,
+        "false alarm_seconds_difference": 0.16900000000001825,
+        "confusion_seconds_difference": 1.6619999999999635
+      },
+      "CD": {
+        "der_difference_percentage_points_right_minus_left": 10.014402845165627,
+        "missed detection_seconds_difference": 1.141000000000016,
+        "false alarm_seconds_difference": 0.716999999999949,
+        "confusion_seconds_difference": 10.587999999998196
+      },
+      "AC": {
+        "der_difference_percentage_points_right_minus_left": -10.97030117234204,
+        "missed detection_seconds_difference": 1.250999999999193,
+        "false alarm_seconds_difference": -14.89300000000491,
+        "confusion_seconds_difference": 0.007999999999999119
+      },
+      "BD": {
+        "der_difference_percentage_points_right_minus_left": -4.013485568991354,
+        "missed detection_seconds_difference": 0.42299999999916515,
+        "false alarm_seconds_difference": -14.34500000000498,
+        "confusion_seconds_difference": 8.933999999998232
+      }
+    }
+  },
+  "reception": {
+    "long_context": {
+      "A": {
+        "first_stable_token_s": 8.625,
+        "first_stable_attributed_token_s": 8.625,
+        "stable_tokens": 3571,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 1,
+        "max_send_stall_seconds": 0.0,
+        "max_source_availability_to_pcm_write_seconds": 152.26499999999942,
+        "actual_audio_seconds": 600.0,
+        "active_websocket_seconds": 754.0,
+        "finalizations": 1,
+        "transitions": [
+          {
+            "provider_cut_sample": 9600000,
+            "terminal": true,
+            "finalize_written_s": 752.3279999999995,
+            "fin_received_s": 752.5619999999999,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 753.2350000000006,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "B": {
+        "first_stable_token_s": 7.625,
+        "first_stable_attributed_token_s": 7.625,
+        "stable_tokens": 3587,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 2,
+        "max_send_stall_seconds": 0.0,
+        "max_source_availability_to_pcm_write_seconds": 152.3130000000001,
+        "actual_audio_seconds": 600.0,
+        "active_websocket_seconds": 754.0470000000005,
+        "finalizations": 122,
+        "transitions": [
+          {
+            "provider_cut_sample": 86016,
+            "terminal": false,
+            "finalize_written_s": 7.390999999999622,
+            "fin_received_s": 7.625,
+            "successor_pcm_s": 7.42200000000048
+          },
+          {
+            "provider_cut_sample": 178176,
+            "terminal": false,
+            "finalize_written_s": 14.593999999999141,
+            "fin_received_s": 14.79700000000048,
+            "successor_pcm_s": 14.610000000000582
+          },
+          {
+            "provider_cut_sample": 220672,
+            "terminal": false,
+            "finalize_written_s": 17.906999999999243,
+            "fin_received_s": 18.125,
+            "successor_pcm_s": 17.92200000000048
+          },
+          {
+            "provider_cut_sample": 267264,
+            "terminal": false,
+            "finalize_written_s": 21.563000000000102,
+            "fin_received_s": 21.76599999999962,
+            "successor_pcm_s": 21.610000000000582
+          },
+          {
+            "provider_cut_sample": 365568,
+            "terminal": false,
+            "finalize_written_s": 29.25,
+            "fin_received_s": 29.453999999999724,
+            "successor_pcm_s": 29.26599999999962
+          },
+          {
+            "provider_cut_sample": 472064,
+            "terminal": false,
+            "finalize_written_s": 37.59399999999914,
+            "fin_received_s": 37.82899999999972,
+            "successor_pcm_s": 37.65699999999924
+          },
+          {
+            "provider_cut_sample": 567808,
+            "terminal": false,
+            "finalize_written_s": 45.07899999999972,
+            "fin_received_s": 45.28199999999924,
+            "successor_pcm_s": 45.09399999999914
+          },
+          {
+            "provider_cut_sample": 637440,
+            "terminal": false,
+            "finalize_written_s": 50.51599999999962,
+            "fin_received_s": 50.71899999999914,
+            "successor_pcm_s": 50.53199999999924
+          },
+          {
+            "provider_cut_sample": 717824,
+            "terminal": false,
+            "finalize_written_s": 56.79700000000048,
+            "fin_received_s": 57.03199999999924,
+            "successor_pcm_s": 56.84399999999914
+          },
+          {
+            "provider_cut_sample": 802304,
+            "terminal": false,
+            "finalize_written_s": 63.39099999999962,
+            "fin_received_s": 63.59399999999914,
+            "successor_pcm_s": 63.40699999999924
+          },
+          {
+            "provider_cut_sample": 842752,
+            "terminal": false,
+            "finalize_written_s": 66.5630000000001,
+            "fin_received_s": 66.78199999999924,
+            "successor_pcm_s": 66.59399999999914
+          },
+          {
+            "provider_cut_sample": 863744,
+            "terminal": false,
+            "finalize_written_s": 68.20399999999972,
+            "fin_received_s": 68.40699999999924,
+            "successor_pcm_s": 68.23500000000058
+          },
+          {
+            "provider_cut_sample": 925696,
+            "terminal": false,
+            "finalize_written_s": 73.07899999999972,
+            "fin_received_s": 73.28199999999924,
+            "successor_pcm_s": 73.125
+          },
+          {
+            "provider_cut_sample": 1029632,
+            "terminal": false,
+            "finalize_written_s": 81.21899999999914,
+            "fin_received_s": 81.4380000000001,
+            "successor_pcm_s": 81.28199999999924
+          },
+          {
+            "provider_cut_sample": 1125376,
+            "terminal": false,
+            "finalize_written_s": 88.70399999999972,
+            "fin_received_s": 88.90699999999924,
+            "successor_pcm_s": 88.71899999999914
+          },
+          {
+            "provider_cut_sample": 1221120,
+            "terminal": false,
+            "finalize_written_s": 96.20399999999972,
+            "fin_received_s": 96.42200000000048,
+            "successor_pcm_s": 96.23500000000058
+          },
+          {
+            "provider_cut_sample": 1316864,
+            "terminal": false,
+            "finalize_written_s": 103.70399999999972,
+            "fin_received_s": 103.90699999999924,
+            "successor_pcm_s": 103.76599999999962
+          },
+          {
+            "provider_cut_sample": 1357824,
+            "terminal": false,
+            "finalize_written_s": 106.90699999999924,
+            "fin_received_s": 107.14099999999962,
+            "successor_pcm_s": 106.95399999999972
+          },
+          {
+            "provider_cut_sample": 1457664,
+            "terminal": false,
+            "finalize_written_s": 114.71899999999914,
+            "fin_received_s": 114.96899999999914,
+            "successor_pcm_s": 114.76599999999962
+          },
+          {
+            "provider_cut_sample": 1553408,
+            "terminal": false,
+            "finalize_written_s": 122.1880000000001,
+            "fin_received_s": 122.39099999999962,
+            "successor_pcm_s": 122.20399999999972
+          },
+          {
+            "provider_cut_sample": 1649152,
+            "terminal": false,
+            "finalize_written_s": 129.67200000000048,
+            "fin_received_s": 129.92200000000048,
+            "successor_pcm_s": 129.70399999999972
+          },
+          {
+            "provider_cut_sample": 1695232,
+            "terminal": false,
+            "finalize_written_s": 133.28199999999924,
+            "fin_received_s": 133.54700000000048,
+            "successor_pcm_s": 133.34399999999914
+          },
+          {
+            "provider_cut_sample": 1796096,
+            "terminal": false,
+            "finalize_written_s": 141.17200000000048,
+            "fin_received_s": 141.39099999999962,
+            "successor_pcm_s": 141.21899999999914
+          },
+          {
+            "provider_cut_sample": 1891840,
+            "terminal": false,
+            "finalize_written_s": 148.64099999999962,
+            "fin_received_s": 148.84399999999914,
+            "successor_pcm_s": 148.65699999999924
+          },
+          {
+            "provider_cut_sample": 1987584,
+            "terminal": false,
+            "finalize_written_s": 156.17200000000048,
+            "fin_received_s": 156.40699999999924,
+            "successor_pcm_s": 156.20399999999972
+          },
+          {
+            "provider_cut_sample": 2083328,
+            "terminal": false,
+            "finalize_written_s": 163.65699999999924,
+            "fin_received_s": 163.875,
+            "successor_pcm_s": 163.70399999999972
+          },
+          {
+            "provider_cut_sample": 2176512,
+            "terminal": false,
+            "finalize_written_s": 170.95399999999972,
+            "fin_received_s": 171.20399999999972,
+            "successor_pcm_s": 170.98500000000058
+          },
+          {
+            "provider_cut_sample": 2275840,
+            "terminal": false,
+            "finalize_written_s": 178.71899999999914,
+            "fin_received_s": 178.9380000000001,
+            "successor_pcm_s": 178.73500000000058
+          },
+          {
+            "provider_cut_sample": 2339840,
+            "terminal": false,
+            "finalize_written_s": 183.73500000000058,
+            "fin_received_s": 183.9380000000001,
+            "successor_pcm_s": 183.75
+          },
+          {
+            "provider_cut_sample": 2401792,
+            "terminal": false,
+            "finalize_written_s": 188.59399999999914,
+            "fin_received_s": 188.82899999999972,
+            "successor_pcm_s": 188.64099999999962
+          },
+          {
+            "provider_cut_sample": 2474496,
+            "terminal": false,
+            "finalize_written_s": 194.29700000000048,
+            "fin_received_s": 194.5,
+            "successor_pcm_s": 194.34399999999914
+          },
+          {
+            "provider_cut_sample": 2578944,
+            "terminal": false,
+            "finalize_written_s": 202.46899999999914,
+            "fin_received_s": 202.6880000000001,
+            "successor_pcm_s": 202.5
+          },
+          {
+            "provider_cut_sample": 2675200,
+            "terminal": false,
+            "finalize_written_s": 210.04700000000048,
+            "fin_received_s": 210.25,
+            "successor_pcm_s": 210.11000000000058
+          },
+          {
+            "provider_cut_sample": 2744320,
+            "terminal": false,
+            "finalize_written_s": 215.45399999999972,
+            "fin_received_s": 215.67200000000048,
+            "successor_pcm_s": 215.5
+          },
+          {
+            "provider_cut_sample": 2814976,
+            "terminal": false,
+            "finalize_written_s": 220.98500000000058,
+            "fin_received_s": 221.20399999999972,
+            "successor_pcm_s": 221.0
+          },
+          {
+            "provider_cut_sample": 2882048,
+            "terminal": false,
+            "finalize_written_s": 226.21899999999914,
+            "fin_received_s": 226.4380000000001,
+            "successor_pcm_s": 226.25
+          },
+          {
+            "provider_cut_sample": 2903552,
+            "terminal": false,
+            "finalize_written_s": 227.92200000000048,
+            "fin_received_s": 228.125,
+            "successor_pcm_s": 227.95399999999972
+          },
+          {
+            "provider_cut_sample": 2971136,
+            "terminal": false,
+            "finalize_written_s": 233.20399999999972,
+            "fin_received_s": 233.42200000000048,
+            "successor_pcm_s": 233.21899999999914
+          },
+          {
+            "provider_cut_sample": 3076096,
+            "terminal": false,
+            "finalize_written_s": 241.45399999999972,
+            "fin_received_s": 241.67200000000048,
+            "successor_pcm_s": 241.5
+          },
+          {
+            "provider_cut_sample": 3170304,
+            "terminal": false,
+            "finalize_written_s": 248.79700000000048,
+            "fin_received_s": 249.0630000000001,
+            "successor_pcm_s": 248.8130000000001
+          },
+          {
+            "provider_cut_sample": 3238400,
+            "terminal": false,
+            "finalize_written_s": 254.14099999999962,
+            "fin_received_s": 254.34399999999914,
+            "successor_pcm_s": 254.20399999999972
+          },
+          {
+            "provider_cut_sample": 3337216,
+            "terminal": false,
+            "finalize_written_s": 261.8600000000006,
+            "fin_received_s": 262.09399999999914,
+            "successor_pcm_s": 261.8909999999996
+          },
+          {
+            "provider_cut_sample": 3419648,
+            "terminal": false,
+            "finalize_written_s": 268.2970000000005,
+            "fin_received_s": 268.5159999999996,
+            "successor_pcm_s": 268.3289999999997
+          },
+          {
+            "provider_cut_sample": 3492864,
+            "terminal": false,
+            "finalize_written_s": 274.0470000000005,
+            "fin_received_s": 274.25,
+            "successor_pcm_s": 274.1100000000006
+          },
+          {
+            "provider_cut_sample": 3530240,
+            "terminal": false,
+            "finalize_written_s": 276.96899999999914,
+            "fin_received_s": 277.1880000000001,
+            "successor_pcm_s": 276.9850000000006
+          },
+          {
+            "provider_cut_sample": 3568640,
+            "terminal": false,
+            "finalize_written_s": 279.96899999999914,
+            "fin_received_s": 280.1880000000001,
+            "successor_pcm_s": 279.9850000000006
+          },
+          {
+            "provider_cut_sample": 3674112,
+            "terminal": false,
+            "finalize_written_s": 288.21899999999914,
+            "fin_received_s": 288.4539999999997,
+            "successor_pcm_s": 288.25
+          },
+          {
+            "provider_cut_sample": 3768832,
+            "terminal": false,
+            "finalize_written_s": 295.6409999999996,
+            "fin_received_s": 295.84399999999914,
+            "successor_pcm_s": 295.7039999999997
+          },
+          {
+            "provider_cut_sample": 3878912,
+            "terminal": false,
+            "finalize_written_s": 304.2659999999996,
+            "fin_received_s": 304.4850000000006,
+            "successor_pcm_s": 304.2970000000005
+          },
+          {
+            "provider_cut_sample": 3974656,
+            "terminal": false,
+            "finalize_written_s": 311.7970000000005,
+            "fin_received_s": 312.03199999999924,
+            "successor_pcm_s": 311.84399999999914
+          },
+          {
+            "provider_cut_sample": 4070400,
+            "terminal": false,
+            "finalize_written_s": 319.28199999999924,
+            "fin_received_s": 319.5159999999996,
+            "successor_pcm_s": 319.34399999999914
+          },
+          {
+            "provider_cut_sample": 4166144,
+            "terminal": false,
+            "finalize_written_s": 326.7970000000005,
+            "fin_received_s": 327.0,
+            "successor_pcm_s": 326.8289999999997
+          },
+          {
+            "provider_cut_sample": 4265472,
+            "terminal": false,
+            "finalize_written_s": 334.625,
+            "fin_received_s": 334.84399999999914,
+            "successor_pcm_s": 334.6409999999996
+          },
+          {
+            "provider_cut_sample": 4339712,
+            "terminal": false,
+            "finalize_written_s": 340.4539999999997,
+            "fin_received_s": 340.7039999999997,
+            "successor_pcm_s": 340.4850000000006
+          },
+          {
+            "provider_cut_sample": 4423680,
+            "terminal": false,
+            "finalize_written_s": 347.0159999999996,
+            "fin_received_s": 347.25,
+            "successor_pcm_s": 347.0470000000005
+          },
+          {
+            "provider_cut_sample": 4524032,
+            "terminal": false,
+            "finalize_written_s": 354.9380000000001,
+            "fin_received_s": 355.1409999999996,
+            "successor_pcm_s": 355.0
+          },
+          {
+            "provider_cut_sample": 4595712,
+            "terminal": false,
+            "finalize_written_s": 360.5630000000001,
+            "fin_received_s": 360.7659999999996,
+            "successor_pcm_s": 360.59399999999914
+          },
+          {
+            "provider_cut_sample": 4694016,
+            "terminal": false,
+            "finalize_written_s": 368.25,
+            "fin_received_s": 368.4850000000006,
+            "successor_pcm_s": 368.28199999999924
+          },
+          {
+            "provider_cut_sample": 4789760,
+            "terminal": false,
+            "finalize_written_s": 375.75,
+            "fin_received_s": 376.0,
+            "successor_pcm_s": 375.7970000000005
+          },
+          {
+            "provider_cut_sample": 4853760,
+            "terminal": false,
+            "finalize_written_s": 380.75,
+            "fin_received_s": 381.0,
+            "successor_pcm_s": 380.7970000000005
+          },
+          {
+            "provider_cut_sample": 4908032,
+            "terminal": false,
+            "finalize_written_s": 385.0,
+            "fin_received_s": 385.2039999999997,
+            "successor_pcm_s": 385.0630000000001
+          },
+          {
+            "provider_cut_sample": 4964864,
+            "terminal": false,
+            "finalize_written_s": 389.4539999999997,
+            "fin_received_s": 389.65699999999924,
+            "successor_pcm_s": 389.5159999999996
+          },
+          {
+            "provider_cut_sample": 5075456,
+            "terminal": false,
+            "finalize_written_s": 398.1100000000006,
+            "fin_received_s": 398.34399999999914,
+            "successor_pcm_s": 398.15699999999924
+          },
+          {
+            "provider_cut_sample": 5145600,
+            "terminal": false,
+            "finalize_written_s": 403.59399999999914,
+            "fin_received_s": 403.7970000000005,
+            "successor_pcm_s": 403.65699999999924
+          },
+          {
+            "provider_cut_sample": 5227520,
+            "terminal": false,
+            "finalize_written_s": 410.0,
+            "fin_received_s": 410.2350000000006,
+            "successor_pcm_s": 410.03199999999924
+          },
+          {
+            "provider_cut_sample": 5347328,
+            "terminal": false,
+            "finalize_written_s": 419.375,
+            "fin_received_s": 419.59399999999914,
+            "successor_pcm_s": 419.4220000000005
+          },
+          {
+            "provider_cut_sample": 5443072,
+            "terminal": false,
+            "finalize_written_s": 426.84399999999914,
+            "fin_received_s": 427.0789999999997,
+            "successor_pcm_s": 426.8600000000006
+          },
+          {
+            "provider_cut_sample": 5468160,
+            "terminal": false,
+            "finalize_written_s": 428.8130000000001,
+            "fin_received_s": 429.0470000000005,
+            "successor_pcm_s": 428.8600000000006
+          },
+          {
+            "provider_cut_sample": 5528576,
+            "terminal": false,
+            "finalize_written_s": 433.53199999999924,
+            "fin_received_s": 433.7350000000006,
+            "successor_pcm_s": 433.5470000000005
+          },
+          {
+            "provider_cut_sample": 5577728,
+            "terminal": false,
+            "finalize_written_s": 437.375,
+            "fin_received_s": 437.5789999999997,
+            "successor_pcm_s": 437.4220000000005
+          },
+          {
+            "provider_cut_sample": 5669376,
+            "terminal": false,
+            "finalize_written_s": 444.5630000000001,
+            "fin_received_s": 444.78199999999924,
+            "successor_pcm_s": 444.5789999999997
+          },
+          {
+            "provider_cut_sample": 5745664,
+            "terminal": false,
+            "finalize_written_s": 450.53199999999924,
+            "fin_received_s": 450.75,
+            "successor_pcm_s": 450.59399999999914
+          },
+          {
+            "provider_cut_sample": 5815808,
+            "terminal": false,
+            "finalize_written_s": 456.0159999999996,
+            "fin_received_s": 456.21899999999914,
+            "successor_pcm_s": 456.03199999999924
+          },
+          {
+            "provider_cut_sample": 5854208,
+            "terminal": false,
+            "finalize_written_s": 459.0159999999996,
+            "fin_received_s": 459.21899999999914,
+            "successor_pcm_s": 459.03199999999924
+          },
+          {
+            "provider_cut_sample": 5876224,
+            "terminal": false,
+            "finalize_written_s": 460.7350000000006,
+            "fin_received_s": 460.9850000000006,
+            "successor_pcm_s": 460.78199999999924
+          },
+          {
+            "provider_cut_sample": 5966336,
+            "terminal": false,
+            "finalize_written_s": 467.7970000000005,
+            "fin_received_s": 468.0630000000001,
+            "successor_pcm_s": 467.8130000000001
+          },
+          {
+            "provider_cut_sample": 6052352,
+            "terminal": false,
+            "finalize_written_s": 474.53199999999924,
+            "fin_received_s": 474.7659999999996,
+            "successor_pcm_s": 474.5630000000001
+          },
+          {
+            "provider_cut_sample": 6155776,
+            "terminal": false,
+            "finalize_written_s": 482.625,
+            "fin_received_s": 482.84399999999914,
+            "successor_pcm_s": 482.6409999999996
+          },
+          {
+            "provider_cut_sample": 6260224,
+            "terminal": false,
+            "finalize_written_s": 490.7970000000005,
+            "fin_received_s": 491.03199999999924,
+            "successor_pcm_s": 490.84399999999914
+          },
+          {
+            "provider_cut_sample": 6355968,
+            "terminal": false,
+            "finalize_written_s": 498.28199999999924,
+            "fin_received_s": 498.5159999999996,
+            "successor_pcm_s": 498.2970000000005
+          },
+          {
+            "provider_cut_sample": 6419968,
+            "terminal": false,
+            "finalize_written_s": 503.3289999999997,
+            "fin_received_s": 503.5470000000005,
+            "successor_pcm_s": 503.34399999999914
+          },
+          {
+            "provider_cut_sample": 6529536,
+            "terminal": false,
+            "finalize_written_s": 511.9220000000005,
+            "fin_received_s": 512.1409999999996,
+            "successor_pcm_s": 511.9380000000001
+          },
+          {
+            "provider_cut_sample": 6625280,
+            "terminal": false,
+            "finalize_written_s": 519.4539999999997,
+            "fin_received_s": 519.6880000000001,
+            "successor_pcm_s": 519.4850000000006
+          },
+          {
+            "provider_cut_sample": 6721024,
+            "terminal": false,
+            "finalize_written_s": 526.9380000000001,
+            "fin_received_s": 527.1720000000005,
+            "successor_pcm_s": 526.9850000000006
+          },
+          {
+            "provider_cut_sample": 6788608,
+            "terminal": false,
+            "finalize_written_s": 532.2189999999991,
+            "fin_received_s": 532.4380000000001,
+            "successor_pcm_s": 532.2350000000006
+          },
+          {
+            "provider_cut_sample": 6865408,
+            "terminal": false,
+            "finalize_written_s": 538.2189999999991,
+            "fin_received_s": 538.4380000000001,
+            "successor_pcm_s": 538.2350000000006
+          },
+          {
+            "provider_cut_sample": 6963200,
+            "terminal": false,
+            "finalize_written_s": 545.8600000000006,
+            "fin_received_s": 546.0939999999991,
+            "successor_pcm_s": 545.9220000000005
+          },
+          {
+            "provider_cut_sample": 7057408,
+            "terminal": false,
+            "finalize_written_s": 553.25,
+            "fin_received_s": 553.4689999999991,
+            "successor_pcm_s": 553.2659999999996
+          },
+          {
+            "provider_cut_sample": 7090176,
+            "terminal": false,
+            "finalize_written_s": 555.8130000000001,
+            "fin_received_s": 556.0319999999992,
+            "successor_pcm_s": 555.8289999999997
+          },
+          {
+            "provider_cut_sample": 7158272,
+            "terminal": false,
+            "finalize_written_s": 561.1409999999996,
+            "fin_received_s": 561.4380000000001,
+            "successor_pcm_s": 561.1569999999992
+          },
+          {
+            "provider_cut_sample": 7198720,
+            "terminal": false,
+            "finalize_written_s": 564.3130000000001,
+            "fin_received_s": 564.5470000000005,
+            "successor_pcm_s": 564.3600000000006
+          },
+          {
+            "provider_cut_sample": 7297024,
+            "terminal": false,
+            "finalize_written_s": 572.0319999999992,
+            "fin_received_s": 572.2659999999996,
+            "successor_pcm_s": 572.0789999999997
+          },
+          {
+            "provider_cut_sample": 7388672,
+            "terminal": false,
+            "finalize_written_s": 579.2039999999997,
+            "fin_received_s": 579.4380000000001,
+            "successor_pcm_s": 579.2189999999991
+          },
+          {
+            "provider_cut_sample": 7462400,
+            "terminal": false,
+            "finalize_written_s": 584.9689999999991,
+            "fin_received_s": 585.1720000000005,
+            "successor_pcm_s": 585.0319999999992
+          },
+          {
+            "provider_cut_sample": 7554048,
+            "terminal": false,
+            "finalize_written_s": 592.125,
+            "fin_received_s": 592.3439999999991,
+            "successor_pcm_s": 592.1569999999992
+          },
+          {
+            "provider_cut_sample": 7636992,
+            "terminal": false,
+            "finalize_written_s": 598.6100000000006,
+            "fin_received_s": 598.8289999999997,
+            "successor_pcm_s": 598.6569999999992
+          },
+          {
+            "provider_cut_sample": 7716864,
+            "terminal": false,
+            "finalize_written_s": 604.8909999999996,
+            "fin_received_s": 605.0939999999991,
+            "successor_pcm_s": 604.9380000000001
+          },
+          {
+            "provider_cut_sample": 7810560,
+            "terminal": false,
+            "finalize_written_s": 612.2039999999997,
+            "fin_received_s": 612.4380000000001,
+            "successor_pcm_s": 612.25
+          },
+          {
+            "provider_cut_sample": 7930880,
+            "terminal": false,
+            "finalize_written_s": 621.6409999999996,
+            "fin_received_s": 621.8439999999991,
+            "successor_pcm_s": 621.6720000000005
+          },
+          {
+            "provider_cut_sample": 8032768,
+            "terminal": false,
+            "finalize_written_s": 629.6100000000006,
+            "fin_received_s": 629.8600000000006,
+            "successor_pcm_s": 629.625
+          },
+          {
+            "provider_cut_sample": 8068608,
+            "terminal": false,
+            "finalize_written_s": 632.4220000000005,
+            "fin_received_s": 632.6409999999996,
+            "successor_pcm_s": 632.4380000000001
+          },
+          {
+            "provider_cut_sample": 8151040,
+            "terminal": false,
+            "finalize_written_s": 638.875,
+            "fin_received_s": 639.0939999999991,
+            "successor_pcm_s": 638.8909999999996
+          },
+          {
+            "provider_cut_sample": 8218112,
+            "terminal": false,
+            "finalize_written_s": 644.125,
+            "fin_received_s": 644.3439999999991,
+            "successor_pcm_s": 644.1569999999992
+          },
+          {
+            "provider_cut_sample": 8298496,
+            "terminal": false,
+            "finalize_written_s": 650.4220000000005,
+            "fin_received_s": 650.6409999999996,
+            "successor_pcm_s": 650.4689999999991
+          },
+          {
+            "provider_cut_sample": 8393728,
+            "terminal": false,
+            "finalize_written_s": 657.8600000000006,
+            "fin_received_s": 658.0939999999991,
+            "successor_pcm_s": 657.9069999999992
+          },
+          {
+            "provider_cut_sample": 8419840,
+            "terminal": false,
+            "finalize_written_s": 659.8909999999996,
+            "fin_received_s": 660.1100000000006,
+            "successor_pcm_s": 659.9069999999992
+          },
+          {
+            "provider_cut_sample": 8527872,
+            "terminal": false,
+            "finalize_written_s": 668.3439999999991,
+            "fin_received_s": 668.5630000000001,
+            "successor_pcm_s": 668.3600000000006
+          },
+          {
+            "provider_cut_sample": 8643072,
+            "terminal": false,
+            "finalize_written_s": 677.3600000000006,
+            "fin_received_s": 677.5789999999997,
+            "successor_pcm_s": 677.375
+          },
+          {
+            "provider_cut_sample": 8713728,
+            "terminal": false,
+            "finalize_written_s": 682.8909999999996,
+            "fin_received_s": 683.1100000000006,
+            "successor_pcm_s": 682.9380000000001
+          },
+          {
+            "provider_cut_sample": 8804864,
+            "terminal": false,
+            "finalize_written_s": 690.0630000000001,
+            "fin_received_s": 690.2819999999992,
+            "successor_pcm_s": 690.1100000000006
+          },
+          {
+            "provider_cut_sample": 8903168,
+            "terminal": false,
+            "finalize_written_s": 697.75,
+            "fin_received_s": 697.9850000000006,
+            "successor_pcm_s": 697.7659999999996
+          },
+          {
+            "provider_cut_sample": 8958976,
+            "terminal": false,
+            "finalize_written_s": 702.1569999999992,
+            "fin_received_s": 702.375,
+            "successor_pcm_s": 702.1720000000005
+          },
+          {
+            "provider_cut_sample": 9042944,
+            "terminal": false,
+            "finalize_written_s": 708.7350000000006,
+            "fin_received_s": 708.9539999999997,
+            "successor_pcm_s": 708.7659999999996
+          },
+          {
+            "provider_cut_sample": 9113600,
+            "terminal": false,
+            "finalize_written_s": 714.2819999999992,
+            "fin_received_s": 714.5159999999996,
+            "successor_pcm_s": 714.3439999999991
+          },
+          {
+            "provider_cut_sample": 9194496,
+            "terminal": false,
+            "finalize_written_s": 720.625,
+            "fin_received_s": 720.8439999999991,
+            "successor_pcm_s": 720.6720000000005
+          },
+          {
+            "provider_cut_sample": 9270784,
+            "terminal": false,
+            "finalize_written_s": 726.5789999999997,
+            "fin_received_s": 726.7970000000005,
+            "successor_pcm_s": 726.6100000000006
+          },
+          {
+            "provider_cut_sample": 9299456,
+            "terminal": false,
+            "finalize_written_s": 728.8600000000006,
+            "fin_received_s": 729.1100000000006,
+            "successor_pcm_s": 728.9069999999992
+          },
+          {
+            "provider_cut_sample": 9399296,
+            "terminal": false,
+            "finalize_written_s": 736.7039999999997,
+            "fin_received_s": 736.9539999999997,
+            "successor_pcm_s": 736.75
+          },
+          {
+            "provider_cut_sample": 9495040,
+            "terminal": false,
+            "finalize_written_s": 744.1720000000005,
+            "fin_received_s": 744.4069999999992,
+            "successor_pcm_s": 744.1880000000001
+          },
+          {
+            "provider_cut_sample": 9590784,
+            "terminal": false,
+            "finalize_written_s": 751.6569999999992,
+            "fin_received_s": 751.9069999999992,
+            "successor_pcm_s": 751.6880000000001
+          },
+          {
+            "provider_cut_sample": 9600000,
+            "terminal": false,
+            "finalize_written_s": 752.375,
+            "fin_received_s": 752.6100000000006,
+            "successor_pcm_s": null
+          },
+          {
+            "provider_cut_sample": 9600000,
+            "terminal": true,
+            "finalize_written_s": 752.375,
+            "fin_received_s": 752.6409999999996,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 753.4060000000009,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "C": {
+        "first_stable_token_s": 8.610000000000582,
+        "first_stable_attributed_token_s": 8.610000000000582,
+        "stable_tokens": 3327,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 1,
+        "max_send_stall_seconds": 0.0,
+        "max_source_availability_to_pcm_write_seconds": 161.0,
+        "actual_audio_seconds": 602.788,
+        "active_websocket_seconds": 762.6720000000005,
+        "finalizations": 1,
+        "transitions": [
+          {
+            "provider_cut_sample": 9644608,
+            "terminal": true,
+            "finalize_written_s": 761.0470000000005,
+            "fin_received_s": 761.2660000000014,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 761.9689999999991,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "D": {
+        "first_stable_token_s": 7.92200000000048,
+        "first_stable_attributed_token_s": 7.92200000000048,
+        "stable_tokens": 3648,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 2,
+        "max_send_stall_seconds": 0.01600000000144064,
+        "max_source_availability_to_pcm_write_seconds": 167.20399999999972,
+        "actual_audio_seconds": 602.788,
+        "active_websocket_seconds": 768.9380000000001,
+        "finalizations": 122,
+        "transitions": [
+          {
+            "provider_cut_sample": 89216,
+            "terminal": false,
+            "finalize_written_s": 7.718999999999141,
+            "fin_received_s": 7.92200000000048,
+            "successor_pcm_s": 7.781999999999243
+          },
+          {
+            "provider_cut_sample": 180288,
+            "terminal": false,
+            "finalize_written_s": 14.953999999999724,
+            "fin_received_s": 15.156999999999243,
+            "successor_pcm_s": 15.015999999999622
+          },
+          {
+            "provider_cut_sample": 222784,
+            "terminal": false,
+            "finalize_written_s": 18.313000000000102,
+            "fin_received_s": 18.51599999999962,
+            "successor_pcm_s": 18.375
+          },
+          {
+            "provider_cut_sample": 269376,
+            "terminal": false,
+            "finalize_written_s": 21.953999999999724,
+            "fin_received_s": 22.156999999999243,
+            "successor_pcm_s": 22.01599999999962
+          },
+          {
+            "provider_cut_sample": 370880,
+            "terminal": false,
+            "finalize_written_s": 29.96899999999914,
+            "fin_received_s": 30.188000000000102,
+            "successor_pcm_s": 30.031999999999243
+          },
+          {
+            "provider_cut_sample": 477824,
+            "terminal": false,
+            "finalize_written_s": 38.39099999999962,
+            "fin_received_s": 38.61000000000058,
+            "successor_pcm_s": 38.45399999999972
+          },
+          {
+            "provider_cut_sample": 581568,
+            "terminal": false,
+            "finalize_written_s": 46.59399999999914,
+            "fin_received_s": 46.8130000000001,
+            "successor_pcm_s": 46.65699999999924
+          },
+          {
+            "provider_cut_sample": 659200,
+            "terminal": false,
+            "finalize_written_s": 52.8130000000001,
+            "fin_received_s": 53.01599999999962,
+            "successor_pcm_s": 52.875
+          },
+          {
+            "provider_cut_sample": 741568,
+            "terminal": false,
+            "finalize_written_s": 59.3130000000001,
+            "fin_received_s": 59.51599999999962,
+            "successor_pcm_s": 59.375
+          },
+          {
+            "provider_cut_sample": 829248,
+            "terminal": false,
+            "finalize_written_s": 66.1880000000001,
+            "fin_received_s": 66.39099999999962,
+            "successor_pcm_s": 66.25
+          },
+          {
+            "provider_cut_sample": 869696,
+            "terminal": false,
+            "finalize_written_s": 69.39099999999962,
+            "fin_received_s": 69.625,
+            "successor_pcm_s": 69.45399999999972
+          },
+          {
+            "provider_cut_sample": 890688,
+            "terminal": false,
+            "finalize_written_s": 71.03199999999924,
+            "fin_received_s": 71.25,
+            "successor_pcm_s": 71.09399999999914
+          },
+          {
+            "provider_cut_sample": 927360,
+            "terminal": false,
+            "finalize_written_s": 73.9380000000001,
+            "fin_received_s": 74.17200000000048,
+            "successor_pcm_s": 74.0
+          },
+          {
+            "provider_cut_sample": 1034304,
+            "terminal": false,
+            "finalize_written_s": 82.39099999999962,
+            "fin_received_s": 82.61000000000058,
+            "successor_pcm_s": 82.45399999999972
+          },
+          {
+            "provider_cut_sample": 1138048,
+            "terminal": false,
+            "finalize_written_s": 90.51599999999962,
+            "fin_received_s": 90.71899999999914,
+            "successor_pcm_s": 90.57899999999972
+          },
+          {
+            "provider_cut_sample": 1241792,
+            "terminal": false,
+            "finalize_written_s": 98.73500000000058,
+            "fin_received_s": 98.9380000000001,
+            "successor_pcm_s": 98.79700000000048
+          },
+          {
+            "provider_cut_sample": 1345536,
+            "terminal": false,
+            "finalize_written_s": 106.95399999999972,
+            "fin_received_s": 107.1880000000001,
+            "successor_pcm_s": 107.01599999999962
+          },
+          {
+            "provider_cut_sample": 1391296,
+            "terminal": false,
+            "finalize_written_s": 110.57899999999972,
+            "fin_received_s": 110.76599999999962,
+            "successor_pcm_s": 110.64099999999962
+          },
+          {
+            "provider_cut_sample": 1494336,
+            "terminal": false,
+            "finalize_written_s": 118.65699999999924,
+            "fin_received_s": 118.86000000000058,
+            "successor_pcm_s": 118.71899999999914
+          },
+          {
+            "provider_cut_sample": 1598080,
+            "terminal": false,
+            "finalize_written_s": 126.84399999999914,
+            "fin_received_s": 127.04700000000048,
+            "successor_pcm_s": 126.90699999999924
+          },
+          {
+            "provider_cut_sample": 1701824,
+            "terminal": false,
+            "finalize_written_s": 135.04700000000048,
+            "fin_received_s": 135.26599999999962,
+            "successor_pcm_s": 135.11000000000058
+          },
+          {
+            "provider_cut_sample": 1752704,
+            "terminal": false,
+            "finalize_written_s": 139.07899999999972,
+            "fin_received_s": 139.29700000000048,
+            "successor_pcm_s": 139.14099999999962
+          },
+          {
+            "provider_cut_sample": 1856768,
+            "terminal": false,
+            "finalize_written_s": 147.34399999999914,
+            "fin_received_s": 147.5630000000001,
+            "successor_pcm_s": 147.40699999999924
+          },
+          {
+            "provider_cut_sample": 1960512,
+            "terminal": false,
+            "finalize_written_s": 155.54700000000048,
+            "fin_received_s": 155.76599999999962,
+            "successor_pcm_s": 155.61000000000058
+          },
+          {
+            "provider_cut_sample": 2064256,
+            "terminal": false,
+            "finalize_written_s": 163.78199999999924,
+            "fin_received_s": 164.0,
+            "successor_pcm_s": 163.84399999999914
+          },
+          {
+            "provider_cut_sample": 2168000,
+            "terminal": false,
+            "finalize_written_s": 172.04700000000048,
+            "fin_received_s": 172.28199999999924,
+            "successor_pcm_s": 172.11000000000058
+          },
+          {
+            "provider_cut_sample": 2269184,
+            "terminal": false,
+            "finalize_written_s": 180.03199999999924,
+            "fin_received_s": 181.0,
+            "successor_pcm_s": 180.09399999999914
+          },
+          {
+            "provider_cut_sample": 2371712,
+            "terminal": false,
+            "finalize_written_s": 188.1880000000001,
+            "fin_received_s": 188.39099999999962,
+            "successor_pcm_s": 188.25
+          },
+          {
+            "provider_cut_sample": 2443712,
+            "terminal": false,
+            "finalize_written_s": 193.9380000000001,
+            "fin_received_s": 194.14099999999962,
+            "successor_pcm_s": 194.0
+          },
+          {
+            "provider_cut_sample": 2505664,
+            "terminal": false,
+            "finalize_written_s": 198.875,
+            "fin_received_s": 199.07899999999972,
+            "successor_pcm_s": 198.9380000000001
+          },
+          {
+            "provider_cut_sample": 2567936,
+            "terminal": false,
+            "finalize_written_s": 203.79700000000048,
+            "fin_received_s": 204.01599999999962,
+            "successor_pcm_s": 203.86000000000058
+          },
+          {
+            "provider_cut_sample": 2674880,
+            "terminal": false,
+            "finalize_written_s": 212.28199999999924,
+            "fin_received_s": 212.5,
+            "successor_pcm_s": 212.34399999999914
+          },
+          {
+            "provider_cut_sample": 2779136,
+            "terminal": false,
+            "finalize_written_s": 220.5630000000001,
+            "fin_received_s": 220.78199999999924,
+            "successor_pcm_s": 220.625
+          },
+          {
+            "provider_cut_sample": 2856256,
+            "terminal": false,
+            "finalize_written_s": 226.75,
+            "fin_received_s": 226.95399999999972,
+            "successor_pcm_s": 226.8130000000001
+          },
+          {
+            "provider_cut_sample": 2930112,
+            "terminal": false,
+            "finalize_written_s": 232.64099999999962,
+            "fin_received_s": 232.84399999999914,
+            "successor_pcm_s": 232.70399999999972
+          },
+          {
+            "provider_cut_sample": 2997184,
+            "terminal": false,
+            "finalize_written_s": 238.03199999999924,
+            "fin_received_s": 238.23500000000058,
+            "successor_pcm_s": 238.09399999999914
+          },
+          {
+            "provider_cut_sample": 3018688,
+            "terminal": false,
+            "finalize_written_s": 239.75,
+            "fin_received_s": 239.95399999999972,
+            "successor_pcm_s": 239.8130000000001
+          },
+          {
+            "provider_cut_sample": 3089472,
+            "terminal": false,
+            "finalize_written_s": 245.32899999999972,
+            "fin_received_s": 245.53199999999924,
+            "successor_pcm_s": 245.39099999999962
+          },
+          {
+            "provider_cut_sample": 3182592,
+            "terminal": false,
+            "finalize_written_s": 252.71899999999914,
+            "fin_received_s": 252.9380000000001,
+            "successor_pcm_s": 252.78199999999924
+          },
+          {
+            "provider_cut_sample": 3280000,
+            "terminal": false,
+            "finalize_written_s": 260.40699999999924,
+            "fin_received_s": 260.6100000000006,
+            "successor_pcm_s": 260.46899999999914
+          },
+          {
+            "provider_cut_sample": 3351296,
+            "terminal": false,
+            "finalize_written_s": 266.0470000000005,
+            "fin_received_s": 266.2970000000005,
+            "successor_pcm_s": 266.1100000000006
+          },
+          {
+            "provider_cut_sample": 3453312,
+            "terminal": false,
+            "finalize_written_s": 274.1100000000006,
+            "fin_received_s": 274.34399999999914,
+            "successor_pcm_s": 274.1720000000005
+          },
+          {
+            "provider_cut_sample": 3543744,
+            "terminal": false,
+            "finalize_written_s": 281.2970000000005,
+            "fin_received_s": 281.53199999999924,
+            "successor_pcm_s": 281.3600000000006
+          },
+          {
+            "provider_cut_sample": 3618944,
+            "terminal": false,
+            "finalize_written_s": 287.1409999999996,
+            "fin_received_s": 287.3600000000006,
+            "successor_pcm_s": 287.2039999999997
+          },
+          {
+            "provider_cut_sample": 3641280,
+            "terminal": false,
+            "finalize_written_s": 288.9220000000005,
+            "fin_received_s": 289.125,
+            "successor_pcm_s": 288.9850000000006
+          },
+          {
+            "provider_cut_sample": 3679680,
+            "terminal": false,
+            "finalize_written_s": 291.9850000000006,
+            "fin_received_s": 292.2039999999997,
+            "successor_pcm_s": 292.0470000000005
+          },
+          {
+            "provider_cut_sample": 3786624,
+            "terminal": false,
+            "finalize_written_s": 300.3909999999996,
+            "fin_received_s": 300.6100000000006,
+            "successor_pcm_s": 300.4539999999997
+          },
+          {
+            "provider_cut_sample": 3889344,
+            "terminal": false,
+            "finalize_written_s": 308.46899999999914,
+            "fin_received_s": 308.6880000000001,
+            "successor_pcm_s": 308.53199999999924
+          },
+          {
+            "provider_cut_sample": 3996288,
+            "terminal": false,
+            "finalize_written_s": 317.0159999999996,
+            "fin_received_s": 317.2350000000006,
+            "successor_pcm_s": 317.0789999999997
+          },
+          {
+            "provider_cut_sample": 4100032,
+            "terminal": false,
+            "finalize_written_s": 325.2039999999997,
+            "fin_received_s": 325.4220000000005,
+            "successor_pcm_s": 325.2659999999996
+          },
+          {
+            "provider_cut_sample": 4203776,
+            "terminal": false,
+            "finalize_written_s": 333.40699999999924,
+            "fin_received_s": 333.625,
+            "successor_pcm_s": 333.46899999999914
+          },
+          {
+            "provider_cut_sample": 4307520,
+            "terminal": false,
+            "finalize_written_s": 341.78199999999924,
+            "fin_received_s": 342.0,
+            "successor_pcm_s": 341.84399999999914
+          },
+          {
+            "provider_cut_sample": 4411264,
+            "terminal": false,
+            "finalize_written_s": 350.03199999999924,
+            "fin_received_s": 350.2350000000006,
+            "successor_pcm_s": 350.09399999999914
+          },
+          {
+            "provider_cut_sample": 4493504,
+            "terminal": false,
+            "finalize_written_s": 356.6100000000006,
+            "fin_received_s": 356.8289999999997,
+            "successor_pcm_s": 356.6720000000005
+          },
+          {
+            "provider_cut_sample": 4580672,
+            "terminal": false,
+            "finalize_written_s": 363.5789999999997,
+            "fin_received_s": 363.7970000000005,
+            "successor_pcm_s": 363.6409999999996
+          },
+          {
+            "provider_cut_sample": 4684032,
+            "terminal": false,
+            "finalize_written_s": 371.84399999999914,
+            "fin_received_s": 372.0470000000005,
+            "successor_pcm_s": 371.9220000000005
+          },
+          {
+            "provider_cut_sample": 4758912,
+            "terminal": false,
+            "finalize_written_s": 377.84399999999914,
+            "fin_received_s": 378.0470000000005,
+            "successor_pcm_s": 377.90699999999924
+          },
+          {
+            "provider_cut_sample": 4860416,
+            "terminal": false,
+            "finalize_written_s": 385.96899999999914,
+            "fin_received_s": 386.21899999999914,
+            "successor_pcm_s": 386.03199999999924
+          },
+          {
+            "provider_cut_sample": 4964160,
+            "terminal": false,
+            "finalize_written_s": 394.25,
+            "fin_received_s": 394.46899999999914,
+            "successor_pcm_s": 394.3130000000001
+          },
+          {
+            "provider_cut_sample": 5036160,
+            "terminal": false,
+            "finalize_written_s": 400.0,
+            "fin_received_s": 400.2039999999997,
+            "successor_pcm_s": 400.0630000000001
+          },
+          {
+            "provider_cut_sample": 5090432,
+            "terminal": false,
+            "finalize_written_s": 404.2970000000005,
+            "fin_received_s": 404.5,
+            "successor_pcm_s": 404.3600000000006
+          },
+          {
+            "provider_cut_sample": 5147264,
+            "terminal": false,
+            "finalize_written_s": 408.8289999999997,
+            "fin_received_s": 409.03199999999924,
+            "successor_pcm_s": 408.90699999999924
+          },
+          {
+            "provider_cut_sample": 5254208,
+            "terminal": false,
+            "finalize_written_s": 417.34399999999914,
+            "fin_received_s": 417.5630000000001,
+            "successor_pcm_s": 417.40699999999924
+          },
+          {
+            "provider_cut_sample": 5332352,
+            "terminal": false,
+            "finalize_written_s": 423.53199999999924,
+            "fin_received_s": 423.75,
+            "successor_pcm_s": 423.59399999999914
+          },
+          {
+            "provider_cut_sample": 5417472,
+            "terminal": false,
+            "finalize_written_s": 430.2039999999997,
+            "fin_received_s": 430.40699999999924,
+            "successor_pcm_s": 430.2659999999996
+          },
+          {
+            "provider_cut_sample": 5524416,
+            "terminal": false,
+            "finalize_written_s": 438.75,
+            "fin_received_s": 438.96899999999914,
+            "successor_pcm_s": 438.8130000000001
+          },
+          {
+            "provider_cut_sample": 5628160,
+            "terminal": false,
+            "finalize_written_s": 446.9850000000006,
+            "fin_received_s": 447.2039999999997,
+            "successor_pcm_s": 447.0470000000005
+          },
+          {
+            "provider_cut_sample": 5658048,
+            "terminal": false,
+            "finalize_written_s": 449.3600000000006,
+            "fin_received_s": 449.5789999999997,
+            "successor_pcm_s": 449.4220000000005
+          },
+          {
+            "provider_cut_sample": 5715712,
+            "terminal": false,
+            "finalize_written_s": 453.9380000000001,
+            "fin_received_s": 454.1409999999996,
+            "successor_pcm_s": 454.0
+          },
+          {
+            "provider_cut_sample": 5745728,
+            "terminal": false,
+            "finalize_written_s": 456.3130000000001,
+            "fin_received_s": 456.5159999999996,
+            "successor_pcm_s": 456.375
+          },
+          {
+            "provider_cut_sample": 5824512,
+            "terminal": false,
+            "finalize_written_s": 462.625,
+            "fin_received_s": 462.84399999999914,
+            "successor_pcm_s": 462.6880000000001
+          },
+          {
+            "provider_cut_sample": 5904000,
+            "terminal": false,
+            "finalize_written_s": 468.9220000000005,
+            "fin_received_s": 469.125,
+            "successor_pcm_s": 468.9850000000006
+          },
+          {
+            "provider_cut_sample": 5964736,
+            "terminal": false,
+            "finalize_written_s": 473.7659999999996,
+            "fin_received_s": 473.96899999999914,
+            "successor_pcm_s": 473.8289999999997
+          },
+          {
+            "provider_cut_sample": 5989632,
+            "terminal": false,
+            "finalize_written_s": 475.7350000000006,
+            "fin_received_s": 475.9380000000001,
+            "successor_pcm_s": 475.7970000000005
+          },
+          {
+            "provider_cut_sample": 6009920,
+            "terminal": false,
+            "finalize_written_s": 477.3909999999996,
+            "fin_received_s": 477.6100000000006,
+            "successor_pcm_s": 477.4539999999997
+          },
+          {
+            "provider_cut_sample": 6103040,
+            "terminal": false,
+            "finalize_written_s": 484.8289999999997,
+            "fin_received_s": 485.03199999999924,
+            "successor_pcm_s": 484.8909999999996
+          },
+          {
+            "provider_cut_sample": 6188992,
+            "terminal": false,
+            "finalize_written_s": 491.6100000000006,
+            "fin_received_s": 491.8289999999997,
+            "successor_pcm_s": 491.6720000000005
+          },
+          {
+            "provider_cut_sample": 6288768,
+            "terminal": false,
+            "finalize_written_s": 499.5159999999996,
+            "fin_received_s": 499.71899999999914,
+            "successor_pcm_s": 499.5789999999997
+          },
+          {
+            "provider_cut_sample": 6395712,
+            "terminal": false,
+            "finalize_written_s": 507.9380000000001,
+            "fin_received_s": 508.15699999999924,
+            "successor_pcm_s": 508.0
+          },
+          {
+            "provider_cut_sample": 6499456,
+            "terminal": false,
+            "finalize_written_s": 516.1409999999996,
+            "fin_received_s": 516.3600000000006,
+            "successor_pcm_s": 516.2039999999997
+          },
+          {
+            "provider_cut_sample": 6571456,
+            "terminal": false,
+            "finalize_written_s": 521.8439999999991,
+            "fin_received_s": 522.0630000000001,
+            "successor_pcm_s": 521.9069999999992
+          },
+          {
+            "provider_cut_sample": 6678400,
+            "terminal": false,
+            "finalize_written_s": 530.2970000000005,
+            "fin_received_s": 530.5159999999996,
+            "successor_pcm_s": 530.3600000000006
+          },
+          {
+            "provider_cut_sample": 6782144,
+            "terminal": false,
+            "finalize_written_s": 538.6569999999992,
+            "fin_received_s": 538.8909999999996,
+            "successor_pcm_s": 538.7189999999991
+          },
+          {
+            "provider_cut_sample": 6885888,
+            "terminal": false,
+            "finalize_written_s": 546.9850000000006,
+            "fin_received_s": 547.2039999999997,
+            "successor_pcm_s": 547.0470000000005
+          },
+          {
+            "provider_cut_sample": 6961472,
+            "terminal": false,
+            "finalize_written_s": 553.0319999999992,
+            "fin_received_s": 553.25,
+            "successor_pcm_s": 553.0939999999991
+          },
+          {
+            "provider_cut_sample": 7041472,
+            "terminal": false,
+            "finalize_written_s": 559.4220000000005,
+            "fin_received_s": 559.625,
+            "successor_pcm_s": 559.4850000000006
+          },
+          {
+            "provider_cut_sample": 7142464,
+            "terminal": false,
+            "finalize_written_s": 567.3289999999997,
+            "fin_received_s": 567.5470000000005,
+            "successor_pcm_s": 567.3909999999996
+          },
+          {
+            "provider_cut_sample": 7244672,
+            "terminal": false,
+            "finalize_written_s": 575.5,
+            "fin_received_s": 575.7189999999991,
+            "successor_pcm_s": 575.5630000000001
+          },
+          {
+            "provider_cut_sample": 7268032,
+            "terminal": false,
+            "finalize_written_s": 577.3289999999997,
+            "fin_received_s": 577.5470000000005,
+            "successor_pcm_s": 577.3909999999996
+          },
+          {
+            "provider_cut_sample": 7339328,
+            "terminal": false,
+            "finalize_written_s": 583.0789999999997,
+            "fin_received_s": 583.2970000000005,
+            "successor_pcm_s": 583.1409999999996
+          },
+          {
+            "provider_cut_sample": 7379776,
+            "terminal": false,
+            "finalize_written_s": 586.3130000000001,
+            "fin_received_s": 586.5159999999996,
+            "successor_pcm_s": 586.375
+          },
+          {
+            "provider_cut_sample": 7467776,
+            "terminal": false,
+            "finalize_written_s": 593.2819999999992,
+            "fin_received_s": 593.5470000000005,
+            "successor_pcm_s": 593.3439999999991
+          },
+          {
+            "provider_cut_sample": 7545024,
+            "terminal": false,
+            "finalize_written_s": 599.4220000000005,
+            "fin_received_s": 599.6409999999996,
+            "successor_pcm_s": 599.4850000000006
+          },
+          {
+            "provider_cut_sample": 7621952,
+            "terminal": false,
+            "finalize_written_s": 605.4689999999991,
+            "fin_received_s": 605.6720000000005,
+            "successor_pcm_s": 605.5319999999992
+          },
+          {
+            "provider_cut_sample": 7715584,
+            "terminal": false,
+            "finalize_written_s": 612.7970000000005,
+            "fin_received_s": 613.0159999999996,
+            "successor_pcm_s": 612.8600000000006
+          },
+          {
+            "provider_cut_sample": 7790784,
+            "terminal": false,
+            "finalize_written_s": 618.75,
+            "fin_received_s": 618.9689999999991,
+            "successor_pcm_s": 618.8130000000001
+          },
+          {
+            "provider_cut_sample": 7859712,
+            "terminal": false,
+            "finalize_written_s": 624.1249999999982,
+            "fin_received_s": 624.3439999999991,
+            "successor_pcm_s": 624.1880000000001
+          },
+          {
+            "provider_cut_sample": 7903552,
+            "terminal": false,
+            "finalize_written_s": 627.5630000000001,
+            "fin_received_s": 627.7820000000011,
+            "successor_pcm_s": 627.6249999999982
+          },
+          {
+            "provider_cut_sample": 7970432,
+            "terminal": false,
+            "finalize_written_s": 632.9380000000001,
+            "fin_received_s": 633.1410000000014,
+            "successor_pcm_s": 632.9999999999982
+          },
+          {
+            "provider_cut_sample": 8075520,
+            "terminal": false,
+            "finalize_written_s": 641.3439999999991,
+            "fin_received_s": 641.5789999999997,
+            "successor_pcm_s": 641.4070000000011
+          },
+          {
+            "provider_cut_sample": 8116160,
+            "terminal": false,
+            "finalize_written_s": 644.5630000000001,
+            "fin_received_s": 644.7820000000011,
+            "successor_pcm_s": 644.6249999999982
+          },
+          {
+            "provider_cut_sample": 8201792,
+            "terminal": false,
+            "finalize_written_s": 651.4070000000011,
+            "fin_received_s": 651.6249999999982,
+            "successor_pcm_s": 651.4689999999991
+          },
+          {
+            "provider_cut_sample": 8272064,
+            "terminal": false,
+            "finalize_written_s": 657.0939999999991,
+            "fin_received_s": 657.2970000000005,
+            "successor_pcm_s": 657.1570000000011
+          },
+          {
+            "provider_cut_sample": 8347264,
+            "terminal": false,
+            "finalize_written_s": 663.0939999999991,
+            "fin_received_s": 663.3130000000001,
+            "successor_pcm_s": 663.1570000000011
+          },
+          {
+            "provider_cut_sample": 8440896,
+            "terminal": false,
+            "finalize_written_s": 670.5939999999991,
+            "fin_received_s": 670.8289999999997,
+            "successor_pcm_s": 670.6570000000011
+          },
+          {
+            "provider_cut_sample": 8467008,
+            "terminal": false,
+            "finalize_written_s": 672.6880000000001,
+            "fin_received_s": 672.9070000000011,
+            "successor_pcm_s": 672.7499999999982
+          },
+          {
+            "provider_cut_sample": 8561152,
+            "terminal": false,
+            "finalize_written_s": 680.2660000000014,
+            "fin_received_s": 680.4689999999991,
+            "successor_pcm_s": 680.3289999999997
+          },
+          {
+            "provider_cut_sample": 8668096,
+            "terminal": false,
+            "finalize_written_s": 688.8289999999997,
+            "fin_received_s": 689.0630000000001,
+            "successor_pcm_s": 688.8910000000014
+          },
+          {
+            "provider_cut_sample": 8746752,
+            "terminal": false,
+            "finalize_written_s": 695.1570000000011,
+            "fin_received_s": 695.3599999999988,
+            "successor_pcm_s": 695.2189999999991
+          },
+          {
+            "provider_cut_sample": 8841088,
+            "terminal": false,
+            "finalize_written_s": 702.7189999999991,
+            "fin_received_s": 702.9220000000005,
+            "successor_pcm_s": 702.7820000000011
+          },
+          {
+            "provider_cut_sample": 8934208,
+            "terminal": false,
+            "finalize_written_s": 710.2039999999997,
+            "fin_received_s": 710.4380000000001,
+            "successor_pcm_s": 710.2660000000014
+          },
+          {
+            "provider_cut_sample": 8990016,
+            "terminal": false,
+            "finalize_written_s": 714.6880000000001,
+            "fin_received_s": 714.9070000000011,
+            "successor_pcm_s": 714.7499999999982
+          },
+          {
+            "provider_cut_sample": 9061504,
+            "terminal": false,
+            "finalize_written_s": 720.4380000000001,
+            "fin_received_s": 720.6570000000011,
+            "successor_pcm_s": 720.4999999999982
+          },
+          {
+            "provider_cut_sample": 9135360,
+            "terminal": false,
+            "finalize_written_s": 726.3130000000001,
+            "fin_received_s": 726.5320000000011,
+            "successor_pcm_s": 726.3749999999982
+          },
+          {
+            "provider_cut_sample": 9213120,
+            "terminal": false,
+            "finalize_written_s": 732.5630000000001,
+            "fin_received_s": 732.7970000000005,
+            "successor_pcm_s": 732.6249999999982
+          },
+          {
+            "provider_cut_sample": 9291392,
+            "terminal": false,
+            "finalize_written_s": 738.8439999999991,
+            "fin_received_s": 739.0470000000005,
+            "successor_pcm_s": 738.9070000000011
+          },
+          {
+            "provider_cut_sample": 9320064,
+            "terminal": false,
+            "finalize_written_s": 741.1410000000014,
+            "fin_received_s": 741.3439999999991,
+            "successor_pcm_s": 741.2039999999997
+          },
+          {
+            "provider_cut_sample": 9423104,
+            "terminal": false,
+            "finalize_written_s": 749.3910000000014,
+            "fin_received_s": 749.5939999999991,
+            "successor_pcm_s": 749.4539999999997
+          },
+          {
+            "provider_cut_sample": 9526848,
+            "terminal": false,
+            "finalize_written_s": 757.8130000000001,
+            "fin_received_s": 758.0320000000011,
+            "successor_pcm_s": 757.8749999999982
+          },
+          {
+            "provider_cut_sample": 9630592,
+            "terminal": false,
+            "finalize_written_s": 766.1880000000001,
+            "fin_received_s": 766.4070000000011,
+            "successor_pcm_s": 766.2499999999982
+          },
+          {
+            "provider_cut_sample": 9644608,
+            "terminal": false,
+            "finalize_written_s": 767.2660000000014,
+            "fin_received_s": 767.4999999999982,
+            "successor_pcm_s": null
+          },
+          {
+            "provider_cut_sample": 9644608,
+            "terminal": true,
+            "finalize_written_s": 767.2660000000014,
+            "fin_received_s": 767.5320000000011,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 768.2810000000009,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      }
+    },
+    "brief_interjections": {
+      "A": {
+        "first_stable_token_s": 8.40599999999904,
+        "first_stable_attributed_token_s": 8.40599999999904,
+        "stable_tokens": 627,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 1,
+        "max_send_stall_seconds": 0.01599999999962165,
+        "max_source_availability_to_pcm_write_seconds": 31.29699999999866,
+        "actual_audio_seconds": 120.0,
+        "active_websocket_seconds": 152.875,
+        "finalizations": 1,
+        "transitions": [
+          {
+            "provider_cut_sample": 1920000,
+            "terminal": true,
+            "finalize_written_s": 151.35899999999674,
+            "fin_received_s": 151.54699999999866,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 152.2970000000023,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "B": {
+        "first_stable_token_s": 8.56300000000192,
+        "first_stable_attributed_token_s": 8.56300000000192,
+        "stable_tokens": 604,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 1,
+        "max_send_stall_seconds": 0.01600000000325963,
+        "max_source_availability_to_pcm_write_seconds": 31.625,
+        "actual_audio_seconds": 120.0,
+        "active_websocket_seconds": 153.36000000000058,
+        "finalizations": 25,
+        "transitions": [
+          {
+            "provider_cut_sample": 96768,
+            "terminal": false,
+            "finalize_written_s": 8.328000000001339,
+            "fin_received_s": 8.56300000000192,
+            "successor_pcm_s": 8.34400000000096
+          },
+          {
+            "provider_cut_sample": 192512,
+            "terminal": false,
+            "finalize_written_s": 15.875,
+            "fin_received_s": 16.110000000000582,
+            "successor_pcm_s": 15.90599999999904
+          },
+          {
+            "provider_cut_sample": 288256,
+            "terminal": false,
+            "finalize_written_s": 23.40599999999904,
+            "fin_received_s": 23.6720000000023,
+            "successor_pcm_s": 23.45300000000134
+          },
+          {
+            "provider_cut_sample": 353280,
+            "terminal": false,
+            "finalize_written_s": 28.53099999999904,
+            "fin_received_s": 28.7970000000023,
+            "successor_pcm_s": 28.56300000000192
+          },
+          {
+            "provider_cut_sample": 431616,
+            "terminal": false,
+            "finalize_written_s": 34.68800000000192,
+            "fin_received_s": 34.95300000000134,
+            "successor_pcm_s": 34.71900000000096
+          },
+          {
+            "provider_cut_sample": 538624,
+            "terminal": false,
+            "finalize_written_s": 43.07800000000134,
+            "fin_received_s": 43.34400000000096,
+            "successor_pcm_s": 43.125
+          },
+          {
+            "provider_cut_sample": 634368,
+            "terminal": false,
+            "finalize_written_s": 50.61000000000058,
+            "fin_received_s": 50.84400000000096,
+            "successor_pcm_s": 50.625
+          },
+          {
+            "provider_cut_sample": 730112,
+            "terminal": false,
+            "finalize_written_s": 58.14099999999962,
+            "fin_received_s": 58.375,
+            "successor_pcm_s": 58.1720000000023
+          },
+          {
+            "provider_cut_sample": 795136,
+            "terminal": false,
+            "finalize_written_s": 63.23500000000058,
+            "fin_received_s": 63.46900000000096,
+            "successor_pcm_s": 63.25
+          },
+          {
+            "provider_cut_sample": 858624,
+            "terminal": false,
+            "finalize_written_s": 68.23500000000058,
+            "fin_received_s": 68.51599999999962,
+            "successor_pcm_s": 68.28099999999904
+          },
+          {
+            "provider_cut_sample": 937984,
+            "terminal": false,
+            "finalize_written_s": 74.45300000000134,
+            "fin_received_s": 74.68800000000192,
+            "successor_pcm_s": 74.48500000000058
+          },
+          {
+            "provider_cut_sample": 973312,
+            "terminal": false,
+            "finalize_written_s": 77.23500000000058,
+            "fin_received_s": 77.45300000000134,
+            "successor_pcm_s": 77.26599999999962
+          },
+          {
+            "provider_cut_sample": 1075712,
+            "terminal": false,
+            "finalize_written_s": 85.26599999999962,
+            "fin_received_s": 85.51599999999962,
+            "successor_pcm_s": 85.2970000000023
+          },
+          {
+            "provider_cut_sample": 1171456,
+            "terminal": false,
+            "finalize_written_s": 92.82800000000134,
+            "fin_received_s": 93.09400000000096,
+            "successor_pcm_s": 92.875
+          },
+          {
+            "provider_cut_sample": 1235456,
+            "terminal": false,
+            "finalize_written_s": 97.86000000000058,
+            "fin_received_s": 98.09400000000096,
+            "successor_pcm_s": 97.90599999999904
+          },
+          {
+            "provider_cut_sample": 1335296,
+            "terminal": false,
+            "finalize_written_s": 105.73500000000058,
+            "fin_received_s": 106.0,
+            "successor_pcm_s": 105.78099999999904
+          },
+          {
+            "provider_cut_sample": 1431040,
+            "terminal": false,
+            "finalize_written_s": 113.25,
+            "fin_received_s": 113.5,
+            "successor_pcm_s": 113.26599999999962
+          },
+          {
+            "provider_cut_sample": 1481216,
+            "terminal": false,
+            "finalize_written_s": 117.18800000000192,
+            "fin_received_s": 117.43800000000192,
+            "successor_pcm_s": 117.21900000000096
+          },
+          {
+            "provider_cut_sample": 1581568,
+            "terminal": false,
+            "finalize_written_s": 125.06300000000192,
+            "fin_received_s": 125.2970000000023,
+            "successor_pcm_s": 125.07800000000134
+          },
+          {
+            "provider_cut_sample": 1659392,
+            "terminal": false,
+            "finalize_written_s": 131.21900000000096,
+            "fin_received_s": 131.46900000000096,
+            "successor_pcm_s": 131.26599999999962
+          },
+          {
+            "provider_cut_sample": 1764864,
+            "terminal": false,
+            "finalize_written_s": 139.48500000000058,
+            "fin_received_s": 139.71900000000096,
+            "successor_pcm_s": 139.5470000000023
+          },
+          {
+            "provider_cut_sample": 1860608,
+            "terminal": false,
+            "finalize_written_s": 146.96900000000096,
+            "fin_received_s": 147.20300000000134,
+            "successor_pcm_s": 146.98500000000058
+          },
+          {
+            "provider_cut_sample": 1880576,
+            "terminal": false,
+            "finalize_written_s": 148.53099999999904,
+            "fin_received_s": 148.75,
+            "successor_pcm_s": 148.5470000000023
+          },
+          {
+            "provider_cut_sample": 1909248,
+            "terminal": false,
+            "finalize_written_s": 150.84400000000096,
+            "fin_received_s": 151.09400000000096,
+            "successor_pcm_s": 150.875
+          },
+          {
+            "provider_cut_sample": 1920000,
+            "terminal": true,
+            "finalize_written_s": 151.68800000000192,
+            "fin_received_s": 151.9220000000023,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 152.64099999999962,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "C": {
+        "first_stable_token_s": 8.812000000001717,
+        "first_stable_attributed_token_s": 8.812000000001717,
+        "stable_tokens": 624,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 1,
+        "max_send_stall_seconds": 0.01600000000325963,
+        "max_source_availability_to_pcm_write_seconds": 42.76600000000096,
+        "actual_audio_seconds": 125.304,
+        "active_websocket_seconds": 163.76499999999942,
+        "finalizations": 1,
+        "transitions": [
+          {
+            "provider_cut_sample": 2004864,
+            "terminal": true,
+            "finalize_written_s": 162.10900000000038,
+            "fin_received_s": 162.32800000000134,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 163.06199999999808,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "D": {
+        "first_stable_token_s": 8.764999999999418,
+        "first_stable_attributed_token_s": 8.764999999999418,
+        "stable_tokens": 649,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 2,
+        "max_send_stall_seconds": 0.01599999999962165,
+        "max_source_availability_to_pcm_write_seconds": 42.71899999999866,
+        "actual_audio_seconds": 125.304,
+        "active_websocket_seconds": 163.79699999999866,
+        "finalizations": 25,
+        "transitions": [
+          {
+            "provider_cut_sample": 99968,
+            "terminal": false,
+            "finalize_written_s": 8.734000000000378,
+            "fin_received_s": 8.9529999999977,
+            "successor_pcm_s": 8.796999999998661
+          },
+          {
+            "provider_cut_sample": 203712,
+            "terminal": false,
+            "finalize_written_s": 17.15599999999904,
+            "fin_received_s": 17.42199999999866,
+            "successor_pcm_s": 17.21799999999712
+          },
+          {
+            "provider_cut_sample": 307456,
+            "terminal": false,
+            "finalize_written_s": 25.53099999999904,
+            "fin_received_s": 25.764999999999418,
+            "successor_pcm_s": 25.59299999999712
+          },
+          {
+            "provider_cut_sample": 380480,
+            "terminal": false,
+            "finalize_written_s": 31.40599999999904,
+            "fin_received_s": 31.639999999999418,
+            "successor_pcm_s": 31.46799999999712
+          },
+          {
+            "provider_cut_sample": 455680,
+            "terminal": false,
+            "finalize_written_s": 37.43699999999808,
+            "fin_received_s": 37.68699999999808,
+            "successor_pcm_s": 37.5
+          },
+          {
+            "provider_cut_sample": 562624,
+            "terminal": false,
+            "finalize_written_s": 46.03099999999904,
+            "fin_received_s": 46.25,
+            "successor_pcm_s": 46.09299999999712
+          },
+          {
+            "provider_cut_sample": 666368,
+            "terminal": false,
+            "finalize_written_s": 54.40599999999904,
+            "fin_received_s": 54.63999999999942,
+            "successor_pcm_s": 54.46799999999712
+          },
+          {
+            "provider_cut_sample": 770112,
+            "terminal": false,
+            "finalize_written_s": 62.78099999999904,
+            "fin_received_s": 63.01499999999942,
+            "successor_pcm_s": 62.84299999999712
+          },
+          {
+            "provider_cut_sample": 843136,
+            "terminal": false,
+            "finalize_written_s": 68.65599999999904,
+            "fin_received_s": 68.88999999999942,
+            "successor_pcm_s": 68.71799999999712
+          },
+          {
+            "provider_cut_sample": 891584,
+            "terminal": false,
+            "finalize_written_s": 72.53099999999904,
+            "fin_received_s": 72.78099999999904,
+            "successor_pcm_s": 72.59299999999712
+          },
+          {
+            "provider_cut_sample": 974144,
+            "terminal": false,
+            "finalize_written_s": 79.23400000000038,
+            "fin_received_s": 79.46799999999712,
+            "successor_pcm_s": 79.29699999999866
+          },
+          {
+            "provider_cut_sample": 1009472,
+            "terminal": false,
+            "finalize_written_s": 81.98400000000038,
+            "fin_received_s": 82.21799999999712,
+            "successor_pcm_s": 82.04699999999866
+          },
+          {
+            "provider_cut_sample": 1115072,
+            "terminal": false,
+            "finalize_written_s": 90.48400000000038,
+            "fin_received_s": 90.71799999999712,
+            "successor_pcm_s": 90.54699999999866
+          },
+          {
+            "provider_cut_sample": 1218816,
+            "terminal": false,
+            "finalize_written_s": 98.90599999999904,
+            "fin_received_s": 99.17199999999866,
+            "successor_pcm_s": 98.96799999999712
+          },
+          {
+            "provider_cut_sample": 1290816,
+            "terminal": false,
+            "finalize_written_s": 104.7029999999977,
+            "fin_received_s": 104.92199999999866,
+            "successor_pcm_s": 104.76499999999942
+          },
+          {
+            "provider_cut_sample": 1393856,
+            "terminal": false,
+            "finalize_written_s": 112.98400000000038,
+            "fin_received_s": 113.21799999999712,
+            "successor_pcm_s": 113.04699999999866
+          },
+          {
+            "provider_cut_sample": 1497600,
+            "terminal": false,
+            "finalize_written_s": 121.40599999999904,
+            "fin_received_s": 121.625,
+            "successor_pcm_s": 121.46799999999712
+          },
+          {
+            "provider_cut_sample": 1552576,
+            "terminal": false,
+            "finalize_written_s": 125.81199999999808,
+            "fin_received_s": 126.04699999999866,
+            "successor_pcm_s": 125.875
+          },
+          {
+            "provider_cut_sample": 1656128,
+            "terminal": false,
+            "finalize_written_s": 134.18699999999808,
+            "fin_received_s": 134.43699999999808,
+            "successor_pcm_s": 134.25
+          },
+          {
+            "provider_cut_sample": 1741952,
+            "terminal": false,
+            "finalize_written_s": 141.06199999999808,
+            "fin_received_s": 141.28099999999904,
+            "successor_pcm_s": 141.125
+          },
+          {
+            "provider_cut_sample": 1848896,
+            "terminal": false,
+            "finalize_written_s": 149.65599999999904,
+            "fin_received_s": 149.90599999999904,
+            "successor_pcm_s": 149.71799999999712
+          },
+          {
+            "provider_cut_sample": 1952640,
+            "terminal": false,
+            "finalize_written_s": 158.03099999999904,
+            "fin_received_s": 158.25,
+            "successor_pcm_s": 158.09299999999712
+          },
+          {
+            "provider_cut_sample": 1977408,
+            "terminal": false,
+            "finalize_written_s": 159.98400000000038,
+            "fin_received_s": 160.2029999999977,
+            "successor_pcm_s": 160.04699999999866
+          },
+          {
+            "provider_cut_sample": 2004864,
+            "terminal": false,
+            "finalize_written_s": 162.06199999999808,
+            "fin_received_s": 162.31199999999808,
+            "successor_pcm_s": null
+          },
+          {
+            "provider_cut_sample": 2004864,
+            "terminal": true,
+            "finalize_written_s": 162.06199999999808,
+            "fin_received_s": 162.35900000000038,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 163.07900000000154,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      }
+    },
+    "low_overlap": {
+      "A": {
+        "first_stable_token_s": 8.59400000000096,
+        "first_stable_attributed_token_s": 8.59400000000096,
+        "stable_tokens": 662,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 1,
+        "max_send_stall_seconds": 0.01600000000325963,
+        "max_source_availability_to_pcm_write_seconds": 31.454000000001543,
+        "actual_audio_seconds": 120.0,
+        "active_websocket_seconds": 153.1720000000023,
+        "finalizations": 1,
+        "transitions": [
+          {
+            "provider_cut_sample": 1920000,
+            "terminal": true,
+            "finalize_written_s": 151.51600000000326,
+            "fin_received_s": 151.71900000000096,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 152.45300000000134,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "B": {
+        "first_stable_token_s": 8.420999999998457,
+        "first_stable_attributed_token_s": 8.420999999998457,
+        "stable_tokens": 657,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 2,
+        "max_send_stall_seconds": 0.01600000000325963,
+        "max_source_availability_to_pcm_write_seconds": 31.5,
+        "actual_audio_seconds": 120.0,
+        "active_websocket_seconds": 153.25,
+        "finalizations": 26,
+        "transitions": [
+          {
+            "provider_cut_sample": 95744,
+            "terminal": false,
+            "finalize_written_s": 8.203000000001339,
+            "fin_received_s": 8.420999999998457,
+            "successor_pcm_s": 8.234000000000378
+          },
+          {
+            "provider_cut_sample": 142848,
+            "terminal": false,
+            "finalize_written_s": 11.889999999999418,
+            "fin_received_s": 12.125,
+            "successor_pcm_s": 11.920999999998457
+          },
+          {
+            "provider_cut_sample": 247808,
+            "terminal": false,
+            "finalize_written_s": 20.125,
+            "fin_received_s": 20.343000000000757,
+            "successor_pcm_s": 20.139999999999418
+          },
+          {
+            "provider_cut_sample": 334336,
+            "terminal": false,
+            "finalize_written_s": 26.920999999998457,
+            "fin_received_s": 27.139999999999418,
+            "successor_pcm_s": 26.937000000001717
+          },
+          {
+            "provider_cut_sample": 416256,
+            "terminal": false,
+            "finalize_written_s": 33.38999999999942,
+            "fin_received_s": 33.625,
+            "successor_pcm_s": 33.43700000000172
+          },
+          {
+            "provider_cut_sample": 497664,
+            "terminal": false,
+            "finalize_written_s": 39.82800000000134,
+            "fin_received_s": 40.04599999999846,
+            "successor_pcm_s": 39.875
+          },
+          {
+            "provider_cut_sample": 598016,
+            "terminal": false,
+            "finalize_written_s": 47.68700000000172,
+            "fin_received_s": 47.88999999999942,
+            "successor_pcm_s": 47.71800000000076
+          },
+          {
+            "provider_cut_sample": 629248,
+            "terminal": false,
+            "finalize_written_s": 50.15599999999904,
+            "fin_received_s": 50.35900000000038,
+            "successor_pcm_s": 50.18700000000172
+          },
+          {
+            "provider_cut_sample": 715776,
+            "terminal": false,
+            "finalize_written_s": 56.96800000000076,
+            "fin_received_s": 57.20300000000134,
+            "successor_pcm_s": 56.98400000000038
+          },
+          {
+            "provider_cut_sample": 818176,
+            "terminal": false,
+            "finalize_written_s": 64.98400000000038,
+            "fin_received_s": 65.20300000000134,
+            "successor_pcm_s": 65.0
+          },
+          {
+            "provider_cut_sample": 922624,
+            "terminal": false,
+            "finalize_written_s": 73.17099999999846,
+            "fin_received_s": 73.40599999999904,
+            "successor_pcm_s": 73.21800000000076
+          },
+          {
+            "provider_cut_sample": 1018368,
+            "terminal": false,
+            "finalize_written_s": 80.71800000000076,
+            "fin_received_s": 80.93700000000172,
+            "successor_pcm_s": 80.73400000000038
+          },
+          {
+            "provider_cut_sample": 1083904,
+            "terminal": false,
+            "finalize_written_s": 85.875,
+            "fin_received_s": 86.09300000000076,
+            "successor_pcm_s": 85.88999999999942
+          },
+          {
+            "provider_cut_sample": 1180160,
+            "terminal": false,
+            "finalize_written_s": 93.43700000000172,
+            "fin_received_s": 93.68700000000172,
+            "successor_pcm_s": 93.48400000000038
+          },
+          {
+            "provider_cut_sample": 1251328,
+            "terminal": false,
+            "finalize_written_s": 99.0,
+            "fin_received_s": 99.21800000000076,
+            "successor_pcm_s": 99.04599999999846
+          },
+          {
+            "provider_cut_sample": 1300480,
+            "terminal": false,
+            "finalize_written_s": 102.82800000000134,
+            "fin_received_s": 103.06200000000172,
+            "successor_pcm_s": 102.85900000000038
+          },
+          {
+            "provider_cut_sample": 1399808,
+            "terminal": false,
+            "finalize_written_s": 110.60900000000038,
+            "fin_received_s": 110.82800000000134,
+            "successor_pcm_s": 110.625
+          },
+          {
+            "provider_cut_sample": 1475584,
+            "terminal": false,
+            "finalize_written_s": 116.56200000000172,
+            "fin_received_s": 116.79599999999846,
+            "successor_pcm_s": 116.59300000000076
+          },
+          {
+            "provider_cut_sample": 1579008,
+            "terminal": false,
+            "finalize_written_s": 124.65599999999904,
+            "fin_received_s": 124.875,
+            "successor_pcm_s": 124.67099999999846
+          },
+          {
+            "provider_cut_sample": 1674752,
+            "terminal": false,
+            "finalize_written_s": 132.18700000000172,
+            "fin_received_s": 132.42099999999846,
+            "successor_pcm_s": 132.21800000000076
+          },
+          {
+            "provider_cut_sample": 1740288,
+            "terminal": false,
+            "finalize_written_s": 137.32800000000134,
+            "fin_received_s": 137.56200000000172,
+            "successor_pcm_s": 137.375
+          },
+          {
+            "provider_cut_sample": 1843712,
+            "terminal": false,
+            "finalize_written_s": 145.53099999999904,
+            "fin_received_s": 145.76499999999942,
+            "successor_pcm_s": 145.56200000000172
+          },
+          {
+            "provider_cut_sample": 1865216,
+            "terminal": false,
+            "finalize_written_s": 147.23400000000038,
+            "fin_received_s": 147.45300000000134,
+            "successor_pcm_s": 147.26499999999942
+          },
+          {
+            "provider_cut_sample": 1913344,
+            "terminal": false,
+            "finalize_written_s": 151.01499999999942,
+            "fin_received_s": 151.21800000000076,
+            "successor_pcm_s": 151.04599999999846
+          },
+          {
+            "provider_cut_sample": 1920000,
+            "terminal": false,
+            "finalize_written_s": 151.56200000000172,
+            "fin_received_s": 151.78099999999904,
+            "successor_pcm_s": null
+          },
+          {
+            "provider_cut_sample": 1920000,
+            "terminal": true,
+            "finalize_written_s": 151.56200000000172,
+            "fin_received_s": 151.82800000000134,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 152.54699999999866,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "C": {
+        "first_stable_token_s": 8.671999999998661,
+        "first_stable_attributed_token_s": 8.671999999998661,
+        "stable_tokens": 674,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 1,
+        "max_send_stall_seconds": 0.01599999999962165,
+        "max_source_availability_to_pcm_write_seconds": 43.125,
+        "actual_audio_seconds": 126.336,
+        "active_websocket_seconds": 164.70300000000134,
+        "finalizations": 1,
+        "transitions": [
+          {
+            "provider_cut_sample": 2021376,
+            "terminal": true,
+            "finalize_written_s": 163.17199999999866,
+            "fin_received_s": 163.35900000000038,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 164.125,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "D": {
+        "first_stable_token_s": 8.7970000000023,
+        "first_stable_attributed_token_s": 8.7970000000023,
+        "stable_tokens": 672,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 2,
+        "max_send_stall_seconds": 0.01600000000325963,
+        "max_source_availability_to_pcm_write_seconds": 43.09400000000096,
+        "actual_audio_seconds": 126.336,
+        "active_websocket_seconds": 164.875,
+        "finalizations": 26,
+        "transitions": [
+          {
+            "provider_cut_sample": 98944,
+            "terminal": false,
+            "finalize_written_s": 8.703000000001339,
+            "fin_received_s": 8.9220000000023,
+            "successor_pcm_s": 8.764999999999418
+          },
+          {
+            "provider_cut_sample": 150848,
+            "terminal": false,
+            "finalize_written_s": 12.859000000000378,
+            "fin_received_s": 13.109000000000378,
+            "successor_pcm_s": 12.9220000000023
+          },
+          {
+            "provider_cut_sample": 257792,
+            "terminal": false,
+            "finalize_written_s": 21.45300000000134,
+            "fin_received_s": 21.6720000000023,
+            "successor_pcm_s": 21.514999999999418
+          },
+          {
+            "provider_cut_sample": 352320,
+            "terminal": false,
+            "finalize_written_s": 29.09400000000096,
+            "fin_received_s": 29.32800000000134,
+            "successor_pcm_s": 29.156000000002678
+          },
+          {
+            "provider_cut_sample": 437440,
+            "terminal": false,
+            "finalize_written_s": 35.96900000000096,
+            "fin_received_s": 36.20300000000134,
+            "successor_pcm_s": 36.03100000000268
+          },
+          {
+            "provider_cut_sample": 522048,
+            "terminal": false,
+            "finalize_written_s": 42.7970000000023,
+            "fin_received_s": 43.03100000000268,
+            "successor_pcm_s": 42.85900000000038
+          },
+          {
+            "provider_cut_sample": 624896,
+            "terminal": false,
+            "finalize_written_s": 51.10900000000038,
+            "fin_received_s": 51.32800000000134,
+            "successor_pcm_s": 51.1720000000023
+          },
+          {
+            "provider_cut_sample": 656128,
+            "terminal": false,
+            "finalize_written_s": 53.57800000000134,
+            "fin_received_s": 53.7970000000023,
+            "successor_pcm_s": 53.63999999999942
+          },
+          {
+            "provider_cut_sample": 745856,
+            "terminal": false,
+            "finalize_written_s": 60.73400000000038,
+            "fin_received_s": 60.95300000000134,
+            "successor_pcm_s": 60.7970000000023
+          },
+          {
+            "provider_cut_sample": 851456,
+            "terminal": false,
+            "finalize_written_s": 69.28100000000268,
+            "fin_received_s": 69.51499999999942,
+            "successor_pcm_s": 69.34400000000096
+          },
+          {
+            "provider_cut_sample": 958400,
+            "terminal": false,
+            "finalize_written_s": 77.84400000000096,
+            "fin_received_s": 78.07800000000134,
+            "successor_pcm_s": 77.90600000000268
+          },
+          {
+            "provider_cut_sample": 1062144,
+            "terminal": false,
+            "finalize_written_s": 86.20300000000134,
+            "fin_received_s": 86.43700000000172,
+            "successor_pcm_s": 86.26499999999942
+          },
+          {
+            "provider_cut_sample": 1135680,
+            "terminal": false,
+            "finalize_written_s": 92.10900000000038,
+            "fin_received_s": 92.34400000000096,
+            "successor_pcm_s": 92.1720000000023
+          },
+          {
+            "provider_cut_sample": 1235136,
+            "terminal": false,
+            "finalize_written_s": 100.10900000000038,
+            "fin_received_s": 100.32800000000134,
+            "successor_pcm_s": 100.1720000000023
+          },
+          {
+            "provider_cut_sample": 1314304,
+            "terminal": false,
+            "finalize_written_s": 106.45300000000134,
+            "fin_received_s": 106.68700000000172,
+            "successor_pcm_s": 106.51499999999942
+          },
+          {
+            "provider_cut_sample": 1363456,
+            "terminal": false,
+            "finalize_written_s": 110.40600000000268,
+            "fin_received_s": 110.625,
+            "successor_pcm_s": 110.46900000000096
+          },
+          {
+            "provider_cut_sample": 1465984,
+            "terminal": false,
+            "finalize_written_s": 118.60900000000038,
+            "fin_received_s": 118.82800000000134,
+            "successor_pcm_s": 118.6720000000023
+          },
+          {
+            "provider_cut_sample": 1549760,
+            "terminal": false,
+            "finalize_written_s": 125.32800000000134,
+            "fin_received_s": 125.5470000000023,
+            "successor_pcm_s": 125.38999999999942
+          },
+          {
+            "provider_cut_sample": 1656384,
+            "terminal": false,
+            "finalize_written_s": 133.85900000000038,
+            "fin_received_s": 134.10900000000038,
+            "successor_pcm_s": 133.9220000000023
+          },
+          {
+            "provider_cut_sample": 1760128,
+            "terminal": false,
+            "finalize_written_s": 142.20300000000134,
+            "fin_received_s": 142.43700000000172,
+            "successor_pcm_s": 142.26499999999942
+          },
+          {
+            "provider_cut_sample": 1833664,
+            "terminal": false,
+            "finalize_written_s": 148.13999999999942,
+            "fin_received_s": 148.35900000000038,
+            "successor_pcm_s": 148.21900000000096
+          },
+          {
+            "provider_cut_sample": 1940288,
+            "terminal": false,
+            "finalize_written_s": 156.73400000000038,
+            "fin_received_s": 156.96900000000096,
+            "successor_pcm_s": 156.7970000000023
+          },
+          {
+            "provider_cut_sample": 1966592,
+            "terminal": false,
+            "finalize_written_s": 158.78100000000268,
+            "fin_received_s": 159.0,
+            "successor_pcm_s": 158.84400000000096
+          },
+          {
+            "provider_cut_sample": 2014720,
+            "terminal": false,
+            "finalize_written_s": 162.60900000000038,
+            "fin_received_s": 162.85900000000038,
+            "successor_pcm_s": 162.6720000000023
+          },
+          {
+            "provider_cut_sample": 2021376,
+            "terminal": false,
+            "finalize_written_s": 163.13999999999942,
+            "fin_received_s": 163.375,
+            "successor_pcm_s": null
+          },
+          {
+            "provider_cut_sample": 2021376,
+            "terminal": true,
+            "finalize_written_s": 163.13999999999942,
+            "fin_received_s": 163.40600000000268,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 164.125,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      }
+    },
+    "long_return_gap": {
+      "A": {
+        "first_stable_token_s": 8.4220000000023,
+        "first_stable_attributed_token_s": 8.4220000000023,
+        "stable_tokens": 738,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 1,
+        "max_send_stall_seconds": 0.01600000000325963,
+        "max_source_availability_to_pcm_write_seconds": 46.63999999999942,
+        "actual_audio_seconds": 180.0,
+        "active_websocket_seconds": 228.23400000000038,
+        "finalizations": 1,
+        "transitions": [
+          {
+            "provider_cut_sample": 2880000,
+            "terminal": true,
+            "finalize_written_s": 226.70300000000134,
+            "fin_received_s": 226.88999999999942,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 227.63999999999942,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "B": {
+        "first_stable_token_s": 7.5,
+        "first_stable_attributed_token_s": 7.5,
+        "stable_tokens": 761,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 2,
+        "max_send_stall_seconds": 0.01600000000325963,
+        "max_source_availability_to_pcm_write_seconds": 47.06299999999828,
+        "actual_audio_seconds": 180.0,
+        "active_websocket_seconds": 228.81299999999828,
+        "finalizations": 36,
+        "transitions": [
+          {
+            "provider_cut_sample": 83456,
+            "terminal": false,
+            "finalize_written_s": 7.265999999999622,
+            "fin_received_s": 7.5,
+            "successor_pcm_s": 7.312999999998283
+          },
+          {
+            "provider_cut_sample": 169472,
+            "terminal": false,
+            "finalize_written_s": 14.062999999998283,
+            "fin_received_s": 14.281999999999243,
+            "successor_pcm_s": 14.0779999999977
+          },
+          {
+            "provider_cut_sample": 278016,
+            "terminal": false,
+            "finalize_written_s": 22.5779999999977,
+            "fin_received_s": 22.79699999999866,
+            "successor_pcm_s": 22.610000000000582
+          },
+          {
+            "provider_cut_sample": 398848,
+            "terminal": false,
+            "finalize_written_s": 32.03199999999924,
+            "fin_received_s": 32.28199999999924,
+            "successor_pcm_s": 32.06299999999828
+          },
+          {
+            "provider_cut_sample": 481280,
+            "terminal": false,
+            "finalize_written_s": 38.5,
+            "fin_received_s": 38.75,
+            "successor_pcm_s": 38.53199999999924
+          },
+          {
+            "provider_cut_sample": 538624,
+            "terminal": false,
+            "finalize_written_s": 43.0,
+            "fin_received_s": 43.23500000000058,
+            "successor_pcm_s": 43.04699999999866
+          },
+          {
+            "provider_cut_sample": 696320,
+            "terminal": false,
+            "finalize_written_s": 55.4529999999977,
+            "fin_received_s": 55.68799999999828,
+            "successor_pcm_s": 55.48500000000058
+          },
+          {
+            "provider_cut_sample": 728064,
+            "terminal": false,
+            "finalize_written_s": 57.96900000000096,
+            "fin_received_s": 58.17199999999866,
+            "successor_pcm_s": 58.03199999999924
+          },
+          {
+            "provider_cut_sample": 788992,
+            "terminal": false,
+            "finalize_written_s": 62.75,
+            "fin_received_s": 62.98500000000058,
+            "successor_pcm_s": 62.79699999999866
+          },
+          {
+            "provider_cut_sample": 880640,
+            "terminal": false,
+            "finalize_written_s": 69.98500000000058,
+            "fin_received_s": 70.18799999999828,
+            "successor_pcm_s": 70.0
+          },
+          {
+            "provider_cut_sample": 980480,
+            "terminal": false,
+            "finalize_written_s": 77.86000000000058,
+            "fin_received_s": 78.0779999999977,
+            "successor_pcm_s": 77.89099999999962
+          },
+          {
+            "provider_cut_sample": 1097728,
+            "terminal": false,
+            "finalize_written_s": 87.04699999999866,
+            "fin_received_s": 87.25,
+            "successor_pcm_s": 87.11000000000058
+          },
+          {
+            "provider_cut_sample": 1118720,
+            "terminal": false,
+            "finalize_written_s": 88.7029999999977,
+            "fin_received_s": 88.93799999999828,
+            "successor_pcm_s": 88.73500000000058
+          },
+          {
+            "provider_cut_sample": 1184768,
+            "terminal": false,
+            "finalize_written_s": 93.875,
+            "fin_received_s": 94.0779999999977,
+            "successor_pcm_s": 93.89099999999962
+          },
+          {
+            "provider_cut_sample": 1285632,
+            "terminal": false,
+            "finalize_written_s": 101.84400000000096,
+            "fin_received_s": 102.0779999999977,
+            "successor_pcm_s": 101.90699999999924
+          },
+          {
+            "provider_cut_sample": 1380352,
+            "terminal": false,
+            "finalize_written_s": 109.29699999999866,
+            "fin_received_s": 109.51599999999962,
+            "successor_pcm_s": 109.3279999999977
+          },
+          {
+            "provider_cut_sample": 1484288,
+            "terminal": false,
+            "finalize_written_s": 117.4529999999977,
+            "fin_received_s": 117.68799999999828,
+            "successor_pcm_s": 117.5
+          },
+          {
+            "provider_cut_sample": 1566720,
+            "terminal": false,
+            "finalize_written_s": 123.93799999999828,
+            "fin_received_s": 124.17199999999866,
+            "successor_pcm_s": 123.96900000000096
+          },
+          {
+            "provider_cut_sample": 1680384,
+            "terminal": false,
+            "finalize_written_s": 132.86000000000058,
+            "fin_received_s": 133.06299999999828,
+            "successor_pcm_s": 132.89099999999962
+          },
+          {
+            "provider_cut_sample": 1700864,
+            "terminal": false,
+            "finalize_written_s": 134.5,
+            "fin_received_s": 134.71900000000096,
+            "successor_pcm_s": 134.54699999999866
+          },
+          {
+            "provider_cut_sample": 1774592,
+            "terminal": false,
+            "finalize_written_s": 140.28199999999924,
+            "fin_received_s": 140.51599999999962,
+            "successor_pcm_s": 140.3279999999977
+          },
+          {
+            "provider_cut_sample": 1854464,
+            "terminal": false,
+            "finalize_written_s": 146.59400000000096,
+            "fin_received_s": 146.79699999999866,
+            "successor_pcm_s": 146.64099999999962
+          },
+          {
+            "provider_cut_sample": 1896960,
+            "terminal": false,
+            "finalize_written_s": 149.90699999999924,
+            "fin_received_s": 150.15699999999924,
+            "successor_pcm_s": 149.9529999999977
+          },
+          {
+            "provider_cut_sample": 1962496,
+            "terminal": false,
+            "finalize_written_s": 155.09400000000096,
+            "fin_received_s": 155.3279999999977,
+            "successor_pcm_s": 155.14099999999962
+          },
+          {
+            "provider_cut_sample": 2060288,
+            "terminal": false,
+            "finalize_written_s": 162.81299999999828,
+            "fin_received_s": 163.04699999999866,
+            "successor_pcm_s": 162.86000000000058
+          },
+          {
+            "provider_cut_sample": 2156032,
+            "terminal": false,
+            "finalize_written_s": 170.3279999999977,
+            "fin_received_s": 170.54699999999866,
+            "successor_pcm_s": 170.39099999999962
+          },
+          {
+            "provider_cut_sample": 2235904,
+            "terminal": false,
+            "finalize_written_s": 176.59400000000096,
+            "fin_received_s": 176.79699999999866,
+            "successor_pcm_s": 176.61000000000058
+          },
+          {
+            "provider_cut_sample": 2334720,
+            "terminal": false,
+            "finalize_written_s": 184.36000000000058,
+            "fin_received_s": 184.61000000000058,
+            "successor_pcm_s": 184.39099999999962
+          },
+          {
+            "provider_cut_sample": 2372096,
+            "terminal": false,
+            "finalize_written_s": 187.28199999999924,
+            "fin_received_s": 187.5,
+            "successor_pcm_s": 187.3279999999977
+          },
+          {
+            "provider_cut_sample": 2440704,
+            "terminal": false,
+            "finalize_written_s": 192.64099999999962,
+            "fin_received_s": 192.86000000000058,
+            "successor_pcm_s": 192.65699999999924
+          },
+          {
+            "provider_cut_sample": 2536960,
+            "terminal": false,
+            "finalize_written_s": 200.2029999999977,
+            "fin_received_s": 200.43799999999828,
+            "successor_pcm_s": 200.25
+          },
+          {
+            "provider_cut_sample": 2609152,
+            "terminal": false,
+            "finalize_written_s": 205.875,
+            "fin_received_s": 206.11000000000058,
+            "successor_pcm_s": 205.90699999999924
+          },
+          {
+            "provider_cut_sample": 2700800,
+            "terminal": false,
+            "finalize_written_s": 213.04699999999866,
+            "fin_received_s": 213.26599999999962,
+            "successor_pcm_s": 213.11000000000058
+          },
+          {
+            "provider_cut_sample": 2808320,
+            "terminal": false,
+            "finalize_written_s": 221.5,
+            "fin_received_s": 221.73500000000058,
+            "successor_pcm_s": 221.53199999999924
+          },
+          {
+            "provider_cut_sample": 2880000,
+            "terminal": false,
+            "finalize_written_s": 227.125,
+            "fin_received_s": 227.36000000000058,
+            "successor_pcm_s": null
+          },
+          {
+            "provider_cut_sample": 2880000,
+            "terminal": true,
+            "finalize_written_s": 227.125,
+            "fin_received_s": 227.375,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 228.11000000000058,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "C": {
+        "first_stable_token_s": 8.718000000000757,
+        "first_stable_attributed_token_s": 8.718000000000757,
+        "stable_tokens": 741,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 1,
+        "max_send_stall_seconds": 0.01600000000325963,
+        "max_source_availability_to_pcm_write_seconds": 37.88999999999942,
+        "actual_audio_seconds": 160.656,
+        "active_websocket_seconds": 219.57800000000134,
+        "finalizations": 1,
+        "transitions": [
+          {
+            "provider_cut_sample": 2570496,
+            "terminal": true,
+            "finalize_written_s": 217.90599999999904,
+            "fin_received_s": 218.15599999999904,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 218.89099999999962,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      },
+      "D": {
+        "first_stable_token_s": 7.984000000000378,
+        "first_stable_attributed_token_s": 7.984000000000378,
+        "stable_tokens": 759,
+        "missing_speaker_tokens": 0,
+        "maximum_pending_completions": 2,
+        "max_send_stall_seconds": 0.01599999999962165,
+        "max_source_availability_to_pcm_write_seconds": 38.0,
+        "actual_audio_seconds": 160.656,
+        "active_websocket_seconds": 219.75,
+        "finalizations": 36,
+        "transitions": [
+          {
+            "provider_cut_sample": 86656,
+            "terminal": false,
+            "finalize_written_s": 7.734000000000378,
+            "fin_received_s": 7.984000000000378,
+            "successor_pcm_s": 7.7959999999984575
+          },
+          {
+            "provider_cut_sample": 161856,
+            "terminal": false,
+            "finalize_written_s": 13.764999999999418,
+            "fin_received_s": 13.984000000000378,
+            "successor_pcm_s": 13.828000000001339
+          },
+          {
+            "provider_cut_sample": 238080,
+            "terminal": false,
+            "finalize_written_s": 19.85900000000038,
+            "fin_received_s": 20.093000000000757,
+            "successor_pcm_s": 19.920999999998457
+          },
+          {
+            "provider_cut_sample": 345024,
+            "terminal": false,
+            "finalize_written_s": 28.48400000000038,
+            "fin_received_s": 28.75,
+            "successor_pcm_s": 28.545999999998457
+          },
+          {
+            "provider_cut_sample": 435456,
+            "terminal": false,
+            "finalize_written_s": 35.76499999999942,
+            "fin_received_s": 36.0,
+            "successor_pcm_s": 35.82800000000134
+          },
+          {
+            "provider_cut_sample": 464448,
+            "terminal": false,
+            "finalize_written_s": 38.01499999999942,
+            "fin_received_s": 38.26499999999942,
+            "successor_pcm_s": 41.88999999999942
+          },
+          {
+            "provider_cut_sample": 500096,
+            "terminal": false,
+            "finalize_written_s": 44.68700000000172,
+            "fin_received_s": 44.90599999999904,
+            "successor_pcm_s": 44.75
+          },
+          {
+            "provider_cut_sample": 524992,
+            "terminal": false,
+            "finalize_written_s": 46.57800000000134,
+            "fin_received_s": 46.79599999999846,
+            "successor_pcm_s": 46.63999999999942
+          },
+          {
+            "provider_cut_sample": 583680,
+            "terminal": false,
+            "finalize_written_s": 51.31200000000172,
+            "fin_received_s": 51.54599999999846,
+            "successor_pcm_s": 53.875
+          },
+          {
+            "provider_cut_sample": 612160,
+            "terminal": false,
+            "finalize_written_s": 56.10900000000038,
+            "fin_received_s": 56.32800000000134,
+            "successor_pcm_s": 60.35900000000038
+          },
+          {
+            "provider_cut_sample": 636544,
+            "terminal": false,
+            "finalize_written_s": 62.28099999999904,
+            "fin_received_s": 62.53099999999904,
+            "successor_pcm_s": 62.73400000000038
+          },
+          {
+            "provider_cut_sample": 743488,
+            "terminal": false,
+            "finalize_written_s": 71.35900000000038,
+            "fin_received_s": 71.59300000000076,
+            "successor_pcm_s": 71.42099999999846
+          },
+          {
+            "provider_cut_sample": 767232,
+            "terminal": false,
+            "finalize_written_s": 73.23400000000038,
+            "fin_received_s": 73.45300000000134,
+            "successor_pcm_s": 73.29599999999846
+          },
+          {
+            "provider_cut_sample": 836480,
+            "terminal": false,
+            "finalize_written_s": 78.81200000000172,
+            "fin_received_s": 79.03099999999904,
+            "successor_pcm_s": 78.875
+          },
+          {
+            "provider_cut_sample": 931136,
+            "terminal": false,
+            "finalize_written_s": 86.48400000000038,
+            "fin_received_s": 86.71800000000076,
+            "successor_pcm_s": 86.54599999999846
+          },
+          {
+            "provider_cut_sample": 1029056,
+            "terminal": false,
+            "finalize_written_s": 94.38999999999942,
+            "fin_received_s": 94.60900000000038,
+            "successor_pcm_s": 94.45300000000134
+          },
+          {
+            "provider_cut_sample": 1136000,
+            "terminal": false,
+            "finalize_written_s": 102.98400000000038,
+            "fin_received_s": 103.20300000000134,
+            "successor_pcm_s": 103.04599999999846
+          },
+          {
+            "provider_cut_sample": 1226432,
+            "terminal": false,
+            "finalize_written_s": 110.26499999999942,
+            "fin_received_s": 110.48400000000038,
+            "successor_pcm_s": 110.32800000000134
+          },
+          {
+            "provider_cut_sample": 1333376,
+            "terminal": false,
+            "finalize_written_s": 118.88999999999942,
+            "fin_received_s": 119.125,
+            "successor_pcm_s": 118.95300000000134
+          },
+          {
+            "provider_cut_sample": 1358656,
+            "terminal": false,
+            "finalize_written_s": 120.85900000000038,
+            "fin_received_s": 121.07800000000134,
+            "successor_pcm_s": 120.92099999999846
+          },
+          {
+            "provider_cut_sample": 1422464,
+            "terminal": false,
+            "finalize_written_s": 125.98400000000038,
+            "fin_received_s": 126.23400000000038,
+            "successor_pcm_s": 126.04599999999846
+          },
+          {
+            "provider_cut_sample": 1504320,
+            "terminal": false,
+            "finalize_written_s": 132.56200000000172,
+            "fin_received_s": 132.78099999999904,
+            "successor_pcm_s": 132.625
+          },
+          {
+            "provider_cut_sample": 1546816,
+            "terminal": false,
+            "finalize_written_s": 135.93700000000172,
+            "fin_received_s": 136.17099999999846,
+            "successor_pcm_s": 136.0
+          },
+          {
+            "provider_cut_sample": 1615552,
+            "terminal": false,
+            "finalize_written_s": 141.38999999999942,
+            "fin_received_s": 141.625,
+            "successor_pcm_s": 141.45300000000134
+          },
+          {
+            "provider_cut_sample": 1716544,
+            "terminal": false,
+            "finalize_written_s": 149.51499999999942,
+            "fin_received_s": 149.73400000000038,
+            "successor_pcm_s": 149.57800000000134
+          },
+          {
+            "provider_cut_sample": 1820288,
+            "terminal": false,
+            "finalize_written_s": 157.85900000000038,
+            "fin_received_s": 158.09300000000076,
+            "successor_pcm_s": 157.92099999999846
+          },
+          {
+            "provider_cut_sample": 1908160,
+            "terminal": false,
+            "finalize_written_s": 164.93700000000172,
+            "fin_received_s": 165.17099999999846,
+            "successor_pcm_s": 165.0
+          },
+          {
+            "provider_cut_sample": 2010176,
+            "terminal": false,
+            "finalize_written_s": 173.10900000000038,
+            "fin_received_s": 173.34300000000076,
+            "successor_pcm_s": 173.17099999999846
+          },
+          {
+            "provider_cut_sample": 2052352,
+            "terminal": false,
+            "finalize_written_s": 176.48400000000038,
+            "fin_received_s": 176.70300000000134,
+            "successor_pcm_s": 176.54599999999846
+          },
+          {
+            "provider_cut_sample": 2120960,
+            "terminal": false,
+            "finalize_written_s": 181.93700000000172,
+            "fin_received_s": 182.15599999999904,
+            "successor_pcm_s": 182.0
+          },
+          {
+            "provider_cut_sample": 2220416,
+            "terminal": false,
+            "finalize_written_s": 189.88999999999942,
+            "fin_received_s": 190.125,
+            "successor_pcm_s": 189.95300000000134
+          },
+          {
+            "provider_cut_sample": 2300608,
+            "terminal": false,
+            "finalize_written_s": 196.31200000000172,
+            "fin_received_s": 196.53099999999904,
+            "successor_pcm_s": 196.375
+          },
+          {
+            "provider_cut_sample": 2395456,
+            "terminal": false,
+            "finalize_written_s": 204.01499999999942,
+            "fin_received_s": 204.23400000000038,
+            "successor_pcm_s": 204.07800000000134
+          },
+          {
+            "provider_cut_sample": 2498816,
+            "terminal": false,
+            "finalize_written_s": 212.31200000000172,
+            "fin_received_s": 212.54599999999846,
+            "successor_pcm_s": 212.375
+          },
+          {
+            "provider_cut_sample": 2570496,
+            "terminal": false,
+            "finalize_written_s": 218.01499999999942,
+            "fin_received_s": 218.29599999999846,
+            "successor_pcm_s": null
+          },
+          {
+            "provider_cut_sample": 2570496,
+            "terminal": true,
+            "finalize_written_s": 218.01499999999942,
+            "fin_received_s": 218.31200000000172,
+            "successor_pcm_s": null
+          }
+        ],
+        "readiness_limit": "Provider evidence arrival only. No caption publication, physical source-speech end, translation, VRChat or HMD readiness measurement.",
+        "observed_connection_seconds": 219.03199999999924,
+        "websocket_envelope_limit": "Ledger duration conservatively includes connect establishment and final result accounting; event-connected-to-closed is measured separately."
+      }
+    }
+  },
+  "timestamp_status": "Unresolved; independently verified acoustic anchors missing; no correction",
+  "application_readiness": "Not established by these live recorded-file streams"
+}

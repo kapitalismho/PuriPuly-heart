@@ -1,0 +1,182 @@
+{
+  "case_id": "low_overlap",
+  "arm": "A",
+  "source_seconds": 120.0,
+  "sent_seconds": 120.0,
+  "pcm_sha256": "262f71c543590dc526b8e33ecd7a7a46bc81f4ea33fbfac04323b7ffe3b3d2fa",
+  "trace_sha256": "842fbf1d8c468eb47b92f9fac56f25ce34185d85808991a510643e76314930ab",
+  "finalizations": 1,
+  "cut_positions": [
+    {
+      "source_cut_sample": 95744,
+      "provider_cut_sample": 95744,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 142848,
+      "provider_cut_sample": 142848,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 247808,
+      "provider_cut_sample": 247808,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 334336,
+      "provider_cut_sample": 334336,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 416256,
+      "provider_cut_sample": 416256,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 497664,
+      "provider_cut_sample": 497664,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 598016,
+      "provider_cut_sample": 598016,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 629248,
+      "provider_cut_sample": 629248,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 715776,
+      "provider_cut_sample": 715776,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 818176,
+      "provider_cut_sample": 818176,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 922624,
+      "provider_cut_sample": 922624,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1018368,
+      "provider_cut_sample": 1018368,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1083904,
+      "provider_cut_sample": 1083904,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1180160,
+      "provider_cut_sample": 1180160,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1251328,
+      "provider_cut_sample": 1251328,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1300480,
+      "provider_cut_sample": 1300480,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1399808,
+      "provider_cut_sample": 1399808,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1475584,
+      "provider_cut_sample": 1475584,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1579008,
+      "provider_cut_sample": 1579008,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1674752,
+      "provider_cut_sample": 1674752,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1740288,
+      "provider_cut_sample": 1740288,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1843712,
+      "provider_cut_sample": 1843712,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1865216,
+      "provider_cut_sample": 1865216,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1913344,
+      "provider_cut_sample": 1913344,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1920000,
+      "provider_cut_sample": 1920000,
+      "reason": "source_eof"
+    }
+  ],
+  "mode": "dry",
+  "completed": true,
+  "failure": null,
+  "fin_count": 1,
+  "pending_completions": [],
+  "actual_audio_seconds": 120.0,
+  "active_websocket_seconds": 0,
+  "replay_elapsed_seconds": 120.05,
+  "timeline": [
+    {
+      "provider_start_s": 0.0,
+      "provider_end_s": 120.0,
+      "source_start_s": 0.0,
+      "source_end_s": 120.0,
+      "boundary": false
+    }
+  ],
+  "tokens": [],
+  "raw_responses_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "config": {
+    "model": "stt-rt-v5",
+    "audio_format": "pcm_s16le",
+    "sample_rate": 16000,
+    "num_channels": 1,
+    "language_hints": [
+      "en"
+    ],
+    "enable_endpoint_detection": false,
+    "enable_language_identification": false,
+    "enable_speaker_diarization": true
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "versions": {
+      "numpy": "2.5.1",
+      "onnxruntime": "1.28.0",
+      "websockets": "15.0.1",
+      "keyring": "25.7.0"
+    },
+    "model_sha256": {
+      "src/puripuly_heart/data/vad/silero_vad.onnx": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+      "src/puripuly_heart/data/models/smart-turn-v3.2-cpu.onnx": "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f"
+    }
+  },
+  "native_artifact_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+}

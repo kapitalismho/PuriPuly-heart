@@ -1,0 +1,216 @@
+{
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/204",
+  "status": "complete; surfaces frozen; no further calls",
+  "activity": "two explicitly approved S200-only-off requests after immutable A-D",
+  "authority": "User accepted completed18-call execution boundary; Director integrates and reviews; no production adoption",
+  "resources": {
+    "new_requests": 2,
+    "new_audio_seconds": 277.76,
+    "new_websocket_envelope_seconds": 380.20300000000134,
+    "new_connected_to_closed_seconds": 378.7659999999996,
+    "new_finalizations_and_receipts": 61,
+    "cumulative_requests": 18,
+    "cumulative_audio_seconds": 4347.928,
+    "cumulative_websocket_envelope_seconds": 5586.032000000005,
+    "retries": 0
+  },
+  "cumulative_finalization_controls_and_receipts": 487,
+  "cumulative_connected_to_closed_seconds": 5573.659,
+  "final_disposition": "defer production adoption; S200-off is not a blanket improvement; fewer finalizations retain measured quality/arrival tradeoff with unvalidated publication/ownership readiness",
+  "passed": [
+    "2/2 actual default dry streams",
+    "retained actual D source bytes/packet boundaries/replay/source availability/manual control sequence verified; provider positions explicitly shifted",
+    "no future actual PCM writes",
+    "2/2 actual finite provider requests;61/61 finalizations/receipts; completed responses",
+    "pinned SDK2.3.0 speaker-first source projection2/2",
+    "pinned WSL pyannote.metrics4.0.0 full UEM/zero collar/overlap/whole-case mapping2/2",
+    "same frozen lexical/global-mapping/coverage/arrival diagnostic and unchanged return-error witnesses",
+    "five new/cumulative request/audio/WebSocket quota boundary guards rejected before connect",
+    "focused Ruff on shared sender and ablation runner"
+  ],
+  "blocked": {
+    "R4": "Independently verified source-acoustic event/word anchors with quantified uncertainty are missing. Licensing, credentials, runtime and source bytes are available. No calibration call spent and no inferred timestamp correction.",
+    "operating_point": "Actual first-readable publication/color ownership readiness and product-useful quality/text/coverage/arrival operating point remain unvalidated."
+  },
+  "not_run": [
+    "seven-case new factorial expansion",
+    "repeats/significance and independent holdout",
+    "operating-point trials",
+    "R4 calibration calls",
+    "physical microphone/VRChat/HMD and Korean/Japanese generalization",
+    "invoice and resident-memory high-water measurement"
+  ],
+  "not_run_disposition": "Not empirically rejected or deemed unnecessary; no additional calls authorized at completion",
+  "findings": {
+    "brief": {
+      "DER_percent": {
+        "D": 83.26034642562605,
+        "S200_off": 69.80807986326711
+      },
+      "native_wrong_percent": [
+        36.23,
+        22.96
+      ],
+      "correct_reference_coverage_percent": [
+        38.68,
+        45.71
+      ],
+      "recognized_words": [
+        369,
+        353
+      ],
+      "correct_short_words": [
+        2,
+        1
+      ],
+      "short_reference_words": 17,
+      "correct_available_at_actual_finalize_percent": [
+        4.84,
+        3.3
+      ]
+    },
+    "return": {
+      "DER_percent": {
+        "D": 43.66234581311851,
+        "S200_off": 44.029256282136274
+      },
+      "native_wrong_percent": [
+        9.45,
+        9.5
+      ],
+      "correct_reference_coverage_percent": [
+        80.71,
+        80.27
+      ],
+      "recognized_words": [
+        433,
+        432
+      ],
+      "same_wrong_return_witness_words": [
+        38,
+        38
+      ],
+      "correct_available_at_actual_finalize_percent": [
+        5.99,
+        4.21
+      ]
+    },
+    "qualification": "One new run per case against earlier immutable D; no repeat significance or independently calibrated latency; paced padding removal also changes actual send/control opportunity."
+  },
+  "execution_sources": {
+    "plan": {
+      "path": "factorial/ablation/run_plan.json",
+      "sha256": "a454485e811757e413706a86bdbfc1487ffced8377ee02be847008ebcf5f29e8"
+    },
+    "shared_sender": {
+      "path": "factorial/ablation/frozen/shared_sender.py",
+      "sha256": "e5a654687b1d48e099b3a0da25064fbb255c027e7e42d756d11d76ec8567ce6c"
+    },
+    "ablation_sender": {
+      "path": "factorial/ablation/frozen/ablation_sender.py",
+      "sha256": "047dfbba7c0633e9cd8bcada589299f94a4b71d538f8319bc04159f0c08a441f"
+    },
+    "config": {
+      "path": "factorial/ablation/config.json",
+      "sha256": "c7254b19241967c7c4184c569eaaa3e920e5d671a00e6a6bdc809216b4ac7eb7"
+    }
+  },
+  "supporting_artifacts": {
+    "report": {
+      "path": "factorial/ablation/report.md",
+      "sha256": "f96fc2d041b3af71d17fbc431d165da4ed465c0d2bb68f6248a3e49fae35e1f9"
+    },
+    "parent_report": {
+      "path": "factorial_report.md",
+      "sha256": "da226777b59b858a0cc19412a0287e4b5a1b50384fe4659619fb70999acd9410"
+    },
+    "comparison": {
+      "path": "factorial/ablation/comparison.json",
+      "sha256": "e89143737b27d4c2e62c3b72f2719d74d992ceddb3b893e0f0f48a72a6557cc5"
+    },
+    "scores": {
+      "path": "factorial/ablation/scores.json",
+      "sha256": "3d72bc36d1dd736c626b6a67456756d0465a50c78ab3bc23d1a189efba213b65"
+    },
+    "quota_ledger": {
+      "path": "factorial/ablation/quota_ledger.json",
+      "sha256": "8a144b7d484131411e476f84ce1f155a19a21ede2b9fe4f8a12277636fe12de4"
+    },
+    "dry_verification": {
+      "path": "factorial/ablation/dry_verification.json",
+      "sha256": "80d8c181cfc5f1af138f90cb736d10c1451aa5563f9470a844becc1aac511559"
+    },
+    "native_identity_evidence": {
+      "path": "ablation_identity_evidence.json",
+      "sha256": "322595c68334a90b15284dbfd07373f79be6f20442446940dcea29b6009dad30"
+    },
+    "native_identity_report": {
+      "path": "ablation_identity_report.md",
+      "sha256": "0beec6f66db3b5cfea41c9e25d8624b20d4d9279dbd2fec8053c5aa2af4b2aeb"
+    },
+    "original_closure_history": {
+      "path": "factorial/ablation/frozen/completion_record_before_ablation.json",
+      "sha256": "7b1469acb780f85816a238cbdccbd9b60dc53161f31acd50f473557bb9b39c54"
+    },
+    "original_report_history": {
+      "path": "factorial/ablation/frozen/factorial_report_before_ablation.md",
+      "sha256": "5062b8e8ed7853185848fc010a08bd44d7e5329c3c351d484f1e4828b984a252"
+    }
+  },
+  "receipts": [
+    {
+      "case": "brief_interjections",
+      "arm": "D_no_S200",
+      "execution_sender_version": "S200-only-off-v1",
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/ablation/live/brief_interjections/D_no_S200/result.json",
+          "sha256": "02dc3551072751493080137f1ccec294e3b1bd26988944e757b266b0c39915e1"
+        },
+        "raw_responses": {
+          "path": "factorial/ablation/live/brief_interjections/D_no_S200/responses.jsonl",
+          "sha256": "9072d75f21ae377ba8f4e503263de42c892df53e9d7e4b62f339d46e458f67f2"
+        },
+        "write_receive_events": {
+          "path": "factorial/ablation/live/brief_interjections/D_no_S200/events.jsonl",
+          "sha256": "0a10598f0755186b4ba494b2456ed48f50811fbc99d477f4016df99917fbcf6e"
+        },
+        "sdk_projection": {
+          "path": "factorial/ablation/sdk_output/D_no_S200/brief_interjections.json",
+          "sha256": "dbe99661f87e314245b487fbf1df6d7c180820c6aab73a5161ad6a3697cbaf09"
+        },
+        "prediction_rttm": {
+          "path": "factorial/ablation/predictions/D_no_S200/brief_interjections.rttm",
+          "sha256": "7d8ab5b03639e84b0bfa46d5362476415b0cd4e23ea4a7f132c4a7f50111fc09"
+        }
+      }
+    },
+    {
+      "case": "long_return_gap",
+      "arm": "D_no_S200",
+      "execution_sender_version": "S200-only-off-v1",
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/ablation/live/long_return_gap/D_no_S200/result.json",
+          "sha256": "a3eb5c8a9bca887d05403ce8991c64e8ee04e21ae09be7a5f08af9fcde667315"
+        },
+        "raw_responses": {
+          "path": "factorial/ablation/live/long_return_gap/D_no_S200/responses.jsonl",
+          "sha256": "77c41d7075e6f13a02cd1f721d0df4d921bfe6960b804cba6149618332737b2a"
+        },
+        "write_receive_events": {
+          "path": "factorial/ablation/live/long_return_gap/D_no_S200/events.jsonl",
+          "sha256": "219dd4c465aef75eea69160fa4fc546b1331d7bb06c40d20b0cb290fab0253f9"
+        },
+        "sdk_projection": {
+          "path": "factorial/ablation/sdk_output/D_no_S200/long_return_gap.json",
+          "sha256": "3db43d45e9aec64d2758b8f44b5b5c40a32b8a6f2c9ba7c11a9e79a9c43e63c3"
+        },
+        "prediction_rttm": {
+          "path": "factorial/ablation/predictions/D_no_S200/long_return_gap.rttm",
+          "sha256": "7dcc4efe9c257c916e1ba0b39093ed32becf6b658e09861cae2c659c0f7756c5"
+        }
+      }
+    }
+  ]
+}

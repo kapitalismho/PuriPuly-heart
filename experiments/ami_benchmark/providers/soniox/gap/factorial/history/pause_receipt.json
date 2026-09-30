@@ -1,0 +1,18 @@
+{
+  "A_completed": {
+    "audio_seconds": 600,
+    "websocket_seconds": 754
+  },
+  "B_completed": {
+    "audio_seconds": 600,
+    "websocket_seconds": 754.0470000000005
+  },
+  "runner_exit": "FileExistsError at replay existing-directory check, before ws connect for C",
+  "C_connection_opened": false,
+  "released_reservation": {
+    "audio_seconds": 602.788,
+    "websocket_seconds": 945
+  },
+  "retry_requests_consumed": 0,
+  "Director_approved_sender_v2": true
+}

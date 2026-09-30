@@ -1,0 +1,31 @@
+{
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/204",
+  "baseline_production_revision": "4dc46fdac8c771d3bb58e46bd44304b86fde9c47",
+  "authorization": {
+    "granted": true,
+    "source": "User explicitly approved proposed two-call S200-only ablation in this task continuation, via Director",
+    "scope": "brief_interjections and long_return_gap D-minus-S200 only; retain manual finalize controls; no retries; stop after two calls",
+    "max_new_requests": 2,
+    "max_new_audio_seconds": 277.760,
+    "max_new_websocket_seconds": 540,
+    "max_cumulative_requests": 18,
+    "max_cumulative_audio_seconds": 4347.928,
+    "max_cumulative_websocket_seconds": 5745.829,
+    "global_request_cap": 24,
+    "global_audio_seconds_cap": 6000,
+    "global_websocket_seconds_cap": 7200,
+    "allowed_audio": "Existing CC BY 4.0 public AMI only",
+    "retries": 0
+  },
+  "arm": "D_no_S200",
+  "order": [{"case_id": "brief_interjections", "timeout_seconds": 225}, {"case_id": "long_return_gap", "timeout_seconds": 315}],
+  "intervention": "Remove only packets marked synthetic S200; preserve every original-D source packet, replay, quantization, source availability and manual-control sequence. Subtract removed sample counts from provider positions and timelines. Do not repacketize retained source bytes.",
+  "pacing": "Reuse original nominal800 sender, concurrent receive, no intermediate ACK gate, terminal ACK completion and source-availability/no-catch-up pacing. Removing paced S200 necessarily permits earlier controls/input; measure this inseparable effect, do not claim wall-time equality.",
+  "base_configuration": "../../experiment_config.json",
+  "base_quota_ledger": "../quota_ledger.json",
+  "comparison": "Immutable actual original D results on the same two cases; one new run per case, no repeat/significance claim",
+  "projection": "Reuse @soniox/node@2.3.0 speaker grouping before source mapping and existing conversion helper, literal native timing",
+  "scorer": "Reuse score_case with pyannote.metrics4.0.0, zero collar, overlap included, full clip UEM, one entire-case optimal mapping",
+  "identity": "Independent owner uses unchanged frozen lexical/global-mapping rules; no native-width identity metric",
+  "application_readiness": "Recorded-file provider arrivals only; no production caption-publication or physical certification"
+}

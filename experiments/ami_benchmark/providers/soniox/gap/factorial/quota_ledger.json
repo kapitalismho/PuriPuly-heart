@@ -1,0 +1,141 @@
+{
+  "released_reservations": [
+    {
+      "identity": "long_context/C",
+      "reserved_audio_seconds": 602.788,
+      "reserved_websocket_seconds": 945.0,
+      "reason": "Deliberate pause sentinel caused existing-directory refusal before ws connect; zero provider request, zero retry",
+      "history": "history/quota_ledger_pause_v1.json"
+    }
+  ],
+  "entries": [
+    {
+      "identity": "long_context/A",
+      "reserved_audio_seconds": 600.0,
+      "reserved_websocket_seconds": 945.0,
+      "status": "complete",
+      "actual_audio_seconds": 600.0,
+      "active_websocket_seconds": 754.0
+    },
+    {
+      "identity": "long_context/B",
+      "reserved_audio_seconds": 600.0,
+      "reserved_websocket_seconds": 945.0,
+      "status": "complete",
+      "actual_audio_seconds": 600.0,
+      "active_websocket_seconds": 754.0470000000005
+    },
+    {
+      "identity": "long_context/C",
+      "reserved_audio_seconds": 602.788,
+      "reserved_websocket_seconds": 945.0,
+      "status": "complete",
+      "actual_audio_seconds": 602.788,
+      "active_websocket_seconds": 762.6720000000005
+    },
+    {
+      "identity": "long_context/D",
+      "reserved_audio_seconds": 602.788,
+      "reserved_websocket_seconds": 945.0,
+      "status": "complete",
+      "actual_audio_seconds": 602.788,
+      "active_websocket_seconds": 768.9380000000001
+    },
+    {
+      "identity": "brief_interjections/B",
+      "reserved_audio_seconds": 120.0,
+      "reserved_websocket_seconds": 225.0,
+      "status": "complete",
+      "actual_audio_seconds": 120.0,
+      "active_websocket_seconds": 153.36000000000058
+    },
+    {
+      "identity": "brief_interjections/D",
+      "reserved_audio_seconds": 125.304,
+      "reserved_websocket_seconds": 225.0,
+      "status": "complete",
+      "actual_audio_seconds": 125.304,
+      "active_websocket_seconds": 163.79699999999866
+    },
+    {
+      "identity": "brief_interjections/A",
+      "reserved_audio_seconds": 120.0,
+      "reserved_websocket_seconds": 225.0,
+      "status": "complete",
+      "actual_audio_seconds": 120.0,
+      "active_websocket_seconds": 152.875
+    },
+    {
+      "identity": "brief_interjections/C",
+      "reserved_audio_seconds": 125.304,
+      "reserved_websocket_seconds": 225.0,
+      "status": "complete",
+      "actual_audio_seconds": 125.304,
+      "active_websocket_seconds": 163.76499999999942
+    },
+    {
+      "identity": "low_overlap/D",
+      "reserved_audio_seconds": 126.336,
+      "reserved_websocket_seconds": 225.0,
+      "status": "complete",
+      "actual_audio_seconds": 126.336,
+      "active_websocket_seconds": 164.875
+    },
+    {
+      "identity": "low_overlap/C",
+      "reserved_audio_seconds": 126.336,
+      "reserved_websocket_seconds": 225.0,
+      "status": "complete",
+      "actual_audio_seconds": 126.336,
+      "active_websocket_seconds": 164.70300000000134
+    },
+    {
+      "identity": "low_overlap/B",
+      "reserved_audio_seconds": 120.0,
+      "reserved_websocket_seconds": 225.0,
+      "status": "complete",
+      "actual_audio_seconds": 120.0,
+      "active_websocket_seconds": 153.25
+    },
+    {
+      "identity": "low_overlap/A",
+      "reserved_audio_seconds": 120.0,
+      "reserved_websocket_seconds": 225.0,
+      "status": "complete",
+      "actual_audio_seconds": 120.0,
+      "active_websocket_seconds": 153.1720000000023
+    },
+    {
+      "identity": "long_return_gap/C",
+      "reserved_audio_seconds": 160.656,
+      "reserved_websocket_seconds": 315.0,
+      "status": "complete",
+      "actual_audio_seconds": 160.656,
+      "active_websocket_seconds": 219.57800000000134
+    },
+    {
+      "identity": "long_return_gap/A",
+      "reserved_audio_seconds": 180.0,
+      "reserved_websocket_seconds": 315.0,
+      "status": "complete",
+      "actual_audio_seconds": 180.0,
+      "active_websocket_seconds": 228.23400000000038
+    },
+    {
+      "identity": "long_return_gap/D",
+      "reserved_audio_seconds": 160.656,
+      "reserved_websocket_seconds": 315.0,
+      "status": "complete",
+      "actual_audio_seconds": 160.656,
+      "active_websocket_seconds": 219.75
+    },
+    {
+      "identity": "long_return_gap/B",
+      "reserved_audio_seconds": 180.0,
+      "reserved_websocket_seconds": 315.0,
+      "status": "complete",
+      "actual_audio_seconds": 180.0,
+      "active_websocket_seconds": 228.81299999999828
+    }
+  ]
+}

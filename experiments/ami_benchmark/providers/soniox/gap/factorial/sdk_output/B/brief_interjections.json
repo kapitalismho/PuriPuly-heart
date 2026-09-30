@@ -1,0 +1,581 @@
+{
+  "native_artifact_sha256": "2dd6d15affc27a686f4e28aaaf0846756e30016afa84cc4906b6aa1b8248e1a1",
+  "sdk_segments": [
+    {
+      "text": "When I go to bed at, like, 1, you're still on my— You never go to bed.",
+      "start_ms": 360,
+      "end_ms": 5460,
+      "speaker": "1",
+      "token_start_index": 0,
+      "token_end_index": 26
+    },
+    {
+      "text": " Sleep.",
+      "start_ms": 6540,
+      "end_ms": 6840,
+      "speaker": "2",
+      "token_start_index": 26,
+      "token_end_index": 30
+    },
+    {
+      "text": " Don't just leave your computer on, maybe.",
+      "start_ms": 6900,
+      "end_ms": 8340,
+      "speaker": "3",
+      "token_start_index": 30,
+      "token_end_index": 44
+    },
+    {
+      "text": " Or he pretends. Always busy.",
+      "start_ms": 9720,
+      "end_ms": 11280,
+      "speaker": "1",
+      "token_start_index": 44,
+      "token_end_index": 54
+    },
+    {
+      "text": " Yeah, right.",
+      "start_ms": 11580,
+      "end_ms": 11640,
+      "speaker": "2",
+      "token_start_index": 54,
+      "token_end_index": 59
+    },
+    {
+      "text": " Actually not. So maybe.",
+      "start_ms": 12240,
+      "end_ms": 14160,
+      "speaker": "1",
+      "token_start_index": 59,
+      "token_end_index": 68
+    },
+    {
+      "text": " But I'm never online in the morning, so.",
+      "start_ms": 14340,
+      "end_ms": 16440,
+      "speaker": "2",
+      "token_start_index": 68,
+      "token_end_index": 82
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 17220,
+      "end_ms": 17400,
+      "speaker": "1",
+      "token_start_index": 82,
+      "token_end_index": 84
+    },
+    {
+      "text": " Actually. Notice that. No one is.",
+      "start_ms": 17580,
+      "end_ms": 18960,
+      "speaker": "3",
+      "token_start_index": 84,
+      "token_end_index": 95
+    },
+    {
+      "text": " Nice.",
+      "start_ms": 21420,
+      "end_ms": 21600,
+      "speaker": "2",
+      "token_start_index": 95,
+      "token_end_index": 97
+    },
+    {
+      "text": " All right.",
+      "start_ms": 22260,
+      "end_ms": 22560,
+      "speaker": "3",
+      "token_start_index": 97,
+      "token_end_index": 101
+    },
+    {
+      "text": " Yeah. So.",
+      "start_ms": 22740,
+      "end_ms": 24120,
+      "speaker": "1",
+      "token_start_index": 101,
+      "token_end_index": 105
+    },
+    {
+      "text": " Okay. So I'll send it off to you, and.",
+      "start_ms": 24360,
+      "end_ms": 26640,
+      "speaker": "3",
+      "token_start_index": 105,
+      "token_end_index": 119
+    },
+    {
+      "text": " Yeah, do what you want to do with it first, and then I'll look at it.",
+      "start_ms": 27780,
+      "end_ms": 31860,
+      "speaker": "1",
+      "token_start_index": 119,
+      "token_end_index": 144
+    },
+    {
+      "text": " Hepatology.",
+      "start_ms": 31920,
+      "end_ms": 32460,
+      "speaker": "2",
+      "token_start_index": 144,
+      "token_end_index": 149
+    },
+    {
+      "text": " Yeah. And I'll send it out to you again, sort of.",
+      "start_ms": 32940,
+      "end_ms": 36900,
+      "speaker": "1",
+      "token_start_index": 149,
+      "token_end_index": 166
+    },
+    {
+      "text": " Was there anything else we wanted to add to the timeline? I mean, essentially. What you can't see either right there. Here's the old one.",
+      "start_ms": 37020,
+      "end_ms": 44160,
+      "speaker": "3",
+      "token_start_index": 166,
+      "token_end_index": 216
+    },
+    {
+      "text": " Oh, there's more.",
+      "start_ms": 44220,
+      "end_ms": 44760,
+      "speaker": "1",
+      "token_start_index": 216,
+      "token_end_index": 222
+    },
+    {
+      "text": " Oh, that's your original. One.",
+      "start_ms": 44820,
+      "end_ms": 46500,
+      "speaker": "3",
+      "token_start_index": 222,
+      "token_end_index": 232
+    },
+    {
+      "text": " Oh, this is the one that— okay.",
+      "start_ms": 46740,
+      "end_ms": 48000,
+      "speaker": "1",
+      "token_start_index": 232,
+      "token_end_index": 242
+    },
+    {
+      "text": " Yeah, yeah, which just copied straight out.",
+      "start_ms": 48120,
+      "end_ms": 49440,
+      "speaker": "3",
+      "token_start_index": 242,
+      "token_end_index": 254
+    },
+    {
+      "text": " We probably want to think about if we want to change— Our goals and stuff. I think one thing that we could. Probably skip. Totally is the removing things from the audio files.",
+      "start_ms": 51240,
+      "end_ms": 66060,
+      "speaker": "1",
+      "token_start_index": 254,
+      "token_end_index": 314
+    },
+    {
+      "text": " That's what I thought as well. I mean, do we. Are we actually going to attempt that?",
+      "start_ms": 66240,
+      "end_ms": 69720,
+      "speaker": "2",
+      "token_start_index": 314,
+      "token_end_index": 343
+    },
+    {
+      "text": " No. I don't think.",
+      "start_ms": 69960,
+      "end_ms": 70980,
+      "speaker": "1",
+      "token_start_index": 343,
+      "token_end_index": 350
+    },
+    {
+      "text": " I don't think so either.",
+      "start_ms": 71340,
+      "end_ms": 72060,
+      "speaker": "2",
+      "token_start_index": 350,
+      "token_end_index": 359
+    },
+    {
+      "text": " That's too big.",
+      "start_ms": 72060,
+      "end_ms": 72540,
+      "speaker": "1",
+      "token_start_index": 359,
+      "token_end_index": 365
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 72780,
+      "end_ms": 72900,
+      "speaker": "3",
+      "token_start_index": 365,
+      "token_end_index": 367
+    },
+    {
+      "text": " I think that's. We don't even know how to approach that at the moment, I think.",
+      "start_ms": 73140,
+      "end_ms": 76320,
+      "speaker": "2",
+      "token_start_index": 367,
+      "token_end_index": 392
+    },
+    {
+      "text": " No.",
+      "start_ms": 76440,
+      "end_ms": 76500,
+      "speaker": "1",
+      "token_start_index": 392,
+      "token_end_index": 393
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 76740,
+      "end_ms": 76980,
+      "speaker": "3",
+      "token_start_index": 393,
+      "token_end_index": 395
+    },
+    {
+      "text": " It's a good thing to have to say what we could have done if we had more time. Good future work thing, isn't it? Sticking the conclusion. It's a final report. Should have we had more time?",
+      "start_ms": 78060,
+      "end_ms": 86820,
+      "speaker": "2",
+      "token_start_index": 395,
+      "token_end_index": 453
+    },
+    {
+      "text": " Yeah. Yeah, yeah. That's right.",
+      "start_ms": 87420,
+      "end_ms": 89040,
+      "speaker": "1",
+      "token_start_index": 453,
+      "token_end_index": 464
+    },
+    {
+      "text": " Unless we discover. Some sort of time warp thing.",
+      "start_ms": 89580,
+      "end_ms": 91500,
+      "speaker": "3",
+      "token_start_index": 464,
+      "token_end_index": 479
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 92160,
+      "end_ms": 92340,
+      "speaker": "2",
+      "token_start_index": 479,
+      "token_end_index": 481
+    },
+    {
+      "text": " Yeah. But that's definitely one thing.",
+      "start_ms": 93840,
+      "end_ms": 95460,
+      "speaker": "1",
+      "token_start_index": 481,
+      "token_end_index": 492
+    },
+    {
+      "text": " So maybe, I mean, we should definitely— well, we could probably not put it under. This heading, but put it under changes since the initial specification.",
+      "start_ms": 95940,
+      "end_ms": 103140,
+      "speaker": "2",
+      "token_start_index": 492,
+      "token_end_index": 535
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 103500,
+      "end_ms": 103620,
+      "speaker": "1",
+      "token_start_index": 535,
+      "token_end_index": 537
+    },
+    {
+      "text": " And say. Yeah, we didn't.",
+      "start_ms": 103800,
+      "end_ms": 105960,
+      "speaker": "2",
+      "token_start_index": 537,
+      "token_end_index": 547
+    },
+    {
+      "text": " We decided the time is too short.",
+      "start_ms": 106140,
+      "end_ms": 109620,
+      "speaker": "1",
+      "token_start_index": 547,
+      "token_end_index": 557
+    },
+    {
+      "text": " Or we felt there were more important things. To do with our time than.",
+      "start_ms": 109740,
+      "end_ms": 112440,
+      "speaker": "2",
+      "token_start_index": 557,
+      "token_end_index": 576
+    },
+    {
+      "text": " Yes, I'm not.",
+      "start_ms": 112560,
+      "end_ms": 113340,
+      "speaker": "1",
+      "token_start_index": 576,
+      "token_end_index": 583
+    },
+    {
+      "text": " Yeah. To worry about.",
+      "start_ms": 113400,
+      "end_ms": 114780,
+      "speaker": "2",
+      "token_start_index": 583,
+      "token_end_index": 591
+    },
+    {
+      "text": " We prefer to concentrate on the main. ",
+      "start_ms": 115020,
+      "end_ms": 120720,
+      "speaker": "1",
+      "token_start_index": 591,
+      "token_end_index": 604
+    }
+  ],
+  "projected_intervals": [
+    [
+      0.36,
+      5.46,
+      "1"
+    ],
+    [
+      6.54,
+      6.84,
+      "2"
+    ],
+    [
+      6.9,
+      8.34,
+      "3"
+    ],
+    [
+      9.72,
+      11.28,
+      "1"
+    ],
+    [
+      11.58,
+      11.64,
+      "2"
+    ],
+    [
+      12.24,
+      14.16,
+      "1"
+    ],
+    [
+      14.34,
+      16.44,
+      "2"
+    ],
+    [
+      17.22,
+      17.4,
+      "1"
+    ],
+    [
+      17.58,
+      18.96,
+      "3"
+    ],
+    [
+      21.42,
+      21.6,
+      "2"
+    ],
+    [
+      22.26,
+      22.56,
+      "3"
+    ],
+    [
+      22.74,
+      24.12,
+      "1"
+    ],
+    [
+      24.36,
+      26.64,
+      "3"
+    ],
+    [
+      27.78,
+      31.86,
+      "1"
+    ],
+    [
+      31.92,
+      32.46,
+      "2"
+    ],
+    [
+      32.94,
+      36.9,
+      "1"
+    ],
+    [
+      37.02,
+      44.16,
+      "3"
+    ],
+    [
+      44.22,
+      44.76,
+      "1"
+    ],
+    [
+      44.82,
+      46.5,
+      "3"
+    ],
+    [
+      46.74,
+      48.0,
+      "1"
+    ],
+    [
+      48.12,
+      49.44,
+      "3"
+    ],
+    [
+      51.24,
+      66.06,
+      "1"
+    ],
+    [
+      66.24,
+      69.72,
+      "2"
+    ],
+    [
+      69.96,
+      70.98,
+      "1"
+    ],
+    [
+      71.34,
+      72.06,
+      "2"
+    ],
+    [
+      72.06,
+      72.54,
+      "1"
+    ],
+    [
+      72.78,
+      72.9,
+      "3"
+    ],
+    [
+      73.14,
+      76.32,
+      "2"
+    ],
+    [
+      76.44,
+      76.5,
+      "1"
+    ],
+    [
+      76.74,
+      76.98,
+      "3"
+    ],
+    [
+      78.06,
+      86.82,
+      "2"
+    ],
+    [
+      87.42,
+      89.04,
+      "1"
+    ],
+    [
+      89.58,
+      91.5,
+      "3"
+    ],
+    [
+      92.16,
+      92.34,
+      "2"
+    ],
+    [
+      93.84,
+      95.46,
+      "1"
+    ],
+    [
+      95.94,
+      103.14,
+      "2"
+    ],
+    [
+      103.5,
+      103.62,
+      "1"
+    ],
+    [
+      103.8,
+      105.96,
+      "2"
+    ],
+    [
+      106.14,
+      109.62,
+      "1"
+    ],
+    [
+      109.74,
+      112.44,
+      "2"
+    ],
+    [
+      112.56,
+      113.34,
+      "1"
+    ],
+    [
+      113.4,
+      114.78,
+      "2"
+    ],
+    [
+      115.02,
+      120.0,
+      "1"
+    ]
+  ],
+  "projection_diagnostics": {
+    "sdk_groups": 43,
+    "untimed_groups": [],
+    "zero_duration_groups": [],
+    "unattributed_groups": [],
+    "padding_or_omitted_groups": [],
+    "out_of_support_groups": [
+      42
+    ],
+    "wholly_out_of_support_groups": [],
+    "out_of_support_total_ms": 719.9999999999989,
+    "mapped_source_pieces": 43,
+    "bridged_positive_gap_ms": 66000.0,
+    "max_bridged_gap_ms": 3780
+  }
+}

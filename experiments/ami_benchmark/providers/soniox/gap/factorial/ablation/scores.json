@@ -1,0 +1,36 @@
+{
+  "pyannote.metrics": "4.0.0",
+  "collar": 0,
+  "overlap_included": true,
+  "mapping": "one entire-case optimal speaker mapping",
+  "per_arm": {
+    "D_no_S200": [
+      {
+        "id": "brief_interjections",
+        "pair_with": null,
+        "duration_s": 120,
+        "reference_speakers": 4,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 1,
+        "der": 0.6980807986326711,
+        "total": 117.6009999999916,
+        "missed detection": 39.35099999999859,
+        "false alarm": 18.70999999999873,
+        "confusion": 24.033999999997572
+      },
+      {
+        "id": "long_return_gap",
+        "pair_with": null,
+        "duration_s": 180,
+        "reference_speakers": 4,
+        "predicted_speakers": 2,
+        "speaker_count_absolute_error": 2,
+        "der": 0.44029256282136275,
+        "total": 124.28099999997842,
+        "missed detection": 7.518999999999176,
+        "false alarm": 36.01399999999499,
+        "confusion": 11.186999999998122
+      }
+    ]
+  }
+}

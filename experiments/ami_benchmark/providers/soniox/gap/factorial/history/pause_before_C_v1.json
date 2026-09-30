@@ -1,0 +1,7 @@
+{
+  "reason": "Director requested pause after in-flight long_context/B, before next not-started call",
+  "mechanism": "existing replay refuses an existing live result directory before connecting; this guard directory deliberately triggers that refusal",
+  "provider_call_started": false,
+  "frozen_plan_changed": false,
+  "note": "Conservative quota reservation may be created for C before this guard is encountered. That reservation is not proof of an actual provider request. Director decision required before resumption."
+}

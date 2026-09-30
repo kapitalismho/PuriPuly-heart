@@ -1,0 +1,52 @@
+{
+  "proof": [
+    {
+      "case": "long_context",
+      "A_B_packetization_and_virtual_pacing_unchanged": true,
+      "C_D_exact_original_app_pcm_maps_cuts_preserved": true,
+      "C_D_identical_packets_and_availability": true,
+      "max_packet_bytes": 1600,
+      "max_added_availability_spread_seconds": 0.032,
+      "v1_C_packets": 18677,
+      "v2_C_packets": 12551,
+      "no_future_audio": true
+    },
+    {
+      "case": "brief_interjections",
+      "A_B_packetization_and_virtual_pacing_unchanged": true,
+      "C_D_exact_original_app_pcm_maps_cuts_preserved": true,
+      "C_D_identical_packets_and_availability": true,
+      "max_packet_bytes": 1600,
+      "max_added_availability_spread_seconds": 0.032,
+      "v1_C_packets": 3883,
+      "v2_C_packets": 2609,
+      "no_future_audio": true
+    },
+    {
+      "case": "low_overlap",
+      "A_B_packetization_and_virtual_pacing_unchanged": true,
+      "C_D_exact_original_app_pcm_maps_cuts_preserved": true,
+      "C_D_identical_packets_and_availability": true,
+      "max_packet_bytes": 1600,
+      "max_added_availability_spread_seconds": 0.032,
+      "v1_C_packets": 3912,
+      "v2_C_packets": 2634,
+      "no_future_audio": true
+    },
+    {
+      "case": "long_return_gap",
+      "A_B_packetization_and_virtual_pacing_unchanged": true,
+      "C_D_exact_original_app_pcm_maps_cuts_preserved": true,
+      "C_D_identical_packets_and_availability": true,
+      "max_packet_bytes": 1600,
+      "max_added_availability_spread_seconds": 0.032,
+      "v1_C_packets": 4982,
+      "v2_C_packets": 3346,
+      "no_future_audio": true
+    }
+  ],
+  "A_B_prior_evidence_applicable": true,
+  "scope": "offline mechanics; not accuracy",
+  "original_sender": "history/sender_v1.py",
+  "amended_plan": "run_plan_v2.json"
+}

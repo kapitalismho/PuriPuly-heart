@@ -1,0 +1,1143 @@
+{
+  "resources": {
+    "new_requests": 2,
+    "new_audio_seconds": 277.76,
+    "new_websocket_envelope_seconds": 380.20300000000134,
+    "new_connected_to_closed_seconds": 378.7659999999996,
+    "new_finalizations_and_receipts": 61,
+    "cumulative_requests": 18,
+    "cumulative_audio_seconds": 4347.928,
+    "cumulative_websocket_envelope_seconds": 5586.032000000005,
+    "retries": 0
+  },
+  "comparisons": [
+    {
+      "case": "brief_interjections",
+      "control_D": {
+        "id": "brief_interjections",
+        "pair_with": null,
+        "duration_s": 120,
+        "reference_speakers": 4,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 1,
+        "der": 0.8326034642562605,
+        "total": 117.6009999999916,
+        "missed detection": 41.10799999999857,
+        "false alarm": 19.662999999998565,
+        "confusion": 37.14399999999637
+      },
+      "S200_off": {
+        "id": "brief_interjections",
+        "pair_with": null,
+        "duration_s": 120,
+        "reference_speakers": 4,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 1,
+        "der": 0.6980807986326711,
+        "total": 117.6009999999916,
+        "missed detection": 39.35099999999859,
+        "false alarm": 18.70999999999873,
+        "confusion": 24.033999999997572
+      },
+      "der_difference_pp": -13.45226656235894,
+      "component_differences_s": {
+        "missed detection": -1.7569999999999766,
+        "false alarm": -0.952999999999836,
+        "confusion": -13.109999999998795
+      },
+      "original_D_reception": {
+        "transitions": [
+          {
+            "provider_cut_sample": 99968,
+            "available_source_sample": 96768,
+            "terminal": false,
+            "finalize_written_s": 8.734000000000378,
+            "fin_received_s": 8.9529999999977,
+            "successor_pcm_s": 8.796999999998661
+          },
+          {
+            "provider_cut_sample": 203712,
+            "available_source_sample": 192512,
+            "terminal": false,
+            "finalize_written_s": 17.15599999999904,
+            "fin_received_s": 17.42199999999866,
+            "successor_pcm_s": 17.21799999999712
+          },
+          {
+            "provider_cut_sample": 307456,
+            "available_source_sample": 288256,
+            "terminal": false,
+            "finalize_written_s": 25.53099999999904,
+            "fin_received_s": 25.764999999999418,
+            "successor_pcm_s": 25.59299999999712
+          },
+          {
+            "provider_cut_sample": 380480,
+            "available_source_sample": 353280,
+            "terminal": false,
+            "finalize_written_s": 31.40599999999904,
+            "fin_received_s": 31.639999999999418,
+            "successor_pcm_s": 31.46799999999712
+          },
+          {
+            "provider_cut_sample": 455680,
+            "available_source_sample": 431616,
+            "terminal": false,
+            "finalize_written_s": 37.43699999999808,
+            "fin_received_s": 37.68699999999808,
+            "successor_pcm_s": 37.5
+          },
+          {
+            "provider_cut_sample": 562624,
+            "available_source_sample": 538624,
+            "terminal": false,
+            "finalize_written_s": 46.03099999999904,
+            "fin_received_s": 46.25,
+            "successor_pcm_s": 46.09299999999712
+          },
+          {
+            "provider_cut_sample": 666368,
+            "available_source_sample": 634368,
+            "terminal": false,
+            "finalize_written_s": 54.40599999999904,
+            "fin_received_s": 54.63999999999942,
+            "successor_pcm_s": 54.46799999999712
+          },
+          {
+            "provider_cut_sample": 770112,
+            "available_source_sample": 730112,
+            "terminal": false,
+            "finalize_written_s": 62.78099999999904,
+            "fin_received_s": 63.01499999999942,
+            "successor_pcm_s": 62.84299999999712
+          },
+          {
+            "provider_cut_sample": 843136,
+            "available_source_sample": 795136,
+            "terminal": false,
+            "finalize_written_s": 68.65599999999904,
+            "fin_received_s": 68.88999999999942,
+            "successor_pcm_s": 68.71799999999712
+          },
+          {
+            "provider_cut_sample": 891584,
+            "available_source_sample": 858624,
+            "terminal": false,
+            "finalize_written_s": 72.53099999999904,
+            "fin_received_s": 72.78099999999904,
+            "successor_pcm_s": 72.59299999999712
+          },
+          {
+            "provider_cut_sample": 974144,
+            "available_source_sample": 937984,
+            "terminal": false,
+            "finalize_written_s": 79.23400000000038,
+            "fin_received_s": 79.46799999999712,
+            "successor_pcm_s": 79.29699999999866
+          },
+          {
+            "provider_cut_sample": 1009472,
+            "available_source_sample": 973312,
+            "terminal": false,
+            "finalize_written_s": 81.98400000000038,
+            "fin_received_s": 82.21799999999712,
+            "successor_pcm_s": 82.04699999999866
+          },
+          {
+            "provider_cut_sample": 1115072,
+            "available_source_sample": 1075712,
+            "terminal": false,
+            "finalize_written_s": 90.48400000000038,
+            "fin_received_s": 90.71799999999712,
+            "successor_pcm_s": 90.54699999999866
+          },
+          {
+            "provider_cut_sample": 1218816,
+            "available_source_sample": 1171456,
+            "terminal": false,
+            "finalize_written_s": 98.90599999999904,
+            "fin_received_s": 99.17199999999866,
+            "successor_pcm_s": 98.96799999999712
+          },
+          {
+            "provider_cut_sample": 1290816,
+            "available_source_sample": 1235456,
+            "terminal": false,
+            "finalize_written_s": 104.7029999999977,
+            "fin_received_s": 104.92199999999866,
+            "successor_pcm_s": 104.76499999999942
+          },
+          {
+            "provider_cut_sample": 1393856,
+            "available_source_sample": 1335296,
+            "terminal": false,
+            "finalize_written_s": 112.98400000000038,
+            "fin_received_s": 113.21799999999712,
+            "successor_pcm_s": 113.04699999999866
+          },
+          {
+            "provider_cut_sample": 1497600,
+            "available_source_sample": 1431040,
+            "terminal": false,
+            "finalize_written_s": 121.40599999999904,
+            "fin_received_s": 121.625,
+            "successor_pcm_s": 121.46799999999712
+          },
+          {
+            "provider_cut_sample": 1552576,
+            "available_source_sample": 1481216,
+            "terminal": false,
+            "finalize_written_s": 125.81199999999808,
+            "fin_received_s": 126.04699999999866,
+            "successor_pcm_s": 125.875
+          },
+          {
+            "provider_cut_sample": 1656128,
+            "available_source_sample": 1581568,
+            "terminal": false,
+            "finalize_written_s": 134.18699999999808,
+            "fin_received_s": 134.43699999999808,
+            "successor_pcm_s": 134.25
+          },
+          {
+            "provider_cut_sample": 1741952,
+            "available_source_sample": 1659392,
+            "terminal": false,
+            "finalize_written_s": 141.06199999999808,
+            "fin_received_s": 141.28099999999904,
+            "successor_pcm_s": 141.125
+          },
+          {
+            "provider_cut_sample": 1848896,
+            "available_source_sample": 1764864,
+            "terminal": false,
+            "finalize_written_s": 149.65599999999904,
+            "fin_received_s": 149.90599999999904,
+            "successor_pcm_s": 149.71799999999712
+          },
+          {
+            "provider_cut_sample": 1952640,
+            "available_source_sample": 1860608,
+            "terminal": false,
+            "finalize_written_s": 158.03099999999904,
+            "fin_received_s": 158.25,
+            "successor_pcm_s": 158.09299999999712
+          },
+          {
+            "provider_cut_sample": 1977408,
+            "available_source_sample": 1880576,
+            "terminal": false,
+            "finalize_written_s": 159.98400000000038,
+            "fin_received_s": 160.2029999999977,
+            "successor_pcm_s": 160.04699999999866
+          },
+          {
+            "provider_cut_sample": 2004864,
+            "available_source_sample": 1909248,
+            "terminal": false,
+            "finalize_written_s": 162.06199999999808,
+            "fin_received_s": 162.31199999999808,
+            "successor_pcm_s": null
+          },
+          {
+            "provider_cut_sample": 2004864,
+            "available_source_sample": 1920000,
+            "terminal": true,
+            "finalize_written_s": 162.06199999999808,
+            "fin_received_s": 162.35900000000038,
+            "successor_pcm_s": null
+          }
+        ],
+        "first_stable_token_s": 8.764999999999418,
+        "first_stable_attributed_token_s": 8.764999999999418,
+        "stable_tokens": 649,
+        "missing_speaker_tokens": 0,
+        "max_pending_completions": 2,
+        "max_send_stall_s": 0.01599999999962165,
+        "max_source_availability_to_write_s": 42.71899999999866,
+        "connected_to_closed_s": 163.07900000000154
+      },
+      "S200_off_reception": {
+        "transitions": [
+          {
+            "provider_cut_sample": 96768,
+            "available_source_sample": 96768,
+            "terminal": false,
+            "finalize_written_s": 8.609000000000378,
+            "fin_received_s": 8.81199999999808,
+            "successor_pcm_s": 8.671999999998661
+          },
+          {
+            "provider_cut_sample": 197312,
+            "available_source_sample": 192512,
+            "terminal": false,
+            "finalize_written_s": 16.78099999999904,
+            "fin_received_s": 17.014999999999418,
+            "successor_pcm_s": 16.84299999999712
+          },
+          {
+            "provider_cut_sample": 297856,
+            "available_source_sample": 288256,
+            "terminal": false,
+            "finalize_written_s": 24.90599999999904,
+            "fin_received_s": 25.125,
+            "successor_pcm_s": 24.96799999999712
+          },
+          {
+            "provider_cut_sample": 367680,
+            "available_source_sample": 353280,
+            "terminal": false,
+            "finalize_written_s": 30.53099999999904,
+            "fin_received_s": 30.75,
+            "successor_pcm_s": 30.59299999999712
+          },
+          {
+            "provider_cut_sample": 439680,
+            "available_source_sample": 431616,
+            "terminal": false,
+            "finalize_written_s": 36.31199999999808,
+            "fin_received_s": 36.54699999999866,
+            "successor_pcm_s": 36.375
+          },
+          {
+            "provider_cut_sample": 543424,
+            "available_source_sample": 538624,
+            "terminal": false,
+            "finalize_written_s": 44.65599999999904,
+            "fin_received_s": 44.875,
+            "successor_pcm_s": 44.71799999999712
+          },
+          {
+            "provider_cut_sample": 643968,
+            "available_source_sample": 634368,
+            "terminal": false,
+            "finalize_written_s": 52.78099999999904,
+            "fin_received_s": 53.0,
+            "successor_pcm_s": 52.84299999999712
+          },
+          {
+            "provider_cut_sample": 744512,
+            "available_source_sample": 730112,
+            "terminal": false,
+            "finalize_written_s": 60.90599999999904,
+            "fin_received_s": 61.125,
+            "successor_pcm_s": 60.96799999999712
+          },
+          {
+            "provider_cut_sample": 814336,
+            "available_source_sample": 795136,
+            "terminal": false,
+            "finalize_written_s": 66.53099999999904,
+            "fin_received_s": 66.75,
+            "successor_pcm_s": 66.59299999999712
+          },
+          {
+            "provider_cut_sample": 862784,
+            "available_source_sample": 858624,
+            "terminal": false,
+            "finalize_written_s": 70.40599999999904,
+            "fin_received_s": 70.60900000000038,
+            "successor_pcm_s": 70.46799999999712
+          },
+          {
+            "provider_cut_sample": 942144,
+            "available_source_sample": 937984,
+            "terminal": false,
+            "finalize_written_s": 76.73400000000038,
+            "fin_received_s": 76.93699999999808,
+            "successor_pcm_s": 76.79699999999866
+          },
+          {
+            "provider_cut_sample": 977472,
+            "available_source_sample": 973312,
+            "terminal": false,
+            "finalize_written_s": 79.48400000000038,
+            "fin_received_s": 79.7029999999977,
+            "successor_pcm_s": 79.54699999999866
+          },
+          {
+            "provider_cut_sample": 1079872,
+            "available_source_sample": 1075712,
+            "terminal": false,
+            "finalize_written_s": 87.73400000000038,
+            "fin_received_s": 87.9529999999977,
+            "successor_pcm_s": 87.79699999999866
+          },
+          {
+            "provider_cut_sample": 1180416,
+            "available_source_sample": 1171456,
+            "terminal": false,
+            "finalize_written_s": 95.90599999999904,
+            "fin_received_s": 96.13999999999942,
+            "successor_pcm_s": 95.96799999999712
+          },
+          {
+            "provider_cut_sample": 1249216,
+            "available_source_sample": 1235456,
+            "terminal": false,
+            "finalize_written_s": 101.43699999999808,
+            "fin_received_s": 101.63999999999942,
+            "successor_pcm_s": 101.5
+          },
+          {
+            "provider_cut_sample": 1349056,
+            "available_source_sample": 1335296,
+            "terminal": false,
+            "finalize_written_s": 109.48400000000038,
+            "fin_received_s": 109.7029999999977,
+            "successor_pcm_s": 109.54699999999866
+          },
+          {
+            "provider_cut_sample": 1449600,
+            "available_source_sample": 1431040,
+            "terminal": false,
+            "finalize_written_s": 117.65599999999904,
+            "fin_received_s": 117.88999999999942,
+            "successor_pcm_s": 117.71799999999712
+          },
+          {
+            "provider_cut_sample": 1504576,
+            "available_source_sample": 1481216,
+            "terminal": false,
+            "finalize_written_s": 122.06199999999808,
+            "fin_received_s": 122.28099999999904,
+            "successor_pcm_s": 122.125
+          },
+          {
+            "provider_cut_sample": 1604928,
+            "available_source_sample": 1581568,
+            "terminal": false,
+            "finalize_written_s": 130.18699999999808,
+            "fin_received_s": 130.40599999999904,
+            "successor_pcm_s": 130.25
+          },
+          {
+            "provider_cut_sample": 1687552,
+            "available_source_sample": 1659392,
+            "terminal": false,
+            "finalize_written_s": 136.81199999999808,
+            "fin_received_s": 137.06199999999808,
+            "successor_pcm_s": 136.875
+          },
+          {
+            "provider_cut_sample": 1791296,
+            "available_source_sample": 1764864,
+            "terminal": false,
+            "finalize_written_s": 145.15599999999904,
+            "fin_received_s": 145.375,
+            "successor_pcm_s": 145.21799999999712
+          },
+          {
+            "provider_cut_sample": 1891840,
+            "available_source_sample": 1860608,
+            "terminal": false,
+            "finalize_written_s": 153.28099999999904,
+            "fin_received_s": 153.51499999999942,
+            "successor_pcm_s": 153.34299999999712
+          },
+          {
+            "provider_cut_sample": 1916608,
+            "available_source_sample": 1880576,
+            "terminal": false,
+            "finalize_written_s": 155.23400000000038,
+            "fin_received_s": 155.43699999999808,
+            "successor_pcm_s": 155.29699999999866
+          },
+          {
+            "provider_cut_sample": 1944064,
+            "available_source_sample": 1909248,
+            "terminal": false,
+            "finalize_written_s": 157.43699999999808,
+            "fin_received_s": 157.68699999999808,
+            "successor_pcm_s": null
+          },
+          {
+            "provider_cut_sample": 1944064,
+            "available_source_sample": 1920000,
+            "terminal": true,
+            "finalize_written_s": 157.43699999999808,
+            "fin_received_s": 157.73400000000038,
+            "successor_pcm_s": null
+          }
+        ],
+        "first_stable_token_s": 8.81199999999808,
+        "first_stable_attributed_token_s": 8.81199999999808,
+        "stable_tokens": 618,
+        "missing_speaker_tokens": 0,
+        "max_pending_completions": 2,
+        "max_send_stall_s": 0.01599999999962165,
+        "max_source_availability_to_write_s": 38.09399999999866,
+        "connected_to_closed_s": 158.39099999999962
+      },
+      "source_packet_write_time_difference_s": {
+        "min": -4.78099999999904,
+        "median": -2.5,
+        "max": 0.125
+      },
+      "control_write_time_difference_s": {
+        "min": -4.75,
+        "median": -2.75,
+        "max": -0.125
+      },
+      "audio_seconds_original_D": 125.304,
+      "audio_seconds_S200_off": 121.504,
+      "websocket_envelope_original_D": 163.79699999999866,
+      "websocket_envelope_S200_off": 159.15599999999904,
+      "actual_source_packet_bytes_boundaries_availability_and_controls_match": true,
+      "no_future_audio": true
+    },
+    {
+      "case": "long_return_gap",
+      "control_D": {
+        "id": "long_return_gap",
+        "pair_with": null,
+        "duration_s": 180,
+        "reference_speakers": 4,
+        "predicted_speakers": 2,
+        "speaker_count_absolute_error": 2,
+        "der": 0.43662345813118514,
+        "total": 124.2809999999784,
+        "missed detection": 7.4469999999991945,
+        "false alarm": 36.157999999995,
+        "confusion": 10.658999999998201
+      },
+      "S200_off": {
+        "id": "long_return_gap",
+        "pair_with": null,
+        "duration_s": 180,
+        "reference_speakers": 4,
+        "predicted_speakers": 2,
+        "speaker_count_absolute_error": 2,
+        "der": 0.44029256282136275,
+        "total": 124.28099999997842,
+        "missed detection": 7.518999999999176,
+        "false alarm": 36.01399999999499,
+        "confusion": 11.186999999998122
+      },
+      "der_difference_pp": 0.3669104690177616,
+      "component_differences_s": {
+        "missed detection": 0.07199999999998141,
+        "false alarm": -0.14400000000001256,
+        "confusion": 0.5279999999999205
+      },
+      "original_D_reception": {
+        "transitions": [
+          {
+            "provider_cut_sample": 86656,
+            "available_source_sample": 83456,
+            "terminal": false,
+            "finalize_written_s": 7.734000000000378,
+            "fin_received_s": 7.984000000000378,
+            "successor_pcm_s": 7.7959999999984575
+          },
+          {
+            "provider_cut_sample": 161856,
+            "available_source_sample": 169472,
+            "terminal": false,
+            "finalize_written_s": 13.764999999999418,
+            "fin_received_s": 13.984000000000378,
+            "successor_pcm_s": 13.828000000001339
+          },
+          {
+            "provider_cut_sample": 238080,
+            "available_source_sample": 278016,
+            "terminal": false,
+            "finalize_written_s": 19.85900000000038,
+            "fin_received_s": 20.093000000000757,
+            "successor_pcm_s": 19.920999999998457
+          },
+          {
+            "provider_cut_sample": 345024,
+            "available_source_sample": 398848,
+            "terminal": false,
+            "finalize_written_s": 28.48400000000038,
+            "fin_received_s": 28.75,
+            "successor_pcm_s": 28.545999999998457
+          },
+          {
+            "provider_cut_sample": 435456,
+            "available_source_sample": 481280,
+            "terminal": false,
+            "finalize_written_s": 35.76499999999942,
+            "fin_received_s": 36.0,
+            "successor_pcm_s": 35.82800000000134
+          },
+          {
+            "provider_cut_sample": 464448,
+            "available_source_sample": 538624,
+            "terminal": false,
+            "finalize_written_s": 38.01499999999942,
+            "fin_received_s": 38.26499999999942,
+            "successor_pcm_s": 41.88999999999942
+          },
+          {
+            "provider_cut_sample": 500096,
+            "available_source_sample": 696320,
+            "terminal": false,
+            "finalize_written_s": 44.68700000000172,
+            "fin_received_s": 44.90599999999904,
+            "successor_pcm_s": 44.75
+          },
+          {
+            "provider_cut_sample": 524992,
+            "available_source_sample": 728064,
+            "terminal": false,
+            "finalize_written_s": 46.57800000000134,
+            "fin_received_s": 46.79599999999846,
+            "successor_pcm_s": 46.63999999999942
+          },
+          {
+            "provider_cut_sample": 583680,
+            "available_source_sample": 788992,
+            "terminal": false,
+            "finalize_written_s": 51.31200000000172,
+            "fin_received_s": 51.54599999999846,
+            "successor_pcm_s": 53.875
+          },
+          {
+            "provider_cut_sample": 612160,
+            "available_source_sample": 880640,
+            "terminal": false,
+            "finalize_written_s": 56.10900000000038,
+            "fin_received_s": 56.32800000000134,
+            "successor_pcm_s": 60.35900000000038
+          },
+          {
+            "provider_cut_sample": 636544,
+            "available_source_sample": 980480,
+            "terminal": false,
+            "finalize_written_s": 62.28099999999904,
+            "fin_received_s": 62.53099999999904,
+            "successor_pcm_s": 62.73400000000038
+          },
+          {
+            "provider_cut_sample": 743488,
+            "available_source_sample": 1097728,
+            "terminal": false,
+            "finalize_written_s": 71.35900000000038,
+            "fin_received_s": 71.59300000000076,
+            "successor_pcm_s": 71.42099999999846
+          },
+          {
+            "provider_cut_sample": 767232,
+            "available_source_sample": 1118720,
+            "terminal": false,
+            "finalize_written_s": 73.23400000000038,
+            "fin_received_s": 73.45300000000134,
+            "successor_pcm_s": 73.29599999999846
+          },
+          {
+            "provider_cut_sample": 836480,
+            "available_source_sample": 1184768,
+            "terminal": false,
+            "finalize_written_s": 78.81200000000172,
+            "fin_received_s": 79.03099999999904,
+            "successor_pcm_s": 78.875
+          },
+          {
+            "provider_cut_sample": 931136,
+            "available_source_sample": 1285632,
+            "terminal": false,
+            "finalize_written_s": 86.48400000000038,
+            "fin_received_s": 86.71800000000076,
+            "successor_pcm_s": 86.54599999999846
+          },
+          {
+            "provider_cut_sample": 1029056,
+            "available_source_sample": 1380352,
+            "terminal": false,
+            "finalize_written_s": 94.38999999999942,
+            "fin_received_s": 94.60900000000038,
+            "successor_pcm_s": 94.45300000000134
+          },
+          {
+            "provider_cut_sample": 1136000,
+            "available_source_sample": 1484288,
+            "terminal": false,
+            "finalize_written_s": 102.98400000000038,
+            "fin_received_s": 103.20300000000134,
+            "successor_pcm_s": 103.04599999999846
+          },
+          {
+            "provider_cut_sample": 1226432,
+            "available_source_sample": 1566720,
+            "terminal": false,
+            "finalize_written_s": 110.26499999999942,
+            "fin_received_s": 110.48400000000038,
+            "successor_pcm_s": 110.32800000000134
+          },
+          {
+            "provider_cut_sample": 1333376,
+            "available_source_sample": 1680384,
+            "terminal": false,
+            "finalize_written_s": 118.88999999999942,
+            "fin_received_s": 119.125,
+            "successor_pcm_s": 118.95300000000134
+          },
+          {
+            "provider_cut_sample": 1358656,
+            "available_source_sample": 1700864,
+            "terminal": false,
+            "finalize_written_s": 120.85900000000038,
+            "fin_received_s": 121.07800000000134,
+            "successor_pcm_s": 120.92099999999846
+          },
+          {
+            "provider_cut_sample": 1422464,
+            "available_source_sample": 1774592,
+            "terminal": false,
+            "finalize_written_s": 125.98400000000038,
+            "fin_received_s": 126.23400000000038,
+            "successor_pcm_s": 126.04599999999846
+          },
+          {
+            "provider_cut_sample": 1504320,
+            "available_source_sample": 1854464,
+            "terminal": false,
+            "finalize_written_s": 132.56200000000172,
+            "fin_received_s": 132.78099999999904,
+            "successor_pcm_s": 132.625
+          },
+          {
+            "provider_cut_sample": 1546816,
+            "available_source_sample": 1896960,
+            "terminal": false,
+            "finalize_written_s": 135.93700000000172,
+            "fin_received_s": 136.17099999999846,
+            "successor_pcm_s": 136.0
+          },
+          {
+            "provider_cut_sample": 1615552,
+            "available_source_sample": 1962496,
+            "terminal": false,
+            "finalize_written_s": 141.38999999999942,
+            "fin_received_s": 141.625,
+            "successor_pcm_s": 141.45300000000134
+          },
+          {
+            "provider_cut_sample": 1716544,
+            "available_source_sample": 2060288,
+            "terminal": false,
+            "finalize_written_s": 149.51499999999942,
+            "fin_received_s": 149.73400000000038,
+            "successor_pcm_s": 149.57800000000134
+          },
+          {
+            "provider_cut_sample": 1820288,
+            "available_source_sample": 2156032,
+            "terminal": false,
+            "finalize_written_s": 157.85900000000038,
+            "fin_received_s": 158.09300000000076,
+            "successor_pcm_s": 157.92099999999846
+          },
+          {
+            "provider_cut_sample": 1908160,
+            "available_source_sample": 2235904,
+            "terminal": false,
+            "finalize_written_s": 164.93700000000172,
+            "fin_received_s": 165.17099999999846,
+            "successor_pcm_s": 165.0
+          },
+          {
+            "provider_cut_sample": 2010176,
+            "available_source_sample": 2334720,
+            "terminal": false,
+            "finalize_written_s": 173.10900000000038,
+            "fin_received_s": 173.34300000000076,
+            "successor_pcm_s": 173.17099999999846
+          },
+          {
+            "provider_cut_sample": 2052352,
+            "available_source_sample": 2372096,
+            "terminal": false,
+            "finalize_written_s": 176.48400000000038,
+            "fin_received_s": 176.70300000000134,
+            "successor_pcm_s": 176.54599999999846
+          },
+          {
+            "provider_cut_sample": 2120960,
+            "available_source_sample": 2440704,
+            "terminal": false,
+            "finalize_written_s": 181.93700000000172,
+            "fin_received_s": 182.15599999999904,
+            "successor_pcm_s": 182.0
+          },
+          {
+            "provider_cut_sample": 2220416,
+            "available_source_sample": 2536960,
+            "terminal": false,
+            "finalize_written_s": 189.88999999999942,
+            "fin_received_s": 190.125,
+            "successor_pcm_s": 189.95300000000134
+          },
+          {
+            "provider_cut_sample": 2300608,
+            "available_source_sample": 2609152,
+            "terminal": false,
+            "finalize_written_s": 196.31200000000172,
+            "fin_received_s": 196.53099999999904,
+            "successor_pcm_s": 196.375
+          },
+          {
+            "provider_cut_sample": 2395456,
+            "available_source_sample": 2700800,
+            "terminal": false,
+            "finalize_written_s": 204.01499999999942,
+            "fin_received_s": 204.23400000000038,
+            "successor_pcm_s": 204.07800000000134
+          },
+          {
+            "provider_cut_sample": 2498816,
+            "available_source_sample": 2808320,
+            "terminal": false,
+            "finalize_written_s": 212.31200000000172,
+            "fin_received_s": 212.54599999999846,
+            "successor_pcm_s": 212.375
+          },
+          {
+            "provider_cut_sample": 2570496,
+            "available_source_sample": 2880000,
+            "terminal": false,
+            "finalize_written_s": 218.01499999999942,
+            "fin_received_s": 218.29599999999846,
+            "successor_pcm_s": null
+          },
+          {
+            "provider_cut_sample": 2570496,
+            "available_source_sample": 2880000,
+            "terminal": true,
+            "finalize_written_s": 218.01499999999942,
+            "fin_received_s": 218.31200000000172,
+            "successor_pcm_s": null
+          }
+        ],
+        "first_stable_token_s": 7.984000000000378,
+        "first_stable_attributed_token_s": 7.984000000000378,
+        "stable_tokens": 759,
+        "missing_speaker_tokens": 0,
+        "max_pending_completions": 2,
+        "max_send_stall_s": 0.01599999999962165,
+        "max_source_availability_to_write_s": 38.0,
+        "connected_to_closed_s": 219.03199999999924
+      },
+      "S200_off_reception": {
+        "transitions": [
+          {
+            "provider_cut_sample": 83456,
+            "available_source_sample": 83456,
+            "terminal": false,
+            "finalize_written_s": 7.438000000001921,
+            "fin_received_s": 7.657000000002881,
+            "successor_pcm_s": 7.5
+          },
+          {
+            "provider_cut_sample": 155456,
+            "available_source_sample": 169472,
+            "terminal": false,
+            "finalize_written_s": 13.21900000000096,
+            "fin_received_s": 13.454000000001543,
+            "successor_pcm_s": 13.4220000000023
+          },
+          {
+            "provider_cut_sample": 228480,
+            "available_source_sample": 278016,
+            "terminal": false,
+            "finalize_written_s": 19.31300000000192,
+            "fin_received_s": 19.53200000000288,
+            "successor_pcm_s": 19.375
+          },
+          {
+            "provider_cut_sample": 332224,
+            "available_source_sample": 398848,
+            "terminal": false,
+            "finalize_written_s": 27.68800000000192,
+            "fin_received_s": 27.90700000000288,
+            "successor_pcm_s": 27.75
+          },
+          {
+            "provider_cut_sample": 419456,
+            "available_source_sample": 481280,
+            "terminal": false,
+            "finalize_written_s": 34.71900000000096,
+            "fin_received_s": 34.9220000000023,
+            "successor_pcm_s": 34.78200000000288
+          },
+          {
+            "provider_cut_sample": 448448,
+            "available_source_sample": 538624,
+            "terminal": false,
+            "finalize_written_s": 36.96900000000096,
+            "fin_received_s": 37.25,
+            "successor_pcm_s": 41.89100000000326
+          },
+          {
+            "provider_cut_sample": 484096,
+            "available_source_sample": 696320,
+            "terminal": false,
+            "finalize_written_s": 44.64100000000326,
+            "fin_received_s": 44.86000000000058,
+            "successor_pcm_s": 44.70400000000154
+          },
+          {
+            "provider_cut_sample": 508992,
+            "available_source_sample": 728064,
+            "terminal": false,
+            "finalize_written_s": 46.64100000000326,
+            "fin_received_s": 46.84400000000096,
+            "successor_pcm_s": 46.70400000000154
+          },
+          {
+            "provider_cut_sample": 567680,
+            "available_source_sample": 788992,
+            "terminal": false,
+            "finalize_written_s": 51.26600000000326,
+            "fin_received_s": 51.48500000000058,
+            "successor_pcm_s": 53.86000000000058
+          },
+          {
+            "provider_cut_sample": 596160,
+            "available_source_sample": 880640,
+            "terminal": false,
+            "finalize_written_s": 56.06300000000192,
+            "fin_received_s": 56.31300000000192,
+            "successor_pcm_s": 60.36000000000058
+          },
+          {
+            "provider_cut_sample": 620544,
+            "available_source_sample": 980480,
+            "terminal": false,
+            "finalize_written_s": 62.21900000000096,
+            "fin_received_s": 62.45400000000154,
+            "successor_pcm_s": 62.73500000000058
+          },
+          {
+            "provider_cut_sample": 724288,
+            "available_source_sample": 1097728,
+            "terminal": false,
+            "finalize_written_s": 71.18800000000192,
+            "fin_received_s": 71.40700000000288,
+            "successor_pcm_s": 71.25
+          },
+          {
+            "provider_cut_sample": 748032,
+            "available_source_sample": 1118720,
+            "terminal": false,
+            "finalize_written_s": 73.06300000000192,
+            "fin_received_s": 73.28200000000288,
+            "successor_pcm_s": 73.125
+          },
+          {
+            "provider_cut_sample": 814080,
+            "available_source_sample": 1184768,
+            "terminal": false,
+            "finalize_written_s": 78.39100000000326,
+            "fin_received_s": 78.59400000000096,
+            "successor_pcm_s": 78.45400000000154
+          },
+          {
+            "provider_cut_sample": 905536,
+            "available_source_sample": 1285632,
+            "terminal": false,
+            "finalize_written_s": 85.70400000000154,
+            "fin_received_s": 85.93800000000192,
+            "successor_pcm_s": 85.76600000000326
+          },
+          {
+            "provider_cut_sample": 1000256,
+            "available_source_sample": 1380352,
+            "terminal": false,
+            "finalize_written_s": 93.34400000000096,
+            "fin_received_s": 93.56300000000192,
+            "successor_pcm_s": 93.40700000000288
+          },
+          {
+            "provider_cut_sample": 1104000,
+            "available_source_sample": 1484288,
+            "terminal": false,
+            "finalize_written_s": 101.68800000000192,
+            "fin_received_s": 101.90700000000288,
+            "successor_pcm_s": 101.75
+          },
+          {
+            "provider_cut_sample": 1191232,
+            "available_source_sample": 1566720,
+            "terminal": false,
+            "finalize_written_s": 108.71900000000096,
+            "fin_received_s": 108.93800000000192,
+            "successor_pcm_s": 108.78200000000288
+          },
+          {
+            "provider_cut_sample": 1294976,
+            "available_source_sample": 1680384,
+            "terminal": false,
+            "finalize_written_s": 117.625,
+            "fin_received_s": 117.84400000000096,
+            "successor_pcm_s": 117.70400000000154
+          },
+          {
+            "provider_cut_sample": 1320256,
+            "available_source_sample": 1700864,
+            "terminal": false,
+            "finalize_written_s": 120.59400000000096,
+            "fin_received_s": 120.81300000000192,
+            "successor_pcm_s": 120.68800000000192
+          },
+          {
+            "provider_cut_sample": 1384064,
+            "available_source_sample": 1774592,
+            "terminal": false,
+            "finalize_written_s": 128.01600000000326,
+            "fin_received_s": 128.25,
+            "successor_pcm_s": 128.125
+          },
+          {
+            "provider_cut_sample": 1462720,
+            "available_source_sample": 1854464,
+            "terminal": false,
+            "finalize_written_s": 135.57900000000154,
+            "fin_received_s": 135.7970000000023,
+            "successor_pcm_s": 135.64100000000326
+          },
+          {
+            "provider_cut_sample": 1505216,
+            "available_source_sample": 1896960,
+            "terminal": false,
+            "finalize_written_s": 139.14100000000326,
+            "fin_received_s": 139.36000000000058,
+            "successor_pcm_s": 139.20400000000154
+          },
+          {
+            "provider_cut_sample": 1570752,
+            "available_source_sample": 1962496,
+            "terminal": false,
+            "finalize_written_s": 144.73500000000058,
+            "fin_received_s": 145.06300000000192,
+            "successor_pcm_s": 144.7970000000023
+          },
+          {
+            "provider_cut_sample": 1668544,
+            "available_source_sample": 2060288,
+            "terminal": false,
+            "finalize_written_s": 152.59400000000096,
+            "fin_received_s": 152.81300000000192,
+            "successor_pcm_s": 152.65700000000288
+          },
+          {
+            "provider_cut_sample": 1769088,
+            "available_source_sample": 2156032,
+            "terminal": false,
+            "finalize_written_s": 160.81300000000192,
+            "fin_received_s": 161.03200000000288,
+            "successor_pcm_s": 160.875
+          },
+          {
+            "provider_cut_sample": 1853760,
+            "available_source_sample": 2235904,
+            "terminal": false,
+            "finalize_written_s": 167.64100000000326,
+            "fin_received_s": 167.84400000000096,
+            "successor_pcm_s": 167.70400000000154
+          },
+          {
+            "provider_cut_sample": 1952576,
+            "available_source_sample": 2334720,
+            "terminal": false,
+            "finalize_written_s": 175.56300000000192,
+            "fin_received_s": 175.7970000000023,
+            "successor_pcm_s": 175.625
+          },
+          {
+            "provider_cut_sample": 1994752,
+            "available_source_sample": 2372096,
+            "terminal": false,
+            "finalize_written_s": 178.93800000000192,
+            "fin_received_s": 179.15700000000288,
+            "successor_pcm_s": 179.0
+          },
+          {
+            "provider_cut_sample": 2063360,
+            "available_source_sample": 2440704,
+            "terminal": false,
+            "finalize_written_s": 184.39100000000326,
+            "fin_received_s": 184.59400000000096,
+            "successor_pcm_s": 184.45400000000154
+          },
+          {
+            "provider_cut_sample": 2159616,
+            "available_source_sample": 2536960,
+            "terminal": false,
+            "finalize_written_s": 192.09400000000096,
+            "fin_received_s": 192.31300000000192,
+            "successor_pcm_s": 192.15700000000288
+          },
+          {
+            "provider_cut_sample": 2236608,
+            "available_source_sample": 2609152,
+            "terminal": false,
+            "finalize_written_s": 198.26600000000326,
+            "fin_received_s": 198.48500000000058,
+            "successor_pcm_s": 198.32900000000154
+          },
+          {
+            "provider_cut_sample": 2328256,
+            "available_source_sample": 2700800,
+            "terminal": false,
+            "finalize_written_s": 205.59400000000096,
+            "fin_received_s": 205.81300000000192,
+            "successor_pcm_s": 205.65700000000288
+          },
+          {
+            "provider_cut_sample": 2428416,
+            "available_source_sample": 2808320,
+            "terminal": false,
+            "finalize_written_s": 213.64100000000326,
+            "fin_received_s": 213.86000000000058,
+            "successor_pcm_s": 213.70400000000154
+          },
+          {
+            "provider_cut_sample": 2500096,
+            "available_source_sample": 2880000,
+            "terminal": false,
+            "finalize_written_s": 219.34400000000096,
+            "fin_received_s": 219.59400000000096,
+            "successor_pcm_s": null
+          },
+          {
+            "provider_cut_sample": 2500096,
+            "available_source_sample": 2880000,
+            "terminal": true,
+            "finalize_written_s": 219.34400000000096,
+            "fin_received_s": 219.64100000000326,
+            "successor_pcm_s": null
+          }
+        ],
+        "first_stable_token_s": 7.657000000002881,
+        "first_stable_attributed_token_s": 7.657000000002881,
+        "stable_tokens": 756,
+        "missing_speaker_tokens": 0,
+        "max_pending_completions": 2,
+        "max_send_stall_s": 0.01600000000325963,
+        "max_source_availability_to_write_s": 39.32900000000154,
+        "connected_to_closed_s": 220.375
+      },
+      "source_packet_write_time_difference_s": {
+        "min": -1.5780000000013388,
+        "median": 0.0790000000015425,
+        "max": 3.5790000000015425
+      },
+      "control_write_time_difference_s": {
+        "min": -1.5459999999984575,
+        "median": -0.0459999999984575,
+        "max": 3.345000000001164
+      },
+      "audio_seconds_original_D": 160.656,
+      "audio_seconds_S200_off": 156.256,
+      "websocket_envelope_original_D": 219.75,
+      "websocket_envelope_S200_off": 221.0470000000023,
+      "actual_source_packet_bytes_boundaries_availability_and_controls_match": true,
+      "no_future_audio": true
+    }
+  ],
+  "readiness_limit": "Actual provider recorded-file arrivals/control barriers only; no application publication or independently calibrated acoustic clock",
+  "statistical_limit": "One new call per case; no significance claim"
+}

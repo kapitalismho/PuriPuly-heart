@@ -1,0 +1,27 @@
+{
+  "passed": [
+    {
+      "case": "brief_interjections",
+      "source_packet_count": 2533,
+      "exact_actual_D_source_bytes_boundaries_replay_and_availability": true,
+      "controls_preserved": 25,
+      "removed_seconds": 3.8,
+      "source_maps_control_provider_positions_shifted_explicitly": true,
+      "no_future_audio": true,
+      "terminal_completion_passed": true
+    },
+    {
+      "case": "long_return_gap",
+      "source_packet_count": 3258,
+      "exact_actual_D_source_bytes_boundaries_replay_and_availability": true,
+      "controls_preserved": 36,
+      "removed_seconds": 4.4,
+      "source_maps_control_provider_positions_shifted_explicitly": true,
+      "no_future_audio": true,
+      "terminal_completion_passed": true
+    }
+  ],
+  "meaning": "Mechanics only, not native accuracy",
+  "original_A_D_config_sha256": "cf5455ab078c63832a2a9b955102e410e9570e48b2f5723e8e60d444a7d54ab8",
+  "original_A_D_ledger_sha256": "ab23fa32bc3333b083300cf039aee54ce18491716d92a93bd9e40b2edaae4571"
+}

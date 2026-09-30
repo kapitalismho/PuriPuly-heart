@@ -1,0 +1,4323 @@
+{
+  "rows": [
+    {
+      "case_id": "long_context",
+      "arm": "A",
+      "source_seconds": 600.0,
+      "sent_seconds": 600.0,
+      "pcm_sha256": "2421a3954fd006645f3b8db2543a3f6c9f180010ba80d04eaba71cbdd4fbf9ed",
+      "trace_sha256": "039522e7059f1ecc46cf9625eb97c673cd9db3cf9ce806d150ad8a9503899e4d",
+      "finalizations": 1,
+      "cut_positions": [
+        {
+          "source_cut_sample": 86016,
+          "provider_cut_sample": 86016,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 178176,
+          "provider_cut_sample": 178176,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 220672,
+          "provider_cut_sample": 220672,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 267264,
+          "provider_cut_sample": 267264,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 365568,
+          "provider_cut_sample": 365568,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 472064,
+          "provider_cut_sample": 472064,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 567808,
+          "provider_cut_sample": 567808,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 637440,
+          "provider_cut_sample": 637440,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 717824,
+          "provider_cut_sample": 717824,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 802304,
+          "provider_cut_sample": 802304,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 842752,
+          "provider_cut_sample": 842752,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 863744,
+          "provider_cut_sample": 863744,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 925696,
+          "provider_cut_sample": 925696,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1029632,
+          "provider_cut_sample": 1029632,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1125376,
+          "provider_cut_sample": 1125376,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1221120,
+          "provider_cut_sample": 1221120,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1316864,
+          "provider_cut_sample": 1316864,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1357824,
+          "provider_cut_sample": 1357824,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1457664,
+          "provider_cut_sample": 1457664,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1553408,
+          "provider_cut_sample": 1553408,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1649152,
+          "provider_cut_sample": 1649152,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1695232,
+          "provider_cut_sample": 1695232,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1796096,
+          "provider_cut_sample": 1796096,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1891840,
+          "provider_cut_sample": 1891840,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1987584,
+          "provider_cut_sample": 1987584,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2083328,
+          "provider_cut_sample": 2083328,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2176512,
+          "provider_cut_sample": 2176512,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2275840,
+          "provider_cut_sample": 2275840,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2339840,
+          "provider_cut_sample": 2339840,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2401792,
+          "provider_cut_sample": 2401792,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2474496,
+          "provider_cut_sample": 2474496,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2578944,
+          "provider_cut_sample": 2578944,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2675200,
+          "provider_cut_sample": 2675200,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2744320,
+          "provider_cut_sample": 2744320,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2814976,
+          "provider_cut_sample": 2814976,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2882048,
+          "provider_cut_sample": 2882048,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2903552,
+          "provider_cut_sample": 2903552,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2971136,
+          "provider_cut_sample": 2971136,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3076096,
+          "provider_cut_sample": 3076096,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3170304,
+          "provider_cut_sample": 3170304,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3238400,
+          "provider_cut_sample": 3238400,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3337216,
+          "provider_cut_sample": 3337216,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3419648,
+          "provider_cut_sample": 3419648,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3492864,
+          "provider_cut_sample": 3492864,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3530240,
+          "provider_cut_sample": 3530240,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3568640,
+          "provider_cut_sample": 3568640,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3674112,
+          "provider_cut_sample": 3674112,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3768832,
+          "provider_cut_sample": 3768832,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3878912,
+          "provider_cut_sample": 3878912,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3974656,
+          "provider_cut_sample": 3974656,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4070400,
+          "provider_cut_sample": 4070400,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4166144,
+          "provider_cut_sample": 4166144,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4265472,
+          "provider_cut_sample": 4265472,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4339712,
+          "provider_cut_sample": 4339712,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4423680,
+          "provider_cut_sample": 4423680,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4524032,
+          "provider_cut_sample": 4524032,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4595712,
+          "provider_cut_sample": 4595712,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4694016,
+          "provider_cut_sample": 4694016,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4789760,
+          "provider_cut_sample": 4789760,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4853760,
+          "provider_cut_sample": 4853760,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4908032,
+          "provider_cut_sample": 4908032,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4964864,
+          "provider_cut_sample": 4964864,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5075456,
+          "provider_cut_sample": 5075456,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5145600,
+          "provider_cut_sample": 5145600,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5227520,
+          "provider_cut_sample": 5227520,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5347328,
+          "provider_cut_sample": 5347328,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5443072,
+          "provider_cut_sample": 5443072,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5468160,
+          "provider_cut_sample": 5468160,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5528576,
+          "provider_cut_sample": 5528576,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5577728,
+          "provider_cut_sample": 5577728,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5669376,
+          "provider_cut_sample": 5669376,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5745664,
+          "provider_cut_sample": 5745664,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5815808,
+          "provider_cut_sample": 5815808,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5854208,
+          "provider_cut_sample": 5854208,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5876224,
+          "provider_cut_sample": 5876224,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5966336,
+          "provider_cut_sample": 5966336,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6052352,
+          "provider_cut_sample": 6052352,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6155776,
+          "provider_cut_sample": 6155776,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6260224,
+          "provider_cut_sample": 6260224,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6355968,
+          "provider_cut_sample": 6355968,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6419968,
+          "provider_cut_sample": 6419968,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6529536,
+          "provider_cut_sample": 6529536,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6625280,
+          "provider_cut_sample": 6625280,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6721024,
+          "provider_cut_sample": 6721024,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6788608,
+          "provider_cut_sample": 6788608,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6865408,
+          "provider_cut_sample": 6865408,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6963200,
+          "provider_cut_sample": 6963200,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 7057408,
+          "provider_cut_sample": 7057408,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7090176,
+          "provider_cut_sample": 7090176,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7158272,
+          "provider_cut_sample": 7158272,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7198720,
+          "provider_cut_sample": 7198720,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7297024,
+          "provider_cut_sample": 7297024,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7388672,
+          "provider_cut_sample": 7388672,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7462400,
+          "provider_cut_sample": 7462400,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7554048,
+          "provider_cut_sample": 7554048,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7636992,
+          "provider_cut_sample": 7636992,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7716864,
+          "provider_cut_sample": 7716864,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7810560,
+          "provider_cut_sample": 7810560,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7930880,
+          "provider_cut_sample": 7930880,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8032768,
+          "provider_cut_sample": 8032768,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 8068608,
+          "provider_cut_sample": 8068608,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8151040,
+          "provider_cut_sample": 8151040,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8218112,
+          "provider_cut_sample": 8218112,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8298496,
+          "provider_cut_sample": 8298496,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8393728,
+          "provider_cut_sample": 8393728,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8419840,
+          "provider_cut_sample": 8419840,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8527872,
+          "provider_cut_sample": 8527872,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8643072,
+          "provider_cut_sample": 8643072,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 8713728,
+          "provider_cut_sample": 8713728,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8804864,
+          "provider_cut_sample": 8804864,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8903168,
+          "provider_cut_sample": 8903168,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8958976,
+          "provider_cut_sample": 8958976,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9042944,
+          "provider_cut_sample": 9042944,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9113600,
+          "provider_cut_sample": 9113600,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9194496,
+          "provider_cut_sample": 9194496,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9270784,
+          "provider_cut_sample": 9270784,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9299456,
+          "provider_cut_sample": 9299456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9399296,
+          "provider_cut_sample": 9399296,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9495040,
+          "provider_cut_sample": 9495040,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9590784,
+          "provider_cut_sample": 9590784,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9600000,
+          "provider_cut_sample": 9600000,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 945.0
+    },
+    {
+      "case_id": "long_context",
+      "arm": "B",
+      "source_seconds": 600.0,
+      "sent_seconds": 600.0,
+      "pcm_sha256": "2421a3954fd006645f3b8db2543a3f6c9f180010ba80d04eaba71cbdd4fbf9ed",
+      "trace_sha256": "039522e7059f1ecc46cf9625eb97c673cd9db3cf9ce806d150ad8a9503899e4d",
+      "finalizations": 122,
+      "cut_positions": [
+        {
+          "source_cut_sample": 86016,
+          "provider_cut_sample": 86016,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 178176,
+          "provider_cut_sample": 178176,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 220672,
+          "provider_cut_sample": 220672,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 267264,
+          "provider_cut_sample": 267264,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 365568,
+          "provider_cut_sample": 365568,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 472064,
+          "provider_cut_sample": 472064,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 567808,
+          "provider_cut_sample": 567808,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 637440,
+          "provider_cut_sample": 637440,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 717824,
+          "provider_cut_sample": 717824,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 802304,
+          "provider_cut_sample": 802304,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 842752,
+          "provider_cut_sample": 842752,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 863744,
+          "provider_cut_sample": 863744,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 925696,
+          "provider_cut_sample": 925696,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1029632,
+          "provider_cut_sample": 1029632,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1125376,
+          "provider_cut_sample": 1125376,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1221120,
+          "provider_cut_sample": 1221120,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1316864,
+          "provider_cut_sample": 1316864,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1357824,
+          "provider_cut_sample": 1357824,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1457664,
+          "provider_cut_sample": 1457664,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1553408,
+          "provider_cut_sample": 1553408,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1649152,
+          "provider_cut_sample": 1649152,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1695232,
+          "provider_cut_sample": 1695232,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1796096,
+          "provider_cut_sample": 1796096,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1891840,
+          "provider_cut_sample": 1891840,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1987584,
+          "provider_cut_sample": 1987584,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2083328,
+          "provider_cut_sample": 2083328,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2176512,
+          "provider_cut_sample": 2176512,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2275840,
+          "provider_cut_sample": 2275840,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2339840,
+          "provider_cut_sample": 2339840,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2401792,
+          "provider_cut_sample": 2401792,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2474496,
+          "provider_cut_sample": 2474496,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2578944,
+          "provider_cut_sample": 2578944,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2675200,
+          "provider_cut_sample": 2675200,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2744320,
+          "provider_cut_sample": 2744320,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2814976,
+          "provider_cut_sample": 2814976,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2882048,
+          "provider_cut_sample": 2882048,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2903552,
+          "provider_cut_sample": 2903552,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2971136,
+          "provider_cut_sample": 2971136,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3076096,
+          "provider_cut_sample": 3076096,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3170304,
+          "provider_cut_sample": 3170304,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3238400,
+          "provider_cut_sample": 3238400,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3337216,
+          "provider_cut_sample": 3337216,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3419648,
+          "provider_cut_sample": 3419648,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3492864,
+          "provider_cut_sample": 3492864,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3530240,
+          "provider_cut_sample": 3530240,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3568640,
+          "provider_cut_sample": 3568640,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3674112,
+          "provider_cut_sample": 3674112,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3768832,
+          "provider_cut_sample": 3768832,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3878912,
+          "provider_cut_sample": 3878912,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3974656,
+          "provider_cut_sample": 3974656,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4070400,
+          "provider_cut_sample": 4070400,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4166144,
+          "provider_cut_sample": 4166144,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4265472,
+          "provider_cut_sample": 4265472,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4339712,
+          "provider_cut_sample": 4339712,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4423680,
+          "provider_cut_sample": 4423680,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4524032,
+          "provider_cut_sample": 4524032,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4595712,
+          "provider_cut_sample": 4595712,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4694016,
+          "provider_cut_sample": 4694016,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4789760,
+          "provider_cut_sample": 4789760,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4853760,
+          "provider_cut_sample": 4853760,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4908032,
+          "provider_cut_sample": 4908032,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4964864,
+          "provider_cut_sample": 4964864,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5075456,
+          "provider_cut_sample": 5075456,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5145600,
+          "provider_cut_sample": 5145600,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5227520,
+          "provider_cut_sample": 5227520,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5347328,
+          "provider_cut_sample": 5347328,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5443072,
+          "provider_cut_sample": 5443072,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5468160,
+          "provider_cut_sample": 5468160,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5528576,
+          "provider_cut_sample": 5528576,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5577728,
+          "provider_cut_sample": 5577728,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5669376,
+          "provider_cut_sample": 5669376,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5745664,
+          "provider_cut_sample": 5745664,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5815808,
+          "provider_cut_sample": 5815808,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5854208,
+          "provider_cut_sample": 5854208,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5876224,
+          "provider_cut_sample": 5876224,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5966336,
+          "provider_cut_sample": 5966336,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6052352,
+          "provider_cut_sample": 6052352,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6155776,
+          "provider_cut_sample": 6155776,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6260224,
+          "provider_cut_sample": 6260224,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6355968,
+          "provider_cut_sample": 6355968,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6419968,
+          "provider_cut_sample": 6419968,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6529536,
+          "provider_cut_sample": 6529536,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6625280,
+          "provider_cut_sample": 6625280,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6721024,
+          "provider_cut_sample": 6721024,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6788608,
+          "provider_cut_sample": 6788608,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6865408,
+          "provider_cut_sample": 6865408,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6963200,
+          "provider_cut_sample": 6963200,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 7057408,
+          "provider_cut_sample": 7057408,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7090176,
+          "provider_cut_sample": 7090176,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7158272,
+          "provider_cut_sample": 7158272,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7198720,
+          "provider_cut_sample": 7198720,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7297024,
+          "provider_cut_sample": 7297024,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7388672,
+          "provider_cut_sample": 7388672,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7462400,
+          "provider_cut_sample": 7462400,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7554048,
+          "provider_cut_sample": 7554048,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7636992,
+          "provider_cut_sample": 7636992,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7716864,
+          "provider_cut_sample": 7716864,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7810560,
+          "provider_cut_sample": 7810560,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7930880,
+          "provider_cut_sample": 7930880,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8032768,
+          "provider_cut_sample": 8032768,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 8068608,
+          "provider_cut_sample": 8068608,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8151040,
+          "provider_cut_sample": 8151040,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8218112,
+          "provider_cut_sample": 8218112,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8298496,
+          "provider_cut_sample": 8298496,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8393728,
+          "provider_cut_sample": 8393728,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8419840,
+          "provider_cut_sample": 8419840,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8527872,
+          "provider_cut_sample": 8527872,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8643072,
+          "provider_cut_sample": 8643072,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 8713728,
+          "provider_cut_sample": 8713728,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8804864,
+          "provider_cut_sample": 8804864,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8903168,
+          "provider_cut_sample": 8903168,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8958976,
+          "provider_cut_sample": 8958976,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9042944,
+          "provider_cut_sample": 9042944,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9113600,
+          "provider_cut_sample": 9113600,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9194496,
+          "provider_cut_sample": 9194496,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9270784,
+          "provider_cut_sample": 9270784,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9299456,
+          "provider_cut_sample": 9299456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9399296,
+          "provider_cut_sample": 9399296,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9495040,
+          "provider_cut_sample": 9495040,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9590784,
+          "provider_cut_sample": 9590784,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9600000,
+          "provider_cut_sample": 9600000,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 945.0
+    },
+    {
+      "case_id": "long_context",
+      "arm": "C",
+      "source_seconds": 600.0,
+      "sent_seconds": 602.788,
+      "pcm_sha256": "f9bea3128723af594e2ce0d2d04def48f1d0184cbb9ba0f225facf57683124df",
+      "trace_sha256": "039522e7059f1ecc46cf9625eb97c673cd9db3cf9ce806d150ad8a9503899e4d",
+      "finalizations": 1,
+      "cut_positions": [
+        {
+          "source_cut_sample": 86016,
+          "provider_cut_sample": 89216,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 178176,
+          "provider_cut_sample": 180288,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 220672,
+          "provider_cut_sample": 222784,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 267264,
+          "provider_cut_sample": 269376,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 365568,
+          "provider_cut_sample": 370880,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 472064,
+          "provider_cut_sample": 477824,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 567808,
+          "provider_cut_sample": 581568,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 637440,
+          "provider_cut_sample": 659200,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 717824,
+          "provider_cut_sample": 741568,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 802304,
+          "provider_cut_sample": 829248,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 842752,
+          "provider_cut_sample": 869696,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 863744,
+          "provider_cut_sample": 890688,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 925696,
+          "provider_cut_sample": 927360,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1029632,
+          "provider_cut_sample": 1034304,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1125376,
+          "provider_cut_sample": 1138048,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1221120,
+          "provider_cut_sample": 1241792,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1316864,
+          "provider_cut_sample": 1345536,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1357824,
+          "provider_cut_sample": 1391296,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1457664,
+          "provider_cut_sample": 1494336,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1553408,
+          "provider_cut_sample": 1598080,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1649152,
+          "provider_cut_sample": 1701824,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1695232,
+          "provider_cut_sample": 1752704,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1796096,
+          "provider_cut_sample": 1856768,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1891840,
+          "provider_cut_sample": 1960512,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1987584,
+          "provider_cut_sample": 2064256,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2083328,
+          "provider_cut_sample": 2168000,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2176512,
+          "provider_cut_sample": 2269184,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2275840,
+          "provider_cut_sample": 2371712,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2339840,
+          "provider_cut_sample": 2443712,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2401792,
+          "provider_cut_sample": 2505664,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2474496,
+          "provider_cut_sample": 2567936,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2578944,
+          "provider_cut_sample": 2674880,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2675200,
+          "provider_cut_sample": 2779136,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2744320,
+          "provider_cut_sample": 2856256,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2814976,
+          "provider_cut_sample": 2930112,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2882048,
+          "provider_cut_sample": 2997184,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2903552,
+          "provider_cut_sample": 3018688,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2971136,
+          "provider_cut_sample": 3089472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3076096,
+          "provider_cut_sample": 3182592,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3170304,
+          "provider_cut_sample": 3280000,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3238400,
+          "provider_cut_sample": 3351296,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3337216,
+          "provider_cut_sample": 3453312,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3419648,
+          "provider_cut_sample": 3543744,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3492864,
+          "provider_cut_sample": 3618944,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3530240,
+          "provider_cut_sample": 3641280,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3568640,
+          "provider_cut_sample": 3679680,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3674112,
+          "provider_cut_sample": 3786624,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3768832,
+          "provider_cut_sample": 3889344,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3878912,
+          "provider_cut_sample": 3996288,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3974656,
+          "provider_cut_sample": 4100032,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4070400,
+          "provider_cut_sample": 4203776,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4166144,
+          "provider_cut_sample": 4307520,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4265472,
+          "provider_cut_sample": 4411264,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4339712,
+          "provider_cut_sample": 4493504,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4423680,
+          "provider_cut_sample": 4580672,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4524032,
+          "provider_cut_sample": 4684032,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4595712,
+          "provider_cut_sample": 4758912,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4694016,
+          "provider_cut_sample": 4860416,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4789760,
+          "provider_cut_sample": 4964160,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4853760,
+          "provider_cut_sample": 5036160,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4908032,
+          "provider_cut_sample": 5090432,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4964864,
+          "provider_cut_sample": 5147264,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5075456,
+          "provider_cut_sample": 5254208,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5145600,
+          "provider_cut_sample": 5332352,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5227520,
+          "provider_cut_sample": 5417472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5347328,
+          "provider_cut_sample": 5524416,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5443072,
+          "provider_cut_sample": 5628160,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5468160,
+          "provider_cut_sample": 5658048,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5528576,
+          "provider_cut_sample": 5715712,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5577728,
+          "provider_cut_sample": 5745728,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5669376,
+          "provider_cut_sample": 5824512,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5745664,
+          "provider_cut_sample": 5904000,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5815808,
+          "provider_cut_sample": 5964736,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5854208,
+          "provider_cut_sample": 5989632,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5876224,
+          "provider_cut_sample": 6009920,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5966336,
+          "provider_cut_sample": 6103040,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6052352,
+          "provider_cut_sample": 6188992,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6155776,
+          "provider_cut_sample": 6288768,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6260224,
+          "provider_cut_sample": 6395712,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6355968,
+          "provider_cut_sample": 6499456,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6419968,
+          "provider_cut_sample": 6571456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6529536,
+          "provider_cut_sample": 6678400,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6625280,
+          "provider_cut_sample": 6782144,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6721024,
+          "provider_cut_sample": 6885888,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6788608,
+          "provider_cut_sample": 6961472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6865408,
+          "provider_cut_sample": 7041472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6963200,
+          "provider_cut_sample": 7142464,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 7057408,
+          "provider_cut_sample": 7244672,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7090176,
+          "provider_cut_sample": 7268032,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7158272,
+          "provider_cut_sample": 7339328,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7198720,
+          "provider_cut_sample": 7379776,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7297024,
+          "provider_cut_sample": 7467776,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7388672,
+          "provider_cut_sample": 7545024,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7462400,
+          "provider_cut_sample": 7621952,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7554048,
+          "provider_cut_sample": 7715584,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7636992,
+          "provider_cut_sample": 7790784,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7716864,
+          "provider_cut_sample": 7859712,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7810560,
+          "provider_cut_sample": 7903552,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7930880,
+          "provider_cut_sample": 7970432,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8032768,
+          "provider_cut_sample": 8075520,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 8068608,
+          "provider_cut_sample": 8116160,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8151040,
+          "provider_cut_sample": 8201792,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8218112,
+          "provider_cut_sample": 8272064,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8298496,
+          "provider_cut_sample": 8347264,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8393728,
+          "provider_cut_sample": 8440896,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8419840,
+          "provider_cut_sample": 8467008,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8527872,
+          "provider_cut_sample": 8561152,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8643072,
+          "provider_cut_sample": 8668096,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 8713728,
+          "provider_cut_sample": 8746752,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8804864,
+          "provider_cut_sample": 8841088,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8903168,
+          "provider_cut_sample": 8934208,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8958976,
+          "provider_cut_sample": 8990016,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9042944,
+          "provider_cut_sample": 9061504,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9113600,
+          "provider_cut_sample": 9135360,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9194496,
+          "provider_cut_sample": 9213120,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9270784,
+          "provider_cut_sample": 9291392,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9299456,
+          "provider_cut_sample": 9320064,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9399296,
+          "provider_cut_sample": 9423104,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9495040,
+          "provider_cut_sample": 9526848,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9590784,
+          "provider_cut_sample": 9630592,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9600000,
+          "provider_cut_sample": 9644608,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 945.0
+    },
+    {
+      "case_id": "long_context",
+      "arm": "D",
+      "source_seconds": 600.0,
+      "sent_seconds": 602.788,
+      "pcm_sha256": "f9bea3128723af594e2ce0d2d04def48f1d0184cbb9ba0f225facf57683124df",
+      "trace_sha256": "039522e7059f1ecc46cf9625eb97c673cd9db3cf9ce806d150ad8a9503899e4d",
+      "finalizations": 122,
+      "cut_positions": [
+        {
+          "source_cut_sample": 86016,
+          "provider_cut_sample": 89216,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 178176,
+          "provider_cut_sample": 180288,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 220672,
+          "provider_cut_sample": 222784,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 267264,
+          "provider_cut_sample": 269376,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 365568,
+          "provider_cut_sample": 370880,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 472064,
+          "provider_cut_sample": 477824,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 567808,
+          "provider_cut_sample": 581568,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 637440,
+          "provider_cut_sample": 659200,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 717824,
+          "provider_cut_sample": 741568,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 802304,
+          "provider_cut_sample": 829248,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 842752,
+          "provider_cut_sample": 869696,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 863744,
+          "provider_cut_sample": 890688,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 925696,
+          "provider_cut_sample": 927360,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1029632,
+          "provider_cut_sample": 1034304,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1125376,
+          "provider_cut_sample": 1138048,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1221120,
+          "provider_cut_sample": 1241792,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1316864,
+          "provider_cut_sample": 1345536,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1357824,
+          "provider_cut_sample": 1391296,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1457664,
+          "provider_cut_sample": 1494336,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1553408,
+          "provider_cut_sample": 1598080,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1649152,
+          "provider_cut_sample": 1701824,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1695232,
+          "provider_cut_sample": 1752704,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1796096,
+          "provider_cut_sample": 1856768,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1891840,
+          "provider_cut_sample": 1960512,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1987584,
+          "provider_cut_sample": 2064256,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2083328,
+          "provider_cut_sample": 2168000,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2176512,
+          "provider_cut_sample": 2269184,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2275840,
+          "provider_cut_sample": 2371712,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2339840,
+          "provider_cut_sample": 2443712,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2401792,
+          "provider_cut_sample": 2505664,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2474496,
+          "provider_cut_sample": 2567936,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2578944,
+          "provider_cut_sample": 2674880,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2675200,
+          "provider_cut_sample": 2779136,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2744320,
+          "provider_cut_sample": 2856256,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2814976,
+          "provider_cut_sample": 2930112,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2882048,
+          "provider_cut_sample": 2997184,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2903552,
+          "provider_cut_sample": 3018688,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2971136,
+          "provider_cut_sample": 3089472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3076096,
+          "provider_cut_sample": 3182592,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3170304,
+          "provider_cut_sample": 3280000,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3238400,
+          "provider_cut_sample": 3351296,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3337216,
+          "provider_cut_sample": 3453312,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3419648,
+          "provider_cut_sample": 3543744,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3492864,
+          "provider_cut_sample": 3618944,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3530240,
+          "provider_cut_sample": 3641280,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3568640,
+          "provider_cut_sample": 3679680,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3674112,
+          "provider_cut_sample": 3786624,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3768832,
+          "provider_cut_sample": 3889344,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 3878912,
+          "provider_cut_sample": 3996288,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 3974656,
+          "provider_cut_sample": 4100032,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4070400,
+          "provider_cut_sample": 4203776,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4166144,
+          "provider_cut_sample": 4307520,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4265472,
+          "provider_cut_sample": 4411264,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4339712,
+          "provider_cut_sample": 4493504,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4423680,
+          "provider_cut_sample": 4580672,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4524032,
+          "provider_cut_sample": 4684032,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4595712,
+          "provider_cut_sample": 4758912,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4694016,
+          "provider_cut_sample": 4860416,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4789760,
+          "provider_cut_sample": 4964160,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 4853760,
+          "provider_cut_sample": 5036160,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4908032,
+          "provider_cut_sample": 5090432,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 4964864,
+          "provider_cut_sample": 5147264,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5075456,
+          "provider_cut_sample": 5254208,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5145600,
+          "provider_cut_sample": 5332352,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5227520,
+          "provider_cut_sample": 5417472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5347328,
+          "provider_cut_sample": 5524416,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5443072,
+          "provider_cut_sample": 5628160,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 5468160,
+          "provider_cut_sample": 5658048,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5528576,
+          "provider_cut_sample": 5715712,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5577728,
+          "provider_cut_sample": 5745728,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5669376,
+          "provider_cut_sample": 5824512,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5745664,
+          "provider_cut_sample": 5904000,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5815808,
+          "provider_cut_sample": 5964736,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5854208,
+          "provider_cut_sample": 5989632,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5876224,
+          "provider_cut_sample": 6009920,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 5966336,
+          "provider_cut_sample": 6103040,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6052352,
+          "provider_cut_sample": 6188992,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6155776,
+          "provider_cut_sample": 6288768,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6260224,
+          "provider_cut_sample": 6395712,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6355968,
+          "provider_cut_sample": 6499456,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6419968,
+          "provider_cut_sample": 6571456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6529536,
+          "provider_cut_sample": 6678400,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6625280,
+          "provider_cut_sample": 6782144,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6721024,
+          "provider_cut_sample": 6885888,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 6788608,
+          "provider_cut_sample": 6961472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6865408,
+          "provider_cut_sample": 7041472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 6963200,
+          "provider_cut_sample": 7142464,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 7057408,
+          "provider_cut_sample": 7244672,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7090176,
+          "provider_cut_sample": 7268032,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7158272,
+          "provider_cut_sample": 7339328,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7198720,
+          "provider_cut_sample": 7379776,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7297024,
+          "provider_cut_sample": 7467776,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7388672,
+          "provider_cut_sample": 7545024,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7462400,
+          "provider_cut_sample": 7621952,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7554048,
+          "provider_cut_sample": 7715584,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7636992,
+          "provider_cut_sample": 7790784,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7716864,
+          "provider_cut_sample": 7859712,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7810560,
+          "provider_cut_sample": 7903552,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 7930880,
+          "provider_cut_sample": 7970432,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8032768,
+          "provider_cut_sample": 8075520,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 8068608,
+          "provider_cut_sample": 8116160,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8151040,
+          "provider_cut_sample": 8201792,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8218112,
+          "provider_cut_sample": 8272064,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8298496,
+          "provider_cut_sample": 8347264,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8393728,
+          "provider_cut_sample": 8440896,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8419840,
+          "provider_cut_sample": 8467008,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8527872,
+          "provider_cut_sample": 8561152,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8643072,
+          "provider_cut_sample": 8668096,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 8713728,
+          "provider_cut_sample": 8746752,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8804864,
+          "provider_cut_sample": 8841088,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8903168,
+          "provider_cut_sample": 8934208,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 8958976,
+          "provider_cut_sample": 8990016,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9042944,
+          "provider_cut_sample": 9061504,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9113600,
+          "provider_cut_sample": 9135360,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9194496,
+          "provider_cut_sample": 9213120,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9270784,
+          "provider_cut_sample": 9291392,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9299456,
+          "provider_cut_sample": 9320064,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 9399296,
+          "provider_cut_sample": 9423104,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9495040,
+          "provider_cut_sample": 9526848,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9590784,
+          "provider_cut_sample": 9630592,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 9600000,
+          "provider_cut_sample": 9644608,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 945.0
+    },
+    {
+      "case_id": "brief_interjections",
+      "arm": "B",
+      "source_seconds": 120.0,
+      "sent_seconds": 120.0,
+      "pcm_sha256": "58a76f6f139d99357eed3855c8b447812847592c30b89fae7697d0ea1e72eb5f",
+      "trace_sha256": "7dd957d3b616d290044f8a7021bd99d333e0d263a4d3a7bec2d29f102dd86c9c",
+      "finalizations": 25,
+      "cut_positions": [
+        {
+          "source_cut_sample": 96768,
+          "provider_cut_sample": 96768,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 192512,
+          "provider_cut_sample": 192512,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 288256,
+          "provider_cut_sample": 288256,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 353280,
+          "provider_cut_sample": 353280,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 431616,
+          "provider_cut_sample": 431616,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 538624,
+          "provider_cut_sample": 538624,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 634368,
+          "provider_cut_sample": 634368,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 730112,
+          "provider_cut_sample": 730112,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 795136,
+          "provider_cut_sample": 795136,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 858624,
+          "provider_cut_sample": 858624,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 937984,
+          "provider_cut_sample": 937984,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 973312,
+          "provider_cut_sample": 973312,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1075712,
+          "provider_cut_sample": 1075712,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1171456,
+          "provider_cut_sample": 1171456,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1235456,
+          "provider_cut_sample": 1235456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1335296,
+          "provider_cut_sample": 1335296,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1431040,
+          "provider_cut_sample": 1431040,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1481216,
+          "provider_cut_sample": 1481216,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1581568,
+          "provider_cut_sample": 1581568,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1659392,
+          "provider_cut_sample": 1659392,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1764864,
+          "provider_cut_sample": 1764864,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1860608,
+          "provider_cut_sample": 1860608,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1880576,
+          "provider_cut_sample": 1880576,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1909248,
+          "provider_cut_sample": 1909248,
+          "reason": "delivery_pause"
+        }
+      ],
+      "timeout_seconds": 225.0
+    },
+    {
+      "case_id": "brief_interjections",
+      "arm": "D",
+      "source_seconds": 120.0,
+      "sent_seconds": 125.304,
+      "pcm_sha256": "f25cd3777e5b1effdcf187e85eee2f3c89937d2d3cba1ae79ef600f11fd3c15e",
+      "trace_sha256": "7dd957d3b616d290044f8a7021bd99d333e0d263a4d3a7bec2d29f102dd86c9c",
+      "finalizations": 25,
+      "cut_positions": [
+        {
+          "source_cut_sample": 96768,
+          "provider_cut_sample": 99968,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 192512,
+          "provider_cut_sample": 203712,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 288256,
+          "provider_cut_sample": 307456,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 353280,
+          "provider_cut_sample": 380480,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 431616,
+          "provider_cut_sample": 455680,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 538624,
+          "provider_cut_sample": 562624,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 634368,
+          "provider_cut_sample": 666368,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 730112,
+          "provider_cut_sample": 770112,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 795136,
+          "provider_cut_sample": 843136,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 858624,
+          "provider_cut_sample": 891584,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 937984,
+          "provider_cut_sample": 974144,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 973312,
+          "provider_cut_sample": 1009472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1075712,
+          "provider_cut_sample": 1115072,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1171456,
+          "provider_cut_sample": 1218816,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1235456,
+          "provider_cut_sample": 1290816,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1335296,
+          "provider_cut_sample": 1393856,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1431040,
+          "provider_cut_sample": 1497600,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1481216,
+          "provider_cut_sample": 1552576,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1581568,
+          "provider_cut_sample": 1656128,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1659392,
+          "provider_cut_sample": 1741952,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1764864,
+          "provider_cut_sample": 1848896,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1860608,
+          "provider_cut_sample": 1952640,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1880576,
+          "provider_cut_sample": 1977408,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1909248,
+          "provider_cut_sample": 2004864,
+          "reason": "delivery_pause"
+        }
+      ],
+      "timeout_seconds": 225.0
+    },
+    {
+      "case_id": "brief_interjections",
+      "arm": "A",
+      "source_seconds": 120.0,
+      "sent_seconds": 120.0,
+      "pcm_sha256": "58a76f6f139d99357eed3855c8b447812847592c30b89fae7697d0ea1e72eb5f",
+      "trace_sha256": "7dd957d3b616d290044f8a7021bd99d333e0d263a4d3a7bec2d29f102dd86c9c",
+      "finalizations": 1,
+      "cut_positions": [
+        {
+          "source_cut_sample": 96768,
+          "provider_cut_sample": 96768,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 192512,
+          "provider_cut_sample": 192512,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 288256,
+          "provider_cut_sample": 288256,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 353280,
+          "provider_cut_sample": 353280,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 431616,
+          "provider_cut_sample": 431616,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 538624,
+          "provider_cut_sample": 538624,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 634368,
+          "provider_cut_sample": 634368,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 730112,
+          "provider_cut_sample": 730112,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 795136,
+          "provider_cut_sample": 795136,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 858624,
+          "provider_cut_sample": 858624,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 937984,
+          "provider_cut_sample": 937984,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 973312,
+          "provider_cut_sample": 973312,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1075712,
+          "provider_cut_sample": 1075712,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1171456,
+          "provider_cut_sample": 1171456,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1235456,
+          "provider_cut_sample": 1235456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1335296,
+          "provider_cut_sample": 1335296,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1431040,
+          "provider_cut_sample": 1431040,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1481216,
+          "provider_cut_sample": 1481216,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1581568,
+          "provider_cut_sample": 1581568,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1659392,
+          "provider_cut_sample": 1659392,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1764864,
+          "provider_cut_sample": 1764864,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1860608,
+          "provider_cut_sample": 1860608,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1880576,
+          "provider_cut_sample": 1880576,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1909248,
+          "provider_cut_sample": 1909248,
+          "reason": "delivery_pause"
+        }
+      ],
+      "timeout_seconds": 225.0
+    },
+    {
+      "case_id": "brief_interjections",
+      "arm": "C",
+      "source_seconds": 120.0,
+      "sent_seconds": 125.304,
+      "pcm_sha256": "f25cd3777e5b1effdcf187e85eee2f3c89937d2d3cba1ae79ef600f11fd3c15e",
+      "trace_sha256": "7dd957d3b616d290044f8a7021bd99d333e0d263a4d3a7bec2d29f102dd86c9c",
+      "finalizations": 1,
+      "cut_positions": [
+        {
+          "source_cut_sample": 96768,
+          "provider_cut_sample": 99968,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 192512,
+          "provider_cut_sample": 203712,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 288256,
+          "provider_cut_sample": 307456,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 353280,
+          "provider_cut_sample": 380480,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 431616,
+          "provider_cut_sample": 455680,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 538624,
+          "provider_cut_sample": 562624,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 634368,
+          "provider_cut_sample": 666368,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 730112,
+          "provider_cut_sample": 770112,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 795136,
+          "provider_cut_sample": 843136,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 858624,
+          "provider_cut_sample": 891584,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 937984,
+          "provider_cut_sample": 974144,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 973312,
+          "provider_cut_sample": 1009472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1075712,
+          "provider_cut_sample": 1115072,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1171456,
+          "provider_cut_sample": 1218816,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1235456,
+          "provider_cut_sample": 1290816,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1335296,
+          "provider_cut_sample": 1393856,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1431040,
+          "provider_cut_sample": 1497600,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1481216,
+          "provider_cut_sample": 1552576,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1581568,
+          "provider_cut_sample": 1656128,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1659392,
+          "provider_cut_sample": 1741952,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1764864,
+          "provider_cut_sample": 1848896,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1860608,
+          "provider_cut_sample": 1952640,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1880576,
+          "provider_cut_sample": 1977408,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1909248,
+          "provider_cut_sample": 2004864,
+          "reason": "delivery_pause"
+        }
+      ],
+      "timeout_seconds": 225.0
+    },
+    {
+      "case_id": "low_overlap",
+      "arm": "D",
+      "source_seconds": 120.0,
+      "sent_seconds": 126.336,
+      "pcm_sha256": "d6d5fbeedd9f070c9206c8dceb709fab5e8e3a283a5af1eb3526fbab62b77364",
+      "trace_sha256": "842fbf1d8c468eb47b92f9fac56f25ce34185d85808991a510643e76314930ab",
+      "finalizations": 26,
+      "cut_positions": [
+        {
+          "source_cut_sample": 95744,
+          "provider_cut_sample": 98944,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 142848,
+          "provider_cut_sample": 150848,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 247808,
+          "provider_cut_sample": 257792,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 334336,
+          "provider_cut_sample": 352320,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 416256,
+          "provider_cut_sample": 437440,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 497664,
+          "provider_cut_sample": 522048,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 598016,
+          "provider_cut_sample": 624896,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 629248,
+          "provider_cut_sample": 656128,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 715776,
+          "provider_cut_sample": 745856,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 818176,
+          "provider_cut_sample": 851456,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 922624,
+          "provider_cut_sample": 958400,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1018368,
+          "provider_cut_sample": 1062144,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1083904,
+          "provider_cut_sample": 1135680,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1180160,
+          "provider_cut_sample": 1235136,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1251328,
+          "provider_cut_sample": 1314304,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1300480,
+          "provider_cut_sample": 1363456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1399808,
+          "provider_cut_sample": 1465984,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1475584,
+          "provider_cut_sample": 1549760,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1579008,
+          "provider_cut_sample": 1656384,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1674752,
+          "provider_cut_sample": 1760128,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1740288,
+          "provider_cut_sample": 1833664,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1843712,
+          "provider_cut_sample": 1940288,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1865216,
+          "provider_cut_sample": 1966592,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1913344,
+          "provider_cut_sample": 2014720,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1920000,
+          "provider_cut_sample": 2021376,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 225.0
+    },
+    {
+      "case_id": "low_overlap",
+      "arm": "C",
+      "source_seconds": 120.0,
+      "sent_seconds": 126.336,
+      "pcm_sha256": "d6d5fbeedd9f070c9206c8dceb709fab5e8e3a283a5af1eb3526fbab62b77364",
+      "trace_sha256": "842fbf1d8c468eb47b92f9fac56f25ce34185d85808991a510643e76314930ab",
+      "finalizations": 1,
+      "cut_positions": [
+        {
+          "source_cut_sample": 95744,
+          "provider_cut_sample": 98944,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 142848,
+          "provider_cut_sample": 150848,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 247808,
+          "provider_cut_sample": 257792,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 334336,
+          "provider_cut_sample": 352320,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 416256,
+          "provider_cut_sample": 437440,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 497664,
+          "provider_cut_sample": 522048,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 598016,
+          "provider_cut_sample": 624896,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 629248,
+          "provider_cut_sample": 656128,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 715776,
+          "provider_cut_sample": 745856,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 818176,
+          "provider_cut_sample": 851456,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 922624,
+          "provider_cut_sample": 958400,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1018368,
+          "provider_cut_sample": 1062144,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1083904,
+          "provider_cut_sample": 1135680,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1180160,
+          "provider_cut_sample": 1235136,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1251328,
+          "provider_cut_sample": 1314304,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1300480,
+          "provider_cut_sample": 1363456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1399808,
+          "provider_cut_sample": 1465984,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1475584,
+          "provider_cut_sample": 1549760,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1579008,
+          "provider_cut_sample": 1656384,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1674752,
+          "provider_cut_sample": 1760128,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1740288,
+          "provider_cut_sample": 1833664,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1843712,
+          "provider_cut_sample": 1940288,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1865216,
+          "provider_cut_sample": 1966592,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1913344,
+          "provider_cut_sample": 2014720,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1920000,
+          "provider_cut_sample": 2021376,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 225.0
+    },
+    {
+      "case_id": "low_overlap",
+      "arm": "B",
+      "source_seconds": 120.0,
+      "sent_seconds": 120.0,
+      "pcm_sha256": "262f71c543590dc526b8e33ecd7a7a46bc81f4ea33fbfac04323b7ffe3b3d2fa",
+      "trace_sha256": "842fbf1d8c468eb47b92f9fac56f25ce34185d85808991a510643e76314930ab",
+      "finalizations": 26,
+      "cut_positions": [
+        {
+          "source_cut_sample": 95744,
+          "provider_cut_sample": 95744,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 142848,
+          "provider_cut_sample": 142848,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 247808,
+          "provider_cut_sample": 247808,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 334336,
+          "provider_cut_sample": 334336,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 416256,
+          "provider_cut_sample": 416256,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 497664,
+          "provider_cut_sample": 497664,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 598016,
+          "provider_cut_sample": 598016,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 629248,
+          "provider_cut_sample": 629248,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 715776,
+          "provider_cut_sample": 715776,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 818176,
+          "provider_cut_sample": 818176,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 922624,
+          "provider_cut_sample": 922624,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1018368,
+          "provider_cut_sample": 1018368,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1083904,
+          "provider_cut_sample": 1083904,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1180160,
+          "provider_cut_sample": 1180160,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1251328,
+          "provider_cut_sample": 1251328,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1300480,
+          "provider_cut_sample": 1300480,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1399808,
+          "provider_cut_sample": 1399808,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1475584,
+          "provider_cut_sample": 1475584,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1579008,
+          "provider_cut_sample": 1579008,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1674752,
+          "provider_cut_sample": 1674752,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1740288,
+          "provider_cut_sample": 1740288,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1843712,
+          "provider_cut_sample": 1843712,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1865216,
+          "provider_cut_sample": 1865216,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1913344,
+          "provider_cut_sample": 1913344,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1920000,
+          "provider_cut_sample": 1920000,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 225.0
+    },
+    {
+      "case_id": "low_overlap",
+      "arm": "A",
+      "source_seconds": 120.0,
+      "sent_seconds": 120.0,
+      "pcm_sha256": "262f71c543590dc526b8e33ecd7a7a46bc81f4ea33fbfac04323b7ffe3b3d2fa",
+      "trace_sha256": "842fbf1d8c468eb47b92f9fac56f25ce34185d85808991a510643e76314930ab",
+      "finalizations": 1,
+      "cut_positions": [
+        {
+          "source_cut_sample": 95744,
+          "provider_cut_sample": 95744,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 142848,
+          "provider_cut_sample": 142848,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 247808,
+          "provider_cut_sample": 247808,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 334336,
+          "provider_cut_sample": 334336,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 416256,
+          "provider_cut_sample": 416256,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 497664,
+          "provider_cut_sample": 497664,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 598016,
+          "provider_cut_sample": 598016,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 629248,
+          "provider_cut_sample": 629248,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 715776,
+          "provider_cut_sample": 715776,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 818176,
+          "provider_cut_sample": 818176,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 922624,
+          "provider_cut_sample": 922624,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1018368,
+          "provider_cut_sample": 1018368,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1083904,
+          "provider_cut_sample": 1083904,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1180160,
+          "provider_cut_sample": 1180160,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1251328,
+          "provider_cut_sample": 1251328,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1300480,
+          "provider_cut_sample": 1300480,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1399808,
+          "provider_cut_sample": 1399808,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1475584,
+          "provider_cut_sample": 1475584,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1579008,
+          "provider_cut_sample": 1579008,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1674752,
+          "provider_cut_sample": 1674752,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1740288,
+          "provider_cut_sample": 1740288,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1843712,
+          "provider_cut_sample": 1843712,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1865216,
+          "provider_cut_sample": 1865216,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1913344,
+          "provider_cut_sample": 1913344,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1920000,
+          "provider_cut_sample": 1920000,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 225.0
+    },
+    {
+      "case_id": "long_return_gap",
+      "arm": "C",
+      "source_seconds": 180.0,
+      "sent_seconds": 160.656,
+      "pcm_sha256": "79a5daffb2b88717809d66f3888c43383afc09986f395d282ca97dc16248daef",
+      "trace_sha256": "ca941b099e9aa36fde2999b03777104809fbf88fcd712b6cf8fa563d57bbcd11",
+      "finalizations": 1,
+      "cut_positions": [
+        {
+          "source_cut_sample": 83456,
+          "provider_cut_sample": 86656,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 169472,
+          "provider_cut_sample": 161856,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 278016,
+          "provider_cut_sample": 238080,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 398848,
+          "provider_cut_sample": 345024,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 481280,
+          "provider_cut_sample": 435456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 538624,
+          "provider_cut_sample": 464448,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 696320,
+          "provider_cut_sample": 500096,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 728064,
+          "provider_cut_sample": 524992,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 788992,
+          "provider_cut_sample": 583680,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 880640,
+          "provider_cut_sample": 612160,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 980480,
+          "provider_cut_sample": 636544,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1097728,
+          "provider_cut_sample": 743488,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1118720,
+          "provider_cut_sample": 767232,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1184768,
+          "provider_cut_sample": 836480,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1285632,
+          "provider_cut_sample": 931136,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1380352,
+          "provider_cut_sample": 1029056,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1484288,
+          "provider_cut_sample": 1136000,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1566720,
+          "provider_cut_sample": 1226432,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1680384,
+          "provider_cut_sample": 1333376,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1700864,
+          "provider_cut_sample": 1358656,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1774592,
+          "provider_cut_sample": 1422464,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1854464,
+          "provider_cut_sample": 1504320,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1896960,
+          "provider_cut_sample": 1546816,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1962496,
+          "provider_cut_sample": 1615552,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2060288,
+          "provider_cut_sample": 1716544,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2156032,
+          "provider_cut_sample": 1820288,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2235904,
+          "provider_cut_sample": 1908160,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2334720,
+          "provider_cut_sample": 2010176,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2372096,
+          "provider_cut_sample": 2052352,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2440704,
+          "provider_cut_sample": 2120960,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2536960,
+          "provider_cut_sample": 2220416,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2609152,
+          "provider_cut_sample": 2300608,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2700800,
+          "provider_cut_sample": 2395456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2808320,
+          "provider_cut_sample": 2498816,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2880000,
+          "provider_cut_sample": 2570496,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 315.0
+    },
+    {
+      "case_id": "long_return_gap",
+      "arm": "A",
+      "source_seconds": 180.0,
+      "sent_seconds": 180.0,
+      "pcm_sha256": "64d1ef63b71dfc78334ec742c8d5c661ca796e02a3b1dd25f494634f71722ef9",
+      "trace_sha256": "ca941b099e9aa36fde2999b03777104809fbf88fcd712b6cf8fa563d57bbcd11",
+      "finalizations": 1,
+      "cut_positions": [
+        {
+          "source_cut_sample": 83456,
+          "provider_cut_sample": 83456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 169472,
+          "provider_cut_sample": 169472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 278016,
+          "provider_cut_sample": 278016,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 398848,
+          "provider_cut_sample": 398848,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 481280,
+          "provider_cut_sample": 481280,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 538624,
+          "provider_cut_sample": 538624,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 696320,
+          "provider_cut_sample": 696320,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 728064,
+          "provider_cut_sample": 728064,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 788992,
+          "provider_cut_sample": 788992,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 880640,
+          "provider_cut_sample": 880640,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 980480,
+          "provider_cut_sample": 980480,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1097728,
+          "provider_cut_sample": 1097728,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1118720,
+          "provider_cut_sample": 1118720,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1184768,
+          "provider_cut_sample": 1184768,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1285632,
+          "provider_cut_sample": 1285632,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1380352,
+          "provider_cut_sample": 1380352,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1484288,
+          "provider_cut_sample": 1484288,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1566720,
+          "provider_cut_sample": 1566720,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1680384,
+          "provider_cut_sample": 1680384,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1700864,
+          "provider_cut_sample": 1700864,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1774592,
+          "provider_cut_sample": 1774592,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1854464,
+          "provider_cut_sample": 1854464,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1896960,
+          "provider_cut_sample": 1896960,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1962496,
+          "provider_cut_sample": 1962496,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2060288,
+          "provider_cut_sample": 2060288,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2156032,
+          "provider_cut_sample": 2156032,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2235904,
+          "provider_cut_sample": 2235904,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2334720,
+          "provider_cut_sample": 2334720,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2372096,
+          "provider_cut_sample": 2372096,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2440704,
+          "provider_cut_sample": 2440704,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2536960,
+          "provider_cut_sample": 2536960,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2609152,
+          "provider_cut_sample": 2609152,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2700800,
+          "provider_cut_sample": 2700800,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2808320,
+          "provider_cut_sample": 2808320,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2880000,
+          "provider_cut_sample": 2880000,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 315.0
+    },
+    {
+      "case_id": "long_return_gap",
+      "arm": "D",
+      "source_seconds": 180.0,
+      "sent_seconds": 160.656,
+      "pcm_sha256": "79a5daffb2b88717809d66f3888c43383afc09986f395d282ca97dc16248daef",
+      "trace_sha256": "ca941b099e9aa36fde2999b03777104809fbf88fcd712b6cf8fa563d57bbcd11",
+      "finalizations": 36,
+      "cut_positions": [
+        {
+          "source_cut_sample": 83456,
+          "provider_cut_sample": 86656,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 169472,
+          "provider_cut_sample": 161856,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 278016,
+          "provider_cut_sample": 238080,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 398848,
+          "provider_cut_sample": 345024,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 481280,
+          "provider_cut_sample": 435456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 538624,
+          "provider_cut_sample": 464448,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 696320,
+          "provider_cut_sample": 500096,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 728064,
+          "provider_cut_sample": 524992,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 788992,
+          "provider_cut_sample": 583680,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 880640,
+          "provider_cut_sample": 612160,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 980480,
+          "provider_cut_sample": 636544,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1097728,
+          "provider_cut_sample": 743488,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1118720,
+          "provider_cut_sample": 767232,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1184768,
+          "provider_cut_sample": 836480,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1285632,
+          "provider_cut_sample": 931136,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1380352,
+          "provider_cut_sample": 1029056,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1484288,
+          "provider_cut_sample": 1136000,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1566720,
+          "provider_cut_sample": 1226432,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1680384,
+          "provider_cut_sample": 1333376,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1700864,
+          "provider_cut_sample": 1358656,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1774592,
+          "provider_cut_sample": 1422464,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1854464,
+          "provider_cut_sample": 1504320,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1896960,
+          "provider_cut_sample": 1546816,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1962496,
+          "provider_cut_sample": 1615552,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2060288,
+          "provider_cut_sample": 1716544,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2156032,
+          "provider_cut_sample": 1820288,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2235904,
+          "provider_cut_sample": 1908160,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2334720,
+          "provider_cut_sample": 2010176,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2372096,
+          "provider_cut_sample": 2052352,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2440704,
+          "provider_cut_sample": 2120960,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2536960,
+          "provider_cut_sample": 2220416,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2609152,
+          "provider_cut_sample": 2300608,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2700800,
+          "provider_cut_sample": 2395456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2808320,
+          "provider_cut_sample": 2498816,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2880000,
+          "provider_cut_sample": 2570496,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 315.0
+    },
+    {
+      "case_id": "long_return_gap",
+      "arm": "B",
+      "source_seconds": 180.0,
+      "sent_seconds": 180.0,
+      "pcm_sha256": "64d1ef63b71dfc78334ec742c8d5c661ca796e02a3b1dd25f494634f71722ef9",
+      "trace_sha256": "ca941b099e9aa36fde2999b03777104809fbf88fcd712b6cf8fa563d57bbcd11",
+      "finalizations": 36,
+      "cut_positions": [
+        {
+          "source_cut_sample": 83456,
+          "provider_cut_sample": 83456,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 169472,
+          "provider_cut_sample": 169472,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 278016,
+          "provider_cut_sample": 278016,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 398848,
+          "provider_cut_sample": 398848,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 481280,
+          "provider_cut_sample": 481280,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 538624,
+          "provider_cut_sample": 538624,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 696320,
+          "provider_cut_sample": 696320,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 728064,
+          "provider_cut_sample": 728064,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 788992,
+          "provider_cut_sample": 788992,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 880640,
+          "provider_cut_sample": 880640,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 980480,
+          "provider_cut_sample": 980480,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1097728,
+          "provider_cut_sample": 1097728,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1118720,
+          "provider_cut_sample": 1118720,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1184768,
+          "provider_cut_sample": 1184768,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1285632,
+          "provider_cut_sample": 1285632,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1380352,
+          "provider_cut_sample": 1380352,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1484288,
+          "provider_cut_sample": 1484288,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1566720,
+          "provider_cut_sample": 1566720,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1680384,
+          "provider_cut_sample": 1680384,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 1700864,
+          "provider_cut_sample": 1700864,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1774592,
+          "provider_cut_sample": 1774592,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1854464,
+          "provider_cut_sample": 1854464,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1896960,
+          "provider_cut_sample": 1896960,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 1962496,
+          "provider_cut_sample": 1962496,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2060288,
+          "provider_cut_sample": 2060288,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2156032,
+          "provider_cut_sample": 2156032,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2235904,
+          "provider_cut_sample": 2235904,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2334720,
+          "provider_cut_sample": 2334720,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2372096,
+          "provider_cut_sample": 2372096,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2440704,
+          "provider_cut_sample": 2440704,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2536960,
+          "provider_cut_sample": 2536960,
+          "reason": "delivery_deadline"
+        },
+        {
+          "source_cut_sample": 2609152,
+          "provider_cut_sample": 2609152,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2700800,
+          "provider_cut_sample": 2700800,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2808320,
+          "provider_cut_sample": 2808320,
+          "reason": "delivery_pause"
+        },
+        {
+          "source_cut_sample": 2880000,
+          "provider_cut_sample": 2880000,
+          "reason": "source_eof"
+        }
+      ],
+      "timeout_seconds": 315.0
+    }
+  ],
+  "requests": 16,
+  "audio_seconds": 4070.168,
+  "websocket_timeout_seconds": 6840.0,
+  "reserved_timestamp": {
+    "status": "blocked_pending_independently_verified_speech_anchors",
+    "reserved_requests": 4,
+    "reserved_audio_seconds": 80,
+    "reserved_websocket_seconds": 300,
+    "protocol": "20s public AMI calibration and separately frozen validation excerpt, zero vs repeated finalize; exact samples and independently verified unique word/event anchors; controlled real vs synthetic silence; preserve literal timing and observed counters"
+  },
+  "config_sha256": "cf5455ab078c63832a2a9b955102e410e9570e48b2f5723e8e60d444a7d54ab8",
+  "harness_sha256": "1f64e23b1241682917697fa479658bedf6b77abc771d1e8eecaf2ee8cda4f4f3",
+  "manifest_sha256": "85fafad005b1ce73b9c1e066313a04bc2ec496b9748b9db59721b75d94ccde73",
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "versions": {
+      "numpy": "2.5.1",
+      "onnxruntime": "1.28.0",
+      "websockets": "15.0.1",
+      "keyring": "25.7.0"
+    },
+    "model_sha256": {
+      "src/puripuly_heart/data/vad/silero_vad.onnx": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+      "src/puripuly_heart/data/models/smart-turn-v3.2-cpu.onnx": "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f"
+    }
+  }
+}

@@ -1,0 +1,563 @@
+{
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/204",
+  "baseline_production_revision": "4dc46fdac8c771d3bb58e46bd44304b86fde9c47",
+  "execution_source": "Original A-D pre-call plans and history/sender_v1.py/sender_v2.py remain authoritative; ablation uses its frozen plan/shared_sender.py/ablation_sender.py; never rewrite execution pins to later HEAD",
+  "final_harness_sha256": "e5a654687b1d48e099b3a0da25064fbb255c027e7e42d756d11d76ec8567ce6c",
+  "report_sha256": "da226777b59b858a0cc19412a0287e4b5a1b50384fe4659619fb70999acd9410",
+  "resources": {
+    "requests": 18,
+    "completed_requests": 18,
+    "transmitted_audio_seconds": 4347.928,
+    "websocket_envelope_seconds": 5586.032000000005,
+    "observed_connected_to_closed_seconds": 5573.659,
+    "finalization_controls_and_receipts": 487,
+    "timestamp_requests": 0,
+    "retries": 0,
+    "released_before_connect_reservations": 1
+  },
+  "passed": [
+    "actual four-case integrated-component trace freeze without labels",
+    "16/16 authorized finite WS runs and426/426 finalized/finished barriers",
+    "matched actual PCM/chunk/availability signatures per pair and no future writes",
+    "S200 and app quantization/replay maps retained exactly",
+    "pinned SDK speaker-first source projection16/16",
+    "WSL pyannote.metrics4.0.0 whole-case scoring16/16",
+    "actual default offline CLI and bounded fault smoke",
+    "finite quota boundary rejections",
+    "post-call summary receipt repair: all426 matched; no native edits",
+    "focused final Ruff lint",
+    "approved S200-only-off dry2/2: actual original-D retained source bytes/packet boundaries/replay/availability/manual controls; shifted provider maps",
+    "actual ablation2/2 finite requests and61/61 finalizations/finished responses; no future PCM writes",
+    "pinned SDK/scorer2/2 plus identical frozen lexical/global-mapping/coverage/arrival diagnostic",
+    "five new/cumulative request/audio/WS quota boundary guards rejected before connect",
+    "18/18 cumulative completion and487/487 finalization receipts; all surfaces frozen; no further calls"
+  ],
+  "expected_failure_checks": [
+    "dry missing-fin completion rejected and pending retained",
+    "post-call changed source live pin rejected before connect"
+  ],
+  "blocked": [
+    "R4 independently verified acoustic anchors with quantified uncertainty/cause/correction",
+    "R5 product-useful quality/text/coverage/publication operating point"
+  ],
+  "not_run": [
+    "seven-case new factorial expansion: needs12 further calls beyond accepted18-call stop; not rejected or deemed unnecessary",
+    "repeat/significance allocation",
+    "timestamp calibration reservation unused",
+    "less-aggressive serial-finalization candidate",
+    "physical microphone/VRChat/HMD/Korean/Japanese generalization",
+    "invoice and resident-memory high-water"
+  ],
+  "disposition": "Director: defer production adoption. S200-off is not a blanket improvement; fewer finalizations present measured quality/arrival tradeoff but current publication/ownership readiness is unvalidated. Seven-case expansion and operating-point trials are not run, not empirically rejected or unnecessary. No further calls.",
+  "ablation_completed": {
+    "arms": "D minus S200 only; exact retained source/replay/cuts with shifted provider positions",
+    "cases": ["brief_interjections", "long_return_gap"],
+    "requests": 2,
+    "audio_seconds": 277.76,
+    "websocket_envelope_seconds": 380.20300000000134,
+    "connected_to_closed_seconds": 378.7659999999996,
+    "maximum_websocket_seconds": 540,
+    "finalization_controls_and_receipts": 61,
+    "completion_record": "factorial/ablation/completion_record.json",
+    "report": "factorial/ablation/report.md",
+    "same_rule_identity_report": "ablation_identity_report.md",
+    "original_A_D_closure_history": "factorial/ablation/frozen/completion_record_before_ablation.json",
+    "original_A_D_resources": {"requests": 16, "audio_seconds": 4070.168, "websocket_envelope_seconds": 5205.829000000003, "finalization_controls_and_receipts": 426},
+    "interpretation": "Brief DER/native attribution/overall correct coverage improve, but recognized and short-interjection words decrease; returning-speaker error persists; correct final-word exposure at actual controls decreases in both. No blanket quality/text/readiness win.",
+    "frozen_execution_boundary": 18
+  },
+  "docs_proposals": [
+    "link new isolated harness and companion evidence",
+    "distinguish current peer segmentation/encoder and archived ACK gates",
+    "state archived wall time includes offline segmentation trace pass",
+    "retain native-time uncertainty and first-readable consumer ownership caveat"
+  ],
+  "receipts": [
+    {
+      "case": "long_context",
+      "arm": "A",
+      "execution_sender_version": 1,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/long_context/A/result.json",
+          "sha256": "0b340383dead2d3ce10ece92d2206b17fc85d7789feff26e24abc9ac749a5283"
+        },
+        "raw_responses": {
+          "path": "factorial/live/long_context/A/responses.jsonl",
+          "sha256": "b0069da23a225d185cbe942b957c538e8366a4c999242dba3b5d745a883c3c84"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/long_context/A/events.jsonl",
+          "sha256": "9d767aa9315215ad12be9b9db96fd5a09cd68749297deef6378b9e76d40fd628"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/A/long_context.json",
+          "sha256": "950d79842bdbea864a89a91d16d932bce2b7fd4e7764139714f39ee08f0008f8"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/A/long_context.rttm",
+          "sha256": "9e28db0ad0071cf3e01d53edbd3f9dc6641232240ec8fcdac70902c0800fd1cc"
+        }
+      }
+    },
+    {
+      "case": "long_context",
+      "arm": "B",
+      "execution_sender_version": 1,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/long_context/B/result.json",
+          "sha256": "4afd95aa2989b24cf87089390b204ec4e281753c51672908f79bd6f5fc0a9442"
+        },
+        "raw_responses": {
+          "path": "factorial/live/long_context/B/responses.jsonl",
+          "sha256": "96be24429ae5093db22213068e3112d82f2eeeb014540bef825c62dd6f97702c"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/long_context/B/events.jsonl",
+          "sha256": "83f57eecaaad56e732f9fb08c7da576436ff7fdb47780faae5ad47b22df935d1"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/B/long_context.json",
+          "sha256": "6d153990ba230c6a8331a2b891469e06b9c386ccdf25fb9d64c82cd9d18fb2a6"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/B/long_context.rttm",
+          "sha256": "a6a4de9b83aae3af04f932ecdbaf123e9e07e239a2248f11e1dff7bd38d835e4"
+        }
+      }
+    },
+    {
+      "case": "long_context",
+      "arm": "C",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/long_context/C/result.json",
+          "sha256": "34700d9a35d32c4b1f9b6df70dcbbff86f12d412fdec17470dfabe06e6f5bc96"
+        },
+        "raw_responses": {
+          "path": "factorial/live/long_context/C/responses.jsonl",
+          "sha256": "504fe879c8b408733ebecdf250b28304ad6c0f30b1ad47cc7e7c55d2d30e329f"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/long_context/C/events.jsonl",
+          "sha256": "a4b39e6ecce2b5f8e80b75dabf69423b255dcfed0eeaebcdd6c61afaa3a45006"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/C/long_context.json",
+          "sha256": "e60e0eacaa6685e8cd1ec41a6f0367ddb5458e19b67ef11ca98df3fea1769970"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/C/long_context.rttm",
+          "sha256": "d7217a6ea43a87433f5cb6f3f7ffcc8cac00db840061c97095d1516365a0082f"
+        }
+      }
+    },
+    {
+      "case": "long_context",
+      "arm": "D",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/long_context/D/result.json",
+          "sha256": "6d4fa1d50f16ca94de3235f27c930e8f9a48c6295cb0c561e48503739478518c"
+        },
+        "raw_responses": {
+          "path": "factorial/live/long_context/D/responses.jsonl",
+          "sha256": "ad7e0f5b24ccbc119d56ab52fb15817a2061609bbe8bc1dd5c968d91fe3ae74e"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/long_context/D/events.jsonl",
+          "sha256": "3675316fc60a559f507d81118923ba97ea8e09a430b3b7bf37524e4e50907c40"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/D/long_context.json",
+          "sha256": "17826c40b98ddf7592c9662702e3636aa511c248e7b9264016324afbce81e947"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/D/long_context.rttm",
+          "sha256": "9482117dc3dba730541820a9d18dbcdb36087f709b8960b00171210482fd8a0e"
+        }
+      }
+    },
+    {
+      "case": "brief_interjections",
+      "arm": "A",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/brief_interjections/A/result.json",
+          "sha256": "c8c4418e8a4456a9d704e22a3bf5a9fa8eff076f65bef839b1a614f440b65a5e"
+        },
+        "raw_responses": {
+          "path": "factorial/live/brief_interjections/A/responses.jsonl",
+          "sha256": "cc7793fdd9154bf5b7cffc8f14784b1c775b3197fceb5611e250482b1f5efd7f"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/brief_interjections/A/events.jsonl",
+          "sha256": "afe71cc493915d305b12727b84f2580bb51dac11d0cbe7331a7723cb556809fb"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/A/brief_interjections.json",
+          "sha256": "6624d07c782db55532bb6cd0d5efd736c218bf15d4945b1d327f2bfb9c1e773d"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/A/brief_interjections.rttm",
+          "sha256": "91f6cb088ef5cffedecc0efc3484c5cb3b88a756a87794619452bbd105fd7518"
+        }
+      }
+    },
+    {
+      "case": "brief_interjections",
+      "arm": "B",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/brief_interjections/B/result.json",
+          "sha256": "a2a9e9ce1e515ec8ddd6d5547a67f8217b1da55b0f1d3924833734326f58537e"
+        },
+        "raw_responses": {
+          "path": "factorial/live/brief_interjections/B/responses.jsonl",
+          "sha256": "6bc5e5dde22715b8bf40364c12a815d7d6a91752010331fcedb9228b1e39dbb7"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/brief_interjections/B/events.jsonl",
+          "sha256": "f715b582f784098822dd08253487e9470e441cecca580027a567555e5094288c"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/B/brief_interjections.json",
+          "sha256": "38ad0e5c697dca0e7c60d153d1c16a4385b5226fe1ddb9bbd7331529e318f2d1"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/B/brief_interjections.rttm",
+          "sha256": "916daf47ad3dc178ee14b7d57be872b89117f05d6714c366d56292c544ab2928"
+        }
+      }
+    },
+    {
+      "case": "brief_interjections",
+      "arm": "C",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/brief_interjections/C/result.json",
+          "sha256": "5e8202ab860d3f4391585cba43a35baee38840b5702a611ef5767b4045116f9c"
+        },
+        "raw_responses": {
+          "path": "factorial/live/brief_interjections/C/responses.jsonl",
+          "sha256": "18258152382289591eb2888fdccdcfd59614d659f90585867b52a96b66e95ac4"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/brief_interjections/C/events.jsonl",
+          "sha256": "4267c39da1a859a19eda5ec6318e385af41459569a3a315088765440978fa7cd"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/C/brief_interjections.json",
+          "sha256": "babb26fd12edd6799643d61a3556012d1ea1ff62620478af77eef35d3b2a3963"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/C/brief_interjections.rttm",
+          "sha256": "b9e7a73f6a3165af70a005230c3cf9cb1bfa272c04009c1d1b0c28bffc7f4b95"
+        }
+      }
+    },
+    {
+      "case": "brief_interjections",
+      "arm": "D",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/brief_interjections/D/result.json",
+          "sha256": "194c761090cd0bde23af594cfc09db686f90d7f0495dbde98d9a0f066b212084"
+        },
+        "raw_responses": {
+          "path": "factorial/live/brief_interjections/D/responses.jsonl",
+          "sha256": "d5e9f6066e0c4f9c812367b264efb73b28cce18954214dae314be3d69d77f376"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/brief_interjections/D/events.jsonl",
+          "sha256": "1b9e50a82fbca3854d09df1319f8925e9a4983eafeb84a7551835e90cb5a065f"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/D/brief_interjections.json",
+          "sha256": "0af511233e722346c3bc7c81ce4f77c9528b44428de67a6c4a23c66aa51fd535"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/D/brief_interjections.rttm",
+          "sha256": "ff214def786c416b74216f835aafc542b462bd9db81ea437cbe30fb1ddb1fbd7"
+        }
+      }
+    },
+    {
+      "case": "low_overlap",
+      "arm": "A",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/low_overlap/A/result.json",
+          "sha256": "fe592fb6265f7688ceb8996eca2c06c2fbb54a37c664ce53cf55cb090c99e8a8"
+        },
+        "raw_responses": {
+          "path": "factorial/live/low_overlap/A/responses.jsonl",
+          "sha256": "629d6f7967a92d262ec226e067198c901ef5cb7db0b0c56b724ebbeb942a4400"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/low_overlap/A/events.jsonl",
+          "sha256": "f0e3fe30caf26ae4bc638b6f51f625c3c042d1210c3112385740911f141c1cd0"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/A/low_overlap.json",
+          "sha256": "fb2652283b1152c407d1334ea9ebe8eee2fcbd7a7a2339acc8625133c62cfab9"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/A/low_overlap.rttm",
+          "sha256": "9d1854de8522878ede72af37d0c5aa538c1b52351170699e268b0274c8f986ab"
+        }
+      }
+    },
+    {
+      "case": "low_overlap",
+      "arm": "B",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/low_overlap/B/result.json",
+          "sha256": "000e01ee076a6b6f769b24a629c1ce3ae7a4d990cb8f55b25c935b887bd8e0ea"
+        },
+        "raw_responses": {
+          "path": "factorial/live/low_overlap/B/responses.jsonl",
+          "sha256": "d1c9526c403c59e0dbbdc221c5cbe32f488de65152a17f2c9859d27450582f2c"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/low_overlap/B/events.jsonl",
+          "sha256": "cbccf2efe974020aed0549c27670f5e62b112a7722de26512ee9da1e606b8e37"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/B/low_overlap.json",
+          "sha256": "0d898f6865744d8b844c9ff35d3c7bff06d77bf1ee52f542eb6f90b95990e2ae"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/B/low_overlap.rttm",
+          "sha256": "89f94f60b67ded0edee083a3158fa7ce902723fefc4d2d224b6c9771f6c3afe5"
+        }
+      }
+    },
+    {
+      "case": "low_overlap",
+      "arm": "C",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/low_overlap/C/result.json",
+          "sha256": "8150b2bc53187d0307f14e9048d6497f892ea27a2cfc7d0c8de4805b34205f80"
+        },
+        "raw_responses": {
+          "path": "factorial/live/low_overlap/C/responses.jsonl",
+          "sha256": "c3598da626be836f2d4ddf6bf1d43fe23492020134208a98b9899d7a73966894"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/low_overlap/C/events.jsonl",
+          "sha256": "0b7a0b0d002ed0630b59bf3f01c2b74b3369b0884f84a3affc1beec4ee71e55c"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/C/low_overlap.json",
+          "sha256": "4d322133fd89f8bddaa7753f20844f7614b94a64fa0a77d6cabe6a925abc7280"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/C/low_overlap.rttm",
+          "sha256": "40befb2f8c9b5b15af7b3fe1c96d6b72a80327cb951b95f56cff14aa60389f23"
+        }
+      }
+    },
+    {
+      "case": "low_overlap",
+      "arm": "D",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/low_overlap/D/result.json",
+          "sha256": "ef69a2bd4bcd2c3a65560b306de635424f623accc65783b2808e95a7bd21cb40"
+        },
+        "raw_responses": {
+          "path": "factorial/live/low_overlap/D/responses.jsonl",
+          "sha256": "f448f786179fd56cd27522311a3efd55dbd97ce9f794cd00851d55aebc2a1067"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/low_overlap/D/events.jsonl",
+          "sha256": "ebccb071da69b2e049fc6136fc9af289bae00fc92a472fc84ae0764ac362b13c"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/D/low_overlap.json",
+          "sha256": "a87f2ba68a899d06731ca175c98332142e869f28c43abc006b0436e70c9a467e"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/D/low_overlap.rttm",
+          "sha256": "1ecff0218d8701b32969176ac4b07691ea17d6ba1a4fbd6d84d2b159515d185c"
+        }
+      }
+    },
+    {
+      "case": "long_return_gap",
+      "arm": "A",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/long_return_gap/A/result.json",
+          "sha256": "3eeb2247775a92a2b25a58b75a6bb37b3b161a5a348c00fc4f90d59b21c91d91"
+        },
+        "raw_responses": {
+          "path": "factorial/live/long_return_gap/A/responses.jsonl",
+          "sha256": "8c2381eee3ee735e5ef66c0cadb4189f25a3009f0a9f43edf919afb28b475438"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/long_return_gap/A/events.jsonl",
+          "sha256": "6f919000744f7275dca1e5c46b421907b4aefb5f4462a2ac9a49ba193d24d4ac"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/A/long_return_gap.json",
+          "sha256": "5db8ff112de9262054ddd0c4a121ab9bdca51175205df28189025da2f2f5dc28"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/A/long_return_gap.rttm",
+          "sha256": "cedb5f6bacaf88b2841453be7c8ef0f93faab3d98679d70238787f1c7572046f"
+        }
+      }
+    },
+    {
+      "case": "long_return_gap",
+      "arm": "B",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/long_return_gap/B/result.json",
+          "sha256": "82c2b75d93d76eedf7d057cea27b7688fb33a0927136c1de722d6d7391f1ff56"
+        },
+        "raw_responses": {
+          "path": "factorial/live/long_return_gap/B/responses.jsonl",
+          "sha256": "d7817301c1d521ecb54840a8b92ba225660dc9d9b7aad3ce65984c23452adf54"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/long_return_gap/B/events.jsonl",
+          "sha256": "a19c4570940ea6c466de0aa24685fdc48c3333fee6b37fb7df3a165ffb4b1203"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/B/long_return_gap.json",
+          "sha256": "26d5593425b2ccbcc1f6f360f22b36277ac31fe125e25818bad89856ad0a26c1"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/B/long_return_gap.rttm",
+          "sha256": "726061a08f37751678d316fd2f4b336a0a09dd26f4b1e4132f414afc7069cc3c"
+        }
+      }
+    },
+    {
+      "case": "long_return_gap",
+      "arm": "C",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/long_return_gap/C/result.json",
+          "sha256": "dd39a4f8e82dd20c431469583218729c52d9c0ae427c3122ddf41a77f2f3cc75"
+        },
+        "raw_responses": {
+          "path": "factorial/live/long_return_gap/C/responses.jsonl",
+          "sha256": "26e3a6cbbe9d1590ca44a14fbe845541270668edaae2bd5f3f5ca94e0b468144"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/long_return_gap/C/events.jsonl",
+          "sha256": "4c5b5c50594971cb261e32d480f8309a4bc98bacf252f174b4c63b3bbae28d70"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/C/long_return_gap.json",
+          "sha256": "58ad4bc60310d0e7047b8b4a632eb90010a0237e002aaa07fd8e1ee624f82eb7"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/C/long_return_gap.rttm",
+          "sha256": "3c529c1fd79ffa32b7931f57abaf52eb3cc5e2d01bc9c1d307d5bf1600dd275f"
+        }
+      }
+    },
+    {
+      "case": "long_return_gap",
+      "arm": "D",
+      "execution_sender_version": 2,
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/live/long_return_gap/D/result.json",
+          "sha256": "141fa4061960dfb2a2f278610746edccebeee93ea76621111e91cc9c0f7a5014"
+        },
+        "raw_responses": {
+          "path": "factorial/live/long_return_gap/D/responses.jsonl",
+          "sha256": "1f35b2688ec96afeaa25b68a7b108ec6de2b301827dd333093e05d7406470801"
+        },
+        "write_receive_events": {
+          "path": "factorial/live/long_return_gap/D/events.jsonl",
+          "sha256": "39c19d9ae47f7fc44e85b8e8e0ba8a17f637f2deb7ec185c1f32ddd4a5bb3bd0"
+        },
+        "sdk_projection": {
+          "path": "factorial/sdk_output/D/long_return_gap.json",
+          "sha256": "175ca7a28ae9413fda45c963b5074d47b9533d82cf8a5f830561e1ff942f8297"
+        },
+        "prediction_rttm": {
+          "path": "factorial/predictions/D/long_return_gap.rttm",
+          "sha256": "24ec33878743c7d428ff52005a7c53d28cc6b9a164e6cd1d199ab56f50e27ccb"
+        }
+      }
+    },
+    {
+      "case": "brief_interjections",
+      "arm": "D_no_S200",
+      "execution_sender_version": "S200-only-off-v1",
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/ablation/live/brief_interjections/D_no_S200/result.json",
+          "sha256": "02dc3551072751493080137f1ccec294e3b1bd26988944e757b266b0c39915e1"
+        },
+        "raw_responses": {
+          "path": "factorial/ablation/live/brief_interjections/D_no_S200/responses.jsonl",
+          "sha256": "9072d75f21ae377ba8f4e503263de42c892df53e9d7e4b62f339d46e458f67f2"
+        },
+        "write_receive_events": {
+          "path": "factorial/ablation/live/brief_interjections/D_no_S200/events.jsonl",
+          "sha256": "0a10598f0755186b4ba494b2456ed48f50811fbc99d477f4016df99917fbcf6e"
+        },
+        "sdk_projection": {
+          "path": "factorial/ablation/sdk_output/D_no_S200/brief_interjections.json",
+          "sha256": "dbe99661f87e314245b487fbf1df6d7c180820c6aab73a5161ad6a3697cbaf09"
+        },
+        "prediction_rttm": {
+          "path": "factorial/ablation/predictions/D_no_S200/brief_interjections.rttm",
+          "sha256": "7d8ab5b03639e84b0bfa46d5362476415b0cd4e23ea4a7f132c4a7f50111fc09"
+        }
+      }
+    },
+    {
+      "case": "long_return_gap",
+      "arm": "D_no_S200",
+      "execution_sender_version": "S200-only-off-v1",
+      "artifacts": {
+        "native_result": {
+          "path": "factorial/ablation/live/long_return_gap/D_no_S200/result.json",
+          "sha256": "a3eb5c8a9bca887d05403ce8991c64e8ee04e21ae09be7a5f08af9fcde667315"
+        },
+        "raw_responses": {
+          "path": "factorial/ablation/live/long_return_gap/D_no_S200/responses.jsonl",
+          "sha256": "77c41d7075e6f13a02cd1f721d0df4d921bfe6960b804cba6149618332737b2a"
+        },
+        "write_receive_events": {
+          "path": "factorial/ablation/live/long_return_gap/D_no_S200/events.jsonl",
+          "sha256": "219dd4c465aef75eea69160fa4fc546b1331d7bb06c40d20b0cb290fab0253f9"
+        },
+        "sdk_projection": {
+          "path": "factorial/ablation/sdk_output/D_no_S200/long_return_gap.json",
+          "sha256": "3db43d45e9aec64d2758b8f44b5b5c40a32b8a6f2c9ba7c11a9e79a9c43e63c3"
+        },
+        "prediction_rttm": {
+          "path": "factorial/ablation/predictions/D_no_S200/long_return_gap.rttm",
+          "sha256": "7dcc4efe9c257c916e1ba0b39093ed32becf6b658e09861cae2c659c0f7756c5"
+        }
+      }
+    }
+  ]
+}

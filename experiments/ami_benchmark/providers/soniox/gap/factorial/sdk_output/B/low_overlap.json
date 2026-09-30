@@ -1,0 +1,72 @@
+{
+  "native_artifact_sha256": "5b82afd96344c21baa9b23758bf514a83067dae8bbea576002772a648fb12c01",
+  "sdk_segments": [
+    {
+      "text": "News, and that was 34%, or even more important, the thing that we did address in our last meeting. That frequently it's lost somewhere in the room. So those are two things that we definitely do want to address. We want to make it as simple. As possible, we want to make it obvious and intuitive to use. And then the things about finding it. We talked about a light-emitting thing as well as maybe a beep. And I think that those are things after my research that we definitely want to try to incorporate. Okay, can we go to the next slide, please? Okay, so my personal preference is in this project. Are we really have to concentrate on the sizzle? That is the selling point, the thing that's going to make it an impulse purchase. Because once there's no be-back, well, in sales they always say, you know, \"Be-backs don't come back.\" If somebody says, \"Oh, I'll come back and get it next week,\" you're dead. They're never going to come back and buy it. You've got to make it attractive. Enough so they buy it now, now, now. Now is a big word, and. In my book, for selling this thing. And in order to make it really saleable. We've got to shorten the learning curve, make sure it's really intuitive and easy to use. We have to have as few buttons as possible. Because more buttons is more confusion. So that's why I'm saying simplicity is good. Finding it's important, obviously. Can't use it if you can't find it. So we've got to concentrate on the features that help you find it. And I've already said this several times, but I put it down in writing here: it should be an attractive impulse purchase at 25 euros. So it has to have enough value that when somebody looks at it, they say, \"Uh, 25 euros, I'm not going to take that.\" It has to be so great that they're going to say, \"Ah, 25 euros isn't much.\" And then maybe a motto like, \"We put fashion in electronics,\" might be something we can use in our. Marketing campaign.",
+      "start_ms": 300,
+      "end_ms": 117360,
+      "speaker": "1",
+      "token_start_index": 0,
+      "token_end_index": 640
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 118200,
+      "end_ms": 118380,
+      "speaker": "2",
+      "token_start_index": 640,
+      "token_end_index": 642
+    },
+    {
+      "text": " Okay, that's about it for me right now.",
+      "start_ms": 118500,
+      "end_ms": 120480,
+      "speaker": "1",
+      "token_start_index": 642,
+      "token_end_index": 654
+    },
+    {
+      "text": " Okay. ",
+      "start_ms": 121140,
+      "end_ms": 121320,
+      "speaker": "2",
+      "token_start_index": 654,
+      "token_end_index": 657
+    }
+  ],
+  "projected_intervals": [
+    [
+      0.3,
+      117.36,
+      "1"
+    ],
+    [
+      118.2,
+      118.38,
+      "2"
+    ],
+    [
+      118.5,
+      120.0,
+      "1"
+    ]
+  ],
+  "projection_diagnostics": {
+    "sdk_groups": 4,
+    "untimed_groups": [],
+    "zero_duration_groups": [],
+    "unattributed_groups": [],
+    "padding_or_omitted_groups": [],
+    "out_of_support_groups": [
+      2,
+      3
+    ],
+    "wholly_out_of_support_groups": [
+      3
+    ],
+    "out_of_support_total_ms": 659.9999999999966,
+    "mapped_source_pieces": 3,
+    "bridged_positive_gap_ms": 81180.0,
+    "max_bridged_gap_ms": 1680
+  }
+}

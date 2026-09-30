@@ -1,0 +1,177 @@
+{
+  "case_id": "brief_interjections",
+  "arm": "B",
+  "source_seconds": 120.0,
+  "sent_seconds": 120.0,
+  "pcm_sha256": "58a76f6f139d99357eed3855c8b447812847592c30b89fae7697d0ea1e72eb5f",
+  "trace_sha256": "7dd957d3b616d290044f8a7021bd99d333e0d263a4d3a7bec2d29f102dd86c9c",
+  "finalizations": 25,
+  "cut_positions": [
+    {
+      "source_cut_sample": 96768,
+      "provider_cut_sample": 96768,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 192512,
+      "provider_cut_sample": 192512,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 288256,
+      "provider_cut_sample": 288256,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 353280,
+      "provider_cut_sample": 353280,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 431616,
+      "provider_cut_sample": 431616,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 538624,
+      "provider_cut_sample": 538624,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 634368,
+      "provider_cut_sample": 634368,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 730112,
+      "provider_cut_sample": 730112,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 795136,
+      "provider_cut_sample": 795136,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 858624,
+      "provider_cut_sample": 858624,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 937984,
+      "provider_cut_sample": 937984,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 973312,
+      "provider_cut_sample": 973312,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1075712,
+      "provider_cut_sample": 1075712,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1171456,
+      "provider_cut_sample": 1171456,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1235456,
+      "provider_cut_sample": 1235456,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1335296,
+      "provider_cut_sample": 1335296,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1431040,
+      "provider_cut_sample": 1431040,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1481216,
+      "provider_cut_sample": 1481216,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1581568,
+      "provider_cut_sample": 1581568,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1659392,
+      "provider_cut_sample": 1659392,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1764864,
+      "provider_cut_sample": 1764864,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1860608,
+      "provider_cut_sample": 1860608,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1880576,
+      "provider_cut_sample": 1880576,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1909248,
+      "provider_cut_sample": 1909248,
+      "reason": "delivery_pause"
+    }
+  ],
+  "mode": "dry",
+  "completed": true,
+  "failure": null,
+  "fin_count": 25,
+  "pending_completions": [],
+  "actual_audio_seconds": 120.0,
+  "active_websocket_seconds": 0,
+  "replay_elapsed_seconds": 120.05,
+  "timeline": [
+    {
+      "provider_start_s": 0.0,
+      "provider_end_s": 120.0,
+      "source_start_s": 0.0,
+      "source_end_s": 120.0,
+      "boundary": false
+    }
+  ],
+  "tokens": [],
+  "raw_responses_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "config": {
+    "model": "stt-rt-v5",
+    "audio_format": "pcm_s16le",
+    "sample_rate": 16000,
+    "num_channels": 1,
+    "language_hints": [
+      "en"
+    ],
+    "enable_endpoint_detection": false,
+    "enable_language_identification": false,
+    "enable_speaker_diarization": true
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "versions": {
+      "numpy": "2.5.1",
+      "onnxruntime": "1.28.0",
+      "websockets": "15.0.1",
+      "keyring": "25.7.0"
+    },
+    "model_sha256": {
+      "src/puripuly_heart/data/vad/silero_vad.onnx": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+      "src/puripuly_heart/data/models/smart-turn-v3.2-cpu.onnx": "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f"
+    }
+  },
+  "native_artifact_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+}

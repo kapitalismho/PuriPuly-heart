@@ -1,0 +1,45 @@
+{
+  "resources": {
+    "requests": 16,
+    "completed_requests": 16,
+    "transmitted_audio_seconds": 4070.168,
+    "websocket_envelope_seconds": 5205.829000000003,
+    "observed_connected_to_closed_seconds": 5194.893000000002,
+    "finalization_controls_and_receipts": 426,
+    "timestamp_requests": 0,
+    "retries": 0,
+    "released_before_connect_reservations": 1
+  },
+  "observed_checks": [
+    {
+      "case": "long_context",
+      "actual_matched_pcm_packet_availability_signatures": true,
+      "no_future_audio_actual_writes": true,
+      "all_controls_acknowledged_and_finished_received": true,
+      "one_connection_each_arm": true
+    },
+    {
+      "case": "brief_interjections",
+      "actual_matched_pcm_packet_availability_signatures": true,
+      "no_future_audio_actual_writes": true,
+      "all_controls_acknowledged_and_finished_received": true,
+      "one_connection_each_arm": true
+    },
+    {
+      "case": "low_overlap",
+      "actual_matched_pcm_packet_availability_signatures": true,
+      "no_future_audio_actual_writes": true,
+      "all_controls_acknowledged_and_finished_received": true,
+      "one_connection_each_arm": true
+    },
+    {
+      "case": "long_return_gap",
+      "actual_matched_pcm_packet_availability_signatures": true,
+      "no_future_audio_actual_writes": true,
+      "all_controls_acknowledged_and_finished_received": true,
+      "one_connection_each_arm": true
+    }
+  ],
+  "receipt_join_repair": "Matched logged FIFO control by exact provider cut and terminal flag, not floating wall-clock equality; all terminal receipts accounted",
+  "execution_source": "history/sender_v1.py and history/sender_v2.py, plans frozen before calls; final helper repair after calls changes no sender or native outputs"
+}

@@ -1,0 +1,117 @@
+{
+  "pairs": [
+    {
+      "case": "long_context",
+      "pair": "AB",
+      "matched_packets": 12113,
+      "write_time_difference_right_minus_left_seconds": {
+        "min": -0.2969999999986612,
+        "median": -0.15499999999883585,
+        "max": 0.09400000000096043
+      },
+      "active_ws_right_minus_left_seconds": 0.04700000000048021,
+      "right_arm_successor_pcm_before_fin": 120,
+      "right_arm_fin_before_successor_pcm": 0,
+      "declared_pcm_packet_availability_signature_matches": true
+    },
+    {
+      "case": "long_context",
+      "pair": "CD",
+      "matched_packets": 12551,
+      "write_time_difference_right_minus_left_seconds": {
+        "min": -0.14100000000144064,
+        "median": 1.9689999999991414,
+        "max": 6.233999999998559
+      },
+      "active_ws_right_minus_left_seconds": 6.265999999999622,
+      "right_arm_successor_pcm_before_fin": 120,
+      "right_arm_fin_before_successor_pcm": 0,
+      "declared_pcm_packet_availability_signature_matches": true
+    },
+    {
+      "case": "brief_interjections",
+      "pair": "AB",
+      "matched_packets": 2424,
+      "write_time_difference_right_minus_left_seconds": {
+        "min": 0.13999999999941792,
+        "median": 0.26600000000325963,
+        "max": 0.3600000000005821
+      },
+      "active_ws_right_minus_left_seconds": 0.4850000000005821,
+      "right_arm_successor_pcm_before_fin": 24,
+      "right_arm_fin_before_successor_pcm": 0,
+      "declared_pcm_packet_availability_signature_matches": true
+    },
+    {
+      "case": "brief_interjections",
+      "pair": "CD",
+      "matched_packets": 2609,
+      "write_time_difference_right_minus_left_seconds": {
+        "min": -0.11000000000422006,
+        "median": -0.0470000000022992,
+        "max": 0.01599999999962165
+      },
+      "active_ws_right_minus_left_seconds": 0.0319999999992433,
+      "right_arm_successor_pcm_before_fin": 23,
+      "right_arm_fin_before_successor_pcm": 0,
+      "declared_pcm_packet_availability_signature_matches": true
+    },
+    {
+      "case": "low_overlap",
+      "pair": "AB",
+      "matched_packets": 2424,
+      "write_time_difference_right_minus_left_seconds": {
+        "min": -0.09500000000116415,
+        "median": -0.01599999999962165,
+        "max": 0.062000000001717126
+      },
+      "active_ws_right_minus_left_seconds": 0.0779999999977008,
+      "right_arm_successor_pcm_before_fin": 24,
+      "right_arm_fin_before_successor_pcm": 0,
+      "declared_pcm_packet_availability_signature_matches": true
+    },
+    {
+      "case": "low_overlap",
+      "pair": "CD",
+      "matched_packets": 2634,
+      "write_time_difference_right_minus_left_seconds": {
+        "min": -0.11000000000058208,
+        "median": -0.046999999998661224,
+        "max": 0.17199999999866122
+      },
+      "active_ws_right_minus_left_seconds": 0.17199999999866122,
+      "right_arm_successor_pcm_before_fin": 24,
+      "right_arm_fin_before_successor_pcm": 0,
+      "declared_pcm_packet_availability_signature_matches": true
+    },
+    {
+      "case": "long_return_gap",
+      "pair": "AB",
+      "matched_packets": 3633,
+      "write_time_difference_right_minus_left_seconds": {
+        "min": -0.01600000000325963,
+        "median": 0.25,
+        "max": 0.4850000000005821
+      },
+      "active_ws_right_minus_left_seconds": 0.5789999999979045,
+      "right_arm_successor_pcm_before_fin": 34,
+      "right_arm_fin_before_successor_pcm": 0,
+      "declared_pcm_packet_availability_signature_matches": true
+    },
+    {
+      "case": "long_return_gap",
+      "pair": "CD",
+      "matched_packets": 3346,
+      "write_time_difference_right_minus_left_seconds": {
+        "min": -0.07800000000133878,
+        "median": 0.125,
+        "max": 0.18799999999828287
+      },
+      "active_ws_right_minus_left_seconds": 0.17199999999866122,
+      "right_arm_successor_pcm_before_fin": 30,
+      "right_arm_fin_before_successor_pcm": 4,
+      "declared_pcm_packet_availability_signature_matches": true
+    }
+  ],
+  "interpretation": "Actual writer timing is observed, not asserted equal. Both arms use same declared scheduling rule; controls and receiver activity can affect writer lateness. No intermediate ACK gate."
+}

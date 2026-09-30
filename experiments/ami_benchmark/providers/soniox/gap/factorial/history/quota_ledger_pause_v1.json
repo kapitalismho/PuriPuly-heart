@@ -1,0 +1,26 @@
+{
+  "entries": [
+    {
+      "identity": "long_context/A",
+      "reserved_audio_seconds": 600.0,
+      "reserved_websocket_seconds": 945.0,
+      "status": "complete",
+      "actual_audio_seconds": 600.0,
+      "active_websocket_seconds": 754.0
+    },
+    {
+      "identity": "long_context/B",
+      "reserved_audio_seconds": 600.0,
+      "reserved_websocket_seconds": 945.0,
+      "status": "complete",
+      "actual_audio_seconds": 600.0,
+      "active_websocket_seconds": 754.0470000000005
+    },
+    {
+      "identity": "long_context/C",
+      "reserved_audio_seconds": 602.788,
+      "reserved_websocket_seconds": 945.0,
+      "status": "reserved_before_connect"
+    }
+  ]
+}

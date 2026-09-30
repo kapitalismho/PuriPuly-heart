@@ -1,0 +1,28 @@
+{
+  "issue_requirement": "R4",
+  "status": "blocked_not_run",
+  "missing_prerequisite": "Independent source-acoustic verification of unique speech/event anchors with quantified timing uncertainty; retained word/phoneme timing is forced-aligned and is insufficient",
+  "public_audio": {
+    "license": "CC BY 4.0",
+    "official_download": "https://groups.inf.ed.ac.uk/ami/download/",
+    "timing_provenance": "https://groups.inf.ed.ac.uk/ami/corpus/transcription.shtml",
+    "existing_case": "low_overlap",
+    "calibration_source_interval_samples": [0, 320000],
+    "validation_source_interval_samples": [640000, 960000],
+    "sample_rate": 16000,
+    "annotation_selection": "No reference labels/timing used to choose these disjoint fixed sample intervals; speech/event suitability remains independently unverified"
+  },
+  "frozen_before_call_requirements": [
+    "Preserve original calibration and disjoint validation WAV/PCM, SHA-256 and exact sample count",
+    "Verifier independently inspects waveform and speech/event audio without provider transcript timing, records unique event identity, sample interval and conservative uncertainty",
+    "Keep all ambiguous/repeated/unmatched anchors and report their coverage",
+    "Freeze controls, real-silence intervals and exact synthetic silence insertion map separately; never replace real silence while testing finalization",
+    "Declare calibration/validation zero-versus-multiple-finalize schedule and total samples before request",
+    "Retain literal tokens, all raw responses and observed final_audio_proc_ms/total_audio_proc_ms when actually present",
+    "Compare native token/counter clocks against independent source intervals, not transcript-to-transcript matching alone",
+    "A correction requires documented source/protocol rule plus separately frozen validation with original/corrected results; no fitted finalize-count subtraction"
+  ],
+  "maximum_unused_reservation": {"requests": 4, "audio_seconds": 80, "active_websocket_seconds": 300},
+  "calls_spent": 0,
+  "decision": "Do not make unsupported calibration calls. Preserve literal native time and classify drift cause/correction unresolved. Independent-anchor recording/verification is the exact missing prerequisite, not licensing, credentials or basic runtime."
+}

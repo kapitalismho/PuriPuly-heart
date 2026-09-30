@@ -1,0 +1,24 @@
+{
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/204",
+  "baseline_revision": "4dc46fdac8c771d3bb58e46bd44304b86fde9c47",
+  "authorization": {
+    "granted": true,
+    "recorded_date": "2026-09-30",
+    "source": "Director relayed explicit user approval in task session",
+    "max_requests": 24,
+    "max_audio_seconds": 6000,
+    "max_active_websocket_seconds": 7200,
+    "allowed_audio": "existing public CC BY 4.0 AMI only",
+    "allowed_work": "fixed A-D comparison plus independent-anchor timestamp diagnostic",
+    "retries": 0
+  },
+  "subset": ["long_context", "brief_interjections", "low_overlap", "long_return_gap"],
+  "arm_order_by_case": [["A", "B", "C", "D"], ["B", "D", "A", "C"], ["D", "C", "B", "A"], ["C", "A", "D", "B"]],
+  "repeats_per_arm": 1,
+  "provider": {"model": "stt-rt-v5", "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket", "audio_format": "pcm_s16le", "sample_rate": 16000, "num_channels": 1, "language_hints": ["en"], "enable_endpoint_detection": false, "enable_language_identification": false, "enable_speaker_diarization": true},
+  "segmentation": {"channel": "peer", "ring_buffer_ms": 500, "speech_threshold": 0.4, "hangover_ms": 500, "pre_roll_ms": 500, "source_language": "en", "delivery_profile_effective": "on", "selective_padding_ms": 200, "settings_source": "current main-worktree nonsecret persisted settings plus integrated English SmartTurn policy"},
+  "wire": {"chunk_samples": 800, "receive_policy": "independent concurrent reader; no intermediate fin gating in any arm", "pacing": "each write waits for frozen source availability and previous write audio-duration completion; no catch-up burst", "keepalive_seconds": 10, "max_pending_finalizations": 256, "max_receive_bytes": 67108864, "per_call_timeout": "1.5 * original_duration_seconds + 45", "open_timeout_seconds": 12, "terminal_timeout_seconds": 30},
+  "timestamp_diagnostic": {"status": "blocked_pending_independently_verified_speech_anchors", "reserved_requests": 4, "reserved_audio_seconds": 80, "reserved_websocket_seconds": 300, "protocol": "20s public AMI calibration and separately frozen validation excerpt, zero vs repeated finalize; exact samples and independently verified unique word/event anchors; controlled real vs synthetic silence; preserve literal timing and observed counters"},
+  "projection": {"sdk": "@soniox/node@2.3.0", "group_by": ["speaker"], "order": "group provider time then intersect frozen source pieces", "timestamp_correction": "none"},
+  "scorer": {"pyannote.metrics": "4.0.0", "collar": 0, "skip_overlap": false, "uem": "full clip", "speaker_mapping": "one optimal mapping per entire case"}
+}

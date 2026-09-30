@@ -1,0 +1,50 @@
+[
+  {
+    "case": "long_context",
+    "arm": "C",
+    "actual_packet_concat_sha256": "f9bea3128723af594e2ce0d2d04def48f1d0184cbb9ba0f225facf57683124df",
+    "matches_frozen_app_pcm": true
+  },
+  {
+    "case": "long_context",
+    "arm": "D",
+    "actual_packet_concat_sha256": "f9bea3128723af594e2ce0d2d04def48f1d0184cbb9ba0f225facf57683124df",
+    "matches_frozen_app_pcm": true
+  },
+  {
+    "case": "brief_interjections",
+    "arm": "C",
+    "actual_packet_concat_sha256": "f25cd3777e5b1effdcf187e85eee2f3c89937d2d3cba1ae79ef600f11fd3c15e",
+    "matches_frozen_app_pcm": true
+  },
+  {
+    "case": "brief_interjections",
+    "arm": "D",
+    "actual_packet_concat_sha256": "f25cd3777e5b1effdcf187e85eee2f3c89937d2d3cba1ae79ef600f11fd3c15e",
+    "matches_frozen_app_pcm": true
+  },
+  {
+    "case": "low_overlap",
+    "arm": "C",
+    "actual_packet_concat_sha256": "d6d5fbeedd9f070c9206c8dceb709fab5e8e3a283a5af1eb3526fbab62b77364",
+    "matches_frozen_app_pcm": true
+  },
+  {
+    "case": "low_overlap",
+    "arm": "D",
+    "actual_packet_concat_sha256": "d6d5fbeedd9f070c9206c8dceb709fab5e8e3a283a5af1eb3526fbab62b77364",
+    "matches_frozen_app_pcm": true
+  },
+  {
+    "case": "long_return_gap",
+    "arm": "C",
+    "actual_packet_concat_sha256": "79a5daffb2b88717809d66f3888c43383afc09986f395d282ca97dc16248daef",
+    "matches_frozen_app_pcm": true
+  },
+  {
+    "case": "long_return_gap",
+    "arm": "D",
+    "actual_packet_concat_sha256": "79a5daffb2b88717809d66f3888c43383afc09986f395d282ca97dc16248daef",
+    "matches_frozen_app_pcm": true
+  }
+]

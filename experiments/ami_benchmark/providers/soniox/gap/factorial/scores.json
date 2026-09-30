@@ -1,0 +1,224 @@
+{
+  "pyannote.metrics": "4.0.0",
+  "collar": 0,
+  "overlap_included": true,
+  "mapping": "one optimal entire-case speaker mapping",
+  "per_arm": {
+    "A": [
+      {
+        "id": "long_context",
+        "pair_with": null,
+        "duration_s": 600,
+        "reference_speakers": 3,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 0,
+        "der": 0.42738789207082556,
+        "total": 549.8049999999995,
+        "missed detection": 127.76399999999954,
+        "false alarm": 93.65900000000009,
+        "confusion": 13.557000000000407
+      },
+      {
+        "id": "brief_interjections",
+        "pair_with": null,
+        "duration_s": 120,
+        "reference_speakers": 4,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 1,
+        "der": 0.626049098221954,
+        "total": 117.60100000000001,
+        "missed detection": 34.22899999999999,
+        "false alarm": 16.768000000000022,
+        "confusion": 22.627000000000013
+      },
+      {
+        "id": "low_overlap",
+        "pair_with": null,
+        "duration_s": 120,
+        "reference_speakers": 3,
+        "predicted_speakers": 2,
+        "speaker_count_absolute_error": 1,
+        "der": 0.15389758248146898,
+        "total": 103.205,
+        "missed detection": 0.5339999999999947,
+        "false alarm": 15.34900000000001,
+        "confusion": 0.0
+      },
+      {
+        "id": "long_return_gap",
+        "pair_with": null,
+        "duration_s": 180,
+        "reference_speakers": 4,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 1,
+        "der": 0.44618244140294927,
+        "total": 124.28100000000002,
+        "missed detection": 5.0549999999999855,
+        "false alarm": 50.33399999999996,
+        "confusion": 0.06300000000000594
+      }
+    ],
+    "B": [
+      {
+        "id": "long_context",
+        "pair_with": null,
+        "duration_s": 600,
+        "reference_speakers": 3,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 0,
+        "der": 0.7367302952865101,
+        "total": 549.8049999999994,
+        "missed detection": 163.51199999999943,
+        "false alarm": 117.8870000000001,
+        "confusion": 123.65899999999974
+      },
+      {
+        "id": "brief_interjections",
+        "pair_with": null,
+        "duration_s": 120,
+        "reference_speakers": 4,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 1,
+        "der": 0.6984294351238511,
+        "total": 117.60100000000001,
+        "missed detection": 37.09299999999999,
+        "false alarm": 19.21200000000001,
+        "confusion": 25.83100000000003
+      },
+      {
+        "id": "low_overlap",
+        "pair_with": null,
+        "duration_s": 120,
+        "reference_speakers": 3,
+        "predicted_speakers": 2,
+        "speaker_count_absolute_error": 1,
+        "der": 0.18040792597257896,
+        "total": 103.205,
+        "missed detection": 1.2599999999999938,
+        "false alarm": 16.79500000000001,
+        "confusion": 0.5640000000000072
+      },
+      {
+        "id": "long_return_gap",
+        "pair_with": null,
+        "duration_s": 180,
+        "reference_speakers": 4,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 1,
+        "der": 0.4767583138210987,
+        "total": 124.28100000000003,
+        "missed detection": 7.024000000000029,
+        "false alarm": 50.50299999999998,
+        "confusion": 1.7249999999999694
+      }
+    ],
+    "C": [
+      {
+        "id": "long_context",
+        "pair_with": null,
+        "duration_s": 600,
+        "reference_speakers": 3,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 0,
+        "der": 0.43129291294188127,
+        "total": 549.8049999997569,
+        "missed detection": 132.1509999999605,
+        "false alarm": 92.87799999995214,
+        "confusion": 12.097999999993544
+      },
+      {
+        "id": "brief_interjections",
+        "pair_with": null,
+        "duration_s": 120,
+        "reference_speakers": 4,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 1,
+        "der": 0.5844508124931003,
+        "total": 117.60099999999105,
+        "missed detection": 33.80499999999854,
+        "false alarm": 16.367999999999064,
+        "confusion": 18.55899999999825
+      },
+      {
+        "id": "low_overlap",
+        "pair_with": null,
+        "duration_s": 120,
+        "reference_speakers": 3,
+        "predicted_speakers": 2,
+        "speaker_count_absolute_error": 1,
+        "der": 0.1782956252119591,
+        "total": 103.20499999999154,
+        "missed detection": 0.5729999999999962,
+        "false alarm": 17.827999999998735,
+        "confusion": 0.0
+      },
+      {
+        "id": "long_return_gap",
+        "pair_with": null,
+        "duration_s": 180,
+        "reference_speakers": 4,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 1,
+        "der": 0.3364794296795289,
+        "total": 124.28099999997832,
+        "missed detection": 6.3059999999991785,
+        "false alarm": 35.44099999999505,
+        "confusion": 0.07100000000000506
+      }
+    ],
+    "D": [
+      {
+        "id": "long_context",
+        "pair_with": null,
+        "duration_s": 600,
+        "reference_speakers": 3,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 0,
+        "der": 0.7179672793081023,
+        "total": 549.8049999997677,
+        "missed detection": 155.1669999999577,
+        "false alarm": 113.49799999994119,
+        "confusion": 126.07699999992549
+      },
+      {
+        "id": "brief_interjections",
+        "pair_with": null,
+        "duration_s": 120,
+        "reference_speakers": 4,
+        "predicted_speakers": 3,
+        "speaker_count_absolute_error": 1,
+        "der": 0.8326034642562605,
+        "total": 117.6009999999916,
+        "missed detection": 41.10799999999857,
+        "false alarm": 19.662999999998565,
+        "confusion": 37.14399999999637
+      },
+      {
+        "id": "low_overlap",
+        "pair_with": null,
+        "duration_s": 120,
+        "reference_speakers": 3,
+        "predicted_speakers": 2,
+        "speaker_count_absolute_error": 1,
+        "der": 0.20439901167579277,
+        "total": 103.20499999999161,
+        "missed detection": 1.2000000000000057,
+        "false alarm": 19.33099999999855,
+        "confusion": 0.5639999999999219
+      },
+      {
+        "id": "long_return_gap",
+        "pair_with": null,
+        "duration_s": 180,
+        "reference_speakers": 4,
+        "predicted_speakers": 2,
+        "speaker_count_absolute_error": 2,
+        "der": 0.43662345813118514,
+        "total": 124.2809999999784,
+        "missed detection": 7.4469999999991945,
+        "false alarm": 36.157999999995,
+        "confusion": 10.658999999998201
+      }
+    ]
+  }
+}

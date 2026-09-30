@@ -95,8 +95,10 @@ Provider JSON, JSONL and RTTM evidence has byte-preserving Git attributes so lin
 
 ## Soniox segmented-input investigation (#204)
 
+The [decision and evidence index](providers/soniox/gap/report.md) records the completed 16-call controlled A–D comparison and separately approved two-call S200-only ablation, reproduction commands, quota receipts, and unmet criteria. **Defer production adoption:** finalization worsened declared-output DER in all observed matched-PCM pairs, but native word identity, text coverage, and readiness do not uniformly follow DER. S200-off is not a blanket improvement. No production behavior changed.
+
 The [retained-output diagnosis](providers/soniox/gap/offline_report.md) reproduces the corrected baseline without provider calls and adds a reference-aligned lexical speaker diagnostic with explicit unmatched, ambiguous, overlap, and short-interjection coverage. DER and conditional recognized-word identity are distinct measurements; neither is live caption-color accuracy. Public word/turn references and acquisition identities are retained with the report.
 
 The [application-consumption probe](providers/soniox/gap/consumption_report.md) exercises actual scoped recognition, peer terminal admission, translation ownership, output, and first-readable presentation with scripted native responses. It verifies text/scope behavior, not acoustic model quality or physical microphone/VRChat/HMD operation. On the current Soniox path, `FinalSpeakerRun.source_*_ms` remains native stream time; stable updates do not bypass the terminal-driven peer publication contract.
 
-These offline findings do not establish a causal finalization/PCM effect or authorize a production change. Timestamp drift remains unresolved; no guessed per-finalize correction or reference-fitted timing adjustment is applied.
+The [controlled comparison](providers/soniox/gap/factorial_report.md), [live lexical diagnosis](providers/soniox/gap/live_identity_report.md), and [S200-only diagnosis](providers/soniox/gap/ablation_identity_report.md) preserve actual PCM/control/receive traces and distinguish raw-stream pacing from the current ACK-gated adapter. Timestamp calibration and a production-safe first-readable operating point remain unresolved; no guessed per-finalize correction or reference-fitted timing adjustment is applied.

@@ -1,0 +1,25 @@
+{
+  "baseline_usage": {
+    "requests": 16,
+    "audio_seconds": 4070.168,
+    "websocket_seconds": 5205.829000000003
+  },
+  "entries": [
+    {
+      "identity": "brief_interjections/D_no_S200",
+      "status": "complete",
+      "reserved_audio_seconds": 121.504,
+      "reserved_websocket_seconds": 225,
+      "actual_audio_seconds": 121.504,
+      "active_websocket_seconds": 159.15599999999904
+    },
+    {
+      "identity": "long_return_gap/D_no_S200",
+      "status": "complete",
+      "reserved_audio_seconds": 156.256,
+      "reserved_websocket_seconds": 315,
+      "actual_audio_seconds": 156.256,
+      "active_websocket_seconds": 221.0470000000023
+    }
+  ]
+}

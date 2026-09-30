@@ -1,0 +1,2854 @@
+{
+  "native_artifact_sha256": "dad978e7d63ae3726c66b724e825486616e2326bebb18ef30f5ce66ac414422c",
+  "sdk_segments": [
+    {
+      "text": "They're going to want to look at the BDB ones, and so default to that, or— I don't know.",
+      "start_ms": 60,
+      "end_ms": 3900,
+      "speaker": "1",
+      "token_start_index": 0,
+      "token_end_index": 34
+    },
+    {
+      "text": " Well, how— how are we going to know that?",
+      "start_ms": 4020,
+      "end_ms": 5280,
+      "speaker": "2",
+      "token_start_index": 34,
+      "token_end_index": 48
+    },
+    {
+      "text": " Based on what they did the last time.",
+      "start_ms": 6060,
+      "end_ms": 7320,
+      "speaker": "1",
+      "token_start_index": 48,
+      "token_end_index": 59
+    },
+    {
+      "text": " It can have a site preferences.",
+      "start_ms": 8880,
+      "end_ms": 10380,
+      "speaker": "3",
+      "token_start_index": 59,
+      "token_end_index": 68
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 10680,
+      "end_ms": 10860,
+      "speaker": "1",
+      "token_start_index": 68,
+      "token_end_index": 70
+    },
+    {
+      "text": " It could have a site preferences, I guess.",
+      "start_ms": 11100,
+      "end_ms": 12960,
+      "speaker": "3",
+      "token_start_index": 70,
+      "token_end_index": 84
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 13260,
+      "end_ms": 13560,
+      "speaker": "1",
+      "token_start_index": 84,
+      "token_end_index": 86
+    },
+    {
+      "text": " But that would defy the whole point of browsing, right? If you only wanted to look at—",
+      "start_ms": 14100,
+      "end_ms": 18240,
+      "speaker": "2",
+      "token_start_index": 86,
+      "token_end_index": 116
+    },
+    {
+      "text": " Well, or call it favorites, then.",
+      "start_ms": 18300,
+      "end_ms": 19860,
+      "speaker": "1",
+      "token_start_index": 116,
+      "token_end_index": 126
+    },
+    {
+      "text": " Yeah, okay.",
+      "start_ms": 20160,
+      "end_ms": 20820,
+      "speaker": "3",
+      "token_start_index": 126,
+      "token_end_index": 130
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 22860,
+      "end_ms": 23100,
+      "speaker": "1",
+      "token_start_index": 130,
+      "token_end_index": 132
+    },
+    {
+      "text": " You could have a favorite.",
+      "start_ms": 23340,
+      "end_ms": 24180,
+      "speaker": "3",
+      "token_start_index": 132,
+      "token_end_index": 140
+    },
+    {
+      "text": " Well, you just— you just scroll down the list and find your favorite one. I mean—",
+      "start_ms": 24240,
+      "end_ms": 27300,
+      "speaker": "2",
+      "token_start_index": 140,
+      "token_end_index": 167
+    },
+    {
+      "text": " Yeah, it's not enough information, is it?",
+      "start_ms": 27360,
+      "end_ms": 29040,
+      "speaker": "1",
+      "token_start_index": 167,
+      "token_end_index": 179
+    },
+    {
+      "text": " It's not like they come back every day and do the same browsing. Fancy words, changed today.",
+      "start_ms": 29040,
+      "end_ms": 34380,
+      "speaker": "2",
+      "token_start_index": 179,
+      "token_end_index": 207
+    },
+    {
+      "text": " I forgot. Right. Um, okay. Well, no, I'm just getting back to sort of what could be on the— the startup screen.",
+      "start_ms": 36000,
+      "end_ms": 44640,
+      "speaker": "1",
+      "token_start_index": 207,
+      "token_end_index": 247
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 45000,
+      "end_ms": 45180,
+      "speaker": "2",
+      "token_start_index": 247,
+      "token_end_index": 249
+    },
+    {
+      "text": " Like, there's just a range of things we could do. We could have, like, search options, browse options. I mean, just— I don't know, just playing around with ideas. Um, and then we can tie this into our evaluation, uh, tasks and say, well, if you want to search for a meeting or search for a user in a particular meeting, then do this, blah, blah, blah. So we can— yeah.",
+      "start_ms": 45480,
+      "end_ms": 67080,
+      "speaker": "1",
+      "token_start_index": 249,
+      "token_end_index": 370
+    },
+    {
+      "text": " Oh, right.",
+      "start_ms": 67380,
+      "end_ms": 67740,
+      "speaker": "2",
+      "token_start_index": 370,
+      "token_end_index": 375
+    },
+    {
+      "text": " Sort of, um—",
+      "start_ms": 67980,
+      "end_ms": 68400,
+      "speaker": "1",
+      "token_start_index": 375,
+      "token_end_index": 381
+    },
+    {
+      "text": " Oh, okay.",
+      "start_ms": 68400,
+      "end_ms": 68760,
+      "speaker": "2",
+      "token_start_index": 381,
+      "token_end_index": 385
+    },
+    {
+      "text": " Yeah, guide them and just like, hey, my task is to do this, and there's a button for it.",
+      "start_ms": 68820,
+      "end_ms": 72660,
+      "speaker": "1",
+      "token_start_index": 385,
+      "token_end_index": 413
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 72900,
+      "end_ms": 73140,
+      "speaker": "2",
+      "token_start_index": 413,
+      "token_end_index": 415
+    },
+    {
+      "text": " Perfect. You know?",
+      "start_ms": 73200,
+      "end_ms": 74280,
+      "speaker": "1",
+      "token_start_index": 415,
+      "token_end_index": 423
+    },
+    {
+      "text": " No.",
+      "start_ms": 74760,
+      "end_ms": 74820,
+      "speaker": "2",
+      "token_start_index": 423,
+      "token_end_index": 424
+    },
+    {
+      "text": " Yeah. I don't know.",
+      "start_ms": 75120,
+      "end_ms": 77280,
+      "speaker": "1",
+      "token_start_index": 424,
+      "token_end_index": 432
+    },
+    {
+      "text": " Um.",
+      "start_ms": 77700,
+      "end_ms": 77880,
+      "speaker": "2",
+      "token_start_index": 432,
+      "token_end_index": 434
+    },
+    {
+      "text": " Yeah, it would be quite good if it has, yeah.",
+      "start_ms": 78060,
+      "end_ms": 79620,
+      "speaker": "3",
+      "token_start_index": 434,
+      "token_end_index": 449
+    },
+    {
+      "text": " I— I wasn't going to put any, you know, any, any help in there. Any sort of explanation of how the browser works, to be honest.",
+      "start_ms": 80340,
+      "end_ms": 86760,
+      "speaker": "2",
+      "token_start_index": 449,
+      "token_end_index": 493
+    },
+    {
+      "text": " No, that's not what I'm suggesting.",
+      "start_ms": 87000,
+      "end_ms": 88680,
+      "speaker": "1",
+      "token_start_index": 493,
+      "token_end_index": 506
+    },
+    {
+      "text": " So.",
+      "start_ms": 88680,
+      "end_ms": 89100,
+      "speaker": "2",
+      "token_start_index": 506,
+      "token_end_index": 508
+    },
+    {
+      "text": " I'm just saying, like, these are just— like, a lot of programs will kind of lame programs do have that sort of thing first, just because they don't want people to have to go through all the menus and search themselves and just, like, do commonly used tasks.",
+      "start_ms": 89160,
+      "end_ms": 101040,
+      "speaker": "1",
+      "token_start_index": 508,
+      "token_end_index": 581
+    },
+    {
+      "text": " I see.",
+      "start_ms": 101100,
+      "end_ms": 101400,
+      "speaker": "2",
+      "token_start_index": 581,
+      "token_end_index": 584
+    },
+    {
+      "text": " Or just exit and just let me use the program. You know, as well.",
+      "start_ms": 101460,
+      "end_ms": 104820,
+      "speaker": "1",
+      "token_start_index": 584,
+      "token_end_index": 602
+    },
+    {
+      "text": " Yeah, yeah.",
+      "start_ms": 104880,
+      "end_ms": 105360,
+      "speaker": "3",
+      "token_start_index": 602,
+      "token_end_index": 606
+    },
+    {
+      "text": " But I mean, the main thing, what you want to do, is to view a meeting, right?",
+      "start_ms": 106380,
+      "end_ms": 109320,
+      "speaker": "2",
+      "token_start_index": 606,
+      "token_end_index": 634
+    },
+    {
+      "text": " Probably, or search something.",
+      "start_ms": 109860,
+      "end_ms": 111060,
+      "speaker": "1",
+      "token_start_index": 634,
+      "token_end_index": 644
+    },
+    {
+      "text": " Or search.",
+      "start_ms": 111240,
+      "end_ms": 111600,
+      "speaker": "3",
+      "token_start_index": 644,
+      "token_end_index": 648
+    },
+    {
+      "text": " Yeah, or search, yeah.",
+      "start_ms": 111660,
+      "end_ms": 112380,
+      "speaker": "2",
+      "token_start_index": 648,
+      "token_end_index": 656
+    },
+    {
+      "text": " Yeah, so even if it just said two things, just said one, so one said take me straight to this meeting and have a text box you can enter it, or it would drop down a menu and then another one that said search that loaded instantly, loaded up the search.",
+      "start_ms": 112440,
+      "end_ms": 122880,
+      "speaker": "3",
+      "token_start_index": 656,
+      "token_end_index": 735
+    },
+    {
+      "text": " I agree. Find specific meeting.",
+      "start_ms": 122880,
+      "end_ms": 124260,
+      "speaker": "1",
+      "token_start_index": 735,
+      "token_end_index": 746
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 124440,
+      "end_ms": 124740,
+      "speaker": "3",
+      "token_start_index": 746,
+      "token_end_index": 748
+    },
+    {
+      "text": " You know, that's an easy sort of thing.",
+      "start_ms": 124740,
+      "end_ms": 125880,
+      "speaker": "1",
+      "token_start_index": 748,
+      "token_end_index": 760
+    },
+    {
+      "text": " Yeah, yeah. Or one that, yeah, or one.",
+      "start_ms": 126180,
+      "end_ms": 128280,
+      "speaker": "3",
+      "token_start_index": 760,
+      "token_end_index": 773
+    },
+    {
+      "text": " Yeah, that all happens through the search, basically.",
+      "start_ms": 128460,
+      "end_ms": 130740,
+      "speaker": "2",
+      "token_start_index": 773,
+      "token_end_index": 789
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 130980,
+      "end_ms": 131100,
+      "speaker": "3",
+      "token_start_index": 789,
+      "token_end_index": 791
+    },
+    {
+      "text": " Basically, either the user knows which meeting he wants to look at, and you just click on it, or he doesn't, and then he searches for one that sort of looks like it.",
+      "start_ms": 131220,
+      "end_ms": 140520,
+      "speaker": "2",
+      "token_start_index": 791,
+      "token_end_index": 847
+    },
+    {
+      "text": " Well, the other thing to do is just have it search as the default. Just it opens in the search window opens. And that's the interface. And you just go from there.",
+      "start_ms": 140520,
+      "end_ms": 148080,
+      "speaker": "3",
+      "token_start_index": 847,
+      "token_end_index": 896
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 148860,
+      "end_ms": 149100,
+      "speaker": "2",
+      "token_start_index": 896,
+      "token_end_index": 898
+    },
+    {
+      "text": " And then that brings up the browser after you've searched for something. Or, or the search— but the search window could have on it something that said just has a drop-down menu that says just and a go button that said take me to this.",
+      "start_ms": 151140,
+      "end_ms": 162540,
+      "speaker": "3",
+      "token_start_index": 898,
+      "token_end_index": 972
+    },
+    {
+      "text": " Oh, I see what you mean.",
+      "start_ms": 162660,
+      "end_ms": 163560,
+      "speaker": "2",
+      "token_start_index": 972,
+      "token_end_index": 983
+    },
+    {
+      "text": " So the, so the.",
+      "start_ms": 163680,
+      "end_ms": 164400,
+      "speaker": "3",
+      "token_start_index": 983,
+      "token_end_index": 989
+    },
+    {
+      "text": " Inside the search menu, yeah.",
+      "start_ms": 164460,
+      "end_ms": 165480,
+      "speaker": "2",
+      "token_start_index": 989,
+      "token_end_index": 998
+    },
+    {
+      "text": " Yeah, so the only thing that comes up when you finish is a, um, when you start, it's just one window like that, and it's got all the search stuff, like, down there. So this is your search.",
+      "start_ms": 165600,
+      "end_ms": 175200,
+      "speaker": "3",
+      "token_start_index": 998,
+      "token_end_index": 1061
+    },
+    {
+      "text": " Mm-hmm.",
+      "start_ms": 175320,
+      "end_ms": 175740,
+      "speaker": "2",
+      "token_start_index": 1061,
+      "token_end_index": 1066
+    },
+    {
+      "text": " Just all here. And here is just go to wherever. And a go button. And then from there, it takes you to wherever else you want.",
+      "start_ms": 176220,
+      "end_ms": 183600,
+      "speaker": "3",
+      "token_start_index": 1066,
+      "token_end_index": 1108
+    },
+    {
+      "text": " Yeah, that's, that's what, yeah.",
+      "start_ms": 183600,
+      "end_ms": 184740,
+      "speaker": "2",
+      "token_start_index": 1108,
+      "token_end_index": 1119
+    },
+    {
+      "text": " Yeah. And then the topic says welcome to— welcome to our browser.",
+      "start_ms": 185220,
+      "end_ms": 190500,
+      "speaker": "3",
+      "token_start_index": 1119,
+      "token_end_index": 1143
+    },
+    {
+      "text": " Yeah, that looks about right. Um, but I'm, I'm unsure about how to— how to put all the information in there.",
+      "start_ms": 190980,
+      "end_ms": 198000,
+      "speaker": "2",
+      "token_start_index": 1143,
+      "token_end_index": 1179
+    },
+    {
+      "text": " Because.",
+      "start_ms": 198000,
+      "end_ms": 198240,
+      "speaker": "3",
+      "token_start_index": 1179,
+      "token_end_index": 1183
+    },
+    {
+      "text": " Because we need.",
+      "start_ms": 198240,
+      "end_ms": 198780,
+      "speaker": "2",
+      "token_start_index": 1183,
+      "token_end_index": 1189
+    },
+    {
+      "text": " Drop-down menu.",
+      "start_ms": 199080,
+      "end_ms": 199500,
+      "speaker": "3",
+      "token_start_index": 1189,
+      "token_end_index": 1195
+    },
+    {
+      "text": " Drop-down menu. But we want all the information about the name, the longer name.",
+      "start_ms": 199500,
+      "end_ms": 203820,
+      "speaker": "2",
+      "token_start_index": 1195,
+      "token_end_index": 1218
+    },
+    {
+      "text": " Oh, you want.",
+      "start_ms": 203940,
+      "end_ms": 204480,
+      "speaker": "3",
+      "token_start_index": 1218,
+      "token_end_index": 1224
+    },
+    {
+      "text": " And the users.",
+      "start_ms": 204600,
+      "end_ms": 205020,
+      "speaker": "2",
+      "token_start_index": 1224,
+      "token_end_index": 1228
+    },
+    {
+      "text": " Oh, yeah.",
+      "start_ms": 205620,
+      "end_ms": 205860,
+      "speaker": "3",
+      "token_start_index": 1228,
+      "token_end_index": 1232
+    },
+    {
+      "text": " Well, we don't actually have user names, do we? Aren't there all these codes, like, let me 11 or whatever?",
+      "start_ms": 205920,
+      "end_ms": 210300,
+      "speaker": "1",
+      "token_start_index": 1232,
+      "token_end_index": 1267
+    },
+    {
+      "text": " Yeah. Maybe if they know the codes and in other top— in other corpus.",
+      "start_ms": 210540,
+      "end_ms": 214620,
+      "speaker": "2",
+      "token_start_index": 1267,
+      "token_end_index": 1288
+    },
+    {
+      "text": " Yeah, that's cool.",
+      "start_ms": 214740,
+      "end_ms": 215220,
+      "speaker": "3",
+      "token_start_index": 1288,
+      "token_end_index": 1294
+    },
+    {
+      "text": " In a case like that, we do want drop-down. We don't want them to type them, do we?",
+      "start_ms": 215340,
+      "end_ms": 218040,
+      "speaker": "1",
+      "token_start_index": 1294,
+      "token_end_index": 1324
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 219660,
+      "end_ms": 219840,
+      "speaker": "2",
+      "token_start_index": 1324,
+      "token_end_index": 1326
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 220860,
+      "end_ms": 220980,
+      "speaker": "3",
+      "token_start_index": 1326,
+      "token_end_index": 1328
+    },
+    {
+      "text": " Drop-down is definitely not.",
+      "start_ms": 221160,
+      "end_ms": 222600,
+      "speaker": "2",
+      "token_start_index": 1328,
+      "token_end_index": 1338
+    },
+    {
+      "text": " Okay. Um, and allow multiple? No. Okay, you're just looking for one specific.",
+      "start_ms": 222660,
+      "end_ms": 227220,
+      "speaker": "1",
+      "token_start_index": 1338,
+      "token_end_index": 1364
+    },
+    {
+      "text": " This is good, but if you want to search, you search. If you want to look for one meeting and just look at it, then that's fine.",
+      "start_ms": 227400,
+      "end_ms": 231480,
+      "speaker": "3",
+      "token_start_index": 1364,
+      "token_end_index": 1410
+    },
+    {
+      "text": " Yeah, okay.",
+      "start_ms": 231480,
+      "end_ms": 231960,
+      "speaker": "1",
+      "token_start_index": 1410,
+      "token_end_index": 1414
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 232320,
+      "end_ms": 232500,
+      "speaker": "2",
+      "token_start_index": 1414,
+      "token_end_index": 1416
+    },
+    {
+      "text": " Um.",
+      "start_ms": 232620,
+      "end_ms": 232740,
+      "speaker": "1",
+      "token_start_index": 1416,
+      "token_end_index": 1418
+    },
+    {
+      "text": " But then, yeah, as I said.",
+      "start_ms": 232860,
+      "end_ms": 234000,
+      "speaker": "2",
+      "token_start_index": 1418,
+      "token_end_index": 1427
+    },
+    {
+      "text": " That's, that's true. That's—",
+      "start_ms": 234420,
+      "end_ms": 235440,
+      "speaker": "3",
+      "token_start_index": 1427,
+      "token_end_index": 1438
+    },
+    {
+      "text": " Um.",
+      "start_ms": 236220,
+      "end_ms": 236400,
+      "speaker": "2",
+      "token_start_index": 1438,
+      "token_end_index": 1440
+    },
+    {
+      "text": " Well, yes, you have two one. One is one— one there where you got two, one for meeting, one for speaker, and you can choose. You can go go for go or go for the other. Can't go for both. If you go for both.",
+      "start_ms": 236400,
+      "end_ms": 245580,
+      "speaker": "3",
+      "token_start_index": 1440,
+      "token_end_index": 1506
+    },
+    {
+      "text": " No, no, no. I'm not— I'm not saying you can— you can pick a user. But it should come up with some list, but an extended list of the— of the meetings. So, you know, you have BDR, whatever it was called, A1. And then it gives you the longer name, blah. And then it gives you the, you know, the participants.",
+      "start_ms": 245580,
+      "end_ms": 263520,
+      "speaker": "2",
+      "token_start_index": 1506,
+      "token_end_index": 1614
+    },
+    {
+      "text": " We could do Microsoft Study and hold it over it and it pops up a thing.",
+      "start_ms": 263700,
+      "end_ms": 266640,
+      "speaker": "3",
+      "token_start_index": 1614,
+      "token_end_index": 1634
+    },
+    {
+      "text": " Oh.",
+      "start_ms": 267000,
+      "end_ms": 267180,
+      "speaker": "1",
+      "token_start_index": 1634,
+      "token_end_index": 1636
+    },
+    {
+      "text": " I was thinking that. Yeah. Tooltip.",
+      "start_ms": 268260,
+      "end_ms": 270300,
+      "speaker": "2",
+      "token_start_index": 1636,
+      "token_end_index": 1649
+    },
+    {
+      "text": " Mm-hmm.",
+      "start_ms": 270780,
+      "end_ms": 271200,
+      "speaker": "1",
+      "token_start_index": 1649,
+      "token_end_index": 1654
+    },
+    {
+      "text": " But then.",
+      "start_ms": 271320,
+      "end_ms": 271920,
+      "speaker": "2",
+      "token_start_index": 1654,
+      "token_end_index": 1657
+    },
+    {
+      "text": " Is that complicated?",
+      "start_ms": 272100,
+      "end_ms": 273000,
+      "speaker": "3",
+      "token_start_index": 1657,
+      "token_end_index": 1663
+    },
+    {
+      "text": " No, it's not at all, I think.",
+      "start_ms": 273300,
+      "end_ms": 274560,
+      "speaker": "2",
+      "token_start_index": 1663,
+      "token_end_index": 1675
+    },
+    {
+      "text": " A tooltip?",
+      "start_ms": 274980,
+      "end_ms": 275520,
+      "speaker": "1",
+      "token_start_index": 1675,
+      "token_end_index": 1680
+    },
+    {
+      "text": " A tooltip, yeah. I've not tried that yet, but I was— I was going to do that.",
+      "start_ms": 275640,
+      "end_ms": 278880,
+      "speaker": "2",
+      "token_start_index": 1680,
+      "token_end_index": 1708
+    },
+    {
+      "text": " Mouse over, isn't it?",
+      "start_ms": 279060,
+      "end_ms": 279780,
+      "speaker": "3",
+      "token_start_index": 1708,
+      "token_end_index": 1717
+    },
+    {
+      "text": " It was like, yeah, virtually this one. Yeah.",
+      "start_ms": 279840,
+      "end_ms": 281520,
+      "speaker": "2",
+      "token_start_index": 1717,
+      "token_end_index": 1731
+    },
+    {
+      "text": " Well, let's do that then.",
+      "start_ms": 281700,
+      "end_ms": 282540,
+      "speaker": "3",
+      "token_start_index": 1731,
+      "token_end_index": 1739
+    },
+    {
+      "text": " Yeah, I'm not sure what the— is that very— is that not annoying? If you have to.",
+      "start_ms": 283260,
+      "end_ms": 288240,
+      "speaker": "2",
+      "token_start_index": 1739,
+      "token_end_index": 1770
+    },
+    {
+      "text": " Get out the bloody way of doing it.",
+      "start_ms": 288600,
+      "end_ms": 290100,
+      "speaker": "3",
+      "token_start_index": 1770,
+      "token_end_index": 1784
+    },
+    {
+      "text": " Yeah, yeah, yeah. Yes. We do that a lot, don't they? No, but, you know, to— to search for a specific user, you have to hold your mouse over that one, wait for it to pop up.",
+      "start_ms": 290100,
+      "end_ms": 301020,
+      "speaker": "2",
+      "token_start_index": 1784,
+      "token_end_index": 1842
+    },
+    {
+      "text": " Yeah, yeah, that's true. That's annoying.",
+      "start_ms": 301200,
+      "end_ms": 302640,
+      "speaker": "3",
+      "token_start_index": 1842,
+      "token_end_index": 1856
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 302880,
+      "end_ms": 303120,
+      "speaker": "1",
+      "token_start_index": 1856,
+      "token_end_index": 1858
+    },
+    {
+      "text": " But that's why you could just have a list of your users, then. And just you just say, I want to look for this user. Go.",
+      "start_ms": 303660,
+      "end_ms": 309780,
+      "speaker": "3",
+      "token_start_index": 1858,
+      "token_end_index": 1897
+    },
+    {
+      "text": " And then.",
+      "start_ms": 310560,
+      "end_ms": 310980,
+      "speaker": "2",
+      "token_start_index": 1897,
+      "token_end_index": 1900
+    },
+    {
+      "text": " Find me. Find me, and then it pulls up a list of all the ones who got that user in. And then you search, then— but then you're doing search. Maybe just leave it. Just have them meeting names there. And don't worry about the speakers. If they're doing speakers, they're doing search. It's not the same.",
+      "start_ms": 310980,
+      "end_ms": 324360,
+      "speaker": "3",
+      "token_start_index": 1900,
+      "token_end_index": 2002
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 324480,
+      "end_ms": 324660,
+      "speaker": "1",
+      "token_start_index": 2002,
+      "token_end_index": 2004
+    },
+    {
+      "text": " It's doing a quick access.",
+      "start_ms": 324720,
+      "end_ms": 325980,
+      "speaker": "3",
+      "token_start_index": 2004,
+      "token_end_index": 2014
+    },
+    {
+      "text": " Hmm. Yeah. It would just be nice to have some basic information on each user.",
+      "start_ms": 326220,
+      "end_ms": 331500,
+      "speaker": "2",
+      "token_start_index": 2014,
+      "token_end_index": 2036
+    },
+    {
+      "text": " Yeah, or you could have a text box there that's got.",
+      "start_ms": 331500,
+      "end_ms": 333180,
+      "speaker": "3",
+      "token_start_index": 2036,
+      "token_end_index": 2053
+    },
+    {
+      "text": " Yeah, I'm thinking that that updates.",
+      "start_ms": 333180,
+      "end_ms": 334440,
+      "speaker": "2",
+      "token_start_index": 2053,
+      "token_end_index": 2066
+    },
+    {
+      "text": " Yeah, as you go over the.",
+      "start_ms": 334860,
+      "end_ms": 336060,
+      "speaker": "3",
+      "token_start_index": 2066,
+      "token_end_index": 2075
+    },
+    {
+      "text": " Depending on.",
+      "start_ms": 336180,
+      "end_ms": 336660,
+      "speaker": "2",
+      "token_start_index": 2075,
+      "token_end_index": 2080
+    },
+    {
+      "text": " Then that doesn't get interrupted, like, in the way.",
+      "start_ms": 336780,
+      "end_ms": 338100,
+      "speaker": "3",
+      "token_start_index": 2080,
+      "token_end_index": 2097
+    },
+    {
+      "text": " Yeah, maybe that's the best idea then.",
+      "start_ms": 338340,
+      "end_ms": 339480,
+      "speaker": "2",
+      "token_start_index": 2097,
+      "token_end_index": 2109
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 339480,
+      "end_ms": 339600,
+      "speaker": "3",
+      "token_start_index": 2109,
+      "token_end_index": 2111
+    },
+    {
+      "text": " So you've got a drop-down menu. A search— a search button. Not search, go button. And then some sort of field which updates dynamically depending on what you've got highlighted.",
+      "start_ms": 339600,
+      "end_ms": 353640,
+      "speaker": "2",
+      "token_start_index": 2111,
+      "token_end_index": 2170
+    },
+    {
+      "text": " Yeah. The full name and the speakers.",
+      "start_ms": 353940,
+      "end_ms": 356160,
+      "speaker": "3",
+      "token_start_index": 2170,
+      "token_end_index": 2180
+    },
+    {
+      "text": " Yeah. Yeah, that sounds good.",
+      "start_ms": 356400,
+      "end_ms": 358080,
+      "speaker": "2",
+      "token_start_index": 2180,
+      "token_end_index": 2191
+    },
+    {
+      "text": " Yeah. And we can do all of that without even ever going anywhere near loading up a— a thing.",
+      "start_ms": 358440,
+      "end_ms": 364920,
+      "speaker": "3",
+      "token_start_index": 2191,
+      "token_end_index": 2221
+    },
+    {
+      "text": " A thing?",
+      "start_ms": 366300,
+      "end_ms": 366780,
+      "speaker": "2",
+      "token_start_index": 2221,
+      "token_end_index": 2225
+    },
+    {
+      "text": " Oh, call. And a— a thing.",
+      "start_ms": 367260,
+      "end_ms": 368580,
+      "speaker": "3",
+      "token_start_index": 2225,
+      "token_end_index": 2235
+    },
+    {
+      "text": " Nom.",
+      "start_ms": 369000,
+      "end_ms": 369180,
+      "speaker": "2",
+      "token_start_index": 2235,
+      "token_end_index": 2237
+    },
+    {
+      "text": " A meeting, a nom.",
+      "start_ms": 369360,
+      "end_ms": 370080,
+      "speaker": "3",
+      "token_start_index": 2237,
+      "token_end_index": 2244
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 370140,
+      "end_ms": 370380,
+      "speaker": "2",
+      "token_start_index": 2244,
+      "token_end_index": 2246
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 370440,
+      "end_ms": 370620,
+      "speaker": "3",
+      "token_start_index": 2246,
+      "token_end_index": 2248
+    },
+    {
+      "text": " What does nom actually stand for?",
+      "start_ms": 373440,
+      "end_ms": 375120,
+      "speaker": "2",
+      "token_start_index": 2248,
+      "token_end_index": 2258
+    },
+    {
+      "text": " I think it's a night object model.",
+      "start_ms": 375360,
+      "end_ms": 376800,
+      "speaker": "3",
+      "token_start_index": 2258,
+      "token_end_index": 2270
+    },
+    {
+      "text": " Yeah, night, oh yes.",
+      "start_ms": 377220,
+      "end_ms": 377880,
+      "speaker": "2",
+      "token_start_index": 2270,
+      "token_end_index": 2278
+    },
+    {
+      "text": " Just put it. I think in that case it's the right corpus, is that what it is?",
+      "start_ms": 378480,
+      "end_ms": 381960,
+      "speaker": "1",
+      "token_start_index": 2278,
+      "token_end_index": 2304
+    },
+    {
+      "text": " Night, yeah, it is, you're right. It's the right corpus, yeah.",
+      "start_ms": 382020,
+      "end_ms": 384180,
+      "speaker": "3",
+      "token_start_index": 2304,
+      "token_end_index": 2328
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 384300,
+      "end_ms": 384420,
+      "speaker": "1",
+      "token_start_index": 2328,
+      "token_end_index": 2330
+    },
+    {
+      "text": " It's the night right corpus, and then you got night right elements and then you got night right attributes.",
+      "start_ms": 385140,
+      "end_ms": 389220,
+      "speaker": "3",
+      "token_start_index": 2330,
+      "token_end_index": 2363
+    },
+    {
+      "text": " You've got lots of nom something and then night something and then en something.",
+      "start_ms": 389940,
+      "end_ms": 393420,
+      "speaker": "2",
+      "token_start_index": 2363,
+      "token_end_index": 2387
+    },
+    {
+      "text": " Yeah, and extended.",
+      "start_ms": 393780,
+      "end_ms": 394380,
+      "speaker": "1",
+      "token_start_index": 2387,
+      "token_end_index": 2393
+    },
+    {
+      "text": " I think the en ones are interfaces, and the night one— one of the ways around one's an interface and one's actually an implemented class.",
+      "start_ms": 394380,
+      "end_ms": 400200,
+      "speaker": "3",
+      "token_start_index": 2393,
+      "token_end_index": 2433
+    },
+    {
+      "text": " Right.",
+      "start_ms": 400860,
+      "end_ms": 401160,
+      "speaker": "1",
+      "token_start_index": 2433,
+      "token_end_index": 2436
+    },
+    {
+      "text": " Because if you go back enough, I think I'm— what's his name? Not very good. The API is all right, but there's not a lot of description in it.",
+      "start_ms": 401940,
+      "end_ms": 407760,
+      "speaker": "3",
+      "token_start_index": 2436,
+      "token_end_index": 2486
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 408000,
+      "end_ms": 408180,
+      "speaker": "1",
+      "token_start_index": 2486,
+      "token_end_index": 2488
+    },
+    {
+      "text": " It's very creepy.",
+      "start_ms": 408540,
+      "end_ms": 409260,
+      "speaker": "3",
+      "token_start_index": 2488,
+      "token_end_index": 2495
+    },
+    {
+      "text": " No.",
+      "start_ms": 409380,
+      "end_ms": 409440,
+      "speaker": "2",
+      "token_start_index": 2495,
+      "token_end_index": 2496
+    },
+    {
+      "text": " It tells you what.",
+      "start_ms": 409980,
+      "end_ms": 410580,
+      "speaker": "3",
+      "token_start_index": 2496,
+      "token_end_index": 2503
+    },
+    {
+      "text": " And most of the descriptions are hints to each other, saying, you've got to update this Jonathan. This is— this is an unintelligible.",
+      "start_ms": 410820,
+      "end_ms": 418320,
+      "speaker": "2",
+      "token_start_index": 2503,
+      "token_end_index": 2545
+    },
+    {
+      "text": " Right.",
+      "start_ms": 418860,
+      "end_ms": 419040,
+      "speaker": "1",
+      "token_start_index": 2545,
+      "token_end_index": 2548
+    },
+    {
+      "text": " Right.",
+      "start_ms": 419160,
+      "end_ms": 419400,
+      "speaker": "2",
+      "token_start_index": 2548,
+      "token_end_index": 2551
+    },
+    {
+      "text": " Yeah. So you end up just it returns a en text box. Okay, what's that though? It's a implementation of an en text error.",
+      "start_ms": 420240,
+      "end_ms": 430020,
+      "speaker": "3",
+      "token_start_index": 2551,
+      "token_end_index": 2589
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 430080,
+      "end_ms": 430260,
+      "speaker": "2",
+      "token_start_index": 2589,
+      "token_end_index": 2591
+    },
+    {
+      "text": " Interface. What's that? Oh, it's a extended version of an oh, stop it.",
+      "start_ms": 430500,
+      "end_ms": 435780,
+      "speaker": "3",
+      "token_start_index": 2591,
+      "token_end_index": 2614
+    },
+    {
+      "text": " That's crazy.",
+      "start_ms": 437220,
+      "end_ms": 437880,
+      "speaker": "1",
+      "token_start_index": 2614,
+      "token_end_index": 2620
+    },
+    {
+      "text": " Yeah. Yeah, definitely.",
+      "start_ms": 438060,
+      "end_ms": 439500,
+      "speaker": "2",
+      "token_start_index": 2620,
+      "token_end_index": 2627
+    },
+    {
+      "text": " Oh my God.",
+      "start_ms": 439620,
+      "end_ms": 440040,
+      "speaker": "1",
+      "token_start_index": 2627,
+      "token_end_index": 2631
+    },
+    {
+      "text": " It's not very fun. Right. So anyone else got anything to say?",
+      "start_ms": 440220,
+      "end_ms": 446400,
+      "speaker": "2",
+      "token_start_index": 2631,
+      "token_end_index": 2653
+    },
+    {
+      "text": " Um, not really. Just going to keep on going.",
+      "start_ms": 446760,
+      "end_ms": 449220,
+      "speaker": "1",
+      "token_start_index": 2653,
+      "token_end_index": 2668
+    },
+    {
+      "text": " Do we, yeah, do we want another meeting at the end of the week? Um, with Penelope?",
+      "start_ms": 451200,
+      "end_ms": 455940,
+      "speaker": "2",
+      "token_start_index": 2668,
+      "token_end_index": 2697
+    },
+    {
+      "text": " Might be useful, wouldn't it?",
+      "start_ms": 457740,
+      "end_ms": 458760,
+      "speaker": "3",
+      "token_start_index": 2697,
+      "token_end_index": 2708
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 458880,
+      "end_ms": 459000,
+      "speaker": "2",
+      "token_start_index": 2708,
+      "token_end_index": 2710
+    },
+    {
+      "text": " Like Friday afternoon or something?",
+      "start_ms": 459120,
+      "end_ms": 460380,
+      "speaker": "1",
+      "token_start_index": 2710,
+      "token_end_index": 2723
+    },
+    {
+      "text": " Yeah, something like that. I mean, I think I'm going to do quite a bit of work this week, so I'll have probably more to talk about.",
+      "start_ms": 460500,
+      "end_ms": 466320,
+      "speaker": "2",
+      "token_start_index": 2723,
+      "token_end_index": 2768
+    },
+    {
+      "text": " Yeah, I should have more to talk about.",
+      "start_ms": 466980,
+      "end_ms": 468120,
+      "speaker": "3",
+      "token_start_index": 2768,
+      "token_end_index": 2780
+    },
+    {
+      "text": " Okay.",
+      "start_ms": 468120,
+      "end_ms": 468420,
+      "speaker": "1",
+      "token_start_index": 2780,
+      "token_end_index": 2782
+    },
+    {
+      "text": " I think.",
+      "start_ms": 468540,
+      "end_ms": 468780,
+      "speaker": "2",
+      "token_start_index": 2782,
+      "token_end_index": 2786
+    },
+    {
+      "text": " Then we won't have to have the meeting with Steve on Tuesday, or at all. Yeah. So.",
+      "start_ms": 468840,
+      "end_ms": 473040,
+      "speaker": "1",
+      "token_start_index": 2786,
+      "token_end_index": 2813
+    },
+    {
+      "text": " Do we want to arrange this— get this one earlier, maybe? Three or earlier?",
+      "start_ms": 473160,
+      "end_ms": 478200,
+      "speaker": "3",
+      "token_start_index": 2813,
+      "token_end_index": 2839
+    },
+    {
+      "text": " If you like. Well, we can just discuss that on Friday if we have one.",
+      "start_ms": 478440,
+      "end_ms": 481260,
+      "speaker": "2",
+      "token_start_index": 2839,
+      "token_end_index": 2862
+    },
+    {
+      "text": " Yeah, that's true. True.",
+      "start_ms": 481260,
+      "end_ms": 484200,
+      "speaker": "1",
+      "token_start_index": 2862,
+      "token_end_index": 2871
+    },
+    {
+      "text": " Friday?",
+      "start_ms": 486060,
+      "end_ms": 486360,
+      "speaker": "2",
+      "token_start_index": 2871,
+      "token_end_index": 2875
+    },
+    {
+      "text": " Yeah, sure.",
+      "start_ms": 486480,
+      "end_ms": 486780,
+      "speaker": "1",
+      "token_start_index": 2875,
+      "token_end_index": 2879
+    },
+    {
+      "text": " What— what time?",
+      "start_ms": 486960,
+      "end_ms": 487680,
+      "speaker": "2",
+      "token_start_index": 2879,
+      "token_end_index": 2886
+    },
+    {
+      "text": " Um.",
+      "start_ms": 489360,
+      "end_ms": 489660,
+      "speaker": "1",
+      "token_start_index": 2886,
+      "token_end_index": 2888
+    },
+    {
+      "text": " Um.",
+      "start_ms": 491640,
+      "end_ms": 491880,
+      "speaker": "2",
+      "token_start_index": 2888,
+      "token_end_index": 2890
+    },
+    {
+      "text": " Just after SPT?",
+      "start_ms": 492180,
+      "end_ms": 493740,
+      "speaker": "3",
+      "token_start_index": 2890,
+      "token_end_index": 2896
+    },
+    {
+      "text": " Hmm. Possibly. I don't know. Usually by then.",
+      "start_ms": 494220,
+      "end_ms": 497760,
+      "speaker": "1",
+      "token_start_index": 2896,
+      "token_end_index": 2916
+    },
+    {
+      "text": " So.",
+      "start_ms": 498180,
+      "end_ms": 498420,
+      "speaker": "3",
+      "token_start_index": 2916,
+      "token_end_index": 2918
+    },
+    {
+      "text": " Need a break.",
+      "start_ms": 498780,
+      "end_ms": 499260,
+      "speaker": "1",
+      "token_start_index": 2918,
+      "token_end_index": 2923
+    },
+    {
+      "text": " Yeah, yeah. But that means straight up.",
+      "start_ms": 499740,
+      "end_ms": 501240,
+      "speaker": "3",
+      "token_start_index": 2923,
+      "token_end_index": 2935
+    },
+    {
+      "text": " Although, well, I don't know because it's the lab and try and get some work done.",
+      "start_ms": 501240,
+      "end_ms": 503700,
+      "speaker": "1",
+      "token_start_index": 2935,
+      "token_end_index": 2961
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 504660,
+      "end_ms": 504840,
+      "speaker": "3",
+      "token_start_index": 2961,
+      "token_end_index": 2963
+    },
+    {
+      "text": " For the— the lab stuff.",
+      "start_ms": 504960,
+      "end_ms": 506100,
+      "speaker": "1",
+      "token_start_index": 2963,
+      "token_end_index": 2972
+    },
+    {
+      "text": " For the— yeah, that could be quite good.",
+      "start_ms": 506100,
+      "end_ms": 507540,
+      "speaker": "3",
+      "token_start_index": 2972,
+      "token_end_index": 2986
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 507600,
+      "end_ms": 507780,
+      "speaker": "1",
+      "token_start_index": 2986,
+      "token_end_index": 2988
+    },
+    {
+      "text": " I've got a doctor's appointment at 10 to 2.",
+      "start_ms": 507840,
+      "end_ms": 510480,
+      "speaker": "2",
+      "token_start_index": 2988,
+      "token_end_index": 3005
+    },
+    {
+      "text": " Oh, okay.",
+      "start_ms": 510660,
+      "end_ms": 511020,
+      "speaker": "1",
+      "token_start_index": 3005,
+      "token_end_index": 3009
+    },
+    {
+      "text": " Right.",
+      "start_ms": 511500,
+      "end_ms": 511740,
+      "speaker": "3",
+      "token_start_index": 3009,
+      "token_end_index": 3012
+    },
+    {
+      "text": " Um.",
+      "start_ms": 512160,
+      "end_ms": 512340,
+      "speaker": "1",
+      "token_start_index": 3012,
+      "token_end_index": 3014
+    },
+    {
+      "text": " 10 to 2.",
+      "start_ms": 512460,
+      "end_ms": 513060,
+      "speaker": "3",
+      "token_start_index": 3014,
+      "token_end_index": 3019
+    },
+    {
+      "text": " What?",
+      "start_ms": 514680,
+      "end_ms": 514920,
+      "speaker": "2",
+      "token_start_index": 3019,
+      "token_end_index": 3022
+    },
+    {
+      "text": " Friday morning?",
+      "start_ms": 515100,
+      "end_ms": 515760,
+      "speaker": "3",
+      "token_start_index": 3022,
+      "token_end_index": 3028
+    },
+    {
+      "text": " Oh.",
+      "start_ms": 516180,
+      "end_ms": 516540,
+      "speaker": "2",
+      "token_start_index": 3028,
+      "token_end_index": 3030
+    },
+    {
+      "text": " Or 3 o'clock?",
+      "start_ms": 517620,
+      "end_ms": 518700,
+      "speaker": "1",
+      "token_start_index": 3030,
+      "token_end_index": 3037
+    },
+    {
+      "text": " 3 o'clock.",
+      "start_ms": 519360,
+      "end_ms": 519960,
+      "speaker": "3",
+      "token_start_index": 3037,
+      "token_end_index": 3043
+    },
+    {
+      "text": " Or you want to get out?",
+      "start_ms": 519960,
+      "end_ms": 521040,
+      "speaker": "1",
+      "token_start_index": 3043,
+      "token_end_index": 3052
+    },
+    {
+      "text": " I don't know. Maybe I do. I'm not sure what I'm doing this weekend.",
+      "start_ms": 521580,
+      "end_ms": 524280,
+      "speaker": "3",
+      "token_start_index": 3052,
+      "token_end_index": 3081
+    },
+    {
+      "text": " Okay, right.",
+      "start_ms": 524280,
+      "end_ms": 524820,
+      "speaker": "1",
+      "token_start_index": 3081,
+      "token_end_index": 3086
+    },
+    {
+      "text": " Um.",
+      "start_ms": 525180,
+      "end_ms": 525360,
+      "speaker": "3",
+      "token_start_index": 3086,
+      "token_end_index": 3088
+    },
+    {
+      "text": " Because I think she's got a class at 11:00. We've all got class— well, three of us have class at 12:00. Um.",
+      "start_ms": 527580,
+      "end_ms": 534060,
+      "speaker": "1",
+      "token_start_index": 3088,
+      "token_end_index": 3129
+    },
+    {
+      "text": " How about.",
+      "start_ms": 534720,
+      "end_ms": 535080,
+      "speaker": "2",
+      "token_start_index": 3129,
+      "token_end_index": 3132
+    },
+    {
+      "text": " Should we say 3 o'clock and then if there's a serious problem after that?",
+      "start_ms": 535260,
+      "end_ms": 538020,
+      "speaker": "3",
+      "token_start_index": 3132,
+      "token_end_index": 3154
+    },
+    {
+      "text": " Or if we could try 1:00. We could try shortly after. Well, yeah, yeah, well, yeah, well, it wouldn't be a long meeting then. I don't know. Would you want to? No, probably not.",
+      "start_ms": 538020,
+      "end_ms": 545640,
+      "speaker": "1",
+      "token_start_index": 3154,
+      "token_end_index": 3220
+    },
+    {
+      "text": " Um.",
+      "start_ms": 545940,
+      "end_ms": 546180,
+      "speaker": "2",
+      "token_start_index": 3220,
+      "token_end_index": 3222
+    },
+    {
+      "text": " If one's bad for you, then.",
+      "start_ms": 547020,
+      "end_ms": 548220,
+      "speaker": "1",
+      "token_start_index": 3222,
+      "token_end_index": 3232
+    },
+    {
+      "text": " No, no, that— that would only give us, like, 35 minutes or something.",
+      "start_ms": 548340,
+      "end_ms": 552420,
+      "speaker": "2",
+      "token_start_index": 3232,
+      "token_end_index": 3255
+    },
+    {
+      "text": " Right, okay.",
+      "start_ms": 552540,
+      "end_ms": 552900,
+      "speaker": "1",
+      "token_start_index": 3255,
+      "token_end_index": 3260
+    },
+    {
+      "text": " Well, what—",
+      "start_ms": 553380,
+      "end_ms": 554100,
+      "speaker": "2",
+      "token_start_index": 3260,
+      "token_end_index": 3265
+    },
+    {
+      "text": " It's might not be too— I don't think we need.",
+      "start_ms": 554400,
+      "end_ms": 555840,
+      "speaker": "3",
+      "token_start_index": 3265,
+      "token_end_index": 3282
+    },
+    {
+      "text": " Oh, quite late, like, you know, 5 or 6.",
+      "start_ms": 555840,
+      "end_ms": 557520,
+      "speaker": "2",
+      "token_start_index": 3282,
+      "token_end_index": 3298
+    },
+    {
+      "text": " A 3 is better than 5 or 6.",
+      "start_ms": 557880,
+      "end_ms": 559140,
+      "speaker": "3",
+      "token_start_index": 3298,
+      "token_end_index": 3308
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 559320,
+      "end_ms": 559500,
+      "speaker": "1",
+      "token_start_index": 3308,
+      "token_end_index": 3310
+    },
+    {
+      "text": " Well, 3 o'clock. Let's say 3 o'clock.",
+      "start_ms": 561120,
+      "end_ms": 562500,
+      "speaker": "2",
+      "token_start_index": 3310,
+      "token_end_index": 3327
+    },
+    {
+      "text": " Just 3, let's say 3 o'clock, and then, um, if there's a problem with that, then it's 3 o'clock's a problem, 5 or 6 will be a problem. Because I won't be here. But I don't think that will be. I'm not sure.",
+      "start_ms": 562500,
+      "end_ms": 573540,
+      "speaker": "3",
+      "token_start_index": 3327,
+      "token_end_index": 3397
+    },
+    {
+      "text": " Right. I'll write, um, I'll write this meeting up and I'll send it to Penelope as well.",
+      "start_ms": 574140,
+      "end_ms": 578820,
+      "speaker": "2",
+      "token_start_index": 3397,
+      "token_end_index": 3430
+    },
+    {
+      "text": " Okay.",
+      "start_ms": 578940,
+      "end_ms": 579180,
+      "speaker": "1",
+      "token_start_index": 3430,
+      "token_end_index": 3432
+    },
+    {
+      "text": " Is she collecting them?",
+      "start_ms": 579780,
+      "end_ms": 580800,
+      "speaker": "3",
+      "token_start_index": 3432,
+      "token_end_index": 3439
+    },
+    {
+      "text": " No.",
+      "start_ms": 581520,
+      "end_ms": 581580,
+      "speaker": "2",
+      "token_start_index": 3439,
+      "token_end_index": 3440
+    },
+    {
+      "text": " No, you're just sending it to her.",
+      "start_ms": 582240,
+      "end_ms": 583260,
+      "speaker": "3",
+      "token_start_index": 3440,
+      "token_end_index": 3453
+    },
+    {
+      "text": " Because she's not here.",
+      "start_ms": 583740,
+      "end_ms": 584520,
+      "speaker": "2",
+      "token_start_index": 3453,
+      "token_end_index": 3461
+    },
+    {
+      "text": " No, I mean, is she collecting? Oh, right. Oh, yeah, sorry. Yeah. It's cool for the gift.",
+      "start_ms": 584940,
+      "end_ms": 590820,
+      "speaker": "3",
+      "token_start_index": 3461,
+      "token_end_index": 3495
+    },
+    {
+      "text": " I collect meeting summaries.",
+      "start_ms": 590880,
+      "end_ms": 592140,
+      "speaker": "2",
+      "token_start_index": 3495,
+      "token_end_index": 3505
+    },
+    {
+      "text": " I thought somebody was collecting them, but— well, that's what I thought when you said that.",
+      "start_ms": 593340,
+      "end_ms": 596580,
+      "speaker": "3",
+      "token_start_index": 3505,
+      "token_end_index": 3537
+    },
+    {
+      "text": " Yeah, no, we should probably do that at the end, but yeah.",
+      "start_ms": 596580,
+      "end_ms": 598440,
+      "speaker": "2",
+      "token_start_index": 3537,
+      "token_end_index": 3556
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 598560,
+      "end_ms": 598740,
+      "speaker": "1",
+      "token_start_index": 3556,
+      "token_end_index": 3558
+    },
+    {
+      "text": " Because then we'd know who's missed. ",
+      "start_ms": 598860,
+      "end_ms": 599640,
+      "speaker": "3",
+      "token_start_index": 3558,
+      "token_end_index": 3571
+    }
+  ],
+  "projected_intervals": [
+    [
+      0.06,
+      3.9,
+      "1"
+    ],
+    [
+      4.02,
+      5.28,
+      "2"
+    ],
+    [
+      6.06,
+      7.32,
+      "1"
+    ],
+    [
+      8.88,
+      10.38,
+      "3"
+    ],
+    [
+      10.68,
+      10.86,
+      "1"
+    ],
+    [
+      11.1,
+      12.96,
+      "3"
+    ],
+    [
+      13.26,
+      13.56,
+      "1"
+    ],
+    [
+      14.1,
+      18.24,
+      "2"
+    ],
+    [
+      18.3,
+      19.86,
+      "1"
+    ],
+    [
+      20.16,
+      20.82,
+      "3"
+    ],
+    [
+      22.86,
+      23.1,
+      "1"
+    ],
+    [
+      23.34,
+      24.18,
+      "3"
+    ],
+    [
+      24.24,
+      27.3,
+      "2"
+    ],
+    [
+      27.36,
+      29.04,
+      "1"
+    ],
+    [
+      29.04,
+      34.38,
+      "2"
+    ],
+    [
+      36.0,
+      44.64,
+      "1"
+    ],
+    [
+      45.0,
+      45.18,
+      "2"
+    ],
+    [
+      45.48,
+      67.08,
+      "1"
+    ],
+    [
+      67.38,
+      67.74,
+      "2"
+    ],
+    [
+      67.98,
+      68.4,
+      "1"
+    ],
+    [
+      68.4,
+      68.76,
+      "2"
+    ],
+    [
+      68.82,
+      72.66,
+      "1"
+    ],
+    [
+      72.9,
+      73.14,
+      "2"
+    ],
+    [
+      73.2,
+      74.28,
+      "1"
+    ],
+    [
+      74.76,
+      74.82,
+      "2"
+    ],
+    [
+      75.12,
+      77.28,
+      "1"
+    ],
+    [
+      77.7,
+      77.88,
+      "2"
+    ],
+    [
+      78.06,
+      79.62,
+      "3"
+    ],
+    [
+      80.34,
+      86.76,
+      "2"
+    ],
+    [
+      87.0,
+      88.68,
+      "1"
+    ],
+    [
+      88.68,
+      89.1,
+      "2"
+    ],
+    [
+      89.16,
+      101.04,
+      "1"
+    ],
+    [
+      101.1,
+      101.4,
+      "2"
+    ],
+    [
+      101.46,
+      104.82,
+      "1"
+    ],
+    [
+      104.88,
+      105.36,
+      "3"
+    ],
+    [
+      106.38,
+      109.32,
+      "2"
+    ],
+    [
+      109.86,
+      111.06,
+      "1"
+    ],
+    [
+      111.24,
+      111.6,
+      "3"
+    ],
+    [
+      111.66,
+      112.38,
+      "2"
+    ],
+    [
+      112.44,
+      122.88,
+      "3"
+    ],
+    [
+      122.88,
+      124.26,
+      "1"
+    ],
+    [
+      124.44,
+      124.74,
+      "3"
+    ],
+    [
+      124.74,
+      125.88,
+      "1"
+    ],
+    [
+      126.18,
+      128.28,
+      "3"
+    ],
+    [
+      128.46,
+      130.74,
+      "2"
+    ],
+    [
+      130.98,
+      131.1,
+      "3"
+    ],
+    [
+      131.22,
+      140.52,
+      "2"
+    ],
+    [
+      140.52,
+      148.08,
+      "3"
+    ],
+    [
+      148.86,
+      149.1,
+      "2"
+    ],
+    [
+      151.14,
+      162.54,
+      "3"
+    ],
+    [
+      162.66,
+      163.56,
+      "2"
+    ],
+    [
+      163.68,
+      164.4,
+      "3"
+    ],
+    [
+      164.46,
+      165.48,
+      "2"
+    ],
+    [
+      165.6,
+      175.2,
+      "3"
+    ],
+    [
+      175.32,
+      175.74,
+      "2"
+    ],
+    [
+      176.22,
+      183.6,
+      "3"
+    ],
+    [
+      183.6,
+      184.74,
+      "2"
+    ],
+    [
+      185.22,
+      190.5,
+      "3"
+    ],
+    [
+      190.98,
+      198.0,
+      "2"
+    ],
+    [
+      198.0,
+      198.24,
+      "3"
+    ],
+    [
+      198.24,
+      198.78,
+      "2"
+    ],
+    [
+      199.08,
+      199.5,
+      "3"
+    ],
+    [
+      199.5,
+      203.82,
+      "2"
+    ],
+    [
+      203.94,
+      204.48,
+      "3"
+    ],
+    [
+      204.6,
+      205.02,
+      "2"
+    ],
+    [
+      205.62,
+      205.86,
+      "3"
+    ],
+    [
+      205.92,
+      210.3,
+      "1"
+    ],
+    [
+      210.54,
+      214.62,
+      "2"
+    ],
+    [
+      214.74,
+      215.22,
+      "3"
+    ],
+    [
+      215.34,
+      218.04,
+      "1"
+    ],
+    [
+      219.66,
+      219.84,
+      "2"
+    ],
+    [
+      220.86,
+      220.98,
+      "3"
+    ],
+    [
+      221.16,
+      222.6,
+      "2"
+    ],
+    [
+      222.66,
+      227.22,
+      "1"
+    ],
+    [
+      227.4,
+      231.48,
+      "3"
+    ],
+    [
+      231.48,
+      231.96,
+      "1"
+    ],
+    [
+      232.32,
+      232.5,
+      "2"
+    ],
+    [
+      232.62,
+      232.74,
+      "1"
+    ],
+    [
+      232.86,
+      234.0,
+      "2"
+    ],
+    [
+      234.42,
+      235.44,
+      "3"
+    ],
+    [
+      236.22,
+      236.4,
+      "2"
+    ],
+    [
+      236.4,
+      245.58,
+      "3"
+    ],
+    [
+      245.58,
+      263.52,
+      "2"
+    ],
+    [
+      263.7,
+      266.64,
+      "3"
+    ],
+    [
+      267.0,
+      267.18,
+      "1"
+    ],
+    [
+      268.26,
+      270.3,
+      "2"
+    ],
+    [
+      270.78,
+      271.2,
+      "1"
+    ],
+    [
+      271.32,
+      271.92,
+      "2"
+    ],
+    [
+      272.1,
+      273.0,
+      "3"
+    ],
+    [
+      273.3,
+      274.56,
+      "2"
+    ],
+    [
+      274.98,
+      275.52,
+      "1"
+    ],
+    [
+      275.64,
+      278.88,
+      "2"
+    ],
+    [
+      279.06,
+      279.78,
+      "3"
+    ],
+    [
+      279.84,
+      281.52,
+      "2"
+    ],
+    [
+      281.7,
+      282.54,
+      "3"
+    ],
+    [
+      283.26,
+      288.24,
+      "2"
+    ],
+    [
+      288.6,
+      290.1,
+      "3"
+    ],
+    [
+      290.1,
+      301.02,
+      "2"
+    ],
+    [
+      301.2,
+      302.64,
+      "3"
+    ],
+    [
+      302.88,
+      303.12,
+      "1"
+    ],
+    [
+      303.66,
+      309.78,
+      "3"
+    ],
+    [
+      310.56,
+      310.98,
+      "2"
+    ],
+    [
+      310.98,
+      324.36,
+      "3"
+    ],
+    [
+      324.48,
+      324.66,
+      "1"
+    ],
+    [
+      324.72,
+      325.98,
+      "3"
+    ],
+    [
+      326.22,
+      331.5,
+      "2"
+    ],
+    [
+      331.5,
+      333.18,
+      "3"
+    ],
+    [
+      333.18,
+      334.44,
+      "2"
+    ],
+    [
+      334.86,
+      336.06,
+      "3"
+    ],
+    [
+      336.18,
+      336.66,
+      "2"
+    ],
+    [
+      336.78,
+      338.1,
+      "3"
+    ],
+    [
+      338.34,
+      339.48,
+      "2"
+    ],
+    [
+      339.48,
+      339.6,
+      "3"
+    ],
+    [
+      339.6,
+      353.64,
+      "2"
+    ],
+    [
+      353.94,
+      356.16,
+      "3"
+    ],
+    [
+      356.4,
+      358.08,
+      "2"
+    ],
+    [
+      358.44,
+      364.92,
+      "3"
+    ],
+    [
+      366.3,
+      366.78,
+      "2"
+    ],
+    [
+      367.26,
+      368.58,
+      "3"
+    ],
+    [
+      369.0,
+      369.18,
+      "2"
+    ],
+    [
+      369.36,
+      370.08,
+      "3"
+    ],
+    [
+      370.14,
+      370.38,
+      "2"
+    ],
+    [
+      370.44,
+      370.62,
+      "3"
+    ],
+    [
+      373.44,
+      375.12,
+      "2"
+    ],
+    [
+      375.36,
+      376.8,
+      "3"
+    ],
+    [
+      377.22,
+      377.88,
+      "2"
+    ],
+    [
+      378.48,
+      381.96,
+      "1"
+    ],
+    [
+      382.02,
+      384.18,
+      "3"
+    ],
+    [
+      384.3,
+      384.42,
+      "1"
+    ],
+    [
+      385.14,
+      389.22,
+      "3"
+    ],
+    [
+      389.94,
+      393.42,
+      "2"
+    ],
+    [
+      393.78,
+      394.38,
+      "1"
+    ],
+    [
+      394.38,
+      400.2,
+      "3"
+    ],
+    [
+      400.86,
+      401.16,
+      "1"
+    ],
+    [
+      401.94,
+      407.76,
+      "3"
+    ],
+    [
+      408.0,
+      408.18,
+      "1"
+    ],
+    [
+      408.54,
+      409.26,
+      "3"
+    ],
+    [
+      409.38,
+      409.44,
+      "2"
+    ],
+    [
+      409.98,
+      410.58,
+      "3"
+    ],
+    [
+      410.82,
+      418.32,
+      "2"
+    ],
+    [
+      418.86,
+      419.04,
+      "1"
+    ],
+    [
+      419.16,
+      419.4,
+      "2"
+    ],
+    [
+      420.24,
+      430.02,
+      "3"
+    ],
+    [
+      430.08,
+      430.26,
+      "2"
+    ],
+    [
+      430.5,
+      435.78,
+      "3"
+    ],
+    [
+      437.22,
+      437.88,
+      "1"
+    ],
+    [
+      438.06,
+      439.5,
+      "2"
+    ],
+    [
+      439.62,
+      440.04,
+      "1"
+    ],
+    [
+      440.22,
+      446.4,
+      "2"
+    ],
+    [
+      446.76,
+      449.22,
+      "1"
+    ],
+    [
+      451.2,
+      455.94,
+      "2"
+    ],
+    [
+      457.74,
+      458.76,
+      "3"
+    ],
+    [
+      458.88,
+      459.0,
+      "2"
+    ],
+    [
+      459.12,
+      460.38,
+      "1"
+    ],
+    [
+      460.5,
+      466.32,
+      "2"
+    ],
+    [
+      466.98,
+      468.12,
+      "3"
+    ],
+    [
+      468.12,
+      468.42,
+      "1"
+    ],
+    [
+      468.54,
+      468.78,
+      "2"
+    ],
+    [
+      468.84,
+      473.04,
+      "1"
+    ],
+    [
+      473.16,
+      478.2,
+      "3"
+    ],
+    [
+      478.44,
+      481.26,
+      "2"
+    ],
+    [
+      481.26,
+      484.2,
+      "1"
+    ],
+    [
+      486.06,
+      486.36,
+      "2"
+    ],
+    [
+      486.48,
+      486.78,
+      "1"
+    ],
+    [
+      486.96,
+      487.68,
+      "2"
+    ],
+    [
+      489.36,
+      489.66,
+      "1"
+    ],
+    [
+      491.64,
+      491.88,
+      "2"
+    ],
+    [
+      492.18,
+      493.74,
+      "3"
+    ],
+    [
+      494.22,
+      497.76,
+      "1"
+    ],
+    [
+      498.18,
+      498.42,
+      "3"
+    ],
+    [
+      498.78,
+      499.26,
+      "1"
+    ],
+    [
+      499.74,
+      501.24,
+      "3"
+    ],
+    [
+      501.24,
+      503.7,
+      "1"
+    ],
+    [
+      504.66,
+      504.84,
+      "3"
+    ],
+    [
+      504.96,
+      506.1,
+      "1"
+    ],
+    [
+      506.1,
+      507.54,
+      "3"
+    ],
+    [
+      507.6,
+      507.78,
+      "1"
+    ],
+    [
+      507.84,
+      510.48,
+      "2"
+    ],
+    [
+      510.66,
+      511.02,
+      "1"
+    ],
+    [
+      511.5,
+      511.74,
+      "3"
+    ],
+    [
+      512.16,
+      512.34,
+      "1"
+    ],
+    [
+      512.46,
+      513.06,
+      "3"
+    ],
+    [
+      514.68,
+      514.92,
+      "2"
+    ],
+    [
+      515.1,
+      515.76,
+      "3"
+    ],
+    [
+      516.18,
+      516.54,
+      "2"
+    ],
+    [
+      517.62,
+      518.7,
+      "1"
+    ],
+    [
+      519.36,
+      519.96,
+      "3"
+    ],
+    [
+      519.96,
+      521.04,
+      "1"
+    ],
+    [
+      521.58,
+      524.28,
+      "3"
+    ],
+    [
+      524.28,
+      524.82,
+      "1"
+    ],
+    [
+      525.18,
+      525.36,
+      "3"
+    ],
+    [
+      527.58,
+      534.06,
+      "1"
+    ],
+    [
+      534.72,
+      535.08,
+      "2"
+    ],
+    [
+      535.26,
+      538.02,
+      "3"
+    ],
+    [
+      538.02,
+      545.64,
+      "1"
+    ],
+    [
+      545.94,
+      546.18,
+      "2"
+    ],
+    [
+      547.02,
+      548.22,
+      "1"
+    ],
+    [
+      548.34,
+      552.42,
+      "2"
+    ],
+    [
+      552.54,
+      552.9,
+      "1"
+    ],
+    [
+      553.38,
+      554.1,
+      "2"
+    ],
+    [
+      554.4,
+      555.84,
+      "3"
+    ],
+    [
+      555.84,
+      557.52,
+      "2"
+    ],
+    [
+      557.88,
+      559.14,
+      "3"
+    ],
+    [
+      559.32,
+      559.5,
+      "1"
+    ],
+    [
+      561.12,
+      562.5,
+      "2"
+    ],
+    [
+      562.5,
+      573.54,
+      "3"
+    ],
+    [
+      574.14,
+      578.82,
+      "2"
+    ],
+    [
+      578.94,
+      579.18,
+      "1"
+    ],
+    [
+      579.78,
+      580.8,
+      "3"
+    ],
+    [
+      581.52,
+      581.58,
+      "2"
+    ],
+    [
+      582.24,
+      583.26,
+      "3"
+    ],
+    [
+      583.74,
+      584.52,
+      "2"
+    ],
+    [
+      584.94,
+      590.82,
+      "3"
+    ],
+    [
+      590.88,
+      592.14,
+      "2"
+    ],
+    [
+      593.34,
+      596.58,
+      "3"
+    ],
+    [
+      596.58,
+      598.44,
+      "2"
+    ],
+    [
+      598.56,
+      598.74,
+      "1"
+    ],
+    [
+      598.86,
+      599.64,
+      "3"
+    ]
+  ],
+  "projection_diagnostics": {
+    "sdk_groups": 218,
+    "untimed_groups": [],
+    "zero_duration_groups": [],
+    "unattributed_groups": [],
+    "padding_or_omitted_groups": [],
+    "out_of_support_groups": [],
+    "wholly_out_of_support_groups": [],
+    "out_of_support_total_ms": 0.0,
+    "mapped_source_pieces": 218,
+    "bridged_positive_gap_ms": 301980.0,
+    "max_bridged_gap_ms": 2640
+  }
+}

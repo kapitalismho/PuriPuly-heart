@@ -1,0 +1,662 @@
+{
+  "case_id": "long_context",
+  "arm": "A",
+  "source_seconds": 600.0,
+  "sent_seconds": 600.0,
+  "pcm_sha256": "2421a3954fd006645f3b8db2543a3f6c9f180010ba80d04eaba71cbdd4fbf9ed",
+  "trace_sha256": "039522e7059f1ecc46cf9625eb97c673cd9db3cf9ce806d150ad8a9503899e4d",
+  "finalizations": 1,
+  "cut_positions": [
+    {
+      "source_cut_sample": 86016,
+      "provider_cut_sample": 86016,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 178176,
+      "provider_cut_sample": 178176,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 220672,
+      "provider_cut_sample": 220672,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 267264,
+      "provider_cut_sample": 267264,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 365568,
+      "provider_cut_sample": 365568,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 472064,
+      "provider_cut_sample": 472064,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 567808,
+      "provider_cut_sample": 567808,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 637440,
+      "provider_cut_sample": 637440,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 717824,
+      "provider_cut_sample": 717824,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 802304,
+      "provider_cut_sample": 802304,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 842752,
+      "provider_cut_sample": 842752,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 863744,
+      "provider_cut_sample": 863744,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 925696,
+      "provider_cut_sample": 925696,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1029632,
+      "provider_cut_sample": 1029632,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1125376,
+      "provider_cut_sample": 1125376,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1221120,
+      "provider_cut_sample": 1221120,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1316864,
+      "provider_cut_sample": 1316864,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1357824,
+      "provider_cut_sample": 1357824,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1457664,
+      "provider_cut_sample": 1457664,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1553408,
+      "provider_cut_sample": 1553408,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1649152,
+      "provider_cut_sample": 1649152,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1695232,
+      "provider_cut_sample": 1695232,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1796096,
+      "provider_cut_sample": 1796096,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1891840,
+      "provider_cut_sample": 1891840,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1987584,
+      "provider_cut_sample": 1987584,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 2083328,
+      "provider_cut_sample": 2083328,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 2176512,
+      "provider_cut_sample": 2176512,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2275840,
+      "provider_cut_sample": 2275840,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 2339840,
+      "provider_cut_sample": 2339840,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2401792,
+      "provider_cut_sample": 2401792,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2474496,
+      "provider_cut_sample": 2474496,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2578944,
+      "provider_cut_sample": 2578944,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 2675200,
+      "provider_cut_sample": 2675200,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 2744320,
+      "provider_cut_sample": 2744320,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2814976,
+      "provider_cut_sample": 2814976,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2882048,
+      "provider_cut_sample": 2882048,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2903552,
+      "provider_cut_sample": 2903552,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2971136,
+      "provider_cut_sample": 2971136,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 3076096,
+      "provider_cut_sample": 3076096,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 3170304,
+      "provider_cut_sample": 3170304,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 3238400,
+      "provider_cut_sample": 3238400,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 3337216,
+      "provider_cut_sample": 3337216,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 3419648,
+      "provider_cut_sample": 3419648,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 3492864,
+      "provider_cut_sample": 3492864,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 3530240,
+      "provider_cut_sample": 3530240,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 3568640,
+      "provider_cut_sample": 3568640,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 3674112,
+      "provider_cut_sample": 3674112,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 3768832,
+      "provider_cut_sample": 3768832,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 3878912,
+      "provider_cut_sample": 3878912,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 3974656,
+      "provider_cut_sample": 3974656,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 4070400,
+      "provider_cut_sample": 4070400,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 4166144,
+      "provider_cut_sample": 4166144,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 4265472,
+      "provider_cut_sample": 4265472,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 4339712,
+      "provider_cut_sample": 4339712,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 4423680,
+      "provider_cut_sample": 4423680,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 4524032,
+      "provider_cut_sample": 4524032,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 4595712,
+      "provider_cut_sample": 4595712,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 4694016,
+      "provider_cut_sample": 4694016,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 4789760,
+      "provider_cut_sample": 4789760,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 4853760,
+      "provider_cut_sample": 4853760,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 4908032,
+      "provider_cut_sample": 4908032,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 4964864,
+      "provider_cut_sample": 4964864,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 5075456,
+      "provider_cut_sample": 5075456,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 5145600,
+      "provider_cut_sample": 5145600,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 5227520,
+      "provider_cut_sample": 5227520,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 5347328,
+      "provider_cut_sample": 5347328,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 5443072,
+      "provider_cut_sample": 5443072,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 5468160,
+      "provider_cut_sample": 5468160,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 5528576,
+      "provider_cut_sample": 5528576,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 5577728,
+      "provider_cut_sample": 5577728,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 5669376,
+      "provider_cut_sample": 5669376,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 5745664,
+      "provider_cut_sample": 5745664,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 5815808,
+      "provider_cut_sample": 5815808,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 5854208,
+      "provider_cut_sample": 5854208,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 5876224,
+      "provider_cut_sample": 5876224,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 5966336,
+      "provider_cut_sample": 5966336,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 6052352,
+      "provider_cut_sample": 6052352,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 6155776,
+      "provider_cut_sample": 6155776,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 6260224,
+      "provider_cut_sample": 6260224,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 6355968,
+      "provider_cut_sample": 6355968,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 6419968,
+      "provider_cut_sample": 6419968,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 6529536,
+      "provider_cut_sample": 6529536,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 6625280,
+      "provider_cut_sample": 6625280,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 6721024,
+      "provider_cut_sample": 6721024,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 6788608,
+      "provider_cut_sample": 6788608,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 6865408,
+      "provider_cut_sample": 6865408,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 6963200,
+      "provider_cut_sample": 6963200,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 7057408,
+      "provider_cut_sample": 7057408,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 7090176,
+      "provider_cut_sample": 7090176,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 7158272,
+      "provider_cut_sample": 7158272,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 7198720,
+      "provider_cut_sample": 7198720,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 7297024,
+      "provider_cut_sample": 7297024,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 7388672,
+      "provider_cut_sample": 7388672,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 7462400,
+      "provider_cut_sample": 7462400,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 7554048,
+      "provider_cut_sample": 7554048,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 7636992,
+      "provider_cut_sample": 7636992,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 7716864,
+      "provider_cut_sample": 7716864,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 7810560,
+      "provider_cut_sample": 7810560,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 7930880,
+      "provider_cut_sample": 7930880,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 8032768,
+      "provider_cut_sample": 8032768,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 8068608,
+      "provider_cut_sample": 8068608,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 8151040,
+      "provider_cut_sample": 8151040,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 8218112,
+      "provider_cut_sample": 8218112,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 8298496,
+      "provider_cut_sample": 8298496,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 8393728,
+      "provider_cut_sample": 8393728,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 8419840,
+      "provider_cut_sample": 8419840,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 8527872,
+      "provider_cut_sample": 8527872,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 8643072,
+      "provider_cut_sample": 8643072,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 8713728,
+      "provider_cut_sample": 8713728,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 8804864,
+      "provider_cut_sample": 8804864,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 8903168,
+      "provider_cut_sample": 8903168,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 8958976,
+      "provider_cut_sample": 8958976,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 9042944,
+      "provider_cut_sample": 9042944,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 9113600,
+      "provider_cut_sample": 9113600,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 9194496,
+      "provider_cut_sample": 9194496,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 9270784,
+      "provider_cut_sample": 9270784,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 9299456,
+      "provider_cut_sample": 9299456,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 9399296,
+      "provider_cut_sample": 9399296,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 9495040,
+      "provider_cut_sample": 9495040,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 9590784,
+      "provider_cut_sample": 9590784,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 9600000,
+      "provider_cut_sample": 9600000,
+      "reason": "source_eof"
+    }
+  ],
+  "mode": "dry",
+  "completed": true,
+  "failure": null,
+  "fin_count": 1,
+  "pending_completions": [],
+  "actual_audio_seconds": 600.0,
+  "active_websocket_seconds": 0,
+  "replay_elapsed_seconds": 600.0500000000068,
+  "timeline": [
+    {
+      "provider_start_s": 0.0,
+      "provider_end_s": 600.0,
+      "source_start_s": 0.0,
+      "source_end_s": 600.0,
+      "boundary": false
+    }
+  ],
+  "tokens": [],
+  "raw_responses_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "config": {
+    "model": "stt-rt-v5",
+    "audio_format": "pcm_s16le",
+    "sample_rate": 16000,
+    "num_channels": 1,
+    "language_hints": [
+      "en"
+    ],
+    "enable_endpoint_detection": false,
+    "enable_language_identification": false,
+    "enable_speaker_diarization": true
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "versions": {
+      "numpy": "2.5.1",
+      "onnxruntime": "1.28.0",
+      "websockets": "15.0.1",
+      "keyring": "25.7.0"
+    },
+    "model_sha256": {
+      "src/puripuly_heart/data/vad/silero_vad.onnx": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+      "src/puripuly_heart/data/models/smart-turn-v3.2-cpu.onnx": "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f"
+    }
+  },
+  "native_artifact_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+}

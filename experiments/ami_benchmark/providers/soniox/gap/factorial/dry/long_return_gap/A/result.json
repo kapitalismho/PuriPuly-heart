@@ -1,0 +1,232 @@
+{
+  "case_id": "long_return_gap",
+  "arm": "A",
+  "source_seconds": 180.0,
+  "sent_seconds": 180.0,
+  "pcm_sha256": "64d1ef63b71dfc78334ec742c8d5c661ca796e02a3b1dd25f494634f71722ef9",
+  "trace_sha256": "ca941b099e9aa36fde2999b03777104809fbf88fcd712b6cf8fa563d57bbcd11",
+  "finalizations": 1,
+  "cut_positions": [
+    {
+      "source_cut_sample": 83456,
+      "provider_cut_sample": 83456,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 169472,
+      "provider_cut_sample": 169472,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 278016,
+      "provider_cut_sample": 278016,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 398848,
+      "provider_cut_sample": 398848,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 481280,
+      "provider_cut_sample": 481280,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 538624,
+      "provider_cut_sample": 538624,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 696320,
+      "provider_cut_sample": 696320,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 728064,
+      "provider_cut_sample": 728064,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 788992,
+      "provider_cut_sample": 788992,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 880640,
+      "provider_cut_sample": 880640,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 980480,
+      "provider_cut_sample": 980480,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1097728,
+      "provider_cut_sample": 1097728,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1118720,
+      "provider_cut_sample": 1118720,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1184768,
+      "provider_cut_sample": 1184768,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1285632,
+      "provider_cut_sample": 1285632,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1380352,
+      "provider_cut_sample": 1380352,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1484288,
+      "provider_cut_sample": 1484288,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1566720,
+      "provider_cut_sample": 1566720,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1680384,
+      "provider_cut_sample": 1680384,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 1700864,
+      "provider_cut_sample": 1700864,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1774592,
+      "provider_cut_sample": 1774592,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1854464,
+      "provider_cut_sample": 1854464,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1896960,
+      "provider_cut_sample": 1896960,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 1962496,
+      "provider_cut_sample": 1962496,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2060288,
+      "provider_cut_sample": 2060288,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 2156032,
+      "provider_cut_sample": 2156032,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 2235904,
+      "provider_cut_sample": 2235904,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2334720,
+      "provider_cut_sample": 2334720,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 2372096,
+      "provider_cut_sample": 2372096,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2440704,
+      "provider_cut_sample": 2440704,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2536960,
+      "provider_cut_sample": 2536960,
+      "reason": "delivery_deadline"
+    },
+    {
+      "source_cut_sample": 2609152,
+      "provider_cut_sample": 2609152,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2700800,
+      "provider_cut_sample": 2700800,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2808320,
+      "provider_cut_sample": 2808320,
+      "reason": "delivery_pause"
+    },
+    {
+      "source_cut_sample": 2880000,
+      "provider_cut_sample": 2880000,
+      "reason": "source_eof"
+    }
+  ],
+  "mode": "dry",
+  "completed": true,
+  "failure": null,
+  "fin_count": 1,
+  "pending_completions": [],
+  "actual_audio_seconds": 180.0,
+  "active_websocket_seconds": 0,
+  "replay_elapsed_seconds": 180.05000000001178,
+  "timeline": [
+    {
+      "provider_start_s": 0.0,
+      "provider_end_s": 180.0,
+      "source_start_s": 0.0,
+      "source_end_s": 180.0,
+      "boundary": false
+    }
+  ],
+  "tokens": [],
+  "raw_responses_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "config": {
+    "model": "stt-rt-v5",
+    "audio_format": "pcm_s16le",
+    "sample_rate": 16000,
+    "num_channels": 1,
+    "language_hints": [
+      "en"
+    ],
+    "enable_endpoint_detection": false,
+    "enable_language_identification": false,
+    "enable_speaker_diarization": true
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "versions": {
+      "numpy": "2.5.1",
+      "onnxruntime": "1.28.0",
+      "websockets": "15.0.1",
+      "keyring": "25.7.0"
+    },
+    "model_sha256": {
+      "src/puripuly_heart/data/vad/silero_vad.onnx": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+      "src/puripuly_heart/data/models/smart-turn-v3.2-cpu.onnx": "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f"
+    }
+  },
+  "native_artifact_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+}

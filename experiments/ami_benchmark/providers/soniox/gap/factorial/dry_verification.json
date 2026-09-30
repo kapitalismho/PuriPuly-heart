@@ -1,0 +1,37 @@
+{
+  "observed_checks": [
+    {
+      "case": "long_context",
+      "matched_pcm_and_chunks": true,
+      "source_available_before_every_write": true,
+      "C_D_identical_S200_positions": true,
+      "all_terminal_completions": true
+    },
+    {
+      "case": "brief_interjections",
+      "matched_pcm_and_chunks": true,
+      "source_available_before_every_write": true,
+      "C_D_identical_S200_positions": true,
+      "all_terminal_completions": true
+    },
+    {
+      "case": "low_overlap",
+      "matched_pcm_and_chunks": true,
+      "source_available_before_every_write": true,
+      "C_D_identical_S200_positions": true,
+      "all_terminal_completions": true
+    },
+    {
+      "case": "long_return_gap",
+      "matched_pcm_and_chunks": true,
+      "source_available_before_every_write": true,
+      "C_D_identical_S200_positions": true,
+      "all_terminal_completions": true
+    }
+  ],
+  "fault_probes": {
+    "low_overlap_D_missing_fin": "failed completion as expected with all pending controls retained",
+    "low_overlap_D_stall": "completed with pacing delay retained"
+  },
+  "scope": "mechanics only; no native accuracy"
+}

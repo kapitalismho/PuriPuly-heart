@@ -1,0 +1,230 @@
+{
+  "native_artifact_sha256": "cd1b17da83b2bce348417cd5c0da9f05a44b4dc538185c812dde787d6ae7ae6d",
+  "sdk_segments": [
+    {
+      "text": "Design, um, reducing the size of the control, and an electronic panel. For further features like programming, things like that. Okay. Three presentations, I've got written here, so— Shall we hear from marketing first?",
+      "start_ms": 360,
+      "end_ms": 20760,
+      "speaker": "1",
+      "token_start_index": 0,
+      "token_end_index": 64
+    },
+    {
+      "text": " Um, is it okay if I postpone that to later? I just want to get access to a little bit more information. Is that okay?",
+      "start_ms": 21300,
+      "end_ms": 25860,
+      "speaker": "2",
+      "token_start_index": 64,
+      "token_end_index": 100
+    },
+    {
+      "text": " No, that's fine, that's fine.",
+      "start_ms": 25860,
+      "end_ms": 26640,
+      "speaker": "1",
+      "token_start_index": 100,
+      "token_end_index": 110
+    },
+    {
+      "text": " Okay, yeah, I'll go first. Can I grab the—",
+      "start_ms": 26820,
+      "end_ms": 29340,
+      "speaker": "3",
+      "token_start_index": 110,
+      "token_end_index": 126
+    },
+    {
+      "text": " Can you plug me?",
+      "start_ms": 29340,
+      "end_ms": 29760,
+      "speaker": "1",
+      "token_start_index": 126,
+      "token_end_index": 133
+    },
+    {
+      "text": " Thanks. What do I have to press? Oh, F8.",
+      "start_ms": 32340,
+      "end_ms": 43260,
+      "speaker": "3",
+      "token_start_index": 133,
+      "token_end_index": 149
+    },
+    {
+      "text": " Um, FN. Function, FN.",
+      "start_ms": 44400,
+      "end_ms": 47400,
+      "speaker": "1",
+      "token_start_index": 149,
+      "token_end_index": 160
+    },
+    {
+      "text": " Oh, right, yeah. Okay. Maybe.",
+      "start_ms": 47460,
+      "end_ms": 54540,
+      "speaker": "3",
+      "token_start_index": 160,
+      "token_end_index": 172
+    },
+    {
+      "text": " Yep.",
+      "start_ms": 59940,
+      "end_ms": 60240,
+      "speaker": "2",
+      "token_start_index": 172,
+      "token_end_index": 175
+    },
+    {
+      "text": " Yep, there we go. Okay, this is, uh, the working design presented by me, the, uh, industrial designer extraordinaire. Okay, this is where I went a bit mad with PowerPoint, so— What the first thing question I asked was, what are we trying to design? Well, a device which. Basically just sends the signal to the TV to change its state, whether that be the power or the channel. Um, or the volume, everything is just, um, some sort of signal to change the state of. The TV or other appliance that it's sending the signal to. Um, so I decided I'd have a look at what other people have designed and try and take some inspiration. From that. But, uh, although we will want to be taking— Ideas from other people, we want to make sure that our design stands out and. I thought that was something that— Well, it wasn't really my area because— I'm dealing with the inside, really. So, yeah, I ran out of time, so I couldn't do this one. As fun as the last one. Um, and, uh, I found out that most, uh. Controls use some form of infrared to send signals to the TV, presumably because— Of the cost issue of, uh, something like the same thing that computers use wireless, and you don't— Need to send very much information. Um, most of them are powered by some form of battery. Now, R1, I'm— I'm not sure whether we want to look at the size issue because most. Of them are powered by AAA batteries, but those can be quite bulky. So I— I didn't know if you wanted to look at something else so we could shrink down the size.",
+      "start_ms": 60420,
+      "end_ms": 170160,
+      "speaker": "3",
+      "token_start_index": 175,
+      "token_end_index": 669
+    },
+    {
+      "text": " Mm-hmm.",
+      "start_ms": 170940,
+      "end_ms": 171360,
+      "speaker": "2",
+      "token_start_index": 669,
+      "token_end_index": 674
+    },
+    {
+      "text": " Of the control.",
+      "start_ms": 171720,
+      "end_ms": 172320,
+      "speaker": "3",
+      "token_start_index": 674,
+      "token_end_index": 678
+    },
+    {
+      "text": " Can I interject to ask a question there?",
+      "start_ms": 172320,
+      "end_ms": 173820,
+      "speaker": "2",
+      "token_start_index": 678,
+      "token_end_index": 691
+    },
+    {
+      "text": " Yeah.",
+      "start_ms": 173820,
+      "end_ms": 173940,
+      "speaker": "3",
+      "token_start_index": 691,
+      "token_end_index": 693
+    },
+    {
+      "text": " Is that appropriate? You're saying the AAA batteries are small? Are the car—",
+      "start_ms": 173940,
+      "end_ms": 177000,
+      "speaker": "2",
+      "token_start_index": 693,
+      "token_end_index": 719
+    },
+    {
+      "text": " Um, no, no, if you— if you look at— if you look at most remote controls, they're quite— they're quite. ",
+      "start_ms": 177660,
+      "end_ms": 181680,
+      "speaker": "3",
+      "token_start_index": 719,
+      "token_end_index": 761
+    }
+  ],
+  "projected_intervals": [
+    [
+      0.36,
+      20.76,
+      "1"
+    ],
+    [
+      21.3,
+      25.86,
+      "2"
+    ],
+    [
+      25.86,
+      26.64,
+      "1"
+    ],
+    [
+      26.82,
+      29.34,
+      "3"
+    ],
+    [
+      29.34,
+      29.76,
+      "1"
+    ],
+    [
+      32.34,
+      43.26,
+      "3"
+    ],
+    [
+      44.4,
+      47.4,
+      "1"
+    ],
+    [
+      47.46,
+      54.54,
+      "3"
+    ],
+    [
+      59.94,
+      60.24,
+      "2"
+    ],
+    [
+      60.42,
+      170.16,
+      "3"
+    ],
+    [
+      170.94,
+      171.36,
+      "2"
+    ],
+    [
+      171.72,
+      172.32,
+      "3"
+    ],
+    [
+      172.32,
+      173.82,
+      "2"
+    ],
+    [
+      173.82,
+      173.94,
+      "3"
+    ],
+    [
+      173.94,
+      177.0,
+      "2"
+    ],
+    [
+      177.66,
+      180.0,
+      "3"
+    ]
+  ],
+  "projection_diagnostics": {
+    "sdk_groups": 16,
+    "untimed_groups": [],
+    "zero_duration_groups": [],
+    "unattributed_groups": [],
+    "padding_or_omitted_groups": [],
+    "out_of_support_groups": [
+      15
+    ],
+    "wholly_out_of_support_groups": [],
+    "out_of_support_total_ms": 1680.0000000000068,
+    "mapped_source_pieces": 16,
+    "bridged_positive_gap_ms": 125160.0,
+    "max_bridged_gap_ms": 9120
+  }
+}
