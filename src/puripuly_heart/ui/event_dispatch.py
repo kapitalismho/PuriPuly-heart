@@ -398,6 +398,9 @@ class UIEventBridge:
     async def _handle_event(self, event: UIEvent) -> None:
         if self._closed:
             return
+        authority = getattr(event, "delivery_authority", None)
+        if authority is not None and not authority.claim_delivery():
+            return
         mapped = map_ui_event(event)
         if mapped is None:
             return
@@ -410,11 +413,12 @@ class UIEventBridge:
             if projection.transcript is None:
                 return
             transcript_projection = projection.transcript
-            self.dashboard_destination.publish_transcript(
-                transcript_projection.text,
-                language_code=transcript_projection.language_code,
-                debug_prefix=transcript_projection.debug_prefix,
-            )
+            if authority is None or authority.claim_presentation():
+                self.dashboard_destination.publish_transcript(
+                    transcript_projection.text,
+                    language_code=transcript_projection.language_code,
+                    debug_prefix=transcript_projection.debug_prefix,
+                )
             for history in projection.history:
                 self.history_destination.append_entry(
                     history.source,
@@ -429,11 +433,13 @@ class UIEventBridge:
             if projection.translation is None:
                 return
             translation_projection = projection.translation
-            dashboard_published = self.dashboard_destination.publish_translation(
-                translation_projection.text,
-                language_code=translation_projection.language_code,
-                debug_prefix=translation_projection.debug_prefix,
-            )
+            dashboard_published = False
+            if authority is None or authority.claim_presentation():
+                dashboard_published = self.dashboard_destination.publish_translation(
+                    translation_projection.text,
+                    language_code=translation_projection.language_code,
+                    debug_prefix=translation_projection.debug_prefix,
+                )
             if dashboard_published is not False and projection.translation_diagnostic is not None:
                 self._emit_dashboard_translation_applied_diagnostic(
                     diagnostic=projection.translation_diagnostic,
@@ -474,4 +480,6 @@ class UIEventBridge:
             payload=destination_payload,
             event=destination_event,
         ):
-            self.dashboard_destination.publish_error(text)
+            authority = event.delivery_authority
+            if authority is None or authority.claim_presentation():
+                self.dashboard_destination.publish_error(text)

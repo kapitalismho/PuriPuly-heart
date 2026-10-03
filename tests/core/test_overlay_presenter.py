@@ -4208,6 +4208,11 @@ async def test_presenter_native_fresh_render_generations_preserve_channels_and_e
             occupant_key=f"self:{self_turn}",
         )
     )
+    assert presenter.snapshot().native_fresh_render_generations.self == self_generation + 1
+    stream_episode = presenter.snapshot().native_quiet_tail_episodes.self
+    assert stream_episode is not None and stream_episode.phase == "stream"
+    assert stream_episode.generation != self_episode.generation
+    self_generation = presenter.snapshot().native_fresh_render_generations.self
     await presenter.emit(
         adapter.translation_stream_update(
             utterance_id=self_turn,
@@ -4219,7 +4224,7 @@ async def test_presenter_native_fresh_render_generations_preserve_channels_and_e
         )
     )
     assert presenter.snapshot().native_fresh_render_generations.self == self_generation
-    assert presenter.snapshot().native_quiet_tail_episodes.self == self_episode
+    assert presenter.snapshot().native_quiet_tail_episodes.self == stream_episode
     await presenter.emit(
         adapter.transcript_final(
             Transcript(

@@ -1392,3 +1392,68 @@ async def test_overlay_bridge_retires_connection_on_obsolete_validity_challenge(
         await bridge.stop()
     assert "validity_response" not in bridge._mailbox.pending_controls
     assert bridge.messages.empty()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("remove", ["expiry", "clear", "off"])
+async def test_active_self_stalled_bridge_coalesces_and_never_replays_removed_target(
+    remove: str,
+) -> None:
+    clock = FakeClock(_now=10.0)
+    bridge = OverlayBridge(session_token="expected-token", clock=clock)
+    presenter = OverlayPresenter(
+        bridge=bridge,
+        calibration=OverlayCalibration(),
+        clock=clock,
+        native_retry_enabled=True,
+    )
+    adapter = OverlayEventAdapter(clock=clock)
+    turn = uuid4()
+    stalled = _BlockingSendConnection()
+    bridge._authenticated_connections.add(stalled)
+    try:
+        await presenter.emit(
+            adapter.self_active_update(
+                text="source", utterance_id=turn, occupant_key=f"self:{turn}"
+            )
+        )
+        await stalled.send_started.wait()
+        for index in range(20):
+            await presenter.emit(
+                adapter.self_active_update(
+                    text=f"source {index}",
+                    secondary_text="synthetic translation",
+                    utterance_id=turn,
+                    occupant_key=f"self:{turn}",
+                )
+            )
+        accepted = presenter.snapshot()
+        assert accepted.blocks[0].secondary_text == "synthetic translation"
+        assert accepted.native_quiet_tail_episodes.self.phase == "stream"
+        assert accepted.native_quiet_tail_episodes.self.generation == 1
+        assert not stalled.sent_payloads
+        if remove == "expiry":
+            clock.advance(9.0)
+        elif remove == "clear":
+            await presenter.clear_for_runtime_detach()
+        else:
+            await presenter.close()
+        stalled.release_send.set()
+        await _wait_until(lambda: len(stalled.sent_payloads) == 2)
+        revisions = [message["payload"]["revision"] for message in stalled.sent_payloads]
+        assert revisions[0] == 1
+        assert revisions[1] > accepted.revision
+        assert stalled.sent_payloads[-1]["payload"]["blocks"] == []
+        assert "native_quiet_tail_episodes" not in stalled.sent_payloads[-1]["payload"]
+        bridge._authenticated_connections.discard(stalled)
+        reconnected = _BlockingInitialSnapshotConnection()
+        replay = asyncio.create_task(bridge._handle_connection(reconnected))
+        await _wait_until(lambda: bool(reconnected.sent_payloads))
+        reconnected.allow_disconnect.set()
+        await replay
+        assert len(reconnected.sent_payloads) == 1
+        assert reconnected.sent_payloads[0]["payload"]["blocks"] == []
+        assert "native_quiet_tail_episodes" not in reconnected.sent_payloads[0]["payload"]
+    finally:
+        await presenter.close()
+        await bridge.stop()

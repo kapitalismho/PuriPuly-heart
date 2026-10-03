@@ -5,7 +5,7 @@ import logging
 from collections import deque
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol, cast
 from uuid import UUID
 
@@ -197,7 +197,53 @@ class _PeerUiBatch:
     publication_generation: int
     source_order: int
     parent_utterance_id: UUID
-    events: list[tuple[UIEvent, str]] = field(default_factory=list)
+    events: deque[tuple[UIEvent, str]] = field(default_factory=deque)
+    writing: bool = False
+
+
+@dataclass(slots=True)
+class _UiDeliveryAuthority:
+    owner: TranslationUiMessageQueue
+    destination_generation: int
+    sequence: int
+    self_generation: int | None
+    speech_generation: int | None
+    peer_generation: int | None
+    peer_source_order: int | None
+    claimed: bool = False
+
+    def is_current(self) -> bool:
+        owner = self.owner
+        return (
+            not owner._closed
+            and owner.output_runtime.state == "open"
+            and self.destination_generation == owner._destination_generation
+            and (self.self_generation is None or self.self_generation == owner._self_generation)
+            and (
+                self.speech_generation is None or self.speech_generation == owner._speech_generation
+            )
+            and (
+                self.peer_generation is None
+                or (
+                    self.peer_source_order is not None
+                    and owner.output_runtime.peer_publication_is_authorized(
+                        self.peer_generation, self.peer_source_order
+                    )
+                )
+            )
+        )
+
+    def claim_delivery(self) -> bool:
+        if self.claimed or not self.is_current():
+            return False
+        self.claimed = True
+        return True
+
+    def claim_presentation(self) -> bool:
+        if not self.is_current() or self.sequence < self.owner._presented_sequence:
+            return False
+        self.owner._presented_sequence = self.sequence
+        return True
 
 
 @dataclass(slots=True)
@@ -206,6 +252,16 @@ class TranslationUiMessageQueue:
     output_runtime: OutputRuntime = field(repr=False)
     peer_waiting_capacity: int = 8
     write_timeout_s: float = 5.0
+    self_waiting_capacity: int = 32
+    peer_batch_event_capacity: int = 32
+    _self_events: deque[UIEvent] = field(default_factory=deque, init=False)
+    _active_self_event: UIEvent | None = field(default=None, init=False)
+    _self_worker: asyncio.Task[None] | None = field(default=None, init=False, repr=False)
+    _destination_generation: int = field(default=0, init=False)
+    _self_generation: int = field(default=0, init=False)
+    _speech_generation: int = field(default=0, init=False)
+    _sequence: int = field(default=0, init=False)
+    _presented_sequence: int = field(default=-1, init=False)
     dropped_peer_events: int = 0
     _peer_batches: deque[_PeerUiBatch] = field(default_factory=deque, init=False)
     _active_peer_batch: _PeerUiBatch | None = field(default=None, init=False)
@@ -219,17 +275,27 @@ class TranslationUiMessageQueue:
     _active_generation: int | None = field(default=None, init=False)
     _latest_source_order: int = field(default=-1, init=False)
     _closed: bool = field(default=False, init=False)
+    _replacing: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         if self.peer_waiting_capacity < 1:
             raise ValueError("peer_waiting_capacity must be positive")
+        if self.self_waiting_capacity < 1:
+            raise ValueError("self_waiting_capacity must be positive")
+        if self.peer_batch_event_capacity < 1:
+            raise ValueError("peer_batch_event_capacity must be positive")
         if self.write_timeout_s <= 0:
             raise ValueError("write_timeout_s must be positive")
-        self.output_runtime.bind_peer_ui_delivery(self)
+        self.output_runtime.bind_ui_delivery(self)
 
     @property
     def has_resources(self) -> bool:
-        return self._peer_worker is not None or bool(self._peer_batches)
+        return (
+            self._peer_worker is not None
+            or bool(self._peer_batches)
+            or self._self_worker is not None
+            or bool(self._self_events)
+        )
 
     async def publish(
         self,
@@ -239,9 +305,27 @@ class TranslationUiMessageQueue:
         publication_generation: int | None = None,
         source_order: int | None = None,
     ) -> OutputPublicationResult | None:
+        self._sequence += 1
+        event = replace(
+            event,
+            delivery_authority=_UiDeliveryAuthority(
+                self,
+                self._destination_generation,
+                self._sequence,
+                self._self_generation if event.channel != "peer" else None,
+                (
+                    self._speech_generation
+                    if event.channel != "peer" and event.source in {None, "Mic"}
+                    else None
+                ),
+                publication_generation if event.channel == "peer" else None,
+                source_order,
+            ),
+        )
+        if self._replacing:
+            return self._record_self(event, "destination_replaced")
         if event.channel != "peer":
-            await self.queue.put(event)
-            return None
+            return self._submit_self_event(event)
         publication_id = self._publication_id(event, parent_utterance_id)
         if parent_utterance_id is None or publication_generation is None or source_order is None:
             if event.type is not UIEventType.SESSION_STATE_CHANGED:
@@ -315,6 +399,17 @@ class TranslationUiMessageQueue:
                 parent_utterance_id=parent_utterance_id,
             )
             self._peer_batches.append(batch)
+        if len(batch.events) + int(batch.writing) >= self.peer_batch_event_capacity:
+            self.dropped_peer_events += 1
+            return self._record(
+                event,
+                publication_id,
+                parent_utterance_id=parent_utterance_id,
+                publication_generation=publication_generation,
+                source_order=source_order,
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                reason="output_overload",
+            )
         batch.events.append((event, publication_id))
         self._in_flight_keys.add(key)
         self._latest_source_order = max(self._latest_source_order, source_order)
@@ -336,7 +431,6 @@ class TranslationUiMessageQueue:
         return result
 
     def activate_peer_generation(self, generation: int) -> None:
-        self._closed = False
         if self._active_generation != generation:
             self._active_generation = generation
             self._latest_source_order = -1
@@ -365,13 +459,37 @@ class TranslationUiMessageQueue:
 
     async def wait_for_idle(self) -> None:
         while True:
+            self_worker = self._self_worker
+            if self_worker is not None:
+                await asyncio.gather(self_worker, return_exceptions=True)
+                if self._self_worker is self_worker:
+                    self._self_worker = None
+                    self._ensure_self_writer()
             worker = self._peer_worker
-            if worker is None:
+            if worker is None and self._self_worker is None:
                 return
+            if worker is not None:
+                await asyncio.gather(worker, return_exceptions=True)
+                if self._peer_worker is worker:
+                    self._peer_worker = None
+
+    async def wait_for_peer_idle(self) -> None:
+        while self._peer_worker is not None:
+            worker = self._peer_worker
             await asyncio.gather(worker, return_exceptions=True)
+            if self._peer_worker is worker:
+                self._peer_worker = None
 
     async def close(self) -> None:
         self._closed = True
+        self._destination_generation += 1
+        self_worker = self._self_worker
+        if self_worker is not None and not self_worker.done():
+            self_worker.cancel()
+            await asyncio.gather(self_worker, return_exceptions=True)
+        self._self_worker = None
+        while self._self_events:
+            self._record_self(self._self_events.popleft(), "output_runtime_closing")
         self._writer_cancel_reason = "output_runtime_closing"
         worker = self._peer_worker
         if worker is not None and not worker.done():
@@ -382,16 +500,142 @@ class TranslationUiMessageQueue:
             self._reject_batch(batch, "output_runtime_closing")
         self._peer_batches.clear()
 
+    def retire_self_generation(self, generation: int) -> None:
+        if generation <= self._self_generation:
+            return
+        self._self_generation = generation
+        self._reject_retired_self_events()
+
+    def retire_self_speech(self) -> None:
+        self._speech_generation += 1
+        self._reject_retired_self_events()
+
+    def _reject_retired_self_events(self) -> None:
+        retained = deque()
+        while self._self_events:
+            event = self._self_events.popleft()
+            if event.delivery_authority is not None and not event.delivery_authority.is_current():
+                self._record_self(event, "publication_generation_retired")
+            else:
+                retained.append(event)
+        self._self_events = retained
+        active = self._active_self_event
+        if (
+            active is not None
+            and active.delivery_authority is not None
+            and not active.delivery_authority.is_current()
+            and self._self_worker is not None
+        ):
+            self._self_worker.cancel()
+
+    def retire_destination(self) -> None:
+        self._destination_generation += 1
+        self._writer_cancel_reason = "destination_replaced"
+        while self._self_events:
+            self._record_self(self._self_events.popleft(), "destination_replaced")
+        while self._peer_batches:
+            self._reject_batch(self._peer_batches.popleft(), "destination_replaced")
+        for worker in (self._self_worker, self._peer_worker):
+            if worker is not None and not worker.done():
+                worker.cancel()
+
+    async def replace_destination(self, queue: asyncio.Queue[UIEvent]) -> None:
+        if self._closed or self.output_runtime.state != "open":
+            raise RuntimeError("UI destination is closed")
+        self._replacing = True
+        self.retire_destination()
+        try:
+            await self.wait_for_idle()
+            self.queue = queue
+        finally:
+            self._replacing = False
+
+    def _submit_self_event(self, event: UIEvent) -> OutputPublicationResult:
+        if self._closed or self.output_runtime.state != "open":
+            return self._record_self(event, "output_runtime_closing")
+        if not self._self_events and self._self_worker is None:
+            try:
+                self.queue.put_nowait(event)
+            except asyncio.QueueFull:
+                pass
+            else:
+                return self._record_self(event, "ui_queue_submitted")
+        if len(self._self_events) >= self.self_waiting_capacity:
+            return self._record_self(event, "output_overload")
+        self._self_events.append(event)
+        self._ensure_self_writer()
+        return self._record_self(event, "accepted_handoff")
+
+    def _ensure_self_writer(self) -> None:
+        if self._self_events and not self._closed and self._self_worker is None:
+            self._self_worker = asyncio.create_task(self._run_self_writer(), name="self-ui-writer")
+
+    async def _run_self_writer(self) -> None:
+        try:
+            while self._self_events:
+                event = self._self_events.popleft()
+                self._active_self_event = event
+                if (
+                    event.delivery_authority is not None
+                    and not event.delivery_authority.is_current()
+                ):
+                    self._record_self(event, "publication_generation_retired")
+                    continue
+                try:
+                    await asyncio.wait_for(self.queue.put(event), timeout=self.write_timeout_s)
+                except TimeoutError:
+                    self._record_self(event, "destination_write_timeout")
+                except asyncio.CancelledError:
+                    authority = cast(_UiDeliveryAuthority, event.delivery_authority)
+                    reason = (
+                        "output_runtime_closing"
+                        if self._closed
+                        else (
+                            "destination_replaced"
+                            if authority.destination_generation != self._destination_generation
+                            else "publication_generation_retired"
+                        )
+                    )
+                    self._record_self(event, reason)
+                    raise
+                except Exception:
+                    self._record_self(event, "destination_publish_failed")
+                else:
+                    self._record_self(event, "ui_queue_submitted")
+                finally:
+                    self._active_self_event = None
+        finally:
+            self._active_self_event = None
+            self._self_worker = None
+            self._ensure_self_writer()
+
+    def _record_self(self, event: UIEvent, reason: str) -> OutputPublicationResult:
+        accepted = reason in {"accepted_handoff", "ui_queue_submitted"}
+        authority = cast(_UiDeliveryAuthority, event.delivery_authority)
+        return self.output_runtime.record_ui_publication(
+            channel=event.channel,
+            status=(
+                OUTPUT_ROUTING_DECISION_PUBLISHED if accepted else OUTPUT_ROUTING_DECISION_SKIPPED
+            ),
+            publication_id=f"{self._publication_id(event, event.utterance_id)}:{authority.sequence}",
+            reason=reason,
+            publication_generation=authority.self_generation,
+            source_order=authority.sequence,
+            parent_utterance_id=event.utterance_id,
+            event_type=event.type.value,
+            accepted_handoff=accepted,
+            ui_queue_submitted=reason == "ui_queue_submitted",
+        )
+
     async def _run_peer_writer(self) -> None:
         current = asyncio.current_task()
         try:
             while self._peer_batches:
                 batch = self._peer_batches.popleft()
                 self._active_peer_batch = batch
-                index = 0
-                while index < len(batch.events):
-                    event, publication_id = batch.events[index]
-                    index += 1
+                while batch.events:
+                    event, publication_id = batch.events.popleft()
+                    batch.writing = True
                     if not self.output_runtime.peer_publication_is_authorized(
                         batch.publication_generation,
                         batch.source_order,
@@ -402,6 +646,7 @@ class TranslationUiMessageQueue:
                             publication_id,
                             "publication_generation_retired",
                         )
+                        batch.writing = False
                         continue
                     try:
                         await asyncio.wait_for(
@@ -418,14 +663,19 @@ class TranslationUiMessageQueue:
                     except asyncio.CancelledError:
                         reason = self._writer_cancel_reason or "output_runtime_closing"
                         self._reject_event(batch, event, publication_id, reason)
-                        for pending_event, pending_id in batch.events[index:]:
+                        for pending_event, pending_id in batch.events:
                             self._reject_event(
                                 batch,
                                 pending_event,
                                 pending_id,
                                 reason,
                             )
+                        batch.events.clear()
                         raise
+                    except Exception:
+                        self._reject_event(
+                            batch, event, publication_id, "destination_publish_failed"
+                        )
                     else:
                         self._complete_key(batch.publication_generation, publication_id)
                         self._record(
@@ -439,6 +689,9 @@ class TranslationUiMessageQueue:
                             accepted_handoff=True,
                             ui_queue_submitted=True,
                         )
+                    finally:
+                        batch.writing = False
+                        event = None
                 self._active_peer_batch = None
         finally:
             self._active_peer_batch = None
@@ -456,6 +709,16 @@ class TranslationUiMessageQueue:
         event: UIEvent,
         publication_id: str,
     ) -> OutputPublicationResult:
+        if self._closed or self.output_runtime.state != "open":
+            return self._record(
+                event,
+                publication_id,
+                parent_utterance_id=None,
+                publication_generation=None,
+                source_order=None,
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                reason="output_runtime_closing",
+            )
         try:
             self.queue.put_nowait(event)
         except asyncio.QueueFull:
@@ -582,7 +845,8 @@ class TranslationUiMessageQueue:
         accepted_handoff: bool = False,
         ui_queue_submitted: bool = False,
     ) -> OutputPublicationResult:
-        return self.output_runtime.record_peer_ui_publication(
+        return self.output_runtime.record_ui_publication(
+            channel="peer",
             status=status,
             publication_id=publication_id,
             reason=reason,
@@ -1021,7 +1285,8 @@ class TranslationOutputProjectionOwner:
             )
         ):
             identity = message.utterance_id or parent_utterance_id or "control"
-            return self.output_runtime.record_peer_ui_publication(
+            return self.output_runtime.record_ui_publication(
+                channel="peer",
                 status=OUTPUT_ROUTING_DECISION_SKIPPED,
                 publication_id=f"{message.event_type.value}:{identity}",
                 reason="publication_generation_retired",
@@ -1038,6 +1303,10 @@ class TranslationOutputProjectionOwner:
             publication_generation=publication_generation,
             source_order=source_order,
         )
+
+    def retire_self_ui_speech(self) -> None:
+        if isinstance(self.ui_messages, TranslationUiMessageQueue):
+            self.ui_messages.retire_self_speech()
 
     def publish_system_immediate(self, text: str) -> OutputPublicationResult:
         return self.output_runtime.publish_system_immediate_chatbox(text=text)

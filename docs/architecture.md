@@ -395,13 +395,17 @@ Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/tran
 
 Delivery boundaries:
 
-- Peer UI and overlay destinations have independent bounded queues and writers.
+- Self/manual and Peer UI publications use independently bounded writer lanes owned by `TranslationUiMessageQueue` and `OutputRuntime`, sharing the production capacity-one consumer queue and destination-sequence authority. UI admission does not wait for consumption or gate Self source Presenter application and otherwise eligible translation execution. Peer overlay delivery remains independently bounded.
 - Self chatbox delivery owns its bounded admission and expiry policy.
 - Output handoff releases translation ordering without waiting for display. Sink failure does not replay recognition or translation.
 - Peer publications retain activation generation and `source_order` through output. For turn-bound providers this follows segment order; independent Gemini finals use receipt-ordered admission into the same monotonic publication sequence. Retiring an activation cancels its deliveries and rejects late work.
 - Peer text without speaker runs, including independent Gemini finals, is `non_diarized` and uses the existing gold style without a speaker hold or guessed identity. Explicit uncertain or missing speaker attribution keeps the gray fallback; first-readable presentation remains pinned.
 - Destination admission and presenter application receipts are explicit; neither is a remote display acknowledgement.
 - E2E summaries measure last source speech to the first successful Self chatbox page send or the Peer presenter application receipt. Gemini's frozen approximate origin propagates through the existing latency timeline without waiting for local `SpeechEnd`; its summaries include `estimated=true`. Missing speech observations remain unmeasured. A newer utterance observed before an older native final can underestimate the older result's latency; these estimates are not exact utterance attribution.
+
+Self/manual UI delivery retains 32 waiting events plus one active event. Peer retains eight waiting batches plus an active batch, each with at most 32 outstanding events including its active write. Delivered Peer payloads are released; this is not a limit on lifetime batch emissions or provider segmentation. Each lane owns one writer with a five-second write timeout. Including the queue and active consumer, these boundaries retain at most 323 distinct event payloads. Capacity exhaustion, write failure, retirement, replacement, and shutdown receive explicit destination-local routing dispositions rather than replaying recognition or translation. `accepted_handoff` means admission; `ui_queue_submitted` means local queue submission, not UI application or physical display.
+
+Optional `UIEvent` delivery authority rejects retired, replaced, or duplicate callbacks. A shared sequence prevents delayed older Self/manual/Peer events from replacing newer visible dashboard state while preserving authorized logical history and error handling. Source retirement preserves manual isolation. Destination replacement joins both UI writers without retiring other output destinations. Context preparation, predecessor ordering, execution slots, and speculative reuse remain translation-owner constraints, independent of UI consumption.
 
 Caption and overlay settings control destinations, not peer capture. Conversation errors share publication identity; runtime session status uses a separate path.
 
@@ -420,7 +424,7 @@ Destination adapters must not bypass routing policy.
 Each destination has independent admission and delivery state. Replacing one
 destination must not block or retire work for the others.
 
-Implementation: `core/runtime/output.py`. Behavior tests: `tests/core/runtime/test_output_runtime.py`.
+Implementation: `core/runtime/output.py`, `core/orchestrator/translation_output_projection.py`, `ui/event_dispatch.py`. Behavior tests: `tests/core/runtime/test_output_runtime.py`, `tests/core/test_translation_ui_delivery.py`, `tests/core/test_self_ui_isolation.py`.
 
 ### Overlays
 
@@ -434,7 +438,11 @@ Each generation owns its tasks and shutdown. Python owns caption lifetime; nativ
 
 `OverlayPresenter` owns provider-independent Peer subtitle admission and pacing (`core/overlay/presenter.py`); output retains bounded waiting work.
 
-Behavior tests: `tests/core/test_overlay_presenter.py`.
+SELF source-first presentation uses normalized stable contributions when available and authoritative terminal or independent results otherwise. Source remains the primary line; translation updates the same logical caption. Active text is already readable and is not prematurely finalized to obtain rendering protection. Merge/speculation, sticky preview translation, active-row protection, and existing late-result/expiry rules remain independent of native retries.
+
+Changed, visible active SELF captions establish stream-phase freshness through `OverlayPresenter` and `NativeRetryIntentProjection`. Same-target updates advance trigger generation without renewing the stream episode's deadline or completed count. Semantic finalization enters the final phase; a changed final translation retains its distinct final episode. Unchanged content does not trigger freshness. Native alone schedules the existing bounded retries; desktop rendering has no retry cadence. Scene coalescing may display source and translation together without an original-only dwell or render acknowledgement.
+
+Behavior tests: `tests/core/test_overlay_presenter.py`, `tests/core/test_overlay_active_freshness.py`, `tests/core/test_overlay_bridge.py`, and `native/overlay/tests/runtime.rs`. Software application/submission evidence is not physical HMD freshness evidence.
 
 ## Runtime Logging
 

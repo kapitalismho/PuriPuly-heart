@@ -78,13 +78,16 @@ class UIEventBridgePort(Protocol):
 UIEventBridgeAdapter = UIEventBridgePort
 
 
-class PeerUiDeliveryLifecyclePort(Protocol):
+class UiDeliveryLifecyclePort(Protocol):
     @property
     def has_resources(self) -> bool: ...
 
     def activate_peer_generation(self, generation: int) -> None: ...
     def retire_peer_generation(self, generation: int) -> None: ...
+    def retire_self_generation(self, generation: int) -> None: ...
+    def retire_destination(self) -> None: ...
     async def wait_for_idle(self) -> None: ...
+    async def wait_for_peer_idle(self) -> None: ...
     async def close(self) -> None: ...
 
 
@@ -153,7 +156,7 @@ class OutputRuntime:
     _peer_active_batch: _PeerOverlayBatch | None = None
     _peer_overlay_worker: asyncio.Task[None] | None = None
     _peer_writer_cancel_reason: str | None = None
-    _peer_ui_delivery: PeerUiDeliveryLifecyclePort | None = None
+    _ui_delivery: UiDeliveryLifecyclePort | None = None
     _peer_overlay_delivery_observer: Callable[[OutputRoutingDecision], None] | None = None
     _batch_admission: DestinationBatchAdmission = field(default_factory=DestinationBatchAdmission)
     _routing_decisions: deque[OutputRoutingDecision] = field(init=False)
@@ -195,7 +198,7 @@ class OutputRuntime:
             or self._peer_overlay_worker is not None
             or bool(self._peer_overlay_batches)
             or bool(self._active_delivery_tasks)
-            or (self._peer_ui_delivery is not None and self._peer_ui_delivery.has_resources)
+            or (self._ui_delivery is not None and self._ui_delivery.has_resources)
             or bool(self._batch_admission.batches)
             or not self._chatbox_typing_reasons_cleared
             or not self._chatbox_backlog_dropped
@@ -318,9 +321,9 @@ class OutputRuntime:
             if worker is None:
                 break
             await asyncio.gather(worker, return_exceptions=True)
-        peer_ui_delivery = self._peer_ui_delivery
-        if peer_ui_delivery is not None:
-            await peer_ui_delivery.wait_for_idle()
+        ui_delivery = self._ui_delivery
+        if ui_delivery is not None:
+            await ui_delivery.wait_for_peer_idle()
 
     @property
     def has_active_overlay_deliveries(self) -> bool:
@@ -352,10 +355,10 @@ class OutputRuntime:
             self.overlay_sink = overlay_sink
             return True
 
-    def bind_peer_ui_delivery(self, delivery: PeerUiDeliveryLifecyclePort) -> None:
-        if self._peer_ui_delivery is not None and self._peer_ui_delivery is not delivery:
+    def bind_ui_delivery(self, delivery: UiDeliveryLifecyclePort) -> None:
+        if self._ui_delivery is not None and self._ui_delivery is not delivery:
             raise RuntimeError("peer UI delivery owner is already bound")
-        self._peer_ui_delivery = delivery
+        self._ui_delivery = delivery
 
     def bind_peer_overlay_delivery_observer(
         self,
@@ -379,9 +382,9 @@ class OutputRuntime:
             return
         self._peer_generation = generation
         self._latest_peer_source_order = -1
-        peer_ui_delivery = self._peer_ui_delivery
-        if peer_ui_delivery is not None:
-            peer_ui_delivery.activate_peer_generation(generation)
+        ui_delivery = self._ui_delivery
+        if ui_delivery is not None:
+            ui_delivery.activate_peer_generation(generation)
 
     def retire_peer_generation(self, generation: int) -> None:
         self._retired_peer_generation = max(self._retired_peer_generation, generation)
@@ -394,9 +397,9 @@ class OutputRuntime:
         for batch in tuple(self._peer_overlay_batches):
             self._reject_peer_batch(batch, reason="publication_generation_retired")
         self._peer_overlay_batches.clear()
-        peer_ui_delivery = self._peer_ui_delivery
-        if peer_ui_delivery is not None:
-            peer_ui_delivery.retire_peer_generation(generation)
+        ui_delivery = self._ui_delivery
+        if ui_delivery is not None:
+            ui_delivery.retire_peer_generation(generation)
 
     def peer_publication_is_authorized(
         self,
@@ -448,6 +451,10 @@ class OutputRuntime:
             if not self._ui_event_bridge_task.done():
                 raise RuntimeError("OutputRuntime already owns a UI event bridge task")
             self._collect_done_task_failure(self._ui_event_bridge_task)
+        if self._ui_event_bridge is not None and self._ui_event_bridge is not bridge:
+            delivery = self._ui_delivery
+            if delivery is not None:
+                delivery.retire_destination()
         self._ui_event_bridge = bridge
         self._ui_event_bridge_task = self._create_task(
             bridge.run(),
@@ -495,9 +502,9 @@ class OutputRuntime:
         failures: list[Exception] = []
         await self._cancel_chatbox_flush_task(failures)
         await self._cancel_active_delivery_tasks()
-        peer_ui_delivery = self._peer_ui_delivery
-        if peer_ui_delivery is not None:
-            await peer_ui_delivery.close()
+        ui_delivery = self._ui_delivery
+        if ui_delivery is not None:
+            await ui_delivery.close()
         self._clear_chatbox_typing_reasons(failures)
         self._drop_chatbox_backlog(failures)
         await self._cancel_ui_event_bridge_started_wait_task(failures)
@@ -1571,6 +1578,8 @@ class OutputRuntime:
 
     def retire_turn_generation(self, channel: ChannelId, turn_generation: int) -> None:
         self._batch_admission.retire_turn_generation(channel, turn_generation)
+        if channel == "self" and self._ui_delivery is not None:
+            self._ui_delivery.retire_self_generation(turn_generation)
         for scope in tuple(self._retired_publication_ranges):
             if not self._publication_scope_precedes_generation(
                 scope,
@@ -1860,9 +1869,10 @@ class OutputRuntime:
             return f"{transcript_text} ({translation_text})"
         return translation_text
 
-    def record_peer_ui_publication(
+    def record_ui_publication(
         self,
         *,
+        channel: ChannelId,
         status: OutputRoutingDecisionStatus,
         publication_id: str,
         reason: str,
@@ -1880,7 +1890,7 @@ class OutputRuntime:
             publication_kind=PUBLICATION_KIND_CONVERSATION_FEED,
             reason=reason,
             metadata={
-                "channel": "peer",
+                "channel": channel,
                 "publication_generation": publication_generation,
                 "source_order": source_order,
                 "parent_utterance_id": (

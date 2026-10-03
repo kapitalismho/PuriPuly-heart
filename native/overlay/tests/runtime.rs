@@ -6521,3 +6521,107 @@ fn cli_emits_startup_failure_event_when_manifest_is_missing() {
         .iter()
         .any(|event| event["type"] == "startup_error"));
 }
+
+#[tokio::test]
+async fn production_owner_renders_python_active_self_without_renewing_exhausted_stream() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+    let output = Command::new("uv")
+        .args([
+            "run",
+            "--frozen",
+            "python",
+            "-m",
+            "tests.helpers.overlay_active_freshness",
+        ])
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let snapshots: Vec<OverlayPresentationSnapshot> =
+        serde_json::from_slice(&output.stdout).unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":snapshots[0]})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws).await;
+        for (index, delay) in [(1, 150), (2, 600), (3, 100), (4, 100), (5, 650), (6, 650)] {
+            tokio::time::sleep(Duration::from_millis(delay)).await;
+            ws.send(Message::Text(
+                json!({"type":"snapshot","payload":snapshots[index]})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        PoseRecoverySubmitter {
+            state: state.clone(),
+            pose_available_at: std::time::Instant::now(),
+            visible: false,
+        },
+    );
+    owner
+        .run(
+            &mut bridge,
+            &test_logger("python-active-self-production").await,
+        )
+        .await
+        .unwrap();
+    let audit = owner.fresh_retry_audit_for_test();
+    let stream = audit
+        .iter()
+        .filter(|fact| fact.0 == "self" && fact.1 <= 4 && fact.2 == "completed")
+        .collect::<Vec<_>>();
+    assert!(!stream.is_empty());
+    assert!(stream.len() <= 4);
+    assert!(stream.iter().all(|fact| fact.1 <= 2));
+    assert_eq!(stream.last().unwrap().3 as usize, stream.len());
+    for generation in [5, 6] {
+        let completed = audit
+            .iter()
+            .filter(|fact| fact.0 == "self" && fact.1 == generation && fact.2 == "completed")
+            .collect::<Vec<_>>();
+        assert!(!completed.is_empty());
+        assert!(completed.len() <= 5);
+        assert_eq!(completed[0].3, 1);
+    }
+    assert!(owner
+        .successful_attempt_audit_for_test()
+        .iter()
+        .any(|attempt| attempt.logical_causes.to_vec().iter().any(|cause|
+            cause.kind == PresentationCauseKind::SceneUpdate
+                && cause.trigger_generation == Some(attempt.logical_revision))));
+    assert!(owner.runtime().state().blocks().is_empty());
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}

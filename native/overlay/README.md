@@ -43,6 +43,19 @@ fails. Health reports presentation progress, not caption freshness. Runtime
 generation retirement, bounded recovery, OFF/shutdown, and the 500 ms empty-frame
 hide grace remain unchanged.
 
+Changed, visible SELF active-source captions use the existing stream-phase
+fresh-render episode without becoming semantic finals. Normal scene-update
+rendering remains immediate. Same-target updates may advance trigger generation
+but retain the episode deadline and completed count, including after exhaustion.
+Semantic finalization changes phase; a changed final translation retains its
+distinct final episode. Unchanged content does not establish a new trigger.
+
+The production P05 bounds remain 100 ms retry cadence, a 500 ms scheduling
+deadline, at most four stream and five final opportunities, and a separate
+2 s readiness no-progress timeout. These are scheduling bounds, not display
+latency guarantees. Retry metadata does not refresh caption age or reanchor a
+current identity. Desktop presentation does not schedule native retries.
+
 Python's semantic retirement compares `(publication_order, publication_index)`
 within a scope and generation to reject late publications. It does not invalidate
 a different entry that is still current. Native uses those coordinates and
@@ -61,6 +74,11 @@ Run commands from the repository root. On Windows, use a short `--target-dir`
 path if the checkout is deep enough to exceed MSBuild's tracking-file path limit.
 
 ## Verification
+
+The cross-language active-source tests invoke `uv run --frozen python` to produce
+snapshots through the actual Python Presenter before exercising native reducer
+and retry ownership. Install `uv` and the locked Python test environment before
+running the Rust suite.
 
 ```powershell
 cargo test --locked --manifest-path native/overlay/Cargo.toml

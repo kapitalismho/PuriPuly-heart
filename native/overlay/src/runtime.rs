@@ -3068,6 +3068,99 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn python_active_self_projection_drives_native_stream_and_final_accounting() {
+        use crate::{NATIVE_FRESH_RETRY_CADENCE, NATIVE_FRESH_RETRY_DEADLINE};
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        let output = std::process::Command::new("uv")
+            .args([
+                "run",
+                "--frozen",
+                "python",
+                "-m",
+                "tests.helpers.overlay_active_freshness",
+            ])
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let snapshots: Vec<OverlayPresentationSnapshot> =
+            serde_json::from_slice(&output.stdout).unwrap();
+        let logger = OverlayLogger::open(std::env::temp_dir()).await.unwrap();
+        let channel = FreshRetryChannel::SelfChannel;
+        let mut owner = NativePresentationOwner::new(
+            snapshots[0].clone(),
+            CaptionRenderer::new_for_test().unwrap(),
+            FakeOpenVr::default(),
+        );
+        owner.reconcile_fresh_schedules(&logger).await.unwrap();
+        let first = owner.retry_episodes.schedule(channel).unwrap().clone();
+        assert_eq!(first.max_completed, 4);
+        assert_eq!(
+            first.deadline - (first.next_due - NATIVE_FRESH_RETRY_CADENCE),
+            NATIVE_FRESH_RETRY_DEADLINE
+        );
+        let completed = owner
+            .retry_episodes
+            .complete_matching(&first, first.next_due, NATIVE_FRESH_RETRY_CADENCE)
+            .unwrap();
+        assert_eq!(completed.completed, 1);
+        owner.runtime.apply_snapshot(snapshots[1].clone());
+        owner.reconcile_fresh_schedules(&logger).await.unwrap();
+        let updated = owner.retry_episodes.schedule(channel).unwrap().clone();
+        assert_eq!(updated.completed, 1);
+        assert_eq!(updated.deadline, first.deadline);
+        assert_eq!(updated.next_due, completed.next_due);
+        assert_eq!(updated.episode_generation, first.episode_generation);
+        assert_ne!(updated.trigger_generation, first.trigger_generation);
+        owner.runtime.apply_snapshot(snapshots[2].clone());
+        owner.reconcile_fresh_schedules(&logger).await.unwrap();
+        for count in 2..=4 {
+            let due = owner.retry_episodes.schedule(channel).unwrap().clone();
+            let result = owner
+                .retry_episodes
+                .complete_matching(&due, due.next_due, NATIVE_FRESH_RETRY_CADENCE)
+                .unwrap();
+            assert_eq!(result.completed, count);
+        }
+        assert!(owner.retry_episodes.schedule(channel).is_none());
+        owner.runtime.apply_snapshot(snapshots[3].clone());
+        owner.reconcile_fresh_schedules(&logger).await.unwrap();
+        assert!(owner.retry_episodes.schedule(channel).is_none());
+        assert_eq!(
+            owner.retry_episodes.accounting(channel).unwrap().completed,
+            4
+        );
+        for snapshot in &snapshots[4..6] {
+            owner.runtime.apply_snapshot(snapshot.clone());
+            owner.reconcile_fresh_schedules(&logger).await.unwrap();
+            let final_schedule = owner.retry_episodes.schedule(channel).unwrap().clone();
+            assert_eq!(final_schedule.completed, 0);
+            assert_eq!(final_schedule.max_completed, 5);
+            assert_ne!(final_schedule.episode_generation, first.episode_generation);
+            for count in 1..=5 {
+                let due = owner.retry_episodes.schedule(channel).unwrap().clone();
+                let result = owner
+                    .retry_episodes
+                    .complete_matching(&due, due.next_due, NATIVE_FRESH_RETRY_CADENCE)
+                    .unwrap();
+                assert_eq!(result.completed, count);
+            }
+        }
+        owner.runtime.apply_snapshot(snapshots[6].clone());
+        owner.reconcile_fresh_schedules(&logger).await.unwrap();
+        assert!(owner.retry_episodes.schedule(channel).is_none());
+        assert!(owner.runtime.state().blocks().is_empty());
+    }
+
+    #[tokio::test]
     async fn diagnostic_profiles_schedule_zero_or_exactly_one_delayed_due_completion() {
         fn snapshot(revision: u64, generation: u64) -> OverlayPresentationSnapshot {
             serde_json::from_value(serde_json::json!({

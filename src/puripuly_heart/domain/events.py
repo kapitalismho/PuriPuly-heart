@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TypeAlias
+from typing import Protocol, TypeAlias
 from uuid import UUID
 
 from puripuly_heart.core.messages import ErrorDiagnostics, UserErrorReport, UserMessageRef
@@ -96,6 +96,13 @@ class UIEventType(str, Enum):
     ERROR = "ERROR"
 
 
+class UIEventDeliveryAuthority(Protocol):
+    def is_current(self) -> bool: ...
+    def claim_delivery(self) -> bool: ...
+
+    def claim_presentation(self) -> bool: ...
+
+
 @dataclass(frozen=True, slots=True)
 class UIEvent:
     type: UIEventType
@@ -104,6 +111,7 @@ class UIEvent:
     source: str | None = None
     channel: ChannelId | None = None
     runtime_log_handled: bool = False
+    delivery_authority: UIEventDeliveryAuthority | None = None
 
     def __post_init__(self) -> None:
         resolved_channel = self.channel

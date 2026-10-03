@@ -1064,7 +1064,7 @@ class OverlayPresenter(OverlaySink):
         if event.channel == "self":
             if not event_changed or not isinstance(
                 event,
-                (SelfTranscriptFinal, TranslationFinal),
+                (SelfActiveUpdate, SelfTranscriptFinal, TranslationFinal),
             ):
                 return None
         elif event.channel == "peer":
@@ -1084,6 +1084,16 @@ class OverlayPresenter(OverlaySink):
             if rendered_key != key:
                 continue
             if block.primary_text.strip():
+                if isinstance(event, SelfActiveUpdate):
+                    previous_block = next(
+                        (previous for previous in previous_snapshot.blocks if previous.id == block.id),
+                        None,
+                    )
+                    if previous_block is not None and (
+                        self._presentation_state.visible_block_content_signature(previous_block)
+                        == self._presentation_state.visible_block_content_signature(block)
+                    ):
+                        return None
                 if event.channel == "self" and block.block_variant == "finalized":
                     previous_block = self._visible_finalized_self_block_in_snapshot(
                         previous_snapshot,
