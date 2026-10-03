@@ -415,11 +415,277 @@ def test_prepared_stage_loader_rejects_identity_tampering(tmp_path, monkeypatch,
 
 
 @pytest.mark.asyncio
-async def test_direct_live_refuses_inherited_experiment_overrides(monkeypatch):
+async def test_direct_live_refuses_inherited_experiment_overrides(tmp_path, monkeypatch):
     monkeypatch.setattr(
         measurement, "inspect_process_names", lambda: {"vrserver.exe", "vrcompositor.exe"}
     )
     monkeypatch.setenv("PURIPULY_SKIP_VR_PREFLIGHT", "1")
-    args = SimpleNamespace(live=True, confirm_hmd_ready=True, scenario="stable")
+    run_id = "overrides"
+    run = tmp_path / "runs" / run_id
+    run.mkdir(parents=True)
+    (run / "owned.json").write_text("{}", encoding="utf-8")
+    lock = tmp_path / "active-live.lock"
+    lock.write_text(json.dumps({"run_id": run_id}), encoding="utf-8")
+    monkeypatch.setattr(measurement, "LIVE_LOCK", lock)
+    args = SimpleNamespace(
+        live=True,
+        confirm_hmd_ready=True,
+        scenario="stable",
+        stage=tmp_path,
+        arm="candidate",
+        anchor="head_locked",
+        run_id=run_id,
+        duration=1,
+        timeout=20,
+        device="unknown",
+        firmware="unknown",
+        connection="unknown",
+    )
     with pytest.raises(measurement.MeasurementError, match="overrides refused"):
         await scenarios.run_measurement(args)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure", ["cancel_inventory", "stop_inventory", "timeout_inventory", "early_init_error"]
+)
+async def test_owned_preparation_abort_writes_receipt_without_native_start(
+    tmp_path, monkeypatch, failure
+):
+    import threading
+
+    run_id = "preparation-" + failure
+    run = tmp_path / "runs" / run_id
+    run.mkdir(parents=True)
+    (run / "owned.json").write_text("{}", encoding="utf-8")
+    lock = tmp_path / "active-live.lock"
+    lock.write_text(json.dumps({"run_id": run_id}), encoding="utf-8")
+    monkeypatch.setattr(measurement, "LIVE_LOCK", lock)
+    monkeypatch.setattr(
+        measurement, "inspect_process_names", lambda: {"vrserver.exe", "vrcompositor.exe"}
+    )
+    for key in tuple(scenarios.os.environ):
+        if key.startswith("PURIPULY_"):
+            monkeypatch.delenv(key)
+    monkeypatch.setattr(
+        measurement,
+        "load_prepared_stage",
+        lambda p: {
+            "control": {},
+            "native": {},
+            "sources": {"candidate": {"tree": {"sha256": "explicit-test-boundary"}}},
+        },
+    )
+    monkeypatch.setattr(scenarios, "validate_arm_imports", lambda p: "explicit-test-boundary")
+    native_starts = []
+
+    def prohibited_native(**kwargs):
+        native_starts.append(True)
+        pytest.fail("preparation abort must never create native manager")
+
+    monkeypatch.setattr(scenarios, "OverlayProcessManager", prohibited_native)
+    entered, release = threading.Event(), threading.Event()
+
+    def inventory():
+        entered.set()
+        release.wait(5)
+        return {"os": "explicit-test-boundary"}
+
+    monkeypatch.setattr(measurement, "environment_inventory", inventory)
+    if failure == "early_init_error":
+        release.set()
+        monkeypatch.setattr(
+            scenarios,
+            "OverlayDiagnosticsRecorder",
+            lambda **kwargs: (_ for _ in ()).throw(RuntimeError("controlled_early_init_error")),
+        )
+    args = SimpleNamespace(
+        stage=tmp_path,
+        arm="candidate",
+        anchor="head_locked",
+        run_id=run_id,
+        live=True,
+        confirm_hmd_ready=True,
+        duration=1,
+        timeout=1 if failure == "timeout_inventory" else 20,
+        scenario="independent",
+        device="unknown",
+        firmware="unknown",
+        connection="unknown",
+    )
+    task = asyncio.create_task(scenarios.run_measurement(args))
+    try:
+        if failure == "cancel_inventory":
+            await scenarios.until(entered.is_set)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        elif failure == "stop_inventory":
+            await scenarios.until(entered.is_set)
+            measurement.request_stop(tmp_path, run_id)
+            with pytest.raises(measurement.MeasurementError, match="operator_stop"):
+                await task
+        else:
+            with pytest.raises((measurement.MeasurementError, RuntimeError)):
+                await task
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+    await asyncio.sleep(0.05)
+    report = json.loads((run / "report.json").read_text(encoding="utf-8"))
+    assert report["software"]["outcome"] == "failed"
+    assert report["software"]["cleanup"] == "complete"
+    assert (
+        report["software"]["failure_reason"]
+        == {
+            "cancel_inventory": "cancelled",
+            "stop_inventory": "operator_stop",
+            "timeout_inventory": "run_timeout",
+            "early_init_error": "controlled_early_init_error",
+        }[failure]
+    )
+    assert report["software"]["native_startup"] == "not_started"
+    assert report["physical_hmd"]["result"] == "not_observed"
+    assert not native_starts
+
+
+@pytest.mark.parametrize("failure", ["cancel_before_popen", "failure_before_popen"])
+def test_controller_pre_spawn_abort_releases_owned_lock(tmp_path, monkeypatch, failure):
+    monkeypatch.setattr(measurement, "load_prepared_stage", lambda p: {})
+    original_write = measurement._write_json
+
+    def controlled_write(path, payload):
+        if path.name == "owned.json":
+            if failure == "cancel_before_popen":
+                raise KeyboardInterrupt
+            raise RuntimeError("controlled_controller_init_error")
+        original_write(path, payload)
+
+    monkeypatch.setattr(measurement, "_write_json", controlled_write)
+    monkeypatch.setattr(
+        measurement.subprocess,
+        "Popen",
+        lambda *args, **kwargs: pytest.fail("pre-spawn abort must not spawn"),
+    )
+    with pytest.raises((KeyboardInterrupt, RuntimeError, measurement.MeasurementError)):
+        measurement.launch_arm(tmp_path, arm="candidate", scenario="stable", anchor="head_locked")
+    reports = list((tmp_path / "runs").glob("*/report.json"))
+    assert len(reports) == 1
+    report = json.loads(reports[0].read_text(encoding="utf-8"))
+    assert report["software"]["outcome"] == "failed"
+    assert report["software"]["cleanup"] == "complete"
+    assert not (tmp_path / "active.lock").exists()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "cancel_inventory",
+        "early_init_error",
+        "worker_bootstrap_error",
+        "unknown_worker_exit",
+        "ambiguous_spawn_cancel",
+        "popen_error",
+    ],
+)
+def test_controller_pre_runtime_worker_abort_releases_only_confirmed_ownership(
+    tmp_path, monkeypatch, failure
+):
+    import threading
+
+    metadata = {
+        "control": {},
+        "native": {},
+        "sources": {"candidate": {"tree": {"sha256": "explicit-test-boundary"}}},
+    }
+    monkeypatch.setattr(measurement, "load_prepared_stage", lambda p: metadata)
+    monkeypatch.setattr(scenarios, "validate_arm_imports", lambda p: "explicit-test-boundary")
+    monkeypatch.setattr(
+        scenarios,
+        "OverlayProcessManager",
+        lambda **kwargs: pytest.fail("pre-runtime abort must not start native"),
+    )
+    entered, release = threading.Event(), threading.Event()
+
+    def inventory():
+        entered.set()
+        release.wait(5)
+        return {"os": "explicit-test-boundary"}
+
+    monkeypatch.setattr(measurement, "environment_inventory", inventory)
+    if failure == "early_init_error":
+        release.set()
+        monkeypatch.setattr(
+            scenarios,
+            "OverlayDiagnosticsRecorder",
+            lambda **kwargs: (_ for _ in ()).throw(RuntimeError("controlled_early_init_error")),
+        )
+
+    class ControlledWorker:
+        returncode = 2
+
+        def __init__(self, command, **kwargs):
+            self.args = measurement.build_parser().parse_args(command[3:])
+
+        def wait(self, timeout):
+            if failure == "unknown_worker_exit":
+                return 2
+            if failure == "worker_bootstrap_error":
+                monkeypatch.setattr(
+                    measurement,
+                    "load_prepared_stage",
+                    lambda p: (_ for _ in ()).throw(RuntimeError("controlled_bootstrap_error")),
+                )
+                with pytest.raises(RuntimeError, match="controlled_bootstrap_error"):
+                    measurement.run_owned_worker(self.args)
+                return 2
+
+            async def execute():
+                task = asyncio.create_task(scenarios.run_measurement(self.args))
+                try:
+                    if failure == "cancel_inventory":
+                        await scenarios.until(entered.is_set)
+                        task.cancel()
+                        with pytest.raises(asyncio.CancelledError):
+                            await task
+                    else:
+                        with pytest.raises(
+                            measurement.MeasurementError, match="controlled_early_init_error"
+                        ):
+                            await task
+                finally:
+                    release.set()
+                    await asyncio.gather(task, return_exceptions=True)
+
+            asyncio.run(execute())
+            return 2
+
+        def poll(self):
+            return 2
+
+    def spawn(command, **kwargs):
+        if failure == "ambiguous_spawn_cancel":
+            raise KeyboardInterrupt
+        if failure == "popen_error":
+            raise OSError("controlled_spawn_error")
+        return ControlledWorker(command, **kwargs)
+
+    monkeypatch.setattr(measurement.subprocess, "Popen", spawn)
+    try:
+        with pytest.raises((measurement.MeasurementError, KeyboardInterrupt, OSError)):
+            measurement.launch_arm(
+                tmp_path, arm="candidate", scenario="independent", anchor="head_locked"
+            )
+    finally:
+        release.set()
+    confirmed = failure not in ("unknown_worker_exit", "ambiguous_spawn_cancel")
+    assert (tmp_path / "active.lock").exists() is not confirmed
+    reports = list((tmp_path / "runs").glob("*/report.json"))
+    if failure == "unknown_worker_exit":
+        assert reports == []
+    else:
+        report = json.loads(reports[0].read_text(encoding="utf-8"))
+        assert report["software"]["outcome"] == "failed"
+        assert report["software"]["cleanup"] == ("complete" if confirmed else "unconfirmed")
+        assert report["software"]["native_startup"] == ("not_started" if confirmed else "unknown")
+        assert report["physical_hmd"]["result"] == "not_observed"

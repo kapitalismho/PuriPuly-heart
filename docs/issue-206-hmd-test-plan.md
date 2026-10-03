@@ -11,13 +11,13 @@ Compare product baseline `8666bb57935b7c6da0c3c8aeaec9d116762d9f3d` with candida
 ## Operator commands and resume point
 
 Run from the development checkout in PowerShell. The prepared-session location
-for this work is `C:/pph206-hmd-kit/issue206-reviewed`; use its manifest and reports,
+for this work is `C:/pph206-hmd-kit/issue206-ready-fixed`; use its manifest and reports,
 not an installed executable or a newer unrecorded Python source tree.
 
 Safe before the wearer returns:
 
 ```powershell
-$stage = 'C:/pph206-hmd-kit/issue206-reviewed'
+$stage = 'C:/pph206-hmd-kit/issue206-ready-fixed'
 uv run --frozen python -B scripts/bench_ovr_hmd_measurement.py inspect --stage $stage
 uv run --frozen python -B scripts/bench_ovr_hmd_measurement.py dry-run --stage $stage --arm candidate --scenario stable --anchor head_locked
 ```
@@ -203,11 +203,11 @@ was changed for this kit. The developer scenario helper composes the existing
 translation/output/overlay owners; it is not a second production scheduler or an
 installed-application execution claim.
 
-Ready stage: `C:/pph206-hmd-kit/issue206-reviewed`.
+Ready stage: `C:/pph206-hmd-kit/issue206-ready-fixed`.
 Preparation receipt SHA256:
-`e92c78c91aa578b27daae09a5bad8ecb28d1bbf9cb73319323564af495792dcf`.
+`bc9a21ca1f78334525154d3c0c43fa0bf154e5395671a5061d41618d46d5fb63`.
 Harness aggregate SHA256:
-`dab10c5640c8997f9aa7c04a9a1b7ea6e68345213edd24ad4388f9622122de46`.
+`a43d0d9f83993732bdb766e0ecc7fed1e404497ed1bcc5f46aac24edafca72b0`.
 The stage records and checks complete source trees, archive/lock hashes, harness,
 native/resource hashes, interpreter and installed-distribution identity.
 
@@ -220,12 +220,13 @@ Production profile remains P05/off. No new native build or physical run occurred
 
 | Check | Observed result |
 | --- | --- |
-| Focused harness/owner/bridge/runtime suite | 115 passed; two existing real-subprocess tests initially skipped because `INTEGRATION` was unset |
+| Focused harness/owner/bridge/runtime suite | Initially 115 passed; after preparation-abort repair, 127 passed. Two existing opt-in real-subprocess tests skipped in those invocations; separately enabled and passed below |
 | Both arms × both anchors × all 12 actual offline scenarios | 48 passed, zero failed; real controller/worker processes and owner engine, not a substituted short sequence |
 | Both maximum offline burst cases | 60-second requested scheduling window per arm, 119 meaningful updates/provider calls per arm, cleanup complete |
 | Actual run-correlated stop after source/provider start | Controller exited 2, `operator_stop`, cleanup complete; not a software pass |
 | Actual timeout after source/provider start | Controller exited 2, `run_timeout`, cleanup complete; not a software pass |
-| Post-format ready stage | Both arms' independent/stable cases passed (four runs), startup contract and read-only identity inspection passed |
+| Post-format checkpoint | Both arms' independent/stable cases passed (four runs), startup contract and read-only identity inspection passed |
+| Repaired ready stage | Ten actual runs passed: both arms × independent/stable/final-only/mixed-active/restart-reconnect; immediate and post-source stop/timeout failed truthfully, completed cleanup and released owned locks |
 | Previously skipped shutdown integrations, explicitly enabled | Both passed with real synthetic Python subprocesses; no native OpenVR process |
 | Ruff/Black | Ruff passed after unused-local/import cleanup; Black formatted the three tool/test files |
 
@@ -233,11 +234,36 @@ The full 48-case matrix, maximum bursts and stop/timeout receipts are retained i
 the pre-format stage `C:/pph206-hmd-kit/issue206-final/offline-verification.json`;
 its preparation SHA256 is
 `f4135cff509c6a7c4c3ca778d9e587efdd9b4c4aa9b9377888713f04ffaf7113`.
-The ready-stage `offline-verification.json` identifies the four fresh runs and
-documents retained evidence applicability. Formatting removed only an unused
+The intermediate `issue206-reviewed/offline-verification.json` identifies four
+post-format runs and documents retained evidence applicability. Formatting removed only an unused
 local binding (preserving validation), an unused import and reordered imports;
 normalized operational AST comparisons matched. The 48-case matrix is retained,
 not mislabeled as rerun against different harness bytes.
+
+Independent review of preparation checkpoint `5869d04a4c0c1dd00d5216539ba0fd7872b1f1b3`
+found a medium-severity abort gap before scenario entry: cancellable environment
+inventory was outside the receipt finalizer, so cancellation could leave a
+controller lock without a report even though native had not started. The
+finding was accepted. Four focused regressions failed before the repair.
+
+The repaired worker covers preparation, inventory and partial initialization
+with its monitored failure/receipt boundary. The controller also covers
+confirmed pre-spawn failures, and worker bootstrap failures receive an explicit
+pre-runtime receipt. Stop is checked before initialization and native start.
+Unknown worker/native termination or ambiguous spawn cancellation remains
+fail-closed rather than claiming cleanup. Read-only inventory work already
+running in an executor can finish under its own ten-second timeout; cancellation
+is not falsely described as terminating that work. The controller waits for
+worker exit before releasing ownership.
+
+`issue206-ready-fixed/repair-verification.json` records the 127-pass affected
+suite, ten fresh owner scenarios, four actual early/active stop/timeout receipts,
+current source/native/harness identities and remaining limits. Its scenario
+engine and provider/presenter helpers match the prior checkpoint's operational
+AST; the full earlier 48-case matrix and maximum bursts retain scenario
+applicability, but are not substituted for the refreshed abort/cleanup proof.
+The two separately passed production-runtime subprocess integrations and the
+isolated application-control complement are unaffected by this tooling repair.
 
 Observed baseline independent ingress had no source/provider call before UI
 release; candidate had source and one provider call. Stable and final-only

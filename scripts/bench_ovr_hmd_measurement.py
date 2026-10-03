@@ -361,6 +361,68 @@ def environment_inventory() -> dict:
     return result
 
 
+def _record_pre_runtime_abort(run, run_id, arm, scenario, anchor, live, exc, phase, confirmed):
+    _write_json(
+        run / "report.json",
+        {
+            "schema": RUN_SCHEMA,
+            "run_id": run_id,
+            "arm": arm,
+            "scenario": scenario,
+            "anchor": anchor,
+            "mode": "live" if live else "offline_dry_run",
+            "software": {
+                "outcome": "failed",
+                "failure_reason": (
+                    "cancelled"
+                    if isinstance(exc, (KeyboardInterrupt, asyncio.CancelledError))
+                    else str(exc)
+                ),
+                "phase": phase,
+                "cleanup": "complete" if confirmed else "unconfirmed",
+                "native_startup": "not_started" if confirmed else "unknown",
+            },
+            "physical_hmd": {"result": "not_observed", "api_success_is_not_physical_pass": True},
+        },
+    )
+    (run / "report.sha256").write_text(_sha256(run / "report.json"), encoding="ascii")
+
+
+def run_owned_worker(args):
+    run = args.stage / "runs" / args.run_id
+    lock = LIVE_LOCK if args.live else args.stage / "active.lock"
+    if (
+        not (run / "owned.json").is_file()
+        or not lock.is_file()
+        or json.loads(lock.read_text(encoding="utf-8")).get("run_id") != args.run_id
+    ):
+        raise MeasurementError("run-correlated controller ownership required")
+    runtime_entered = False
+    try:
+        load_prepared_stage(args.stage)
+        source = args.stage.resolve() / "source" / args.arm
+        sys.path[:0] = [str(source / "src"), str(source)]
+        sys.modules["bench_ovr_hmd_measurement"] = sys.modules[__name__]
+        from hmd_issue206_scenarios import run_measurement
+
+        runtime_entered = True
+        asyncio.run(run_measurement(args))
+    except BaseException as exc:
+        if not runtime_entered:
+            _record_pre_runtime_abort(
+                run,
+                args.run_id,
+                args.arm,
+                args.scenario,
+                args.anchor,
+                args.live,
+                exc,
+                "worker_bootstrap",
+                True,
+            )
+        raise
+
+
 def launch_arm(
     stage: Path,
     *,
@@ -404,62 +466,66 @@ def launch_arm(
         raise MeasurementError(
             "concurrent/stale owned run guard: inspect active.lock; never delete while owned runtime exists"
         ) from exc
-    os.close(descriptor)
-    _write_json(lock, {"run_id": run_id, "controller_pid": os.getpid()})
-    _write_json(
-        run / "owned.json",
-        {"run_id": run_id, "controller_pid": os.getpid(), "native_pid": "not_started"},
-    )
-    env = os.environ.copy()
-    for key in tuple(env):
-        if key.startswith("PURIPULY_") or key in ("PYTHONPATH", "PYTHONHOME"):
-            env.pop(key)
-    env.update(
-        {
-            "PYTHONDONTWRITEBYTECODE": "1",
-            "PYTHONPATH": str(stage / "source" / arm / "src")
-            + os.pathsep
-            + str(stage / "source" / arm),
-            "LOCALAPPDATA": str(run / "localappdata"),
-            "APPDATA": str(run / "appdata"),
-            "TEMP": str(run / "tmp"),
-            "TMP": str(run / "tmp"),
-            "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE": "p05",
-            "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT": "off",
-        }
-    )
-    for directory in ("localappdata", "appdata", "tmp", "logs"):
-        (run / directory).mkdir()
-    args = [
-        sys.executable,
-        "-B",
-        str(stage / "control" / "bench_ovr_hmd_measurement.py"),
-        "internal-run",
-        "--stage",
-        str(stage),
-        "--run-id",
-        run_id,
-        "--arm",
-        arm,
-        "--scenario",
-        scenario,
-        "--anchor",
-        anchor,
-        "--duration",
-        str(duration),
-        "--timeout",
-        str(timeout),
-        "--device",
-        device,
-        "--firmware",
-        firmware,
-        "--connection",
-        connection,
-    ]
-    if live:
-        args += ["--live", "--confirm-hmd-ready"]
     child = None
+    spawn_attempted = False
+    confirmed_no_worker = True
     try:
+        os.close(descriptor)
+        _write_json(lock, {"run_id": run_id, "controller_pid": os.getpid()})
+        _write_json(
+            run / "owned.json",
+            {"run_id": run_id, "controller_pid": os.getpid(), "native_pid": "not_started"},
+        )
+        env = os.environ.copy()
+        for key in tuple(env):
+            if key.startswith("PURIPULY_") or key in ("PYTHONPATH", "PYTHONHOME"):
+                env.pop(key)
+        env.update(
+            {
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONPATH": str(stage / "source" / arm / "src")
+                + os.pathsep
+                + str(stage / "source" / arm),
+                "LOCALAPPDATA": str(run / "localappdata"),
+                "APPDATA": str(run / "appdata"),
+                "TEMP": str(run / "tmp"),
+                "TMP": str(run / "tmp"),
+                "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE": "p05",
+                "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT": "off",
+            }
+        )
+        for directory in ("localappdata", "appdata", "tmp", "logs"):
+            (run / directory).mkdir()
+        args = [
+            sys.executable,
+            "-B",
+            str(stage / "control" / "bench_ovr_hmd_measurement.py"),
+            "internal-run",
+            "--stage",
+            str(stage),
+            "--run-id",
+            run_id,
+            "--arm",
+            arm,
+            "--scenario",
+            scenario,
+            "--anchor",
+            anchor,
+            "--duration",
+            str(duration),
+            "--timeout",
+            str(timeout),
+            "--device",
+            device,
+            "--firmware",
+            firmware,
+            "--connection",
+            connection,
+        ]
+        if live:
+            args += ["--live", "--confirm-hmd-ready"]
+        spawn_attempted = True
+        confirmed_no_worker = False
         child = subprocess.Popen(args, env=env, cwd=run)
         try:
             child.wait(timeout=timeout + 30)
@@ -471,12 +537,31 @@ def launch_arm(
             raise MeasurementError(
                 f"owned arm exited {child.returncode}; inspect {run / 'report.json'}"
             )
-    finally:
+    except BaseException as exc:
         if child is None:
+            confirmed_no_worker = not spawn_attempted or isinstance(exc, OSError)
+            _record_pre_runtime_abort(
+                run,
+                run_id,
+                arm,
+                scenario,
+                anchor,
+                live,
+                exc,
+                "controller_before_spawn" if confirmed_no_worker else "spawn_unconfirmed",
+                confirmed_no_worker,
+            )
+        raise
+    finally:
+        if child is None and confirmed_no_worker:
             lock.unlink(missing_ok=True)
-        elif child.poll() is not None and (run / "report.json").is_file():
+        elif child is not None and child.poll() is not None and (run / "report.json").is_file():
             receipt = json.loads((run / "report.json").read_text(encoding="utf-8"))
-            if receipt.get("software", {}).get("cleanup") == "complete":
+            if (
+                receipt.get("schema") == RUN_SCHEMA
+                and receipt.get("run_id") == run_id
+                and receipt.get("software", {}).get("cleanup") == "complete"
+            ):
                 lock.unlink(missing_ok=True)
     return run / "report.json"
 
@@ -587,13 +672,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         elif args.command == "internal-run":
-            load_prepared_stage(args.stage)
-            source = args.stage.resolve() / "source" / args.arm
-            sys.path[:0] = [str(source / "src"), str(source)]
-            sys.modules["bench_ovr_hmd_measurement"] = sys.modules[__name__]
-            from hmd_issue206_scenarios import run_measurement
-
-            asyncio.run(run_measurement(args))
+            run_owned_worker(args)
         else:
             print(
                 launch_arm(

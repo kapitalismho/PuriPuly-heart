@@ -586,7 +586,7 @@ def validate_arm_imports(source):
     return str(Path(puripuly_heart.__file__).resolve())
 
 
-async def run_measurement(args):
+def _prepare_source(args):
     if args.live:
         require(args.confirm_hmd_ready, "live requires --confirm-hmd-ready")
         control.validate_live_guard(control.inspect_process_names(), confirmed_hmd_ready=True)
@@ -617,6 +617,12 @@ async def run_measurement(args):
     preparation = control.load_prepared_stage(args.stage)
     source = (args.stage / "source" / args.arm).resolve()
     source_import = validate_arm_imports(source)
+    return preparation, source_import
+
+
+async def run_measurement(args):
+    if args.live:
+        require(args.confirm_hmd_ready, "live requires --confirm-hmd-ready")
     run = args.stage / "runs" / args.run_id
     require((run / "owned.json").is_file(), "run must be controller-owned")
     lock = control.LIVE_LOCK if args.live else args.stage / "active.lock"
@@ -630,17 +636,13 @@ async def run_measurement(args):
     started = time.monotonic()
     outcome, failure, cleanup = "failed", None, "not_started"
     runtime, manager, bridge, engine = None, None, None, None
+    manager_start_attempted = False
     transitioning = True
     started_at = control._utc_now()
-    environment = await asyncio.to_thread(control.environment_inventory)
-    diagnostics = OverlayDiagnosticsRecorder(
-        overlay_instance_id="hmd-" + args.run_id,
-        diagnostics_dir=run / "diagnostics",
-        capture_measurements=True,
-    )
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(anchor=args.anchor), native_retry_enabled=True
-    )
+    preparation = {}
+    source_import = "not_validated"
+    environment = {"preparation": "not_completed"}
+    diagnostics, presenter = None, None
     generation = 0
     owned_receipt_failure = None
 
@@ -666,9 +668,10 @@ async def run_measurement(args):
             return process
 
     async def start_runtime():
-        nonlocal runtime, manager, bridge, transitioning, generation
+        nonlocal runtime, manager, bridge, transitioning, generation, manager_start_attempted
         generation += 1
         transitioning = True
+        require(not (run / "stop.request").exists(), "operator_stop")
         control.load_prepared_stage(args.stage)
         runtime = OverlayRuntimeHandle(
             overlay_instance_id="hmd-" + args.run_id, shutdown_grace_s=3.0
@@ -690,7 +693,9 @@ async def run_measurement(args):
         await presenter.update_calibration(OverlayCalibration(anchor=args.anchor))
         await presenter.begin_native_retry_epoch(enabled=True)
         manager = None
+        manager_start_attempted = False
         if args.live:
+            require(not (run / "stop.request").exists(), "operator_stop")
             control.validate_live_guard(
                 control.inspect_process_names(), confirmed_hmd_ready=args.confirm_hmd_ready
             )
@@ -718,6 +723,8 @@ async def run_measurement(args):
                 graceful_shutdown_request=bridge.broadcast_shutdown,
             )
             runtime.attach_process_manager(manager)
+            require(not (run / "stop.request").exists(), "operator_stop")
+            manager_start_attempted = True
             await manager.start()
             require(
                 manager.state == "connected", f"native startup failed: {manager.failure_reason}"
@@ -732,13 +739,15 @@ async def run_measurement(args):
         nonlocal runtime
         if runtime:
             await runtime.close(preserve_presenter_state=preserve)
-            if manager:
+            if manager and manager_start_attempted:
                 receipt = manager.shutdown_receipt()
                 shutdowns.append(receipt)
                 require(shutdown_ok(receipt), "owned native shutdown failed")
             if preserve:
                 runtime.detach_preserved_presenter()
             runtime = None
+        elif presenter is not None:
+            await presenter.close()
 
     async def restart():
         nonlocal transitioning
@@ -764,7 +773,19 @@ async def run_measurement(args):
             await asyncio.sleep(0.1)
 
     async def execute():
-        nonlocal engine
+        nonlocal engine, preparation, source_import, environment, diagnostics, presenter
+        require(not (run / "stop.request").exists(), "operator_stop")
+        preparation, source_import = _prepare_source(args)
+        environment = await asyncio.to_thread(control.environment_inventory)
+        require(not (run / "stop.request").exists(), "operator_stop")
+        diagnostics = OverlayDiagnosticsRecorder(
+            overlay_instance_id="hmd-" + args.run_id,
+            diagnostics_dir=run / "diagnostics",
+            capture_measurements=True,
+        )
+        presenter = OverlayPresenter(
+            calibration=OverlayCalibration(anchor=args.anchor), native_retry_enabled=True
+        )
         await start_runtime()
         engine = ScenarioEngine(presenter, args, records, restart)
         await engine.run()
@@ -801,9 +822,16 @@ async def run_measurement(args):
         if cleanup_failures:
             outcome = "failed"
             failure = f"{failure or ''}; cleanup: {'; '.join(cleanup_failures)}"
-        diagnostic_receipt = await diagnostics.dump_evidence(
-            outcome="success" if outcome == "pass" else "failure", run_id=args.run_id
-        )
+        diagnostic_receipt = {"outcome": "not_started"}
+        if diagnostics is not None:
+            try:
+                diagnostic_receipt = await diagnostics.dump_evidence(
+                    outcome="success" if outcome == "pass" else "failure", run_id=args.run_id
+                )
+            except Exception as exc:
+                diagnostic_receipt = {"outcome": "failed", "reason": str(exc)}
+                outcome = "failed"
+                failure = f"{failure or ''}; diagnostics: {exc}"
         payload = {
             "schema": control.RUN_SCHEMA,
             "run_id": args.run_id,
@@ -811,11 +839,14 @@ async def run_measurement(args):
             "scenario": args.scenario,
             "anchor": args.anchor,
             "mode": "live" if args.live else "offline_dry_run",
-            "source_revision": control.ARMS[args.arm],
+            "source_revision": control.ARMS.get(args.arm, "not_validated"),
             "source_import": source_import,
-            "harness": preparation["control"],
-            "native": preparation["native"],
-            "source_tree_sha256": preparation["sources"][args.arm]["tree"]["sha256"],
+            "harness": preparation.get("control", "not_validated"),
+            "native": preparation.get("native", "not_validated"),
+            "source_tree_sha256": preparation.get("sources", {})
+            .get(args.arm, {})
+            .get("tree", {})
+            .get("sha256", "not_validated"),
             "started_at": started_at,
             "elapsed_seconds": time.monotonic() - started,
             "requested_sustained_seconds": args.duration if args.scenario == "sustained" else None,
@@ -835,7 +866,14 @@ async def run_measurement(args):
                 "provider_calls": len(engine.provider.calls) if engine else 0,
                 "shutdowns": shutdowns,
                 "diagnostics": diagnostic_receipt,
-                "native_evidence": diagnostics.evidence_summary() if args.live else "not_run",
+                "native_evidence": (
+                    diagnostics.evidence_summary()
+                    if args.live and diagnostics is not None
+                    else "not_run"
+                ),
+                "native_startup": (
+                    "attempted" if manager_start_attempted or shutdowns else "not_started"
+                ),
                 "scope": "real developer translation/Presenter/projection/bridge owners; native only in live",
             },
             "physical_hmd": {"result": "not_observed", "api_success_is_not_physical_pass": True},
