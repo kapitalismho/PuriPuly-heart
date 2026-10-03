@@ -4,7 +4,7 @@
 
 The reported delay/staleness occurred in **SteamVR**. Desktop captures, Presenter acceptance, successful OpenVR API calls, and native health are not proof that the wearer saw current pixels.
 
-The maintainer requested a test plan and complete preparation up to the test start, then a joint session after returning and putting on the HMD. Preparation must not start a live overlay, SteamVR, VRChat, microphone/loopback capture, or paid provider requests. The later [short physical session](#short-physical-session-2026-10-03-utc) exercised only the two cases recorded below; full physical acceptance remains incomplete. See [software evidence](issue-206-verification.md).
+The maintainer requested a test plan and complete preparation up to the test start, then a joint session after returning and putting on the HMD. Preparation must not start a live overlay, SteamVR, VRChat, microphone/loopback capture, or paid provider requests. The initial [short physical session](#short-physical-session-2026-10-03-utc) and subsequent [resumed batch](#resumed-batch-2026-10-03-utc) retain the actual observations and failures below; full physical acceptance remains incomplete. See [software evidence](issue-206-verification.md).
 
 Compare product baseline `8666bb57935b7c6da0c3c8aeaec9d116762d9f3d` with candidate `c501b83350d4c39129cf61dd3e582b6ebbea04a5`. Use separate pinned Python/source exports, not two labels pointing to the candidate Python code. The native production implementation is unchanged between these revisions, so use one shared, hash-verified native assembly and record its actual build provenance. Full native source trees are not identical: the candidate adds tests.
 
@@ -148,8 +148,19 @@ harness.
 
 Safe host setup and inspection:
 
+For a later live check, capture the original Windows shell OpenVR registry path
+in a fresh dedicated terminal **before** changing the profile environment, and
+bind it before starting the host. The registry contains runtime discovery
+metadata, not application settings or credentials; do not copy or edit it.
+All application/home/secret-store isolation remains enabled. If a host was
+already started without this binding, stop it normally and start a new isolated
+host; changing only a later CLI client's environment cannot repair its parent.
+
 ```powershell
+$originalShellLocalAppData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+$openvrRegistryPath = Join-Path $originalShellLocalAppData 'openvr/openvrpaths.vrpath'
 . C:/pph206-hmd-kit/app-control/session.ps1
+$env:VR_PATHREG_OVERRIDE = $openvrRegistryPath
 pph app start --background
 pph capture set self off
 pph capture set peer off
@@ -164,9 +175,10 @@ pph overlay status
 pph osc status
 ```
 
-Check the JSON effective OFF state before proceeding. Only later, with the
-wearer's renewed confirmation and no other native overlay, execute each live
-command separately: `pph overlay set on`, `pph overlay status`, then
+Check the JSON effective OFF state before proceeding. Live admission also
+requires the captured OpenVR registry file to exist, the wearer to be ready,
+and no other native overlay. Execute each live command in order, inspecting
+its effective receipt before continuing: `pph overlay set on`, `pph overlay status`, then
 `pph text submit --file "$appStage/config/manual-source.txt"`. Stop with
 `pph overlay set off`, inspect `pph overlay status`, and finish with
 `pph app stop`, including after a failed ON attempt. Ask the wearer separately
@@ -453,3 +465,137 @@ bridge sessions with distinct instance IDs, restart ordinals 1/2/3 and wire
 generation 1, preserved original/replayed deadlines, stale late translation
 and empty final blocks. These are real WebSocket/owner-path checks, not native
 or HMD runs. They do not replace the still-required live reconnect comparison.
+
+### Corrected live batch and short-case coverage
+
+After the repair checkpoint `c8e19ad4657b8c96bbb2d510c97bc5112dfb8077`
+passed independent whole-checkpoint review, the wearer renewed readiness with
+**“껐고 착용 중, 나머지 일괄 시작”**. The corrected stage's
+`resumed-batch-02/state.json` records **24 software/cleanup passes**:
+the remaining head-locked baseline/candidate reconnect pair, then all eleven
+short scenarios on both arms with spatial lock. The command wall time was
+349.11 seconds, not a display-latency measurement.
+
+The wearer reported **“계속 봤고 모두 정상”**, including normal disappearance,
+after this entire corrected batch. Twenty-four new observation sidecars retain
+that ordered batch-level qualitative observation and its limits.
+`short-coverage.json` verifies **44 unique passing observed short combinations**:
+11 per arm/anchor, each with live mode, software pass, complete cleanup,
+`no_issue` observation and matching report SHA256.
+
+Twenty records retain the original harness aggregate identity
+`a43d0d9f83993732bdb766e0ecc7fed1e404497ed1bcc5f46aac24edafca72b0`;
+24 use the corrected aggregate
+`c61ba7691fed792b32715ea07353da4bf5e0d5191a885212fb89234a225b755b`.
+`carryover-index.json` lists the exact copied original evidence and file hashes.
+Independent review accepted retention because those earlier single-owner
+scenarios already used wire generation 1 and their product/native bytes,
+scenario semantics and retry policy were unchanged. Copies are not new runs.
+The original failed reconnect remains at the old stage and does not qualify.
+
+The wearer separately authorized four ten-second sustained comparisons followed
+by the application complement. Two initial sustained admissions were blocked
+before any run/native launch because the ordinary installed application was
+present; their zero-completion states are retained as `sustained-batch-01` and
+`sustained-batch-02`. After the wearer confirmed application closure, the
+remaining shutdown interval ended and targeted inspection found no guarded
+application/native process. The Director retained that renewed readiness for
+a new admission, without relaxing the guard or adding an automatic retry loop.
+These admission blocks are neither physical executions nor passes.
+
+### Sustained observations and actual-application boundary
+
+`sustained-batch-03/state.json` records four successful native software/cleanup
+runs, each requesting a ten-second update interval:
+
+- head-locked baseline `baseline-sustained-d1107f27`;
+- head-locked candidate `candidate-sustained-e0d90687`;
+- spatial-locked baseline `baseline-sustained-cf0e422d`;
+- spatial-locked candidate `candidate-sustained-dd655f30`.
+
+The wearer answered **“계속 봤고 모두 정상”** and **“완전히 사라짐”**.
+Four correlated observation sidecars retain those qualitative results.
+The session therefore has **48 passing observed synthetic-owner/native cases**
+(44 short plus four sustained), not 48 real-application tests.
+`final-physical-observation.json` retains the final physical scope and limits.
+
+The separate actual-application attempt is **failed**, not included in that
+count. `app-complement-02/14-overlay-set-on.json` has an applied terminal ON
+receipt, but `configured_target=steamvr`, `effective_target=desktop` and
+`fallback_active=true`. The operator rejected this state before manual text
+submission. An applied ON receipt and connected desktop fallback do not prove
+SteamVR presentation. No manual-source HMD observation is claimed.
+
+The app log at
+`C:/pph206-hmd-kit/app-control/localappdata/puripuly-heart/puripuly_heart.log`
+records the original SteamVR generation failure as `steamvr_not_installed`.
+Its retained diagnostic file
+`diagnostics/overlay/overlay-diagnostics-failure-20261004-050215-561115000-overlay-a71aeae56cdc918f.jsonl`
+records native startup failure; child PID 204 exited 20 with readers complete
+and no force. In the pinned native implementation this means
+`VR_IsRuntimeInstalled()` returned false before OpenVR background initialization,
+HMD discovery or rendering. The same pinned bytes passed the preceding native
+suite; discoverability in the application's separately isolated environment
+must not be inferred from that success.
+
+OFF returned applied/off/runtime-inactive, app stop returned terminal stopped,
+and post-stop status returned `instance_not_found`. The final process check
+found owned host PID 33576 absent and no native overlays. The wearer was told
+the HMD could be removed; further live application exposure requires renewed
+readiness, not an automatic retry.
+
+The application operator's Windows PowerShell 5.1 subprocess handling was
+validated before this attempt using actual safe Python stderr/exit probes
+(`app-native-smoke-04/result.json`), not application launches. Separate stdout
+and stderr capture preserves expected exit-3 absence JSON; typed state checks
+and failed outcomes remain strict. The identity verifier checks all 1,378
+source files and 31 native assembly files even under Python optimization.
+Four seconds is the intended post-admission hold, not a measured ON-to-OFF
+duration; this failed attempt never reached that hold.
+
+These results do not establish detailed native render/retry/resource accounting,
+application automatic recovery, exact HMD latency, long-session stability,
+device-wide safety or resolution of the historical SteamVR delay.
+
+### Resolved app discovery and final physical check
+
+`openvr-discovery-proof.json` isolates the original app failure without VR
+initialization. With the pinned `openvr_api.dll`, `VR_IsRuntimeInstalled()` was
+true in the regular environment and false under the exact app profile
+isolation. Restoring only `USERPROFILE` restored discovery; keeping all profile
+isolation and setting `VR_PATHREG_OVERRIDE` to the original Windows shell
+OpenVR registry also restored discovery. The redirected profile changed shell
+LocalAppData to `app-control/home/AppData/Local`, where no registry existed.
+Only path/existence/API booleans were recorded, not registry contents.
+
+The live operator now captures the original shell registry before isolation and
+binds that single runtime-discovery prerequisite before host startup. It does
+not expose the real home/profile or change application settings, secrets,
+product/native bytes, or the user's registry. The exact binding fragment passed
+a no-initialization probe (`app03-environment-binding-proof.json`).
+
+The wearer then explicitly selected **“착용 중, 마지막 앱 확인 진행”**.
+The separately recorded `app-complement-03` attempt passed:
+
+- instance `711d02f2-fe82-4ac7-82e9-5b7eaedadcda`;
+- ON applied/terminal, configured and effective target `steamvr`, connected
+  process/runtime, presentation ready, `fallback_active=false`;
+- public manual-source submission applied/terminal with capture and translation
+  still disabled;
+- OFF applied/terminal, desired false, lifecycle off, effective target null and
+  runtime inactive;
+- app stop terminal/stopped, then exit-3 `instance_not_found`;
+- final owned host PID 7984 absent and no native overlay processes.
+
+The wearer answered **“정상 표시됐고 완전히 사라짐”**, including no
+placement/flicker/residual-text issue or discomfort. `app-complement-03/observation.json`
+correlates this actual-application HMD observation with report SHA256
+`d17c98e7d23f74fae56ce62034ca97c606244afe11640daf71c99ef5436c1ca8`.
+The earlier fallback attempt and both prelaunch admission blocks remain intact;
+none is rewritten into success.
+
+The bounded session is complete: **44 short native scenarios, four ten-second
+sustained scenarios, and one corrected-environment actual-application
+ON/manual-source/OFF observation** passed their declared software/physical
+checks. This is not full issue-206 remediation, a long-session guarantee,
+native-cost measurement, or application automatic-recovery acceptance.
