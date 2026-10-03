@@ -48,6 +48,16 @@ uv run --frozen pytest tests/core/test_self_ui_isolation.py tests/core/test_tran
 
 Result: **608 passed**, 33 existing `asyncio.iscoroutinefunction` deprecation warnings, 13.75 s. Printed owner observations for all three routes included `source_application=true provider_calls=1 ui_released=false`, `translation_application=true ui_released=false`, and separately `provider_completed=true translation_application=true bridge_released=false`.
 
+The independent checkpoint review of `8666bb57935b7c6da0c3c8aeaec9d116762d9f3d..16ea76a83cae6ce4319c4f8480eb89d839c69235` found one medium-severity lifecycle defect (F1): replacing a completed/failed UI bridge in the same loop turn as SELF writer creation could cancel the writer before coroutine entry, leaving a stranded writer reference. The finding was accepted and repaired with identity-checked task-completion ownership; cancellation-before-entry now releases the writer and starts retained current work. No task-per-event, capacity, timeout, rendering or provider policy changed.
+
+The production `OutputRuntime.start_ui_event_bridge` regression failed before repair for both completed and failed previous bridges while waiting for actual history/dashboard consumption (`artifact://99`). After repair, both cases passed without using `wait_for_idle` as recovery. A failed-bridge cleanup fixture was corrected to the existing single-error rethrow contract. Repair verification command:
+
+```powershell
+uv run --extra dev pytest tests/core/test_translation_ui_delivery.py tests/core/test_self_ui_isolation.py tests/core/test_translation_output_projection_owner.py tests/core/runtime/test_output_runtime.py tests/ui/test_event_bridge.py tests/core/test_overlay_bridge.py -o addopts=-s -q --tb=short
+```
+
+Result: **177 passed**, 3.72 s (`artifact://104`), including all six owner pressure smokes. Ruff passed and Black left both changed files unchanged. The 608-test integrated run and raw desktop hashes above describe the initial checkpoint; this bounded repair changes only SELF writer completion cleanup and its regression tests. Native/desktop rendering, protocol, layout, translation scheduling and the deferred physical scope are unchanged; their prior evidence is retained, not relabeled as rerun.
+
 Native commands:
 
 ```powershell

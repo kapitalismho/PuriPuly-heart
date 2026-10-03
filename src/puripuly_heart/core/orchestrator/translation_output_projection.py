@@ -569,6 +569,13 @@ class TranslationUiMessageQueue:
     def _ensure_self_writer(self) -> None:
         if self._self_events and not self._closed and self._self_worker is None:
             self._self_worker = asyncio.create_task(self._run_self_writer(), name="self-ui-writer")
+            self._self_worker.add_done_callback(self._finish_self_writer)
+
+    def _finish_self_writer(self, worker: asyncio.Task[None]) -> None:
+        if self._self_worker is worker:
+            self._active_self_event = None
+            self._self_worker = None
+            self._ensure_self_writer()
 
     async def _run_self_writer(self) -> None:
         try:
@@ -605,9 +612,8 @@ class TranslationUiMessageQueue:
                 finally:
                     self._active_self_event = None
         finally:
-            self._active_self_event = None
-            self._self_worker = None
-            self._ensure_self_writer()
+            if self._self_worker is asyncio.current_task():
+                self._active_self_event = None
 
     def _record_self(self, event: UIEvent, reason: str) -> OutputPublicationResult:
         accepted = reason in {"accepted_handoff", "ui_queue_submitted"}

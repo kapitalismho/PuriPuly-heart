@@ -311,3 +311,61 @@ async def test_output_generation_and_bridge_replacement_reject_submitted_late_ca
         first.close()
         second.close()
         await output.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("previous_bridge", ["completed", "failed"])
+async def test_production_bridge_replacement_recovers_unstarted_self_writer(
+    previous_bridge: str,
+) -> None:
+    destination = asyncio.Queue(maxsize=1)
+    output = OutputRuntime(chatbox=RecordingOscQueue())
+    owner = TranslationUiMessageQueue(destination, output)
+    app = DummyApp()
+    first = make_bridge(app, event_queue=destination)
+    second = make_bridge(app, event_queue=destination)
+    if previous_bridge == "completed":
+        first.close()
+    else:
+
+        async def fail_bridge() -> None:
+            raise RuntimeError("previous bridge failed")
+
+        first.run = fail_bridge
+    try:
+        previous = output.start_ui_event_bridge(first)
+        await asyncio.gather(previous, return_exceptions=True)
+        assert previous.done()
+        destination.put_nowait(UIEvent(UIEventType.SESSION_STATE_CHANGED))
+        retired = await owner.publish(transcript_event("retired speech"))
+        assert retired.decision.reason == "accepted_handoff"
+        cancelled_writer = owner._self_worker
+        assert cancelled_writer is not None
+        output.start_ui_event_bridge(second)
+        manual = await owner.publish(transcript_event("current manual", source="You"))
+        speech = await owner.publish(transcript_event("current speech"))
+        assert manual.decision.reason == speech.decision.reason == "accepted_handoff"
+
+        async def wait_for_consumption() -> None:
+            while len(app.history) != 2 or owner.has_resources:
+                await asyncio.sleep(0)
+
+        await asyncio.wait_for(wait_for_consumption(), 1.0)
+        assert cancelled_writer.cancelled()
+        assert [entry[1] for entry in app.history] == ["current manual", "current speech"]
+        assert [call[0] for call in app.view_dashboard.display_calls] == [
+            "current manual",
+            "current speech",
+        ]
+        assert len([d for d in output.routing_decisions if d.reason == "destination_replaced"]) == 1
+        assert len([d for d in output.routing_decisions if d.reason == "ui_queue_submitted"]) == 2
+        assert owner._self_worker is None
+        assert not owner._self_events
+    finally:
+        first.close()
+        second.close()
+        if previous_bridge == "failed":
+            with pytest.raises(RuntimeError, match="previous bridge failed"):
+                await output.close()
+        else:
+            await output.close()
