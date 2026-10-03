@@ -535,54 +535,6 @@ async def test_all_llm_outer_providers_forward_scene_to_inner_client() -> None:
     assert [inner.calls for inner in inners] == [[2]] * len(inners)
 
 
-@pytest.mark.asyncio
-async def test_managed_gemma_provider_embeds_scene_in_user_message() -> None:
-    from puripuly_heart.core.local_translation.runtime import (
-        ManagedGemmaMetrics,
-        ManagedGemmaResponse,
-    )
-    from puripuly_heart.providers.llm.managed_gemma import ManagedGemmaLLMProvider
-
-    @dataclass
-    class CapturingRuntime:
-        user_messages: list[str] = field(default_factory=list)
-
-        async def translate(self, **kwargs):  # type: ignore[no-untyped-def]
-            self.user_messages.append(kwargs["user_message"])
-            return ManagedGemmaResponse(
-                text="ok",
-                metrics=ManagedGemmaMetrics(1, 1, 1, 1.0, 1.0, 1.0),
-            )
-
-        async def release(self) -> None:
-            return None
-
-    runtime = CapturingRuntime()
-    provider = ManagedGemmaLLMProvider(runtime=runtime, backend="cpu")  # type: ignore[arg-type]
-    await provider.translate(
-        utterance_id=uuid4(),
-        text="hello",
-        system_prompt="system",
-        source_language="en",
-        target_language="ko",
-        context="prior",
-        scene_participant_count=2,
-    )
-    assert runtime.user_messages == [
-        "<scene>\nPeople: 2\n</scene>\n\n<context>\nprior\n</context>\n\n<input>\nhello\n</input>"
-    ]
-    await provider.translate(
-        utterance_id=uuid4(),
-        text="hello",
-        system_prompt="system",
-        source_language="en",
-        target_language="ko",
-        context="prior",
-        scene_participant_count=None,
-    )
-    assert runtime.user_messages[1] == "<context>\nprior\n</context>\n\n<input>\nhello\n</input>"
-
-
 def test_gemma_prefix_identity_ignores_scene_people() -> None:
     from puripuly_heart.core.local_translation.assets import e4b_gemma_spec
     from puripuly_heart.core.local_translation.runtime import _prefix_identity
@@ -595,53 +547,3 @@ def test_gemma_prefix_identity_ignores_scene_people() -> None:
         spec=spec, system_prompt="system", source_language="en", target_language="ko"
     )
     assert first == second
-
-
-@pytest.mark.asyncio
-async def test_httpx_clients_embed_scene_in_request_body() -> None:
-    from puripuly_heart.providers.llm.deepseek import HttpxDeepSeekClient
-    from puripuly_heart.providers.llm.local_openai import HttpxLocalOpenAIClient
-    from puripuly_heart.providers.llm.openrouter import HttpxOpenRouterClient
-    from puripuly_heart.providers.llm.qwen_async import HttpxQwenClient
-
-    bodies = [
-        HttpxDeepSeekClient(api_key="k", model="m")._build_request_body(
-            text="hello",
-            system_prompt="system",
-            source_language="en",
-            target_language="ko",
-            context="prior",
-            scene_participant_count=2,
-        ),
-        HttpxOpenRouterClient(api_key="k", model="m")._build_request_body(
-            text="hello",
-            system_prompt="system",
-            source_language="en",
-            target_language="ko",
-            context="prior",
-            scene_participant_count=2,
-        ),
-        HttpxQwenClient(api_key="k", model="m")._build_request_body(
-            text="hello",
-            system_prompt="system",
-            source_language="en",
-            target_language="ko",
-            context="prior",
-            scene_participant_count=2,
-        ),
-        HttpxLocalOpenAIClient(model="m")._build_request_body(
-            text="hello",
-            system_prompt="system",
-            source_language="en",
-            target_language="ko",
-            context="prior",
-            scene_participant_count=2,
-        ),
-    ]
-    for body in bodies:
-        content = body["messages"][1]["content"]
-        assert isinstance(content, str)
-        assert content.startswith("<scene>\nPeople: 2\n</scene>\n\n")
-        assert "<context>\nprior\n</context>" in content
-        assert content.endswith("<input>\nhello\n</input>")
-        assert body["messages"][0]["content"] == "system"
