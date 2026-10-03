@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import hashlib
+import asyncio
 import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,399 +10,416 @@ import pytest
 
 from scripts import bench_ovr_hmd_measurement as measurement
 
-
-def test_live_guard_refuses_preexisting_overlay_without_stopping_it() -> None:
-    processes = {
-        "vrserver.exe",
-        "vrcompositor.exe",
-        "PuriPulyHeartOverlay.exe",
-    }
-
-    with pytest.raises(measurement.MeasurementError, match="already running"):
-        measurement.validate_live_guard(processes, confirmed_hmd_ready=True)
-
-    assert "PuriPulyHeartOverlay.exe" in processes
+sys.path.insert(0, str(Path(measurement.__file__).parent))
+from puripuly_heart.config.overlay_calibration import OverlayCalibration
+from puripuly_heart.core.overlay.presenter import OverlayPresenter
+from scripts import hmd_issue206_scenarios as scenarios
 
 
-def test_startup_contract_rejects_extra_or_changed_capability(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    mismatched = dict(measurement.EXPECTED_STARTUP_CONTRACT)
-    mismatched["unexpected_capability"] = {"version": 1}
+@pytest.mark.parametrize(
+    "confirmed,names",
+    [
+        (False, set()),
+        (True, set()),
+        (True, {"vrserver.exe", "vrcompositor.exe", "PuriPulyHeartOverlay.exe"}),
+    ],
+)
+def test_live_guard_fail_closed(confirmed, names):
+    with pytest.raises(measurement.MeasurementError):
+        measurement.validate_live_guard(names, confirmed_hmd_ready=confirmed)
+
+
+def test_direct_launch_guard_precedes_loading_and_spawning(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        measurement,
+        "load_prepared_stage",
+        lambda p: pytest.fail("identity must not load before missing confirmation guard"),
+    )
+    with pytest.raises(measurement.MeasurementError, match="confirm-hmd-ready"):
+        measurement.launch_arm(
+            tmp_path, arm="candidate", scenario="stable", anchor="head_locked", live=True
+        )
+
+
+@pytest.mark.asyncio
+async def test_direct_runtime_guard_cannot_be_bypassed():
+    with pytest.raises(measurement.MeasurementError, match="confirm-hmd-ready"):
+        await scenarios.run_measurement(SimpleNamespace(live=True, confirm_hmd_ready=False))
+
+
+def test_startup_contract_acceptance_and_extra_capability_rejection(monkeypatch):
+    payload = dict(measurement.EXPECTED_STARTUP_CONTRACT)
     monkeypatch.setattr(
         measurement.subprocess,
         "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0,
-            stdout=json.dumps(mismatched),
-            stderr="",
-        ),
+        lambda *a, **k: SimpleNamespace(returncode=0, stdout=json.dumps(payload)),
     )
+    assert measurement._check_startup_contract(Path("native.exe"))["vr_initialization"] is False
+    payload["unexpected"] = True
+    with pytest.raises(measurement.MeasurementError, match="mismatch"):
+        measurement._check_startup_contract(Path("native.exe"))
 
-    with pytest.raises(measurement.MeasurementError, match="startup contract mismatch"):
-        measurement._check_startup_contract(Path("candidate.exe"))
+
+def test_complete_tree_identity_detects_source_and_lock_tampering(tmp_path):
+    (tmp_path / "src").mkdir()
+    code = tmp_path / "src" / "owner.py"
+    lock = tmp_path / "uv.lock"
+    code.write_text("before", encoding="utf-8")
+    lock.write_text("lock", encoding="utf-8")
+    original = measurement._tree_identity(tmp_path)
+    code.write_text("after", encoding="utf-8")
+    assert measurement._tree_identity(tmp_path) != original
+    original = measurement._tree_identity(tmp_path)
+    lock.write_text("changed lock", encoding="utf-8")
+    assert measurement._tree_identity(tmp_path) != original
 
 
-def test_manual_observation_cannot_upgrade_failed_software_run(tmp_path: Path) -> None:
-    run_report = tmp_path / "run-failed.json"
-    run_report.write_text(
+@pytest.mark.parametrize(
+    "mode,outcome", [("offline_dry_run", "pass"), ("live", "failed"), ("live", "pass")]
+)
+def test_observation_never_upgrades_offline_or_failed_run(tmp_path, mode, outcome):
+    path = tmp_path / "report.json"
+    path.write_text(
         json.dumps(
             {
                 "schema": measurement.RUN_SCHEMA,
-                "run_id": "failed-run",
-                "session": "session-local",
-                "software": {"outcome": "failed", "failure_reason": "runtime_crashed"},
+                "run_id": "owned-run",
+                "mode": mode,
+                "software": {"outcome": outcome},
             }
         ),
         encoding="utf-8",
     )
+    if mode != "live":
+        with pytest.raises(measurement.MeasurementError, match="offline"):
+            measurement.record_observation(
+                path, result="no_issue", note="readable", uncertainty="manual"
+            )
+    else:
+        observation = measurement.record_observation(
+            path, result="no_issue", note="readable", uncertainty="manual"
+        )
+        payload = json.loads(observation.read_text(encoding="utf-8"))
+        assert payload["overall_outcome"] == (
+            "failed" if outcome == "failed" else "observation_recorded"
+        )
+        assert payload["new_run_performed"] is False
+        assert json.loads(path.read_text(encoding="utf-8"))["software"]["outcome"] == outcome
 
-    observation_path = measurement.record_observation(
-        run_report,
-        result="no_issue",
-        note="No visual issue noticed before the software failure.",
-        uncertainty="manual observation; timing unknown",
-    )
-    observation = json.loads(observation_path.read_text(encoding="utf-8"))
 
-    assert observation["software_run_outcome"] == "failed"
-    assert observation["overall_outcome"] == "failed"
-    assert observation["latency_claim"] == "not_measured"
-    assert observation["cannot_upgrade_failed_software_run"] is True
+def test_stop_is_run_correlated_and_does_not_terminate_processes(tmp_path):
+    run = tmp_path / "runs" / "candidate-stable-1234"
+    run.mkdir(parents=True)
+    (run / "owned.json").write_text("{}", encoding="utf-8")
+    assert measurement.request_stop(tmp_path, run.name).is_file()
+    with pytest.raises(measurement.MeasurementError):
+        measurement.request_stop(tmp_path, "../unrelated")
+
+
+@pytest.mark.parametrize("duration,timeout", [(61, 90), (0, 90), (10, 121), (float("nan"), 90)])
+def test_duration_and_timeout_bounded_before_launch(tmp_path, duration, timeout):
+    with pytest.raises(measurement.MeasurementError):
+        measurement.launch_arm(
+            tmp_path,
+            arm="candidate",
+            scenario="sustained",
+            anchor="head_locked",
+            duration=duration,
+            timeout=timeout,
+        )
 
 
 @pytest.mark.asyncio
-async def test_offline_run_closes_owned_bridge_tasks_without_cleanup_failure(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    preparation = {
-        "session": "cleanup-session",
-        "pair": {"protocol": 8},
-        "provenance": {"accepted_source": measurement.ACCEPTED_SOURCE},
+@pytest.mark.parametrize("name", measurement.SCENARIOS)
+async def test_actual_scenario_engine_semantics_and_owned_cleanup(name):
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), native_retry_enabled=True)
+    records = []
+    args = SimpleNamespace(arm="candidate", scenario=name, live=False, duration=1)
+    restart_calls = []
+
+    async def restart():
+        restart_calls.append(True)
+        await presenter.begin_native_retry_epoch(enabled=True)
+
+    engine = scenarios.ScenarioEngine(presenter, args, records, restart)
+    try:
+        async with asyncio.timeout(20):
+            await engine.run()
+        assert records
+        assert any(r["stage"] == "provider_call" for r in records)
+        assert any(r["stage"] == "Presenter_application" for r in records)
+        assert len(engine.provider.calls) <= 4
+        if name in ("independent", "stable", "final_only"):
+            assert engine.checks["before_ui_release"]["source_applied"] is True
+            assert engine.checks["identity_preserved"] is True
+            assert len(engine.provider.calls) == 1
+        if name == "stable_burst":
+            assert engine.checks["stable_updates"] == 4
+        if name == "restart_reconnect":
+            assert len(restart_calls) == 2
+    finally:
+        await engine.close()
+        await presenter.close()
+    assert engine.consumer.done()
+    assert all(task.done() for task in engine.ingress)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("termination", ["cancel", "timeout"])
+async def test_real_owner_engine_cancellation_and_timeout_cleanup(termination):
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), native_retry_enabled=True)
+    engine = scenarios.ScenarioEngine(
+        presenter,
+        SimpleNamespace(arm="candidate", scenario="expiry", live=False, duration=1),
+        [],
+        None,
+    )
+    task = asyncio.create_task(engine.run())
+    try:
+        await scenarios.until(lambda: bool(engine.provider.calls))
+        if termination == "cancel":
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(task, 0.01)
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await engine.close()
+        await presenter.close()
+    assert engine.consumer.done()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [{"forced": True}, {"exit_confirmed": False}, {"exit_code": 1}, {"acknowledged": False}],
+)
+def test_shutdown_requires_normal_owned_exit(change):
+    receipt = {
+        "cleanup_succeeded": True,
+        "exit_confirmed": True,
+        "graceful_completed": True,
+        "acknowledged": True,
+        "forced": False,
+        "exit_code": 0,
+        "terminal_cause": None,
     }
+    assert scenarios.shutdown_ok(receipt)
+    receipt.update(change)
+    assert not scenarios.shutdown_ok(receipt)
+
+
+def test_import_guard_rejects_current_checkout_for_exported_arm(tmp_path):
+    with pytest.raises(measurement.MeasurementError, match="import separation"):
+        scenarios.validate_arm_imports(tmp_path / "source" / "baseline")
+
+
+def test_sustained_requires_software_success_and_correlated_no_issue_observation(tmp_path):
+    for name in measurement.SCENARIOS[:-1]:
+        run = tmp_path / "runs" / name
+        run.mkdir(parents=True)
+        report = run / "report.json"
+        report.write_text(
+            json.dumps(
+                {
+                    "mode": "live",
+                    "arm": "candidate",
+                    "anchor": "head_locked",
+                    "scenario": name,
+                    "software": {"outcome": "pass"},
+                }
+            ),
+            encoding="utf-8",
+        )
+        (run / "observation.json").write_text(
+            json.dumps({"result": "no_issue", "run_report_sha256": measurement._sha256(report)}),
+            encoding="utf-8",
+        )
+    measurement.validate_sustained_guard(tmp_path, "candidate", "head_locked")
+    with pytest.raises(measurement.MeasurementError):
+        measurement.validate_sustained_guard(tmp_path, "candidate", "spatial_locked")
+    (tmp_path / "runs" / "expiry" / "observation.json").unlink()
+    with pytest.raises(measurement.MeasurementError):
+        measurement.validate_sustained_guard(tmp_path, "candidate", "head_locked")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("termination", ["stop", "cancel", "timeout", "success", "bad_shutdown"])
+async def test_complete_runtime_cleanup_and_truthful_receipts_with_explicit_fake_native(
+    tmp_path, monkeypatch, termination
+):
+    run_id = "explicit-fake-native-" + termination
+    run = tmp_path / "runs" / run_id
+    run.mkdir(parents=True)
+    (run / "owned.json").write_text("{}", encoding="utf-8")
+    lock = tmp_path / "active-live.lock"
+    lock.write_text(json.dumps({"run_id": run_id}), encoding="utf-8")
+    monkeypatch.setattr(measurement, "LIVE_LOCK", lock)
     monkeypatch.setattr(
         measurement,
         "load_prepared_stage",
-        lambda stage: (preparation, tmp_path / "unused.exe", tmp_path / "unused.dll"),
+        lambda p: {
+            "control": {},
+            "native": {},
+            "sources": {"candidate": {"tree": {"sha256": "explicit-test-boundary"}}},
+        },
     )
-    bridge_initial_revisions: list[int] = []
-    actual_bridge = measurement.OverlayBridge
-
-    def bridge_factory(**kwargs: object):
-        initial_snapshot = kwargs["initial_snapshot"]
-        bridge_initial_revisions.append(initial_snapshot.revision)
-        return actual_bridge(**kwargs)
-
-    monkeypatch.setattr(measurement, "OverlayBridge", bridge_factory)
-
-    async def short_sequence(presenter, *args, **kwargs):
-        _ = (args, kwargs)
-        assert presenter.native_retry_enabled is True
-        assert presenter.snapshot().revision == 1
-        return ([{"step": "synthetic", "outcome": "applied"}], 0.01)
-
-    monkeypatch.setattr(measurement, "_run_fixed_sequence", short_sequence)
-
-    report_path = await measurement.run_measurement(
-        tmp_path,
-        live=False,
-        hold_seconds=3.0,
-        idle_seconds=30.0,
-        run_timeout_seconds=2.0,
-    )
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-
-    assert report["software"]["outcome"] == "pass"
-    assert report["software"]["cleanup"] == "complete"
-    assert report["software"]["owned_child_exit"] == "not_applicable"
-    assert bridge_initial_revisions == [1]
-    assert report["schema"] == "ovr-hmd-measurement-run-v3"
-    assert report["provenance"]["prepared_stage"] == preparation["provenance"]
-    runtime_python = report["provenance"]["runtime_python"]
-    assert runtime_python["identity_kind"] == "sha256_file_set_v1"
-    assert runtime_python["files"]["scripts/bench_ovr_hmd_measurement.py"] == (
-        measurement._sha256(Path(measurement.__file__).resolve())
-    )
-    assert report["provenance"]["relationship"] == (
-        "immutable_prepared_native_stage_with_separately_hashed_current_python"
-    )
-
-
-def test_runtime_identity_changes_when_extracted_implementation_changes(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    relative_sources = [
-        path.relative_to(measurement.ROOT) for path in measurement.RUNTIME_PYTHON_SOURCE_FILES
-    ]
-    extracted = [
-        Path("src/puripuly_heart/core/overlay") / name
-        for name in (
-            "bridge_mailbox.py",
-            "bridge_session.py",
-            "bridge_transport.py",
-            "presenter_acceptance.py",
-            "presenter_projection.py",
-            "process_adapter.py",
-            "process_runners.py",
-        )
-    ] + [Path("src/puripuly_heart/core/runtime/output_batch.py")]
-    for relative in set(relative_sources + extracted):
-        path = tmp_path / relative
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(b"before")
-    monkeypatch.setattr(measurement, "ROOT", tmp_path)
+    monkeypatch.setattr(scenarios, "validate_arm_imports", lambda p: "explicit-test-boundary")
     monkeypatch.setattr(
-        measurement, "RUNTIME_PYTHON_SOURCE_FILES", tuple(tmp_path / p for p in relative_sources)
+        measurement, "inspect_process_names", lambda: {"vrserver.exe", "vrcompositor.exe"}
     )
-    previous = measurement._runtime_python_source_identity()
-    for relative in extracted:
-        (tmp_path / relative).write_bytes(b"after")
-        current = measurement._runtime_python_source_identity()
-        assert current["aggregate_sha256"] != previous["aggregate_sha256"], relative
-        assert current["files"][relative.as_posix()] == hashlib.sha256(b"after").hexdigest()
-        previous = current
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("receipt", "expected_outcome", "expected_reason"),
-    [
-        (
-            {
-                "graceful_request": "sent",
-                "acknowledged": True,
-                "terminate_requested": False,
-                "kill_requested": False,
-                "forced": False,
-                "exit_confirmed": True,
-                "exit_code": 0,
-                "reader_cleanup": "complete",
-                "graceful_completed": True,
-                "cleanup_succeeded": True,
-                "terminal_cause": None,
-                "stdout_events": [{"type": "shutdown_complete"}],
-                "stderr_diagnostics": [],
-            },
-            "pass",
-            None,
-        ),
-        (
-            {
-                "acknowledged": True,
-                "forced": False,
-                "exit_confirmed": True,
-                "exit_code": 1,
-                "cleanup_succeeded": False,
-                "terminal_cause": "runtime_exit_nonzero",
-            },
-            "failed",
-            "runtime_exit_nonzero",
-        ),
-        (
-            {
-                "acknowledged": False,
-                "forced": True,
-                "exit_confirmed": True,
-                "exit_code": 0,
-                "cleanup_succeeded": False,
-                "terminal_cause": "shutdown_forced",
-            },
-            "failed",
-            "shutdown_forced",
-        ),
-        (
-            {
-                "acknowledged": True,
-                "forced": False,
-                "exit_confirmed": False,
-                "exit_code": None,
-                "cleanup_succeeded": False,
-                "terminal_cause": "termination_unconfirmed",
-            },
-            "failed",
-            "termination_unconfirmed",
-        ),
-    ],
-)
-async def test_live_run_requires_confirmed_normal_shutdown_receipt(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    receipt: dict[str, object],
-    expected_outcome: str,
-    expected_reason: str | None,
-) -> None:
-    preparation = {
-        "session": "synthetic-live-session",
-        "pair": {"protocol": 8},
-        "provenance": {"accepted_source": measurement.ACCEPTED_SOURCE},
-    }
-    manager_kwargs: dict[str, object] = {}
-
-    class FakeRunner:
-        def __init__(self, **kwargs: object) -> None:
-            _ = kwargs
-            self.last_process = SimpleNamespace(returncode=receipt.get("exit_code"))
+    monkeypatch.setattr(
+        measurement, "environment_inventory", lambda: {"os": "explicit-test-boundary"}
+    )
+    for key in tuple(scenarios.os.environ):
+        if key.startswith("PURIPULY_"):
+            monkeypatch.delenv(key)
+    managers = []
 
     class FakeManager:
-        def __init__(self, **kwargs: object) -> None:
-            manager_kwargs.update(kwargs)
+        def __init__(self, **kwargs):
             self.state = "off"
-            self.failure_reason: str | None = None
+            self.failure_reason = None
+            assert kwargs["bridge_messages_authenticated"] is True
+            assert kwargs["handoff_experiment"] == "off"
+            managers.append(self)
 
-        async def start(self) -> None:
+        async def start(self):
             self.state = "connected"
 
-        def mark_shutdown_requested(self, *, request_sent: bool = True) -> None:
-            _ = request_sent
+        async def stop(self):
+            self.state = "off"
 
-        async def stop(self) -> None:
-            terminal_cause = receipt.get("terminal_cause")
-            self.failure_reason = terminal_cause if isinstance(terminal_cause, str) else None
-            self.state = "off" if terminal_cause is None else "failed"
+        def shutdown_receipt(self):
+            return {
+                "cleanup_succeeded": True,
+                "exit_confirmed": True,
+                "graceful_completed": True,
+                "acknowledged": True,
+                "forced": termination == "bad_shutdown",
+                "exit_code": 0,
+                "terminal_cause": None,
+            }
 
-        def shutdown_receipt(self) -> dict[str, object]:
-            return dict(receipt)
-
-    async def short_sequence(*args: object, **kwargs: object):
-        _ = (args, kwargs)
-        return ([{"step": "synthetic", "outcome": "applied"}], 0.01)
-
-    monkeypatch.setattr(
-        measurement,
-        "load_prepared_stage",
-        lambda stage: (preparation, tmp_path / "synthetic.exe", tmp_path / "synthetic.dll"),
+    monkeypatch.setattr(scenarios, "OverlayProcessManager", FakeManager)
+    args = SimpleNamespace(
+        stage=tmp_path,
+        arm="candidate",
+        anchor="head_locked",
+        run_id=run_id,
+        live=True,
+        confirm_hmd_ready=True,
+        duration=1,
+        timeout=1 if termination == "timeout" else 20,
+        scenario="independent" if termination in ("success", "bad_shutdown") else "expiry",
+        device="explicit-test-boundary",
+        firmware="unknown",
+        connection="unknown",
     )
-    monkeypatch.setattr(measurement, "MeasurementProcessRunner", FakeRunner)
-    monkeypatch.setattr(measurement, "OverlayProcessManager", FakeManager)
-    monkeypatch.setattr(measurement, "_run_fixed_sequence", short_sequence)
-    monkeypatch.setattr(measurement.secrets, "token_hex", lambda size: "receipt")
-
-    if expected_outcome == "pass":
-        report_path = await measurement.run_measurement(
-            tmp_path,
-            live=True,
-            hold_seconds=3.0,
-            idle_seconds=30.0,
-            run_timeout_seconds=2.0,
-        )
+    task = asyncio.create_task(scenarios.run_measurement(args))
+    if termination in ("stop", "cancel"):
+        await scenarios.until(lambda: bool(managers) and managers[0].state == "connected")
+        await asyncio.sleep(0.05)
+        if termination == "stop":
+            measurement.request_stop(tmp_path, run_id)
+        else:
+            task.cancel()
+    if termination == "success":
+        await task
+    elif termination == "cancel":
+        with pytest.raises(asyncio.CancelledError):
+            await task
     else:
-        with pytest.raises(measurement.MeasurementError, match=expected_reason):
-            await measurement.run_measurement(
-                tmp_path,
-                live=True,
-                hold_seconds=3.0,
-                idle_seconds=30.0,
-                run_timeout_seconds=2.0,
-            )
-        report_path = tmp_path / "run-live-off-receipt.json"
-
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["software"]["outcome"] == expected_outcome
-    assert report["software"]["failure_reason"] == expected_reason
-    assert report["software"]["cleanup"] == ("complete" if expected_outcome == "pass" else "failed")
-    assert report["software"]["shutdown"] == receipt
-    assert "retry_ownership_changed" not in manager_kwargs
-
-
-def test_experiment_cli_requires_explicit_arm_and_exposes_only_approved_arms() -> None:
-    parser = measurement.build_parser()
-
-    with pytest.raises(SystemExit):
-        parser.parse_args(["dry-run", "--stage", "prepared"])
-
-    off = parser.parse_args(["dry-run", "--stage", "prepared", "--arm", "off"])
-    cached = parser.parse_args(["live", "--stage", "prepared", "--arm", "cached_frame_rehandoff"])
-    assert off.arm == "off"
-    assert cached.arm == "cached_frame_rehandoff"
-
-
-@pytest.mark.parametrize("hold", ["0.05", "2.999", "3.001", "30", "nan", "inf", "-inf"])
-def test_live_hold_is_exactly_preregistered_three_seconds(hold: str) -> None:
-    parser = measurement.build_parser()
-
-    with pytest.raises(SystemExit):
-        parser.parse_args(
-            [
-                "live",
-                "--stage",
-                "prepared",
-                "--arm",
-                "off",
-                "--hold-seconds",
-                hold,
+        with pytest.raises(measurement.MeasurementError):
+            await task
+    report = json.loads((run / "report.json").read_text(encoding="utf-8"))
+    assert report["physical_hmd"]["result"] == "not_observed"
+    assert managers[0].state == "off"
+    assert report["software"]["outcome"] == ("pass" if termination == "success" else "failed")
+    assert report["software"]["cleanup"] == (
+        "failed" if termination == "bad_shutdown" else "complete"
+    )
+    if termination in ("stop", "timeout", "cancel"):
+        assert (
+            report["software"]["failure_reason"]
+            == {"stop": "operator_stop", "timeout": "run_timeout", "cancel": "cancelled"}[
+                termination
             ]
         )
 
-    offline = parser.parse_args(
-        [
-            "dry-run",
-            "--stage",
-            "prepared",
-            "--arm",
-            "off",
-            "--hold-seconds",
-            "0.05",
-        ]
-    )
-    assert offline.hold_seconds == 0.05
 
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "hold",
-    [0.05, 2.999, 3.001, 30.0, float("nan"), float("inf"), float("-inf")],
+    "surface", ["source", "lock", "native", "harness", "interpreter", "metadata"]
 )
-async def test_live_hold_contract_is_rejected_before_stage_or_process_launch(
-    hold: float,
-    tmp_path: Path,
-) -> None:
-    with pytest.raises(
-        measurement.MeasurementError,
-        match="exactly 3.0 seconds",
-    ):
-        await measurement.run_measurement(
-            tmp_path / "not-loaded",
-            live=True,
-            hold_seconds=hold,
-            idle_seconds=30.0,
-            run_timeout_seconds=120.0,
-            arm="off",
-        )
-
-
-@pytest.mark.asyncio
-async def test_offline_arm_report_is_experiment_only_without_claiming_reuse(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    preparation = {
-        "session": "paired-session",
-        "pair": {"protocol": 8},
-        "provenance": {"accepted_source": measurement.ACCEPTED_SOURCE},
+def test_prepared_stage_loader_rejects_identity_tampering(tmp_path, monkeypatch, surface):
+    control = tmp_path / "control"
+    control.mkdir()
+    control_script = control / "bench_ovr_hmd_measurement.py"
+    control_script.write_bytes(Path(measurement.__file__).read_bytes())
+    (control / "hmd_issue206_scenarios.py").write_text("helper", encoding="utf-8")
+    native = tmp_path / "runtime" / "run"
+    native.mkdir(parents=True)
+    executable = native / "PuriPulyHeartOverlay.exe"
+    executable.write_bytes(b"explicit-test-native")
+    monkeypatch.setattr(measurement, "SOURCE_EXE_SHA256", measurement._sha256(executable))
+    monkeypatch.setattr(
+        measurement, "_interpreter_identity", lambda: {"identity": "explicit-test-interpreter"}
+    )
+    identities = {}
+    for arm, revision in measurement.ARMS.items():
+        source = tmp_path / "source" / arm
+        source.mkdir(parents=True)
+        (source / "uv.lock").write_text("locked", encoding="utf-8")
+        (source / "owner.py").write_text(arm, encoding="utf-8")
+        archive = source.with_suffix(".tar")
+        archive.write_bytes(arm.encode())
+        identities[arm] = {
+            "revision": revision,
+            "archive_sha256": measurement._sha256(archive),
+            "tree": measurement._tree_identity(source),
+            "lock_sha256": measurement._sha256(source / "uv.lock"),
+        }
+    payload = {
+        "schema": measurement.SCHEMA,
+        "sources": identities,
+        "control": measurement._tree_identity(control),
+        "runtime": measurement._tree_identity(tmp_path / "runtime"),
+        "startup": {"stdout": measurement.EXPECTED_STARTUP_CONTRACT},
+        "interpreter": measurement._interpreter_identity(),
     }
+    report = tmp_path / "preparation.json"
+    measurement._write_json(report, payload)
+    (tmp_path / "preparation.sha256").write_text(measurement._sha256(report), encoding="ascii")
     monkeypatch.setattr(
         measurement,
-        "load_prepared_stage",
-        lambda stage: (preparation, tmp_path / "unused.exe", tmp_path / "unused.dll"),
+        "_check_startup_contract",
+        lambda p: pytest.fail("inspect must not execute native"),
     )
+    assert measurement.load_prepared_stage(tmp_path)["schema"] == measurement.SCHEMA
+    if surface == "source":
+        (tmp_path / "source" / "baseline" / "owner.py").write_text("changed", encoding="utf-8")
+    elif surface == "lock":
+        (tmp_path / "source" / "candidate" / "uv.lock").write_text("changed", encoding="utf-8")
+    elif surface == "native":
+        executable.write_bytes(b"changed-native")
+    elif surface == "harness":
+        (control / "hmd_issue206_scenarios.py").write_text("changed", encoding="utf-8")
+    elif surface == "interpreter":
+        monkeypatch.setattr(measurement, "_interpreter_identity", lambda: {"identity": "changed"})
+    else:
+        report.write_text("{}", encoding="utf-8")
+    with pytest.raises(measurement.MeasurementError, match="identity"):
+        measurement.load_prepared_stage(tmp_path)
 
-    async def short_sequence(*args, **kwargs):
-        return ([{"step": "synthetic", "outcome": "applied"}], 0.01)
 
-    monkeypatch.setattr(measurement, "_run_fixed_sequence", short_sequence)
-    report_path = await measurement.run_measurement(
-        tmp_path,
-        live=False,
-        hold_seconds=3.0,
-        idle_seconds=30.0,
-        run_timeout_seconds=2.0,
-        arm="cached_frame_rehandoff",
+@pytest.mark.asyncio
+async def test_direct_live_refuses_inherited_experiment_overrides(monkeypatch):
+    monkeypatch.setattr(
+        measurement, "inspect_process_names", lambda: {"vrserver.exe", "vrcompositor.exe"}
     )
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-
-    assert report["experiment"]["arm"] == "cached_frame_rehandoff"
-    assert report["experiment"]["experiment_only"] is True
-    assert report["experiment"]["qualifies_for_r2_conformance"] is False
-    assert report["experiment"]["discrimination"] == "not_observed"
-    assert report["software"]["diagnostics"]["outcome"] == "written"
+    monkeypatch.setenv("PURIPULY_SKIP_VR_PREFLIGHT", "1")
+    args = SimpleNamespace(live=True, confirm_hmd_ready=True, scenario="stable")
+    with pytest.raises(measurement.MeasurementError, match="overrides refused"):
+        await scenarios.run_measurement(args)

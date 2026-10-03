@@ -107,3 +107,10 @@ SHA256: `2bb59ca44fd6fa44a80ed05a277cea96c576cd1f093ad26ab1392122b5096e8d`.
 The local archive is not committed or uploaded. The tables, commands, identities and permanent behavior regressions above retain the portable result; raw images require that archive. Temporary executable probes/configs/baseline export were removed and owned GUI/headless/renderer processes closed.
 
 Later worn-HMD SteamVR acceptance must compare a retained baseline/candidate on the affected setup and record source/native identities, effective protocol/profile, device/driver/connection, exposure and observation method. Cover delayed translation, stable bursts, resumed speech, mixed channels, head/spatial lock, clear/OFF and recovery/reconnect. Observe flicker, reanchors, old source/translation pairs and bounded rendering/resource work. Keep source availability, Presenter application, bridge/native readiness/submission, translation readiness and actual HMD observation separate. SELF E2E still ends at first successful chatbox page send, not overlay display. No universal-device or 4–6 h stability conclusion follows from the short software/desktop runs.
+
+The subsequent maintainer request is to prepare the complete test tooling now
+and run the physical session together after the wearer returns. The
+[SteamVR worn-HMD plan and operator commands](issue-206-hmd-test-plan.md) record
+the pinned source/native kit, offline scenario/stop evidence, explicit
+wearer-ready gate, observation procedure and later-session prerequisites.
+This preparation does not supersede or pass the physical criteria above.
