@@ -110,15 +110,6 @@ python -m pytest tests/core/test_overlay_protocol.py tests/core/test_overlay_man
 
 ```
 
-## Worn-HMD session preparation
-
-The [issue 206 SteamVR test plan](../../docs/issue-206-hmd-test-plan.md) defines
-the baseline/candidate source boundary, explicit wearer-ready gate, bounded
-scenarios, stop conditions and observation record. Preparation and offline
-checks do not start SteamVR or a live overlay. Native startup-contract validation
-is not OpenVR readiness or physical display validation. Keep worn-HMD results
-separate from software receipts; the reported latency problem was in SteamVR.
-
 ## Completion
 
 Overlay behavior, protocol, or startup changes complete with:

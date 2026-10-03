@@ -230,7 +230,6 @@ refactoring/
 .tmp/
 /scripts/*
 !/scripts/bench_*.py
-!/scripts/hmd_issue206_scenarios.py
 !/scripts/ci/
 /scripts/ci/*
 !/scripts/ci/build-release-artifacts.ps1
