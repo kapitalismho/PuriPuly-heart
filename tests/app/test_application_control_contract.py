@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from copy import deepcopy
 from dataclasses import replace
 
 import numpy as np
@@ -715,3 +716,56 @@ async def test_peer_terms_are_explicit_and_shared_acceptance_is_isolated(tmp_pat
         assert app.compatibility_settings().state.peer_translation.eula_accepted is True
     finally:
         await app.stop()
+
+
+@pytest.mark.asyncio
+async def test_activation_notice_cli_catalog_apply_and_durable_reload(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
+    path = tmp_path / "settings.json"
+    isolated_settings(path)
+    app = compose_headless_application(path)
+    key = "chatbox.activation_notice.enabled"
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance("activation-notice-control")
+        catalog = await control.query("settings.choices", {})
+        assert key in control.capabilities()["settings_fields"]
+        assert key in catalog["fields"]
+        assert catalog["field_types"][key] == "boolean"
+        assert catalog["field_schemas"][key] == {"type": "boolean", "free_form": False}
+        initial = await control.query("settings.current", {})
+        assert initial["settings"]["intent"]["osc"]["activation_notice_enabled"] is True
+
+        submitted = await control.submit(
+            "settings.apply",
+            {"changes": {key: False}},
+            request_id="disable-activation-notice",
+        )
+        result = await control.wait(submitted["operation_id"], timeout=5)
+        assert result["status"] == "applied"
+        disabled = await control.query("settings.current", {})
+        expected = deepcopy(initial["settings"])
+        expected["intent"]["osc"]["activation_notice_enabled"] = False
+        assert disabled["settings"] == expected
+        for index, invalid in enumerate((None, 0, 1, "false", "true", [], {})):
+            submitted = await control.submit(
+                "settings.apply",
+                {"changes": {key: invalid}},
+                request_id=f"invalid-activation-notice-{index}",
+            )
+            result = await control.wait(submitted["operation_id"], timeout=5)
+            assert result["status"] == "rejected"
+            assert await control.query("settings.current", {}) == disabled
+    finally:
+        await app.stop()
+    restarted = compose_headless_application(path)
+    try:
+        await restarted.start()
+        control = restarted.control()
+        control.bind_instance("activation-notice-restarted")
+        assert (await control.query("settings.current", {}))["settings"]["intent"]["osc"][
+            "activation_notice_enabled"
+        ] is False
+    finally:
+        await restarted.stop()

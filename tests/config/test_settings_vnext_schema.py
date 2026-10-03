@@ -65,6 +65,7 @@ def test_vnext_schema_defaults_match_current_persisted_settings_defaults() -> No
 
     assert settings.intent.audio.input_host_api == WINDOWS_WASAPI_COMPATIBILITY_HOST_API
     assert settings.intent.desktop_audio.vad_hangover_ms == 500
+    assert settings.intent.osc.activation_notice_enabled is True
     assert (
         settings.intent.translation.openrouter_broker_base_url
         == schema.DEFAULT_OPENROUTER_BROKER_BASE_URL
@@ -101,6 +102,7 @@ def test_vnext_schema_represents_current_intent_and_state_leaves() -> None:
         "intent.local_llm.extra_body",
         "intent.local_llm.model",
         "intent.osc.chatbox_address",
+        "intent.osc.activation_notice_enabled",
         "intent.osc.chatbox_clear",
         "intent.osc.chatbox_include_source",
         "intent.osc.chatbox_max_chars",

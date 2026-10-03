@@ -243,6 +243,9 @@ class SettingsGeneralSurfaceSlots:
     clipboard_auto_translate: ft.Control
     vrchat_mic_intercept: ft.Control
     telemetry_enabled: ft.Control
+    activation_notice: ft.Control
+    activation_notice_middle: ft.Control
+    activation_notice_trailing: ft.Control
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,6 +283,7 @@ class SettingsGeneralSurfaceRegions:
     audio_row: ft.Container
     vad_row: ft.Container
     clipboard_row: ft.Container
+    activation_notice_row: ft.Container
     primary_row_placeholder: ft.Control
 
 

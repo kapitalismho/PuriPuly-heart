@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.overlay.presenter import (
     PEER_REPLACEMENT_INTERVAL_SECONDS,
     OverlayPresenter,
@@ -23,6 +24,7 @@ from puripuly_heart.core.overlay.sink import (
 from puripuly_heart.core.runtime.output_batch import OUTPUT_BATCH_MAX_UNSENT
 from puripuly_heart.domain.models import OSCMessage, Transcript
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
+from tests.helpers.fakes import FakeSender
 from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
@@ -428,6 +430,150 @@ async def test_output_runtime_owns_typing_and_immediate_system_side_effects() ->
         "system",
         "system",
     ]
+
+
+@pytest.mark.parametrize(
+    "entrypoint",
+    ["publish_system_immediate_chatbox", "publish_system_disclosure_chatbox"],
+)
+def test_disabled_activation_notice_records_skip_before_redaction_or_delivery(
+    entrypoint: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    observed = []
+    owner = OutputRuntime(
+        chatbox=chatbox,
+        activation_notice_enabled=False,
+        routing_observer=observed.append,
+    )
+    disclosure_id = uuid4()
+
+    def reject_redaction(_text: str) -> str:
+        pytest.fail("Disabled activation notices must not be redacted")
+
+    monkeypatch.setattr(
+        "puripuly_heart.core.runtime.output._redact_chatbox_disclosure_text",
+        reject_redaction,
+    )
+    result = getattr(owner, entrypoint)(
+        text="provider_response_body={'token':'notice-secret'}",
+        disclosure_id=disclosure_id,
+    )
+
+    assert result.decision.decision == "skipped"
+    assert result.decision.reason == "activation_notice_disabled"
+    assert result.decision.publication_id == str(disclosure_id)
+    assert result.decision.metadata["channel"] == "system"
+    assert result.message is None
+    assert observed == [result.decision]
+    assert list(owner.routing_decisions) == [result.decision]
+    assert "notice-secret" not in repr(result.decision)
+    assert chatbox.messages == []
+    assert chatbox.immediate_messages == []
+
+
+@pytest.mark.parametrize(
+    "entrypoint",
+    ["publish_system_immediate_chatbox", "publish_system_disclosure_chatbox"],
+)
+def test_reenabled_activation_notices_do_not_replay_or_retire_skipped_identity(
+    entrypoint: str,
+) -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, activation_notice_enabled=False)
+    disclosure_id = uuid4()
+    publish = getattr(owner, entrypoint)
+
+    skipped = publish(text="activation notice", disclosure_id=disclosure_id)
+    owner.activation_notice_enabled = True
+    chatbox.process_due()
+
+    assert skipped.decision.reason == "activation_notice_disabled"
+    assert chatbox.messages == []
+    assert chatbox.immediate_messages == []
+
+    restored = publish(text="activation notice", disclosure_id=disclosure_id)
+    owner.activation_notice_enabled = False
+    duplicate = publish(text="activation notice", disclosure_id=disclosure_id)
+
+    assert restored.decision.decision == "published"
+    assert duplicate.decision.reason == "duplicate_publication"
+    if entrypoint == "publish_system_immediate_chatbox":
+        assert chatbox.immediate_messages == ["activation notice"]
+        assert chatbox.messages == []
+    else:
+        assert [message.text for message in chatbox.messages] == ["activation notice"]
+        assert chatbox.immediate_messages == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "entrypoint",
+    ["publish_system_immediate_chatbox", "publish_system_disclosure_chatbox"],
+)
+async def test_disabled_activation_notice_preserves_closed_runtime_reason(entrypoint: str) -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, activation_notice_enabled=False)
+    await owner.close()
+
+    result = getattr(owner, entrypoint)(text="activation notice")
+
+    assert result.decision.reason == "output_runtime_closed"
+    assert chatbox.messages == []
+    assert chatbox.immediate_messages == []
+
+
+@pytest.mark.asyncio
+async def test_disabled_activation_notices_leave_self_pagination_typing_and_overlay_live() -> None:
+    OutputRuntime = _output_runtime_class()
+    clock = FakeClock()
+    sender = FakeSender()
+    chatbox = ChatboxPaginator(sender=sender, clock=clock)
+    overlay = RecordingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=chatbox,
+        clock=clock,
+        overlay_sink=overlay,
+        activation_notice_enabled=False,
+    )
+    ordinary = await owner.publish_chatbox(
+        publication_id=uuid4(),
+        channel="self",
+        transcript_text="ordinary speech " * 30,
+        translation_text=None,
+        include_source=True,
+    )
+    typing_on = owner.set_self_chatbox_typing_reason("manual_input", True)
+    immediate = owner.publish_system_immediate_chatbox(text="PuriPuly ON!")
+    disclosure = owner.publish_system_disclosure_chatbox(text="Listen peer disclosure")
+    event = _overlay_event(event_id="self-with-notices-off", channel="self")
+    overlay_result = await owner.publish_overlay_event(event)
+    typing_off = owner.set_self_chatbox_typing_reason("manual_input", False)
+
+    assert ordinary.decision.decision == "published"
+    assert typing_on.decision.decision == "published"
+    assert typing_off.decision.decision == "published"
+    assert overlay_result.decision.decision == "published"
+    assert overlay.events == [event]
+    assert sender.typing == [True, False]
+    assert immediate.decision.reason == "activation_notice_disabled"
+    assert disclosure.decision.reason == "activation_notice_disabled"
+    assert len(sender.sent) == 1
+
+    owner.activation_notice_enabled = True
+    for _ in range(20):
+        clock.advance(chatbox.page_interval_s)
+        chatbox.process_due()
+
+    assert len(sender.sent) > 1
+    assert all("PuriPuly ON!" not in text for text in sender.sent)
+    assert all("Listen peer disclosure" not in text for text in sender.sent)
+    assert all("ordinary speech" in text for text in sender.sent)
+    await owner.close()
 
 
 @pytest.mark.asyncio

@@ -109,6 +109,7 @@ class RuntimePipelineOscInputs:
     chatbox_clear: bool
     chatbox_max_chars: int
     vrc_mic_intercept: bool
+    activation_notice_enabled: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,6 +155,7 @@ def runtime_pipeline_inputs_from_vnext(
             chatbox_clear=osc.chatbox_clear,
             chatbox_max_chars=osc.chatbox_max_chars,
             vrc_mic_intercept=osc.vrc_mic_intercept,
+            activation_notice_enabled=osc.activation_notice_enabled,
         ),
         translation_runtime=project_translation_runtime_settings_from_vnext(settings),
         llm_runtime_input=runtime_resolution_input_from_vnext(settings),
@@ -913,6 +915,7 @@ async def _compose_runtime_pipeline(
         chatbox=osc,
         clock=clock,
         routing_observer=routing_observer if callable(routing_observer) else None,
+        activation_notice_enabled=inputs.osc.activation_notice_enabled,
     )
     resources.output_runtime = output_runtime
     self_runtime = ChannelRuntime(channel="self")

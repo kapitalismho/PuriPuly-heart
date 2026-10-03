@@ -393,9 +393,15 @@ class SettingsRuntimeEffectsAdapter:
             next_settings,
         )
 
+    def apply_activation_notice(self, settings: AppSettingsVNext) -> None:
+        output_runtime = self._pipeline.output_runtime
+        if output_runtime is not None:
+            output_runtime.activation_notice_enabled = settings.intent.osc.activation_notice_enabled
+
     def restore_memory(self, settings: AppSettingsVNext) -> None:
         restored_settings = copy.deepcopy(settings)
         self._settings.canonical = restored_settings
+        self.apply_activation_notice(restored_settings)
         self._calibration.sync_from_settings(restored_settings)
         config_owner = self._pipeline.translation_runtime_configuration
         if config_owner is not None:
@@ -505,6 +511,7 @@ class SettingsRuntimeEffectsAdapter:
         reload_settings_view: bool,
     ) -> None:
         settings = transition.settings
+        self.apply_activation_notice(settings)
         await self._desktop_overlay.apply_controls(transition.desktop_runtime_controls)
         previous_strict_runtime_errors = self._clipboard.strict_runtime_errors
         self._clipboard.strict_runtime_errors = strict_runtime_errors

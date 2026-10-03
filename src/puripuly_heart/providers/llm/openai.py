@@ -236,11 +236,20 @@ class HttpxOpenAIClient:
         scene_participant_count: int | None = None,
         max_output_tokens: int | None = None,
     ) -> dict[str, object]:
-        system_content = _build_system_prompt(
+        rendered_system_prompt = _build_system_prompt(
             system_prompt=system_prompt,
             source_language=source_language,
             target_language=target_language,
         )
+        system_content: str | list[dict[str, object]] = rendered_system_prompt
+        if self.model == OPENAI_MODEL_GPT_6_LUNA:
+            system_content = [
+                {
+                    "type": "text",
+                    "text": rendered_system_prompt,
+                    "prompt_cache_breakpoint": {"mode": "explicit"},
+                }
+            ]
         user_message = build_translation_user_message(
             text=text,
             context=context,
@@ -255,6 +264,8 @@ class HttpxOpenAIClient:
             "reasoning_effort": "none",
             "temperature": 0.6,
         }
+        if self.model == OPENAI_MODEL_GPT_6_LUNA:
+            request_body["prompt_cache_options"] = {"mode": "explicit", "ttl": "30m"}
         if max_output_tokens is not None:
             request_body["max_completion_tokens"] = max_output_tokens
         return request_body

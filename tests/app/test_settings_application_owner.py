@@ -17,6 +17,7 @@ from puripuly_heart.app.ports.settings_runtime_effects import (
     SettingsRuntimeState,
     SettingsRuntimeTransition,
 )
+from puripuly_heart.app.ports.settings_view import ActivationNoticeSettingsIntent
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.capture.self_capture_application import (
     SelfCaptureRuntimeApplyError,
@@ -651,3 +652,104 @@ async def test_routed_mutation_cancellation_finalizes_committed_settings(
     assert settings.mutation_depth == 0
     assert settings.rollback_pending is False
     assert settings.canonical.intent.languages.source_language == "ja"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("previous_enabled", [True, False])
+@pytest.mark.parametrize("save_fails", [True, False])
+async def test_activation_notice_edit_commits_or_restores_without_generic_runtime_apply(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    previous_enabled: bool,
+    save_fails: bool,
+) -> None:
+    current = AppSettingsVNext()
+    current = replace(
+        current,
+        intent=replace(
+            current.intent,
+            osc=replace(
+                current.intent.osc,
+                activation_notice_enabled=previous_enabled,
+                connection_mode="manual",
+                send_port=9120,
+                receive_port=9121,
+                chatbox_include_source=True,
+            ),
+        ),
+    )
+    persistence = SettingsVNextCanonicalPersistenceAdapter()
+    settings = SettingsOwner(
+        path=tmp_path / "settings.json",
+        persistence=persistence,
+        canonical=current,
+        authoritative=True,
+        projection_snapshot=copy.deepcopy(current),
+    )
+    persistence.persist(settings.path, current)
+    rendered: list[bool] = []
+
+    def render_settings(**kwargs: object) -> bool:
+        rendered.append(kwargs["general"].activation_notice_enabled)
+        return True
+
+    projection = SettingsProjectionOwner(
+        presentation=SimpleNamespace(render_settings=render_settings),
+        config_path=settings.path,
+        current_settings=lambda: settings.canonical,
+    )
+    projection.remember_all(current)
+    events: list[str] = []
+
+    class NoticeRuntimeEffects(FakeRuntimeEffects):
+        effective_enabled = previous_enabled
+
+        async def prepare_overlay_persistence(self, *_args: object) -> None:
+            pytest.fail("notice-only edit must not prepare overlay resources")
+
+        def apply_activation_notice(self, committed: AppSettingsVNext) -> None:
+            events.append("notice")
+            self.effective_enabled = committed.intent.osc.activation_notice_enabled
+
+    effects = NoticeRuntimeEffects(events)
+    owner = SettingsApplicationOwner(
+        settings=settings,
+        projection=projection,
+        runtime_effects=effects,
+        manual_fallback=ManualLocalASRFallbackOwner(),
+        cpu_auto_available=lambda: True,
+        inspect_cpu=lambda: pytest.fail("notice-only edit must not inspect ASR"),
+        fallback_sink=lambda _channels, _installation: None,
+        sync_ui=lambda: None,
+        fallback_log_sink=lambda _previous, _normalized, _channels: None,
+        mutation_service_provider=lambda: None,
+        consume_superseded_settings=lambda _settings: False,
+        active_local_asr_change=lambda _base, _next: False,
+        failure_sink=lambda _message: None,
+    )
+    pending = settings_application_module.materialize_immediate_settings_intent(
+        current,
+        ActivationNoticeSettingsIntent(not previous_enabled),
+    )
+    if save_fails:
+        def fail_persist(_path: Path, _settings: AppSettingsVNext) -> None:
+            raise OSError("save failed")
+
+        monkeypatch.setattr(persistence, "persist", fail_persist)
+
+    await owner.apply(pending)
+
+    expected_enabled = previous_enabled if save_fails else not previous_enabled
+    expected = current if save_fails else pending
+    assert settings.canonical == expected
+    assert persistence.load_active(settings.path).canonical_settings == expected
+    assert effects.effective_enabled is expected_enabled
+    assert rendered == [expected_enabled]
+    assert events == ([] if save_fails else ["notice"])
+    assert settings.mutation_depth == 0
+    assert settings.rollback_pending is False
+    assert owner.results.current.status == (
+        TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
+        if save_fails
+        else TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    )

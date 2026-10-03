@@ -275,6 +275,8 @@ Do not retain references across replacement unless the API explicitly allows it.
 
 `SettingsView` consumes only frozen surface snapshots and emits focused typed intents. The settings application owner replays those intents onto the latest canonical settings before persistence and runtime application.
 
+`intent.osc.activation_notice_enabled` defaults to `true` and controls only the Talk and Listen activation chatbox notices. The General tab's fifth row exposes one direct on/off card and two empty cards; its existing four rows are unchanged. Notice-only edits persist through `ActivationNoticeSettingsIntent`, then synchronously update the active output owner without preparing or restarting capture, providers, or overlays. Failed persistence restores the committed settings projection and leaves the output policy unchanged.
+
 
 Contains user selections, not active runtime resources.
 
@@ -359,11 +361,14 @@ GPT 6 Luna over the `chatgpt` connection uses the user's ChatGPT plan through Si
 
 - `ChatGptAccountOwner` runs the loopback OAuth flow (PKCE, dynamic client registration, ID-token verification) and never routes through the Broker.
 - `ChatGptSession` is shared across provider rebuilds. The secret store keeps only the refresh token, issued client ID, host ID, and account label; access tokens stay in memory because they exceed the Windows credential size limit.
-- `ChatGptPlanLLMProvider` owns a pool of Responses API WebSocket connections. One connection serves one request at a time, so concurrent Self, Peer, and hedged requests use separate connections. ChatGPT starts its same-model hedge after 1,700 ms, or immediately on primary failure, using the primary provider's pool.
-- `LlmConnectionReadinessOwner` prepares up to three connections within the four-connection limit while translation is on, independently of Talk and Listen. Pipeline installation and provider replacement also synchronize readiness, so initial and replacement providers can prepare before their first translation.
-- Cancelling an attempt stops delivery to its caller without closing an acquired connection. The provider owns the remaining exchange, drains it under the original 30-second response timeout, and returns the connection only after successful completion. A cancelled pool waiter sends no abandoned request. Draining responses retain their pool slots; a saturated pool can still delay a hedge. Requests that drain after caller cancellation continue to consume upstream usage.
-- Errors, response timeouts, and obsolete token generations retire connections. Turning translation off detaches idle connections immediately and closes them concurrently; in-flight ones close after their response instead of returning to the pool. Provider close cancels and joins owned exchanges and closes their connections, including background drains.
+- `ChatGptPlanLLMProvider` owns a Responses API WebSocket pool with six prepared connections and a six-connection limit. Opening, reserved, running, draining, and closing connections all retain their pool slots until ownership ends.
+- Logical requests share one FIFO admission queue across Self and Peer. At an event-loop boundary, the pool first gives queued requests one ready idle connection each, then gives remaining idle connections to newly admitted requests in FIFO order, at most one extra each. There is no batching timer, mandatory pair, or later upgrade from one attempt to two.
+- `FallbackRacingLLMProvider` uses the core `LLMRequestAdmissionPort` and per-request `LLMRequestExecution` contract to start the granted one or two attempts immediately and publish the first complete success. ChatGPT has no 1,700 ms hedge timer. A single granted attempt may re-enter FIFO admission once with a one-attempt recovery after failure; a paired request cannot start a third attempt. Existing authentication retry behavior remains separate. Direct `ChatGptPlanLLMProvider.translate()` stays single-attempt.
+- `LlmConnectionReadinessOwner` prepares the pool while translation is on, independently of Talk and Listen. Pipeline installation and provider replacement also synchronize readiness, so initial and replacement providers can prepare before their first translation.
+- Cancelling an attempt stops delivery to its caller without closing a running exchange. The provider drains it under the original 30-second response timeout and returns the connection only after successful completion. A cancelled waiter sends no abandoned request, and unused reservations return exactly once. Draining responses retain their pool slots and continue to consume upstream usage. Admission wait remains observable as connection wait, separately from the logical concurrency semaphore queue.
+- Errors, response timeouts, and obsolete token generations retire connections. Turning translation off cancels queued admission and opening work, retires idle and unused reserved connections, and lets in-flight exchanges close after their responses instead of returning to the pool. Retired reservations cannot send or reopen the old pool generation. Provider close cancels and joins owned exchanges and cleanup, including background drains.
 - Detached-connection cleanup finishes before cancellation propagates. Cancelling preparation closes partially opened connections and releases reserved pool slots; closing the readiness owner cannot advance into queued preparation (`app/services/llm_connection_readiness.py`, `providers/llm/chatgpt_plan.py`).
+- ChatGPT login permission failures use a warning snackbar. Inference errors use the dashboard's primary text slot: structured eligibility and usage-limit codes select dedicated subscription and Codex-limit guidance; without a subscription code, HTTP 403 and 429 select the same respective messages. Explicit subscription codes retain precedence, other providers keep their own classification, and unanimous parallel-attempt failures preserve the dedicated message (`core/error_messages.py`, `ui/event_dispatch.py`).
 
 Cloud translation may use bounded hedged attempts according to resolved runtime policy, not persisted fallback selections (`config/runtime_resolution.py`, `core/llm/fallback_racing.py`).
 
@@ -380,7 +385,7 @@ Peer translations may execute concurrently, but source-context preparation and p
 
 Self speculative selection remains in the Self owner. Once a turn is admitted, the turn lifecycle owns subsequent translation and publication.
 
-Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/translation_request.py`, `providers/llm/chatgpt_plan.py`. Behavior tests: `tests/core/test_translation_turn_owner.py`, `tests/core/test_translation_request_owner.py`, `tests/core/test_hedged_attempts.py`.
+Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/translation_request.py`, `core/llm/provider.py`, `core/llm/fallback_racing.py`, `providers/llm/chatgpt_plan.py`. Behavior tests: `tests/core/test_translation_turn_owner.py`, `tests/core/test_translation_request_owner.py`, `tests/core/test_hedged_attempts.py`, `tests/providers/test_chatgpt_plan_provider.py`, `tests/app/test_chatgpt_adaptive_dispatch.py`.
 
 ## Output
 
@@ -397,6 +402,7 @@ Delivery boundaries:
 
 - Self/manual and Peer UI publications use independently bounded writer lanes owned by `TranslationUiMessageQueue` and `OutputRuntime`, sharing the production capacity-one consumer queue and destination-sequence authority. UI admission does not wait for consumption or gate Self source Presenter application and otherwise eligible translation execution. Peer overlay delivery remains independently bounded.
 - Self chatbox delivery owns its bounded admission and expiry policy.
+- `OutputRuntime.activation_notice_enabled` gates the immediate Talk notice and queued Listen disclosure before destination handoff. Disabled notices produce an `activation_notice_disabled` routing outcome; enabling the preference does not replay them. Ordinary Self output, typing, subtitles, errors, and the initial Peer consent requirement are unchanged. Pipeline construction and recreation initialize this policy from canonical settings; Talk's existing activation eligibility and cooldown remain owned by the Self translation channel.
 - Output handoff releases translation ordering without waiting for display. Sink failure does not replay recognition or translation.
 - Peer publications retain activation generation and `source_order` through output. For turn-bound providers this follows segment order; independent Gemini finals use receipt-ordered admission into the same monotonic publication sequence. Retiring an activation cancels its deliveries and rejects late work.
 - Peer text without speaker runs, including independent Gemini finals, is `non_diarized` and uses the existing gold style without a speaker hold or guessed identity. Explicit uncertain or missing speaker attribution keeps the gray fallback; first-readable presentation remains pinned.
@@ -454,6 +460,7 @@ Behavior tests: `tests/core/test_overlay_presenter.py`, `tests/core/test_overlay
 
 - `SessionRuntimeLoggingService` owns bounded asynchronous file delivery. Producers must not block on file I/O.
 - Basic-audience records reach the console and Logs view. Selected technical diagnostics are file-only and metadata-only; accepted conversation uses a separate secret-protected path.
+- Capture basic logs report input stalls/resumption and VAD speech boundaries, not periodic frame/speech-presence summaries. Peer VAD diagnostic windows remain available.
 - Queue pressure prioritizes warning, error, and terminal evidence. Logging does not guarantee complete persistence.
 - The writer retains ownership through stream closure; replacement must not race a retiring writer.
 - Persisted records include calendar date and process ID. Recognition terminals correlate channel, utterance, provider epoch/turn, activation generation, watchdog timing, and recovery decisions. Self capture failures identify the actual active-intent transition; peer expiry records sealed wait and TTL.

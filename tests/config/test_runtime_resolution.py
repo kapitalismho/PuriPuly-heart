@@ -825,18 +825,6 @@ def test_luna_openrouter_connection_keeps_openrouter_byok_target() -> None:
     assert target.credential.reference == "openrouter:byok"
 
 
-def test_luna_chatgpt_plan_starts_same_model_hedge_at_1700_ms() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    intent = runtime_resolution.normalize_translation_runtime_intent(
-        model="gpt_6_luna", connection="chatgpt"
-    )
-    config = runtime_resolution.resolve_llm_config(
-        runtime_resolution.RuntimeResolutionInput(translation=intent)
-    )
-    assert [attempt.target.provider for attempt in config.attempts] == ["chatgpt", "chatgpt"]
-    assert config.attempts[1].start_after_ms == 1700
-
-
 def test_luna_compatibility_provider_and_profile_resolve_to_same_product() -> None:
     runtime_resolution = _runtime_resolution_module()
     direct = runtime_resolution.derive_translation_runtime_intent_from_compatibility(

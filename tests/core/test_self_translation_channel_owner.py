@@ -31,7 +31,12 @@ from puripuly_heart.core.stt.backend import (
     STTTextContribution,
 )
 from puripuly_heart.core.vad.gating import SpeechEnd
-from puripuly_heart.domain.events import STTFinalEvent, STTSessionState, UIEventType
+from puripuly_heart.domain.events import (
+    STTFinalEvent,
+    STTSessionState,
+    STTSessionStateEvent,
+    UIEventType,
+)
 from puripuly_heart.domain.models import OSCMessage, Transcript
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity
 from tests.core.test_self_translation_low_latency import BlockingLLMProvider, FakeLLMProvider
@@ -80,6 +85,61 @@ def test_self_waiting_output_attaches_admitted_context_texts() -> None:
 
     assert filled.context_texts == ("어제 뭐 했어",)
     assert already.context_texts == ()
+
+
+@pytest.mark.asyncio
+async def test_activation_notice_preference_preserves_self_cooldown_without_replay() -> None:
+    clock = FakeClock()
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=osc, clock=clock)
+    owner = harness.self_owner
+    ready = STTSessionStateEvent(state=STTSessionState.STREAMING)
+    try:
+        await harness.start()
+        harness.output_runtime.activation_notice_enabled = False
+        owner.mark_promo_eligible()
+        await owner.handle_stt_event(ready)
+
+        assert osc.immediate_messages == []
+        assert owner._last_promo_time is None
+        assert harness.output_runtime.routing_decisions[-1].reason == "activation_notice_disabled"
+
+        harness.output_runtime.activation_notice_enabled = True
+        await owner.handle_stt_event(ready)
+        assert osc.immediate_messages == []
+
+        clock.advance(5.0)
+        owner.mark_promo_eligible()
+        await owner.handle_stt_event(ready)
+        assert osc.immediate_messages == ["PuriPuly ON!"]
+        assert owner._last_promo_time == 5.0
+
+        clock.advance(30.0)
+        harness.output_runtime.activation_notice_enabled = False
+        owner.mark_promo_eligible()
+        await owner.handle_stt_event(ready)
+        harness.output_runtime.activation_notice_enabled = True
+        owner.mark_promo_eligible()
+        await owner.handle_stt_event(ready)
+        assert osc.immediate_messages == ["PuriPuly ON!"]
+        assert owner._last_promo_time == 5.0
+
+        clock.advance(301.0)
+        harness.output_runtime.activation_notice_enabled = False
+        owner.mark_promo_eligible()
+        await owner.handle_stt_event(ready)
+        assert owner._last_promo_time == 5.0
+        assert harness.output_runtime.routing_decisions[-1].reason == "activation_notice_disabled"
+
+        harness.output_runtime.activation_notice_enabled = True
+        await owner.handle_stt_event(ready)
+        assert osc.immediate_messages == ["PuriPuly ON!"]
+        owner.mark_promo_eligible()
+        await owner.handle_stt_event(ready)
+        assert osc.immediate_messages == ["PuriPuly ON!", "PuriPuly ON!"]
+        assert owner._last_promo_time == clock.now()
+    finally:
+        await harness.stop()
 
 
 @pytest.mark.asyncio

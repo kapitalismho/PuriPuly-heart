@@ -120,12 +120,18 @@ def compose_settings_general_surface(
         slots.vrchat_mic_intercept,
         slots.telemetry_enabled,
     )
+    activation_notice_row = compose_settings_triple_row(
+        slots.activation_notice,
+        slots.activation_notice_middle,
+        slots.activation_notice_trailing,
+    )
     return SettingsGeneralSurfaceRegions(
-        rows=(primary_row, audio_row, vad_row, clipboard_row),
+        rows=(primary_row, audio_row, vad_row, clipboard_row, activation_notice_row),
         primary_row=primary_row,
         audio_row=audio_row,
         vad_row=vad_row,
         clipboard_row=clipboard_row,
+        activation_notice_row=activation_notice_row,
         primary_row_placeholder=primary_row_placeholder,
     )
 

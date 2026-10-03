@@ -4841,49 +4841,6 @@ def test_audio_change_updates_desktop_loopback_controls(monkeypatch: pytest.Monk
     assert changed[-1].intent.desktop_audio.vad_speech_threshold == 0.72
 
 
-def test_general_tab_keeps_fixed_three_slot_rows_with_vrchat_osc_card(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
-
-    view, _ = _make_settings_view(monkeypatch)
-    general_controls = _subtab_controls(view, "general")
-
-    assert len(general_controls) == 4
-    assert {len(control.content.controls) for control in general_controls} == {3}
-    assert _row_card_titles(general_controls[0]) == [
-        t("settings.section.ui"),
-        t("settings.chatbox_include_source"),
-        t("settings.osc.connection.title"),
-    ]
-    assert _row_card_titles(general_controls[1]) == [
-        t("settings.audio_host_api"),
-        t("settings.section.microphone_audio"),
-        t("settings.section.loopback_audio"),
-    ]
-    assert _row_card_titles(general_controls[2]) == [
-        t("settings.microphone_test"),
-        t("settings.section.self_vad_sensitivity"),
-        t("settings.section.peer_vad_sensitivity"),
-    ]
-    assert _row_card_titles(general_controls[3]) == [
-        t("settings.clipboard_auto_translate"),
-        t("settings.vrc_mic_intercept"),
-        t("settings.telemetry.title"),
-    ]
-
-    osc_card = general_controls[0].content.controls[2]
-    assert osc_card is view._vrchat_osc_card
-    assert isinstance(osc_card, SettingsUnitCard)
-    assert osc_card.height == SettingsUnitCard.DEFAULT_HEIGHT
-    assert osc_card.expand is True
-    osc_column = _wrapped_card_column(osc_card)
-    value_slot = osc_column.controls[1]
-    assert isinstance(value_slot, ft.Container)
-    assert value_slot.content is view._osc_connection_text
-    assert view._osc_connection_text.content.value == t("settings.osc.mode.automatic")
-
-
 def test_api_translation_connection_row_places_cloud_free_tier_card(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

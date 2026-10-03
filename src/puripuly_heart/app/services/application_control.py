@@ -14,6 +14,7 @@ from uuid import uuid4
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.managed_gemma_translation import ManagedGemmaTranslationSelection
 from puripuly_heart.app.ports.settings_view import (
+    ActivationNoticeSettingsIntent,
     AudioInputSettingsIntent,
     AudioSettingsIntent,
     ChatboxSourceSettingsIntent,
@@ -200,6 +201,7 @@ IMMEDIATE = {
     "locale": lambda v: LocaleSettingsIntent(v),
     "clipboard.enabled": lambda v: ClipboardSettingsIntent(v),
     "chatbox.source.enabled": lambda v: ChatboxSourceSettingsIntent(v),
+    "chatbox.activation_notice.enabled": lambda v: ActivationNoticeSettingsIntent(v),
     "vrc_mic_intercept.enabled": lambda v: VrcMicInterceptSettingsIntent(v),
     "overlay.target": lambda v: OverlayTargetSettingsIntent(v),
     "overlay.translation.enabled": lambda v: OverlayTranslationSettingsIntent(v),
@@ -257,6 +259,7 @@ BOOLEAN_FIELDS = frozenset(
     {
         "clipboard.enabled",
         "chatbox.source.enabled",
+        "chatbox.activation_notice.enabled",
         "vrc_mic_intercept.enabled",
         "overlay.translation.enabled",
         "overlay.peer_original.enabled",

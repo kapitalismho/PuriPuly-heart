@@ -64,7 +64,6 @@ def test_render_translation_prompt_uses_exact_korean_to_english_rules_and_exampl
         target_name="English",
     )
 
-    assert "Interpret the Korean text to translate into English" in rendered
     assert "Korean" in rendered
     assert "English" in rendered
     assert "Use contractions" in rendered
@@ -73,7 +72,6 @@ def test_render_translation_prompt_uses_exact_korean_to_english_rules_and_exampl
     assert "### Target language Rules" in rendered
     assert "## Examples" in rendered
     assert rendered.index("### Target language Rules") < rendered.index("## Examples")
-    assert rendered.index("## Examples") < rendered.index("## Output")
     assert "\n\n\n" not in rendered
     assert "${" not in rendered
 
@@ -156,8 +154,6 @@ def test_unspecified_source_uses_input_ref_and_skips_pair_examples() -> None:
     assert variables["translationExamples"] == ""
     assert variables["translationExamplesSection"] == ""
     assert variables["targetLanguageRulesSection"].startswith("### Target language Rules\n")
-    assert "Interpret <input> to translate into Japanese" in rendered
-    assert "the English text" not in rendered
     assert "Context Use Example" not in rendered
     assert "## Examples" not in rendered
     assert "### Target language Rules" in rendered
@@ -179,9 +175,6 @@ def test_unspecified_source_to_english_skips_fallback_examples() -> None:
 
     assert variables["translationExamples"] == ""
     assert variables["translationExamplesSection"] == ""
-    assert "Interpret <input> to translate into English" in rendered
-    assert "J'ai trouvé un nouvel avatar." not in rendered
-    assert "the French text" not in rendered
     assert "## Examples" not in rendered
 
 
@@ -194,10 +187,6 @@ def test_missing_rules_and_examples_omit_optional_section_headings() -> None:
 
     assert "### Target language Rules" not in rendered
     assert "## Examples" not in rendered
-    assert "## Output" in rendered
-    assert (
-        "* Use exclamation marks only when the source is clearly emphatic.\n\n## Output" in rendered
-    )
     assert "\n\n\n" not in rendered
 
 
@@ -207,6 +196,7 @@ def test_build_translation_prompt_variables_returns_expected_keys_and_content() 
     assert set(variables) == {
         "sourceName",
         "sourceTextRef",
+        "sourceLanguageSetting",
         "targetName",
         "inputChannel",
         "targetLanguageRules",

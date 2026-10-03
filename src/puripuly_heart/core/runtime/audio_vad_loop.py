@@ -138,7 +138,7 @@ async def run_audio_vad_loop(
     segment_ledger: PeerAudioSegmentLedger | None = None,
     monotonic_clock: Callable[[], float] = time.monotonic,
     smart_turn_owner: SmartTurnInferenceOwner | None = None,
-    progress_interval_audio_ms: float = 10_000.0,
+    peer_diagnostic_interval_audio_ms: float = 10_000.0,
     no_frame_timeout_s: float = 10.0,
 ) -> None:
     chunk_samples = vad.chunk_samples
@@ -151,9 +151,6 @@ async def run_audio_vad_loop(
     synthetic_sequence = 0
     delivery_controller: ListenDeliveryController | None = None
     gate_stream_blocked = False
-    progress_audio_ms = 0.0
-    progress_speech_observed = False
-    last_progress_state: str | None = None
     peer_diagnostics = channel_label.lower() == "peer"
     window_samples = 0
     window_square_sum = 0.0
@@ -310,7 +307,6 @@ async def run_audio_vad_loop(
     async def _process_buffered_chunks() -> None:
         nonlocal gate_stream_blocked
         nonlocal buffer
-        nonlocal progress_audio_ms, progress_speech_observed, last_progress_state
         nonlocal window_samples, window_square_sum, window_max_probability
         nonlocal window_threshold_min, window_threshold_max, window_threshold_hits
         nonlocal window_discarded, window_max_discarded_chunks, window_committed
@@ -417,35 +413,10 @@ async def run_audio_vad_loop(
                         )
                 for event in events:
                     await _dispatch(event)
-            chunk_ms = chunk.size * 1000.0 / float(target_sample_rate_hz)
-            progress_audio_ms += chunk_ms
-            progress_speech_observed = progress_speech_observed or speech_observed
-            if log_basic is not None and progress_audio_ms >= progress_interval_audio_ms:
-                state = (
-                    (
-                        "frames_with_threshold_hit"
-                        if progress_speech_observed
-                        else "frames_without_threshold_hit"
-                    )
-                    if peer_diagnostics
-                    else (
-                        "frames_with_admitted_speech"
-                        if progress_speech_observed
-                        else "frames_without_admitted_speech"
-                    )
-                )
-                if state != last_progress_state:
-                    with contextlib.suppress(Exception):
-                        log_basic(
-                            f"[Capture] progress channel={channel_label} "
-                            f"state={state} observed_audio_ms={int(progress_audio_ms)}"
-                        )
-                    last_progress_state = state
-                progress_audio_ms = 0.0
-                progress_speech_observed = False
             if (
                 peer_diagnostics
-                and window_samples * 1000.0 / target_sample_rate_hz >= progress_interval_audio_ms
+                and window_samples * 1000.0 / target_sample_rate_hz
+                >= peer_diagnostic_interval_audio_ms
             ):
                 _flush_peer_window("interval")
             if delivery_controller is not None:

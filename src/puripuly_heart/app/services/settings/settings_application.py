@@ -9,6 +9,7 @@ from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyPort
 from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeEffectsPort
 from puripuly_heart.app.ports.settings_view import (
+    ActivationNoticeSettingsIntent,
     AudioInputSettingsIntent,
     AudioSettingsIntent,
     ChatboxSourceSettingsIntent,
@@ -311,6 +312,7 @@ def settings_view_surface_snapshots(
         osc_receive_port=intent.osc.receive_port,
         vrc_mic_intercept=intent.osc.vrc_mic_intercept,
         chatbox_include_source=intent.osc.chatbox_include_source,
+        activation_notice_enabled=intent.osc.activation_notice_enabled,
         clipboard_auto_translate_enabled=intent.clipboard.auto_translate_enabled,
         telemetry_enabled=intent.telemetry.enabled,
         peer_expected_languages=tuple(intent.languages.peer_expected_languages),
@@ -535,6 +537,11 @@ def materialize_immediate_settings_intent(
         updated = _with_intent(
             updated,
             osc=replace(updated.intent.osc, chatbox_include_source=intent.enabled),
+        )
+    elif isinstance(intent, ActivationNoticeSettingsIntent):
+        updated = _with_intent(
+            updated,
+            osc=replace(updated.intent.osc, activation_notice_enabled=intent.enabled),
         )
     elif isinstance(intent, ClipboardSettingsIntent):
         updated = _with_intent(
@@ -1417,24 +1424,34 @@ class SettingsApplicationOwner:
         base_settings, patch_values = base_and_patch
         if not patch_values:
             return False
+        notice_only = set(patch_values) == {"intent.osc.activation_notice_enabled"}
         next_settings = copy.deepcopy(next_settings)
-        await self.runtime_effects.prepare_overlay_persistence(
-            base_settings,
-            next_settings,
-        )
-        patch_values = build_overlay_osc_output_settings_path_patch(
-            base_settings,
-            next_settings,
-        )
+        if not notice_only:
+            await self.runtime_effects.prepare_overlay_persistence(
+                base_settings,
+                next_settings,
+            )
+            patch_values = build_overlay_osc_output_settings_path_patch(
+                base_settings,
+                next_settings,
+            )
         committed_settings = apply_settings_path_patch(base_settings, patch_values)
         has_out_of_scope_draft = self.settings.snapshot_values(
             committed_settings
         ) != self.settings.snapshot_values(next_settings)
+
+        async def apply_notice(_settings: object, reload_settings_view: bool) -> None:
+            self.runtime_effects.apply_activation_notice(committed_settings)
+            self.settings.canonical = committed_settings
+            if reload_settings_view:
+                self.projection.render(committed_settings, preserve_custom_vocab_draft=True)
+            self.sync_ui()
+
         runtime_apply = (
             NoopRuntimeApply()
             if has_out_of_scope_draft
             else OverlayOscOutputRuntimeApplyAdapter(
-                apply_settings=self._apply_runtime_effect,
+                apply_settings=apply_notice if notice_only else self._apply_runtime_effect,
                 settings=committed_settings,
                 failure_sink=self.failure_sink,
             )
@@ -1449,6 +1466,12 @@ class SettingsApplicationOwner:
         if not _settings_mutation_committed(result):
             self.settings.canonical = copy.deepcopy(base_settings)
             self.projection.remember_order23(self.settings.canonical)
+            if notice_only:
+                self.projection.render(
+                    self.settings.canonical,
+                    preserve_custom_vocab_draft=True,
+                )
+                self.sync_ui()
             return True
         if has_out_of_scope_draft:
             try:

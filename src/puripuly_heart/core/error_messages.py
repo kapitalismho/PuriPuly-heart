@@ -369,16 +369,24 @@ def _openrouter_limit_fields(exc: BaseException | None) -> dict[str, DiagnosticF
 
 
 def _chatgpt_message_key(exc: BaseException | None, status_code: int | None) -> str | None:
+    has_subscription_code = False
     for item in _exception_chain(exc):
         if getattr(item, "chatgpt_reauth_required", False):
             return "provider.chatgpt.reauth_required"
         code = getattr(item, "subscription_code", None)
+        if code:
+            has_subscription_code = True
         if code == "subscription_sharing_usage_limit_exceeded":
             return "provider.chatgpt.usage_limit"
         if code in ("subscription_sharing_user_not_eligible", "chatpass_v2_scope_not_authorized"):
             return "provider.chatgpt.not_eligible"
     if status_code == 401:
         return "provider.chatgpt.reauth_required"
+    if not has_subscription_code:
+        if status_code == 403:
+            return "provider.chatgpt.not_eligible"
+        if status_code == 429:
+            return "provider.chatgpt.usage_limit"
     return None
 
 

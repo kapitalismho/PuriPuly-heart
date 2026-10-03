@@ -192,19 +192,78 @@ async def test_httpx_openai_client_builds_reasoning_disabled_chat_completion_req
     assert body["temperature"] == 0.6
     assert body["max_completion_tokens"] == 37
     assert "max_tokens" not in body
+    assert body["prompt_cache_options"] == {"mode": "explicit", "ttl": "30m"}
     assert body["messages"] == [
-        {"role": "system", "content": "Translate Korean to English."},
+        {
+            "role": "system",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Translate Korean to English.",
+                    "prompt_cache_breakpoint": {"mode": "explicit"},
+                }
+            ],
+        },
         {
             "role": "user",
             "content": (
-                "<scene>\nPeople: 2\n</scene>\n\n<context>\n"
-                "At the station, the speaker asks a companion to wait.\n"
-                "</context>\n\n<input>\n잠깐만 기다려 주세요.\n</input>"
+                "<context>\nAt the station, the speaker asks a companion to wait.\n"
+                "</context>\n\n<scene>\nPeople: 2\n</scene>\n\n"
+                "<input>\n잠깐만 기다려 주세요.\n</input>"
             ),
         },
     ]
     await client.close()
     assert fake_http.closed is True
+
+
+@pytest.mark.parametrize(
+    ("model", "explicit_cache"),
+    [
+        (OPENAI_MODEL_GPT_6_LUNA, True),
+        ("gpt-5.1", False),
+        (f"{OPENAI_MODEL_GPT_6_LUNA}-preview", False),
+    ],
+)
+def test_openai_cache_schema_preserves_custom_prompt_and_excludes_user_content(
+    model: str, explicit_cache: bool
+) -> None:
+    client = HttpxOpenAIClient(api_key="test-key", model=model)
+    custom_prompt = "Custom instructions\nKeep {literal} exactly as written."
+    requests = [
+        client._build_request_body(
+            text=text,
+            system_prompt=custom_prompt,
+            source_language="Korean",
+            target_language="English",
+            context=context,
+            scene_participant_count=participants,
+        )
+        for text, context, participants in (
+            ("first input", "first context", 2),
+            ("second input", "second context", 3),
+        )
+    ]
+
+    expected_content: object = custom_prompt
+    if explicit_cache:
+        expected_content = [
+            {
+                "type": "text",
+                "text": custom_prompt,
+                "prompt_cache_breakpoint": {"mode": "explicit"},
+            }
+        ]
+    for body in requests:
+        assert body["messages"][0] == {"role": "system", "content": expected_content}
+        assert isinstance(body["messages"][1]["content"], str)
+        assert "max_completion_tokens" not in body
+        if explicit_cache:
+            assert body["prompt_cache_options"] == {"mode": "explicit", "ttl": "30m"}
+        else:
+            assert "prompt_cache_options" not in body
+    assert requests[0]["messages"][0] == requests[1]["messages"][0]
+    assert requests[0]["messages"][1] != requests[1]["messages"][1]
 
 
 @pytest.mark.asyncio

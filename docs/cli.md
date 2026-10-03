@@ -130,6 +130,8 @@ Use `settings.current` to read the current `revision`. `settings apply` accepts 
 
 Revisions and settings events follow successfully committed changes, including GUI-only edits. Queries return the committed snapshot without advancing its revision. Staged preparation and failed persistence are not reported as persisted settings.
 
+`chatbox.activation_notice.enabled` is a boolean preference, enabled by default, persisted as `intent.osc.activation_notice_enabled`. Setting it to `false` suppresses the Talk `PuriPuly ON!` message and Listen audio-capture disclosure without disabling capture or normal translation output. It applies immediately without a runtime restart, and changing it to `true` does not itself send or replay a notice. Peer capture still requires explicit acceptance of its terms.
+
 Example `changes.json` (supported field/type shape; provider availability and credentials still determine runtime success):
 
 ```json
@@ -139,6 +141,7 @@ Example `changes.json` (supported field/type shape; provider availability and cr
     "peer_stt.provider": "qwen_audio",
     "translation.model": "gemma4_26b_31b",
     "translation.connection": "openrouter",
+    "chatbox.activation_notice.enabled": false,
     "telemetry.enabled": false
   }
 }

@@ -123,6 +123,7 @@ ORDER23_OVERLAY_OSC_OUTPUT_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "intent.osc.chatbox_max_chars",
     "intent.osc.vrc_mic_intercept",
     "intent.osc.chatbox_include_source",
+    "intent.osc.activation_notice_enabled",
 )
 
 ORDER24_UI_PROMPT_CLIPBOARD_STATE_SETTINGS_PATHS: Final[tuple[str, ...]] = (

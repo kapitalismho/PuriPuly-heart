@@ -227,6 +227,7 @@ def test_order23_overlay_osc_output_patch_records_initial_covered_surface_list()
         "intent.osc.chatbox_max_chars",
         "intent.osc.vrc_mic_intercept",
         "intent.osc.chatbox_include_source",
+        "intent.osc.activation_notice_enabled",
     }
 
 

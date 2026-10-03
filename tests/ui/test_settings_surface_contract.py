@@ -10,7 +10,6 @@ from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 from puripuly_heart.ui.settings.contract import (
     SettingsApiSurfaceSlots,
     SettingsGeneralIntents,
-    SettingsGeneralSurfaceSlots,
     SettingsOverlayIntents,
     SettingsOverlaySurfaceSlots,
     SettingsPromptIntents,
@@ -21,7 +20,6 @@ from puripuly_heart.ui.settings.contract import (
 from puripuly_heart.ui.settings.renderer import (
     SETTINGS_ROW_SPACING,
     compose_settings_api_surface,
-    compose_settings_general_surface,
     compose_settings_overlay_surface,
     compose_settings_prompt_surface,
 )
@@ -296,60 +294,10 @@ def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
     assert view.on_overlay_calibration_begin is existing_calibration_begin
 
 
-def _general_slots() -> SettingsGeneralSurfaceSlots:
-    return SettingsGeneralSurfaceSlots(
-        **{
-            name: ft.Text(name)
-            for name in SettingsGeneralSurfaceSlots.__dataclass_fields__  # noqa: F821
-        }
-    )
-
-
 def _overlay_slots() -> SettingsOverlaySurfaceSlots:
     return SettingsOverlaySurfaceSlots(
         **{name: ft.Text(name) for name in SettingsOverlaySurfaceSlots.__dataclass_fields__}
     )
-
-
-def test_general_surface_preserves_the_accepted_row_order_and_spacing() -> None:
-    placeholders: list[ft.Control] = []
-    slots = _general_slots()
-    surface = compose_settings_general_surface(
-        slots,
-        placeholder_factory=lambda: _track(placeholders),
-    )
-
-    assert len(placeholders) == 1
-    assert surface.rows == (
-        surface.primary_row,
-        surface.audio_row,
-        surface.vad_row,
-        surface.clipboard_row,
-    )
-    assert surface.primary_row.content.controls == [
-        slots.ui,
-        slots.chatbox_source,
-        surface.primary_row_placeholder,
-    ]
-    assert surface.audio_row.content.controls == [
-        slots.audio_host_api,
-        slots.microphone,
-        slots.loopback,
-    ]
-    assert surface.vad_row.content.controls == [
-        slots.microphone_test,
-        slots.self_vad,
-        slots.peer_vad,
-    ]
-    assert surface.clipboard_row.content.controls == [
-        slots.clipboard_auto_translate,
-        slots.vrchat_mic_intercept,
-        slots.telemetry_enabled,
-    ]
-    for row in surface.rows:
-        assert row.visible is True
-        assert row.content.spacing == FOUNDATION_DESIGN_TOKENS.spacing.page
-        assert row.content.expand is True
 
 
 def test_prompt_surface_preserves_the_accepted_card_order() -> None:

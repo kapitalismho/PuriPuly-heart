@@ -163,7 +163,7 @@ def test_version_49_gemma_consolidated_settings_gain_shared_connections(tmp_path
     assert translation.qwen.region == "singapore"
     assert translation.qwen.beijing == AlibabaRegionalSettings()
     assert translation.qwen.singapore == AlibabaRegionalSettings()
-    assert json.loads(path.read_text(encoding="utf-8"))["settings_version"] == 50
+    assert json.loads(path.read_text(encoding="utf-8"))["settings_version"] == 51
     assert compat.load_vnext_settings(path).migrated is False
     assert migrated.backup_path.read_text(encoding="utf-8") == original_text
 

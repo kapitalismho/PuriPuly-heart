@@ -40,7 +40,7 @@ async def _run_contextual_korean_cases(
             "休",
         ),
     )
-    prompt_template = resolve_system_prompt(None)
+    prompt_template = resolve_system_prompt(None, model=model)
     for target_language, text, context, expected_fragment in cases:
         prompt = render_translation_prompt_template(
             prompt_template,

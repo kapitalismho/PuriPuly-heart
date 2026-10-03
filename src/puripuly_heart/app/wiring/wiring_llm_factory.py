@@ -936,6 +936,7 @@ def create_llm_provider_from_resolved_config(
             fallback_timeout_ms=config.attempts[1].start_after_ms,
             loser_grace_ms=config.loser_grace_ms,
             runtime_logging=runtime_logging,
+            request_admission=base if isinstance(base, ChatGptPlanLLMProvider) else None,
         )
     return SemaphoreLLMProvider(
         inner=base,

@@ -19,6 +19,7 @@ from puripuly_heart.app.services.provider_runtime_apply import (
 )
 from puripuly_heart.config.paths import default_http_extensions_dir
 from puripuly_heart.config.prompts import resolve_system_prompt
+from puripuly_heart.config.runtime_resolution import resolve_llm_config
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.chatgpt.session import ChatGptAccessTokenPort
@@ -83,6 +84,7 @@ def project_translation_runtime_settings_from_vnext(
 ) -> TranslationRuntimeSettingsValues:
     languages = settings.intent.languages
     stt = settings.intent.stt
+    llm_config = resolve_llm_config(runtime_resolution_input_from_vnext(settings))
     return TranslationRuntimeSettingsValues(
         source_language=languages.source_language,
         target_language=languages.target_language,
@@ -97,7 +99,10 @@ def project_translation_runtime_settings_from_vnext(
         peer_source_language=languages.peer_source_language,
         peer_target_language=languages.peer_target_language,
         peer_source_mode=languages.peer_source_mode,
-        system_prompt=resolve_system_prompt(settings.intent.prompts.system_prompt_override),
+        system_prompt=resolve_system_prompt(
+            settings.intent.prompts.system_prompt_override,
+            model=llm_config.primary.model,
+        ),
         concurrency_limit=settings.intent.translation.concurrency_limit,
         chatbox_include_source=settings.intent.osc.chatbox_include_source,
         hangover_s=(

@@ -20,7 +20,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 50
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 51
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -682,8 +682,11 @@ class OscIntent:
     chatbox_max_chars: int = 144
     vrc_mic_intercept: bool = False
     chatbox_include_source: bool = False
+    activation_notice_enabled: bool = True
 
     def __post_init__(self) -> None:
+        if not isinstance(self.activation_notice_enabled, bool):
+            raise ValueError("OSC activation_notice_enabled must be a boolean")
         mode = self.connection_mode if self.connection_mode in OSC_CONNECTION_MODES else "automatic"
         if self.port != OSC_DEFAULT_SEND_PORT and self.send_port == OSC_DEFAULT_SEND_PORT:
             send_port = self.port

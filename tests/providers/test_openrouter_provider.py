@@ -310,6 +310,7 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
         "allow_fallbacks": True,
     }
     assert body["messages"][0] == {"role": "system", "content": "SYSTEM"}
+    assert "prompt_cache_options" not in body
     assert body["messages"][1]["role"] == "user"
     assert "<context>" in body["messages"][1]["content"]
     assert "</context>" in body["messages"][1]["content"]
@@ -343,7 +344,94 @@ async def test_httpx_openrouter_luna_disables_reasoning_and_omits_temperature(
     assert fake_client.last_request["json"]["reasoning"] == {"effort": "none"}
     assert fake_client.last_request["json"]["max_tokens"] == 37
     assert "temperature" not in fake_client.last_request["json"]
+    assert fake_client.last_request["json"]["prompt_cache_options"] == {
+        "mode": "explicit",
+        "ttl": "30m",
+    }
+    assert fake_client.last_request["json"]["messages"] == [
+        {
+            "role": "system",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Translate Korean to English.",
+                    "prompt_cache_breakpoint": {"mode": "explicit"},
+                }
+            ],
+        },
+        {
+            "role": "user",
+            "content": (
+                "<context>\nAt a station, someone asks a companion to wait.\n</context>\n\n"
+                "<input>\n조금만 더 기다려 주세요.\n</input>"
+            ),
+        },
+    ]
     await client.close()
+
+
+@pytest.mark.parametrize(
+    ("models", "explicit_cache"),
+    [
+        ((OPENROUTER_MODEL_GPT_6_LUNA,), True),
+        (("google/gemma-4-26b-a4b-it",), False),
+        ((f"{OPENROUTER_MODEL_GPT_6_LUNA}-preview",), False),
+        ((OPENROUTER_MODEL_GPT_6_LUNA, "google/gemma-4-26b-a4b-it"), False),
+        (("google/gemma-4-26b-a4b-it", OPENROUTER_MODEL_GPT_6_LUNA), False),
+    ],
+)
+def test_openrouter_cache_schema_requires_luna_only_routing_and_preserves_custom_prompt(
+    models: tuple[str, ...], explicit_cache: bool
+) -> None:
+    client = HttpxOpenRouterClient(
+        api_key="test-key",
+        model=models[0],
+        models=models,
+        user_identifier="managed-user-123",
+    )
+    custom_prompt = "Custom instructions\nKeep {literal} exactly as written."
+    requests = [
+        client._build_request_body(
+            text=text,
+            system_prompt=custom_prompt,
+            source_language="Korean",
+            target_language="English",
+            context=context,
+            scene_participant_count=participants,
+            max_output_tokens=37,
+        )
+        for text, context, participants in (
+            ("first input", "first context", 2),
+            ("second input", "second context", 3),
+        )
+    ]
+
+    expected_content: object = custom_prompt
+    if explicit_cache:
+        expected_content = [
+            {
+                "type": "text",
+                "text": custom_prompt,
+                "prompt_cache_breakpoint": {"mode": "explicit"},
+            }
+        ]
+    for body in requests:
+        assert body["messages"][0] == {"role": "system", "content": expected_content}
+        assert isinstance(body["messages"][1]["content"], str)
+        assert body["max_tokens"] == 37
+        assert body["user"] == "managed-user-123"
+        if len(models) == 1:
+            assert body["model"] == models[0]
+            assert "models" not in body
+        else:
+            assert body["models"] == list(models)
+            assert "model" not in body
+        if explicit_cache:
+            assert body["prompt_cache_options"] == {"mode": "explicit", "ttl": "30m"}
+        else:
+            assert "prompt_cache_options" not in body
+    assert requests[0]["messages"][0] == requests[1]["messages"][0]
+    assert requests[0]["messages"][1] != requests[1]["messages"][1]
 
 
 @pytest.mark.asyncio

@@ -4,6 +4,12 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
+from puripuly_heart.app.wiring_provider_runtime import (
+    project_translation_runtime_settings_from_vnext,
+)
+from puripuly_heart.app.wiring_translation_runtime_configuration import (
+    build_translation_runtime_config,
+)
 
 from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeTransition
 from puripuly_heart.app.services.settings.settings_runtime_effects import (
@@ -13,7 +19,10 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
     build_peer_capture_session_config_from_vnext,
     build_peer_stt_runtime_signature_from_vnext,
 )
+from puripuly_heart.config.prompts import get_translation_prompt_template
+from puripuly_heart.config.runtime_resolution import OPENAI_MODEL_GPT_6_LUNA
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfigurationOwner
 
 
 class _AsyncNoop:
@@ -53,6 +62,105 @@ class _VrcMic:
         return None
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("connection", ("official_byok", "openrouter", "chatgpt"))
+@pytest.mark.parametrize("override", (None, "  Custom translation prompt.\n"))
+async def test_live_model_settings_refresh_runtime_prompt_without_changing_override(
+    connection: str,
+    override: str | None,
+) -> None:
+    baseline = AppSettingsVNext()
+    generic = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            prompts=replace(baseline.intent.prompts, system_prompt_override=override),
+        ),
+    )
+    luna = replace(
+        generic,
+        intent=replace(
+            generic.intent,
+            translation=replace(
+                generic.intent.translation,
+                model="gpt_6_luna",
+                connection=connection,
+            ),
+        ),
+    )
+    owner = TranslationRuntimeConfigurationOwner(
+        build_translation_runtime_config(project_translation_runtime_settings_from_vnext(generic))
+    )
+    adapter = object.__new__(SettingsRuntimeEffectsAdapter)
+    adapter._desktop_overlay = _AsyncNoop()
+    adapter._clipboard = SimpleNamespace(strict_runtime_errors=False, sync=_AsyncNoop().sync)
+    adapter._provisioning = _AsyncNoop()
+    adapter._clear_local_pending = lambda: None
+    adapter._pipeline = SimpleNamespace(
+        output_runtime=None,
+        translation_runtime_configuration=owner,
+        peer_translation_channel=None,
+    )
+    adapter._peer = SimpleNamespace(
+        owner=SimpleNamespace(
+            effective_enabled=lambda _state: False,
+            activation_requested=lambda **_kwargs: False,
+        ),
+        state_for=lambda _channel: None,
+    )
+    adapter._settings = SimpleNamespace(
+        overlay_enabled=lambda: False,
+        peer_translation_enabled=lambda: False,
+    )
+    adapter._gpu = SimpleNamespace(
+        state_provider=lambda: SimpleNamespace(selected_provider_requires_model=False)
+    )
+    adapter._overlay = _Overlay()
+    adapter._vrc_mic_sync = _VrcMic()
+    adapter._canonical_settings = lambda value: value
+    adapter._self_runtime_converged = lambda _settings: None
+    adapter._peer_runtime_converged = lambda _settings: None
+    adapter._sync_signatures = lambda _settings: None
+    adapter._rebuild_managed_gemma = _AsyncNoop().inspect_cpu
+
+    previous = generic
+    for target in (luna, generic):
+        transition = SettingsRuntimeTransition(
+            settings=target,
+            previous_settings=previous,
+            previous_locale=target.intent.ui.locale,
+            previous_overlay_enabled=False,
+            previous_self_signature=None,
+            previous_peer_signature=None,
+            previous_peer_translation_enabled=False,
+            previous_peer_activation_requested=False,
+            source_language_changed=False,
+            target_language_changed=False,
+            effective_peer_source_changed=False,
+            effective_peer_target_changed=False,
+            peer_source_language_changed=False,
+            peer_target_language_changed=False,
+            peer_source_mode_changed=False,
+            desktop_runtime_controls=(),
+        )
+
+        await adapter.apply_after_persist(
+            transition,
+            strict_runtime_errors=True,
+            reload_settings_view=False,
+        )
+
+        prompt_model = OPENAI_MODEL_GPT_6_LUNA if target is luna else None
+        expected = (
+            override
+            if override is not None
+            else get_translation_prompt_template(model=prompt_model)
+        )
+        assert owner.snapshot().value.system_prompt == expected
+        assert target.intent.prompts.system_prompt_override == override
+        previous = target
+
+
 def test_peer_runtime_convergence_requires_capture_and_committed_live_provider() -> None:
     settings = AppSettingsVNext()
     adapter = object.__new__(SettingsRuntimeEffectsAdapter)
@@ -71,9 +179,10 @@ def test_peer_runtime_convergence_requires_capture_and_committed_live_provider()
         phase="ready",
     )
     adapter._pipeline = SimpleNamespace(
+        output_runtime=None,
         local_asr_runtime=SimpleNamespace(
             snapshot=SimpleNamespace(channel_for=lambda _channel: channel)
-        )
+        ),
     )
     adapter._canonical_settings = lambda value: value
 
@@ -104,6 +213,7 @@ async def test_failed_self_runtime_apply_does_not_write_target_signature_cache_f
     adapter._provisioning = _AsyncNoop()
     adapter._clear_local_pending = lambda: None
     adapter._pipeline = SimpleNamespace(
+        output_runtime=None,
         translation_runtime_configuration=None,
         peer_translation_channel=object(),
     )
@@ -187,6 +297,7 @@ async def test_peer_refresh_recomputes_activation_after_eula_transition() -> Non
     adapter._provisioning = _AsyncNoop()
     adapter._clear_local_pending = lambda: None
     adapter._pipeline = SimpleNamespace(
+        output_runtime=None,
         translation_runtime_configuration=None,
         peer_translation_channel=object(),
     )
@@ -273,6 +384,7 @@ async def test_stale_active_peer_with_matching_cache_retries_without_caching_non
     adapter._provisioning = _AsyncNoop()
     adapter._clear_local_pending = lambda: None
     adapter._pipeline = SimpleNamespace(
+        output_runtime=None,
         translation_runtime_configuration=None,
         peer_translation_channel=object(),
     )

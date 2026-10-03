@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from typing import Protocol
 from uuid import UUID
 
 from puripuly_heart.core.llm.latency import current_request, observe_attempt
@@ -35,6 +36,31 @@ class LLMProvider:
 
     async def close(self) -> None:
         raise NotImplementedError
+
+
+class LLMRequestExecution(Protocol):
+    @property
+    def attempt_count(self) -> int: ...
+
+    async def translate_attempt(self, attempt_index: int) -> Translation: ...
+
+    async def close(self) -> None: ...
+
+
+class LLMRequestAdmissionPort(Protocol):
+    async def admit_request(
+        self,
+        *,
+        utterance_id: UUID,
+        text: str,
+        system_prompt: str,
+        source_language: str,
+        target_language: str,
+        context: str = "",
+        scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
+        max_attempts: int = 2,
+    ) -> LLMRequestExecution: ...
 
 
 @dataclass(slots=True)

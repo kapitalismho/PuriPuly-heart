@@ -8,7 +8,11 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from puripuly_heart.core.llm.latency import current_request, observe_attempt
-from puripuly_heart.core.llm.provider import LLMProvider
+from puripuly_heart.core.llm.provider import (
+    LLMProvider,
+    LLMRequestAdmissionPort,
+    LLMRequestExecution,
+)
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.domain.models import Translation
@@ -55,6 +59,7 @@ class FallbackRacingLLMProvider(LLMProvider):
     clock: Callable[[], float] = time.monotonic
     sleeper: Callable[[float], Awaitable[None]] | None = None
     runtime_logging: ProviderObservationPort | None = None
+    request_admission: LLMRequestAdmissionPort | None = None
     _inflight_tasks: set[asyncio.Task[object]] = field(init=False, default_factory=set, repr=False)
     _operation_tasks: set[asyncio.Task[object]] = field(init=False, default_factory=set, repr=False)
     _cleanup_tasks: set[asyncio.Task[object]] = field(init=False, default_factory=set, repr=False)
@@ -140,24 +145,46 @@ class FallbackRacingLLMProvider(LLMProvider):
         provider_tasks: dict[int, asyncio.Task[object]] = {}
         schedule_tasks: dict[asyncio.Task[object], int] = {}
         schedule_errors: list[Exception] = []
+        executions: list[LLMRequestExecution] = []
+        recovery_pending = False
         primary_error = asyncio.Event()
         winner_event = asyncio.Event()
         winner_index: int | None = None
         winner_result: Translation | None = None
 
-        async def run_attempt(index: int) -> Translation:
+        async def admit(max_attempts: int) -> LLMRequestExecution:
+            assert self.request_admission is not None
+            execution = await self.request_admission.admit_request(
+                **params, max_attempts=max_attempts
+            )
+            executions.append(execution)
+            if operation.cancelling():
+                raise asyncio.CancelledError
+            return execution
+
+        async def run_attempt(
+            index: int, execution: LLMRequestExecution | None, local_index: int
+        ) -> Translation:
             attempt = self.attempts[index]
             with observe_attempt(
                 provider=attempt.provider_name,
                 model=attempt.model,
                 attempt_index=index,
             ):
+                if execution is not None:
+                    return await execution.translate_attempt(local_index)
                 return await attempt.provider.translate(**params)
 
-        async def start_attempt(index: int, *, trigger_reason: str | None = None) -> None:
+        async def start_attempt(
+            index: int,
+            *,
+            execution: LLMRequestExecution | None = None,
+            local_index: int = 0,
+            trigger_reason: str | None = None,
+        ) -> None:
             if winner_event.is_set() or index in provider_tasks:
                 return
-            task = await self._create_tracked_task(run_attempt(index))
+            task = await self._create_tracked_task(run_attempt(index, execution, local_index))
             provider_tasks[index] = task
 
         operation = asyncio.current_task()
@@ -172,16 +199,26 @@ class FallbackRacingLLMProvider(LLMProvider):
                 release_permit()
             raise
         try:
-            await start_attempt(0)
-            for index, attempt in enumerate(self.attempts[1:], start=1):
-                schedule_task = await self._create_tracked_task(
-                    self._wait_for_attempt_start(
-                        attempt,
-                        primary_error=primary_error,
-                        winner_event=winner_event,
-                    )
+            if self.request_admission is not None:
+                execution = await admit(2)
+                recovery_pending = (
+                    execution.attempt_count == 1
+                    and len(self.attempts) > 1
+                    and self.attempts[1].start_on_primary_error
                 )
-                schedule_tasks[schedule_task] = index
+                for index in range(execution.attempt_count):
+                    await start_attempt(index, execution=execution, local_index=index)
+            else:
+                await start_attempt(0)
+                for index, attempt in enumerate(self.attempts[1:], start=1):
+                    schedule_task = await self._create_tracked_task(
+                        self._wait_for_attempt_start(
+                            attempt,
+                            primary_error=primary_error,
+                            winner_event=winner_event,
+                        )
+                    )
+                    schedule_tasks[schedule_task] = index
 
             while winner_index is None:
                 active_tasks = set(provider_tasks.values()) | set(schedule_tasks)
@@ -218,6 +255,15 @@ class FallbackRacingLLMProvider(LLMProvider):
                 if winner_index is not None:
                     break
 
+                if recovery_pending and outcomes[0].error is not None:
+                    recovery_pending = False
+                    try:
+                        recovery = await admit(1)
+                    except Exception as exc:
+                        schedule_errors.append(exc)
+                    else:
+                        await start_attempt(1, execution=recovery)
+
                 completed_schedule_tasks = [task for task in done if task in schedule_tasks]
                 for task in completed_schedule_tasks:
                     index = schedule_tasks.pop(task)
@@ -249,6 +295,7 @@ class FallbackRacingLLMProvider(LLMProvider):
                     schedule_tasks=schedule_tasks,
                     outcomes=outcomes,
                     winner=winner_index is not None,
+                    executions=executions,
                 )
             )
             self._cleanup_tasks.add(cleanup)
@@ -266,6 +313,7 @@ class FallbackRacingLLMProvider(LLMProvider):
         schedule_tasks: dict[asyncio.Task[object], int],
         outcomes: list[_BranchOutcome],
         winner: bool,
+        executions: list[LLMRequestExecution],
     ) -> None:
         for task in schedule_tasks:
             task.cancel()
@@ -277,10 +325,15 @@ class FallbackRacingLLMProvider(LLMProvider):
                     outcomes=outcomes,
                 )
         finally:
-            for task in schedule_tasks:
-                await self._cancel_task(task)
-            for task in provider_tasks.values():
-                await self._cancel_task(task)
+            try:
+                for task in schedule_tasks:
+                    await self._cancel_task(task)
+                for task in provider_tasks.values():
+                    await self._cancel_task(task)
+            finally:
+                for execution in executions:
+                    with contextlib.suppress(Exception):
+                        await execution.close()
 
     async def close(self) -> None:
         if self._shutdown_task is None:
@@ -394,9 +447,13 @@ class FallbackRacingLLMProvider(LLMProvider):
 
     async def _create_tracked_task(self, awaitable: Awaitable[object]) -> asyncio.Task[object]:
         task = asyncio.create_task(awaitable)
-        async with self._state_lock:
-            closed = self._closed
-            self._inflight_tasks.add(task)
+        try:
+            async with self._state_lock:
+                closed = self._closed
+                self._inflight_tasks.add(task)
+        except BaseException:
+            await self._cancel_task(task)
+            raise
         task.add_done_callback(self._inflight_tasks.discard)
         task.add_done_callback(self._consume_task_result)
         if closed:

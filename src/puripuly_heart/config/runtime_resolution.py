@@ -58,7 +58,6 @@ TRANSLATION_MODEL_CUSTOM_HTTP: Final = "custom_http"
 
 _FIRST_HEDGE_DELAY_MS: Final = 1300
 _EMERGENCY_HEDGE_DELAY_MS: Final = 4400
-_CHATGPT_FIRST_HEDGE_DELAY_MS: Final = 1700
 _LOSER_GRACE_MS: Final = 50
 
 TranslationModelName: TypeAlias = Literal[
@@ -1625,11 +1624,7 @@ def _fallback_plan_for_target(
 ) -> ResolvedLLMFallbackPlan:
     return ResolvedLLMFallbackPlan(
         target=target,
-        timeout_ms=(
-            _CHATGPT_FIRST_HEDGE_DELAY_MS
-            if target.provider == PROVIDER_CHATGPT
-            else _FIRST_HEDGE_DELAY_MS
-        ),
+        timeout_ms=0 if target.provider == PROVIDER_CHATGPT else _FIRST_HEDGE_DELAY_MS,
         force_managed_wrapper=(
             target.provider == PROVIDER_OPENROUTER
             and target.credential.source == CREDENTIAL_SOURCE_MANAGED

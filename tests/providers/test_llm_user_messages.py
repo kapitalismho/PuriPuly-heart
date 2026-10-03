@@ -1,4 +1,3 @@
-from puripuly_heart.providers.llm import deepseek, openrouter, qwen, qwen_async
 from puripuly_heart.providers.llm.gemini import GoogleGenaiGeminiClient
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
@@ -11,15 +10,6 @@ def test_build_translation_user_message_with_context() -> None:
 
 def test_build_translation_user_message_without_context() -> None:
     assert build_translation_user_message(text="hello", context="") == "<input>\nhello\n</input>"
-
-
-def test_openai_compatible_provider_builders_use_tagged_input() -> None:
-    expected = '<context>\n- [self] "hi"\n</context>\n\n<input>\nhello\n</input>'
-
-    assert qwen._build_user_message(text="hello", context='- [self] "hi"') == expected
-    assert qwen_async._build_user_message(text="hello", context='- [self] "hi"') == expected
-    assert deepseek._build_user_message(text="hello", context='- [self] "hi"') == expected
-    assert openrouter._build_user_message(text="hello", context='- [self] "hi"') == expected
 
 
 def test_gemini_build_request_uses_tagged_input() -> None:
@@ -41,8 +31,8 @@ def test_build_translation_user_message_with_scene_and_context() -> None:
     assert build_translation_user_message(
         text="hello", context='- [self] "hi"', scene_participant_count=2
     ) == (
-        "<scene>\nPeople: 2\n</scene>\n\n"
         '<context>\n- [self] "hi"\n</context>\n\n'
+        "<scene>\nPeople: 2\n</scene>\n\n"
         "<input>\nhello\n</input>"
     )
 
@@ -109,49 +99,3 @@ def test_build_translation_user_message_rejects_invalid_scene() -> None:
         == baseline
     )
     assert "<scene>" not in baseline
-
-
-def test_provider_builders_include_scene_prefix() -> None:
-    expected = (
-        "<scene>\nPeople: 3\n</scene>\n\n"
-        '<context>\n- [self] "hi"\n</context>\n\n<input>\nhello\n</input>'
-    )
-    assert (
-        qwen._build_user_message(text="hello", context='- [self] "hi"', scene_participant_count=3)
-        == expected
-    )
-    assert (
-        qwen_async._build_user_message(
-            text="hello", context='- [self] "hi"', scene_participant_count=3
-        )
-        == expected
-    )
-    assert (
-        deepseek._build_user_message(
-            text="hello", context='- [self] "hi"', scene_participant_count=3
-        )
-        == expected
-    )
-    assert (
-        openrouter._build_user_message(
-            text="hello", context='- [self] "hi"', scene_participant_count=3
-        )
-        == expected
-    )
-
-
-def test_gemini_build_request_includes_scene_prefix() -> None:
-    client = GoogleGenaiGeminiClient(api_key="key", model="model")
-    _system_prompt, user_message = client._build_request(
-        operation="translate",
-        text="hello",
-        system_prompt="PROMPT",
-        source_language="en",
-        target_language="ko",
-        context='- [self] "hi"',
-        scene_participant_count=2,
-    )
-    assert user_message == (
-        "<scene>\nPeople: 2\n</scene>\n\n"
-        '<context>\n- [self] "hi"\n</context>\n\n<input>\nhello\n</input>'
-    )

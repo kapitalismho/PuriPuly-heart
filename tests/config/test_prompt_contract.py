@@ -1,50 +1,47 @@
-from pathlib import Path
+import pytest
 
-PROMPT_PATH = Path("prompts/translation_prompt.md")
-
-REQUIRED_PLACEHOLDERS = (
-    "${sourceTextRef}",
-    "${targetName}",
-    "${inputChannel}",
-    "${targetLanguageRulesSection}",
-    "${translationExamplesSection}",
+from puripuly_heart.config.prompts import (
+    get_translation_prompt_template,
+    render_translation_prompt_template,
+    resolve_system_prompt,
 )
 
 
-def _prompt_text() -> str:
-    return PROMPT_PATH.read_text(encoding="utf-8")
-
-
-def _prompt_lines() -> list[str]:
-    return [line.casefold() for line in _prompt_text().splitlines()]
-
-
-def test_translation_prompt_declares_all_render_placeholders() -> None:
-    text = _prompt_text()
-
-    for placeholder in REQUIRED_PLACEHOLDERS:
-        assert placeholder in text
-
-
-def test_translation_prompt_states_context_ordering_relation() -> None:
-    lines = _prompt_lines()
-    ordering_lines = [
-        line for line in lines if "chronologically" in line and "older" in line and "newer" in line
+@pytest.mark.parametrize("model", [None, "gpt-6-luna", "openai/gpt-6-luna"])
+def test_common_prefix_is_independent_of_translation_settings(model: str | None) -> None:
+    template = get_translation_prompt_template(model=model)
+    requests = [
+        render_translation_prompt_template(
+            template,
+            source_name=source,
+            target_name=target,
+            input_channel=channel,
+            source_specified=specified,
+        )
+        for source, target, channel, specified in (
+            ("Korean", "English", "self", True),
+            ("English", "Japanese", "peer", True),
+            ("English", "French", "peer", False),
+        )
     ]
-
-    assert ordering_lines, "prompt must state chronological context ordering"
-    ordering = ordering_lines[0]
-    assert ordering.index("older") < ordering.index(
-        "newer"
-    ), "context ordering must be older before newer"
+    prefixes = [request.split("## Translation Settings\n", 1)[0] for request in requests]
+    assert prefixes[0] == prefixes[1] == prefixes[2]
+    assert requests[0] != requests[1] != requests[2]
+    assert all("${" not in request for request in requests)
 
 
-def test_translation_prompt_excludes_timestamp_and_competing_legend_semantics() -> None:
-    lines = _prompt_lines()
+@pytest.mark.parametrize("model", ["gpt-6-luna", "openai/gpt-6-luna"])
+def test_luna_selection_preserves_custom_prompt_and_other_models(model: str) -> None:
+    generic = resolve_system_prompt(None)
+    luna = resolve_system_prompt(None, model=model)
+    assert luna != generic
+    assert resolve_system_prompt("  ", model=model) == luna
+    custom = "Translate ${sourceName} as a poem.\nKeep this custom layout."
+    assert resolve_system_prompt(custom, model=model) == custom
+    assert resolve_system_prompt(None, model="other-model") == generic
 
-    for line in lines:
-        assert "timestamp" not in line
-        assert "relative age" not in line
-        assert "relative-age" not in line
-        assert "ago" not in line
-        assert "[others]" not in line
+
+def test_luna_connections_share_the_same_default_profile() -> None:
+    assert resolve_system_prompt(None, model="gpt-6-luna") == resolve_system_prompt(
+        None, model="openai/gpt-6-luna"
+    )

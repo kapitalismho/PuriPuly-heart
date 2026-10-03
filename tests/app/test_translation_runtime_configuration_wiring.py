@@ -3,10 +3,14 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from threading import Barrier
+from types import SimpleNamespace
 
+import pytest
 from puripuly_heart.app.wiring_provider_runtime import (
+    ProviderRuntimeEffects,
     project_translation_runtime_settings_from_vnext,
 )
+from puripuly_heart.app.wiring_runtime_pipeline import runtime_pipeline_inputs_from_vnext
 from puripuly_heart.app.wiring_translation_runtime_configuration import (
     build_translation_runtime_config,
     replace_translation_runtime_effective_flags,
@@ -14,11 +18,117 @@ from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_settings,
 )
 
+from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_GPT_6_LUNA
+from puripuly_heart.config.prompts import get_translation_prompt_template
+from puripuly_heart.config.runtime_resolution import OPENAI_MODEL_GPT_6_LUNA
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigurationOwner,
 )
+
+
+@pytest.mark.parametrize(
+    ("model", "connection", "prompt_model"),
+    (
+        ("gpt_6_luna", "official_byok", OPENAI_MODEL_GPT_6_LUNA),
+        ("gpt_6_luna", "openrouter", OPENROUTER_MODEL_GPT_6_LUNA),
+        ("gpt_6_luna", "chatgpt", OPENAI_MODEL_GPT_6_LUNA),
+        ("gemma4_26b_31b", "managed", None),
+        ("deepseek_v4_flash", "openrouter", None),
+        ("deepseek_v4_flash_41", "official_byok", None),
+        ("gemini_flash", "official_byok", None),
+        ("gemini_flash", "openrouter", None),
+        ("qwen38_flash", "official_byok", None),
+        ("managed_gemma", "cpu", None),
+        ("managed_gemma", "gpu", None),
+        ("local_llm", "ollama", None),
+        ("custom_http", "custom_http", None),
+    ),
+)
+@pytest.mark.parametrize("override", (None, "  Custom {source_lang} prompt.\n"))
+def test_startup_runtime_selects_prompt_for_resolved_model(
+    model: str,
+    connection: str,
+    prompt_model: str | None,
+    override: str | None,
+) -> None:
+    baseline = AppSettingsVNext()
+    settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            translation=replace(baseline.intent.translation, model=model, connection=connection),
+            prompts=replace(baseline.intent.prompts, system_prompt_override=override),
+        ),
+    )
+
+    inputs = runtime_pipeline_inputs_from_vnext(settings, peer_translation_enabled=False)
+
+    expected = (
+        override
+        if override is not None and override.strip()
+        else get_translation_prompt_template(model=prompt_model)
+    )
+    assert inputs.translation_runtime.system_prompt == expected
+    assert settings.intent.prompts.system_prompt_override == override
+
+
+@pytest.mark.parametrize("connection", ("official_byok", "openrouter", "chatgpt"))
+@pytest.mark.parametrize("override", (None, "  Custom {target_lang} prompt.\n"))
+def test_provider_apply_switches_default_prompt_without_changing_override(
+    connection: str,
+    override: str | None,
+) -> None:
+    baseline = AppSettingsVNext()
+    settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            prompts=replace(baseline.intent.prompts, system_prompt_override=override),
+        ),
+    )
+    owner = TranslationRuntimeConfigurationOwner(
+        build_translation_runtime_config(project_translation_runtime_settings_from_vnext(settings))
+    )
+    effects = ProviderRuntimeEffects.__new__(ProviderRuntimeEffects)
+    effects.settings = SimpleNamespace(canonical=settings)
+    effects.canonical_settings = lambda value: value
+    effects.clear_local_pending = lambda: None
+    effects.sync_local_notice = lambda: None
+    effects.managed_pending_sink = lambda _value: None
+    effects.managed_pending_provider = lambda: False
+    effects.dashboard_managed_pending_sink = lambda _value: None
+    effects.translation_runtime_configuration_provider = lambda: owner
+    effects.peer = lambda: SimpleNamespace(effective_enabled=lambda: False)
+    luna_settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model="gpt_6_luna",
+                connection=connection,
+            ),
+        ),
+    )
+
+    effects.apply_common(luna_settings)
+
+    prompt_model = (
+        OPENROUTER_MODEL_GPT_6_LUNA if connection == "openrouter" else OPENAI_MODEL_GPT_6_LUNA
+    )
+    assert owner.snapshot().value.system_prompt == (
+        override if override is not None else get_translation_prompt_template(model=prompt_model)
+    )
+    assert effects.settings.canonical.intent.prompts.system_prompt_override == override
+
+    effects.apply_common(settings)
+
+    assert owner.snapshot().value.system_prompt == (
+        override if override is not None else get_translation_prompt_template()
+    )
+    assert effects.settings.canonical.intent.prompts.system_prompt_override == override
 
 
 def test_settings_replace_is_one_atomic_revision_and_preserves_runtime_only_values() -> None:

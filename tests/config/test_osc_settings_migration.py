@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import pytest
+
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.migration import from_dict as from_vnext_dict
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -138,3 +140,51 @@ def test_osc_mode_replace_preserves_manual_ports() -> None:
     assert (off.intent.osc.send_port, off.intent.osc.receive_port) == (9140, 9141)
     automatic = _with_osc(off, connection_mode="automatic")
     assert (automatic.intent.osc.send_port, automatic.intent.osc.receive_port) == (9140, 9141)
+
+
+@pytest.mark.parametrize("settings_version", [1, 49, 50])
+def test_old_osc_settings_default_activation_notice_on(settings_version: int) -> None:
+    persisted = serialization.to_dict(AppSettingsVNext())
+    persisted["settings_version"] = settings_version
+    del persisted["intent"]["osc"]["activation_notice_enabled"]
+
+    loaded = from_vnext_dict(persisted)
+
+    assert loaded.intent.osc.activation_notice_enabled is True
+    assert serialization.to_dict(loaded)["intent"]["osc"]["activation_notice_enabled"] is True
+
+
+def test_old_settings_without_osc_block_default_activation_notice_on() -> None:
+    loaded = from_vnext_dict({"settings_version": 50, "intent": {}, "state": {}})
+
+    assert loaded.intent.osc.activation_notice_enabled is True
+
+
+def test_activation_notice_false_round_trips_without_changing_osc_settings() -> None:
+    settings = _with_osc(
+        AppSettingsVNext(),
+        activation_notice_enabled=False,
+        connection_mode="manual",
+        send_port=9123,
+        receive_port=9124,
+        chatbox_include_source=True,
+        vrc_mic_intercept=True,
+    )
+
+    persisted = serialization.to_dict(settings)
+    loaded = from_vnext_dict(persisted)
+
+    assert persisted["intent"]["osc"]["activation_notice_enabled"] is False
+    assert loaded.intent.osc == settings.intent.osc
+    assert serialization.to_dict(loaded) == persisted
+
+
+@pytest.mark.parametrize("invalid", [None, 0, 1, "false", "true", [], {}])
+def test_activation_notice_requires_boolean(invalid: object) -> None:
+    persisted = serialization.to_dict(AppSettingsVNext())
+    persisted["intent"]["osc"]["activation_notice_enabled"] = invalid
+
+    with pytest.raises(ValueError, match="activation_notice_enabled"):
+        from_vnext_dict(persisted)
+    with pytest.raises(ValueError, match="activation_notice_enabled"):
+        _with_osc(AppSettingsVNext(), activation_notice_enabled=invalid)

@@ -26,6 +26,7 @@ from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretsPort,
 )
 from puripuly_heart.app.ports.settings_view import (
+    ActivationNoticeSettingsIntent,
     AudioInputSettingsIntent,
     AudioSettingsIntent,
     ChatboxSourceSettingsIntent,
@@ -742,6 +743,7 @@ class SettingsView(ft.Column):
             self._chatbox_source_text,
             self._osc_connection_text,
             self._clipboard_auto_translate_text,
+            self._activation_notice_button,
             self._microphone_test_text,
             self._vrc_mic_text,
             self._mic_audio_text,
@@ -1606,6 +1608,22 @@ class SettingsView(ft.Column):
             value=self._telemetry_enabled_text,
         )
 
+        self._activation_notice_title = ft.Text(
+            t("settings.activation_notice.title"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._activation_notice_button = self._build_clickable_text(
+            t("settings.option.on"),
+            self._on_activation_notice_click,
+        )
+        self._activation_notice_button.disabled = True
+        self._activation_notice_card = self._wrap_unit_card(
+            title=self._activation_notice_title,
+            value=self._activation_notice_button,
+        )
+
         self._vrc_mic_text = self._build_clickable_text(
             t("settings.vrc_mic.on"),
             self._on_vrc_mic_click,
@@ -1746,6 +1764,9 @@ class SettingsView(ft.Column):
                 clipboard_auto_translate=clipboard_auto_translate_card,
                 vrchat_mic_intercept=vrc_mic_card,
                 telemetry_enabled=self._telemetry_enabled_card,
+                activation_notice=self._activation_notice_card,
+                activation_notice_middle=self._wrap_empty_unit_card(),
+                activation_notice_trailing=self._wrap_empty_unit_card(),
             ),
             placeholder_factory=lambda: self._vrchat_osc_card,
         )
@@ -3129,6 +3150,16 @@ class SettingsView(ft.Column):
             self._telemetry_enabled_display_label(settings),
         )
 
+    def _sync_activation_notice_card(self) -> None:
+        settings = self._general_snapshot
+        enabled = settings.activation_notice_enabled if settings is not None else True
+        self._set_unit_card_value_text(
+            self._activation_notice_button,
+            t("settings.option.on" if enabled else "settings.option.off"),
+        )
+        self._activation_notice_button.disabled = settings is None
+        _update_control_if_mounted(self._activation_notice_button)
+
     def _active_prompt_key_for_settings(
         self,
         settings: ProviderSettingsSnapshot | None,
@@ -3894,6 +3925,7 @@ class SettingsView(ft.Column):
             else "settings.clipboard_auto_translate.off"
         )
         self._sync_telemetry_enabled_card(general)
+        self._sync_activation_notice_card()
         # Prompt
         provider_name = self._active_prompt_key()
         self._prompt_editor.set_provider(provider_name)
@@ -6623,6 +6655,17 @@ class SettingsView(ft.Column):
             self._clipboard_auto_translate_text.update()
         self._emit_settings_changed(ClipboardSettingsIntent(new_value))
 
+    def _on_activation_notice_click(self, e) -> None:
+        if self._general_snapshot is None or self._activation_notice_button.disabled:
+            return
+        enabled = not self._general_snapshot.activation_notice_enabled
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            activation_notice_enabled=enabled,
+        )
+        self._sync_activation_notice_card()
+        self._emit_settings_changed(ActivationNoticeSettingsIntent(enabled))
+
     def _on_telemetry_enabled_click(self, e) -> None:
         _ = e
         if not is_control_mounted(self) or self._general_snapshot is None:
@@ -6827,6 +6870,8 @@ class SettingsView(ft.Column):
         self._chatbox_source_title.value = t("settings.chatbox_include_source")
         self._clipboard_auto_translate_title.value = t("settings.clipboard_auto_translate")
         self._telemetry_enabled_title.value = t("settings.telemetry.title")
+        self._activation_notice_title.value = t("settings.activation_notice.title")
+        self._sync_activation_notice_card()
         self._peer_provider_title.value = t("settings.section.peer_stt")
         self._gpu_device_title.value = t("settings.gpu_device.asr")
         self._gpu_llm_title.value = t("settings.gpu_device.llm")

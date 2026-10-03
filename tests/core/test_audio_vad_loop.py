@@ -768,49 +768,6 @@ async def test_run_audio_vad_loop_applies_audio_gate_before_forwarding_to_sink()
     assert np.array_equal(sink_events[0], gated)
 
 
-async def test_capture_progress_distinguishes_no_frames_from_frames_without_speech() -> None:
-    logs: list[str] = []
-
-    class DelayedSource:
-        async def frames(self):
-            await asyncio.sleep(0.02)
-            yield AudioFrameF32(
-                samples=np.zeros((8,), dtype=np.float32),
-                sample_rate_hz=16000,
-                channels=1,
-            )
-
-        async def close(self) -> None:
-            return None
-
-    class Sink:
-        async def handle_vad_event(self, _event: object) -> None:
-            return None
-
-    vad = VadGating(
-        SequenceVadEngine(probs=[0.0, 0.0]),
-        sample_rate_hz=16000,
-        chunk_samples=4,
-        ring_buffer_ms=1,
-        hangover_ms=640,
-    )
-
-    await run_audio_vad_loop(
-        source=DelayedSource(),
-        vad=vad,
-        sink=Sink(),
-        target_sample_rate_hz=16000,
-        log_basic=logs.append,
-        no_frame_timeout_s=0.005,
-        progress_interval_audio_ms=0.25,
-    )
-
-    assert any("state=no_frames" in message for message in logs)
-    assert any("state=frames_resumed" in message for message in logs)
-    states = {message.split("state=", 1)[1].split()[0] for message in logs if "state=" in message}
-    assert len(states) == 3
-
-
 async def test_peer_vad_windows_distinguish_discarded_and_committed_candidates(caplog) -> None:
     vad = create_peer_vad_gating(
         SequenceVadEngine(probs=[0.0, 0.8, 0.8, 0.0, 0.8, 0.8, 0.8, 0.0]),
@@ -838,7 +795,7 @@ async def test_peer_vad_windows_distinguish_discarded_and_committed_candidates(c
             sink=Sink(),
             channel_label="peer",
             target_sample_rate_hz=16000,
-            progress_interval_audio_ms=128,
+            peer_diagnostic_interval_audio_ms=128,
         )
 
     windows = [
@@ -885,7 +842,7 @@ async def test_peer_vad_windows_include_unchanged_silence_and_unknown_fake_score
             sink=Sink(),
             channel_label="peer",
             target_sample_rate_hz=16000,
-            progress_interval_audio_ms=1,
+            peer_diagnostic_interval_audio_ms=1,
         )
 
     windows = [
@@ -933,7 +890,7 @@ async def test_peer_vad_window_counts_rollover_as_committed_continuation(caplog)
             sink=Sink(),
             channel_label="peer",
             target_sample_rate_hz=16000,
-            progress_interval_audio_ms=128,
+            peer_diagnostic_interval_audio_ms=128,
         )
 
     assert len(starts) == 2

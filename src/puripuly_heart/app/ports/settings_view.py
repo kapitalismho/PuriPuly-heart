@@ -125,6 +125,7 @@ class GeneralSettingsSnapshot:
     osc_receive_port: int
     vrc_mic_intercept: bool
     chatbox_include_source: bool
+    activation_notice_enabled: bool
     clipboard_auto_translate_enabled: bool
     telemetry_enabled: bool
     peer_expected_languages: tuple[str, ...]
@@ -222,6 +223,11 @@ class ChatboxSourceSettingsIntent:
 
 
 @dataclass(frozen=True, slots=True)
+class ActivationNoticeSettingsIntent:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ClipboardSettingsIntent:
     enabled: bool
 
@@ -287,6 +293,7 @@ ImmediateSettingsIntent: TypeAlias = (
     | OscConnectionSettingsIntent
     | VrcMicInterceptSettingsIntent
     | ChatboxSourceSettingsIntent
+    | ActivationNoticeSettingsIntent
     | ClipboardSettingsIntent
     | PeerExpectedLanguagesIntent
     | CustomVocabularySettingsIntent
@@ -438,6 +445,7 @@ class OpenRouterPkceTarget:
 
 
 __all__ = [
+    "ActivationNoticeSettingsIntent",
     "AlibabaCapabilityEvidence",
     "AlibabaConnectionApplyResult",
     "AlibabaConnectionDraftSnapshot",

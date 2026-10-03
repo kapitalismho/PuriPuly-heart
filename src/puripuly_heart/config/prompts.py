@@ -11,9 +11,12 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping
 
+from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_GPT_6_LUNA
+from puripuly_heart.config.runtime_resolution import OPENAI_MODEL_GPT_6_LUNA
 from puripuly_heart.runtime_layout import current_runtime_layout
 
 TRANSLATION_PROMPT_NAME = "translation_prompt"
+LUNA_TRANSLATION_PROMPT_NAME = "translation_prompt_luna"
 UNSPECIFIED_SOURCE_TEXT_REF = "<input>"
 _LLM_PROVIDER_PROMPT_KEYS = {
     "gemini",
@@ -31,6 +34,7 @@ class PromptAssemblyCache:
     """Cached prompt pieces used to assemble translation prompts."""
 
     template: str
+    luna_template: str | None
     target_language_rules: Mapping[str, str]
     language_pair_examples: Mapping[str, str]
     fallback_examples: str
@@ -144,12 +148,16 @@ def _load_prompt_cache() -> PromptAssemblyCache:
     template_path = prompts_dir / f"{TRANSLATION_PROMPT_NAME}.md"
     if not template_path.exists():
         raise FileNotFoundError(f"Required translation prompt not found: {template_path}")
+    luna_template_path = prompts_dir / f"{LUNA_TRANSLATION_PROMPT_NAME}.md"
 
     target_language_rules = _load_markdown_files(prompts_dir / "prompt-rules" / "target-language")
     language_pair_examples = _load_markdown_files(prompts_dir / "prompt-examples" / "language-pair")
 
     return PromptAssemblyCache(
         template=_read_prompt_text(template_path),
+        luna_template=(
+            _read_prompt_text(luna_template_path) if luna_template_path.exists() else None
+        ),
         target_language_rules=MappingProxyType(target_language_rules),
         language_pair_examples=MappingProxyType(language_pair_examples),
         fallback_examples=language_pair_examples.get(_FALLBACK_EXAMPLES_KEY, ""),
@@ -271,6 +279,7 @@ def build_translation_prompt_variables(
 
     return {
         "sourceName": resolved_source_name,
+        "sourceLanguageSetting": source_name if source_specified else "Unspecified",
         "sourceTextRef": source_text_ref,
         "targetName": target_name,
         "inputChannel": input_channel,
@@ -308,9 +317,15 @@ def render_translation_prompt_template(
     return _collapse_extra_blank_lines(rendered)
 
 
-def get_translation_prompt_template() -> str:
-    """Load the shared translation prompt template."""
-    return _get_prompt_cache().template
+def get_translation_prompt_template(*, model: str | None = None) -> str:
+    cache = _get_prompt_cache()
+    if model in (OPENAI_MODEL_GPT_6_LUNA, OPENROUTER_MODEL_GPT_6_LUNA):
+        if cache.luna_template is None:
+            raise FileNotFoundError(
+                f"Required translation prompt not found: {LUNA_TRANSLATION_PROMPT_NAME}.md"
+            )
+        return cache.luna_template
+    return cache.template
 
 
 def get_default_prompt() -> str:
@@ -318,10 +333,10 @@ def get_default_prompt() -> str:
     return get_translation_prompt_template()
 
 
-def resolve_system_prompt(system_prompt_override: str | None) -> str:
+def resolve_system_prompt(system_prompt_override: str | None, *, model: str | None = None) -> str:
     if isinstance(system_prompt_override, str) and system_prompt_override.strip():
         return system_prompt_override
-    return get_default_prompt()
+    return get_translation_prompt_template(model=model)
 
 
 def normalize_system_prompt_override(value: str) -> str | None:

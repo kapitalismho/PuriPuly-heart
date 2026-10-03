@@ -457,11 +457,21 @@ class HttpxOpenRouterClient:
         scene_participant_count: int | None = None,
         max_output_tokens: int | None = None,
     ) -> dict[str, object]:
-        system_content = _build_system_prompt(
+        explicit_cache = all(model == OPENROUTER_MODEL_GPT_6_LUNA for model in self.models)
+        rendered_system_prompt = _build_system_prompt(
             system_prompt=system_prompt,
             source_language=source_language,
             target_language=target_language,
         )
+        system_content: str | list[dict[str, object]] = rendered_system_prompt
+        if explicit_cache:
+            system_content = [
+                {
+                    "type": "text",
+                    "text": rendered_system_prompt,
+                    "prompt_cache_breakpoint": {"mode": "explicit"},
+                }
+            ]
         user_message = _build_user_message(
             text=text, context=context, scene_participant_count=scene_participant_count
         )
@@ -479,6 +489,8 @@ class HttpxOpenRouterClient:
             ),
             "max_tokens": max_output_tokens or self.max_tokens,
         }
+        if explicit_cache:
+            request_body["prompt_cache_options"] = {"mode": "explicit", "ttl": "30m"}
         if self.model != OPENROUTER_MODEL_GPT_6_LUNA:
             request_body["temperature"] = 0.6
         if len(self.models) == 1:

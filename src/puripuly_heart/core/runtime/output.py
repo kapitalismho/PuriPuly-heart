@@ -129,6 +129,7 @@ class OutputRuntime:
         default=None,
         repr=False,
     )
+    activation_notice_enabled: bool = True
     _state: OutputRuntimeState = "open"
     _chatbox_flush_task: asyncio.Task[None] | None = None
     _ui_event_bridge: UIEventBridgePort | None = None
@@ -746,6 +747,15 @@ class OutputRuntime:
         )
         if duplicate is not None:
             return duplicate
+        if not self.activation_notice_enabled:
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SYSTEM_DISCLOSURE_CHATBOX,
+                publication_id=str(disclosure_uuid),
+                publication_kind=PUBLICATION_KIND_SYSTEM_DISCLOSURE,
+                reason="activation_notice_disabled",
+                metadata={"channel": "system"},
+            )
         message = OSCMessage(
             utterance_id=disclosure_uuid,
             text=_redact_chatbox_disclosure_text(text),
@@ -799,6 +809,15 @@ class OutputRuntime:
         )
         if duplicate is not None:
             return duplicate
+        if not self.activation_notice_enabled:
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SYSTEM_DISCLOSURE_CHATBOX,
+                publication_id=str(disclosure_uuid),
+                publication_kind=PUBLICATION_KIND_SYSTEM_DISCLOSURE,
+                reason="activation_notice_disabled",
+                metadata={"channel": "system", "delivery": "immediate"},
+            )
         safe_text = _redact_chatbox_disclosure_text(text)
         try:
             published = self.chatbox.send_immediate(safe_text)

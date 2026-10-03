@@ -10,6 +10,7 @@ from puripuly_heart.core.http_extensions import (
     HttpExtensionConfigurationError,
     HttpExtensionResponseError,
 )
+from puripuly_heart.core.llm.fallback_racing import LLMProviderRaceError
 from puripuly_heart.core.messages import (
     DIAGNOSTIC_CATEGORY_AUTH,
     DIAGNOSTIC_CATEGORY_INVALID_RESPONSE,
@@ -21,6 +22,7 @@ from puripuly_heart.core.messages import (
 from puripuly_heart.providers.extensions.http_extension_backend import (
     HttpExtensionTranslationError,
 )
+from puripuly_heart.providers.llm.chatgpt_plan import ChatGptPlanResponseError
 from puripuly_heart.providers.llm.openrouter import OpenRouterResponseError
 
 RAW_PROVIDER_DETAIL = "quota exceeded from upstream body token=provider-secret-123"
@@ -121,6 +123,54 @@ def test_wrapped_openrouter_payment_error_preserves_structured_cause() -> None:
     assert report.diagnostics.status_code == 402
     assert report.diagnostics.retry_after_ms == 2_000
     assert report.diagnostics.fields["limit_source"] == "openrouter_in_flight_budget"
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected_key"),
+    [
+        (ChatGptPlanResponseError(403), "provider.chatgpt.not_eligible"),
+        (ChatGptPlanResponseError(429), "provider.chatgpt.usage_limit"),
+        (ChatGptPlanResponseError(401), "provider.chatgpt.reauth_required"),
+        (
+            ChatGptPlanResponseError(429, "subscription_sharing_user_not_eligible"),
+            "provider.chatgpt.not_eligible",
+        ),
+        (
+            ChatGptPlanResponseError(403, "subscription_sharing_usage_limit_exceeded"),
+            "provider.chatgpt.usage_limit",
+        ),
+        (ChatGptPlanResponseError(403, "subscription_sharing_route_not_supported"), "provider.failure"),
+        (ChatGptPlanResponseError(429, "unknown_subscription_error"), "provider.failure"),
+        (ChatGptPlanResponseError(503), "provider.failure"),
+        (OpenRouterResponseError(403), "provider.failure"),
+        (OpenRouterResponseError(429), "provider.failure"),
+    ],
+)
+def test_chatgpt_status_fallback_preserves_explicit_codes_and_other_providers(
+    failure: Exception, expected_key: str
+) -> None:
+    wrapper = RuntimeError("translation failed")
+    wrapper.__cause__ = failure
+
+    report = error_messages.provider_failure_report(wrapper, provider="llm", operation="translate")
+
+    assert report.message.key == expected_key
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_key"),
+    [(403, "provider.chatgpt.not_eligible"), (429, "provider.chatgpt.usage_limit")],
+)
+def test_chatgpt_status_fallback_survives_failed_parallel_attempts(
+    status: int, expected_key: str
+) -> None:
+    failure = LLMProviderRaceError(
+        (ChatGptPlanResponseError(status), ChatGptPlanResponseError(status))
+    )
+
+    report = error_messages.provider_failure_report(failure, provider="llm", operation="translate")
+
+    assert report.message.key == expected_key
 
 
 def test_stt_failure_report_maps_network_category_and_keeps_diagnostics_metadata_only() -> None:
