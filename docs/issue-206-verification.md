@@ -8,7 +8,7 @@ The reported latency/staleness problem occurred in **SteamVR**, not the desktop 
 
 > 안전 테스트는 나중에 스팀VR 환경에서 HMD 쓰고 또 하는 걸로 해줘. 지연 버그는 스팀 VR 환경에 있었다는 걸 명심해
 
-This record covers software/application behavior and sampled desktop presentation. SteamVR/OpenVR physical comparison, worn-HMD safety, affected-device remediation, sustained VR rendering cost, and long-session stability are **not run, user-deferred**, not passed. No software result below establishes that the observed SteamVR delay is fixed. The original physical obligations remain for that later session; no issue closure, merge, push, or deployment is implied.
+At implementation completion, this record covered software/application behavior and sampled desktop presentation; the physical SteamVR criteria were not run and were user-deferred. A later [two-case worn-HMD session](issue-206-hmd-test-plan.md#short-physical-session-2026-10-03-utc) observed baseline and candidate short stable/head-locked captions normally, with no perceived difference. The subsequently authorized [resumed batch](issue-206-hmd-test-plan.md#resumed-batch-2026-10-03-utc) added 18 software/cleanup passes with continuous wearer observation of no anomaly, then stopped on a harness-only reconnect authentication mismatch. That failed case remains failed; unexecuted spatial, application and sustained scope and detailed native-stage/resource measurements remain unverified. Neither software results nor these short observations establishes that the historical SteamVR delay is fixed. No full physical acceptance, issue closure, merge, push or deployment is implied.
 
 ## Source and user-visible changes
 

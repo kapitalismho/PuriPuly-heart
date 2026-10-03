@@ -9,6 +9,8 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
+from websockets.asyncio.client import connect
+
 if __package__:
     from . import bench_ovr_hmd_measurement as control
 else:
@@ -17,6 +19,12 @@ from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
+from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CONTRACT_VERSION,
+    OVERLAY_EXECUTION_CONTRACT,
+    OVERLAY_NATIVE_RETRY_CONTRACT,
+    OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+)
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.process import DefaultOverlayProcessRunner, OverlayProcessManager
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
@@ -558,6 +566,45 @@ class ScenarioEngine:
             await self.expiry_clear_restart(name)
 
 
+async def simulate_native_transport(bridge, ready):
+    async with connect(bridge.url) as connection:
+        await connection.send(
+            json.dumps(
+                {
+                    "type": "auth",
+                    "session_token": bridge.session_token,
+                    "contract_version": OVERLAY_CONTRACT_VERSION,
+                    "overlay_instance_id": bridge.overlay_instance_id,
+                    "runtime_generation": 1,
+                    "capabilities": {
+                        "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                        "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+                        "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                    },
+                }
+            )
+        )
+        revision = 0
+        async for raw in connection:
+            message = json.loads(raw)
+            require(message["type"] != "auth_error", "simulated native bridge_auth_failed")
+            if message["type"] == "snapshot":
+                revision = message["payload"]["revision"]
+                ready.set()
+            elif message["type"] == "health_challenge":
+                await connection.send(
+                    json.dumps(
+                        {
+                            "type": "owner_status",
+                            "overlay_instance_id": bridge.overlay_instance_id,
+                            "runtime_generation": 1,
+                            "health_challenge_id": message["challenge_id"],
+                            "latest_applied_revision": revision,
+                        }
+                    )
+                )
+
+
 def shutdown_ok(receipt):
     return (
         receipt.get("cleanup_succeeded") is True
@@ -643,7 +690,7 @@ async def run_measurement(args):
     source_import = "not_validated"
     environment = {"preparation": "not_completed"}
     diagnostics, presenter = None, None
-    generation = 0
+    restart_ordinal = 0
     owned_receipt_failure = None
 
     class OwnedProcessRunner(DefaultOverlayProcessRunner):
@@ -657,7 +704,10 @@ async def run_measurement(args):
                         "worker_pid": os.getpid(),
                         "native_pid": getattr(process, "pid", "unknown"),
                         "spawn_observed_at": control._utc_now(),
-                        "generation": generation,
+                        "generation": restart_ordinal,
+                        "restart_ordinal": restart_ordinal,
+                        "overlay_instance_id": runtime.overlay_instance_id,
+                        "wire_runtime_generation": 1,
                         "native_sha256": control.SOURCE_EXE_SHA256,
                         "ownership": "managed process handle; stop never targets arbitrary PID",
                     }
@@ -668,13 +718,13 @@ async def run_measurement(args):
             return process
 
     async def start_runtime():
-        nonlocal runtime, manager, bridge, transitioning, generation, manager_start_attempted
-        generation += 1
+        nonlocal runtime, manager, bridge, transitioning, restart_ordinal, manager_start_attempted
+        restart_ordinal += 1
         transitioning = True
         require(not (run / "stop.request").exists(), "operator_stop")
         control.load_prepared_stage(args.stage)
         runtime = OverlayRuntimeHandle(
-            overlay_instance_id="hmd-" + args.run_id, shutdown_grace_s=3.0
+            overlay_instance_id=f"overlay-{uuid4()}", shutdown_grace_s=3.0
         )
         runtime.attach_diagnostics(diagnostics)
         runtime.adopt_presenter(presenter)
@@ -683,7 +733,6 @@ async def run_measurement(args):
             session_token=secrets.token_urlsafe(16),
             initial_snapshot=presenter.snapshot(),
             overlay_instance_id=runtime.overlay_instance_id,
-            runtime_generation=generation,
             diagnostics=diagnostics,
             task_factory=runtime.create_child_task,
         )
@@ -733,6 +782,26 @@ async def run_measurement(args):
                 owned_receipt_failure is None,
                 f"owned process receipt failed: {owned_receipt_failure}",
             )
+        else:
+            ready = asyncio.Event()
+            transport = runtime.create_child_task(
+                simulate_native_transport(bridge, ready), task_name="simulated-native-transport"
+            )
+            waiting = runtime.create_child_task(ready.wait(), task_name="simulated-native-ready")
+            done, _ = await asyncio.wait((transport, waiting), return_when=asyncio.FIRST_COMPLETED)
+            if transport in done:
+                await transport
+                raise control.MeasurementError("simulated native disconnected before snapshot")
+            await waiting
+        records.append(
+            {
+                "stage": "owned_runtime_started",
+                "restart_ordinal": restart_ordinal,
+                "overlay_instance_id": runtime.overlay_instance_id,
+                "wire_runtime_generation": 1,
+                "transport": "native" if args.live else "simulated_native",
+            }
+        )
         transitioning = False
 
     async def close_runtime(preserve=False):

@@ -4,20 +4,34 @@
 
 The reported delay/staleness occurred in **SteamVR**. Desktop captures, Presenter acceptance, successful OpenVR API calls, and native health are not proof that the wearer saw current pixels.
 
-The maintainer requested a test plan and complete preparation up to the test start, then a joint session after returning and putting on the HMD. Preparation must not start a live overlay, SteamVR, VRChat, microphone/loopback capture, or paid provider requests. Physical acceptance remains **not run** until that session. See [software evidence](issue-206-verification.md).
+The maintainer requested a test plan and complete preparation up to the test start, then a joint session after returning and putting on the HMD. Preparation must not start a live overlay, SteamVR, VRChat, microphone/loopback capture, or paid provider requests. The later [short physical session](#short-physical-session-2026-10-03-utc) exercised only the two cases recorded below; full physical acceptance remains incomplete. See [software evidence](issue-206-verification.md).
 
 Compare product baseline `8666bb57935b7c6da0c3c8aeaec9d116762d9f3d` with candidate `c501b83350d4c39129cf61dd3e582b6ebbea04a5`. Use separate pinned Python/source exports, not two labels pointing to the candidate Python code. The native production implementation is unchanged between these revisions, so use one shared, hash-verified native assembly and record its actual build provenance. Full native source trees are not identical: the candidate adds tests.
+
+For the resumed session, the maintainer explicitly requested batch execution
+instead of slow per-case questioning, then confirmed **“착용 중, 일괄 시작”**
+for the remaining short checks and isolated application ON/manual/OFF complement.
+This session-specific agreement supersedes the per-case readiness/observation
+pauses below, not the stop, ownership, identity or sustained-admission rules.
+Run one owned overlay at a time, stop the batch on request/error/incomplete
+cleanup, retain ordered per-run receipts, and obtain the wearer's attributable
+batch observation afterward. Uncertain or unwatched cases remain unobserved.
+Reuse the earlier two stable/head-locked observations; run the remaining 42
+short arm/anchor cases. Sustained runs still require observed successful short
+prerequisites. No simultaneous baseline/candidate overlays or automatic retry
+after failure is authorized.
 
 ## Operator commands and resume point
 
 Run from the development checkout in PowerShell. The prepared-session location
-for this work is `C:/pph206-hmd-kit/issue206-ready-fixed`; use its manifest and reports,
-not an installed executable or a newer unrecorded Python source tree.
+for resumed work is `C:/pph206-hmd-kit/issue206-resume-fixed`; use its manifest and reports,
+after repair verification and renewed wearer readiness. The prior
+`issue206-ready-fixed` stage retains the original live receipts, including failure.
 
 Safe before the wearer returns:
 
 ```powershell
-$stage = 'C:/pph206-hmd-kit/issue206-ready-fixed'
+$stage = 'C:/pph206-hmd-kit/issue206-resume-fixed'
 uv run --frozen python -B scripts/bench_ovr_hmd_measurement.py inspect --stage $stage
 uv run --frozen python -B scripts/bench_ovr_hmd_measurement.py dry-run --stage $stage --arm candidate --scenario stable --anchor head_locked
 ```
@@ -292,3 +306,150 @@ process pair and a pre-existing native overlay were absent, and
 `vr_initialized=false` / physical `not_observed` were reported. Recheck process
 and identity prerequisites when the wearer returns; these observations are not
 a reservation of the future environment or a live-safety pass.
+
+## Short physical session: 2026-10-03 UTC
+
+The wearer confirmed that the HMD was worn, authorized each run separately,
+selected Virtual Desktop and confirmed this was the same environment in which
+the earlier delay occurred. Headset model, firmware and refresh rate were not
+supplied; SteamVR/VRChat version fields returned null and remain unknown.
+Windows build 22631 and AMD Radeon RX 7900 XTX driver 32.0.31041.1004 were
+recorded. Kit/source/native identities matched the prepared pins above.
+
+Only `stable` with `head_locked` placement ran, candidate first then baseline,
+once each. External translation was the gated synthetic provider, not a paid
+service or live STT. The wearer chose **“여기서 마치기”** after the baseline
+observation. No subsequent scenario or overlay launch was authorized or run.
+
+| Run | UTC start | Worker elapsed, not display latency | Software and cleanup | Wearer observation |
+| --- | --- | --- | --- | --- |
+| `candidate-stable-90d9620b` | `2026-10-03T18:08:24Z` | 7.792 s | Pass; source applied and one provider invocation while UI queue full; identity preserved; native graceful exit 0, no forced termination, readers/cleanup complete | Original first, translation added, disappeared after shutdown; no discomfort |
+| `baseline-stable-9bd7aad4` | `2026-10-03T18:10:56Z` | 7.658 s | Pass; source applied and one provider invocation while UI queue full; identity preserved; native graceful exit 0, no forced termination, readers/cleanup complete | Both versions normal; no perceived difference; no discomfort |
+
+The observation method was the wearer's qualitative HMD report through the
+conversation, not a mirror screenshot or instrumented latency measurement.
+The baseline stable active path already supports source-first publication;
+these two normal observations neither demonstrate an improvement nor establish
+that the historical SteamVR delay is fixed.
+
+Raw software receipts and their sidecars are under
+`C:/pph206-hmd-kit/issue206-ready-fixed/runs/<run-id>/report.json`.
+Separate `observation.json` records preserve the wearer's `no_issue` reports and
+uncertainty; the immutable software report's initial `physical_hmd` field is not
+rewritten into a physical pass. Session setup/termination is retained in
+`live-session-candidate-stable-90d9620b.json` at the stage root.
+
+Both owned test native processes exited normally. A later final process
+inspection detected another native overlay from the ordinary repository
+`build/overlay` path, not the kit's pinned runtime path. It was not terminated
+or modified. No claim is made that every user's overlay process was stopped.
+
+### Native-stage evidence limit
+
+Both reports retained bridge/process lifecycle evidence but had empty detailed
+native stage/outcome counters and unknown loss-counter samples. This is
+**unavailable detailed evidence**, not proof that no rendering happened.
+Read-only inspection of the pinned native source found presentation records
+collected internally but no production export to the Python parser's
+`presentation_diagnostics` marker. Python measurement capture was already on;
+no supported settings-only switch or early-report race was found to explain
+the gap. Empty native log directories are consistent with the logger's
+stdout/stderr behavior.
+
+Consequently these runs do not establish per-caption native render/submit
+counts, retry opportunity completion/deadlines, GPU timing, diagnostic loss-free
+delivery or sustained native resource behavior. No instrumentation, production
+code, retry profile or staged executable was changed during this session.
+Detailed native-stage acceptance needs a separately authorized, bounded export
+and repinned executable/evidence; repeating this exact build alone is not a
+supported way to obtain those missing counters.
+
+### Remaining physical scope
+
+Independent/final-only, bursts/resume, mixed-channel/eviction, sticky/expiry,
+dedicated clear/OFF, spatial lock, restart/reconnect, sustained exposure and the
+isolated real-application ON/manual/OFF check are **not run in this session**.
+Automatic application recovery and long-session/device-wide stability remain
+unverified. Observed disappearance on the two ordinary shutdowns is not relabeled
+as completion of those dedicated scenarios. The user-ended session is complete
+as a two-case record, not full issue-206 physical acceptance or issue closure.
+
+## Resumed batch: 2026-10-03 UTC
+
+The wearer requested resumption without per-case questions and explicitly
+authorized a sequential batch in the same Virtual Desktop setup. Identity and
+SteamVR prerequisites passed; no other native overlay was present at admission.
+The plan reused the earlier stable/head-locked pair and ordered the other
+42 short cases as baseline/candidate pairs, head lock before spatial lock.
+Sustained runs remained gated by successful observed short cases.
+
+`issue206-ready-fixed/resumed-batch-01/state.json` retains the ordered plan and
+receipts. The batch ran from `19:07:06Z` to `19:10:49Z` (223.053 seconds,
+not a caption-latency measurement). The first 18 runs passed software and
+cleanup: both arms of independent, final-only, stable burst, resume, mixed
+active, finalized eviction, sticky, expiry and clear/OFF, all head-locked.
+
+Case 19, `baseline-restart_reconnect-b19d60e9`, failed with
+`bridge_auth_failed`. The batch automatically stopped and did not launch the
+remaining 23 planned cases or the separate actual-application complement.
+The first native process acknowledged shutdown and exited 0. Its replacement
+exited 12 with readers complete; aggregate cleanup correctly remained failed.
+No automatic retry, failure-to-pass rewrite or background continuation occurred.
+
+The wearer answered **“계속 지켜봤고 이상 없었음”** and
+**“완전히 사라짐”** after this stop. Nineteen `observation.json` sidecars
+correlate that continuous batch-level qualitative observation to the attempted
+runs. They are not individual latency or baseline/candidate difference reports.
+The failed reconnect remains failed despite no observed display anomaly.
+`resumed-batch-01/wearer-observation.json` records this distinction and the
+unexecuted scope. With the earlier stable pair, 20 short head-locked runs have
+software passes and wearer observations; no spatial case has run yet.
+
+Read-only diagnosis found a harness contract error: each fresh native process
+authenticates with wire runtime generation 1, while the old harness used its
+run-wide restart ordinal as the replacement bridge's wire generation.
+The replacement bridge therefore required 2 and rejected native generation 1.
+It was not reuse of a consumed token: the bridge and token were both fresh.
+Production generation construction uses a fresh instance identity and the
+bridge's default wire generation 1. This receipt does not demonstrate an
+application automatic-recovery regression; replay/deadline checks after the
+first restart were never reached.
+
+The harness repair keeps restart ordinals as evidence metadata, creates a
+fresh instance identity per owner and uses the existing per-process wire
+contract. Offline transport must authenticate through the real bridge using
+that native-compatible contract, rather than bypassing authentication.
+Production source pins, native executable, protocol and retry policy are
+unchanged. The corrected stage is `C:/pph206-hmd-kit/issue206-resume-fixed`;
+old receipts retain their original harness identity and are not relabeled.
+
+After the controller and both native PIDs were confirmed absent, with no
+native overlay present, the failed run's live guard was preserved as
+`resumed-batch-01/failed-live-guard.json` rather than silently discarded.
+The original failure and cleanup result are unchanged. Further HMD exposure
+requires completed repair verification and renewed wearer readiness.
+The remaining short scope is the repaired baseline reconnect, candidate
+reconnect and 22 spatial cases, followed by the separate application complement
+and only eligible optional sustained cases. Detailed native-stage/resource
+evidence remains unavailable as described above.
+
+### Corrected-kit nonphysical verification
+
+The corrected helper SHA256 is
+`144aa0663f246b25dea6c4bd42ab680a8ef6bf0fef727ee291e6044c0328c646`;
+controller and shared native hashes are unchanged. The affected harness suite
+passed **61 tests** (`uv run --no-sync pytest tests/scripts/test_ovr_hmd_measurement.py`).
+Regression coverage authenticates three fresh owners against real bridges and
+rejects a native-compatible wire-1 client when a bridge incorrectly requires 2.
+
+The corrected staged CLI also executed actual offline `restart_reconnect`
+scenarios against both pinned source arms:
+
+- `baseline-restart_reconnect-df97b515`;
+- `candidate-restart_reconnect-6bb41da3`.
+
+Both report software pass and complete cleanup, three authenticated/detached
+bridge sessions with distinct instance IDs, restart ordinals 1/2/3 and wire
+generation 1, preserved original/replayed deadlines, stale late translation
+and empty final blocks. These are real WebSocket/owner-path checks, not native
+or HMD runs. They do not replace the still-required live reconnect comparison.

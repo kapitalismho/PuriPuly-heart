@@ -216,6 +216,73 @@ def test_import_guard_rejects_current_checkout_for_exported_arm(tmp_path):
         scenarios.validate_arm_imports(tmp_path / "source" / "baseline")
 
 
+@pytest.mark.asyncio
+async def test_fresh_process_reconnect_auth_preserves_caption_lifetime(tmp_path, monkeypatch):
+    run_id = "fresh-process-reconnect"
+    run = tmp_path / "runs" / run_id
+    run.mkdir(parents=True)
+    (run / "owned.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "active.lock").write_text(json.dumps({"run_id": run_id}), encoding="utf-8")
+    monkeypatch.setattr(
+        measurement,
+        "load_prepared_stage",
+        lambda p: {"control": {}, "native": {}, "sources": {}},
+    )
+    monkeypatch.setattr(scenarios, "validate_arm_imports", lambda p: "explicit-test-boundary")
+    monkeypatch.setattr(measurement, "environment_inventory", lambda: {})
+    monkeypatch.setattr(
+        scenarios,
+        "OverlayProcessManager",
+        lambda **kwargs: pytest.fail("offline must never launch native"),
+    )
+    args = SimpleNamespace(
+        stage=tmp_path,
+        arm="candidate",
+        anchor="head_locked",
+        run_id=run_id,
+        live=False,
+        confirm_hmd_ready=False,
+        duration=1,
+        timeout=30,
+        scenario="restart_reconnect",
+        device="unknown",
+        firmware="unknown",
+        connection="unknown",
+    )
+    report_path = await scenarios.run_measurement(args)
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["software"]["outcome"] == "pass"
+    assert report["software"]["cleanup"] == "complete"
+    assert report["software"]["native_startup"] == "not_started"
+    assert report["physical_hmd"]["result"] == "not_observed"
+    starts = [
+        receipt
+        for receipt in report["software"]["receipts"]
+        if receipt["stage"] == "owned_runtime_started"
+    ]
+    assert [start["restart_ordinal"] for start in starts] == [1, 2, 3]
+    assert len({start["overlay_instance_id"] for start in starts}) == 3
+    assert all(start["wire_runtime_generation"] == 1 for start in starts)
+    checks = report["software"]["checks"]
+    assert checks["original_deadline"] == checks["replayed_deadline"]
+    assert checks["restart_reconnect"] is True
+
+
+@pytest.mark.asyncio
+async def test_simulated_fresh_native_rejects_restart_ordinal_as_wire_generation():
+    bridge = scenarios.OverlayBridge(
+        session_token="fresh-token", overlay_instance_id="overlay-fresh", runtime_generation=2
+    )
+    ready = asyncio.Event()
+    await bridge.start()
+    try:
+        with pytest.raises(measurement.MeasurementError, match="bridge_auth_failed"):
+            await asyncio.wait_for(scenarios.simulate_native_transport(bridge, ready), 5)
+        assert not ready.is_set()
+    finally:
+        await bridge.stop()
+
+
 def test_sustained_requires_software_success_and_correlated_no_issue_observation(tmp_path):
     for name in measurement.SCENARIOS[:-1]:
         run = tmp_path / "runs" / name
