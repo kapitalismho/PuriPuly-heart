@@ -117,9 +117,7 @@ def test_native_recognition_measures_frozen_anchor_at_actual_endpoint(
     owner.retain_latency_until_output(channel, unit.identity.unit_id)
     owner.clear_latency_timeline(channel, unit.identity.unit_id)
     clock.advance(1.0)
-    owner.record_output_latency_stage(
-        LatencyStageDiagnostic(channel, unit.identity.unit_id, stage)
-    )
+    owner.record_output_latency_stage(LatencyStageDiagnostic(channel, unit.identity.unit_id, stage))
 
     if expected_ms is None:
         assert logging.basic == []
@@ -160,16 +158,12 @@ def test_native_recognition_fanout_finishes_without_local_speech_end(
     owner.record_recognition_latency(unit)
     owner.inherit_latency(LatencyInheritanceDiagnostic(channel, publication_id, (source_id,)))
     for output_id in (first_id, second_id):
-        owner.inherit_latency(
-            LatencyInheritanceDiagnostic(channel, output_id, (publication_id,))
-        )
+        owner.inherit_latency(LatencyInheritanceDiagnostic(channel, output_id, (publication_id,)))
         owner.retain_latency_until_output(channel, output_id)
         owner.clear_latency_timeline(channel, output_id)
     owner.clear_latency_timeline(channel, publication_id)
     owner.clear_latency_timeline(channel, source_id)
-    assert owner.snapshot().timeline_keys == frozenset(
-        {(channel, first_id), (channel, second_id)}
-    )
+    assert owner.snapshot().timeline_keys == frozenset({(channel, first_id), (channel, second_id)})
     owner.record_output_latency_stage(
         LatencyStageDiagnostic(channel, first_id, stage, timestamp=11.0)
     )
@@ -182,8 +176,7 @@ def test_native_recognition_fanout_finishes_without_local_speech_end(
         assert logging.basic == []
     else:
         fields = [
-            dict(part.split("=", 1) for part in message.split()[1:])
-            for message in logging.basic
+            dict(part.split("=", 1) for part in message.split()[1:]) for message in logging.basic
         ]
         assert [int(row[f"last_speech_to_{endpoint}_ms"]) for row in fields] == [3000, 5000]
         assert all(row["estimated"] == "true" for row in fields)

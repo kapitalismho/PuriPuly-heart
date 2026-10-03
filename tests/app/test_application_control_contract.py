@@ -719,7 +719,9 @@ async def test_peer_terms_are_explicit_and_shared_acceptance_is_isolated(tmp_pat
 
 
 @pytest.mark.asyncio
-async def test_activation_notice_cli_catalog_apply_and_durable_reload(tmp_path, monkeypatch) -> None:
+async def test_activation_notice_cli_catalog_apply_and_durable_reload(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
     path = tmp_path / "settings.json"
     isolated_settings(path)

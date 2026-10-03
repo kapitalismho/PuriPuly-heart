@@ -64,9 +64,7 @@ class _Server:
         return socket
 
 
-def _owner(
-    provider: ChatGptPlanLLMProvider, state: dict[str, bool]
-) -> LlmConnectionReadinessOwner:
+def _owner(provider: ChatGptPlanLLMProvider, state: dict[str, bool]) -> LlmConnectionReadinessOwner:
     wrapped = SimpleNamespace(provider=SimpleNamespace(inner=SimpleNamespace(primary=provider)))
     return LlmConnectionReadinessOwner(
         llm_provider=lambda: wrapped,

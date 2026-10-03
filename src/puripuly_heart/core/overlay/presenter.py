@@ -1086,7 +1086,11 @@ class OverlayPresenter(OverlaySink):
             if block.primary_text.strip():
                 if isinstance(event, SelfActiveUpdate):
                     previous_block = next(
-                        (previous for previous in previous_snapshot.blocks if previous.id == block.id),
+                        (
+                            previous
+                            for previous in previous_snapshot.blocks
+                            if previous.id == block.id
+                        ),
                         None,
                     )
                     if previous_block is not None and (

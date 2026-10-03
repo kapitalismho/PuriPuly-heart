@@ -732,6 +732,7 @@ async def test_activation_notice_edit_commits_or_restores_without_generic_runtim
         ActivationNoticeSettingsIntent(not previous_enabled),
     )
     if save_fails:
+
         def fail_persist(_path: Path, _settings: AppSettingsVNext) -> None:
             raise OSError("save failed")
 

@@ -219,9 +219,7 @@ class ScopedRecognitionEngine:
         init=False, default=None, repr=False
     )
     _last_receipt_sequence: int = field(init=False, default=0, repr=False)
-    _estimated_speech_scope: tuple[object, ...] | None = field(
-        init=False, default=None, repr=False
-    )
+    _estimated_speech_scope: tuple[object, ...] | None = field(init=False, default=None, repr=False)
     _estimated_last_speech_at: float | None = field(init=False, default=None, repr=False)
     _recognition_authorities: OrderedDict[RecognitionStreamIdentity, int] = field(
         init=False, default_factory=OrderedDict, repr=False

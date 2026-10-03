@@ -3676,7 +3676,9 @@ async def test_independent_final_without_observed_source_speech_has_no_estimate(
         await engine.handle_owned_vad_event(first)
         await engine.handle_stream_input(stream_input(ledger, 6, 10))
         assert session.stream is not None
-        session.emit(STTRecognitionUnit(RecognitionUnitIdentity(session.stream, uuid4(), 1), "final"))
+        session.emit(
+            STTRecognitionUnit(RecognitionUnitIdentity(session.stream, uuid4(), 1), "final")
+        )
         await wait_until(lambda: any(isinstance(e, STTRecognitionUnitTerminal) for e in emitted))
         finals = [event for event in emitted if isinstance(event, STTRecognitionUnitTerminal)]
         assert finals[0].unit.estimated_last_speech_at is None

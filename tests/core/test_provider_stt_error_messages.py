@@ -139,7 +139,10 @@ def test_wrapped_openrouter_payment_error_preserves_structured_cause() -> None:
             ChatGptPlanResponseError(403, "subscription_sharing_usage_limit_exceeded"),
             "provider.chatgpt.usage_limit",
         ),
-        (ChatGptPlanResponseError(403, "subscription_sharing_route_not_supported"), "provider.failure"),
+        (
+            ChatGptPlanResponseError(403, "subscription_sharing_route_not_supported"),
+            "provider.failure",
+        ),
         (ChatGptPlanResponseError(429, "unknown_subscription_error"), "provider.failure"),
         (ChatGptPlanResponseError(503), "provider.failure"),
         (OpenRouterResponseError(403), "provider.failure"),
