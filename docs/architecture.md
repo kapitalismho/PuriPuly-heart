@@ -472,6 +472,8 @@ Behavior tests: `tests/core/test_overlay_presenter.py`, `tests/core/test_overlay
 - A cancelled ChatGPT attempt summary ends when its caller is cancelled; the provider-owned background drain is excluded and emits no second attempt summary.
 - Auth, connection-pool wait, actual handshake/reuse, service tier, response usage, and local server timings are recorded only where observable. Usage is provider-reported, not estimated; unavailable/ambiguous counts remain `none`. Source, prompt, and context contribute character counts only. Summaries contain no text, headers, URLs, credentials, or external error prose.
 
+Startup logging and latency imports remain safe for render-only desktop and preview dispatch. The LLM provider and racing contracts keep annotation-only domain-model imports behind `TYPE_CHECKING`; configuring logging must not load domain models, provider adapters, secrets, or STT. The real-process dispatch checks in `tests/app/test_desktop_overlay_runner.py` enforce this boundary.
+
 
 Implementation: `core/runtime_logging.py`, `core/llm/latency.py`, `app/services/application_runtime_logging.py`. Behavior tests: `tests/core/test_runtime_logging.py`, `tests/core/test_file_logging.py`, `tests/core/test_llm_latency.py`.
 

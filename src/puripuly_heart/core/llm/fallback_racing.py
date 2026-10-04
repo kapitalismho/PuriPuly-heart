@@ -5,6 +5,7 @@ import contextlib
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from puripuly_heart.core.llm.latency import current_request, observe_attempt
@@ -15,7 +16,9 @@ from puripuly_heart.core.llm.provider import (
 )
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
-from puripuly_heart.domain.models import Translation
+
+if TYPE_CHECKING:
+    from puripuly_heart.domain.models import Translation
 
 
 @dataclass(frozen=True, slots=True)

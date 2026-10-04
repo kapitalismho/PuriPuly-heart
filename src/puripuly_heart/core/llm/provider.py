@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from puripuly_heart.core.llm.latency import current_request, observe_attempt
-from puripuly_heart.domain.models import Translation
+
+if TYPE_CHECKING:
+    from puripuly_heart.domain.models import Translation
 
 
 class LLMProvider:
