@@ -379,14 +379,17 @@ try {
 
     Copy-Item -Path $libsoxrBuiltDllPath -Destination $wheelBuildSoxrDllPath -Force
 
-    Invoke-External -FilePath $pythonCommand -ArgumentList @(
+    Invoke-External -FilePath $pythonCommand -TimeoutSeconds 600 -ArgumentList @(
+        "-u",
         "-m",
         "pip",
         "wheel",
+        "--verbose",
         "--no-build-isolation",
         "--no-deps",
         "--wheel-dir",
         $wheelOutputDir,
+        "--config-settings=build.verbose=true",
         "--config-settings=cmake.define.USE_SYSTEM_LIBSOXR=ON",
         "--config-settings=cmake.define.CMAKE_PREFIX_PATH=$libsoxrInstallDir",
         "--config-settings=cmake.define.nanobind_DIR=$nanobindCmakeDir",
