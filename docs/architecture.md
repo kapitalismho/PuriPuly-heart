@@ -1,23 +1,18 @@
 # Architecture
 
-Implementation-oriented system map for PuriPuly Heart.
+System map for PuriPuly Heart: runtime owners, data handoffs, dependency boundaries, and source entry points.
 
-Use this document to locate:
+Keep this document focused on stable architectural decisions:
 
-- runtime owners,
-- data handoffs,
-- ports and adapters,
-- composition points,
-- lifecycle boundaries,
-- relevant source files.
+- Update the relevant section when ownership, a boundary, or a lifecycle contract changes; do not append a work log.
+- State each invariant once. Keep policy values, retry schedules, UI layout, log field catalogs, and migration procedures in their owning code, tests, or focused guides.
+- Link to representative implementations and behavior tests instead of reproducing their acceptance criteria.
 
-For detailed behavior, runtime policy values, and migration rules, read the referenced code and tests.
-
-Python source paths are relative to `src/puripuly_heart/`. Paths beginning with `src/`, `native/`, or `tests/` are relative to the repository root.
+Python paths are relative to `src/puripuly_heart/`; `src/`, `native/`, `tests/`, and `scripts/` paths are repository-relative.
 
 ## Architecture Model
 
-- Python desktop application is the main system.
+- The Python application hosts the shared runtime for GUI and headless operation.
 - Runtime state and resources belong to explicit owners.
 - Owners depend on ports, not concrete providers.
 - Adapters connect ports to UI, audio, providers, storage, native processes, and external systems.
@@ -36,7 +31,6 @@ core runtime and domain contracts
 
 ## System Boundaries
 
-
 | Boundary             | Responsibility                                                    |
 | -------------------- | ----------------------------------------------------------------- |
 | Python application   | UI, channels, providers, translation, output, settings, lifecycle |
@@ -49,11 +43,9 @@ core runtime and domain contracts
 | Broker               | Managed identity, entitlement, credentials, telemetry             |
 | Local storage        | Settings, secrets, diagnostics, model assets                      |
 
-
 Broker is a control-plane dependency, not part of the normal utterance data path.
 
 ## Runtime Ownership
-
 
 | Owner                   | Owns                                                       | Key path                                                                  |
 | ----------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -77,465 +69,215 @@ Broker is a control-plane dependency, not part of the normal utterance data path
 | Shutdown adapter        | Ordered application teardown                               | `app/adapters/application_runtime_shutdown.py`      |
 | VRChat scene owner     | Process-lifetime instance population, immutable snapshots | `core/vrchat_scene_service.py`, `core/vrchat_scene.py` |
 
-
 Ownership may span several processing stages. Do not assume one owner per pipeline stage.
 
 ## Data Handoffs
 
-### Self speech
-
 ```text
-microphone
-→ normalized audio frames
-→ owned VAD boundaries and permitted stream input
-→ scoped turn results or independent recognition units
-→ self translation turns
-→ publication intents
-→ output runtime
-→ UI / chatbox / overlays
+Self:   microphone → capture / VAD → recognition → translation turns
+        → output → UI / chatbox / overlays
+Manual: text intent → manual translation turn → Self publication path
+Peer:   loopback / process audio → capture / segmentation → recognition
+        → ordered translation admission → output → UI / overlays
 ```
 
-Primary coordinator:
-
-```text
-SelfTranslationChannelOwner
-```
-
-### Manual text
-
-```text
-UI intent
-→ final self transcript
-→ manual translation turn
-→ self publication path
-```
-
-Manual text bypasses capture and STT.
-
-### Peer speech
-
-```text
-loopback or process audio
-→ peer capture and segmentation
-→ scoped turn results or independent recognition units
-→ ordered peer translation admission
-→ publication intents
-→ output runtime
-→ UI / overlays
-```
-
-Peer output must not reach the VRChat chatbox.
+`SelfTranslationChannelOwner` coordinates Self speech. Manual text bypasses capture and STT. Peer output must not reach the VRChat chatbox.
 
 ### Audio ownership
 
-- Capture preserves source order and timing. Audio loss is explicit, not silence.
-- Capture owners retain generation-bound segment ledgers and freeze provider and endpoint settings for admitted segments (`core/audio/ownership.py`).
-- `OwnedVadEvent` carries local segment identity; Gemini and its Rolling member also receive generation-owned `OwnedStreamInput` from the same permitted normalized frames. All scoped PCM, including VAD pre-roll, deduplicates by source range within its recognition stream. Initial unseen context and unseen suffixes are preserved; already-submitted context is not replayed.
-- Gemini `STTProviderInputTerminal` retires an audio slot after submission, without claiming a transcript or server completion. Independently received `STTRecognitionUnitTerminal` supplies text with channel, capture/activation generation, provider epoch, settings scope, and receipt identity.
-- Independent Gemini finals, including the Rolling member, freeze an approximate last-speech origin from the latest VAD-positive real capture frame observed by the scoped engine. Each channel keeps one timestamp and its capture/settings scope; startup preserves the pending same-scope observation, while stream/provider retirement, capture changes, mute, and discontinuity reset it. Silence and local input submission do not advance or erase it. No per-utterance matching, provider-offset map, or artificial speech-end event is introduced.
-- Input terminal metadata goes directly to the bound capture callback, independently of deferred recognition delivery, so a slow text consumer cannot retain audio slots or lose their retirement on text-buffer overflow.
-- Input retirement also clears that exact local segment's VAD/timing bookkeeping; native unit identities are never used to guess a local segment. Failed open inputs are failure-sealed, and later VAD events cannot reopen their retired slots.
-- Failed independent stream writes, receive failures, provider epoch completion, and maximum session age retire the affected epoch before recovery. The next valid retained source frame can admit a replacement recognition stream through `begin_stream`, without inventing a local speech segment or waiting for a new `SpeechStart`. Recovery excludes every already-submitted source range, including the failed write's entire range because remote delivery is unknown, then forwards only definitely-unsent audio under the existing capture retention budget.
-- Recovery opening and stream admission are bounded and recheck live capture authority after awaits. Generation, settings, capture-epoch, mute, stop, and discontinuity invalidation prevent stale recovery; exhausted connection or physical cleanup failure does not trigger a new attempt for every queued frame. Capture owners supply live `OwnedStreamInput.is_current` guards, and Rolling preserves the same stream ownership contract.
-- Queued PCM remains capture-epoch guarded. Ordered boundary controls retain generation authority but are not invalidated when a subsequent frame updates the current capture epoch; a discontinuity must retire the previous stream even while its writer was delayed.
-- `ListenDeliveryController` owns peer segmentation independently of provider readiness (`core/audio/listen_delivery.py`). Deadline seals serialize with the current frame's VAD processing, continuous-input enqueue, and owned-event dispatch, so a timer cannot seal a segment before its already-produced frame is accounted for and queued.
-- Self and peer share `VadGating` but retain separate onset and endpoint policies. Delivery rollover preserves acoustic continuity.
-- `SmartTurnInferenceOwner` owns peer endpoint inference for supported languages and rejects retired results (`core/audio/smart_turn.py`).
-
-Orderly capture completion drains recognition when provider ingress is ready. At normal source end, Peer first waits for any in-flight provider setup to settle: successful startup drains the retained finite input, while a returned pending result aborts and releases dispatch work before source/provider teardown, without fabricating readiness. Stop or discontinuity invalidates affected work.
-Peer dispatch failures cannot be hidden by abort or teardown failures. Queued retention and expiry work are released, the capture owner publishes a fault and deactivates, and application effective-state presentation refreshes for every capture kind. Cleanup errors preserve the original failure; cancellation remains cancellation, and failed resource release retains cleanup debt.
-Gemini requests automatic server activity detection with `prefix_padding_ms=500` and `silence_duration_ms=400`. These provider settings do not alter local VAD/SmartTurn policies, capture pre-roll, continuous PCM coverage, or native-final-only text admission; no artificial silence or repeated audio is added.
-Gemini local endpoints enqueue `audio_stream_end` through the same ordered writer as audio; they do not stop the receiver or block subsequent input waiting for text. Mute, discontinuity, source change, and explicit stop retire the affected stream. Stream-only queued audio does not count as pending local speech for idle lifetime extension. Accepted nonempty native finals refresh a separate idle-activity clock without changing the approximate last-speech origin used for latency. True idle retirement stays disconnected through silent frames and permits the next VAD-positive frame to resume the same live capture scope without requiring a new local segment.
-Consecutive fences without newly written audio are coalesced by that writer. A server GoAway notice with positive `timeLeft` leaves audio and final reception live until the first bounded deadline or socket closure; duplicate notices cannot extend the deadline. Event pressure preserves already-accepted finals and reserves one bounded retirement-control slot rather than clearing accepted text.
-Gemini transport failures and epoch retirement retain structured channel, epoch, operation, allowlisted exception class, bounded numeric code/status, and retirement reason through persisted-log redaction. Raw exception messages, provider responses, transcript text, and tracebacks are excluded. Scoped stream retirement/resumption and Peer runtime/cleanup failures likewise emit metadata-only diagnostics.
-An unchanged effective SELF intent preserves its active capture generation. A new capture generation or capture epoch starts a fresh native stream even when provider settings are unchanged. SELF readiness is tracked separately from text authority: current input failure or the end of either the ready or latest submitted epoch disconnects readiness, including before that epoch's first native final. The ended stream is fenced before publishing the state change, so already-accepted finals may still drain without reviving an ended or superseded stream.
+- Capture preserves source order and timing; audio loss is explicit, not silence.
+- Capture owners retain generation-bound segment ledgers and freeze provider and endpoint settings for admitted work (`core/audio/ownership.py`).
+- `OwnedVadEvent` carries local segment identity; `OwnedStreamInput` carries permitted continuous audio and live capture authority. Scoped PCM is deduplicated by source range, including pre-roll.
+- `ListenDeliveryController` owns Peer segmentation independently of provider readiness (`core/audio/listen_delivery.py`). Self and Peer share `VadGating` but retain separate onset and endpoint policies.
+- `SmartTurnInferenceOwner` owns Peer endpoint inference and rejects retired results (`core/audio/smart_turn.py`).
+- Normal source completion settles provider readiness before draining retained input. Stop or discontinuity invalidates affected work; capture faults remain visible even if cleanup also fails.
 
 ### Managed translation
 
-```text
-managed authentication
-→ Broker entitlement or credential release
-→ provider runtime activation
-→ normal translation request path
-```
+Managed authentication → Broker entitlement or credential release → provider activation → normal translation request path. Broker is not an utterance relay.
 
 ### VRChat scene context
 
-```text
-VRChat process lifetime
-→ log tailer
-→ whitelist parser
-→ member-set trust
-→ immutable snapshot
-→ request prep
-→ structured scene to LLM
-```
+VRChat log tailing → whitelist parsing and member-set trust → immutable snapshot → sanitized translation request context.
 
-- Owner shared across pipeline rebuilds; no audio, VAD, or OSC dependency.
-- Only trusted population context crosses into translation requests. Names and raw logs remain local.
-- Request preparation projects snapshots into sanitized LLM scene context.
-- Custom HTTP extensions never receive scene data.
+The scene owner survives pipeline rebuilds and has no audio, VAD, or OSC dependency. Only trusted population context reaches the LLM; names and raw logs remain local. Custom HTTP extensions never receive scene data.
 
 ## Ports and Adapters
 
+| Boundary | Contract | Adapters |
+| --- | --- | --- |
+| Application control | Typed commands, queries, operations, and events | Local CLI transport and `ApplicationControlOwner` |
+| UI application | `UiApplicationPort` | `UiApplicationBoundary` |
+| UI presentation | `UiPresentationPort`, `UIEventBridgePort` | Flet and headless presentation |
+| Audio and STT | Capture, VAD, provider, and local ASR ports | Microphone, loopback, process capture, local and remote STT |
+| Translation | `TranslationRequestPort`, `LLMProvider` | BYOK, managed, local, and remote providers |
+| Output | Publication contracts, `OverlaySink`, overlay protocol | UI bridge, OSC, desktop and native VR overlays |
+| GPU worker | `GpuWorkerClientPort`, `GpuWorkerProcessFactoryPort` | Native worker process |
+| Secrets | `SecretStore`, `SettingsSecretsPort` | Secret storage and typed settings projection/mutation |
+| Settings UI | Frozen surface snapshots and typed intents | Flet settings and `UiApplicationBoundary` |
+| Shutdown | Runtime shutdown ports | Application shutdown adapter |
+| OSC | Stable schema/codec, `OscControlApplicationPort`, `OscQueryServicePort` | OSC control and OSCQuery |
 
-| Boundary        | Contract                                             | Implementations                          |
-| --------------- | ---------------------------------------------------- | ---------------------------------------- |
-| Local application control | Typed commands, queries, operations, and events | `ApplicationControlOwner`, local transport |
-| UI application  | `UiApplicationPort`                                  | `UiApplicationBoundary` |
-| UI presentation | `UiPresentationPort`, `UIEventBridgePort`            | Flet and headless presentation adapters   |
-| Audio capture   | Capture and VAD ports                                | Microphone, loopback, process capture    |
-| STT             | Provider and local ASR ports                         | CPU ASR, GPU worker, remote STT          |
-| Translation     | `TranslationRequestPort`                             | BYOK, managed, local or remote providers |
-| Output          | Publication and destination contracts                | UI bridge, OSC, overlay                  |
-| Overlay         | `OverlaySink`, overlay protocol                      | Desktop overlay, native VR overlay       |
-| GPU worker      | `GpuWorkerClientPort`, `GpuWorkerProcessFactoryPort` | Native worker process adapter            |
-| Secrets         | `SecretStore`                                        | Keyring, encrypted file, memory          |
-| Settings secrets | `SettingsSecretsPort`                               | Typed settings projection and mutation owner over the configured secret store |
-| Settings UI      | `ProviderSettingsSnapshot`, `GeneralSettingsSnapshot`, `PromptSettingsSnapshot`, `OverlaySettingsSnapshot`, and typed settings intents | Flet settings presentation and `UiApplicationBoundary` |
-| Shutdown        | Runtime shutdown ports                               | Application shutdown adapter             |
-| OSC control ABI | Stable parameter schema and codec contract           | Control schema and codec                |
-| OSC integration | `OscControlApplicationPort`, `OscQueryServicePort`    | OSC control adapter, OSCQuery adapter   |
+Adapters on one port are alternatives unless the owner supports fanout. Output explicitly supports simultaneous destinations.
 
-
-Multiple adapters on one port are alternatives unless the owner explicitly supports multiple destinations.
-
-Output supports multiple simultaneous destinations.
+Protocol guides: [CLI](cli.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions.md).
 
 ## Composition
 
-Primary composition root:
+`composition/application_runtime.py` loads settings and secrets, constructs owners, selects adapters, and connects capture, providers, translation, output, overlays, OSC, and account services. It installs startup/shutdown and returns `UiApplicationBoundary`.
 
-```text
-src/puripuly_heart/composition/application_runtime.py
-```
-
-Responsibilities:
-
-- load settings and secrets,
-- construct owners,
-- select adapters,
-- compose providers,
-- compose self and peer runtimes,
-- compose output and overlays,
-- compose the VRChat OSC control and OSCQuery runtime,
-- compose managed-account services,
-- install startup and shutdown,
-- return `UiApplicationBoundary`.
-
-Composition may construct resources.
-
-Long-lived resource ownership must be transferred to an explicit owner.
+Composition may construct resources, but must transfer long-lived ownership to an explicit runtime owner.
 
 ## Local Application Control
 
-GUI and headless hosts share application owners and runtime resources. Presentation adapters select whether the host has a main window. Headless presentation preserves application error state and severity without GUI notifications.
+GUI and headless hosts share application owners and runtime resources. Presentation adapters determine whether there is a main window; headless operation retains error state and severity without GUI notifications.
 
-`ApplicationControlOwner` exposes a finite catalog of typed commands and owner-backed queries. Settings projections and runtime dependencies come from existing application owners and composition.
+- `ApplicationControlOwner` exposes typed commands and owner-backed queries. CLI commands, ordered GUI intents, and OSC edits use existing owners and shared mutation ordering; resource conflicts have a separate ordering boundary.
+- Queries distinguish committed settings from effective runtime state. Owned tasks and bounded operation receipts outlive client connections and distinguish persistence from runtime completion.
+- `ControlEvents` provides bounded, privacy-filtered subscriptions. Content requires explicit opt-in; slow clients do not block producers, and event gaps require snapshot resynchronization.
+- `HostedApplication` owns the authenticated same-user loopback endpoint and settings-identity lease. Shutdown stops ingress and drains owned operations before releasing runtime resources and the lease.
 
-- Settings and provider edits use existing owners, with shared ordering for CLI commands, ordered GUI intents, and OSC edits.
-- Canonical mutations and resource conflicts have separate ordering boundaries.
-- `settings.current` projects committed settings. Status queries distinguish selected settings from effective runtime state.
-- Submitted tasks and bounded operation receipts belong to the control owner, not client connections. Receipts distinguish durable settings commits from runtime completion.
-- `ControlEvents` provides bounded, privacy-filtered subscriptions to the shared runtime event stream. Content requires explicit opt-in; slow clients do not block producers, and gaps require snapshot resynchronization.
-
-`HostedApplication` owns the authenticated same-user loopback endpoint and settings-identity lease. Shutdown stops ingress and drains owned operations before releasing runtime resources and the lease.
-
-Implementation: `app/services/application_control.py`, `app/services/application_control_events.py`, `cli/host.py`, `cli/transport.py`, `core/control_instance.py`. Command and protocol details: [CLI guide](cli.md).
+Entry points are listed in Runtime Ownership; command and protocol details belong in the [CLI guide](cli.md).
 
 ## Runtime Pipeline
 
-`RuntimePipelineLauncher` builds and installs the active component set.
+`RuntimePipelineLauncher` builds and installs the active capture, STT, translation, output, UI-event, and VRChat microphone-state components.
 
-Typical components:
-
-- self capture,
-- self translation channel,
-- peer runtime,
-- local ASR runtime,
-- STT provider handles,
-- translation requests,
-- LLM runtime,
-- output runtime,
-- UI event queue,
-- VRChat microphone state.
-
-Provider or settings changes may replace runtime components.
-
-Do not retain references across replacement unless the API explicitly allows it.
+Provider or settings changes may replace components. Do not retain references across replacement unless the API explicitly permits it.
 
 ## Configuration
 
-### Persisted intent
+| Layer | Responsibility | Entry points |
+| --- | --- | --- |
+| Persisted intent | Canonical `AppSettingsVNext` selections, persistence, and migration; no live resources | `app/services/canonical_settings_persistence.py`, `config/settings_vnext/compat.py` |
+| Resolved configuration | Provider, model, execution, capture/overlay target, credentials, and capability constraints | `config/resolved.py`, `config/runtime_resolution.py` |
+| Runtime state | Active sources, generations, provider attachments, turns, tasks, and processes | Respective lifecycle owners |
 
-- Canonical schema: `AppSettingsVNext`
-- Owner: canonical settings persistence service
-- Persistence and migration: `config/settings_vnext/compat.py`
-- Desktop overlay defaults, limits, presets, ordering, and visual values: `config/desktop_overlay_values.py`
-- Provider selection enums and normalization values: `config/provider_values.py`
-- Translation model and connection values: `config/translation_values.py`
+`SettingsView` consumes frozen snapshots and emits focused typed intents. The settings owner applies them to the latest canonical settings before persistence and runtime application.
 
-`SettingsView` consumes only frozen surface snapshots and emits focused typed intents. The settings application owner replays those intents onto the latest canonical settings before persistence and runtime application.
+Settings persistence owns intent; runtime owners own its application. The provider-apply boundary coordinates capture and Local ASR owners. Failed or incomplete application must not appear as successfully applied runtime state.
 
-`intent.osc.activation_notice_enabled` defaults to `true` and controls only the Talk and Listen activation chatbox notices. The General tab's fifth row exposes one direct on/off card and two empty cards; its existing four rows are unchanged. Notice-only edits persist through `ActivationNoticeSettingsIntent`, then synchronously update the active output owner without preparing or restarting capture, providers, or overlays. Failed persistence restores the committed settings projection and leaves the output policy unchanged.
+Canonical policy values live in `config/desktop_overlay_values.py`, `config/provider_values.py`, and `config/translation_values.py`, not in this document.
 
-
-Contains user selections, not active runtime resources.
-
-### Resolved configuration
-
-Converts persisted intent into effective runtime configuration.
-
-Includes:
-
-- provider and model selection,
-- local or remote execution,
-- capture target,
-- overlay target,
-- credential source,
-- defaults and capability constraints.
-
-Runtime owners should consume resolved configuration (`config/resolved.py`, `config/runtime_resolution.py`).
-
-### Runtime state
-
-Examples:
-
-- active audio source,
-- VAD instance,
-- capture generation,
-- provider attachment,
-- translation turns,
-- output tasks,
-- overlay process,
-- provider handles.
-
-Runtime state belongs to its lifecycle owner and is not persisted settings.
-
-Settings persistence owns user intent; runtime owners own its application to active resources. The provider-apply boundary coordinates capture and Local ASR owners. Failed or incomplete application must not be represented as successfully applied runtime state.
-
-Implementation: `app/services/provider/provider_runtime_apply.py`. Behavior tests: `tests/app/test_stt_provider_apply_vertical.py`.
+Implementation: `app/services/provider/provider_runtime_apply.py`. Behavior: `tests/app/test_stt_provider_apply_vertical.py`.
 
 ## Provider Boundaries
 
 ### STT
 
-Execution options:
+`ScopedRecognitionEngine` owns channel-scoped recognition (`core/stt/scoped_engine.py`). Self and Peer have separate epochs, bounded buffers, cancellation, and retention; physical CPU/GPU resources remain shared through their runtime owners.
 
-- Python-process local ASR,
-- native GPU worker,
-- remote provider.
+`STTSessionEventProjection` defines scoped turn receipts and independent recognition events (`core/stt/session_projection.py`):
 
-`ScopedRecognitionEngine` owns recognition for both channels (`core/stt/scoped_engine.py`).
+- Turn-bound providers use `STTScopedTurnNormalizer`; provider updates are not final application transcripts.
+- Gemini, including its Rolling member, uses automatic server VAD with locally ordered `audio_stream_end` fences. Fences share the audio writer without blocking reception or subsequent input.
+- For independent recognition, `STTProviderInputTerminal` retires local audio bookkeeping independently of text delivery; it is not a transcript or server acknowledgement. `STTRecognitionUnitTerminal` carries native finals in provider receipt order, without inventing local segment or speaker correspondence.
+- Capture scope and provider epoch jointly authorize results. Input readiness is separate from text authority, so accepted finals can drain without reviving an ended stream.
+- Stream recovery is bounded and rechecks live capture authority. It forwards only definitely-unsent retained audio; submitted or uncertain-delivery ranges are not replayed.
+- Soniox adapters classify retryable failures; the engine owns recovery budgets. Recoverable failures preserve Self capture intent, while permanent or exhausted failures deactivate capture.
 
-- Channels retain separate provider epochs, bounded buffers, cancellation, and retention policies.
-- Physical CPU/GPU resources remain shared through their runtime owners.
-- `STTSessionEventProjection` defines scoped turn receipts and independent recognition events (`core/stt/session_projection.py`). `STTScopedTurnNormalizer` remains the turn-bound provider path; it does not attach Gemini text to a local turn.
-- Gemini uses automatic server VAD with locally led `audio_stream_end` fences, 16-kHz mono PCM16LE, and unchanged 32-ms packetization. Manual activity controls, final-plus-ACK matching, and interim-to-final timeout promotion are absent.
-- Gemini finals are consumed exactly once in provider receipt order through the existing translation owners, including Rolling. This is an explicitly approved output policy, not a guarantee of original-audio ordering. Activity offsets and receive time do not establish local segment, word, or speaker correspondence.
-- Currentness requires both capture and provider-runtime ownership. Missing text is not empty success; only explicit native finals become independent recognition units. Bounded event/audio buffers and finite EOF observation constrain resource retention without asserting that every source sample has a result.
-- Soniox adapters classify retryable failures; the engine owns a shared three-failure recovery budget with 0.8/1.6-second backoff. Successful final or empty results reset the budget. Recovery opens a fresh epoch for the next valid utterance without replaying failed audio. Authentication, configuration, protocol, and unknown faults are not retried.
-- Recoverable Soniox terminals preserve self capture intent without publishing a terminal UI error. Permanent or exhausted failures deactivate capture. User abort invalidates pending admission and late results. Retained self capture keeps the source token and ledger generation aligned; already-admitted segments retain their frozen identity.
-- Soniox readiness is bounded at 5 seconds. Final wait is 5 seconds for peer and 20 seconds for self; peer sealed-segment TTL remains 12 seconds. The peer deadline reserves time for queued work but does not guarantee delivery through repeated failures, and later final responses lose authority.
+Provider replacement preserves frozen settings for admitted work. Abort revokes turn and epoch authority before native cleanup.
 
-Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
+Local execution uses Python-process ASR or a native GPU worker. The Python adapter owns worker launch, authentication, requests, heartbeat, cancellation, and shutdown; Rust owns device discovery, model activation, and transcription.
 
-GPU worker split:
-
-- Python adapter: process launch, authentication, requests, heartbeat, cancellation, shutdown.
-- Rust worker: device discovery, model activation, native transcription.
+Behavior: `tests/core/test_stt_scoped_engine.py`, `tests/providers/test_gemini_transcribe_lifecycle.py`, `tests/providers/test_soniox_reuse.py`.
 
 ### Translation
 
-Provider adapters own:
+- Provider adapters own authentication, endpoint/model mapping, request/response formats, streaming, and provider errors.
+- `TranslationTurnLifecycleOwner` owns bounded Self/Peer admission, parent turns, child translations, cancellation, and publication. `TranslationRequestOwner` owns request preparation and provider-generation authority.
+- Peer execution may be concurrent, but source-context preparation and publication preserve admitted order: segment order for turn-bound STT, receipt order for independent finals.
+- Channel execution limits are separate from provider-wide admission shared by Self and Peer. Self speculative selection stays in the Self owner.
+- Managed local Gemma remains behind `LLMProvider`; its application/runtime owners handle provisioning, readiness, and process lifecycle.
+- Bounded hedging is resolved runtime policy, not persisted fallback selection (`config/runtime_resolution.py`, `core/llm/fallback_racing.py`).
 
-- authentication,
-- endpoint and model mapping,
-- request schema,
-- provider parameters,
-- streaming,
-- response normalization,
-- provider errors.
+Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/translation_request.py`. Behavior: `tests/core/test_translation_turn_owner.py`, `tests/core/test_translation_request_owner.py`, `tests/core/test_hedged_attempts.py`.
 
-The managed local Gemma adapter remains behind `LLMProvider`; its application/runtime owners handle model provisioning, backend readiness, and process lifecycle.
+### ChatGPT connection
 
-GPT 6 Luna over the `chatgpt` connection uses the user's ChatGPT plan through Sign in with ChatGPT:
+- `ChatGptAccountOwner` owns loopback OAuth; `ChatGptSession` survives provider rebuilds. Refresh credentials and account metadata use the secret store; access tokens remain in memory. This path does not use Broker.
+- `ChatGptPlanLLMProvider` owns the bounded Responses API WebSocket pool and shared FIFO admission across Self and Peer.
+- `FallbackRacingLLMProvider` uses `LLMRequestAdmissionPort` / `LLMRequestExecution` to race the attempts granted by available pool capacity, rather than a ChatGPT hedge timer (`core/llm/provider.py`).
+- `LlmConnectionReadinessOwner` prepares connections while translation is enabled, independently of Talk and Listen (`app/services/llm_connection_readiness.py`).
+- Caller cancellation ends delivery, not an already-running exchange. The provider owns bounded draining and retains pool capacity until release; draining can still consume upstream usage.
+- Translation-off retires unused capacity and closes in-flight connections after their responses. Provider close joins exchanges and cleanup; retired reservations cannot revive an old pool generation.
 
-- `ChatGptAccountOwner` runs the loopback OAuth flow (PKCE, dynamic client registration, ID-token verification) and never routes through the Broker.
-- `ChatGptSession` is shared across provider rebuilds. The secret store keeps only the refresh token, issued client ID, host ID, and account label; access tokens stay in memory because they exceed the Windows credential size limit.
-- `ChatGptPlanLLMProvider` owns a Responses API WebSocket pool with six prepared connections and a six-connection limit. Opening, reserved, running, draining, and closing connections all retain their pool slots until ownership ends.
-- Logical requests share one FIFO admission queue across Self and Peer. At an event-loop boundary, the pool first gives queued requests one ready idle connection each, then gives remaining idle connections to newly admitted requests in FIFO order, at most one extra each. There is no batching timer, mandatory pair, or later upgrade from one attempt to two.
-- `FallbackRacingLLMProvider` uses the core `LLMRequestAdmissionPort` and per-request `LLMRequestExecution` contract to start the granted one or two attempts immediately and publish the first complete success. ChatGPT has no 1,700 ms hedge timer. A single granted attempt may re-enter FIFO admission once with a one-attempt recovery after failure; a paired request cannot start a third attempt. Existing authentication retry behavior remains separate. Direct `ChatGptPlanLLMProvider.translate()` stays single-attempt.
-- `LlmConnectionReadinessOwner` prepares the pool while translation is on, independently of Talk and Listen. Pipeline installation and provider replacement also synchronize readiness, so initial and replacement providers can prepare before their first translation.
-- Cancelling an attempt stops delivery to its caller without closing a running exchange. The provider drains it under the original 30-second response timeout and returns the connection only after successful completion. A cancelled waiter sends no abandoned request, and unused reservations return exactly once. Draining responses retain their pool slots and continue to consume upstream usage. Admission wait remains observable as connection wait, separately from the logical concurrency semaphore queue.
-- Errors, response timeouts, and obsolete token generations retire connections. Turning translation off cancels queued admission and opening work, retires idle and unused reserved connections, and lets in-flight exchanges close after their responses instead of returning to the pool. Retired reservations cannot send or reopen the old pool generation. Provider close cancels and joins owned exchanges and cleanup, including background drains.
-- Detached-connection cleanup finishes before cancellation propagates. Cancelling preparation closes partially opened connections and releases reserved pool slots; closing the readiness owner cannot advance into queued preparation (`app/services/llm_connection_readiness.py`, `providers/llm/chatgpt_plan.py`).
-- ChatGPT login permission failures use a warning snackbar. Inference errors use the dashboard's primary text slot: structured eligibility and usage-limit codes select dedicated subscription and Codex-limit guidance; without a subscription code, HTTP 403 and 429 select the same respective messages. Explicit subscription codes retain precedence, other providers keep their own classification, and unanimous parallel-attempt failures preserve the dedicated message (`core/error_messages.py`, `ui/event_dispatch.py`).
-
-Cloud translation may use bounded hedged attempts according to resolved runtime policy, not persisted fallback selections (`config/runtime_resolution.py`, `core/llm/fallback_racing.py`).
-
-Translation owners retain:
-
-- turn lifecycle,
-- cancellation,
-- stale-result rejection,
-- publication handoff.
-
-`TranslationTurnLifecycleOwner` owns bounded Self and Peer admission and the lifecycle of parent turns and child translations. `TranslationRequestOwner` owns request preparation and provider-generation authority.
-
-Peer translations may execute concurrently, but source-context preparation and publication preserve source order. Channel execution limits remain separate from provider-wide admission shared by Self and Peer.
-
-Self speculative selection remains in the Self owner. Once a turn is admitted, the turn lifecycle owns subsequent translation and publication.
-
-Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/translation_request.py`, `core/llm/provider.py`, `core/llm/fallback_racing.py`, `providers/llm/chatgpt_plan.py`. Behavior tests: `tests/core/test_translation_turn_owner.py`, `tests/core/test_translation_request_owner.py`, `tests/core/test_hedged_attempts.py`, `tests/providers/test_chatgpt_plan_provider.py`, `tests/app/test_chatgpt_adaptive_dispatch.py`.
+Implementation: `providers/llm/chatgpt_plan.py`. Behavior: `tests/providers/test_chatgpt_plan_provider.py`, `tests/app/test_chatgpt_adaptive_dispatch.py`.
 
 ## Output
 
-`OutputRuntime` owns:
+`OutputRuntime` owns routing, chatbox state, destination admission and receipts, duplicate/stale-publication rejection, destination replacement, and cleanup.
 
-- route selection and chatbox state,
-- destination-scoped admission and delivery receipts,
-- duplicate and retired-publication rejection,
-- UI event bridge,
-- destination replacement,
-- shutdown cleanup.
-
-Delivery boundaries:
-
-- Self/manual and Peer UI publications use independently bounded writer lanes owned by `TranslationUiMessageQueue` and `OutputRuntime`, sharing the production capacity-one consumer queue and destination-sequence authority. UI admission does not wait for consumption or gate Self source Presenter application and otherwise eligible translation execution. Peer overlay delivery remains independently bounded.
-- Self chatbox delivery owns its bounded admission and expiry policy.
-- `OutputRuntime.activation_notice_enabled` gates the immediate Talk notice and queued Listen disclosure before destination handoff. Disabled notices produce an `activation_notice_disabled` routing outcome; enabling the preference does not replay them. Ordinary Self output, typing, subtitles, errors, and the initial Peer consent requirement are unchanged. Pipeline construction and recreation initialize this policy from canonical settings; Talk's existing activation eligibility and cooldown remain owned by the Self translation channel.
-- Output handoff releases translation ordering without waiting for display. Sink failure does not replay recognition or translation.
-- Peer publications retain activation generation and `source_order` through output. For turn-bound providers this follows segment order; independent Gemini finals use receipt-ordered admission into the same monotonic publication sequence. Retiring an activation cancels its deliveries and rejects late work.
-- Peer text without speaker runs, including independent Gemini finals, is `non_diarized` and uses the existing gold style without a speaker hold or guessed identity. Explicit uncertain or missing speaker attribution keeps the gray fallback; first-readable presentation remains pinned.
-- Destination admission and presenter application receipts are explicit; neither is a remote display acknowledgement.
-- E2E summaries measure last source speech to the first successful Self chatbox page send or the Peer presenter application receipt. Gemini's frozen approximate origin propagates through the existing latency timeline without waiting for local `SpeechEnd`; its summaries include `estimated=true`. Missing speech observations remain unmeasured. A newer utterance observed before an older native final can underestimate the older result's latency; these estimates are not exact utterance attribution.
-
-Self/manual UI delivery retains 32 waiting events plus one active event. Peer retains eight waiting batches plus an active batch, each with at most 32 outstanding events including its active write. Delivered Peer payloads are released; this is not a limit on lifetime batch emissions or provider segmentation. Each lane owns one writer with a five-second write timeout. Including the queue and active consumer, these boundaries retain at most 323 distinct event payloads. Capacity exhaustion, write failure, retirement, replacement, and shutdown receive explicit destination-local routing dispositions rather than replaying recognition or translation. `accepted_handoff` means admission; `ui_queue_submitted` means local queue submission, not UI application or physical display.
-
-Optional `UIEvent` delivery authority rejects retired, replaced, or duplicate callbacks. A shared sequence prevents delayed older Self/manual/Peer events from replacing newer visible dashboard state while preserving authorized logical history and error handling. Source retirement preserves manual isolation. Queue replacement joins both UI writers without retiring other output destinations. Synchronous UI bridge replacement retires destination authority and cancels both writers; their completion callbacks clear ownership and restart accepted current-destination work even when cancellation occurs before a coroutine starts. Closed owners never restart writers. Context preparation, predecessor ordering, execution slots, and speculative reuse remain translation-owner constraints, independent of UI consumption.
-
-Caption and overlay settings control destinations, not peer capture. Conversation errors share publication identity; runtime session status uses a separate path.
-
-Runtime error messages use plain text in the dashboard's upper-right `DisplayCard`, through `UIEventBridge` / `AppDashboardEventDestination` or explicitly error-marked application messages. Provider-specific errors, including OpenRouter and managed-account failures, do not add separate banners, settings actions, or error snackbars. Overlay failures use the existing reason-specific dashboard notice, which yields to conversation content and clears on recovery. Local-ASR feedback distinguishes failures from progress and compatibility notices. Interactive settings/authentication validation and non-error notifications remain local to their owning surfaces.
-
-
-| Publication       | UI               | Chatbox             | Overlay          |
-| ----------------- | ---------------- | ------------------- | ---------------- |
-| Self utterance    | Yes              | Yes                 | Yes              |
-| Peer subtitle     | Yes              | No                  | Yes              |
+| Publication | UI | Chatbox | Overlay |
+| --- | --- | --- | --- |
+| Self utterance | Yes | Yes | Yes |
+| Peer subtitle | Yes | No | Yes |
 | System disclosure | Policy-dependent | Explicit route only | Policy-dependent |
 
+- Each destination has independent bounded delivery state. Failure or replacement in one must not block or retire the others, or replay recognition/translation.
+- `TranslationUiMessageQueue` and `OutputRuntime` own separate Self/manual and Peer writer lanes into the shared UI consumer queue. UI consumption does not gate eligible translation or Self source-caption presentation.
+- Delivery authority and sequence checks reject stale, replaced, or duplicate callbacks; delayed events cannot overwrite newer dashboard state. Source retirement preserves manual-input isolation.
+- Output handoff releases translation ordering without waiting for display. Admission, queue submission, and presenter application are distinct receipts, none a physical-display acknowledgement.
+- Peer publications retain activation generation and admitted order. Caption/overlay preferences control destinations, not capture.
+- The activation-notice preference is an output policy: apply it after persistence without restarting capture/providers or changing Peer consent.
+- Runtime errors use the shared dashboard error path; interactive settings/authentication validation stays on its owning surface. Conversation errors retain publication identity; runtime session status is separate.
 
-Destination adapters must not bypass routing policy.
-
-Each destination has independent admission and delivery state. Replacing one
-destination must not block or retire work for the others.
-
-Implementation: `core/runtime/output.py`, `core/orchestrator/translation_output_projection.py`, `ui/event_dispatch.py`. Behavior tests: `tests/core/runtime/test_output_runtime.py`, `tests/core/test_translation_ui_delivery.py`, `tests/core/test_self_ui_isolation.py`.
+Implementation: `core/runtime/output.py`, `core/orchestrator/translation_output_projection.py`, `ui/event_dispatch.py`. Behavior: `tests/core/runtime/test_output_runtime.py`, `tests/core/test_translation_ui_delivery.py`, `tests/core/test_self_ui_isolation.py`.
 
 ### Overlays
 
 | Owner | Responsibility |
 | --- | --- |
 | Application (`app/services/overlay/`) | Target selection, recovery, and generation replacement |
-| Python runtime (`core/overlay/`, `core/runtime/overlay.py`) | Caption state and expiry, scene delivery, and process lifecycle |
+| Python runtime (`core/overlay/`, `core/runtime/overlay.py`) | Caption lifetime, scene delivery, and process lifecycle |
 | Native runtime (`native/overlay/src/runtime.rs`) | VR rendering, presentation retries, and GPU resources |
 
-Each generation owns its tasks and shutdown. Python owns caption lifetime; native owns presentation retries.
+`OverlayPresenter` owns provider-independent Peer admission/pacing and Self source-first captions (`core/overlay/presenter.py`). Translation updates the same logical Self caption; rendering protection must not force early semantic finalization.
 
-`OverlayPresenter` owns provider-independent Peer subtitle admission and pacing (`core/overlay/presenter.py`); output retains bounded waiting work.
+Each generation owns its tasks and shutdown. Python projects freshness intent; native alone schedules bounded presentation retries. Retry state must not redefine caption lifetime. Software submission is not proof of physical HMD freshness.
 
-SELF source-first presentation uses normalized stable contributions when available and authoritative terminal or independent results otherwise. Source remains the primary line; translation updates the same logical caption. Active text is already readable and is not prematurely finalized to obtain rendering protection. Merge/speculation, sticky preview translation, active-row protection, and existing late-result/expiry rules remain independent of native retries.
-
-Changed, visible active SELF captions establish stream-phase freshness through `OverlayPresenter` and `NativeRetryIntentProjection`. Same-target updates advance trigger generation without renewing the stream episode's deadline or completed count. Semantic finalization enters the final phase; a changed final translation retains its distinct final episode. Unchanged content does not trigger freshness. Native alone schedules the existing bounded retries; desktop rendering has no retry cadence. Scene coalescing may display source and translation together without an original-only dwell or render acknowledgement.
-
-Behavior tests: `tests/core/test_overlay_presenter.py`, `tests/core/test_overlay_active_freshness.py`, `tests/core/test_overlay_bridge.py`, and `native/overlay/tests/runtime.rs`. Software application/submission evidence is not physical HMD freshness evidence.
+Behavior: `tests/core/test_overlay_presenter.py`, `tests/core/test_overlay_active_freshness.py`, `native/overlay/tests/runtime.rs`.
 
 ## Runtime Logging
 
-| Owner | Responsibility |
-| --- | --- |
-| `SessionRuntimeLoggingService` | Shared console, local file, and Logs view delivery |
-| Translation owners | Accepted SELF/PEER source and target records |
-| Overlay owners | Bounded failure evidence and reliable lifecycle warnings |
+`SessionRuntimeLoggingService` owns console, file, and Logs-view delivery. Translation owners produce accepted conversation records; capture/provider/overlay owners produce lifecycle and failure evidence.
 
-- `SessionRuntimeLoggingService` owns bounded asynchronous file delivery. Producers must not block on file I/O.
-- Basic-audience records reach the console and Logs view. Selected technical diagnostics are file-only and metadata-only; accepted conversation uses a separate secret-protected path.
-- Capture basic logs report input stalls/resumption and VAD speech boundaries, not periodic frame/speech-presence summaries. Peer VAD diagnostic windows remain available.
-- Queue pressure prioritizes warning, error, and terminal evidence. Logging does not guarantee complete persistence.
-- The writer retains ownership through stream closure; replacement must not race a retiring writer.
-- Persisted records include calendar date and process ID. Recognition terminals correlate channel, utterance, provider epoch/turn, activation generation, watchdog timing, and recovery decisions. Self capture failures identify the actual active-intent transition; peer expiry records sealed wait and TTL.
-- Soniox file-only turn summaries distinguish finalize enqueue/write, final reception/acceptance, server error codes, transport closure, and local cleanup. A completed write is not a server acknowledgement. Diagnostic fields exclude external error prose, credentials, transcript tokens, speaker identities, and PCM.
-- Translation latency uses task-local request and attempt scopes (`core/llm/latency.py`). Only `request_end` and `attempt_end` summaries are written under `[Diagnostic][LlmLatency]`; there are no start/per-token events, tokenization, prompt hashes, or separate collectors.
-- These summaries go through the existing asynchronous file writer only, not the Logs view, console, control log events, or structured diagnostic fanout. An unavailable or closed logging service drops them without a console fallback. Basic E2E and conversation logging remain unchanged.
-- `request_ms` covers backend execution through completion-authority checks and normalization, not preparation, scheduling, capture, or output delivery. `queue_ms` measures permit acquisition. Attempts identify provider, configured/actual model, transport, outcome, and elapsed time; `winner_attempt` is zero-based. Cancelled hedge summaries can follow their correlated request summary.
-- `network_ms` runs from the latest send to attempt closure, including response processing and connection release. `ttft_ms` records only the first nonempty streamed text; `first_text_to_done_ms` runs from that text to attempt closure. Nonstreaming responses leave these text timings `none`, never substituting headers or full-response time.
-- A cancelled ChatGPT attempt summary ends when its caller is cancelled; the provider-owned background drain is excluded and emits no second attempt summary.
-- Auth, connection-pool wait, actual handshake/reuse, service tier, response usage, and local server timings are recorded only where observable. Usage is provider-reported, not estimated; unavailable/ambiguous counts remain `none`. Source, prompt, and context contribute character counts only. Summaries contain no text, headers, URLs, credentials, or external error prose.
+- File delivery is asynchronous and bounded; producers never wait for file I/O. Queue pressure prioritizes warnings, errors, and terminal evidence, without guaranteeing complete persistence.
+- Basic records reach the console and Logs view. Technical diagnostics are metadata-only; accepted conversation has a separate secret-protected path. Diagnostics exclude credentials, user text, raw provider prose, and audio.
+- Translation latency uses task-local request/attempt scopes and the existing file writer only (`core/llm/latency.py`); unavailable logging does not fall back to console output.
+- E2E timing ends at the Self chatbox send or Peer presenter-application receipt, not physical display. Gemini uses a scoped approximate last-speech origin, not exact utterance attribution; missing origins remain unmeasured.
+- Writers retain ownership through stream closure so replacement cannot race cleanup.
+- Render-only desktop/preview startup remains independent of domain-model, provider, secrets, and STT imports.
 
-Startup logging and latency imports remain safe for render-only desktop and preview dispatch. The LLM provider and racing contracts keep annotation-only domain-model imports behind `TYPE_CHECKING`; configuring logging must not load domain models, provider adapters, secrets, or STT. The real-process dispatch checks in `tests/app/test_desktop_overlay_runner.py` enforce this boundary.
-
-
-Implementation: `core/runtime_logging.py`, `core/llm/latency.py`, `app/services/application_runtime_logging.py`. Behavior tests: `tests/core/test_runtime_logging.py`, `tests/core/test_file_logging.py`, `tests/core/test_llm_latency.py`.
+Implementation: `core/runtime_logging.py`, `app/services/application_runtime_logging.py`. Behavior: `tests/core/test_runtime_logging.py`, `tests/core/test_file_logging.py`, `tests/core/test_llm_latency.py`, `tests/app/test_desktop_overlay_runner.py`.
 
 ## Runtime Layout
 
-- `runtime_layout.py` separates host and interpreter paths, read-only resources, and writable user data.
-- Features resolve runtime paths through this boundary, not process flags or the working directory.
-- Bootstrap selects shared runtime, UI asset, and framework storage paths before application startup.
-- Packaging does not change feature ownership or application logging policy.
-- Native packaging retains upstream Python DLLs and stages the compiler-matched VC++ runtime app-locally. Release validation checks PE import and delay-import closure without using host-installed non-OS DLLs; source/version/hash evidence lives with the build evidence.
-- Native packaging uses its staged embedded Python to precompile both application and dependency sources as optimization-0, checked-hash bytecode before the final artifact manifest is generated. Startup consumes the packaged caches without writing to the installed directories; source changes still invalidate their caches.
-- The native Windows runner and console executable embed the canonical `data/icons/icon.ico` from the Python application. The runner uses that resource for its initial window/taskbar icon; native builds do not maintain separate icon artwork.
-- Native installers require Inno Setup 7.1.0 or newer to compile and install extended-length dependency bytecode paths; the native release workflow pins 7.1.0.
-- Native installer cleanup runs silently after payload installation. Its final-manifest-bound ownership plan contains only obsolete official 2.7.0 files; same-handle hash verification and deletion preserve changed, inaccessible, or linked candidates and continue independent candidates. Unlisted files and writable user-data roots, including legacy root prompts, remain outside cleanup ownership.
+- `runtime_layout.py` separates host/interpreter paths, read-only resources, and writable user data. Features use this boundary rather than process flags or the working directory.
+- Bootstrap selects runtime, UI asset, and framework storage paths before application startup. Packaging does not change feature ownership or logging policy.
+- Native packaging supplies its Python/VC++ dependencies and validated bytecode caches; startup must not write into installed directories.
+- Installer cleanup is limited to manifest-owned obsolete files with identity/hash checks. Modified or unlisted files and writable user data remain outside cleanup ownership.
+- Native installers require Inno Setup 7.1.0 or newer to compile and install extended-length dependency bytecode paths; the native release workflow pins 7.1.0. [Inno Setup 7 release notes](https://github.com/jrsoftware/issrc/releases/tag/is-7_1_0) document the removal of `MAX_PATH` limits.
+
+Build policy and validation: `scripts/ci/build-native-experimental.ps1`. Runtime-path behavior: `tests/test_runtime_layout.py`.
 
 ## Lifecycle
 
-Every owner of a task, process, source, or provider session must define:
+Every task, process, source, and provider session has an owner responsible for ingress stop, cancellation/draining, late-callback rejection, resource release, and restart.
 
-- ingress stop,
-- cancellation or draining,
-- late-callback rejection,
-- resource release,
-- restart behavior.
+### Stale-work protection and replacement
 
-### Stale-work protection
+- Generations, attachment tokens, request IDs, and current-owner checks prevent retired work from mutating current state or publishing output.
+- The owner decides whether admitted work drains or is cancelled. Gracefully admitted work retains its provider scope and frozen settings.
+- Replacement revokes retired authority before it can affect the new runtime. Retired resources remain owned until cleanup completes.
 
-Used mechanisms include:
+### Shutdown
 
-- generations,
-- attachment tokens,
-- request IDs,
-- current-component checks,
-- cancellation,
-- stale completion rejection.
+Stop ingress, drain or cancel owned work, close external resources, then clear runtime references.
 
-Retired work must not mutate current state or publish user-visible output.
+The application shutdown adapter coordinates capture, translation, output, child processes, and services. Window-close orchestration survives ordinary UI-task cancellation until ordered shutdown completes. Child processes remain owned for the host lifetime; abrupt-exit containment is only a fallback.
 
-### Replacement
-
-- The owner controls ingress and decides whether admitted work drains or is cancelled.
-- Admitted work retains its provider scope and frozen settings during a graceful handoff.
-- Replacement must revoke retired work's authority before it can affect the current runtime.
-- Retired resources remain owned until cleanup completes.
-
-Exact handoff and cleanup ordering belongs to each owner's implementation and lifecycle tests.
-
-### Shutdown direction
-
-Stop ingress before draining or cancelling owned work. Close external resources before clearing runtime references.
-
-The application shutdown adapter coordinates teardown across capture, translation, output, child processes, and application services.
-
-Window-close orchestration must survive ordinary UI-task cancellation until ordered shutdown completes.
-
-Implementation: `app/adapters/application_runtime_shutdown.py`. Use shutdown code and lifecycle tests for exact ordering.
-
-Shutdown diagnostics expose bounded lifecycle metadata, not user content or credentials.
-
-Child processes remain owned for the host lifetime. Abrupt-exit containment is a fallback, not a substitute for graceful shutdown.
+Exact handoff and teardown ordering belongs to owner implementations and lifecycle tests. Application entry point: `app/adapters/application_runtime_shutdown.py`.
 
 ## Async Event Model
 
