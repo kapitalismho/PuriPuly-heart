@@ -13,7 +13,7 @@ from packaging.requirements import Requirement
 
 from puripuly_heart.release_evidence.native_distribution import (
     NativeArtifactLayout,
-    compile_application,
+    compile_runtime,
     filter_requirements,
     finalize_soxr_wheel,
     stage_product_metadata,
@@ -235,24 +235,77 @@ def test_product_metadata_is_non_editable_and_record_owned(tmp_path: Path) -> No
     }
 
 
-def test_application_bytecode_is_checked_hash_optimization_zero_and_declared_build_derived(
-    tmp_path: Path,
-) -> None:
+def test_runtime_imports_app_and_dependencies_without_source_compilation(tmp_path: Path) -> None:
     app = tmp_path / "app"
-    package = app / "example"
-    package.mkdir(parents=True)
-    (app / "product_bootstrap.py").write_text("VALUE = 1\n", encoding="utf-8")
-    (package / "__init__.py").write_text("VALUE = 2\n", encoding="utf-8")
+    dependencies = tmp_path / "site-packages"
+    app.mkdir()
+    dependencies.mkdir()
+    (app / "consumer.py").write_text(
+        "from dependency import VALUE\nRESULT = VALUE + 1\n", encoding="utf-8"
+    )
+    (app / "product_bootstrap.py").write_text("RESULT = 9\n", encoding="utf-8")
+    (dependencies / "dependency.py").write_text("VALUE = 41\n", encoding="utf-8")
+    layout = Path(__file__).resolve().parents[2] / "native/windows_host/artifact-layout.json"
 
-    result = compile_application(app)
+    compile_runtime(tmp_path, layout)
 
-    assert result["python_optimize"] == 0
-    assert (app / "product_bootstrap.pyc").is_file()
-    assert {entry["provenance"] for entry in result["bytecode"]} == {"build-derived"}
-    assert {entry["invalidation_mode"] for entry in result["bytecode"]} == {"checked-hash"}
-    for entry in result["bytecode"]:
-        payload = (tmp_path / entry["path"]).read_bytes()
-        assert payload[4:8] == b"\x03\x00\x00\x00"
+    script = (
+        "import importlib.machinery, importlib.util, json, sys\n"
+        f"sys.path[:0] = [{str(app)!r}, {str(dependencies)!r}]\n"
+        "def reject_source_compilation(*args, **kwargs):\n"
+        "    raise AssertionError('runtime source compilation')\n"
+        "importlib.machinery.SourceFileLoader.source_to_code = reject_source_compilation\n"
+        "import consumer\n"
+        f"spec = importlib.util.spec_from_file_location('bootstrap', {str(app / 'product_bootstrap.pyc')!r})\n"
+        "bootstrap = importlib.util.module_from_spec(spec)\n"
+        "spec.loader.exec_module(bootstrap)\n"
+        "print(json.dumps([consumer.RESULT, bootstrap.RESULT]))\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-I", "-B", "-c", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert json.loads(result.stdout) == [42, 9]
+
+
+def test_runtime_bytecode_does_not_hide_changed_dependency_source(tmp_path: Path) -> None:
+    (tmp_path / "app").mkdir()
+    dependencies = tmp_path / "site-packages"
+    dependencies.mkdir()
+    source = dependencies / "dependency.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    layout = Path(__file__).resolve().parents[2] / "native/windows_host/artifact-layout.json"
+
+    compile_runtime(tmp_path, layout)
+    source.write_text("VALUE = 2\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-B",
+            "-c",
+            f"import sys; sys.path.insert(0, {str(dependencies)!r}); "
+            "import dependency; print(dependency.VALUE)",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.stdout.strip() == "2"
+
+
+def test_runtime_build_rejects_uncompilable_dependency(tmp_path: Path) -> None:
+    (tmp_path / "app").mkdir()
+    dependencies = tmp_path / "site-packages"
+    dependencies.mkdir()
+    (dependencies / "dependency.py").write_text("def invalid(:\n", encoding="utf-8")
+    layout = Path(__file__).resolve().parents[2] / "native/windows_host/artifact-layout.json"
+
+    with pytest.raises(RuntimeError, match="SyntaxError"):
+        compile_runtime(tmp_path, layout)
 
 
 def test_embedded_bootstrap_only_persists_bounded_uncaught_error_diagnostics(

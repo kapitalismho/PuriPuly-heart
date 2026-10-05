@@ -87,7 +87,9 @@ It works in many environments, including VRChat and Discord.
 ---
 
 ## Translation Comparison
-![Mean error penalty per sentence for Korean to EN / JA / ZH-Hans across 216 multi-turn samples (Gemba MQM evaluation, lower is better). Blue bars are models available in PuriPuly: 1st Gemma 4 31B (0.353), 2nd Gemma 4 26B A4B (0.387), 3rd DeepSeek-V4 Flash 0731 (0.571), 4th Gemma 4 12B QAT Q4 (0.855), 5th Gemma 4 E4B QAT Q4 (1.577). Orange bars are external baselines: Hy-MT-7B (1.863), Papago (2.699), Gemini 3.5 Live Translate (2.991), MiLMMT 46-4B (3.087), DeepL (3.914), Google Cloud Translation Basic (5.731).](docs/images/performance/2.png)
+![Mean error penalty per sentence for the full speech recognition and translation pipeline. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are combinations available in PuriPuly: Gemini Transcribe → Luna (0.676), Soniox STT → Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). Orange bars are external baselines: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). Judge model: Gemini 3.7 Flash.](docs/images/performance/1.png)
+
+![Mean error penalty per sentence. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are models available in PuriPuly: GPT 6 Luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). Orange bars are external baselines: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Only results with a character error rate (CER) of 5% or less were selected for Qwen 3.8, Gemini 3.5, and Soniox. Judge model: Gemini 3.7 Flash.](docs/images/performance/2.png)
 
 - The blue bars are the models available in PuriPuly.
 - We ran the experiment using Microsoft's Gemba MQM framework.
@@ -416,119 +418,37 @@ Upcoming work is tracked publicly on the [PuriPuly project board](https://github
 
 ## Development
 
-### Environments
+Requires Windows x64, standard GIL-enabled CPython 3.14, and [uv](https://docs.astral.sh/uv/). Run these commands from the repository root.
 
-| Surface                    | Recommended environment | Documentation                                          |
-| -------------------------- | ----------------------- | ------------------------------------------------------ |
-| Python desktop application | Windows                 | This section                                           |
-| Broker service             | Linux                   | [`broker/README.md`](broker/README.md)                 |
-| Native VR overlay          | Windows                 | [`native/overlay/README.md`](native/overlay/README.md) |
-
-### Python Environment
-
-The Python application requires ordinary GIL-enabled CPython 3.14 on Windows x64.
-
-Windows process capture requires SciPy 1.18.0 for audio format conversion, including 44.1 kHz int16 to 48 kHz float32. SciPy is an explicit Windows runtime dependency.
-
-Run the experimental native builder, `scripts/ci/build-native-experimental.ps1`, with PowerShell 7. It evaluates lock-export markers for Windows x64 CPython 3.14.7 and validates the packaged dependency names and versions against that export, rather than a fixed package count. Missing, unexpected, or wrong-version dependencies fail the build. The separate Flet viewer is excluded; the custom SoXR package and bundled licenses, including SciPy's, are validated.
-
-The native builder retains the upstream Python DLL set and stages the selected MSVC toolchain's matching x64 `Microsoft.VC143.CRT` DLLs app-locally, including `MSVCP140_1.dll`. `vc-runtime.json` records their versions, source paths, and hashes. PE import and delay-import validation rejects missing non-OS dependencies; Windows OS/API-set libraries and GPU driver loaders remain external.
-
-Compile `NativeExperimental` installers with `NativeCleanupInclude` pointing to the builder's generated `native-installer-cleanup.iss`, beside the output directory. It is bound to the final native artifact manifest. After installing the new payload, Setup silently removes hash-matching obsolete files owned by the official 2.7.0 release. Modified, locked, linked, and unlisted files are preserved without blocking installation or showing cleanup notifications. User settings, secrets, models, extensions, and the old root `prompts` directory are never cleanup targets.
-
-Create and activate the Windows environment:
+### Setup
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
+uv sync --frozen --extra dev
 ```
 
-Install the application and development dependencies:
-
-```powershell
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
-```
-
-`uv` may be used instead:
-
-```powershell
-uv sync --dev
-```
-
-For Linux or WSL work, use `.venv-wsl` when it is available.
-
-```bash
-UV_PROJECT_ENVIRONMENT=.venv-wsl uv sync --dev
-```
-
-Repositories configured with `direnv` may run commands through:
-
-```bash
-direnv exec . <command>
-```
-
-### Running the Application
-
-Run the Flet desktop application:
-
-```powershell
-python -m puripuly_heart.main run-gui
-```
-
-The equivalent `uv` command is:
+### GUI
 
 ```powershell
 uv run python -m puripuly_heart.main run-gui
 ```
 
-Developer preview controls for hidden UI states are enabled with:
+### CLI
+
+The CLI can run the application without a GUI or control an already-running application. See the [CLI guide](docs/cli.md) for commands.
 
 ```powershell
-python -m puripuly_heart.main run-gui --debug-ui-preview
+uv run python -m puripuly_heart.main cli --help
 ```
 
-### Python Verification
-
-Format the Python sources and tests:
+### Verification
 
 ```powershell
-black src tests
+uv run black --check src tests
+uv run ruff check src tests
+uv run python -m pytest
 ```
 
-Check formatting without modifying files:
-
-```powershell
-black --check src tests
-```
-
-Run lint checks:
-
-```powershell
-ruff check src tests
-```
-
-Run the complete Python test suite:
-
-```powershell
-python -m pytest
-```
-
-Run a focused test file or directory during development:
-
-```powershell
-python -m pytest tests/path/to/test_file.py
-```
-
-### Other Surfaces
-
-Broker documentation is maintained in [`broker/README.md`](broker/README.md).
-
-Native VR overlay documentation is maintained in [`native/overlay/README.md`](native/overlay/README.md).
-
-Custom HTTP API extension documentation is maintained in [`docs/http-extensions.md`](docs/http-extensions.md). For the JSON Schema required for connection, see [`docs/http-extension.schema.json`](docs/http-extension.schema.json).
-
-VRChat OSC controls are documented in [`docs/vrchat-osc.md`](docs/vrchat-osc.md).
+[Broker development (Linux)](broker/README.md) · [VR overlay development (Windows)](native/overlay/README.md)
 
 ---
 

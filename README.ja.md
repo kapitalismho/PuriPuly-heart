@@ -86,7 +86,9 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 ---
 
 ## 翻訳比較
-![韓国語→英語/日本語/中国語（簡体）翻訳の文あたり平均エラーペナルティチャート。216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：1位 Gemma 4 31B (0.353)、2位 Gemma 4 26B A4B (0.387)、3位 DeepSeek-V4 Flash 0731 (0.571)、4位 Gemma 4 12B QAT Q4 (0.855)、5位 Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部ベースライン：Hy-MT-7B (1.863)、Papago (2.699)、Gemini 3.5 Live Translate (2.991)、MiLMMT 46-4B (3.087)、DeepL (3.914)、Google Cloud Translation Basic (5.731)。](docs/images/performance/2.png)
+![音声認識と翻訳を組み合わせた全体パイプラインの文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できる組み合わせ：Gemini Transcribe → Luna (0.676)、Soniox STT → Luna (0.942)、Qwen ASR 1.7B → Gemma 26B (1.024)、Gemini Transcribe → Gemma 26B (1.084)、Soniox STT → Gemma 26B (1.293)、Qwen ASR 0.6B → Gemma 26B (2.374)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (2.108)、Gemini 3.5 Live Translate (3.754)、Soniox Translate (4.989)。評価モデル：Gemini 3.7 Flash。](docs/images/performance/1.png)
+
+![文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：GPT 6 Luna (0.130)、Gemma 4 26B A4B (0.387)、DeepSeek-V4 Flash 0731 (0.571)、Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (1.392)、Papago (2.699)、Gemini 3.5 Translate (2.991)、Soniox Translate (3.473)、DeepL (3.914)、Google Translation (5.731)。Qwen 3.8、Gemini 3.5、Sonioxは文字誤り率（CER）が5%以下の結果のみを選別。評価モデル：Gemini 3.7 Flash。](docs/images/performance/2.png)
 
 - 青い棒グラフはPuriPulyで使用できるモデルです。
 - マイクロソフトのGemba MQMフレームワークを使って実験しました。
@@ -414,117 +416,37 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 
 ## 開発
 
-### 環境
+Windows x64、通常のGIL有効CPython 3.14、[uv](https://docs.astral.sh/uv/)が必要です。リポジトリのルートで実行してください。
 
-| 領域 | 推奨環境 | ドキュメント |
-|---|---|---|
-| Python デスクトップアプリ | Windows | このセクション |
-| Broker サービス | Linux | [`broker/README.md`](broker/README.md) |
-| ネイティブ VR オーバーレイ | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
-
-### Python 環境
-
-Python アプリには Python 3.12 または 3.13 が必要です。
-
-Windows 環境を作成して有効化します:
+### セットアップ
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
+uv sync --frozen --extra dev
 ```
 
-アプリと開発用依存関係をインストールします:
-
-```powershell
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
-```
-
-`uv` を使っても構いません:
-
-```powershell
-uv sync --dev
-```
-
-リポジトリのフックをインストールします:
-
-```powershell
-pre-commit install
-```
-
-Linux や WSL で作業する場合は、利用可能なら `.venv-wsl` を使用します。
-
-```bash
-UV_PROJECT_ENVIRONMENT=.venv-wsl uv sync --dev
-```
-
-`direnv` が設定されたリポジトリでは、次のようにコマンドを実行できます:
-
-```bash
-direnv exec . <command>
-```
-
-### アプリの実行
-
-Flet デスクトップアプリを実行します:
-
-```powershell
-python -m puripuly_heart.main run-gui
-```
-
-同等の `uv` コマンド:
+### GUI
 
 ```powershell
 uv run python -m puripuly_heart.main run-gui
 ```
 
-隠れた UI 状態の開発者プレビュー機能は次で有効になります:
+### CLI
+
+CLIでGUIなしにアプリを起動したり、起動済みのアプリを操作したりできます。コマンドの詳細は[CLIガイド](docs/cli.md)を参照してください。
 
 ```powershell
-python -m puripuly_heart.main run-gui --debug-ui-preview
+uv run python -m puripuly_heart.main cli --help
 ```
 
-### Python の検証
-
-Python ソースとテストをフォーマットします:
+### 検証
 
 ```powershell
-black src tests
+uv run black --check src tests
+uv run ruff check src tests
+uv run python -m pytest
 ```
 
-ファイルを変更せずにフォーマットを確認します:
-
-```powershell
-black --check src tests
-```
-
-リントチェックを実行します:
-
-```powershell
-ruff check src tests
-```
-
-Python テストスイート全体を実行します:
-
-```powershell
-python -m pytest
-```
-
-開発中に特定のテストファイルやディレクトリを実行する場合:
-
-```powershell
-python -m pytest tests/path/to/test_file.py
-```
-
-### その他の領域
-
-Broker のドキュメントは [`broker/README.md`](broker/README.md) で管理されています。
-
-ネイティブ VR オーバーレイのドキュメントは [`native/overlay/README.md`](native/overlay/README.md) で管理されています。
-
-カスタム HTTP API 拡張のドキュメントは [`docs/http-extensions.md`](docs/http-extensions.md) で管理されています。接続に必要な JSON Schema は [`docs/http-extension.schema.json`](docs/http-extension.schema.json) を参照してください。
-
-VRChat OSC コントロールは [`docs/vrchat-osc.md`](docs/vrchat-osc.md) を参照してください。
+[Broker開発（Linux）](broker/README.md) · [VRオーバーレイ開発（Windows）](native/overlay/README.md)
 
 ---
 

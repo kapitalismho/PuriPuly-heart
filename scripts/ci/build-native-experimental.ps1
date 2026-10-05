@@ -117,6 +117,16 @@ foreach ($required in @($ToolPython, $PinnedInputRoot, $PythonEmbedArchive, $Sox
     }
 }
 
+Push-Location $repoRoot
+try {
+    $appVersion = (& $ToolPython (Join-Path $PSScriptRoot "read-project-version.py") | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($appVersion)) {
+        throw "Could not read the project version."
+    }
+} finally {
+    Pop-Location
+}
+
 $layoutPath = Join-Path $repoRoot "native\windows_host\artifact-layout.json"
 $inputSpecPath = Join-Path $repoRoot "native\windows_host\upstream-inputs.json"
 $overlayRoot = Join-Path $repoRoot "native\windows_host\template"
@@ -184,6 +194,8 @@ try {
         "--python-bootstrap", $pythonBootstrapPath,
         "--output", (Join-Path $evidenceRoot "template-render.json")
     ) -WorkingDirectory $repoRoot
+    Copy-Item -LiteralPath (Join-Path $repoRoot "src\puripuly_heart\data\icons\icon.ico") `
+        -Destination (Join-Path $cookiecutterTemplateRoot "{{cookiecutter.out_dir}}\windows\runner\resources\app_icon.ico") -Force
 
     $flutterCommand = Join-Path $flutterSdkRoot "flutter\bin\flutter.bat"
     if (-not (Test-Path -LiteralPath $flutterCommand -PathType Leaf)) {
@@ -210,7 +222,7 @@ try {
     @"
 [project]
 name = "puripuly-heart-native-bootstrap"
-version = "2.8.0"
+version = "$appVersion"
 requires-python = ">=3.14,<3.15"
 
 [tool.flet]
@@ -233,7 +245,7 @@ company = "salee"
         "--company", "salee",
         "--org", "com.salee",
         "--description", "Real-time multilingual speech translation",
-        "--build-version", "2.8.0",
+        "--build-version", $appVersion,
         "--build-number", "0",
         "--module-name", "product_bootstrap",
         "--template", $cookiecutterTemplateRoot,
@@ -351,13 +363,14 @@ company = "salee"
     Copy-Tree -Source (Join-Path $repoRoot "third_party\noto-sans-cjk") -Destination (Join-Path $artifactRoot "third_party\noto-sans-cjk")
 
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(
-        "-m", "puripuly_heart.release_evidence.native_distribution", "compile-app",
-        "--application-root", (Join-Path $artifactRoot "app"), "--output", (Join-Path $evidenceRoot "bytecode.json")
-    ) -WorkingDirectory $repoRoot
-    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
         "-m", "puripuly_heart.release_evidence.native_distribution", "stage-vc-runtime",
         "--target-root", $artifactRoot, "--cmake-build-dir", $consoleBuildRoot,
         "--output", (Join-Path $evidenceRoot "vc-runtime.json")
+    ) -WorkingDirectory $repoRoot
+    Invoke-Checked -FilePath (Join-Path $artifactRoot "python.exe") -ArgumentList @(
+        "-m", "puripuly_heart.release_evidence.native_distribution", "compile-runtime",
+        "--target-root", $artifactRoot, "--layout", $layoutPath,
+        "--output", (Join-Path $evidenceRoot "bytecode.json")
     ) -WorkingDirectory $repoRoot
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(
         "-m", "puripuly_heart.release_evidence.native_distribution", "validate-target",

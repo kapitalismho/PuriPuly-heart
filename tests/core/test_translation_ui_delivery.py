@@ -369,3 +369,162 @@ async def test_production_bridge_replacement_recovers_unstarted_self_writer(
                 await output.close()
         else:
             await output.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("previous_bridge", ["completed", "failed"])
+@pytest.mark.parametrize("writer_started", [False, True])
+async def test_production_bridge_replacement_recovers_peer_writer(
+    previous_bridge: str, writer_started: bool
+) -> None:
+    destination = asyncio.Queue(maxsize=1)
+    output = OutputRuntime(chatbox=RecordingOscQueue())
+    owner = TranslationUiMessageQueue(destination, output)
+    output.activate_peer_generation(1)
+    app = DummyApp()
+    first = make_bridge(app, event_queue=destination)
+    second = make_bridge(app, event_queue=destination)
+    if previous_bridge == "completed":
+        first.close()
+    else:
+
+        async def fail_bridge() -> None:
+            raise RuntimeError("previous bridge failed")
+
+        first.run = fail_bridge
+    try:
+        await asyncio.gather(output.start_ui_event_bridge(first), return_exceptions=True)
+        destination.put_nowait(UIEvent(UIEventType.SESSION_STATE_CHANGED))
+        await owner.publish(
+            transcript_event("retired peer", source="Peer", channel="peer"),
+            parent_utterance_id=uuid4(),
+            publication_generation=1,
+            source_order=1,
+        )
+        if writer_started:
+            await asyncio.sleep(0)
+        output.start_ui_event_bridge(second)
+        transcript = transcript_event("current peer", source="Peer", channel="peer")
+        await owner.publish(
+            transcript,
+            parent_utterance_id=transcript.utterance_id,
+            publication_generation=1,
+            source_order=2,
+        )
+        child_id = uuid4()
+        await owner.publish(
+            UIEvent(
+                UIEventType.TRANSLATION_DONE,
+                child_id,
+                Translation(child_id, "current translation", channel="peer"),
+                source="Peer",
+            ),
+            parent_utterance_id=transcript.utterance_id,
+            publication_generation=1,
+            source_order=2,
+        )
+
+        async def wait_for_consumption() -> None:
+            while len(app.history) != 2 or owner.has_resources:
+                await asyncio.sleep(0)
+
+        await asyncio.wait_for(wait_for_consumption(), 1.0)
+        assert [(entry[1], entry[2]) for entry in app.history] == [
+            ("current peer", False),
+            ("current translation", True),
+        ]
+        assert [call[0] for call in app.view_dashboard.display_calls] == ["current peer"]
+        assert [call[0] for call in app.view_dashboard.translation_calls] == ["current translation"]
+        assert [d.reason for d in output.routing_decisions if d.metadata["source_order"] == 1] == [
+            "accepted_handoff",
+            "destination_replaced",
+        ]
+        assert not owner._in_flight_keys
+    finally:
+        first.close()
+        second.close()
+        if previous_bridge == "failed":
+            with pytest.raises(RuntimeError, match="previous bridge failed"):
+                await output.close()
+        else:
+            await output.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer_only", [False, True])
+async def test_ui_idle_wait_drains_peer_publication_after_prestart_cancellation(
+    peer_only: bool,
+) -> None:
+    destination = asyncio.Queue()
+    output = OutputRuntime(chatbox=RecordingOscQueue())
+    owner = TranslationUiMessageQueue(destination, output)
+    output.activate_peer_generation(1)
+    try:
+        await owner.publish(
+            transcript_event("retired peer", source="Peer", channel="peer"),
+            parent_utterance_id=uuid4(),
+            publication_generation=1,
+            source_order=1,
+        )
+        owner.retire_destination()
+        await owner.publish(
+            transcript_event("current peer", source="Peer", channel="peer"),
+            parent_utterance_id=uuid4(),
+            publication_generation=1,
+            source_order=2,
+        )
+        idle = owner.wait_for_peer_idle() if peer_only else owner.wait_for_idle()
+        await asyncio.wait_for(idle, 1.0)
+        assert destination.get_nowait().payload.text == "current peer"
+        assert destination.empty()
+        assert not owner.has_resources
+        assert not owner._in_flight_keys
+    finally:
+        await output.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("writer_started", [False, True])
+async def test_bridge_replacement_close_does_not_restart_peer_delivery(
+    writer_started: bool,
+) -> None:
+    destination = asyncio.Queue(maxsize=1)
+    output = OutputRuntime(chatbox=RecordingOscQueue())
+    owner = TranslationUiMessageQueue(destination, output)
+    output.activate_peer_generation(1)
+    app = DummyApp()
+    first = make_bridge(app, event_queue=destination)
+    second = make_bridge(app, event_queue=destination)
+    first.close()
+    try:
+        await output.start_ui_event_bridge(first)
+        destination.put_nowait(UIEvent(UIEventType.SESSION_STATE_CHANGED))
+        await owner.publish(
+            transcript_event("retired peer", source="Peer", channel="peer"),
+            parent_utterance_id=uuid4(),
+            publication_generation=1,
+            source_order=1,
+        )
+        if writer_started:
+            await asyncio.sleep(0)
+        output.start_ui_event_bridge(second)
+        await owner.publish(
+            transcript_event("current peer", source="Peer", channel="peer"),
+            parent_utterance_id=uuid4(),
+            publication_generation=1,
+            source_order=2,
+        )
+        await output.close()
+        await asyncio.sleep(0)
+        assert app.history == []
+        assert app.view_dashboard.display_calls == []
+        assert not owner.has_resources
+        assert not owner._in_flight_keys
+        assert [d.reason for d in output.routing_decisions if d.metadata["source_order"] == 2] == [
+            "accepted_handoff",
+            "output_runtime_closing",
+        ]
+    finally:
+        first.close()
+        second.close()
+        await output.close()

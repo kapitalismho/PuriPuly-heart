@@ -88,7 +88,9 @@ PuriPuly — двусторонний голосовой переводчик д
 
 ## Сравнение перевода
 
-![Диаграмма среднего штрафа за предложение при переводе с корейского на EN / JA / ZH-Hans: 216 многоходовых примеров, оценка Gemba MQM, чем ниже — тем лучше. Синие столбцы — модели, доступные в PuriPuly: 1-е место Gemma 4 31B (0.353), 2-е Gemma 4 26B A4B (0.387), 3-е DeepSeek-V4 Flash 0731 (0.571), 4-е Gemma 4 12B QAT Q4 (0.855), 5-е Gemma 4 E4B QAT Q4 (1.577). Оранжевые столбцы — внешние базовые показатели: Hy-MT-7B (1.863), Papago (2.699), Gemini 3.5 Live Translate (2.991), MiLMMT 46-4B (3.087), DeepL (3.914), Google Cloud Translation Basic (5.731).](docs/images/performance/2.png)
+![Средний штраф за предложение для полного конвейера распознавания речи и перевода. С корейского на английский / японский / китайский (упрощённый), 216 многоходовых примеров, оценка Gemba MQM; чем ниже, тем лучше. Синие столбцы — сочетания, доступные в PuriPuly: Gemini Transcribe → Luna (0.676), Soniox STT → Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). Оранжевые столбцы — внешние решения для сравнения: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). Модель-оценщик: Gemini 3.7 Flash.](docs/images/performance/1.png)
+
+![Средний штраф за предложение. С корейского на английский / японский / китайский (упрощённый), 216 многоходовых примеров, оценка Gemba MQM; чем ниже, тем лучше. Синие столбцы — модели, доступные в PuriPuly: GPT 6 Luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). Оранжевые столбцы — внешние решения для сравнения: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Для Qwen 3.8, Gemini 3.5 и Soniox отобраны только результаты с долей ошибочных символов (CER) не выше 5%. Модель-оценщик: Gemini 3.7 Flash.](docs/images/performance/2.png)
 
 - Синие столбцы — модели, доступные в PuriPuly.
 - Для эксперимента использован фреймворк Microsoft Gemba MQM.
@@ -415,117 +417,37 @@ PuriPuly работает лучше всего с облачным STT.
 
 ## Разработка
 
-### Окружения
+Нужны Windows x64, обычный CPython 3.14 с GIL и [uv](https://docs.astral.sh/uv/). Выполняйте команды из корня репозитория.
 
-| Область | Рекомендуемое окружение | Документация |
-|---|---|---|
-| Python-приложение для рабочего стола | Windows | Этот раздел |
-| Сервис-брокер | Linux | [`broker/README.md`](broker/README.md) |
-| Нативный VR-оверлей | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
-
-### Python-окружение
-
-Python-приложению требуется Python 3.12 или 3.13.
-
-Создайте и активируйте окружение Windows:
+### Установка
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
+uv sync --frozen --extra dev
 ```
 
-Установите приложение и зависимости для разработки:
-
-```powershell
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
-```
-
-Вместо этого можно использовать `uv`:
-
-```powershell
-uv sync --dev
-```
-
-Установите хуки репозитория:
-
-```powershell
-pre-commit install
-```
-
-Для работы в Linux или WSL используйте `.venv-wsl`, если он доступен.
-
-```bash
-UV_PROJECT_ENVIRONMENT=.venv-wsl uv sync --dev
-```
-
-В репозиториях с настроенным `direnv` команды можно запускать так:
-
-```bash
-direnv exec . <command>
-```
-
-### Запуск приложения
-
-Запустите Flet-приложение для рабочего стола:
-
-```powershell
-python -m puripuly_heart.main run-gui
-```
-
-Эквивалентная команда с `uv`:
+### GUI
 
 ```powershell
 uv run python -m puripuly_heart.main run-gui
 ```
 
-Элементы предпросмотра для разработчика (скрытые состояния интерфейса) включаются так:
+### CLI
+
+CLI позволяет запускать приложение без GUI и управлять уже работающим приложением. Команды описаны в [руководстве по CLI](docs/cli.md).
 
 ```powershell
-python -m puripuly_heart.main run-gui --debug-ui-preview
+uv run python -m puripuly_heart.main cli --help
 ```
 
-### Проверка Python-кода
-
-Отформатируйте исходники и тесты Python:
+### Проверка
 
 ```powershell
-black src tests
+uv run black --check src tests
+uv run ruff check src tests
+uv run python -m pytest
 ```
 
-Проверка форматирования без изменения файлов:
-
-```powershell
-black --check src tests
-```
-
-Запуск проверок линтером:
-
-```powershell
-ruff check src tests
-```
-
-Запуск полного набора тестов Python:
-
-```powershell
-python -m pytest
-```
-
-Запуск конкретного файла или каталога тестов во время разработки:
-
-```powershell
-python -m pytest tests/path/to/test_file.py
-```
-
-### Прочие области
-
-Документация брокера ведётся в [`broker/README.md`](broker/README.md).
-
-Документация нативного VR-оверлея ведётся в [`native/overlay/README.md`](native/overlay/README.md).
-
-Документация пользовательского HTTP API-расширения ведётся в [`docs/http-extensions.md`](docs/http-extensions.md). Необходимую для подключения JSON Schema см. в [`docs/http-extension.schema.json`](docs/http-extension.schema.json).
-
-Управление VRChat через OSC см. в [`docs/vrchat-osc.md`](docs/vrchat-osc.md).
+[Разработка брокера (Linux)](broker/README.md) · [Разработка VR-оверлея (Windows)](native/overlay/README.md)
 
 ---
 

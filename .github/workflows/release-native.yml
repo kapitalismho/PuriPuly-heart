@@ -1,0 +1,289 @@
+name: Native Release
+
+on:
+  push:
+    tags:
+      - "native-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing native release tag, for example native-v2.8.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-native-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.14.7"
+  UV_VERSION: "0.9.17"
+  INNOSETUP_VERSION: "7.1.0"
+  VULKAN_SDK_VERSION: "1.4.350.0"
+  VULKAN_SDK_SHA256: "855b27ba05d2d8119c5114c5d4ff870ca38f2c632b11e1bb9923b9b7e6ecfe7b"
+  NATIVE_INPUT_ROOT: C:\d177\native-integration\release\inputs
+  NATIVE_BUILD_ROOT: C:\d177\native-integration\release\build
+  NATIVE_OUTPUT_ROOT: C:\d177\native-integration\release\dist
+
+jobs:
+  verify-version:
+    name: Verify native tag and version sync
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.sync.outputs.version }}
+      tag: ${{ steps.sync.outputs.tag }}
+      source-sha: ${{ steps.sync.outputs.source-sha }}
+    steps:
+      - name: Checkout native release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+
+      - name: Validate native tag and project versions
+        id: sync
+        env:
+          TAG_NAME: ${{ inputs.tag || github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import subprocess
+          import tomllib
+          from pathlib import Path
+
+          tag = os.environ["TAG_NAME"]
+          match = re.fullmatch(r"native-v(\d+\.\d+\.\d+)", tag)
+          if match is None:
+              raise SystemExit(f"Expected native-vMAJOR.MINOR.PATCH tag, found {tag!r}")
+          version = match.group(1)
+          source_sha = subprocess.check_output(
+              ["git", "rev-parse", "HEAD"], text=True
+          ).strip()
+          tag_sha = subprocess.check_output(
+              ["git", "rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}"], text=True
+          ).strip()
+          if source_sha != tag_sha:
+              raise SystemExit("Checkout does not match the selected native release tag")
+          root = Path(".")
+          versions = {"tag": version}
+          for filename in (
+              "pyproject.toml",
+              "native/overlay/Cargo.toml",
+              "native/gpu_worker/Cargo.toml",
+          ):
+              payload = tomllib.loads((root / filename).read_text(encoding="utf-8"))
+              section = "project" if filename == "pyproject.toml" else "package"
+              versions[filename] = payload[section]["version"]
+          for filename, pattern in (
+              ("src/puripuly_heart/__init__.py", r'^__version__\s*=\s*"([^"]+)"'),
+              ("installer.iss", r'^#define\s+MyAppVersion\s+"([^"]+)"'),
+          ):
+              matched = re.search(
+                  pattern, (root / filename).read_text(encoding="utf-8"), re.MULTILINE
+              )
+              if matched is None:
+                  raise SystemExit(f"Could not read version from {filename}")
+              versions[filename] = matched.group(1)
+          if len(set(versions.values())) != 1:
+              raise SystemExit(f"Version mismatch: {versions}")
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
+              output.write(f"version={version}\ntag={tag}\nsource-sha={source_sha}\n")
+          print(f"Native version sync OK: {tag} at {source_sha}")
+          PY
+
+  build-installer:
+    name: Build native Windows installer
+    runs-on: windows-2022
+    needs: verify-version
+    steps:
+      - name: Checkout verified native source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.verify-version.outputs.source-sha }}
+          persist-credentials: false
+
+      - name: Setup UV environment
+        uses: ./.github/actions/setup-uv-environment
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          uv-version: ${{ env.UV_VERSION }}
+          sync-args: --extra build
+
+      - name: Cache pinned native inputs
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.NATIVE_INPUT_ROOT }}
+          key: native-release-inputs-${{ runner.os }}-${{ hashFiles('native/windows_host/upstream-inputs.json') }}
+
+      - name: Prepare pinned native inputs and Flet cache
+        shell: pwsh
+        run: |
+          ./scripts/ci/prepare-native-release-inputs.ps1 `
+            -ToolPython (Join-Path $PWD ".venv/Scripts/python.exe") `
+            -PinnedInputRoot $env:NATIVE_INPUT_ROOT
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Vulkan SDK
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP "vulkan-sdk.exe"
+          $sdkRoot = "C:\d177\native-integration\release\vulkan-sdk"
+          Invoke-WebRequest `
+            -Uri "https://sdk.lunarg.com/sdk/download/$env:VULKAN_SDK_VERSION/windows/vulkan_sdk.exe?Human=true" `
+            -OutFile $installer
+          $actualSha256 = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $env:VULKAN_SDK_SHA256) {
+            throw "Vulkan SDK checksum mismatch: expected $env:VULKAN_SDK_SHA256, found $actualSha256"
+          }
+          $install = Start-Process `
+            -FilePath $installer `
+            -ArgumentList @(
+              "--root", $sdkRoot,
+              "--accept-licenses", "--default-answer", "--confirm-command", "install", "copy_only=1"
+            ) `
+            -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "Vulkan SDK installer failed with exit code $($install.ExitCode)"
+          }
+          foreach ($requiredPath in @(
+            "$sdkRoot\Include\vulkan\vulkan.h",
+            "$sdkRoot\Lib\vulkan-1.lib",
+            "$sdkRoot\Bin\glslc.exe",
+            "$sdkRoot\Lib\cmake\SPIRV-Headers\SPIRV-HeadersConfig.cmake"
+          )) {
+            if (-not (Test-Path $requiredPath)) {
+              throw "Vulkan SDK file not found: $requiredPath"
+            }
+          }
+          "VULKAN_SDK=$sdkRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CMAKE_PREFIX_PATH=$sdkRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "$sdkRoot\Bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install pinned Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --version=$env:INNOSETUP_VERSION --allow-downgrade --force --no-progress -y
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup installation failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Build native release artifacts
+        shell: pwsh
+        env:
+          LIBCLANG_PATH: ${{ github.workspace }}\.venv\Lib\site-packages\clang\native
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+        run: |
+          ./scripts/ci/build-native-release-artifacts.ps1 `
+            -ToolPython (Join-Path $PWD ".venv/Scripts/python.exe") `
+            -PinnedInputRoot $env:NATIVE_INPUT_ROOT `
+            -PythonEmbedArchive (Join-Path $env:NATIVE_INPUT_ROOT "python-$env:PYTHON_VERSION-embed-amd64.zip") `
+            -SoxrBuildEnvironment (Join-Path $PWD ".venv") `
+            -BuildRoot $env:NATIVE_BUILD_ROOT `
+            -OutputDir $env:NATIVE_OUTPUT_ROOT `
+            -InstallerOutputDir "installer_output/native" `
+            -InnoSetupVersion $env:INNOSETUP_VERSION
+
+      - name: Verify native release identity and write provenance
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ needs.verify-version.outputs.version }}
+          RELEASE_TAG: ${{ needs.verify-version.outputs.tag }}
+          SOURCE_SHA: ${{ needs.verify-version.outputs.source-sha }}
+        run: |
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.release_identity verify-build `
+            --version $env:APP_VERSION `
+            --tag $env:RELEASE_TAG `
+            --tag-prefix native-v `
+            --source-sha $env:SOURCE_SHA `
+            --build-origin github-hosted `
+            --repository "${{ github.repository }}" `
+            --server-url "${{ github.server_url }}" `
+            --run-id "${{ github.run_id }}" `
+            --run-attempt "${{ github.run_attempt }}" `
+            --main-exe "$env:NATIVE_OUTPUT_ROOT/PuriPulyHeart.exe" `
+            --gpu-worker-exe "$env:NATIVE_OUTPUT_ROOT/PuriPulyHeartGpuWorker.exe" `
+            --overlay-exe "$env:NATIVE_OUTPUT_ROOT/PuriPulyHeartOverlay.exe" `
+            --installer "installer_output/native/PuriPulyHeart-Setup-$env:APP_VERSION.exe" `
+            --soxr-bundle "installer_output/native/PuriPulyHeart-soxr-third-party-source-bundle.zip" `
+            --provenance-out "installer_output/native/release-provenance-$env:APP_VERSION.json"
+
+      - name: Upload native release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-release-artifacts
+          path: installer_output/native/
+          if-no-files-found: error
+
+      - name: Upload native build evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-build-evidence
+          path: |
+            C:/d177/native-integration/release/build/evidence/
+            C:/d177/native-integration/release/inputs/verified-inputs.json
+          if-no-files-found: ignore
+
+  publish-release:
+    name: Create native GitHub draft release
+    runs-on: ubuntu-latest
+    needs:
+      - verify-version
+      - build-installer
+    permissions:
+      contents: write
+    env:
+      APP_VERSION: ${{ needs.verify-version.outputs.version }}
+      RELEASE_TAG: ${{ needs.verify-version.outputs.tag }}
+    steps:
+      - name: Checkout verified native source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.verify-version.outputs.source-sha }}
+          persist-credentials: false
+
+      - name: Download native release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: native-release-artifacts
+          path: native-release-artifacts
+
+      - name: Render native release body
+        run: |
+          PYTHONPATH=src python3 -m puripuly_heart.release_evidence.release_identity render-body \
+            --template .github/release-template.md \
+            --installer-exe "PuriPulyHeart-Setup-$APP_VERSION.exe" \
+            --output native-release-body.md
+
+      - name: Verify native release surface and provenance
+        run: |
+          PYTHONPATH=src python3 -m puripuly_heart.release_evidence.release_identity verify-publish \
+            --version "$APP_VERSION" \
+            --tag "$RELEASE_TAG" \
+            --tag-prefix native-v \
+            --title "$RELEASE_TAG" \
+            --installer-exe "PuriPulyHeart-Setup-$APP_VERSION.exe" \
+            --body native-release-body.md \
+            --asset "native-release-artifacts/PuriPulyHeart-Setup-$APP_VERSION.exe" \
+            --asset "native-release-artifacts/PuriPulyHeart-soxr-third-party-source-bundle.zip" \
+            --provenance "native-release-artifacts/release-provenance-$APP_VERSION.json"
+
+      - name: Create native draft release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+          draft: true
+          body_path: native-release-body.md
+          fail_on_unmatched_files: true
+          files: |
+            native-release-artifacts/PuriPulyHeart-Setup-${{ env.APP_VERSION }}.exe
+            native-release-artifacts/PuriPulyHeart-Setup-${{ env.APP_VERSION }}.exe.sha256
+            native-release-artifacts/PuriPulyHeart-soxr-third-party-source-bundle.zip
+            native-release-artifacts/release-provenance-${{ env.APP_VERSION }}.json

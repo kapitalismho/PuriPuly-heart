@@ -469,12 +469,18 @@ def validate_target(
     }
 
 
-def compile_application(application_root: Path) -> dict[str, Any]:
+def compile_runtime(target_root: Path, layout_path: Path) -> dict[str, Any]:
     if sys.flags.optimize != 0:
         raise RuntimeError(
-            "native application bytecode must be compiled by an optimization-0 interpreter"
+            "native runtime bytecode must be compiled by an optimization-0 interpreter"
         )
-    sources = sorted(application_root.rglob("*.py"))
+    target_root = target_root.resolve()
+    layout = NativeArtifactLayout.load(layout_path)
+    application_root = layout.resolve(target_root, "application_root")
+    dependency_root = layout.resolve(target_root, "dependency_root")
+    sources = sorted(
+        source for root in (application_root, dependency_root) for source in root.rglob("*.py")
+    )
     failures: list[str] = []
     outputs: list[dict[str, str]] = []
     for source in sources:
@@ -487,7 +493,7 @@ def compile_application(application_root: Path) -> dict[str, Any]:
             py_compile.compile(
                 str(source),
                 cfile=str(destination),
-                dfile=source.relative_to(application_root.parent).as_posix(),
+                dfile=source.relative_to(target_root).as_posix(),
                 doraise=True,
                 optimize=0,
                 invalidation_mode=py_compile.PycInvalidationMode.CHECKED_HASH,
@@ -497,8 +503,8 @@ def compile_application(application_root: Path) -> dict[str, Any]:
             continue
         outputs.append(
             {
-                "path": destination.relative_to(application_root.parent).as_posix(),
-                "source": source.relative_to(application_root.parent).as_posix(),
+                "path": destination.relative_to(target_root).as_posix(),
+                "source": source.relative_to(target_root).as_posix(),
                 "sha256": _sha256(destination),
                 "optimization": "0",
                 "invalidation_mode": "checked-hash",
@@ -833,8 +839,9 @@ def _parser() -> argparse.ArgumentParser:
     render.add_argument("--layout", type=Path, required=True)
     render.add_argument("--python-bootstrap", type=Path, required=True)
     render.add_argument("--output", type=Path)
-    compile_parser = commands.add_parser("compile-app")
-    compile_parser.add_argument("--application-root", type=Path, required=True)
+    compile_parser = commands.add_parser("compile-runtime")
+    compile_parser.add_argument("--target-root", type=Path, required=True)
+    compile_parser.add_argument("--layout", type=Path, required=True)
     compile_parser.add_argument("--output", type=Path, required=True)
     validate = commands.add_parser("validate-target")
     validate.add_argument("--target-root", type=Path, required=True)
@@ -883,8 +890,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.template_root, args.overlay_root, args.layout, args.python_bootstrap
             ),
         )
-    elif args.command == "compile-app":
-        _write_json(args.output, compile_application(args.application_root))
+    elif args.command == "compile-runtime":
+        _write_json(args.output, compile_runtime(args.target_root, args.layout))
     elif args.command == "validate-target":
         _write_json(
             args.output,

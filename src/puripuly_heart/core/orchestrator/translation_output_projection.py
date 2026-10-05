@@ -423,11 +423,7 @@ class TranslationUiMessageQueue:
             reason="accepted_handoff",
             accepted_handoff=True,
         )
-        if self._peer_worker is None or self._peer_worker.done():
-            self._peer_worker = asyncio.create_task(
-                self._run_peer_writer(),
-                name="peer-ui-writer",
-            )
+        self._ensure_peer_writer()
         return result
 
     def activate_peer_generation(self, generation: int) -> None:
@@ -470,15 +466,13 @@ class TranslationUiMessageQueue:
                 return
             if worker is not None:
                 await asyncio.gather(worker, return_exceptions=True)
-                if self._peer_worker is worker:
-                    self._peer_worker = None
+                self._finish_peer_writer(worker)
 
     async def wait_for_peer_idle(self) -> None:
         while self._peer_worker is not None:
             worker = self._peer_worker
             await asyncio.gather(worker, return_exceptions=True)
-            if self._peer_worker is worker:
-                self._peer_worker = None
+            self._finish_peer_writer(worker)
 
     async def close(self) -> None:
         self._closed = True
@@ -633,8 +627,19 @@ class TranslationUiMessageQueue:
             ui_queue_submitted=reason == "ui_queue_submitted",
         )
 
+    def _ensure_peer_writer(self) -> None:
+        if self._peer_batches and not self._closed and self._peer_worker is None:
+            self._peer_worker = asyncio.create_task(self._run_peer_writer(), name="peer-ui-writer")
+            self._peer_worker.add_done_callback(self._finish_peer_writer)
+
+    def _finish_peer_writer(self, worker: asyncio.Task[None]) -> None:
+        if self._peer_worker is worker:
+            self._active_peer_batch = None
+            self._writer_cancel_reason = None
+            self._peer_worker = None
+            self._ensure_peer_writer()
+
     async def _run_peer_writer(self) -> None:
-        current = asyncio.current_task()
         try:
             while self._peer_batches:
                 batch = self._peer_batches.popleft()
@@ -701,14 +706,6 @@ class TranslationUiMessageQueue:
                 self._active_peer_batch = None
         finally:
             self._active_peer_batch = None
-            self._writer_cancel_reason = None
-            if self._peer_worker is current:
-                self._peer_worker = None
-                if self._peer_batches and not self._closed:
-                    self._peer_worker = asyncio.create_task(
-                        self._run_peer_writer(),
-                        name="peer-ui-writer",
-                    )
 
     def _submit_unscoped_peer_event(
         self,

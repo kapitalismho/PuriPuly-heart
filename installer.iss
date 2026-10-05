@@ -47,6 +47,9 @@
   #define MyStagedOverlayDir "build\overlay"
 #endif
 #ifdef NativeExperimental
+  #if VER < EncodeVer(7, 1, 0)
+    #error Native packaging requires Inno Setup 7.1.0 or newer for extended-length bytecode paths.
+  #endif
   #define PackagedApplicationRoot "app\"
   #define PackagedSoxrRoot "site-packages\soxr"
   #ifndef NativeCleanupInclude
