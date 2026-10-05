@@ -588,9 +588,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _run_verify_build(arguments: argparse.Namespace) -> dict[str, object]:
     expected_version = arguments.version.strip()
-    check_tag_matches_version(
-        arguments.tag, expected_version, tag_prefix=arguments.tag_prefix
-    )
+    check_tag_matches_version(arguments.tag, expected_version, tag_prefix=arguments.tag_prefix)
     expected_installer = installer_filename(expected_version)
     if Path(arguments.installer).name != expected_installer:
         raise RuntimeError(

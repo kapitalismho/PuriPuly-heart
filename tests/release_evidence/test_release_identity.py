@@ -133,15 +133,18 @@ def test_native_release_surface_and_provenance_round_trip(tmp_path) -> None:
     assert reloaded["tag"] == tag
     assert reloaded["version"] == version
     assert identity.check_tag_matches_version(tag, version, tag_prefix="native-v") == tag
-    assert identity.verify_release_surface(
-        version=version,
-        tag=reloaded["tag"],
-        tag_prefix="native-v",
-        title=tag,
-        installer_exe=installer.name,
-        body_text=f"Download `{installer.name}` below.",
-        asset_names=[installer.name],
-    ) == installer.name
+    assert (
+        identity.verify_release_surface(
+            version=version,
+            tag=reloaded["tag"],
+            tag_prefix="native-v",
+            title=tag,
+            installer_exe=installer.name,
+            body_text=f"Download `{installer.name}` below.",
+            asset_names=[installer.name],
+        )
+        == installer.name
+    )
     identity.verify_assets_against_provenance(reloaded, [installer])
 
 
