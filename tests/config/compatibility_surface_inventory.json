@@ -642,6 +642,7 @@
         {"name": "SelfCaptureDiagnostic", "kind": "attribute"},
         {"name": "SelfCaptureDiagnosticEvent", "kind": "attribute"},
         {"name": "SelfCaptureFailureReason", "kind": "attribute"},
+        {"name": "SelfCaptureIngressError", "kind": "attribute"},
         {"name": "SelfCaptureProviderMutation", "kind": "attribute"},
         {"name": "SelfCaptureProviderMutationStatus", "kind": "attribute"},
         {"name": "SelfCaptureProviderPort", "kind": "attribute"},
