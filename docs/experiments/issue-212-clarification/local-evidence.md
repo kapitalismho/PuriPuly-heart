@@ -40,6 +40,15 @@ For exact-current exercised evidence, the final source was held unchanged while 
 - Final shared `common.py` SHA256: `29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a`.
 - The initial invalid-mode record retains its explicit reconstructed old script hash and failure in [local-results-gpu-mode-error.json](local-results-gpu-mode-error.json). It was not rerun.
 
+**Line-ending portability:** the four result JSON files were emitted as UTF8 bytes with Windows CRLF. Git normalizes these committed blobs to LF, so the original observed runtime `sha256` remains unchanged and intentionally differs from the committed-blob hash. Each entry now also records `canonical_lf_sha256`: SHA256 of the exact UTF8 bytes after replacing `CRLF` with `LF`, with **no JSON parsing/reserialization and no other byte transformation**. This portable hash does not assert that runtime emitted LF. Offline validation confirmed each original byte hash and strict UTF8, then computed its normalized hash; the runtime result files were not rewritten. `local_probe.py` and `common.py` already used LF, so their source hashes are unaffected. No source/fixture/inference rerun was performed for this portability repair.
+
+| Final result artifact | Canonical LF SHA256 |
+| --- | --- |
+| `local-results-real.json` | `57ccb5b62715e2b63eb10138cfcb73b91269f11cc827e1dbcbf8fb5404e4da42` |
+| `local-results-components.json` | `e32b9bb2be5bd60f133e331b6c3a758fed3208db1449e9e7b306ccbe53eea1bf` |
+| `local-results-rolling.json` | `b1d853f53769f3103943519f8e25d0960f8e402cfa00fc977e02e0f59ee63069` |
+| `local-results-gpu.json` | `bf7e453e5b258133bc3c9c710d6afc1d4a3b6b32656358db8bab68a61f019b94` |
+
 The final smoke reused existing public/SAPI artifacts and the same finite sequences; no audio/model acquisition, new acoustic hypothesis, GPU activation/inference, paid request or billing metering occurred. Current `local-results-real/components/rolling/gpu.json` are the frozen-smoke results; original outcomes remain in the source-history archive. Scope remains investigation only; the concrete queued-language mutation and old-context word replay are reported bugs, not authorized product fixes.
 
 ## Finite proposition ledger

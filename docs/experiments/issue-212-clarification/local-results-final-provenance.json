@@ -7,11 +7,14 @@
   "common_sha256_before": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
   "common_sha256_after": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
   "four_modes_share_exact_frozen_sources": true,
+  "result_hash_method": "sha256 is the original observed Windows runtime UTF8 byte hash, unchanged. canonical_lf_sha256 hashes the same UTF8 bytes with CRLF replaced by LF, without JSON parsing/reserialization or any other byte transformation; it is portable Git-normalized artifact provenance, not a claim of runtime LF emission.",
+  "result_hash_validation": "Offline audit recomputed each original byte hash and confirmed equality to unchanged sha256, verified strict UTF8 decoding, then recomputed canonical_lf_sha256 from raw_bytes.replace(CRLF, LF). No source/fixture/inference rerun or result file rewrite.",
   "checks": {
     "local-results-real.json": {
       "stage": "real",
       "command": "../../../.venv/Scripts/python.exe docs/experiments/issue-212-clarification/local_probe.py real",
       "sha256": "abfc64900817df1a20bc1a3fa6716776c629d97dba8d6752ea8ec3630989066e",
+      "canonical_lf_sha256": "57ccb5b62715e2b63eb10138cfcb73b91269f11cc827e1dbcbf8fb5404e4da42",
       "script_sha256": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
       "common_sha256": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
       "exit_code": 0,
@@ -22,6 +25,7 @@
       "stage": "components",
       "command": "../../../.venv/Scripts/python.exe docs/experiments/issue-212-clarification/local_probe.py components",
       "sha256": "6f036b37a23fc3b27c33628bad14af8baefd82eafe6ed5c38737691c4f6f1804",
+      "canonical_lf_sha256": "e32b9bb2be5bd60f133e331b6c3a758fed3208db1449e9e7b306ccbe53eea1bf",
       "script_sha256": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
       "common_sha256": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
       "exit_code": 0
@@ -30,6 +34,7 @@
       "stage": "rolling-scoped",
       "command": "../../../.venv/Scripts/python.exe docs/experiments/issue-212-clarification/local_probe.py rolling-scoped",
       "sha256": "bb910e1cd9cce3f5e8c29ccc476f991a4c9cd4ff76c2b6f8907597c1b624d192",
+      "canonical_lf_sha256": "b1d853f53769f3103943519f8e25d0960f8e402cfa00fc977e02e0f59ee63069",
       "script_sha256": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
       "common_sha256": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
       "exit_code": 0
@@ -38,6 +43,7 @@
       "stage": "gpu",
       "command": "../../../.venv/Scripts/python.exe docs/experiments/issue-212-clarification/local_probe.py gpu",
       "sha256": "5d4fb1cc6d04df8a5e2c63031fe3aaa4b16c4e4d88ebb1b9344b124db73108f1",
+      "canonical_lf_sha256": "bf7e453e5b258133bc3c9c710d6afc1d4a3b6b32656358db8bab68a61f019b94",
       "script_sha256": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
       "common_sha256": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
       "exit_code": 0,
