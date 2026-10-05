@@ -315,6 +315,9 @@ company = "salee"
     Get-ChildItem -LiteralPath (Join-Path $artifactRoot "app") -Directory -Filter "__pycache__" -Recurse | Remove-Item -Recurse -Force
     Get-ChildItem -LiteralPath (Join-Path $artifactRoot "app") -File -Filter "*.pyc" -Recurse | Remove-Item -Force
     Copy-Item -LiteralPath (Join-Path $repoRoot "native\windows_host\product_bootstrap.py") -Destination (Join-Path $artifactRoot "app\product_bootstrap.py") -Force
+    foreach ($module in @("_puripuly_native_runtime.py", "sitecustomize.py")) {
+        Copy-Item -LiteralPath (Join-Path $repoRoot "native\windows_host\$module") -Destination (Join-Path $artifactRoot "app\$module") -Force
+    }
     Copy-Tree -Source (Join-Path $repoRoot "examples\http_extensions") -Destination (Join-Path $artifactRoot "examples\http_extensions")
 
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(
@@ -370,6 +373,12 @@ company = "salee"
     Invoke-Checked -FilePath (Join-Path $artifactRoot "python.exe") -ArgumentList @(
         "-m", "puripuly_heart.release_evidence.native_distribution", "compile-runtime",
         "--target-root", $artifactRoot, "--layout", $layoutPath,
+        "--output", (Join-Path $evidenceRoot "bytecode.json")
+    ) -WorkingDirectory $repoRoot
+    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
+        "-m", "puripuly_heart.release_evidence.native_distribution", "bundle-runtime",
+        "--target-root", $artifactRoot, "--layout", $layoutPath,
+        "--bytecode", (Join-Path $evidenceRoot "bytecode.json"),
         "--output", (Join-Path $evidenceRoot "bytecode.json")
     ) -WorkingDirectory $repoRoot
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(

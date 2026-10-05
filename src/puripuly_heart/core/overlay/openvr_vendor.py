@@ -4,6 +4,8 @@ import hashlib
 from pathlib import Path
 from typing import NamedTuple
 
+from puripuly_heart.runtime_layout import current_runtime_layout
+
 OPENVR_VENDOR_REPOSITORY_REF = "ValveSoftware/openvr@v2.15.6"
 OPENVR_VENDOR_DLL_URL = (
     "https://raw.githubusercontent.com/ValveSoftware/openvr/v2.15.6/bin/win64/openvr_api.dll"
@@ -85,7 +87,7 @@ def collect_vendored_openvr_runtime_binaries() -> list[tuple[str, str]]:
 
 
 def _default_bundle_dir() -> Path:
-    return Path(__file__).resolve().parents[4] / OPENVR_VENDOR_BUNDLE_RELATIVE_DIR
+    return current_runtime_layout().resource(*OPENVR_VENDOR_BUNDLE_RELATIVE_DIR.parts)
 
 
 def _sha256_file(path: Path) -> str:

@@ -25,6 +25,11 @@ class RuntimeLayout:
     def resource(self, *parts: str) -> Path:
         return self.app_resource_root.joinpath(*parts)
 
+    def package_resource(self, *parts: str) -> Path:
+        if self.host_kind == "source":
+            return self.resource("src", "puripuly_heart", *parts)
+        return self.resource("puripuly_heart", *parts)
+
     def native(self, *parts: str) -> Path:
         return self.native_runtime_root.joinpath(*parts)
 
@@ -42,7 +47,14 @@ class RuntimeLayout:
         environment.update(
             {
                 "PYTHONHOME": str(root),
-                "PYTHONPATH": os.pathsep.join((str(self.app_resource_root), str(site_packages))),
+                "PYTHONPATH": os.pathsep.join(
+                    (
+                        str(self.resource("python.zip")),
+                        str(root / "python314.zip"),
+                        str(self.app_resource_root),
+                        str(site_packages),
+                    )
+                ),
                 "PATH": os.pathsep.join(
                     (str(root), str(dlls), str(site_packages), str(system_root / "System32"))
                 ),

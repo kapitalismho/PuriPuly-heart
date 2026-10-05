@@ -781,7 +781,7 @@ class ConstructionDummyDashboardView(ft.Container):
 
 
 class ConstructionDummySettingsView(ft.Container):
-    def __init__(self) -> None:
+    def __init__(self, *, http_extension_registry=None) -> None:
         super().__init__()
         self.on_settings_changed = None
         self.on_prompt_apply_settings = None
@@ -900,7 +900,6 @@ def _patch_app_construction(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda _page, *, on_close: ft.Container(data=on_close),
     )
     monkeypatch.setattr(app_module, "BottomNavBar", lambda on_change: ft.Container(data=on_change))
-    monkeypatch.setattr(app_module, "register_fonts", lambda _page: None)
     monkeypatch.setattr(app_module, "get_app_theme", lambda **_kwargs: "theme")
     monkeypatch.setattr(app_module, "font_for_language", lambda _code: "font")
     monkeypatch.setattr(app_module, "get_locale", lambda: "en")

@@ -3,11 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from importlib import resources
 from pathlib import Path
 from typing import Literal
 
 from puripuly_heart.config import paths
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 LOCAL_STT_MODEL_ID = "qwen3-asr-0.6b-int8-sherpa"
 LOCAL_STT_ENGINE = "sherpa-onnx"
@@ -256,7 +256,7 @@ def load_local_stt_asset_manifest(model_id: str = LOCAL_STT_MODEL_ID) -> LocalST
     manifest_relative_path = LOCAL_STT_MANIFEST_RELATIVE_PATHS.get(model_id)
     if manifest_relative_path is None:
         raise LocalSTTManifestInvalidError(f"unknown local STT model_id: {model_id}")
-    manifest_path = resources.files("puripuly_heart").joinpath(manifest_relative_path)
+    manifest_path = current_runtime_layout().package_resource(manifest_relative_path)
     with manifest_path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
     if not isinstance(payload, dict):

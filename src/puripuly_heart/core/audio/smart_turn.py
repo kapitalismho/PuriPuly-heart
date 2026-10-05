@@ -13,6 +13,7 @@ from uuid import UUID
 import numpy as np
 
 from puripuly_heart.core.audio.smart_turn_features import compute_whisper_log_mel_features
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 SMART_TURN_MODEL_FILENAME = "smart-turn-v3.2-cpu.onnx"
 SMART_TURN_RESOURCE_RELATIVE_PATH = f"data/models/{SMART_TURN_MODEL_FILENAME}"
@@ -166,7 +167,7 @@ class SmartTurnOnnxInference:
 
 
 def bundled_smart_turn_onnx_path() -> Path:
-    model_path = Path(__file__).resolve().parents[2] / SMART_TURN_RESOURCE_RELATIVE_PATH
+    model_path = current_runtime_layout().package_resource(SMART_TURN_RESOURCE_RELATIVE_PATH)
     if not model_path.is_file():
         raise FileNotFoundError(
             f"Bundled Smart Turn model missing: {SMART_TURN_RESOURCE_RELATIVE_PATH}"

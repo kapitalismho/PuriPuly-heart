@@ -128,6 +128,8 @@ Protocol guides: [CLI](cli.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](h
 
 Composition may construct resources, but must transfer long-lived ownership to an explicit runtime owner.
 
+The Settings view receives the application-owned HTTP extension registry at construction; it does not create and discard a second default-directory registry.
+
 ## Local Application Control
 
 GUI and headless hosts share application owners and runtime resources. Presentation adapters determine whether there is a main window; headless operation retains error state and severity without GUI notifications.
@@ -255,11 +257,20 @@ Implementation: `core/runtime_logging.py`, `app/services/application_runtime_log
 
 - `runtime_layout.py` separates host/interpreter paths, read-only resources, and writable user data. Features use this boundary rather than process flags or the working directory.
 - Bootstrap selects runtime, UI asset, and framework storage paths before application startup. Packaging does not change feature ownership or logging policy.
-- Native packaging supplies its Python/VC++ dependencies and validated bytecode caches; startup must not write into installed directories.
+- Native packaging supplies its Python/VC++ dependencies. The build recompiles application, dependency, and supplied standard-library sources as optimization-0, unchecked-hash bytecode. Sourceless standard-library bytecode from the pinned Python SDK retains its upstream compilation settings and separately recorded provenance. Deployed sources, bytecode, and resources form one immutable payload; code changes require rebuilding it rather than runtime source-hash validation. Startup must not write into installed directories.
+- The standard library uses CPython's conventional root-level `python314.zip`, including early interpreter bootstrap modules. Its staged loose `Lib` payload is removed after bundling; the deployed runtime does not depend on that directory.
+- Application code and Flet use standard `zipimport` from `app/python.zip`, with bytecode and matching diagnostic sources in the archive. Flet package resources, including `icons.json`, remain available through `importlib.resources`. The standalone `app/product_bootstrap.pyc` stays on disk; its source and parallel loose application/Flet code are absent from the built artifact.
+- Other dependency bytecode lives under `_native_dependencies/` in `app/python.zip`, with a versioned module index. A shared archive-backed `SourceFileLoader` preserves physical source filenames, package search paths, source inspection, and filesystem resources. Dependency sources, metadata, native extensions, and DLLs remain on disk, but loose dependency bytecode is removed. Indexed code missing from or corrupt in the archive fails explicitly instead of silently recompiling a source fallback.
+- GUI and console bootstrap install the same dependency finder; `sitecustomize` also activates it for configured Python children. Earlier import search locations and native-extension precedence remain authoritative. The GUI host, embedded SeriousPython launcher, console host, and child environment put both code archives before loose application/dependency paths. Bundling reduces distinct code-file accesses without deferring module execution. Build validation and artifact manifests distinguish archive-file identity from member/source hashes, directory entries, and compile provenance.
+- Application resources remain filesystem-backed: models, locale bundles, fonts, notices, and images resolve through `RuntimeLayout.package_resource()`, while prompts use the application resource root. Native extensions and DLLs retain their filesystem dependency/runtime layout. Source and PyInstaller hosts preserve their existing resource roots.
+- The native Windows GUI host sets `com.salee.PuriPulyHeart` as its process AppUserModelID before creating windows. Installer application shortcuts use the same ID and the packaged product ICO directly, rather than the EXE's cached shell icon. Taskbar grouping can retain an old icon independently of the live window's `WM_GETICON`; verify the actual Explorer taskbar after restarting the installed app. This shell identity is separate from the installer AppId. [Windows AppUserModelID guidance](https://learn.microsoft.com/en-us/windows/win32/shell/appids).
+- Main and caption windows pass an absolute filesystem ICO path to Flet's `Window.icon`, not an asset URL. Runtime window icons are separate from the EXE resource and AppUserModelID. The embedded client resolves relative assets under `app/assets`, while product icons reside under `app/puripuly_heart/data/icons`; an unresolved relative ICO can clear the runtime window icons.
 - Installer cleanup is limited to manifest-owned obsolete files with identity/hash checks. Modified or unlisted files and writable user data remain outside cleanup ownership.
-- Native installers require Inno Setup 7.1.0 or newer to compile and install extended-length dependency bytecode paths; the native release workflow pins 7.1.0. [Inno Setup 7 release notes](https://github.com/jrsoftware/issrc/releases/tag/is-7_1_0) document the removal of `MAX_PATH` limits.
+- Native installers require Inno Setup 7.1.0 or newer for extended-length runtime paths and cleanup of previously installed payloads; the native release workflow pins 7.1.0. [Inno Setup 7 release notes](https://github.com/jrsoftware/issrc/releases/tag/is-7_1_0) document the removal of `MAX_PATH` limits.
+- Font resources are immutable for the process lifetime. The UI caches font-file resolution by asset root and family; the main window registers its locale fonts, while the desktop caption renderer registers only its caption font (`ui/fonts.py`).
+- Core audio/network initialization stays on its existing composition paths. Deepgram, ElevenLabs, and QwenAudio verification implementations, encrypted-store cryptography, managed-identity signing, and OAuth verification dependencies import eagerly; startup optimization does not postpone these imports until the first operation.
 
-Build policy and validation: `scripts/ci/build-native-experimental.ps1`. Runtime-path behavior: `tests/test_runtime_layout.py`.
+Build policy and validation: `scripts/ci/build-native-experimental.ps1`, `release_evidence/native_distribution.py`, `tests/release_evidence/test_native_distribution.py`. Runtime-path and archive-loader behavior: `tests/test_runtime_layout.py`, `tests/test_native_python_runtime.py`.
 
 ## Lifecycle
 

@@ -59,7 +59,7 @@ from puripuly_heart.ui.dashboard.contract import (
 from puripuly_heart.ui.fonts import (
     font_for_language,
     locale_body_letter_spacing,
-    register_fonts,
+    register_ui_fonts,
 )
 from puripuly_heart.ui.foundation.adapter import FletFoundationAdapter
 from puripuly_heart.ui.foundation.preview import FoundationPreviewSurface
@@ -461,7 +461,7 @@ class TranslatorApp:
     def _setup_page(self):
         self.page.title = t("app.title")
         self.page.theme_mode = ft.ThemeMode.LIGHT
-        register_fonts(self.page)
+        register_ui_fonts(self.page)
         self.page.theme = get_app_theme(
             font_family=font_for_language(get_locale()),
             body_letter_spacing=locale_body_letter_spacing(get_locale()),
@@ -479,22 +479,16 @@ class TranslatorApp:
         self.page.window.max_height = DEFAULT_WINDOW_HEIGHT
         self.page.window.prevent_close = True
         self.page.window.on_event = self._on_window_event
-        self.page.window.icon = DEFAULT_FOUNDATION_RESOURCES.asset_url(
-            FOUNDATION_DESIGN_TOKENS.icon_asset
+        self.page.window.icon = str(
+            DEFAULT_FOUNDATION_RESOURCES.require_file(FOUNDATION_DESIGN_TOKENS.icon_asset)
         )
         self.page.on_keyboard_event = self._on_keyboard_event
 
     def _build_layout(self):
         self.view_dashboard = DashboardView()
-        self.view_settings = SettingsView()
-        set_http_extension_registry = getattr(
-            self.view_settings,
-            "set_http_extension_registry",
-            None,
+        self.view_settings = SettingsView(
+            http_extension_registry=self.application.http_extension_registry()
         )
-        http_extension_registry = self.application.http_extension_registry()
-        if callable(set_http_extension_registry):
-            set_http_extension_registry(http_extension_registry)
         self.view_logs = LogsView()
         self.view_about = AboutView()
         self.view_settings.set_overlay_runtime_state(self.overlay_state)

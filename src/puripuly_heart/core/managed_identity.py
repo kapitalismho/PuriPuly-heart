@@ -9,12 +9,6 @@ import uuid
 from dataclasses import dataclass, field
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives.serialization import (
-    Encoding,
-    NoEncryption,
-    PrivateFormat,
-    PublicFormat,
-)
 
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
 from puripuly_heart.core.openrouter_credentials import (
@@ -330,9 +324,7 @@ def _load_existing_bundle(
     except ValueError:
         return None
 
-    derived_public_key = encode_base64url(
-        private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
-    )
+    derived_public_key = encode_base64url(private_key.public_key().public_bytes_raw())
     if derived_public_key != public_key_value:
         return None
     if binding_value != _managed_identity_binding_value(installation_id, derived_public_key):
@@ -361,12 +353,8 @@ def _replace_managed_identity_bundle(
 
     installation_id = _generate_uuid7()
     private_key = Ed25519PrivateKey.generate()
-    private_key_value = encode_base64url(
-        private_key.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())
-    )
-    public_key_value = encode_base64url(
-        private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
-    )
+    private_key_value = encode_base64url(private_key.private_bytes_raw())
+    public_key_value = encode_base64url(private_key.public_key().public_bytes_raw())
     binding_value = _managed_identity_binding_value(installation_id, public_key_value)
 
     try:

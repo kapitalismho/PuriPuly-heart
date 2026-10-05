@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import shutil
+import sys
 import types
+from pathlib import Path
 
 import pytest
 
@@ -9,6 +12,7 @@ pytest.importorskip("flet")
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.views import about as about_module
 from puripuly_heart.ui.views.about import AboutView
+from tests.helpers.paths import SOURCE_ROOT
 
 
 def _collect_click_handlers(control) -> list:
@@ -201,11 +205,45 @@ def test_about_view_hover_handlers_and_locale_refresh(monkeypatch: pytest.Monkey
 
 
 def test_about_helper_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
-    class BrokenFiles:
-        def joinpath(self, _name):
-            raise RuntimeError("missing")
+    def broken_layout():
+        raise RuntimeError("missing")
 
-    monkeypatch.setattr(about_module.resources, "files", lambda _name: BrokenFiles())
+    monkeypatch.setattr(about_module, "current_runtime_layout", broken_layout)
 
     assert about_module._load_third_party_notices() == "Could not load license information."
     assert about_module._get_profile_image_path() == ""
+
+
+@pytest.mark.parametrize("host_kind", ("native", "pyinstaller"))
+def test_about_resources_resolve_real_files_outside_module_archive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    host_kind: str,
+) -> None:
+    resource_root = tmp_path / "relocated app 한글"
+    data_root = resource_root / "puripuly_heart" / "data"
+    for relative_path in ("THIRD_PARTY_NOTICES.txt", "pictures/salee_pic.png"):
+        destination = data_root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(SOURCE_ROOT / "data" / relative_path, destination)
+    monkeypatch.setattr(
+        about_module,
+        "__file__",
+        str(resource_root / "python.zip" / "puripuly_heart" / "ui" / "views" / "about.pyc"),
+    )
+    if host_kind == "native":
+        monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(resource_root))
+    else:
+        monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(sys, "_MEIPASS", str(resource_root), raising=False)
+
+    assert about_module._load_third_party_notices() == (
+        SOURCE_ROOT / "data" / "THIRD_PARTY_NOTICES.txt"
+    ).read_text(encoding="utf-8")
+    image_path = Path(about_module._get_profile_image_path())
+    assert image_path == data_root / "pictures" / "salee_pic.png"
+    assert (
+        image_path.read_bytes()
+        == (SOURCE_ROOT / "data" / "pictures" / "salee_pic.png").read_bytes()
+    )

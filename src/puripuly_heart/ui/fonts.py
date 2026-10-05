@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -42,9 +43,20 @@ def fonts_dir() -> Path:
     return assets_dir() / "fonts"
 
 
-def register_fonts(page: "ft.Page") -> None:
+def register_ui_fonts(page: "ft.Page") -> None:
+    _register_fonts(
+        page,
+        (FONT_FAMILY_NANUM, FONT_FAMILY_MPLUS, FONT_FAMILY_RESOURCE_HAN_CN),
+    )
+
+
+def register_caption_fonts(page: "ft.Page") -> None:
+    _register_fonts(page, (FONT_FAMILY_NOTO_SANS_CJK_JP,))
+
+
+def _register_fonts(page: "ft.Page", families: tuple[str, ...]) -> None:
     fonts: dict[str, str] = {}
-    for family in _FONT_FILE_CANDIDATES:
+    for family in families:
         asset_path = font_asset_path(family)
         if asset_path:
             fonts[family] = asset_path
@@ -106,7 +118,11 @@ def _font_available(font_family: str) -> bool:
 
 
 def _resolve_font_file(font_family: str) -> str | None:
-    fonts_root = fonts_dir()
+    return _resolve_font_file_in_root(fonts_dir(), font_family)
+
+
+@lru_cache(maxsize=32)
+def _resolve_font_file_in_root(fonts_root: Path, font_family: str) -> str | None:
     for filename in _FONT_FILE_CANDIDATES.get(font_family, ()):
         if (fonts_root / filename).is_file():
             return filename

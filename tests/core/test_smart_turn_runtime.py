@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import math
+import shutil
+import sys
 import threading
+from pathlib import Path
 from uuid import uuid4
 
 import numpy as np
@@ -22,6 +25,7 @@ from puripuly_heart.core.audio.smart_turn import (
 )
 from puripuly_heart.core.audio.smart_turn_features import compute_whisper_log_mel_features
 from puripuly_heart.core.language import SUPPORTED_LANGUAGES
+from tests.helpers.paths import SOURCE_ROOT
 
 
 def test_product_and_official_language_intersection_profiles_and_input_window() -> None:
@@ -97,6 +101,38 @@ def test_pinned_input_fixture_identity_matches_authoritative_revision() -> None:
         "619865d13db4e64a0640e3d613e021f6971b7e53a03b76a8eaa65a54879f4d52"
     )
     assert features.shape == (80, 800)
+
+
+@pytest.mark.parametrize("host_kind", ("native", "pyinstaller"))
+def test_bundled_smart_turn_uses_filesystem_resources_with_relocated_module_origin(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    host_kind: str,
+) -> None:
+    resource_root = tmp_path / "installed app 한글"
+    model_path = resource_root / "puripuly_heart" / smart_turn.SMART_TURN_RESOURCE_RELATIVE_PATH
+    model_path.parent.mkdir(parents=True)
+    shutil.copy2(SOURCE_ROOT / smart_turn.SMART_TURN_RESOURCE_RELATIVE_PATH, model_path)
+    monkeypatch.setattr(
+        smart_turn,
+        "__file__",
+        str(resource_root / "python.zip" / "puripuly_heart" / "core" / "audio" / "smart_turn.pyc"),
+    )
+    if host_kind == "native":
+        monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(resource_root))
+    else:
+        monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(sys, "_MEIPASS", str(resource_root), raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    bundled_path = smart_turn.bundled_smart_turn_onnx_path()
+
+    assert bundled_path == model_path
+    with bundled_path.open("rb") as handle:
+        assert hashlib.file_digest(handle, "sha256").hexdigest() == (
+            smart_turn.SMART_TURN_RESOURCE_SHA256
+        )
 
 
 @pytest.mark.asyncio

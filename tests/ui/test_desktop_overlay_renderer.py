@@ -2246,7 +2246,6 @@ def test_desktop_overlay_preview_fixtures_use_real_overlay_window_surface_and_ed
 
     assert app.page.window.frameless is True
     assert app.page.title == "PuriPuly Overlay"
-    assert app.page.window.icon == "icons/icon.ico"
     assert app.page.window.always_on_top is True
     assert app.page.window.shadow is False
     assert app.page.window.skip_task_bar is False
@@ -3458,7 +3457,6 @@ async def test_desktop_overlay_flet_window_starts_frameless_transparent_moving_e
         page = app.page
         assert page.window.frameless is True
         assert page.title == "PuriPuly Overlay"
-        assert page.window.icon == "icons/icon.ico"
         assert page.window.always_on_top is True
         assert page.window.shadow is False
         assert page.window.skip_task_bar is False

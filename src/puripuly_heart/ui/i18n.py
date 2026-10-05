@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
-from importlib import resources
 from typing import Any
 
 from puripuly_heart.core.language import get_language_info
 from puripuly_heart.core.messages import UserMessageRef
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def _load_bundle(locale: str) -> dict[str, str]:
 
     data: dict[str, str] = {}
     try:
-        bundle_path = resources.files("puripuly_heart").joinpath(f"{_I18N_DIR}/{locale}.json")
+        bundle_path = current_runtime_layout().package_resource(_I18N_DIR, f"{locale}.json")
         if bundle_path.is_file():
             raw = json.loads(bundle_path.read_text(encoding="utf-8"))
             if isinstance(raw, dict):
@@ -61,7 +61,7 @@ def available_locales() -> tuple[str, ...]:
 
     locales: list[str] = []
     try:
-        base = resources.files("puripuly_heart").joinpath(_I18N_DIR)
+        base = current_runtime_layout().package_resource(_I18N_DIR)
         for entry in base.iterdir():
             if not entry.is_file():
                 continue

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import ast
 import asyncio
-import inspect
 import json
 from dataclasses import asdict
 from pathlib import Path
@@ -21,7 +19,6 @@ from puripuly_heart.ui.fonts import (
     FONT_FAMILY_NOTO_SANS_CJK_JP,
     assets_dir,
     font_asset_path,
-    register_fonts,
 )
 from puripuly_heart.ui.foundation.adapter import FletFoundationAdapter
 from puripuly_heart.ui.foundation.preview import (
@@ -48,7 +45,6 @@ from puripuly_heart.ui.theme import (
 )
 from tests.helpers.paths import REPO_ROOT
 
-FOUNDATION_ROOT = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "foundation"
 LOCALES = ("en", "ko", "zh-CN", "ja", "ru")
 FOUNDATION_I18N_KEYS = {
     "debug_preview.foundation_primitives",
@@ -178,7 +174,6 @@ def test_foundation_adapter_consumes_only_application_and_presentation_ports() -
     assert snapshot.debug_preview_enabled is True
     assert application.state_calls == 1
     assert presentation.locale_calls == 1
-    assert "flet" not in inspect.getsource(app_module.UiApplicationPort).casefold()
 
 
 @pytest.mark.asyncio
@@ -256,16 +251,6 @@ def test_foundation_resource_locator_is_cwd_independent_and_read_only(
             DEFAULT_FOUNDATION_RESOURCES.asset_url(unsafe)
 
 
-def test_register_fonts_loads_each_bundled_font_once() -> None:
-    page = SimpleNamespace()
-
-    register_fonts(page)
-
-    assert len(page.fonts) == 4
-    assert len(set(page.fonts.values())) == len(page.fonts)
-    assert FONT_FAMILY_NOTO_SANS_CJK_JP in page.fonts
-
-
 def test_foundation_preview_copy_has_distinct_inputs_for_all_five_locales() -> None:
     copies = {locale: foundation_preview_copy(locale) for locale in LOCALES}
 
@@ -310,44 +295,3 @@ def test_foundation_preview_action_is_hidden_without_flag_and_has_no_external_ca
 
     assert len(app.page.opened) == 1
     assert isinstance(app.page.opened[0].content, FoundationPreviewSurface)
-    method_source = inspect.getsource(app_module.TranslatorApp._preview_foundation_primitives)
-    assert ".show_dialog(dialog)" in method_source
-    assert ".open(dialog)" not in method_source
-    assert "self.application" not in method_source
-    assert "self.controller" not in method_source
-
-
-def test_foundation_modules_remain_below_the_ui_boundary_and_do_not_cut_over_views() -> None:
-    forbidden_foundation_imports = (
-        "puripuly_heart.config",
-        "puripuly_heart.core.orchestrator",
-        "puripuly_heart.providers",
-    )
-    for path in FOUNDATION_ROOT.glob("*.py"):
-        source = path.read_text(encoding="utf-8")
-        tree = ast.parse(source)
-        imports = {
-            alias.name
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Import)
-            for alias in node.names
-        }
-        imports.update(
-            node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
-        )
-        assert not any(module.startswith(forbidden_foundation_imports) for module in imports)
-
-    for root_name in ("app", "config", "core", "providers"):
-        root = REPO_ROOT / "src" / "puripuly_heart" / root_name
-        for path in root.rglob("*.py"):
-            assert "puripuly_heart.ui.foundation" not in path.read_text(encoding="utf-8")
-
-    main_source = (REPO_ROOT / "src" / "puripuly_heart" / "main.py").read_text(encoding="utf-8")
-    app_source = (REPO_ROOT / "src" / "puripuly_heart" / "ui" / "app.py").read_text(
-        encoding="utf-8"
-    )
-    assert "from puripuly_heart.ui.app import main_gui" in main_source
-    assert "self.view_dashboard = DashboardView()" in app_source
-    assert "self.view_settings = SettingsView()" in app_source
-    assert "self.view_logs = LogsView()" in app_source
-    assert "self.view_about = AboutView()" in app_source

@@ -52,6 +52,7 @@
   #endif
   #define PackagedApplicationRoot "app\"
   #define PackagedSoxrRoot "site-packages\soxr"
+  #define AppShortcutIdentity 'AppUserModelID: "com.salee.PuriPulyHeart";'
   #ifndef NativeCleanupInclude
     #define NativeCleanupInclude MyPackagedAppDir + "\..\native-installer-cleanup.iss"
   #endif
@@ -61,7 +62,9 @@
 #else
   #define PackagedApplicationRoot ""
   #define PackagedSoxrRoot "soxr"
+  #define AppShortcutIdentity ""
 #endif
+#define AppIconRelativePath PackagedApplicationRoot + "puripuly_heart\data\icons\icon.ico"
 #define NotoCjkFontRelativePath PackagedApplicationRoot + "puripuly_heart\data\fonts\NotoSansCJK-Medium.ttc"
 #define LocalSttManifestRelativePath PackagedApplicationRoot + "puripuly_heart\data\models\qwen3-asr-0.6b-int8-sherpa.manifest.json"
 #define ParakeetV3ManifestRelativePath PackagedApplicationRoot + "puripuly_heart\data\models\parakeet-tdt-0.6b-v3-int8-sherpa.manifest.json"
@@ -226,10 +229,10 @@ Source: "{#ProcessCaptureSmokeArtifactRoot}\*"; DestDir: "{app}\process-capture-
 
 [Icons]
 #ifndef InstallerSmokeAppDataRoot
-Name: "{group}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#AppIconRelativePath}"; {#AppShortcutIdentity}
 Name: "{group}\{cm:UninstallProgram,{#MyAppGroupName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
+Name: "{autodesktop}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#AppIconRelativePath}"; Tasks: desktopicon; {#AppShortcutIdentity}
+Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#AppIconRelativePath}"; Tasks: quicklaunchicon; {#AppShortcutIdentity}
 #endif
 
 #ifndef NativeExperimental

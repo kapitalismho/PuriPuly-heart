@@ -1,6 +1,7 @@
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
 #include <shellapi.h>
+#include <shobjidl.h>
 #include <windows.h>
 
 #include <cstdlib>
@@ -69,12 +70,16 @@ bool ConfigureInstalledEnvironment(const std::filesystem::path &root) {
     return false;
   }
   const auto app = root / puripuly_layout::kApplicationRoot;
+  const auto python_archive = root / puripuly_layout::kPythonArchive;
+  const auto stdlib_archive = root / puripuly_layout::kStdlibArchive;
   const auto dependencies = root / puripuly_layout::kDependencyRoot;
   const auto dlls = root / puripuly_layout::kExtensionDllRoot;
   const auto host = root / puripuly_layout::kHostExecutable;
   const auto python = root / puripuly_layout::kPythonExecutable;
   if (!std::filesystem::is_regular_file(host) ||
       !std::filesystem::is_regular_file(python) ||
+      !std::filesystem::is_regular_file(python_archive) ||
+      !std::filesystem::is_regular_file(stdlib_archive) ||
       !std::filesystem::is_directory(app) ||
       !std::filesystem::is_directory(dependencies) ||
       !std::filesystem::is_directory(dlls)) {
@@ -88,6 +93,7 @@ bool ConfigureInstalledEnvironment(const std::filesystem::path &root) {
   const std::wstring path = root.wstring() + L";" + dlls.wstring() + L";" +
                             dependencies.wstring() + L";" + system_directory;
   const std::wstring python_path =
+      python_archive.wstring() + L";" + stdlib_archive.wstring() + L";" +
       app.wstring() + L";" + dependencies.wstring();
 
   SetProcessEnvironment(L"PYTHONHOME", root.wstring());
@@ -189,6 +195,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE previous,
     return EXIT_FAILURE;
   }
   ::LocalFree(argv);
+
+  if (FAILED(::SetCurrentProcessExplicitAppUserModelID(
+          L"com.salee.PuriPulyHeart"))) {
+    return EXIT_FAILURE;
+  }
 
   if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {
     CreateAndAttachConsole();

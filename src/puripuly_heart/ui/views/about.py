@@ -1,11 +1,11 @@
 """About page view with version, credits, acknowledgments, and license info."""
 
 import webbrowser
-from importlib import resources
 
 import flet as ft
 
 from puripuly_heart import __version__
+from puripuly_heart.runtime_layout import current_runtime_layout
 from puripuly_heart.ui.about.contract import AboutSurfaceSlots
 from puripuly_heart.ui.about.renderer import compose_about_surface
 from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
@@ -26,8 +26,8 @@ def _load_third_party_notices() -> str:
     """Load THIRD_PARTY_NOTICES.txt from package data."""
     try:
         return (
-            resources.files("puripuly_heart.data")
-            .joinpath("THIRD_PARTY_NOTICES.txt")
+            current_runtime_layout()
+            .package_resource("data", "THIRD_PARTY_NOTICES.txt")
             .read_text(encoding="utf-8")
         )
     except Exception:
@@ -37,7 +37,7 @@ def _load_third_party_notices() -> str:
 def _get_profile_image_path() -> str:
     """Get the profile image path from package data."""
     try:
-        return str(resources.files("puripuly_heart.data.pictures").joinpath("salee_pic.png"))
+        return str(current_runtime_layout().package_resource("data", "pictures", "salee_pic.png"))
     except Exception:
         return ""
 

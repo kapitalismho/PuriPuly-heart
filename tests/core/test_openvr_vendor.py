@@ -28,9 +28,9 @@ def test_openvr_vendor_module_exposes_pinned_bundle_contract() -> None:
     module = _load_openvr_vendor_module()
     bundle = module.validate_vendored_openvr_bundle(ROOT / "third_party" / "openvr")
 
-    assert (
-        module.OPENVR_VENDOR_DLL_SHA256 == bundle.dll_sha256
-    ), "module hash pin must match the disk-hashed vendored bundle"
+    assert module.OPENVR_VENDOR_DLL_SHA256 == bundle.dll_sha256, (
+        "module hash pin must match the disk-hashed vendored bundle"
+    )
     assert module.OPENVR_VENDOR_SHA256_LINE == f"{bundle.dll_sha256} *openvr_api.dll"
 
 
@@ -73,3 +73,18 @@ def test_validate_openvr_runtime_dll_validates_explicit_expected_sha256(tmp_path
 
     with pytest.raises(ValueError, match="sha256"):
         module.validate_openvr_runtime_dll(dll_path, expected_sha256="0" * 64)
+
+
+def test_default_vendored_bundle_uses_source_resource_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_openvr_vendor_module()
+    monkeypatch.setattr(module, "__file__", str(tmp_path / "relocated" / "openvr_vendor.pyc"))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
+
+    bundle = module.validate_vendored_openvr_bundle()
+
+    assert bundle.bundle_dir == ROOT / "third_party" / "openvr"
+    assert bundle.dll_sha256 == PINNED_OPENVR_DLL_SHA256

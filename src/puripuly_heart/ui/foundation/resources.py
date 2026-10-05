@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
+from puripuly_heart.runtime_layout import current_runtime_layout
+
 
 @dataclass(frozen=True, slots=True)
 class FoundationResourceLocator:
@@ -10,7 +12,7 @@ class FoundationResourceLocator:
 
     @classmethod
     def packaged(cls) -> FoundationResourceLocator:
-        return cls(Path(__file__).resolve().parents[2] / "data")
+        return cls(current_runtime_layout().package_resource("data"))
 
     def asset_url(self, relative_path: str) -> str:
         normalized = self._normalize(relative_path)

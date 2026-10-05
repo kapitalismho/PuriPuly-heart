@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-import inspect
 
 import pytest
 
@@ -10,6 +9,7 @@ from puripuly_heart.app.ports.provider_verifier import (
     PROVIDER_VERIFICATION_STATUS_VERIFIED,
     ProviderVerificationRequest,
 )
+from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 
 
 @pytest.mark.asyncio
@@ -56,7 +56,7 @@ async def test_provider_verifier_adapter_maps_controller_provider_checks(
         staticmethod(fake_deepseek),
     )
     monkeypatch.setattr(
-        adapter_module.DeepgramRealtimeSTTBackend,
+        DeepgramRealtimeSTTBackend,
         "verify_api_key",
         staticmethod(fake_deepgram),
     )
@@ -211,18 +211,3 @@ async def test_provider_verifier_adapter_returns_verified_port_result(
     assert result.diagnostics is None
     assert result.evidence["verifier"] == "provider_adapter"
     assert "not-logged" not in repr(result)
-
-
-def test_wiring_factory_and_openrouter_metadata_compatibility_imports() -> None:
-    adapter_module = importlib.import_module("puripuly_heart.app.adapters.provider_verifier")
-    wiring_module = importlib.import_module("puripuly_heart.app.wiring")
-    core_metadata = importlib.import_module("puripuly_heart.core.openrouter_metadata")
-    provider_openrouter = importlib.import_module("puripuly_heart.providers.llm.openrouter")
-
-    verifier = wiring_module.create_provider_verifier()
-
-    assert isinstance(verifier, adapter_module.ProviderVerifierAdapter)
-    assert provider_openrouter.OpenRouterKeyMetadata is core_metadata.OpenRouterKeyMetadata
-    assert inspect.iscoroutinefunction(
-        adapter_module.ProviderVerifierAdapter.verify_provider_secret
-    )

@@ -50,12 +50,16 @@ bool ConfigureEnvironment(const std::filesystem::path &root) {
     return false;
   }
   const auto app = root / L"app";
+  const auto python_archive = app / L"python.zip";
+  const auto stdlib_archive = root / L"python314.zip";
   const auto dependencies = root / L"site-packages";
   const auto dlls = root / L"DLLs";
   const auto python = root / L"python.exe";
   const auto host = root / L"PuriPulyHeart.exe";
   if (!std::filesystem::is_regular_file(python) ||
       !std::filesystem::is_regular_file(host) ||
+      !std::filesystem::is_regular_file(python_archive) ||
+      !std::filesystem::is_regular_file(stdlib_archive) ||
       !std::filesystem::is_directory(app) ||
       !std::filesystem::is_directory(dependencies) ||
       !std::filesystem::is_directory(dlls)) {
@@ -66,7 +70,9 @@ bool ConfigureEnvironment(const std::filesystem::path &root) {
     return false;
   }
   return SetEnvironment(L"PYTHONHOME", root.wstring()) &&
-         SetEnvironment(L"PYTHONPATH", app.wstring() + L";" +
+         SetEnvironment(L"PYTHONPATH", python_archive.wstring() + L";" +
+                                           stdlib_archive.wstring() + L";" +
+                                           app.wstring() + L";" +
                                            dependencies.wstring()) &&
          SetEnvironment(L"PATH", root.wstring() + L";" + dlls.wstring() +
                                      L";" + dependencies.wstring() + L";" +
