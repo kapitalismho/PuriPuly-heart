@@ -22,6 +22,7 @@ env:
   PYTHON_VERSION: "3.14.7"
   UV_VERSION: "0.9.17"
   INNOSETUP_VERSION: "7.1.0"
+  INNOSETUP_SHA256: "0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f"
   VULKAN_SDK_VERSION: "1.4.350.0"
   VULKAN_SDK_SHA256: "855b27ba05d2d8119c5114c5d4ff870ca38f2c632b11e1bb9923b9b7e6ecfe7b"
   NATIVE_INPUT_ROOT: C:\d177\native-integration\release\inputs
@@ -165,13 +166,31 @@ jobs:
           "CMAKE_PREFIX_PATH=$sdkRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "$sdkRoot\Bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Install pinned Inno Setup
+      - name: Prepare pinned portable Inno Setup
         shell: pwsh
         run: |
-          choco install innosetup --version=$env:INNOSETUP_VERSION --allow-downgrade --force --no-progress -y
-          if ($LASTEXITCODE -ne 0) {
-            throw "Inno Setup installation failed with exit code $LASTEXITCODE"
+          $installer = Join-Path $env:RUNNER_TEMP "innosetup-$env:INNOSETUP_VERSION-x64.exe"
+          $compilerRoot = Join-Path $env:RUNNER_TEMP "Inno Setup $env:INNOSETUP_VERSION"
+          $releaseTag = "is-" + $env:INNOSETUP_VERSION.Replace(".", "_")
+          Invoke-WebRequest `
+            -Uri "https://github.com/jrsoftware/issrc/releases/download/$releaseTag/innosetup-$env:INNOSETUP_VERSION-x64.exe" `
+            -OutFile $installer
+          $actualSha256 = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $env:INNOSETUP_SHA256) {
+            throw "Inno Setup checksum mismatch: expected $env:INNOSETUP_SHA256, found $actualSha256"
           }
+          $install = Start-Process -FilePath $installer -ArgumentList @(
+            "/PORTABLE=1", "/VERYSILENT", "/CURRENTUSER", "/SP-", "/SUPPRESSMSGBOXES",
+            "/NORESTART", "/NOICONS", "/TASKS=", "/DIR=`"$compilerRoot`""
+          ) -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "Inno Setup portable extraction failed with exit code $($install.ExitCode)"
+          }
+          $compiler = Join-Path $compilerRoot "ISCC.exe"
+          if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
+            throw "Inno Setup compiler not found: $compiler"
+          }
+          "INNOSETUP_COMPILER=$compiler" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build native release artifacts
         shell: pwsh
@@ -187,7 +206,8 @@ jobs:
             -BuildRoot $env:NATIVE_BUILD_ROOT `
             -OutputDir $env:NATIVE_OUTPUT_ROOT `
             -InstallerOutputDir "installer_output/native" `
-            -InnoSetupVersion $env:INNOSETUP_VERSION
+            -InnoSetupVersion $env:INNOSETUP_VERSION `
+            -InnoSetupCompiler $env:INNOSETUP_COMPILER
 
       - name: Verify native release identity and write provenance
         shell: pwsh

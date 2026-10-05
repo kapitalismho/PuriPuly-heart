@@ -370,11 +370,24 @@ company = "salee"
         "--target-root", $artifactRoot, "--cmake-build-dir", $consoleBuildRoot,
         "--output", (Join-Path $evidenceRoot "vc-runtime.json")
     ) -WorkingDirectory $repoRoot
-    Invoke-Checked -FilePath (Join-Path $artifactRoot "python.exe") -ArgumentList @(
-        "-m", "puripuly_heart.release_evidence.native_distribution", "compile-runtime",
-        "--target-root", $artifactRoot, "--layout", $layoutPath,
-        "--output", (Join-Path $evidenceRoot "bytecode.json")
-    ) -WorkingDirectory $repoRoot
+    $compilePythonPath = $env:PYTHONPATH
+    $compilePythonHome = $env:PYTHONHOME
+    try {
+        $env:PYTHONHOME = $artifactRoot
+        $env:PYTHONPATH = "$(Join-Path $repoRoot 'src');$(Join-Path $artifactRoot 'site-packages')"
+        Invoke-Checked -FilePath (Join-Path $artifactRoot "python.exe") -ArgumentList @(
+            "-s", "-m", "puripuly_heart.release_evidence.native_distribution", "compile-runtime",
+            "--target-root", $artifactRoot, "--layout", $layoutPath,
+            "--output", (Join-Path $evidenceRoot "bytecode.json")
+        ) -WorkingDirectory $repoRoot
+    } finally {
+        $env:PYTHONPATH = $compilePythonPath
+        if ($null -eq $compilePythonHome) {
+            Remove-Item Env:PYTHONHOME -ErrorAction SilentlyContinue
+        } else {
+            $env:PYTHONHOME = $compilePythonHome
+        }
+    }
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(
         "-m", "puripuly_heart.release_evidence.native_distribution", "bundle-runtime",
         "--target-root", $artifactRoot, "--layout", $layoutPath,
