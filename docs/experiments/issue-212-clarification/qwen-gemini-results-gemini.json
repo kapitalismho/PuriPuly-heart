@@ -1,0 +1,2217 @@
+{
+  "baseline": "0f0ba5173da51250bb5926e4a2eead5e68adff81",
+  "started_utc": "2026-10-05T22:12:26.497565+00:00",
+  "provider": "gemini",
+  "plan": {
+    "Q-01": {
+      "alternatives": "task-relative / connection-audio-relative / speech-relative timestamps",
+      "input_control": "Same socket A with 600ms prefix, then B with 1600ms prefix; finish each once, new task IDs",
+      "predicate": "Compare returned words to actual nonzero speech windows under all three clocks",
+      "consequence": "Only observed task-relative mapping may support candidate T; retain per-task maps and no cross-route certification"
+    },
+    "Q-02": {
+      "alternatives": "word/punctuation reconstruct sentence exactly / lossy or other representation",
+      "input_control": "Retain all native sentence/word fields for A,B,short No,repeated No",
+      "predicate": "Compare literal concatenations with exact sentence text; no strip/lowercase reconstruction",
+      "consequence": "Preserve native exact text and separate word offsets; do not assume lexical word shape"
+    },
+    "Q-03": {
+      "alternatives": "fixed-only words immutable / mutable / never emitted",
+      "input_control": "Capture every partial/final fixed field",
+      "predicate": "Any same-ID fixed prefix mutation refutes independent finality; absence or no mutation cannot establish guarantee",
+      "consequence": "sentence_end remains only documented finality gate"
+    },
+    "Q-04": {
+      "alternatives": "subsecond finish accepted and short content retained / protocol rejection / empty",
+      "input_control": "Energy-bounded shared_no trim plus 80ms each side, total <1s, finish once",
+      "predicate": "Matching task-finished and returned final text; record exact sent samples",
+      "consequence": "Bounded short-control support only; no universal quality or floor claim"
+    },
+    "Q-05": {
+      "alternatives": "empty task terminates / fails / times out",
+      "input_control": "Last task sends zero audio then finish once",
+      "predicate": "Matching task-finished versus task-failed versus 15s timeout",
+      "consequence": "Distinguish task completion from text/empty evidence, no retries"
+    },
+    "Q-06": {
+      "alternatives": "residual final after finish / no residual / after terminal",
+      "input_control": "Immediate finish after serialized audio; 200ms extra observation after terminal",
+      "predicate": "Native receipt versus finish and task-finished write/receipt timings",
+      "consequence": "Drain to matching task-finished; later absence cannot establish universal no-tail"
+    },
+    "Q-07": {
+      "alternatives": "unique task+sentence IDs / duplicate or conflicting final / repeat text under distinct identity",
+      "input_control": "Fresh UUID per reused task and two distinct No occurrences in one task",
+      "predicate": "All native IDs/order and final text are retained; no duplicate controls sent",
+      "consequence": "Identity-based preservation; finite trace cannot certify replay/dedup universally"
+    },
+    "Q-08": {
+      "alternatives": "continuation retained on legal same-socket next task / failure",
+      "input_control": "B follows A after matching terminal and readiness; no application onset gate",
+      "predicate": "Second task content and task IDs",
+      "consequence": "Native continuation observation, not proof current adapter maps or buffers correctly"
+    },
+    "Q-09": {
+      "alternatives": "configured route/model usable / auth, quota, unsupported failure",
+      "input_control": "Exact Beijing workspace route and exact Beijing key only",
+      "predicate": "Readiness/failure and returned metadata",
+      "consequence": "No alternate paid fallback; all other endpoint rows remain not-run"
+    },
+    "Q-10": {
+      "alternatives": "account limits/billing minima can be established / remain unknown",
+      "input_control": "Only incidental native usage/errors from legal requests; no billing measurement or stress",
+      "predicate": "Record returned usage without estimating charge; no universal quota claims",
+      "consequence": "Effective concurrency/lifetime/minimum billing remain unresolved by design"
+    },
+    "G-01": {
+      "alternatives": "final only after fence / final before fence",
+      "input_control": "A plus 800ms silence and 2s receipt window before F1",
+      "predicate": "Native inputTranscription receipt before F1",
+      "consequence": "Counterexample forbids fence-required final admission"
+    },
+    "G-02": {
+      "alternatives": "one fence exactly one final / zero,multiple,independent finals",
+      "input_control": "A natural end then F1; B F2; No F3; second session short/repeated content",
+      "predicate": "Retain native finals versus local fences without assigning ownership; positive finite trace cannot prove bijection",
+      "consequence": "No FIFO pairing or final-count barrier"
+    },
+    "G-03": {
+      "alternatives": "late final after successor input / none observed",
+      "input_control": "Immediately send successor after each fence",
+      "predicate": "Content-diagnostic A/B/No final receipt versus successor writes",
+      "consequence": "Receipt cursor cannot establish acoustic source association"
+    },
+    "G-04": {
+      "alternatives": "finals append independent text / cumulative snapshots",
+      "input_control": "Distinct A/B plus real repeated No at new sample ranges",
+      "predicate": "Exact native final text per receipt, not reconstructed cumulative string",
+      "consequence": "Preserve every native final independently; equal text is not replay evidence"
+    },
+    "G-05": {
+      "alternatives": "time/ID fields establish source association / absent or insufficient",
+      "input_control": "Capture raw SDK-wire JSON and parsed SDK messages including optional fields",
+      "predicate": "Inspect final fields for acoustic intervals and correlated fence/event IDs; word times unsupported by selected contract",
+      "consequence": "No guessed coordinates from finished/activity/receipt/fence index"
+    },
+    "G-06": {
+      "alternatives": "interim/activity/finished are final ACK / distinct events",
+      "input_control": "Same unchanged TEXT+VERBATIM automatic VAD500/400 config",
+      "predicate": "Retain exact field distinctions and receipt ordering",
+      "consequence": "Only input_transcription is authoritative text, no activity ACK pairing"
+    },
+    "G-07": {
+      "alternatives": "short input preserved / rejected or empty",
+      "input_control": "Session2 trimmed No then immediate correction; same transport no manual activity",
+      "predicate": "Returned independent final content and input/fence cursors",
+      "consequence": "Bounded support only, no universal acoustic qualification"
+    },
+    "G-08": {
+      "alternatives": "no-new-audio produces authoritative empty final / no guaranteed evidence",
+      "input_control": "Session2 records local suppression of fence before any audio and repeated fence after last fence; no prohibited empty wire control",
+      "predicate": "Local no-send event versus any spontaneous native empty final",
+      "consequence": "Suppressed fence/write terminal is not empty recognition; absence is bounded only"
+    },
+    "G-09": {
+      "alternatives": "configured default endpoint works / auth quota model unsupported",
+      "input_control": "Effective SDK backend/base URL/API version checked before legal connection",
+      "predicate": "Native setup or sanitized failure; no override inheritance or retry",
+      "consequence": "No fallback; failed branch remains blocked, account limits/billing universal claims unresolved"
+    }
+  },
+  "runtime": {
+    "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "packages": {
+      "websockets": "16.1.1",
+      "google-genai": "2.21.0",
+      "dashscope": "1.26.4"
+    }
+  },
+  "script_sha256": "3dfac6719cf4e89cc83cff02c916af4c5d546cde4ee9b05b6b6433e829209937",
+  "common_sha256": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+  "inputs": {
+    "shared_a": {
+      "file": "audio/shared_a.wav",
+      "wav_sha256": "de9319443c5cebf7c0dd33eccb2eeb8b3219edb2b2adf42c1c2caab539360cbe",
+      "pcm_sha256": "fa4f27683fa43b4556a76da9b51d565039f5da424f04c54503db1da5b1325273",
+      "samples": 31120,
+      "duration_s": 1.945,
+      "energy_bounds_samples_threshold_100": [
+        1707,
+        19260
+      ],
+      "annotation": "Energy support, not phonetic alignment; synthetic Microsoft Zira shared clips"
+    },
+    "shared_b": {
+      "file": "audio/shared_b.wav",
+      "wav_sha256": "0d0fad34b07659f83a03309b06f4314180060aba5687e13951a6e27bd902277d",
+      "pcm_sha256": "50af2eaf21519b0d21813fb9a59a6b1af17b704aef481c913f294f5f3e4cf68b",
+      "samples": 32400,
+      "duration_s": 2.025,
+      "energy_bounds_samples_threshold_100": [
+        1707,
+        20407
+      ],
+      "annotation": "Energy support, not phonetic alignment; synthetic Microsoft Zira shared clips"
+    },
+    "shared_no": {
+      "file": "audio/shared_no.wav",
+      "wav_sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+      "pcm_sha256": "7ecb58a91e9b6b77aa497c3f98aa336fde279f326b49364867ce5b9fffb0570d",
+      "samples": 18160,
+      "duration_s": 1.135,
+      "energy_bounds_samples_threshold_100": [
+        1635,
+        6538
+      ],
+      "annotation": "Energy support, not phonetic alignment; synthetic Microsoft Zira shared clips"
+    },
+    "shared_correction": {
+      "file": "audio/shared_correction.wav",
+      "wav_sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+      "pcm_sha256": "cb204865bc4501df69f9e613bae31aad2557d1b63ec43237f46f6ef5279d84de",
+      "samples": 30720,
+      "duration_s": 1.92,
+      "energy_bounds_samples_threshold_100": [
+        1555,
+        18905
+      ],
+      "annotation": "Energy support, not phonetic alignment; synthetic Microsoft Zira shared clips"
+    },
+    "short_no": {
+      "source": "shared_no",
+      "slice_samples": [
+        355,
+        7818
+      ],
+      "pcm_sha256": "e888d76940c2f012cb643125ab6d7d7961c6692a2f41a9265b5e2c0501396677",
+      "samples": 7463,
+      "duration_s": 0.4664375,
+      "trim": "Threshold100 active support plus80ms each side; no phonetic alignment claim"
+    }
+  },
+  "sessions": [
+    {
+      "epoch": "G-S1",
+      "requested_model": "gemini-3.5-transcribe-live",
+      "returned_model": null,
+      "backend": "google-genai locked SDK; raw receive capture outside packaged adapter",
+      "config": {
+        "response_modalities": [
+          "TEXT"
+        ],
+        "input_audio_transcription": {
+          "mode": "VERBATIM"
+        },
+        "realtime_input_config": {
+          "automatic_activity_detection": {
+            "prefix_padding_ms": 500,
+            "silence_duration_ms": 400
+          }
+        }
+      }
+    },
+    {
+      "epoch": "G-S2",
+      "requested_model": "gemini-3.5-transcribe-live",
+      "returned_model": null,
+      "backend": "google-genai locked SDK; raw receive capture outside packaged adapter",
+      "config": {
+        "response_modalities": [
+          "TEXT"
+        ],
+        "input_audio_transcription": {
+          "mode": "VERBATIM"
+        },
+        "realtime_input_config": {
+          "automatic_activity_detection": {
+            "prefix_padding_ms": 500,
+            "silence_duration_ms": 400
+          }
+        }
+      }
+    }
+  ],
+  "events": [
+    {
+      "ordinal": 1,
+      "receipt_or_write_s": 0.795475,
+      "kind": "connection_attempt",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 0,
+      "endpoint": "wss://generativelanguage.googleapis.com//ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+    },
+    {
+      "ordinal": 2,
+      "receipt_or_write_s": 1.074803,
+      "kind": "setup_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 0,
+      "native": {
+        "setup": {
+          "model": "models/gemini-3.5-transcribe-live",
+          "generationConfig": {
+            "responseModalities": [
+              "TEXT"
+            ]
+          },
+          "inputAudioTranscription": {
+            "mode": "VERBATIM"
+          },
+          "realtimeInputConfig": {
+            "automatic_activity_detection": {
+              "prefix_padding_ms": 500,
+              "silence_duration_ms": 400
+            }
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 3,
+      "receipt_or_write_s": 1.471361,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 0,
+      "native": {
+        "setupComplete": {}
+      }
+    },
+    {
+      "ordinal": 4,
+      "receipt_or_write_s": 1.478524,
+      "kind": "input_manifest",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 0,
+      "label": "silence_prefix500",
+      "start_sample": 0,
+      "end_sample": 8000,
+      "pcm_sha256": "f85f2c34eb2843d2aa5951ee6e8e76985655b2e3ae2cbdd76bdfd654ecf19997",
+      "synthetic_silence": true
+    },
+    {
+      "ordinal": 5,
+      "receipt_or_write_s": 1.479276,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 1600,
+      "label": "silence_prefix500",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 6,
+      "receipt_or_write_s": 1.594329,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 3200,
+      "label": "silence_prefix500",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 7,
+      "receipt_or_write_s": 1.704041,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 4800,
+      "label": "silence_prefix500",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 8,
+      "receipt_or_write_s": 1.81229,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 6400,
+      "label": "silence_prefix500",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 9,
+      "receipt_or_write_s": 1.921589,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 8000,
+      "label": "silence_prefix500",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 10,
+      "receipt_or_write_s": 2.031048,
+      "kind": "input_manifest",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 8000,
+      "label": "shared_a",
+      "start_sample": 8000,
+      "end_sample": 39120,
+      "pcm_sha256": "fa4f27683fa43b4556a76da9b51d565039f5da424f04c54503db1da5b1325273",
+      "synthetic_silence": false
+    },
+    {
+      "ordinal": 11,
+      "receipt_or_write_s": 2.031524,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 9600,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 12,
+      "receipt_or_write_s": 2.139024,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 11200,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 13,
+      "receipt_or_write_s": 2.247238,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 12800,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 14,
+      "receipt_or_write_s": 2.355864,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 14400,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 15,
+      "receipt_or_write_s": 2.442104,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 14400,
+      "native": {
+        "serverContent": {},
+        "voiceActivity": {
+          "type": "ACTIVITY_START",
+          "audioOffset": "0.840s"
+        }
+      }
+    },
+    {
+      "ordinal": 16,
+      "receipt_or_write_s": 2.442311,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 14400,
+      "parsed": {
+        "server_content": {},
+        "voice_activity": {
+          "voice_activity_type": "ACTIVITY_START",
+          "audio_offset": "0.840s"
+        }
+      }
+    },
+    {
+      "ordinal": 17,
+      "receipt_or_write_s": 2.464501,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 16000,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 18,
+      "receipt_or_write_s": 2.572789,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 17600,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 19,
+      "receipt_or_write_s": 2.581742,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 17600,
+      "native": {
+        "serverContent": {
+          "interimInputTranscription": {
+            "text": "The"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 20,
+      "receipt_or_write_s": 2.581851,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 17600,
+      "parsed": {
+        "server_content": {
+          "interim_input_transcription": {
+            "text": "The"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 21,
+      "receipt_or_write_s": 2.681316,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 19200,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 22,
+      "receipt_or_write_s": 2.78966,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 20800,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 23,
+      "receipt_or_write_s": 2.897842,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 22400,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 24,
+      "receipt_or_write_s": 3.007039,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 24000,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 25,
+      "receipt_or_write_s": 3.115747,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 25600,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 26,
+      "receipt_or_write_s": 3.1295,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 25600,
+      "native": {
+        "serverContent": {
+          "interimInputTranscription": {
+            "text": "The red boat"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 27,
+      "receipt_or_write_s": 3.129622,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 25600,
+      "parsed": {
+        "server_content": {
+          "interim_input_transcription": {
+            "text": "The red boat"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 28,
+      "receipt_or_write_s": 3.22405,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 27200,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 29,
+      "receipt_or_write_s": 3.332903,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 28800,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 30,
+      "receipt_or_write_s": 3.441438,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 30400,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 31,
+      "receipt_or_write_s": 3.550333,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 32000,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 32,
+      "receipt_or_write_s": 3.658818,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 33600,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 33,
+      "receipt_or_write_s": 3.662289,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 33600,
+      "native": {
+        "serverContent": {
+          "interimInputTranscription": {
+            "text": "The red boat is ready."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 34,
+      "receipt_or_write_s": 3.662409,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 33600,
+      "parsed": {
+        "server_content": {
+          "interim_input_transcription": {
+            "text": "The red boat is ready."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 35,
+      "receipt_or_write_s": 3.768077,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 35200,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 36,
+      "receipt_or_write_s": 3.876298,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 36800,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 37,
+      "receipt_or_write_s": 3.984716,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 38400,
+      "label": "shared_a",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 38,
+      "receipt_or_write_s": 4.093444,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 39120,
+      "label": "shared_a",
+      "chunk_samples": 720
+    },
+    {
+      "ordinal": 39,
+      "receipt_or_write_s": 4.139628,
+      "kind": "input_manifest",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 39120,
+      "label": "silence_after_A800",
+      "start_sample": 39120,
+      "end_sample": 51920,
+      "pcm_sha256": "c65206769723a13afe80c0d925531639ceef9c2eb97eee3b1b542739ec40597f",
+      "synthetic_silence": true
+    },
+    {
+      "ordinal": 40,
+      "receipt_or_write_s": 4.140038,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 40720,
+      "label": "silence_after_A800",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 41,
+      "receipt_or_write_s": 4.212605,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 40720,
+      "native": {
+        "serverContent": {
+          "interimInputTranscription": {
+            "text": "The red boat is ready."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 42,
+      "receipt_or_write_s": 4.212809,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 40720,
+      "parsed": {
+        "server_content": {
+          "interim_input_transcription": {
+            "text": "The red boat is ready."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 43,
+      "receipt_or_write_s": 4.247907,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 42320,
+      "label": "silence_after_A800",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 44,
+      "receipt_or_write_s": 4.357028,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 43920,
+      "label": "silence_after_A800",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 45,
+      "receipt_or_write_s": 4.466059,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 45520,
+      "label": "silence_after_A800",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 46,
+      "receipt_or_write_s": 4.498308,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 45520,
+      "native": {
+        "serverContent": {
+          "inputTranscription": {
+            "text": "The red boat is ready."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 47,
+      "receipt_or_write_s": 4.498427,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 45520,
+      "parsed": {
+        "server_content": {
+          "input_transcription": {
+            "text": "The red boat is ready."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 48,
+      "receipt_or_write_s": 4.498494,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 45520,
+      "native": {
+        "serverContent": {
+          "generationComplete": true
+        }
+      }
+    },
+    {
+      "ordinal": 49,
+      "receipt_or_write_s": 4.498542,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 45520,
+      "parsed": {
+        "server_content": {
+          "generation_complete": true
+        }
+      }
+    },
+    {
+      "ordinal": 50,
+      "receipt_or_write_s": 4.498594,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 45520,
+      "native": {
+        "serverContent": {},
+        "voiceActivity": {
+          "type": "ACTIVITY_END",
+          "audioOffset": "2.600s"
+        }
+      }
+    },
+    {
+      "ordinal": 51,
+      "receipt_or_write_s": 4.498646,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 45520,
+      "parsed": {
+        "server_content": {},
+        "voice_activity": {
+          "voice_activity_type": "ACTIVITY_END",
+          "audio_offset": "2.600s"
+        }
+      }
+    },
+    {
+      "ordinal": 52,
+      "receipt_or_write_s": 4.574721,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 47120,
+      "label": "silence_after_A800",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 53,
+      "receipt_or_write_s": 4.68335,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 48720,
+      "label": "silence_after_A800",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 54,
+      "receipt_or_write_s": 4.792797,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 50320,
+      "label": "silence_after_A800",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 55,
+      "receipt_or_write_s": 4.901807,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 51920,
+      "label": "silence_after_A800",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 56,
+      "receipt_or_write_s": 5.009535,
+      "kind": "prefence_observation_start",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 51920,
+      "window_s": 2
+    },
+    {
+      "ordinal": 57,
+      "receipt_or_write_s": 7.015151,
+      "kind": "audio_stream_end_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 51920,
+      "fence": "F1"
+    },
+    {
+      "ordinal": 58,
+      "receipt_or_write_s": 7.015274,
+      "kind": "input_manifest",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 51920,
+      "label": "shared_b",
+      "start_sample": 51920,
+      "end_sample": 84320,
+      "pcm_sha256": "50af2eaf21519b0d21813fb9a59a6b1af17b704aef481c913f294f5f3e4cf68b",
+      "synthetic_silence": false
+    },
+    {
+      "ordinal": 59,
+      "receipt_or_write_s": 7.015504,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 53520,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 60,
+      "receipt_or_write_s": 7.123657,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 55120,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 61,
+      "receipt_or_write_s": 7.232481,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 56720,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 62,
+      "receipt_or_write_s": 7.325424,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 56720,
+      "native": {
+        "serverContent": {},
+        "voiceActivity": {
+          "type": "ACTIVITY_START",
+          "audioOffset": "3.480s"
+        }
+      }
+    },
+    {
+      "ordinal": 63,
+      "receipt_or_write_s": 7.325582,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 56720,
+      "parsed": {
+        "server_content": {},
+        "voice_activity": {
+          "voice_activity_type": "ACTIVITY_START",
+          "audio_offset": "3.480s"
+        }
+      }
+    },
+    {
+      "ordinal": 64,
+      "receipt_or_write_s": 7.341625,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 58320,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 65,
+      "receipt_or_write_s": 7.450487,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 59920,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 66,
+      "receipt_or_write_s": 7.557723,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 61520,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 67,
+      "receipt_or_write_s": 7.667908,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 63120,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 68,
+      "receipt_or_write_s": 7.775647,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 64720,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 69,
+      "receipt_or_write_s": 7.88433,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 66320,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 70,
+      "receipt_or_write_s": 7.992513,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 67920,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 71,
+      "receipt_or_write_s": 8.101446,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 69520,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 72,
+      "receipt_or_write_s": 8.123405,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 69520,
+      "native": {
+        "serverContent": {
+          "interimInputTranscription": {
+            "text": "The"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 73,
+      "receipt_or_write_s": 8.123552,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 69520,
+      "parsed": {
+        "server_content": {
+          "interim_input_transcription": {
+            "text": "The"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 74,
+      "receipt_or_write_s": 8.209914,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 71120,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 75,
+      "receipt_or_write_s": 8.318817,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 72720,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 76,
+      "receipt_or_write_s": 8.427773,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 74320,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 77,
+      "receipt_or_write_s": 8.53693,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 75920,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 78,
+      "receipt_or_write_s": 8.645056,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 77520,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 79,
+      "receipt_or_write_s": 8.686629,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 77520,
+      "native": {
+        "serverContent": {
+          "interimInputTranscription": {
+            "text": "The blue train is"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 80,
+      "receipt_or_write_s": 8.686739,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 77520,
+      "parsed": {
+        "server_content": {
+          "interim_input_transcription": {
+            "text": "The blue train is"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 81,
+      "receipt_or_write_s": 8.754335,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 79120,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 82,
+      "receipt_or_write_s": 8.863482,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 80720,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 83,
+      "receipt_or_write_s": 8.97204,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 82320,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 84,
+      "receipt_or_write_s": 9.081268,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 83920,
+      "label": "shared_b",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 85,
+      "receipt_or_write_s": 9.189184,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 84320,
+      "label": "shared_b",
+      "chunk_samples": 400
+    },
+    {
+      "ordinal": 86,
+      "receipt_or_write_s": 9.219905,
+      "kind": "audio_stream_end_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 84320,
+      "fence": "F2"
+    },
+    {
+      "ordinal": 87,
+      "receipt_or_write_s": 9.219961,
+      "kind": "input_manifest",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 84320,
+      "label": "short_no",
+      "start_sample": 84320,
+      "end_sample": 91783,
+      "pcm_sha256": "e888d76940c2f012cb643125ab6d7d7961c6692a2f41a9265b5e2c0501396677",
+      "synthetic_silence": false
+    },
+    {
+      "ordinal": 88,
+      "receipt_or_write_s": 9.22009,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 85920,
+      "label": "short_no",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 89,
+      "receipt_or_write_s": 9.221736,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 85920,
+      "native": {
+        "serverContent": {
+          "interimInputTranscription": {
+            "text": "The blue train is late."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 90,
+      "receipt_or_write_s": 9.221845,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 85920,
+      "parsed": {
+        "server_content": {
+          "interim_input_transcription": {
+            "text": "The blue train is late."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 91,
+      "receipt_or_write_s": 9.328082,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 85920,
+      "native": {
+        "serverContent": {
+          "inputTranscription": {
+            "text": "The blue train is late."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 92,
+      "receipt_or_write_s": 9.328225,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 85920,
+      "parsed": {
+        "server_content": {
+          "input_transcription": {
+            "text": "The blue train is late."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 93,
+      "receipt_or_write_s": 9.328435,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 87520,
+      "label": "short_no",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 94,
+      "receipt_or_write_s": 9.328508,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 87520,
+      "native": {
+        "serverContent": {
+          "generationComplete": true
+        }
+      }
+    },
+    {
+      "ordinal": 95,
+      "receipt_or_write_s": 9.328596,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 87520,
+      "parsed": {
+        "server_content": {
+          "generation_complete": true
+        }
+      }
+    },
+    {
+      "ordinal": 96,
+      "receipt_or_write_s": 9.328631,
+      "kind": "native_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 87520,
+      "native": {
+        "serverContent": {},
+        "voiceActivity": {
+          "type": "ACTIVITY_END",
+          "audioOffset": "5.200s"
+        }
+      }
+    },
+    {
+      "ordinal": 97,
+      "receipt_or_write_s": 9.328688,
+      "kind": "sdk_receive",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 87520,
+      "parsed": {
+        "server_content": {},
+        "voice_activity": {
+          "voice_activity_type": "ACTIVITY_END",
+          "audio_offset": "5.200s"
+        }
+      }
+    },
+    {
+      "ordinal": 98,
+      "receipt_or_write_s": 9.437388,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 89120,
+      "label": "short_no",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 99,
+      "receipt_or_write_s": 9.545888,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 90720,
+      "label": "short_no",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 100,
+      "receipt_or_write_s": 9.654286,
+      "kind": "audio_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 91783,
+      "label": "short_no",
+      "chunk_samples": 1063
+    },
+    {
+      "ordinal": 101,
+      "receipt_or_write_s": 9.731389,
+      "kind": "audio_stream_end_write",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 91783,
+      "fence": "F3"
+    },
+    {
+      "ordinal": 102,
+      "receipt_or_write_s": 9.731417,
+      "kind": "bounded_final_window_start",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 91783,
+      "window_s": 3
+    },
+    {
+      "ordinal": 103,
+      "receipt_or_write_s": 12.740175,
+      "kind": "connection_closing",
+      "epoch": "G-S1",
+      "sent_sample_cursor": 91783,
+      "note": "Window ends, not proof recognition complete"
+    },
+    {
+      "ordinal": 104,
+      "receipt_or_write_s": 12.813512,
+      "kind": "connection_attempt",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 0,
+      "endpoint": "wss://generativelanguage.googleapis.com//ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+    },
+    {
+      "ordinal": 105,
+      "receipt_or_write_s": 13.11959,
+      "kind": "setup_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 0,
+      "native": {
+        "setup": {
+          "model": "models/gemini-3.5-transcribe-live",
+          "generationConfig": {
+            "responseModalities": [
+              "TEXT"
+            ]
+          },
+          "inputAudioTranscription": {
+            "mode": "VERBATIM"
+          },
+          "realtimeInputConfig": {
+            "automatic_activity_detection": {
+              "prefix_padding_ms": 500,
+              "silence_duration_ms": 400
+            }
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 106,
+      "receipt_or_write_s": 13.51241,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 0,
+      "native": {
+        "setupComplete": {}
+      }
+    },
+    {
+      "ordinal": 107,
+      "receipt_or_write_s": 13.512572,
+      "kind": "fence_suppressed_no_new_audio",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 0,
+      "fence": "F0-empty-suppressed",
+      "note": "Mirrors packaged writer; no native control sent"
+    },
+    {
+      "ordinal": 108,
+      "receipt_or_write_s": 13.512605,
+      "kind": "input_manifest",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 0,
+      "label": "short_no",
+      "start_sample": 0,
+      "end_sample": 7463,
+      "pcm_sha256": "e888d76940c2f012cb643125ab6d7d7961c6692a2f41a9265b5e2c0501396677",
+      "synthetic_silence": false
+    },
+    {
+      "ordinal": 109,
+      "receipt_or_write_s": 13.512822,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 1600,
+      "label": "short_no",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 110,
+      "receipt_or_write_s": 13.624483,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 3200,
+      "label": "short_no",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 111,
+      "receipt_or_write_s": 13.733326,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 4800,
+      "label": "short_no",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 112,
+      "receipt_or_write_s": 13.841786,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 6400,
+      "label": "short_no",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 113,
+      "receipt_or_write_s": 13.950271,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 7463,
+      "label": "short_no",
+      "chunk_samples": 1063
+    },
+    {
+      "ordinal": 114,
+      "receipt_or_write_s": 14.02836,
+      "kind": "audio_stream_end_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 7463,
+      "fence": "F1"
+    },
+    {
+      "ordinal": 115,
+      "receipt_or_write_s": 14.028443,
+      "kind": "input_manifest",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 7463,
+      "label": "shared_correction",
+      "start_sample": 7463,
+      "end_sample": 38183,
+      "pcm_sha256": "cb204865bc4501df69f9e613bae31aad2557d1b63ec43237f46f6ef5279d84de",
+      "synthetic_silence": false
+    },
+    {
+      "ordinal": 116,
+      "receipt_or_write_s": 14.028657,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 9063,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 117,
+      "receipt_or_write_s": 14.137165,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 10663,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 118,
+      "receipt_or_write_s": 14.246432,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 12263,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 119,
+      "receipt_or_write_s": 14.344183,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 12263,
+      "native": {
+        "serverContent": {},
+        "voiceActivity": {
+          "type": "ACTIVITY_START",
+          "audioOffset": "0.680s"
+        }
+      }
+    },
+    {
+      "ordinal": 120,
+      "receipt_or_write_s": 14.344334,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 12263,
+      "parsed": {
+        "server_content": {},
+        "voice_activity": {
+          "voice_activity_type": "ACTIVITY_START",
+          "audio_offset": "0.680s"
+        }
+      }
+    },
+    {
+      "ordinal": 121,
+      "receipt_or_write_s": 14.354303,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 13863,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 122,
+      "receipt_or_write_s": 14.462518,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 15463,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 123,
+      "receipt_or_write_s": 14.463856,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 15463,
+      "native": {
+        "serverContent": {
+          "interimInputTranscription": {
+            "text": "No"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 124,
+      "receipt_or_write_s": 14.463974,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 15463,
+      "parsed": {
+        "server_content": {
+          "interim_input_transcription": {
+            "text": "No"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 125,
+      "receipt_or_write_s": 14.571798,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 17063,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 126,
+      "receipt_or_write_s": 14.679638,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 18663,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 127,
+      "receipt_or_write_s": 14.788331,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 20263,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 128,
+      "receipt_or_write_s": 14.897127,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 21863,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 129,
+      "receipt_or_write_s": 15.005136,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 23463,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 130,
+      "receipt_or_write_s": 15.057211,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 23463,
+      "native": {
+        "serverContent": {
+          "interimInputTranscription": {
+            "text": "No. No."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 131,
+      "receipt_or_write_s": 15.057368,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 23463,
+      "parsed": {
+        "server_content": {
+          "interim_input_transcription": {
+            "text": "No. No."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 132,
+      "receipt_or_write_s": 15.113899,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 25063,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 133,
+      "receipt_or_write_s": 15.22243,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 26663,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 134,
+      "receipt_or_write_s": 15.330546,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 28263,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 135,
+      "receipt_or_write_s": 15.439691,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 29863,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 136,
+      "receipt_or_write_s": 15.548282,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 31463,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 137,
+      "receipt_or_write_s": 15.595912,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 31463,
+      "native": {
+        "serverContent": {
+          "interimInputTranscription": {
+            "text": "no no three"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 138,
+      "receipt_or_write_s": 15.59605,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 31463,
+      "parsed": {
+        "server_content": {
+          "interim_input_transcription": {
+            "text": "no no three"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 139,
+      "receipt_or_write_s": 15.656236,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 33063,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 140,
+      "receipt_or_write_s": 15.765417,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 34663,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 141,
+      "receipt_or_write_s": 15.873189,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 36263,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 142,
+      "receipt_or_write_s": 15.981929,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 37863,
+      "label": "shared_correction",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 143,
+      "receipt_or_write_s": 16.00814,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 37863,
+      "native": {
+        "serverContent": {
+          "interimInputTranscription": {
+            "text": "no no three"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 144,
+      "receipt_or_write_s": 16.008269,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 37863,
+      "parsed": {
+        "server_content": {
+          "interim_input_transcription": {
+            "text": "no no three"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 145,
+      "receipt_or_write_s": 16.090897,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 38183,
+      "label": "shared_correction",
+      "chunk_samples": 320
+    },
+    {
+      "ordinal": 146,
+      "receipt_or_write_s": 16.121692,
+      "kind": "audio_stream_end_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 38183,
+      "fence": "F2"
+    },
+    {
+      "ordinal": 147,
+      "receipt_or_write_s": 16.121743,
+      "kind": "input_manifest",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 38183,
+      "label": "repeat_no_1",
+      "start_sample": 38183,
+      "end_sample": 45646,
+      "pcm_sha256": "e888d76940c2f012cb643125ab6d7d7961c6692a2f41a9265b5e2c0501396677",
+      "synthetic_silence": false
+    },
+    {
+      "ordinal": 148,
+      "receipt_or_write_s": 16.121867,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 39783,
+      "label": "repeat_no_1",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 149,
+      "receipt_or_write_s": 16.22953,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 41383,
+      "label": "repeat_no_1",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 150,
+      "receipt_or_write_s": 16.337407,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 42983,
+      "label": "repeat_no_1",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 151,
+      "receipt_or_write_s": 16.380856,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 42983,
+      "native": {
+        "serverContent": {
+          "inputTranscription": {
+            "text": "No no three"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 152,
+      "receipt_or_write_s": 16.381086,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 42983,
+      "parsed": {
+        "server_content": {
+          "input_transcription": {
+            "text": "No no three"
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 153,
+      "receipt_or_write_s": 16.381113,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 42983,
+      "native": {
+        "serverContent": {
+          "generationComplete": true
+        }
+      }
+    },
+    {
+      "ordinal": 154,
+      "receipt_or_write_s": 16.381145,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 42983,
+      "parsed": {
+        "server_content": {
+          "generation_complete": true
+        }
+      }
+    },
+    {
+      "ordinal": 155,
+      "receipt_or_write_s": 16.381197,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 42983,
+      "native": {
+        "serverContent": {},
+        "voiceActivity": {
+          "type": "ACTIVITY_END",
+          "audioOffset": "2.386437500s"
+        }
+      }
+    },
+    {
+      "ordinal": 156,
+      "receipt_or_write_s": 16.381251,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 42983,
+      "parsed": {
+        "server_content": {},
+        "voice_activity": {
+          "voice_activity_type": "ACTIVITY_END",
+          "audio_offset": "2.386437500s"
+        }
+      }
+    },
+    {
+      "ordinal": 157,
+      "receipt_or_write_s": 16.446734,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 44583,
+      "label": "repeat_no_1",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 158,
+      "receipt_or_write_s": 16.556321,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 45646,
+      "label": "repeat_no_1",
+      "chunk_samples": 1063
+    },
+    {
+      "ordinal": 159,
+      "receipt_or_write_s": 16.633328,
+      "kind": "input_manifest",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 45646,
+      "label": "silence_gap700",
+      "start_sample": 45646,
+      "end_sample": 56846,
+      "pcm_sha256": "38d097477228baf52838e2dc91b50ef64f70e9a65030941869f3d31b96d4b8f7",
+      "synthetic_silence": true
+    },
+    {
+      "ordinal": 160,
+      "receipt_or_write_s": 16.633738,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 47246,
+      "label": "silence_gap700",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 161,
+      "receipt_or_write_s": 16.741578,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 48846,
+      "label": "silence_gap700",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 162,
+      "receipt_or_write_s": 16.849118,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 50446,
+      "label": "silence_gap700",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 163,
+      "receipt_or_write_s": 16.957635,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 52046,
+      "label": "silence_gap700",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 164,
+      "receipt_or_write_s": 17.066123,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 53646,
+      "label": "silence_gap700",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 165,
+      "receipt_or_write_s": 17.175173,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 55246,
+      "label": "silence_gap700",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 166,
+      "receipt_or_write_s": 17.283762,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 56846,
+      "label": "silence_gap700",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 167,
+      "receipt_or_write_s": 17.391828,
+      "kind": "input_manifest",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 56846,
+      "label": "repeat_no_2",
+      "start_sample": 56846,
+      "end_sample": 64309,
+      "pcm_sha256": "e888d76940c2f012cb643125ab6d7d7961c6692a2f41a9265b5e2c0501396677",
+      "synthetic_silence": false
+    },
+    {
+      "ordinal": 168,
+      "receipt_or_write_s": 17.392255,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 58446,
+      "label": "repeat_no_2",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 169,
+      "receipt_or_write_s": 17.500528,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 60046,
+      "label": "repeat_no_2",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 170,
+      "receipt_or_write_s": 17.608928,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 61646,
+      "label": "repeat_no_2",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 171,
+      "receipt_or_write_s": 17.717616,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 63246,
+      "label": "repeat_no_2",
+      "chunk_samples": 1600
+    },
+    {
+      "ordinal": 172,
+      "receipt_or_write_s": 17.718715,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 63246,
+      "native": {
+        "serverContent": {},
+        "voiceActivity": {
+          "type": "ACTIVITY_START",
+          "audioOffset": "3.826437500s"
+        }
+      }
+    },
+    {
+      "ordinal": 173,
+      "receipt_or_write_s": 17.718839,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 63246,
+      "parsed": {
+        "server_content": {},
+        "voice_activity": {
+          "voice_activity_type": "ACTIVITY_START",
+          "audio_offset": "3.826437500s"
+        }
+      }
+    },
+    {
+      "ordinal": 174,
+      "receipt_or_write_s": 17.826313,
+      "kind": "audio_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 64309,
+      "label": "repeat_no_2",
+      "chunk_samples": 1063
+    },
+    {
+      "ordinal": 175,
+      "receipt_or_write_s": 17.903058,
+      "kind": "audio_stream_end_write",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 64309,
+      "fence": "F3"
+    },
+    {
+      "ordinal": 176,
+      "receipt_or_write_s": 17.903112,
+      "kind": "fence_suppressed_no_new_audio",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 64309,
+      "fence": "F3-duplicate-suppressed",
+      "note": "Mirrors packaged writer; no native control sent"
+    },
+    {
+      "ordinal": 177,
+      "receipt_or_write_s": 17.90313,
+      "kind": "bounded_final_window_start",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 64309,
+      "window_s": 3
+    },
+    {
+      "ordinal": 178,
+      "receipt_or_write_s": 18.125381,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 64309,
+      "native": {
+        "serverContent": {
+          "inputTranscription": {
+            "text": "No."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 179,
+      "receipt_or_write_s": 18.125536,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 64309,
+      "parsed": {
+        "server_content": {
+          "input_transcription": {
+            "text": "No."
+          }
+        }
+      }
+    },
+    {
+      "ordinal": 180,
+      "receipt_or_write_s": 18.125601,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 64309,
+      "native": {
+        "serverContent": {
+          "generationComplete": true
+        }
+      }
+    },
+    {
+      "ordinal": 181,
+      "receipt_or_write_s": 18.125638,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 64309,
+      "parsed": {
+        "server_content": {
+          "generation_complete": true
+        }
+      }
+    },
+    {
+      "ordinal": 182,
+      "receipt_or_write_s": 18.125652,
+      "kind": "native_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 64309,
+      "native": {
+        "serverContent": {},
+        "voiceActivity": {
+          "type": "ACTIVITY_END",
+          "audioOffset": "4.019312500s"
+        }
+      }
+    },
+    {
+      "ordinal": 183,
+      "receipt_or_write_s": 18.125702,
+      "kind": "sdk_receive",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 64309,
+      "parsed": {
+        "server_content": {},
+        "voice_activity": {
+          "voice_activity_type": "ACTIVITY_END",
+          "audio_offset": "4.019312500s"
+        }
+      }
+    },
+    {
+      "ordinal": 184,
+      "receipt_or_write_s": 20.917964,
+      "kind": "connection_closing",
+      "epoch": "G-S2",
+      "sent_sample_cursor": 64309,
+      "note": "Window ends, not proof recognition complete"
+    }
+  ],
+  "limits": {
+    "qwen_connections": 1,
+    "gemini_connections": 2,
+    "sent_audio_s_per_provider_ceiling": 60,
+    "start_timeout_s": 8,
+    "task_finish_timeout_s": 15,
+    "gemini_final_window_s": 3,
+    "automatic_retries": 0,
+    "billing_meter": false
+  },
+  "effective_backend": {
+    "vertexai": false,
+    "websocket_base_url": "wss://generativelanguage.googleapis.com/",
+    "api_version": "v1beta"
+  },
+  "execution_outcome": "bounded plan completed",
+  "sent_audio_s": 9.75575
+}

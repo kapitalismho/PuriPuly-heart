@@ -1,0 +1,65 @@
+{
+  "baseline": "0f0ba5173da51250bb5926e4a2eead5e68adff81",
+  "kind": "Final frozen-script artifact smoke provenance; external pre/post hash audit, not hashes emitted inside each mode",
+  "source_hash_method": "certutil -hashfile local_probe.py SHA256 and certutil -hashfile common.py SHA256 before and after the sequential four-mode command; values unchanged. Corroborating SHA256 computed during manifest capture.",
+  "script_sha256_before": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
+  "script_sha256_after": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
+  "common_sha256_before": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+  "common_sha256_after": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+  "four_modes_share_exact_frozen_sources": true,
+  "checks": {
+    "local-results-real.json": {
+      "stage": "real",
+      "command": "../../../.venv/Scripts/python.exe docs/experiments/issue-212-clarification/local_probe.py real",
+      "sha256": "abfc64900817df1a20bc1a3fa6716776c629d97dba8d6752ea8ec3630989066e",
+      "script_sha256": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
+      "common_sha256": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+      "exit_code": 0,
+      "decodes": 12,
+      "load_failures": []
+    },
+    "local-results-components.json": {
+      "stage": "components",
+      "command": "../../../.venv/Scripts/python.exe docs/experiments/issue-212-clarification/local_probe.py components",
+      "sha256": "6f036b37a23fc3b27c33628bad14af8baefd82eafe6ed5c38737691c4f6f1804",
+      "script_sha256": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
+      "common_sha256": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+      "exit_code": 0
+    },
+    "local-results-rolling.json": {
+      "stage": "rolling-scoped",
+      "command": "../../../.venv/Scripts/python.exe docs/experiments/issue-212-clarification/local_probe.py rolling-scoped",
+      "sha256": "bb910e1cd9cce3f5e8c29ccc476f991a4c9cd4ff76c2b6f8907597c1b624d192",
+      "script_sha256": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
+      "common_sha256": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+      "exit_code": 0
+    },
+    "local-results-gpu.json": {
+      "stage": "gpu",
+      "command": "../../../.venv/Scripts/python.exe docs/experiments/issue-212-clarification/local_probe.py gpu",
+      "sha256": "5d4fb1cc6d04df8a5e2c63031fe3aaa4b16c4e4d88ebb1b9344b124db73108f1",
+      "script_sha256": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
+      "common_sha256": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+      "exit_code": 0,
+      "authenticated_contract2": true,
+      "worker_cleanup": {
+        "closed": true,
+        "returncode": 0
+      },
+      "inference_attempted": false
+    }
+  },
+  "historical_record": "local-results-source-history.json",
+  "historical_original_runs_recorded_script_hashes": false,
+  "historical_snapshot_basis": "Reconstructed from final script and recorded surgical edits; not runtime captured. Original results and full reconstructed UTF8 sources preserved; original real snapshot byte count12447 matches write tool record.",
+  "historical_initial_invalid_gpu_script_sha256_reconstructed": "1f75c69f93db9bd2962dabb2e063157e02e5dc0a875765a97c5f7e60f99f89bf",
+  "primary_actual_decodes": 12,
+  "final_smoke_actual_decodes": 12,
+  "total_actual_decodes": 24,
+  "additional_hypotheses": false,
+  "external_inference_calls": 0,
+  "billing_metering": false,
+  "model_download_or_activation": false,
+  "gpu_inference": "not run; installed GGUF missing, worker discovery succeeds",
+  "japanese_short_correction_corpus": "not run; no further fixture hunting selected"
+}

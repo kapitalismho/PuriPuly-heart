@@ -1,0 +1,3942 @@
+{
+  "revision": "TIMED-CLOUD-WIRE-1",
+  "environment": {
+    "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "versions": {
+      "websockets": "16.1.1",
+      "deepgram-sdk": "5.3.4",
+      "elevenlabs": "2.65.0"
+    },
+    "source_sha256": {
+      "docs\\experiments\\issue-212-clarification\\timed_cloud_probe.py": "9833a0ca16ba2bff7af4a94c4b0d2e6601164ab077cc68b4a6c7447ba8dd9d89",
+      "docs\\experiments\\issue-212-clarification\\common.py": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+      "docs\\asr-speaker-policy.md": "50afb6a8385705e1138eac7da71a8e80a62bf3f53cdec0993549738eb0229f5f",
+      "docs\\experiments\\issue-212\\evidence.md": "04cfa4bb3c609d5578cecfa5bbfc1934145b3676be148cc6341b2a1883ffe2a4"
+    },
+    "configured_routes": {
+      "soniox": {
+        "model": "stt-rt-v5",
+        "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket"
+      },
+      "deepgram": {
+        "model": "nova-3",
+        "endpoint": "wss://api.deepgram.com/v1/listen"
+      },
+      "elevenlabs": {
+        "model": "scribe_v2_realtime",
+        "endpoint": "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+      }
+    },
+    "audio": {
+      "a": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_a.wav",
+        "wav_sha256": "de9319443c5cebf7c0dd33eccb2eeb8b3219edb2b2adf42c1c2caab539360cbe",
+        "pcm_sha256": "fa4f27683fa43b4556a76da9b51d565039f5da424f04c54503db1da5b1325273",
+        "samples": 31120,
+        "duration_s": 1.945,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1796,
+          "active_end_sample_exclusive": 19242,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1476,
+          "end_sample_exclusive": 19562,
+          "duration_s": 1.130375,
+          "sha256": "1631dc77e659b172c23bb8ae645561575c0671de908c73002aa0814f0c92945d"
+        },
+        "active_trim": {
+          "start_sample": 1796,
+          "end_sample_exclusive": 19242,
+          "duration_s": 1.090375,
+          "sha256": "88fc76e36f693f0d58edd00bb4e865bb13c37d45f0188d3182504871dcc5384f"
+        }
+      },
+      "b": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_b.wav",
+        "wav_sha256": "0d0fad34b07659f83a03309b06f4314180060aba5687e13951a6e27bd902277d",
+        "pcm_sha256": "50af2eaf21519b0d21813fb9a59a6b1af17b704aef481c913f294f5f3e4cf68b",
+        "samples": 32400,
+        "duration_s": 2.025,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1796,
+          "active_end_sample_exclusive": 20219,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1476,
+          "end_sample_exclusive": 20539,
+          "duration_s": 1.1914375,
+          "sha256": "7a3cb982888651f16a32c97049da93f54d7b5eb9e575ca3bc38be0522ca7fa8a"
+        },
+        "active_trim": {
+          "start_sample": 1796,
+          "end_sample_exclusive": 20219,
+          "duration_s": 1.1514375,
+          "sha256": "fd2e3c50896fa0c00bcdcd116a94833bb2d24528f87ca4fbd39b339869d3eedf"
+        }
+      },
+      "no": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+        "wav_sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+        "pcm_sha256": "7ecb58a91e9b6b77aa497c3f98aa336fde279f326b49364867ce5b9fffb0570d",
+        "samples": 18160,
+        "duration_s": 1.135,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1727,
+          "active_end_sample_exclusive": 6361,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1407,
+          "end_sample_exclusive": 6681,
+          "duration_s": 0.329625,
+          "sha256": "59b6545ada47d8a6000f2fffd787e5a2db5af2a0686ec2bbc7dfc2f804d2af07"
+        },
+        "active_trim": {
+          "start_sample": 1727,
+          "end_sample_exclusive": 6361,
+          "duration_s": 0.289625,
+          "sha256": "2aaee5e1281fe84a0b13003341ed8e7cc8b7a9cd97da9c41e27bcb3e2a0418e2"
+        }
+      },
+      "correction": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+        "wav_sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+        "pcm_sha256": "cb204865bc4501df69f9e613bae31aad2557d1b63ec43237f46f6ef5279d84de",
+        "samples": 30720,
+        "duration_s": 1.92,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1633,
+          "active_end_sample_exclusive": 18862,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1313,
+          "end_sample_exclusive": 19182,
+          "duration_s": 1.1168125,
+          "sha256": "ea76608630cb558d7ae3497a2ebfb56d7829a75703b04643d51dfc43e5717ed1"
+        },
+        "active_trim": {
+          "start_sample": 1633,
+          "end_sample_exclusive": 18862,
+          "duration_s": 1.0768125,
+          "sha256": "c9bca2a2ab81851621c29ad54616e22e48c96c68621c819fef68e1067298d2bc"
+        }
+      }
+    },
+    "wire": "Raw native WebSockets using locked websockets; SDKs and packaged adapters bypassed; no product mutation",
+    "sample_rate": 16000,
+    "format": "mono PCM signed16 little endian",
+    "limits": {
+      "initial_connections_per_provider": 2,
+      "automatic_retries": 0,
+      "audio_ceiling_per_provider_s": 60
+    }
+  },
+  "argv": [
+    "--provider",
+    "soniox",
+    "--output",
+    "docs/experiments/issue-212-clarification/timed-cloud-results-soniox.json"
+  ],
+  "prepared_without_connections": false,
+  "provider": "soniox",
+  "sessions": [
+    {
+      "name": "normal",
+      "events": [
+        {
+          "ordinal": 1,
+          "elapsed_s": 0.753361,
+          "sent_sample_cursor": 0,
+          "kind": "connected",
+          "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket"
+        },
+        {
+          "ordinal": 2,
+          "elapsed_s": 0.753522,
+          "sent_sample_cursor": 0,
+          "kind": "configuration_written",
+          "options": {
+            "model": "stt-rt-v5",
+            "audio_format": "pcm_s16le",
+            "sample_rate": 16000,
+            "num_channels": 1,
+            "enable_endpoint_detection": false,
+            "enable_language_identification": false,
+            "enable_speaker_diarization": false,
+            "language_hints": [
+              "en"
+            ]
+          }
+        },
+        {
+          "ordinal": 3,
+          "elapsed_s": 0.753602,
+          "sent_sample_cursor": 1600,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 4,
+          "elapsed_s": 0.858988,
+          "sent_sample_cursor": 3200,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 5,
+          "elapsed_s": 0.968449,
+          "sent_sample_cursor": 4800,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 6,
+          "elapsed_s": 0.97152,
+          "sent_sample_cursor": 4800,
+          "kind": "received",
+          "payload": {
+            "tokens": [],
+            "final_audio_proc_ms": 0,
+            "total_audio_proc_ms": 0
+          }
+        },
+        {
+          "ordinal": 7,
+          "elapsed_s": 1.060993,
+          "sent_sample_cursor": 6400,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 8,
+          "elapsed_s": 1.154416,
+          "sent_sample_cursor": 8000,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 9,
+          "elapsed_s": 1.262553,
+          "sent_sample_cursor": 9600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "9846d79a24378082cfd9e78bd71f3f1cbdad11d9aca5aa8b9b3c5ada7326539a"
+        },
+        {
+          "ordinal": 10,
+          "elapsed_s": 1.371241,
+          "sent_sample_cursor": 11200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "06cc5dffb513bedfa782982a162c7f98740075e3ea3244b2fef8e2a99a2c90cf"
+        },
+        {
+          "ordinal": 11,
+          "elapsed_s": 1.464662,
+          "sent_sample_cursor": 12800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "2cfb71bd5336cacb28cb3c15671db7f287151dbc6f45babde1158a33bad4776a"
+        },
+        {
+          "ordinal": 12,
+          "elapsed_s": 1.573435,
+          "sent_sample_cursor": 14400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "536e69c139f5a967da251625a3b030d518752f3366eec9834c9f3639d6d605cb"
+        },
+        {
+          "ordinal": 13,
+          "elapsed_s": 1.666231,
+          "sent_sample_cursor": 16000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "ff72cb373a8b02ec427db7873540b4a95575d04a610934602a43fe6b811ddbb3"
+        },
+        {
+          "ordinal": 14,
+          "elapsed_s": 1.775347,
+          "sent_sample_cursor": 17600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "8b49d08006a79876ad60915891084233bb7e48585c1a40da3654c486c4004e7b"
+        },
+        {
+          "ordinal": 15,
+          "elapsed_s": 1.86877,
+          "sent_sample_cursor": 19200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "af0b5527980db1c2d5477f5a72b83a8ce9043af76759c2ca350557f571390c37"
+        },
+        {
+          "ordinal": 16,
+          "elapsed_s": 1.976972,
+          "sent_sample_cursor": 20800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "df6891f838adb0c96950f26f2ca4408d6f506dd47eec29fee2508d769cf63d43"
+        },
+        {
+          "ordinal": 17,
+          "elapsed_s": 1.992815,
+          "sent_sample_cursor": 20800,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": "The",
+                "start_ms": 480,
+                "end_ms": 540,
+                "confidence": 0.996,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 0,
+            "total_audio_proc_ms": 1080
+          }
+        },
+        {
+          "ordinal": 18,
+          "elapsed_s": 2.069507,
+          "sent_sample_cursor": 22400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "378813344f230b811b33e256cfec32ffa7b2bd4187784f824eef881f7b123da3"
+        },
+        {
+          "ordinal": 19,
+          "elapsed_s": 2.177801,
+          "sent_sample_cursor": 24000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5855f8380cab2ec9eb65bf62387c3fbffafc51f08d28104e01c8dd08c98d03e1"
+        },
+        {
+          "ordinal": 20,
+          "elapsed_s": 2.270811,
+          "sent_sample_cursor": 25600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "f8f8b0606dca3ebff7caeff940900548882e8b96653dfa2f35d7e41a872f6ffa"
+        },
+        {
+          "ordinal": 21,
+          "elapsed_s": 2.292215,
+          "sent_sample_cursor": 25600,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": "The",
+                "start_ms": 480,
+                "end_ms": 540,
+                "confidence": 0.996,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 720,
+                "end_ms": 780,
+                "confidence": 0.729,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 0,
+            "total_audio_proc_ms": 1320
+          }
+        },
+        {
+          "ordinal": 22,
+          "elapsed_s": 2.363717,
+          "sent_sample_cursor": 27200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5e646e197d8bf4eae401a751d6c0385f8a31340163f22823524c15494efe442a"
+        },
+        {
+          "ordinal": 23,
+          "elapsed_s": 2.471931,
+          "sent_sample_cursor": 28800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "095e617f71af1d91c26eb56b218c1d9b490794b7e436ab6e4ff4cf9a3a7e7e31"
+        },
+        {
+          "ordinal": 24,
+          "elapsed_s": 2.486862,
+          "sent_sample_cursor": 28800,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": "The",
+                "start_ms": 480,
+                "end_ms": 540,
+                "confidence": 0.996,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 720,
+                "end_ms": 780,
+                "confidence": 0.729,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1020,
+                "end_ms": 1080,
+                "confidence": 0.993,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 0,
+            "total_audio_proc_ms": 1560
+          }
+        },
+        {
+          "ordinal": 25,
+          "elapsed_s": 2.565496,
+          "sent_sample_cursor": 30400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 26,
+          "elapsed_s": 2.588544,
+          "sent_sample_cursor": 30400,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": "The",
+                "start_ms": 480,
+                "end_ms": 540,
+                "confidence": 0.996,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 720,
+                "end_ms": 780,
+                "confidence": 0.729,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1020,
+                "end_ms": 1080,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.999,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 0,
+            "total_audio_proc_ms": 1680
+          }
+        },
+        {
+          "ordinal": 27,
+          "elapsed_s": 2.674707,
+          "sent_sample_cursor": 32000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 28,
+          "elapsed_s": 2.688856,
+          "sent_sample_cursor": 32000,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": "The",
+                "start_ms": 480,
+                "end_ms": 540,
+                "confidence": 0.996,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 720,
+                "end_ms": 780,
+                "confidence": 0.729,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1020,
+                "end_ms": 1080,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1200,
+                "end_ms": 1260,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 0,
+            "total_audio_proc_ms": 1800
+          }
+        },
+        {
+          "ordinal": 29,
+          "elapsed_s": 2.76777,
+          "sent_sample_cursor": 33600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 30,
+          "elapsed_s": 2.876305,
+          "sent_sample_cursor": 35200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 31,
+          "elapsed_s": 2.900752,
+          "sent_sample_cursor": 35200,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": "The",
+                "start_ms": 480,
+                "end_ms": 540,
+                "confidence": 0.996,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 720,
+                "end_ms": 780,
+                "confidence": 0.729,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1020,
+                "end_ms": 1080,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1200,
+                "end_ms": 1260,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 1320,
+                "end_ms": 1380,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 0,
+            "total_audio_proc_ms": 1920
+          }
+        },
+        {
+          "ordinal": 32,
+          "elapsed_s": 2.969215,
+          "sent_sample_cursor": 36800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 33,
+          "elapsed_s": 2.985972,
+          "sent_sample_cursor": 36800,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": "The",
+                "start_ms": 480,
+                "end_ms": 540,
+                "confidence": 0.996,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 720,
+                "end_ms": 780,
+                "confidence": 0.729,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1020,
+                "end_ms": 1080,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1200,
+                "end_ms": 1260,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 1320,
+                "end_ms": 1380,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "ad",
+                "start_ms": 1500,
+                "end_ms": 1560,
+                "confidence": 0.893,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 0,
+            "total_audio_proc_ms": 2040
+          }
+        },
+        {
+          "ordinal": 34,
+          "elapsed_s": 3.078236,
+          "sent_sample_cursor": 38400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 35,
+          "elapsed_s": 3.172103,
+          "sent_sample_cursor": 39120,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 720,
+          "pcm_sha256": "52dbd4365b026555e3382c056240376d3aa319c7e46c1aa7c38caa4883570517"
+        },
+        {
+          "ordinal": 36,
+          "elapsed_s": 3.191264,
+          "sent_sample_cursor": 39120,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": "The",
+                "start_ms": 480,
+                "end_ms": 540,
+                "confidence": 0.996,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 720,
+                "end_ms": 780,
+                "confidence": 0.729,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1020,
+                "end_ms": 1080,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1200,
+                "end_ms": 1260,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 1320,
+                "end_ms": 1380,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "ad",
+                "start_ms": 1500,
+                "end_ms": 1560,
+                "confidence": 0.893,
+                "is_final": false
+              },
+              {
+                "text": "y.",
+                "start_ms": 1680,
+                "end_ms": 1740,
+                "confidence": 0.982,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 0,
+            "total_audio_proc_ms": 2280
+          }
+        },
+        {
+          "ordinal": 37,
+          "elapsed_s": 3.218885,
+          "sent_sample_cursor": 40720,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 38,
+          "elapsed_s": 3.327372,
+          "sent_sample_cursor": 42320,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 39,
+          "elapsed_s": 3.42021,
+          "sent_sample_cursor": 43920,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 40,
+          "elapsed_s": 3.528975,
+          "sent_sample_cursor": 45520,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 41,
+          "elapsed_s": 3.621404,
+          "sent_sample_cursor": 47120,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 42,
+          "elapsed_s": 3.729881,
+          "sent_sample_cursor": 48000,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 880,
+          "pcm_sha256": "52e28210c0be3be4e312d3ec209b5c49fc69abdd4c4aed923f1ce29ad25b0350"
+        },
+        {
+          "ordinal": 43,
+          "elapsed_s": 3.776278,
+          "sent_sample_cursor": 48000,
+          "kind": "control_written",
+          "control": "finalize"
+        },
+        {
+          "ordinal": 44,
+          "elapsed_s": 3.99687,
+          "sent_sample_cursor": 48000,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": "The",
+                "start_ms": 480,
+                "end_ms": 540,
+                "confidence": 0.996,
+                "is_final": true
+              },
+              {
+                "text": " red",
+                "start_ms": 720,
+                "end_ms": 780,
+                "confidence": 0.729,
+                "is_final": true
+              },
+              {
+                "text": " bo",
+                "start_ms": 1020,
+                "end_ms": 1080,
+                "confidence": 0.993,
+                "is_final": true
+              },
+              {
+                "text": "at",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.999,
+                "is_final": true
+              },
+              {
+                "text": " is",
+                "start_ms": 1200,
+                "end_ms": 1260,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " re",
+                "start_ms": 1320,
+                "end_ms": 1380,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": "ad",
+                "start_ms": 1500,
+                "end_ms": 1560,
+                "confidence": 0.893,
+                "is_final": true
+              },
+              {
+                "text": "y.",
+                "start_ms": 1680,
+                "end_ms": 1740,
+                "confidence": 0.982,
+                "is_final": true
+              },
+              {
+                "text": "<fin>",
+                "start_ms": 0,
+                "end_ms": 0,
+                "confidence": 0,
+                "is_final": true
+              }
+            ],
+            "final_audio_proc_ms": 3120,
+            "total_audio_proc_ms": 3120
+          }
+        },
+        {
+          "ordinal": 45,
+          "elapsed_s": 3.996925,
+          "sent_sample_cursor": 48000,
+          "kind": "completion_observed",
+          "after_receive_index": 9
+        },
+        {
+          "ordinal": 46,
+          "elapsed_s": 3.997028,
+          "sent_sample_cursor": 49600,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 47,
+          "elapsed_s": 4.102559,
+          "sent_sample_cursor": 51200,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 48,
+          "elapsed_s": 4.211741,
+          "sent_sample_cursor": 52800,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 49,
+          "elapsed_s": 4.305384,
+          "sent_sample_cursor": 54400,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 50,
+          "elapsed_s": 4.398967,
+          "sent_sample_cursor": 56000,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 51,
+          "elapsed_s": 4.506971,
+          "sent_sample_cursor": 57600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "9846d79a24378082cfd9e78bd71f3f1cbdad11d9aca5aa8b9b3c5ada7326539a"
+        },
+        {
+          "ordinal": 52,
+          "elapsed_s": 4.616221,
+          "sent_sample_cursor": 59200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "06cc5dffb513bedfa782982a162c7f98740075e3ea3244b2fef8e2a99a2c90cf"
+        },
+        {
+          "ordinal": 53,
+          "elapsed_s": 4.708937,
+          "sent_sample_cursor": 60800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "2cfb71bd5336cacb28cb3c15671db7f287151dbc6f45babde1158a33bad4776a"
+        },
+        {
+          "ordinal": 54,
+          "elapsed_s": 4.819174,
+          "sent_sample_cursor": 62400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "536e69c139f5a967da251625a3b030d518752f3366eec9834c9f3639d6d605cb"
+        },
+        {
+          "ordinal": 55,
+          "elapsed_s": 4.912191,
+          "sent_sample_cursor": 64000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "ff72cb373a8b02ec427db7873540b4a95575d04a610934602a43fe6b811ddbb3"
+        },
+        {
+          "ordinal": 56,
+          "elapsed_s": 5.020981,
+          "sent_sample_cursor": 65600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "8b49d08006a79876ad60915891084233bb7e48585c1a40da3654c486c4004e7b"
+        },
+        {
+          "ordinal": 57,
+          "elapsed_s": 5.035845,
+          "sent_sample_cursor": 65600,
+          "kind": "received",
+          "payload": {
+            "tokens": [],
+            "final_audio_proc_ms": 3120,
+            "total_audio_proc_ms": 3960
+          }
+        },
+        {
+          "ordinal": 58,
+          "elapsed_s": 5.114597,
+          "sent_sample_cursor": 67200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "af0b5527980db1c2d5477f5a72b83a8ce9043af76759c2ca350557f571390c37"
+        },
+        {
+          "ordinal": 59,
+          "elapsed_s": 5.207737,
+          "sent_sample_cursor": 68800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "df6891f838adb0c96950f26f2ca4408d6f506dd47eec29fee2508d769cf63d43"
+        },
+        {
+          "ordinal": 60,
+          "elapsed_s": 5.236315,
+          "sent_sample_cursor": 68800,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 3600,
+                "end_ms": 3660,
+                "confidence": 0.998,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 3120,
+            "total_audio_proc_ms": 4200
+          }
+        },
+        {
+          "ordinal": 61,
+          "elapsed_s": 5.316224,
+          "sent_sample_cursor": 70400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "378813344f230b811b33e256cfec32ffa7b2bd4187784f824eef881f7b123da3"
+        },
+        {
+          "ordinal": 62,
+          "elapsed_s": 5.33627,
+          "sent_sample_cursor": 70400,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 3600,
+                "end_ms": 3660,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 3780,
+                "end_ms": 3840,
+                "confidence": 0.999,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 3120,
+            "total_audio_proc_ms": 4320
+          }
+        },
+        {
+          "ordinal": 63,
+          "elapsed_s": 5.409973,
+          "sent_sample_cursor": 72000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5855f8380cab2ec9eb65bf62387c3fbffafc51f08d28104e01c8dd08c98d03e1"
+        },
+        {
+          "ordinal": 64,
+          "elapsed_s": 5.519177,
+          "sent_sample_cursor": 73600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "f8f8b0606dca3ebff7caeff940900548882e8b96653dfa2f35d7e41a872f6ffa"
+        },
+        {
+          "ordinal": 65,
+          "elapsed_s": 5.612237,
+          "sent_sample_cursor": 75200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5e646e197d8bf4eae401a751d6c0385f8a31340163f22823524c15494efe442a"
+        },
+        {
+          "ordinal": 66,
+          "elapsed_s": 5.720902,
+          "sent_sample_cursor": 76800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "095e617f71af1d91c26eb56b218c1d9b490794b7e436ab6e4ff4cf9a3a7e7e31"
+        },
+        {
+          "ordinal": 67,
+          "elapsed_s": 5.743017,
+          "sent_sample_cursor": 76800,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 3600,
+                "end_ms": 3660,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 3780,
+                "end_ms": 3840,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 4080,
+                "end_ms": 4140,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 3120,
+            "total_audio_proc_ms": 4680
+          }
+        },
+        {
+          "ordinal": 68,
+          "elapsed_s": 5.813573,
+          "sent_sample_cursor": 78400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 69,
+          "elapsed_s": 5.832512,
+          "sent_sample_cursor": 78400,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 3600,
+                "end_ms": 3660,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 3780,
+                "end_ms": 3840,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 4080,
+                "end_ms": 4140,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 4200,
+                "end_ms": 4260,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 4260,
+                "end_ms": 4320,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 3120,
+            "total_audio_proc_ms": 4800
+          }
+        },
+        {
+          "ordinal": 70,
+          "elapsed_s": 5.922463,
+          "sent_sample_cursor": 80000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 71,
+          "elapsed_s": 5.941282,
+          "sent_sample_cursor": 80000,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 3600,
+                "end_ms": 3660,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 3780,
+                "end_ms": 3840,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 4080,
+                "end_ms": 4140,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 4200,
+                "end_ms": 4260,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 4260,
+                "end_ms": 4320,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 4380,
+                "end_ms": 4440,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 3120,
+            "total_audio_proc_ms": 4920
+          }
+        },
+        {
+          "ordinal": 72,
+          "elapsed_s": 6.01583,
+          "sent_sample_cursor": 81600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 73,
+          "elapsed_s": 6.109001,
+          "sent_sample_cursor": 83200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 74,
+          "elapsed_s": 6.217897,
+          "sent_sample_cursor": 84800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 75,
+          "elapsed_s": 6.2317,
+          "sent_sample_cursor": 84800,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 3600,
+                "end_ms": 3660,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 3780,
+                "end_ms": 3840,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 4080,
+                "end_ms": 4140,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 4200,
+                "end_ms": 4260,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 4260,
+                "end_ms": 4320,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 4380,
+                "end_ms": 4440,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "ad",
+                "start_ms": 4560,
+                "end_ms": 4620,
+                "confidence": 0.99,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 3120,
+            "total_audio_proc_ms": 5160
+          }
+        },
+        {
+          "ordinal": 76,
+          "elapsed_s": 6.310332,
+          "sent_sample_cursor": 86400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 77,
+          "elapsed_s": 6.323862,
+          "sent_sample_cursor": 86400,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 3600,
+                "end_ms": 3660,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 3780,
+                "end_ms": 3840,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 4080,
+                "end_ms": 4140,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 4200,
+                "end_ms": 4260,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 4260,
+                "end_ms": 4320,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 4380,
+                "end_ms": 4440,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "ad",
+                "start_ms": 4560,
+                "end_ms": 4620,
+                "confidence": 0.99,
+                "is_final": false
+              },
+              {
+                "text": "y.",
+                "start_ms": 4740,
+                "end_ms": 4800,
+                "confidence": 0.997,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 3120,
+            "total_audio_proc_ms": 5280
+          }
+        },
+        {
+          "ordinal": 78,
+          "elapsed_s": 6.418939,
+          "sent_sample_cursor": 87120,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 720,
+          "pcm_sha256": "52dbd4365b026555e3382c056240376d3aa319c7e46c1aa7c38caa4883570517"
+        },
+        {
+          "ordinal": 79,
+          "elapsed_s": 6.465358,
+          "sent_sample_cursor": 88720,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 80,
+          "elapsed_s": 6.57444,
+          "sent_sample_cursor": 90320,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 81,
+          "elapsed_s": 6.667053,
+          "sent_sample_cursor": 91920,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 82,
+          "elapsed_s": 6.775523,
+          "sent_sample_cursor": 93520,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 83,
+          "elapsed_s": 6.868907,
+          "sent_sample_cursor": 95120,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 84,
+          "elapsed_s": 6.977479,
+          "sent_sample_cursor": 96000,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 880,
+          "pcm_sha256": "52e28210c0be3be4e312d3ec209b5c49fc69abdd4c4aed923f1ce29ad25b0350"
+        },
+        {
+          "ordinal": 85,
+          "elapsed_s": 7.024617,
+          "sent_sample_cursor": 96000,
+          "kind": "control_written",
+          "control": "finalize"
+        },
+        {
+          "ordinal": 86,
+          "elapsed_s": 7.240745,
+          "sent_sample_cursor": 96000,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 3600,
+                "end_ms": 3660,
+                "confidence": 0.998,
+                "is_final": true
+              },
+              {
+                "text": " red",
+                "start_ms": 3780,
+                "end_ms": 3840,
+                "confidence": 0.999,
+                "is_final": true
+              },
+              {
+                "text": " bo",
+                "start_ms": 4080,
+                "end_ms": 4140,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": "at",
+                "start_ms": 4200,
+                "end_ms": 4260,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " is",
+                "start_ms": 4260,
+                "end_ms": 4320,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " re",
+                "start_ms": 4380,
+                "end_ms": 4440,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": "ad",
+                "start_ms": 4560,
+                "end_ms": 4620,
+                "confidence": 0.99,
+                "is_final": true
+              },
+              {
+                "text": "y.",
+                "start_ms": 4740,
+                "end_ms": 4800,
+                "confidence": 0.997,
+                "is_final": true
+              },
+              {
+                "text": "<fin>",
+                "start_ms": 0,
+                "end_ms": 0,
+                "confidence": 0,
+                "is_final": true
+              }
+            ],
+            "final_audio_proc_ms": 6240,
+            "total_audio_proc_ms": 6240
+          }
+        },
+        {
+          "ordinal": 87,
+          "elapsed_s": 7.240807,
+          "sent_sample_cursor": 96000,
+          "kind": "completion_observed",
+          "after_receive_index": 18
+        },
+        {
+          "ordinal": 88,
+          "elapsed_s": 7.240931,
+          "sent_sample_cursor": 97600,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 89,
+          "elapsed_s": 7.348986,
+          "sent_sample_cursor": 99200,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 90,
+          "elapsed_s": 7.442468,
+          "sent_sample_cursor": 100800,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 91,
+          "elapsed_s": 7.551009,
+          "sent_sample_cursor": 102400,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 92,
+          "elapsed_s": 7.644801,
+          "sent_sample_cursor": 104000,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 93,
+          "elapsed_s": 7.753626,
+          "sent_sample_cursor": 105600,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "bd93e1c0c76c60554f4c6d98b8028730dbbfa6ea82f5011e8fb0dcda22857cb6"
+        },
+        {
+          "ordinal": 94,
+          "elapsed_s": 7.861728,
+          "sent_sample_cursor": 107200,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "b3946e4a530dad81418d6221e9e408becbc955d1de7ed89e8240b1284808e0cc"
+        },
+        {
+          "ordinal": 95,
+          "elapsed_s": 7.954312,
+          "sent_sample_cursor": 108800,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "970d84097b616e85fd7f6ca6f1b680cbe442ee02c6e151b29055a4f67189f246"
+        },
+        {
+          "ordinal": 96,
+          "elapsed_s": 8.063723,
+          "sent_sample_cursor": 110400,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "0d64b1fa34cd8904402576997939e584476d2cc19c4583dfcfa8deaa733c137a"
+        },
+        {
+          "ordinal": 97,
+          "elapsed_s": 8.156485,
+          "sent_sample_cursor": 112000,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "adbefd95d02eeacf4e10c8cd0f9ab7197850607aedc634f195d18c48f037db26"
+        },
+        {
+          "ordinal": 98,
+          "elapsed_s": 8.265754,
+          "sent_sample_cursor": 113600,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "470b10769c35b7695d6478b76279dc921cc3883e509be2a0b2a04142c173659f"
+        },
+        {
+          "ordinal": 99,
+          "elapsed_s": 8.277546,
+          "sent_sample_cursor": 113600,
+          "kind": "received",
+          "payload": {
+            "tokens": [],
+            "final_audio_proc_ms": 6240,
+            "total_audio_proc_ms": 7080
+          }
+        },
+        {
+          "ordinal": 100,
+          "elapsed_s": 8.359057,
+          "sent_sample_cursor": 115200,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "3b67e2722ab173890b7a72c20901229808a4b210b28dc9d5809e42b78bcc73f3"
+        },
+        {
+          "ordinal": 101,
+          "elapsed_s": 8.374013,
+          "sent_sample_cursor": 115200,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 6660,
+                "end_ms": 6720,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 6240,
+            "total_audio_proc_ms": 7200
+          }
+        },
+        {
+          "ordinal": 102,
+          "elapsed_s": 8.467853,
+          "sent_sample_cursor": 116800,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "448c1b2efbc4486b2cfe659b2050eabcac270ab3d573b254b8dba985c6eec33a"
+        },
+        {
+          "ordinal": 103,
+          "elapsed_s": 8.561641,
+          "sent_sample_cursor": 118400,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "19561e8a145a3e476e0e091a5224aaa1b1130e020502afb53459f9576f4fa3fe"
+        },
+        {
+          "ordinal": 104,
+          "elapsed_s": 8.575842,
+          "sent_sample_cursor": 118400,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 6660,
+                "end_ms": 6720,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " bl",
+                "start_ms": 6900,
+                "end_ms": 6960,
+                "confidence": 0.998,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 6240,
+            "total_audio_proc_ms": 7440
+          }
+        },
+        {
+          "ordinal": 105,
+          "elapsed_s": 8.654692,
+          "sent_sample_cursor": 120000,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "3a08f1b665de81d0da8945072ae0c6673590179f3595249804cdb3b219beeecd"
+        },
+        {
+          "ordinal": 106,
+          "elapsed_s": 8.763341,
+          "sent_sample_cursor": 121600,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "3180dab737a1987aab9c0aa8c28f1d4b13562b8affeca579d30e5970ad43bda1"
+        },
+        {
+          "ordinal": 107,
+          "elapsed_s": 8.785058,
+          "sent_sample_cursor": 121600,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 6660,
+                "end_ms": 6720,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " bl",
+                "start_ms": 6900,
+                "end_ms": 6960,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": "ue",
+                "start_ms": 7020,
+                "end_ms": 7080,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 6240,
+            "total_audio_proc_ms": 7560
+          }
+        },
+        {
+          "ordinal": 108,
+          "elapsed_s": 8.856242,
+          "sent_sample_cursor": 123200,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "6d90d96cf6cfc3dac75288b490dd8f6da199ba522a051884997de7410ea56d13"
+        },
+        {
+          "ordinal": 109,
+          "elapsed_s": 8.965213,
+          "sent_sample_cursor": 124800,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "76fc6956b9c337f98b86d161aa981665945a5a707b1967487511b1e796991ab0"
+        },
+        {
+          "ordinal": 110,
+          "elapsed_s": 8.981063,
+          "sent_sample_cursor": 124800,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 6660,
+                "end_ms": 6720,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " bl",
+                "start_ms": 6900,
+                "end_ms": 6960,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": "ue",
+                "start_ms": 7020,
+                "end_ms": 7080,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " tra",
+                "start_ms": 7200,
+                "end_ms": 7260,
+                "confidence": 0.999,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 6240,
+            "total_audio_proc_ms": 7800
+          }
+        },
+        {
+          "ordinal": 111,
+          "elapsed_s": 9.058012,
+          "sent_sample_cursor": 126400,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 112,
+          "elapsed_s": 9.074703,
+          "sent_sample_cursor": 126400,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 6660,
+                "end_ms": 6720,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " bl",
+                "start_ms": 6900,
+                "end_ms": 6960,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": "ue",
+                "start_ms": 7020,
+                "end_ms": 7080,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " tra",
+                "start_ms": 7200,
+                "end_ms": 7260,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": "in",
+                "start_ms": 7320,
+                "end_ms": 7380,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 6240,
+            "total_audio_proc_ms": 7920
+          }
+        },
+        {
+          "ordinal": 113,
+          "elapsed_s": 9.167397,
+          "sent_sample_cursor": 128000,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 114,
+          "elapsed_s": 9.182382,
+          "sent_sample_cursor": 128000,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 6660,
+                "end_ms": 6720,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " bl",
+                "start_ms": 6900,
+                "end_ms": 6960,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": "ue",
+                "start_ms": 7020,
+                "end_ms": 7080,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " tra",
+                "start_ms": 7200,
+                "end_ms": 7260,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": "in",
+                "start_ms": 7320,
+                "end_ms": 7380,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 7440,
+                "end_ms": 7500,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 6240,
+            "total_audio_proc_ms": 8040
+          }
+        },
+        {
+          "ordinal": 115,
+          "elapsed_s": 9.26104,
+          "sent_sample_cursor": 129600,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 116,
+          "elapsed_s": 9.369116,
+          "sent_sample_cursor": 131200,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 117,
+          "elapsed_s": 9.46205,
+          "sent_sample_cursor": 132800,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 118,
+          "elapsed_s": 9.477157,
+          "sent_sample_cursor": 132800,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 6660,
+                "end_ms": 6720,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " bl",
+                "start_ms": 6900,
+                "end_ms": 6960,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": "ue",
+                "start_ms": 7020,
+                "end_ms": 7080,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " tra",
+                "start_ms": 7200,
+                "end_ms": 7260,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": "in",
+                "start_ms": 7320,
+                "end_ms": 7380,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 7440,
+                "end_ms": 7500,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " lat",
+                "start_ms": 7680,
+                "end_ms": 7740,
+                "confidence": 0.999,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 6240,
+            "total_audio_proc_ms": 8280
+          }
+        },
+        {
+          "ordinal": 119,
+          "elapsed_s": 9.555107,
+          "sent_sample_cursor": 134400,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 120,
+          "elapsed_s": 9.66443,
+          "sent_sample_cursor": 136000,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 121,
+          "elapsed_s": 9.681753,
+          "sent_sample_cursor": 136000,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 6660,
+                "end_ms": 6720,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " bl",
+                "start_ms": 6900,
+                "end_ms": 6960,
+                "confidence": 0.998,
+                "is_final": false
+              },
+              {
+                "text": "ue",
+                "start_ms": 7020,
+                "end_ms": 7080,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " tra",
+                "start_ms": 7200,
+                "end_ms": 7260,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": "in",
+                "start_ms": 7320,
+                "end_ms": 7380,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 7440,
+                "end_ms": 7500,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " lat",
+                "start_ms": 7680,
+                "end_ms": 7740,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": "e.",
+                "start_ms": 7920,
+                "end_ms": 7980,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 6240,
+            "total_audio_proc_ms": 8520
+          }
+        },
+        {
+          "ordinal": 122,
+          "elapsed_s": 9.757604,
+          "sent_sample_cursor": 136400,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 400,
+          "pcm_sha256": "67042dfda5683aead81b6055d19c4dba238341f9dd82f49c0e7cc0c19c5f10d1"
+        },
+        {
+          "ordinal": 123,
+          "elapsed_s": 9.788647,
+          "sent_sample_cursor": 138000,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 124,
+          "elapsed_s": 9.89708,
+          "sent_sample_cursor": 139600,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 125,
+          "elapsed_s": 9.989781,
+          "sent_sample_cursor": 141200,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 126,
+          "elapsed_s": 10.098884,
+          "sent_sample_cursor": 142800,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 127,
+          "elapsed_s": 10.191328,
+          "sent_sample_cursor": 144000,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1200,
+          "pcm_sha256": "a0ee989ed2a0a2e3626520afa4032e06144865c8c8f6357293c9f4cd2069eaf2"
+        },
+        {
+          "ordinal": 128,
+          "elapsed_s": 10.268821,
+          "sent_sample_cursor": 144000,
+          "kind": "control_written",
+          "control": "end"
+        },
+        {
+          "ordinal": 129,
+          "elapsed_s": 10.482882,
+          "sent_sample_cursor": 144000,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 6660,
+                "end_ms": 6720,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " bl",
+                "start_ms": 6900,
+                "end_ms": 6960,
+                "confidence": 0.998,
+                "is_final": true
+              },
+              {
+                "text": "ue",
+                "start_ms": 7020,
+                "end_ms": 7080,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " tra",
+                "start_ms": 7200,
+                "end_ms": 7260,
+                "confidence": 0.999,
+                "is_final": true
+              },
+              {
+                "text": "in",
+                "start_ms": 7320,
+                "end_ms": 7380,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " is",
+                "start_ms": 7440,
+                "end_ms": 7500,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " lat",
+                "start_ms": 7680,
+                "end_ms": 7740,
+                "confidence": 0.999,
+                "is_final": true
+              },
+              {
+                "text": "e.",
+                "start_ms": 7920,
+                "end_ms": 7980,
+                "confidence": 1,
+                "is_final": true
+              }
+            ],
+            "final_audio_proc_ms": 9240,
+            "total_audio_proc_ms": 9240
+          }
+        },
+        {
+          "ordinal": 130,
+          "elapsed_s": 10.482924,
+          "sent_sample_cursor": 144000,
+          "kind": "received",
+          "payload": {
+            "tokens": [],
+            "final_audio_proc_ms": 9240,
+            "total_audio_proc_ms": 9240,
+            "finished": true
+          }
+        },
+        {
+          "ordinal": 131,
+          "elapsed_s": 11.695887,
+          "sent_sample_cursor": 144000,
+          "kind": "transport_closed",
+          "code": 1000,
+          "reason": ""
+        },
+        {
+          "ordinal": 132,
+          "elapsed_s": 11.695919,
+          "sent_sample_cursor": 144000,
+          "kind": "bounded_observation_ended",
+          "wait_s": 4,
+          "completion_found": false,
+          "note": "Absence is censored, not a universal no-response guarantee"
+        },
+        {
+          "ordinal": 133,
+          "elapsed_s": 11.695928,
+          "sent_sample_cursor": 144000,
+          "kind": "client_close_requested"
+        }
+      ],
+      "input_map": [
+        {
+          "label": "slot_leading_silence",
+          "provider_start_sample": 0,
+          "provider_end_sample": 8000,
+          "pcm_sha256": "f85f2c34eb2843d2aa5951ee6e8e76985655b2e3ae2cbdd76bdfd654ecf19997",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "shared_a",
+          "provider_start_sample": 8000,
+          "provider_end_sample": 39120,
+          "pcm_sha256": "fa4f27683fa43b4556a76da9b51d565039f5da424f04c54503db1da5b1325273",
+          "source": "shared_a.wav:all",
+          "synthetic_no_source": false
+        },
+        {
+          "label": "slot_trailing_silence",
+          "provider_start_sample": 39120,
+          "provider_end_sample": 48000,
+          "pcm_sha256": "f397d40e4da55ee1afdc4cd4b39078c14cfd12b4c0a24633726218833d59f70b",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "slot_leading_silence",
+          "provider_start_sample": 48000,
+          "provider_end_sample": 56000,
+          "pcm_sha256": "f85f2c34eb2843d2aa5951ee6e8e76985655b2e3ae2cbdd76bdfd654ecf19997",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "shared_a",
+          "provider_start_sample": 56000,
+          "provider_end_sample": 87120,
+          "pcm_sha256": "fa4f27683fa43b4556a76da9b51d565039f5da424f04c54503db1da5b1325273",
+          "source": "shared_a.wav:all",
+          "synthetic_no_source": false
+        },
+        {
+          "label": "slot_trailing_silence",
+          "provider_start_sample": 87120,
+          "provider_end_sample": 96000,
+          "pcm_sha256": "f397d40e4da55ee1afdc4cd4b39078c14cfd12b4c0a24633726218833d59f70b",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "slot_leading_silence",
+          "provider_start_sample": 96000,
+          "provider_end_sample": 104000,
+          "pcm_sha256": "f85f2c34eb2843d2aa5951ee6e8e76985655b2e3ae2cbdd76bdfd654ecf19997",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "shared_b",
+          "provider_start_sample": 104000,
+          "provider_end_sample": 136400,
+          "pcm_sha256": "50af2eaf21519b0d21813fb9a59a6b1af17b704aef481c913f294f5f3e4cf68b",
+          "source": "shared_b.wav:all",
+          "synthetic_no_source": false
+        },
+        {
+          "label": "slot_trailing_silence",
+          "provider_start_sample": 136400,
+          "provider_end_sample": 144000,
+          "pcm_sha256": "a6b5bd491f247f64222e96c0d04c0311816393c536e477006030691a52e04326",
+          "source": null,
+          "synthetic_no_source": true
+        }
+      ],
+      "controls": [
+        {
+          "kind": "finalize",
+          "cursor_samples": 48000,
+          "elapsed_s": 3.77629
+        },
+        {
+          "kind": "finalize",
+          "cursor_samples": 96000,
+          "elapsed_s": 7.024634
+        },
+        {
+          "kind": "end",
+          "cursor_samples": 144000,
+          "elapsed_s": 10.268838
+        }
+      ],
+      "status": "bounded-observation-complete",
+      "options": {
+        "model": "stt-rt-v5",
+        "audio_format": "pcm_s16le",
+        "sample_rate": 16000,
+        "num_channels": 1,
+        "enable_endpoint_detection": false,
+        "enable_language_identification": false,
+        "enable_speaker_diarization": false,
+        "language_hints": [
+          "en"
+        ]
+      },
+      "sent_samples": 144000,
+      "sent_audio_s": 9.0,
+      "wall_s": 11.695963
+    },
+    {
+      "name": "short",
+      "events": [
+        {
+          "ordinal": 1,
+          "elapsed_s": 0.561424,
+          "sent_sample_cursor": 0,
+          "kind": "connected",
+          "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket"
+        },
+        {
+          "ordinal": 2,
+          "elapsed_s": 0.561542,
+          "sent_sample_cursor": 0,
+          "kind": "configuration_written",
+          "options": {
+            "model": "stt-rt-v5",
+            "audio_format": "pcm_s16le",
+            "sample_rate": 16000,
+            "num_channels": 1,
+            "enable_endpoint_detection": false,
+            "enable_language_identification": false,
+            "enable_speaker_diarization": false,
+            "language_hints": [
+              "en"
+            ]
+          }
+        },
+        {
+          "ordinal": 3,
+          "elapsed_s": 0.561586,
+          "sent_sample_cursor": 1600,
+          "kind": "audio_written",
+          "label": "short_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 4,
+          "elapsed_s": 0.668785,
+          "sent_sample_cursor": 3200,
+          "kind": "audio_written",
+          "label": "shared_no_energy_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "318a9469f269fba75216eb4098d5b4931af14fa818208e25850069856baa105c"
+        },
+        {
+          "ordinal": 5,
+          "elapsed_s": 0.754202,
+          "sent_sample_cursor": 3200,
+          "kind": "received",
+          "payload": {
+            "tokens": [],
+            "final_audio_proc_ms": 0,
+            "total_audio_proc_ms": 0
+          }
+        },
+        {
+          "ordinal": 6,
+          "elapsed_s": 0.776737,
+          "sent_sample_cursor": 4800,
+          "kind": "audio_written",
+          "label": "shared_no_energy_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "50f6121e9ec3f6076c2efa6f4721601043951ffff31604bf7ed810f569387ecd"
+        },
+        {
+          "ordinal": 7,
+          "elapsed_s": 0.869656,
+          "sent_sample_cursor": 6400,
+          "kind": "audio_written",
+          "label": "shared_no_energy_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "8753c97aad1d16474c8e3aba835f84cec0223a9e26d54e90c09a437a88c2dd26"
+        },
+        {
+          "ordinal": 8,
+          "elapsed_s": 0.978552,
+          "sent_sample_cursor": 6874,
+          "kind": "audio_written",
+          "label": "shared_no_energy_trim",
+          "sample_count": 474,
+          "pcm_sha256": "2903c77b9386940617b748d1838ff4e6642f82ad0792d636ad67d94019bda432"
+        },
+        {
+          "ordinal": 9,
+          "elapsed_s": 1.009639,
+          "sent_sample_cursor": 8474,
+          "kind": "audio_written",
+          "label": "short_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 10,
+          "elapsed_s": 1.117869,
+          "sent_sample_cursor": 10074,
+          "kind": "audio_written",
+          "label": "short_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 11,
+          "elapsed_s": 1.210287,
+          "sent_sample_cursor": 10074,
+          "kind": "control_written",
+          "control": "finalize"
+        },
+        {
+          "ordinal": 12,
+          "elapsed_s": 1.383264,
+          "sent_sample_cursor": 10074,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": "No.",
+                "start_ms": 180,
+                "end_ms": 240,
+                "confidence": 0.987,
+                "is_final": true
+              },
+              {
+                "text": "<fin>",
+                "start_ms": 0,
+                "end_ms": 0,
+                "confidence": 0,
+                "is_final": true
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 720
+          }
+        },
+        {
+          "ordinal": 13,
+          "elapsed_s": 1.383303,
+          "sent_sample_cursor": 10074,
+          "kind": "completion_observed",
+          "after_receive_index": 1
+        },
+        {
+          "ordinal": 14,
+          "elapsed_s": 4.218915,
+          "sent_sample_cursor": 11674,
+          "kind": "audio_written",
+          "label": "shared_a_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "74820495757c8b80fc601d264e735134b230a28c7c562a7d691cece9c26e19cb"
+        },
+        {
+          "ordinal": 15,
+          "elapsed_s": 4.328669,
+          "sent_sample_cursor": 13274,
+          "kind": "audio_written",
+          "label": "shared_a_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "81819ecc4cd70a5bc686e2c6ccbc49cd52ff3718fcfa505c617d64885dc0ecfe"
+        },
+        {
+          "ordinal": 16,
+          "elapsed_s": 4.422612,
+          "sent_sample_cursor": 14874,
+          "kind": "audio_written",
+          "label": "shared_a_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "c609f97ee10fa48b9c2749e678275a9b2089c78ad7872156cf10c75b005e0c37"
+        },
+        {
+          "ordinal": 17,
+          "elapsed_s": 4.498894,
+          "sent_sample_cursor": 14874,
+          "kind": "received",
+          "payload": {
+            "tokens": [],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 840
+          }
+        },
+        {
+          "ordinal": 18,
+          "elapsed_s": 4.530756,
+          "sent_sample_cursor": 16474,
+          "kind": "audio_written",
+          "label": "shared_a_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "77e9a11eac7c700a09ca488a802256d509293bb3f9f9c901f671bb5c405088f7"
+        },
+        {
+          "ordinal": 19,
+          "elapsed_s": 4.624567,
+          "sent_sample_cursor": 18074,
+          "kind": "audio_written",
+          "label": "shared_a_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "c04b889359a6ca84395e6866596930b7f72a065658198f369bed73e32c342251"
+        },
+        {
+          "ordinal": 20,
+          "elapsed_s": 4.732481,
+          "sent_sample_cursor": 19674,
+          "kind": "audio_written",
+          "label": "shared_a_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "10c6fcd07a095d56a80d0c7b4f5dc31459ff49a3a3b5ce090a4910dc58b08e39"
+        },
+        {
+          "ordinal": 21,
+          "elapsed_s": 4.80051,
+          "sent_sample_cursor": 19674,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 1200
+          }
+        },
+        {
+          "ordinal": 22,
+          "elapsed_s": 4.825046,
+          "sent_sample_cursor": 21274,
+          "kind": "audio_written",
+          "label": "shared_a_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "2493d9597da41b4ba4b2bd9fd97828b70b7d7672b8167634dc657237e6b889c2"
+        },
+        {
+          "ordinal": 23,
+          "elapsed_s": 4.933494,
+          "sent_sample_cursor": 22874,
+          "kind": "audio_written",
+          "label": "shared_a_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "59a03168d82982767c5877e2d420b2fa007b73e20c3c88af2bc16981c18eb3b8"
+        },
+        {
+          "ordinal": 24,
+          "elapsed_s": 5.026011,
+          "sent_sample_cursor": 24474,
+          "kind": "audio_written",
+          "label": "shared_a_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "2b7dfe1c758b33a9c2e05cef2c40a1006170e2ccc0a10af17fb18d751d95e7d6"
+        },
+        {
+          "ordinal": 25,
+          "elapsed_s": 5.107808,
+          "sent_sample_cursor": 24474,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 840,
+                "end_ms": 900,
+                "confidence": 0.919,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 1440
+          }
+        },
+        {
+          "ordinal": 26,
+          "elapsed_s": 5.11922,
+          "sent_sample_cursor": 26074,
+          "kind": "audio_written",
+          "label": "shared_a_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "c17b10910a8c93b6068fc86ef3ce25801bd6ddc285ef7a768e3fd74af067c2f0"
+        },
+        {
+          "ordinal": 27,
+          "elapsed_s": 5.22752,
+          "sent_sample_cursor": 27520,
+          "kind": "audio_written",
+          "label": "shared_a_active_trim",
+          "sample_count": 1446,
+          "pcm_sha256": "e6c05c7f1d4c220cbc909f27104987aae82a59ef1fa8942332f901db129164ec"
+        },
+        {
+          "ordinal": 28,
+          "elapsed_s": 5.297442,
+          "sent_sample_cursor": 27520,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 840,
+                "end_ms": 900,
+                "confidence": 0.919,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.99,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 1680
+          }
+        },
+        {
+          "ordinal": 29,
+          "elapsed_s": 5.321142,
+          "sent_sample_cursor": 29120,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "8cac01fcd7129a55145ffaa489a2a48f166cb4d9d3cf914606cc6b7ddc4d6153"
+        },
+        {
+          "ordinal": 30,
+          "elapsed_s": 5.407232,
+          "sent_sample_cursor": 29120,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 840,
+                "end_ms": 900,
+                "confidence": 0.919,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.99,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1140,
+                "end_ms": 1200,
+                "confidence": 0.997,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1260,
+                "end_ms": 1320,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 1800
+          }
+        },
+        {
+          "ordinal": 31,
+          "elapsed_s": 5.429846,
+          "sent_sample_cursor": 30720,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "c2fcfbc75d123b219154f8a782ca6ed10f6e54d6906fc1fa9d7a3bb1c2913502"
+        },
+        {
+          "ordinal": 32,
+          "elapsed_s": 5.52205,
+          "sent_sample_cursor": 32320,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "0241686b13c2f0348a5bd1f33dc0364932aa37812235bc9f5f27a4928eebb8c2"
+        },
+        {
+          "ordinal": 33,
+          "elapsed_s": 5.605374,
+          "sent_sample_cursor": 32320,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 840,
+                "end_ms": 900,
+                "confidence": 0.919,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.99,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1140,
+                "end_ms": 1200,
+                "confidence": 0.997,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1260,
+                "end_ms": 1320,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 1380,
+                "end_ms": 1440,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 1920
+          }
+        },
+        {
+          "ordinal": 34,
+          "elapsed_s": 5.630474,
+          "sent_sample_cursor": 33920,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "836db5d56815b4c1a59d9573168dc83194038c9e71f15f6b77bfe59b5b86a4f7"
+        },
+        {
+          "ordinal": 35,
+          "elapsed_s": 5.723739,
+          "sent_sample_cursor": 35520,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "d34330f676d2af4efdff952bd337fb4f40bed1460f7f824c9ca2c4a5beecb831"
+        },
+        {
+          "ordinal": 36,
+          "elapsed_s": 5.808247,
+          "sent_sample_cursor": 35520,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 840,
+                "end_ms": 900,
+                "confidence": 0.919,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.99,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1140,
+                "end_ms": 1200,
+                "confidence": 0.997,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1260,
+                "end_ms": 1320,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 1380,
+                "end_ms": 1440,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "ad",
+                "start_ms": 1560,
+                "end_ms": 1620,
+                "confidence": 0.952,
+                "is_final": false
+              },
+              {
+                "text": "y.",
+                "start_ms": 1620,
+                "end_ms": 1680,
+                "confidence": 0.881,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 2160
+          }
+        },
+        {
+          "ordinal": 37,
+          "elapsed_s": 5.832374,
+          "sent_sample_cursor": 37120,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "fb43b8438c5023931cd1af8de93a39c91c9ede6da8742ecdb735a100eefa96a3"
+        },
+        {
+          "ordinal": 38,
+          "elapsed_s": 5.92579,
+          "sent_sample_cursor": 38720,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "587e3be8386135bacd1aeef73b33bba845621cb86b212b87d355d415f1e46717"
+        },
+        {
+          "ordinal": 39,
+          "elapsed_s": 6.006089,
+          "sent_sample_cursor": 38720,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 840,
+                "end_ms": 900,
+                "confidence": 0.919,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.99,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1140,
+                "end_ms": 1200,
+                "confidence": 0.997,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1260,
+                "end_ms": 1320,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 1380,
+                "end_ms": 1440,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "ad",
+                "start_ms": 1560,
+                "end_ms": 1620,
+                "confidence": 0.952,
+                "is_final": false
+              },
+              {
+                "text": "y.",
+                "start_ms": 1620,
+                "end_ms": 1680,
+                "confidence": 0.881,
+                "is_final": false
+              },
+              {
+                "text": " The",
+                "start_ms": 1800,
+                "end_ms": 1860,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 2400
+          }
+        },
+        {
+          "ordinal": 40,
+          "elapsed_s": 6.034388,
+          "sent_sample_cursor": 40320,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "4f3885a2648c374fdcd18b7adea4761eedf630b99b1ae730141cb5986292d061"
+        },
+        {
+          "ordinal": 41,
+          "elapsed_s": 6.126988,
+          "sent_sample_cursor": 41920,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "a8e50df1599473b665840814d3c98523c41a967859528017b20d2385dbbbfc6b"
+        },
+        {
+          "ordinal": 42,
+          "elapsed_s": 6.20944,
+          "sent_sample_cursor": 41920,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 840,
+                "end_ms": 900,
+                "confidence": 0.919,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.99,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1140,
+                "end_ms": 1200,
+                "confidence": 0.997,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1260,
+                "end_ms": 1320,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 1380,
+                "end_ms": 1440,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "ad",
+                "start_ms": 1560,
+                "end_ms": 1620,
+                "confidence": 0.952,
+                "is_final": false
+              },
+              {
+                "text": "y.",
+                "start_ms": 1620,
+                "end_ms": 1680,
+                "confidence": 0.881,
+                "is_final": false
+              },
+              {
+                "text": " The",
+                "start_ms": 1800,
+                "end_ms": 1860,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " bl",
+                "start_ms": 1920,
+                "end_ms": 1980,
+                "confidence": 0.999,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 2520
+          }
+        },
+        {
+          "ordinal": 43,
+          "elapsed_s": 6.234931,
+          "sent_sample_cursor": 43520,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "95e3979703a26425fe32b4b9c2ed2f2bb402c170ca62253504a570d1692eb382"
+        },
+        {
+          "ordinal": 44,
+          "elapsed_s": 6.300706,
+          "sent_sample_cursor": 43520,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 840,
+                "end_ms": 900,
+                "confidence": 0.919,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.99,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1140,
+                "end_ms": 1200,
+                "confidence": 0.997,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1260,
+                "end_ms": 1320,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 1380,
+                "end_ms": 1440,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "ad",
+                "start_ms": 1560,
+                "end_ms": 1620,
+                "confidence": 0.952,
+                "is_final": false
+              },
+              {
+                "text": "y.",
+                "start_ms": 1620,
+                "end_ms": 1680,
+                "confidence": 0.881,
+                "is_final": false
+              },
+              {
+                "text": " The",
+                "start_ms": 1800,
+                "end_ms": 1860,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " bl",
+                "start_ms": 1920,
+                "end_ms": 1980,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": "ue",
+                "start_ms": 2040,
+                "end_ms": 2100,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 2640
+          }
+        },
+        {
+          "ordinal": 45,
+          "elapsed_s": 6.328862,
+          "sent_sample_cursor": 45120,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "070193d0697b06948e85bf29eca76f69259e162cd0cfc8fc29fa01332f8bfc11"
+        },
+        {
+          "ordinal": 46,
+          "elapsed_s": 6.411774,
+          "sent_sample_cursor": 45120,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 840,
+                "end_ms": 900,
+                "confidence": 0.919,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.99,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1140,
+                "end_ms": 1200,
+                "confidence": 0.997,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1260,
+                "end_ms": 1320,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 1380,
+                "end_ms": 1440,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "ad",
+                "start_ms": 1560,
+                "end_ms": 1620,
+                "confidence": 0.952,
+                "is_final": false
+              },
+              {
+                "text": "y.",
+                "start_ms": 1620,
+                "end_ms": 1680,
+                "confidence": 0.881,
+                "is_final": false
+              },
+              {
+                "text": " The",
+                "start_ms": 1800,
+                "end_ms": 1860,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " bl",
+                "start_ms": 1920,
+                "end_ms": 1980,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": "ue",
+                "start_ms": 2040,
+                "end_ms": 2100,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " tra",
+                "start_ms": 2160,
+                "end_ms": 2220,
+                "confidence": 0.962,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 2760
+          }
+        },
+        {
+          "ordinal": 47,
+          "elapsed_s": 6.436867,
+          "sent_sample_cursor": 45943,
+          "kind": "audio_written",
+          "label": "shared_b_active_trim",
+          "sample_count": 823,
+          "pcm_sha256": "56542da4955b2b6dec225dda6b88763ce267264fa3093e3ae3ff513f6e8c0c68"
+        },
+        {
+          "ordinal": 48,
+          "elapsed_s": 6.482864,
+          "sent_sample_cursor": 45943,
+          "kind": "control_written",
+          "control": "finalize"
+        },
+        {
+          "ordinal": 49,
+          "elapsed_s": 6.482982,
+          "sent_sample_cursor": 47543,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 1600,
+          "pcm_sha256": "241a8cc5d682da4df1f5c296d7d8d465d0829f28b7ef144cbf39b35f8d046526"
+        },
+        {
+          "ordinal": 50,
+          "elapsed_s": 6.509279,
+          "sent_sample_cursor": 47543,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": false
+              },
+              {
+                "text": " red",
+                "start_ms": 840,
+                "end_ms": 900,
+                "confidence": 0.919,
+                "is_final": false
+              },
+              {
+                "text": " bo",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.99,
+                "is_final": false
+              },
+              {
+                "text": "at",
+                "start_ms": 1140,
+                "end_ms": 1200,
+                "confidence": 0.997,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 1260,
+                "end_ms": 1320,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " re",
+                "start_ms": 1380,
+                "end_ms": 1440,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": "ad",
+                "start_ms": 1560,
+                "end_ms": 1620,
+                "confidence": 0.952,
+                "is_final": false
+              },
+              {
+                "text": "y.",
+                "start_ms": 1620,
+                "end_ms": 1680,
+                "confidence": 0.881,
+                "is_final": false
+              },
+              {
+                "text": " The",
+                "start_ms": 1800,
+                "end_ms": 1860,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " bl",
+                "start_ms": 1920,
+                "end_ms": 1980,
+                "confidence": 0.999,
+                "is_final": false
+              },
+              {
+                "text": "ue",
+                "start_ms": 2040,
+                "end_ms": 2100,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " tra",
+                "start_ms": 2160,
+                "end_ms": 2220,
+                "confidence": 0.962,
+                "is_final": false
+              },
+              {
+                "text": "in",
+                "start_ms": 2280,
+                "end_ms": 2340,
+                "confidence": 1,
+                "is_final": false
+              },
+              {
+                "text": " is",
+                "start_ms": 2340,
+                "end_ms": 2400,
+                "confidence": 1,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 720,
+            "total_audio_proc_ms": 2880
+          }
+        },
+        {
+          "ordinal": 51,
+          "elapsed_s": 6.591845,
+          "sent_sample_cursor": 49143,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 1600,
+          "pcm_sha256": "14fbdad294fb81fb1afa4c11c582f2af4fae88794b3acb44343726b476856cb6"
+        },
+        {
+          "ordinal": 52,
+          "elapsed_s": 6.658533,
+          "sent_sample_cursor": 49143,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " The",
+                "start_ms": 660,
+                "end_ms": 720,
+                "confidence": 0.993,
+                "is_final": true
+              },
+              {
+                "text": " red",
+                "start_ms": 840,
+                "end_ms": 900,
+                "confidence": 0.919,
+                "is_final": true
+              },
+              {
+                "text": " bo",
+                "start_ms": 1080,
+                "end_ms": 1140,
+                "confidence": 0.99,
+                "is_final": true
+              },
+              {
+                "text": "at",
+                "start_ms": 1140,
+                "end_ms": 1200,
+                "confidence": 0.997,
+                "is_final": true
+              },
+              {
+                "text": " is",
+                "start_ms": 1260,
+                "end_ms": 1320,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " re",
+                "start_ms": 1380,
+                "end_ms": 1440,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": "ad",
+                "start_ms": 1560,
+                "end_ms": 1620,
+                "confidence": 0.952,
+                "is_final": true
+              },
+              {
+                "text": "y.",
+                "start_ms": 1620,
+                "end_ms": 1680,
+                "confidence": 0.881,
+                "is_final": true
+              },
+              {
+                "text": " The",
+                "start_ms": 1800,
+                "end_ms": 1860,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " bl",
+                "start_ms": 1920,
+                "end_ms": 1980,
+                "confidence": 0.999,
+                "is_final": true
+              },
+              {
+                "text": "ue",
+                "start_ms": 2040,
+                "end_ms": 2100,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " tra",
+                "start_ms": 2160,
+                "end_ms": 2220,
+                "confidence": 0.962,
+                "is_final": true
+              },
+              {
+                "text": "in",
+                "start_ms": 2280,
+                "end_ms": 2340,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " is",
+                "start_ms": 2340,
+                "end_ms": 2400,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": " lat",
+                "start_ms": 2460,
+                "end_ms": 2520,
+                "confidence": 0.993,
+                "is_final": true
+              },
+              {
+                "text": "e.",
+                "start_ms": 2520,
+                "end_ms": 2520,
+                "confidence": 1,
+                "is_final": true
+              },
+              {
+                "text": "<fin>",
+                "start_ms": 0,
+                "end_ms": 0,
+                "confidence": 0,
+                "is_final": true
+              }
+            ],
+            "final_audio_proc_ms": 3000,
+            "total_audio_proc_ms": 3000
+          }
+        },
+        {
+          "ordinal": 53,
+          "elapsed_s": 6.685317,
+          "sent_sample_cursor": 50743,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 1600,
+          "pcm_sha256": "002b1ae56e2b570692d22fcc6d35c0e39c4e1b11469326721c3fa0df05c8d182"
+        },
+        {
+          "ordinal": 54,
+          "elapsed_s": 6.794413,
+          "sent_sample_cursor": 52343,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 1600,
+          "pcm_sha256": "f1f1b94994210b85e5e0353af96af6732dc6579a9885dac559687cc4cb57eb57"
+        },
+        {
+          "ordinal": 55,
+          "elapsed_s": 6.887711,
+          "sent_sample_cursor": 53943,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 56,
+          "elapsed_s": 6.995934,
+          "sent_sample_cursor": 55543,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 57,
+          "elapsed_s": 7.08911,
+          "sent_sample_cursor": 57143,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 1600,
+          "pcm_sha256": "d983573dcdce54aa4d34d23e22b0e75a4d62984926159e23a7fba7cdb8f88b9d"
+        },
+        {
+          "ordinal": 58,
+          "elapsed_s": 7.1748,
+          "sent_sample_cursor": 57143,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " No.",
+                "start_ms": 3060,
+                "end_ms": 3120,
+                "confidence": 0.953,
+                "is_final": false
+              }
+            ],
+            "final_audio_proc_ms": 3000,
+            "total_audio_proc_ms": 3600
+          }
+        },
+        {
+          "ordinal": 59,
+          "elapsed_s": 7.197939,
+          "sent_sample_cursor": 58743,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 1600,
+          "pcm_sha256": "5b62e7a86a28a7cee26e405f1eef5df64f3fb7869b8c1f4a40f718e0f3ce9e49"
+        },
+        {
+          "ordinal": 60,
+          "elapsed_s": 7.290766,
+          "sent_sample_cursor": 60343,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 1600,
+          "pcm_sha256": "dfb16d5e5951ef87901c6b6600e02a68310d41e9ddd7c8988f43bc12e30be2f9"
+        },
+        {
+          "ordinal": 61,
+          "elapsed_s": 7.398519,
+          "sent_sample_cursor": 61943,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 1600,
+          "pcm_sha256": "555149549f23a20fddf045b873fa466116d9e2a271fe9858ab3b62b705acbc88"
+        },
+        {
+          "ordinal": 62,
+          "elapsed_s": 7.492873,
+          "sent_sample_cursor": 63543,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 1600,
+          "pcm_sha256": "46e740e3c4e1cb90b0ea05e2699affbd8ac3062e5183792b4f7d443f252cd854"
+        },
+        {
+          "ordinal": 63,
+          "elapsed_s": 7.585528,
+          "sent_sample_cursor": 63812,
+          "kind": "audio_written",
+          "label": "post_control_correction",
+          "sample_count": 269,
+          "pcm_sha256": "60549ba3c9ea0aa1cb5b05a85612cae2d3e6e9af8e6a0221a6ac4276eb403825"
+        },
+        {
+          "ordinal": 64,
+          "elapsed_s": 7.600882,
+          "sent_sample_cursor": 63812,
+          "kind": "completion_observed",
+          "after_receive_index": 13
+        },
+        {
+          "ordinal": 65,
+          "elapsed_s": 7.601009,
+          "sent_sample_cursor": 63812,
+          "kind": "control_written",
+          "control": "end"
+        },
+        {
+          "ordinal": 66,
+          "elapsed_s": 7.777203,
+          "sent_sample_cursor": 63812,
+          "kind": "received",
+          "payload": {
+            "tokens": [
+              {
+                "text": " No.",
+                "start_ms": 3060,
+                "end_ms": 3120,
+                "confidence": 0.953,
+                "is_final": true
+              },
+              {
+                "text": " 3",
+                "start_ms": 3660,
+                "end_ms": 3720,
+                "confidence": 0.866,
+                "is_final": true
+              },
+              {
+                "text": ".",
+                "start_ms": 3720,
+                "end_ms": 3720,
+                "confidence": 0.988,
+                "is_final": true
+              }
+            ],
+            "final_audio_proc_ms": 4200,
+            "total_audio_proc_ms": 4200
+          }
+        },
+        {
+          "ordinal": 67,
+          "elapsed_s": 7.777237,
+          "sent_sample_cursor": 63812,
+          "kind": "received",
+          "payload": {
+            "tokens": [],
+            "final_audio_proc_ms": 4200,
+            "total_audio_proc_ms": 4200,
+            "finished": true
+          }
+        },
+        {
+          "ordinal": 68,
+          "elapsed_s": 8.948233,
+          "sent_sample_cursor": 63812,
+          "kind": "transport_closed",
+          "code": 1000,
+          "reason": ""
+        },
+        {
+          "ordinal": 69,
+          "elapsed_s": 8.94827,
+          "sent_sample_cursor": 63812,
+          "kind": "bounded_observation_ended",
+          "wait_s": 4,
+          "completion_found": false,
+          "note": "Absence is censored, not a universal no-response guarantee"
+        },
+        {
+          "ordinal": 70,
+          "elapsed_s": 8.948279,
+          "sent_sample_cursor": 63812,
+          "kind": "client_close_requested"
+        }
+      ],
+      "input_map": [
+        {
+          "label": "short_leading_silence",
+          "provider_start_sample": 0,
+          "provider_end_sample": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "shared_no_energy_trim",
+          "provider_start_sample": 1600,
+          "provider_end_sample": 6874,
+          "pcm_sha256": "59b6545ada47d8a6000f2fffd787e5a2db5af2a0686ec2bbc7dfc2f804d2af07",
+          "source": "shared_no.wav:trim",
+          "synthetic_no_source": false
+        },
+        {
+          "label": "short_trailing_silence",
+          "provider_start_sample": 6874,
+          "provider_end_sample": 10074,
+          "pcm_sha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "shared_a_active_trim",
+          "provider_start_sample": 10074,
+          "provider_end_sample": 27520,
+          "pcm_sha256": "88fc76e36f693f0d58edd00bb4e865bb13c37d45f0188d3182504871dcc5384f",
+          "source": "shared_a.wav:active_trim",
+          "synthetic_no_source": false
+        },
+        {
+          "label": "shared_b_active_trim",
+          "provider_start_sample": 27520,
+          "provider_end_sample": 45943,
+          "pcm_sha256": "fd2e3c50896fa0c00bcdcd116a94833bb2d24528f87ca4fbd39b339869d3eedf",
+          "source": "shared_b.wav:active_trim",
+          "synthetic_no_source": false
+        },
+        {
+          "label": "post_control_correction",
+          "provider_start_sample": 45943,
+          "provider_end_sample": 63812,
+          "pcm_sha256": "ea76608630cb558d7ae3497a2ebfb56d7829a75703b04643d51dfc43e5717ed1",
+          "source": "shared_correction.wav:trim",
+          "synthetic_no_source": false
+        }
+      ],
+      "controls": [
+        {
+          "kind": "finalize",
+          "cursor_samples": 10074,
+          "elapsed_s": 1.210308
+        },
+        {
+          "kind": "finalize",
+          "cursor_samples": 45943,
+          "elapsed_s": 6.482884
+        },
+        {
+          "kind": "end",
+          "cursor_samples": 63812,
+          "elapsed_s": 7.601019
+        }
+      ],
+      "status": "bounded-observation-complete",
+      "options": {
+        "model": "stt-rt-v5",
+        "audio_format": "pcm_s16le",
+        "sample_rate": 16000,
+        "num_channels": 1,
+        "enable_endpoint_detection": false,
+        "enable_language_identification": false,
+        "enable_speaker_diarization": false,
+        "language_hints": [
+          "en"
+        ]
+      },
+      "sent_samples": 63812,
+      "sent_audio_s": 3.98825,
+      "wall_s": 8.948314
+    }
+  ]
+}

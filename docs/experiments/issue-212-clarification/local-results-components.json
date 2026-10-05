@@ -1,0 +1,279 @@
+{
+  "baseline": "0f0ba5173da51250bb5926e4a2eead5e68adff81",
+  "command": [
+    "docs/experiments/issue-212-clarification/local_probe.py",
+    "components"
+  ],
+  "kind": "Bounded actual production owners with explicitly fake recognizer/member/HTTP/WebSocket; no server or acoustic certification",
+  "claims": {
+    "A-selection": [
+      {
+        "requested_provider": "local_cpu_auto",
+        "effective_provider": "local_cpu_auto",
+        "source_language": "en",
+        "model_id": "parakeet-tdt-0.6b-v3-int8-sherpa",
+        "supported": true,
+        "fallback_applied": false
+      },
+      {
+        "requested_provider": "local_cpu_auto",
+        "effective_provider": "local_cpu_auto",
+        "source_language": "ja",
+        "model_id": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+        "supported": true,
+        "fallback_applied": false
+      },
+      {
+        "requested_provider": "local_cpu_auto",
+        "effective_provider": "local_cpu_auto",
+        "source_language": "ko",
+        "model_id": "qwen3-asr-0.6b-int8-sherpa",
+        "supported": true,
+        "fallback_applied": false
+      },
+      {
+        "requested_provider": "local_cpu_auto",
+        "effective_provider": "local_cpu_auto",
+        "source_language": "xx",
+        "model_id": null,
+        "supported": false,
+        "fallback_applied": false
+      },
+      {
+        "requested_provider": "local_cpu_auto",
+        "effective_provider": "local_qwen",
+        "source_language": "en",
+        "model_id": "qwen3-asr-0.6b-int8-sherpa",
+        "supported": true,
+        "fallback_applied": true
+      },
+      {
+        "requested_provider": "local_parakeet_ja",
+        "effective_provider": "local_qwen",
+        "source_language": "en",
+        "model_id": "qwen3-asr-0.6b-int8-sherpa",
+        "supported": true,
+        "fallback_applied": true
+      }
+    ],
+    "A-queued-options": {
+      "request_languages": [
+        "en",
+        "ja"
+      ],
+      "observed_decode_options": [
+        {
+          "options": {
+            "language": "Japanese"
+          },
+          "samples": 160
+        },
+        {
+          "options": {
+            "language": "Japanese"
+          },
+          "samples": 160
+        }
+      ],
+      "terminals": [
+        {
+          "identity": {
+            "segment": {
+              "activation_generation": 1,
+              "segment_order": 1,
+              "segment_id": "48761a8d-aed7-4eb9-b718-43a6feee892d",
+              "capture_epoch": 1
+            },
+            "provider_epoch_id": "epoch-options",
+            "provider_turn_id": "options-1",
+            "settings_scope": []
+          },
+          "outcome": "final",
+          "text": "no",
+          "final_language_runs": [],
+          "final_speaker_runs": [],
+          "text_authority": "authoritative",
+          "failure_reason": null,
+          "epoch_disposition": "reuse",
+          "failure_retryable": false,
+          "recovery_pending": false,
+          "provenance": [],
+          "included_contributions": []
+        },
+        {
+          "identity": {
+            "segment": {
+              "activation_generation": 1,
+              "segment_order": 2,
+              "segment_id": "5134284b-9ba8-4ae6-9b33-55122bf98d80",
+              "capture_epoch": 1
+            },
+            "provider_epoch_id": "epoch-options",
+            "provider_turn_id": "options-2",
+            "settings_scope": []
+          },
+          "outcome": "final",
+          "text": "no",
+          "final_language_runs": [],
+          "final_speaker_runs": [],
+          "text_authority": "authoritative",
+          "failure_reason": null,
+          "epoch_disposition": "reuse",
+          "failure_retryable": false,
+          "recovery_pending": false,
+          "provenance": [],
+          "included_contributions": []
+        }
+      ],
+      "different_equal_text_identities": true,
+      "first_request_retains_English_options": false,
+      "result": "Current production queued decode reads reconfigured language; immutable request settings do not snapshot native options"
+    },
+    "A-Rolling-late": {
+      "old_member_after_new_open": "elevenlabs_scribe",
+      "new_member": "gemini_transcribe",
+      "old_identity_preserved": true,
+      "old_identity_rejected_by_new": true,
+      "new_identity_preserved": true,
+      "replay_reuses_identity": true,
+      "equal_text_different_identity": true,
+      "delegated_old_controls": [
+        [
+          "end_stream",
+          "source_discontinuity"
+        ]
+      ]
+    },
+    "A-Rolling-discontinuity": {
+      "new_stream": true,
+      "terminal_texts": [
+        "no",
+        "no"
+      ],
+      "terminal_identities": [
+        {
+          "stream": {
+            "channel": "peer",
+            "activation_generation": 3,
+            "capture_epoch": 1,
+            "provider_epoch_id": "c4fd4cc35b6a4ab68fe2ee8b8c666b1f",
+            "settings_scope": [
+              "rolling_free",
+              [
+                "a"
+              ],
+              [
+                "a"
+              ]
+            ]
+          },
+          "unit_id": "14685b11-a6ea-4ed0-8f2b-60ab5d70d091",
+          "receipt_sequence": 1
+        },
+        {
+          "stream": {
+            "channel": "peer",
+            "activation_generation": 3,
+            "capture_epoch": 1,
+            "provider_epoch_id": "c4fd4cc35b6a4ab68fe2ee8b8c666b1f",
+            "settings_scope": [
+              "rolling_free",
+              [
+                "a"
+              ],
+              [
+                "a"
+              ]
+            ]
+          },
+          "unit_id": "38305b3e-043b-43e5-ba47-9e26b0c95295",
+          "receipt_sequence": 2
+        }
+      ],
+      "old_controls": [
+        [
+          "stop"
+        ],
+        [
+          "close"
+        ]
+      ],
+      "all_old_calls": [
+        "('begin', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=3, segment_order=1, segment_id=UUID('f2f0870d-33c6-42b6-846e-9d5255587293'), capture_epoch=1), provider_epoch_id='4bbe0d94f14a42b6b56f54d9f7d87c87', provider_turn_id='227446732dd44a6eb0e56ec10de2e19b', settings_scope=('rolling_free', ('a',), ('a',))))",
+        "('begin_done', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=3, segment_order=1, segment_id=UUID('f2f0870d-33c6-42b6-846e-9d5255587293'), capture_epoch=1), provider_epoch_id='4bbe0d94f14a42b6b56f54d9f7d87c87', provider_turn_id='227446732dd44a6eb0e56ec10de2e19b', settings_scope=('rolling_free', ('a',), ('a',))))",
+        "('seal', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=3, segment_order=1, segment_id=UUID('f2f0870d-33c6-42b6-846e-9d5255587293'), capture_epoch=1), provider_epoch_id='4bbe0d94f14a42b6b56f54d9f7d87c87', provider_turn_id='227446732dd44a6eb0e56ec10de2e19b', settings_scope=('rolling_free', ('a',), ('a',))), (AudioCaptureSpan(capture_epoch=1, callback_sequence=1, source_sample_rate_hz=16000, source_start_sample=2, source_end_sample=10, source_start_monotonic_s=0.000125, source_end_monotonic_s=0.000625, discontinuity_before=None, normalized_sample_rate_hz=16000, normalized_start_sample=2, normalized_end_sample=10),), 'silence', 224)",
+        "('seal_done', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=3, segment_order=1, segment_id=UUID('f2f0870d-33c6-42b6-846e-9d5255587293'), capture_epoch=1), provider_epoch_id='4bbe0d94f14a42b6b56f54d9f7d87c87', provider_turn_id='227446732dd44a6eb0e56ec10de2e19b', settings_scope=('rolling_free', ('a',), ('a',))))",
+        "('stop',)",
+        "('close',)"
+      ],
+      "stale_rejected_replay_ignored_repetition_retained": true
+    },
+    "C-configured-target": {
+      "mode": "offline",
+      "compatibility": "openai_transcription",
+      "endpoint_present": false,
+      "model_present": false,
+      "extra_model_present": false,
+      "named_server": "blocked when endpoint/model absent; no endpoint calls performed"
+    },
+    "C-offline-local-protocol": {
+      "requests": [
+        {
+          "url": "http://example.invalid/v1/audio/transcriptions?model=extra-model",
+          "form": {
+            "language": "en",
+            "model": "extra-model"
+          },
+          "wav": {
+            "rate": 16000,
+            "channels": 1,
+            "width": 2,
+            "frames": 5760,
+            "pcm_sha256": "cb998cbfc4cef3e63e8daf7fd252dccc6c27b94ce95c169470e1a0b0101cd2ca"
+          }
+        }
+      ],
+      "returned_text": "no no",
+      "input_pcm_sha256": "cb998cbfc4cef3e63e8daf7fd252dccc6c27b94ce95c169470e1a0b0101cd2ca",
+      "upstream_extra_fields": [
+        "words",
+        "segments",
+        "language",
+        "server_revision"
+      ],
+      "preserved_value_type": "str",
+      "fixture_not_named_server": true
+    },
+    "C-realtime-local-format": {
+      "connect": [
+        {
+          "url": "ws://example.invalid/v1/realtime?model=declared-model",
+          "headers": {
+            "OpenAI-Beta": "realtime=v1"
+          }
+        }
+      ],
+      "session_update": {
+        "type": "session.update",
+        "session": {
+          "input_audio_transcription": {
+            "model": "declared-model",
+            "language": "en"
+          },
+          "turn_detection": null
+        }
+      },
+      "append_bytes": 11520,
+      "append_pcm_sha256": "cb998cbfc4cef3e63e8daf7fd252dccc6c27b94ce95c169470e1a0b0101cd2ca",
+      "adapter_rate": 16000,
+      "wire_rate_declared": false,
+      "fixture_not_named_server": true
+    }
+  },
+  "cleanup": {
+    "fake_cpu_backend_closed": true,
+    "fake_http_client_closed": true,
+    "fake_websocket_closed": true,
+    "engine_closed": true
+  }
+}

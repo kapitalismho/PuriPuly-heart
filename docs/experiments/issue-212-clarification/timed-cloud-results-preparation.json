@@ -1,0 +1,148 @@
+{
+  "revision": "TIMED-CLOUD-WIRE-1",
+  "environment": {
+    "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "versions": {
+      "websockets": "16.1.1",
+      "deepgram-sdk": "5.3.4",
+      "elevenlabs": "2.65.0"
+    },
+    "source_sha256": {
+      "docs\\experiments\\issue-212-clarification\\timed_cloud_probe.py": "9833a0ca16ba2bff7af4a94c4b0d2e6601164ab077cc68b4a6c7447ba8dd9d89",
+      "docs\\experiments\\issue-212-clarification\\common.py": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+      "docs\\asr-speaker-policy.md": "50afb6a8385705e1138eac7da71a8e80a62bf3f53cdec0993549738eb0229f5f",
+      "docs\\experiments\\issue-212\\evidence.md": "04cfa4bb3c609d5578cecfa5bbfc1934145b3676be148cc6341b2a1883ffe2a4"
+    },
+    "configured_routes": {
+      "soniox": {
+        "model": "stt-rt-v5",
+        "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket"
+      },
+      "deepgram": {
+        "model": "nova-3",
+        "endpoint": "wss://api.deepgram.com/v1/listen"
+      },
+      "elevenlabs": {
+        "model": "scribe_v2_realtime",
+        "endpoint": "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+      }
+    },
+    "audio": {
+      "a": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_a.wav",
+        "wav_sha256": "de9319443c5cebf7c0dd33eccb2eeb8b3219edb2b2adf42c1c2caab539360cbe",
+        "pcm_sha256": "fa4f27683fa43b4556a76da9b51d565039f5da424f04c54503db1da5b1325273",
+        "samples": 31120,
+        "duration_s": 1.945,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1796,
+          "active_end_sample_exclusive": 19242,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1476,
+          "end_sample_exclusive": 19562,
+          "duration_s": 1.130375,
+          "sha256": "1631dc77e659b172c23bb8ae645561575c0671de908c73002aa0814f0c92945d"
+        },
+        "active_trim": {
+          "start_sample": 1796,
+          "end_sample_exclusive": 19242,
+          "duration_s": 1.090375,
+          "sha256": "88fc76e36f693f0d58edd00bb4e865bb13c37d45f0188d3182504871dcc5384f"
+        }
+      },
+      "b": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_b.wav",
+        "wav_sha256": "0d0fad34b07659f83a03309b06f4314180060aba5687e13951a6e27bd902277d",
+        "pcm_sha256": "50af2eaf21519b0d21813fb9a59a6b1af17b704aef481c913f294f5f3e4cf68b",
+        "samples": 32400,
+        "duration_s": 2.025,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1796,
+          "active_end_sample_exclusive": 20219,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1476,
+          "end_sample_exclusive": 20539,
+          "duration_s": 1.1914375,
+          "sha256": "7a3cb982888651f16a32c97049da93f54d7b5eb9e575ca3bc38be0522ca7fa8a"
+        },
+        "active_trim": {
+          "start_sample": 1796,
+          "end_sample_exclusive": 20219,
+          "duration_s": 1.1514375,
+          "sha256": "fd2e3c50896fa0c00bcdcd116a94833bb2d24528f87ca4fbd39b339869d3eedf"
+        }
+      },
+      "no": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+        "wav_sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+        "pcm_sha256": "7ecb58a91e9b6b77aa497c3f98aa336fde279f326b49364867ce5b9fffb0570d",
+        "samples": 18160,
+        "duration_s": 1.135,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1727,
+          "active_end_sample_exclusive": 6361,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1407,
+          "end_sample_exclusive": 6681,
+          "duration_s": 0.329625,
+          "sha256": "59b6545ada47d8a6000f2fffd787e5a2db5af2a0686ec2bbc7dfc2f804d2af07"
+        },
+        "active_trim": {
+          "start_sample": 1727,
+          "end_sample_exclusive": 6361,
+          "duration_s": 0.289625,
+          "sha256": "2aaee5e1281fe84a0b13003341ed8e7cc8b7a9cd97da9c41e27bcb3e2a0418e2"
+        }
+      },
+      "correction": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+        "wav_sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+        "pcm_sha256": "cb204865bc4501df69f9e613bae31aad2557d1b63ec43237f46f6ef5279d84de",
+        "samples": 30720,
+        "duration_s": 1.92,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1633,
+          "active_end_sample_exclusive": 18862,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1313,
+          "end_sample_exclusive": 19182,
+          "duration_s": 1.1168125,
+          "sha256": "ea76608630cb558d7ae3497a2ebfb56d7829a75703b04643d51dfc43e5717ed1"
+        },
+        "active_trim": {
+          "start_sample": 1633,
+          "end_sample_exclusive": 18862,
+          "duration_s": 1.0768125,
+          "sha256": "c9bca2a2ab81851621c29ad54616e22e48c96c68621c819fef68e1067298d2bc"
+        }
+      }
+    },
+    "wire": "Raw native WebSockets using locked websockets; SDKs and packaged adapters bypassed; no product mutation",
+    "sample_rate": 16000,
+    "format": "mono PCM signed16 little endian",
+    "limits": {
+      "initial_connections_per_provider": 2,
+      "automatic_retries": 0,
+      "audio_ceiling_per_provider_s": 60
+    }
+  },
+  "argv": [
+    "--prepare",
+    "--output",
+    "docs/experiments/issue-212-clarification/timed-cloud-results-preparation.json"
+  ],
+  "prepared_without_connections": true
+}

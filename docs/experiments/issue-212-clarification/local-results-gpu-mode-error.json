@@ -1,0 +1,15 @@
+{
+  "baseline": "0f0ba5173da51250bb5926e4a2eead5e68adff81",
+  "command": "../../../.venv/Scripts/python.exe docs/experiments/issue-212-clarification/local_probe.py gpu",
+  "historical_script_sha256_reconstructed": "1f75c69f93db9bd2962dabb2e063157e02e5dc0a875765a97c5f7e60f99f89bf",
+  "historical_hash_basis": "Reconstructed exact source by reversing recorded surgical edits; original run did not capture script/common hashes. Snapshot preserved in local-results-source-history.json, version CA0A-components-invalid-gpu; not a final-script run.",
+  "selected_worker": "C:/Users/salee/Documents/dev/puripuly_heart/build/gpu_worker/PuriPulyHeartGpuWorker.exe",
+  "worker_size": 77884416,
+  "worker_sha256": "5ee4541f289e7aebb76808d3375dd45059518307aa67dee6d91d51cb28cc990d",
+  "process_gate_matched": [],
+  "gpu_model_present": false,
+  "error": "GpuWorkerClosedError: worker exited before authentication with code 10",
+  "probe_error": "Experiment initially supplied invalid launch mode asr; native protocol supports discovery/persistent only. Exit 10 is launch-manifest rejection, not device or inference evidence. Corrected subsequent experiment uses discovery; no product repair.",
+  "authentication_completed": false,
+  "inference_attempted": false
+}

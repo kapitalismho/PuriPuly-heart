@@ -1,0 +1,404 @@
+{
+  "revision": "TIMED-CLOUD-WIRE-COMPARISON-1",
+  "inputs": [
+    "timed-cloud-results-soniox.json",
+    "timed-cloud-results-soniox-passive.json"
+  ],
+  "method": "Exact token receipt-order text and interval comparison; no correction or alignment model applied",
+  "sample_rate": 16000,
+  "input_maps_equal": true,
+  "controlled_sent_samples": 144000,
+  "passive_sent_samples": 144000,
+  "controlled_final_progress_ms": 9240,
+  "passive_final_progress_ms": 9000,
+  "controlled_final_progress_excess_ms": 240,
+  "passive_final_progress_excess_ms": 0,
+  "token_text_sequence_equal": true,
+  "tokens": [
+    {
+      "ordinal": 1,
+      "text": "The",
+      "controlled_interval_ms": [
+        480,
+        540
+      ],
+      "passive_interval_ms": [
+        480,
+        540
+      ],
+      "difference_ms": [
+        0,
+        0
+      ]
+    },
+    {
+      "ordinal": 2,
+      "text": " red",
+      "controlled_interval_ms": [
+        720,
+        780
+      ],
+      "passive_interval_ms": [
+        720,
+        780
+      ],
+      "difference_ms": [
+        0,
+        0
+      ]
+    },
+    {
+      "ordinal": 3,
+      "text": " bo",
+      "controlled_interval_ms": [
+        1020,
+        1080
+      ],
+      "passive_interval_ms": [
+        1020,
+        1080
+      ],
+      "difference_ms": [
+        0,
+        0
+      ]
+    },
+    {
+      "ordinal": 4,
+      "text": "at",
+      "controlled_interval_ms": [
+        1080,
+        1140
+      ],
+      "passive_interval_ms": [
+        1080,
+        1140
+      ],
+      "difference_ms": [
+        0,
+        0
+      ]
+    },
+    {
+      "ordinal": 5,
+      "text": " is",
+      "controlled_interval_ms": [
+        1200,
+        1260
+      ],
+      "passive_interval_ms": [
+        1200,
+        1260
+      ],
+      "difference_ms": [
+        0,
+        0
+      ]
+    },
+    {
+      "ordinal": 6,
+      "text": " re",
+      "controlled_interval_ms": [
+        1320,
+        1380
+      ],
+      "passive_interval_ms": [
+        1320,
+        1380
+      ],
+      "difference_ms": [
+        0,
+        0
+      ]
+    },
+    {
+      "ordinal": 7,
+      "text": "ad",
+      "controlled_interval_ms": [
+        1500,
+        1560
+      ],
+      "passive_interval_ms": [
+        1500,
+        1560
+      ],
+      "difference_ms": [
+        0,
+        0
+      ]
+    },
+    {
+      "ordinal": 8,
+      "text": "y.",
+      "controlled_interval_ms": [
+        1680,
+        1740
+      ],
+      "passive_interval_ms": [
+        1680,
+        1740
+      ],
+      "difference_ms": [
+        0,
+        0
+      ]
+    },
+    {
+      "ordinal": 9,
+      "text": " The",
+      "controlled_interval_ms": [
+        3600,
+        3660
+      ],
+      "passive_interval_ms": [
+        3480,
+        3540
+      ],
+      "difference_ms": [
+        120,
+        120
+      ]
+    },
+    {
+      "ordinal": 10,
+      "text": " red",
+      "controlled_interval_ms": [
+        3780,
+        3840
+      ],
+      "passive_interval_ms": [
+        3660,
+        3720
+      ],
+      "difference_ms": [
+        120,
+        120
+      ]
+    },
+    {
+      "ordinal": 11,
+      "text": " bo",
+      "controlled_interval_ms": [
+        4080,
+        4140
+      ],
+      "passive_interval_ms": [
+        3960,
+        4020
+      ],
+      "difference_ms": [
+        120,
+        120
+      ]
+    },
+    {
+      "ordinal": 12,
+      "text": "at",
+      "controlled_interval_ms": [
+        4200,
+        4260
+      ],
+      "passive_interval_ms": [
+        4080,
+        4140
+      ],
+      "difference_ms": [
+        120,
+        120
+      ]
+    },
+    {
+      "ordinal": 13,
+      "text": " is",
+      "controlled_interval_ms": [
+        4260,
+        4320
+      ],
+      "passive_interval_ms": [
+        4140,
+        4200
+      ],
+      "difference_ms": [
+        120,
+        120
+      ]
+    },
+    {
+      "ordinal": 14,
+      "text": " re",
+      "controlled_interval_ms": [
+        4380,
+        4440
+      ],
+      "passive_interval_ms": [
+        4260,
+        4320
+      ],
+      "difference_ms": [
+        120,
+        120
+      ]
+    },
+    {
+      "ordinal": 15,
+      "text": "ad",
+      "controlled_interval_ms": [
+        4560,
+        4620
+      ],
+      "passive_interval_ms": [
+        4440,
+        4500
+      ],
+      "difference_ms": [
+        120,
+        120
+      ]
+    },
+    {
+      "ordinal": 16,
+      "text": "y.",
+      "controlled_interval_ms": [
+        4740,
+        4800
+      ],
+      "passive_interval_ms": [
+        4680,
+        4740
+      ],
+      "difference_ms": [
+        60,
+        60
+      ]
+    },
+    {
+      "ordinal": 17,
+      "text": " The",
+      "controlled_interval_ms": [
+        6660,
+        6720
+      ],
+      "passive_interval_ms": [
+        6480,
+        6540
+      ],
+      "difference_ms": [
+        180,
+        180
+      ]
+    },
+    {
+      "ordinal": 18,
+      "text": " bl",
+      "controlled_interval_ms": [
+        6900,
+        6960
+      ],
+      "passive_interval_ms": [
+        6660,
+        6720
+      ],
+      "difference_ms": [
+        240,
+        240
+      ]
+    },
+    {
+      "ordinal": 19,
+      "text": "ue",
+      "controlled_interval_ms": [
+        7020,
+        7080
+      ],
+      "passive_interval_ms": [
+        6780,
+        6840
+      ],
+      "difference_ms": [
+        240,
+        240
+      ]
+    },
+    {
+      "ordinal": 20,
+      "text": " tra",
+      "controlled_interval_ms": [
+        7200,
+        7260
+      ],
+      "passive_interval_ms": [
+        7020,
+        7080
+      ],
+      "difference_ms": [
+        180,
+        180
+      ]
+    },
+    {
+      "ordinal": 21,
+      "text": "in",
+      "controlled_interval_ms": [
+        7320,
+        7380
+      ],
+      "passive_interval_ms": [
+        7080,
+        7140
+      ],
+      "difference_ms": [
+        240,
+        240
+      ]
+    },
+    {
+      "ordinal": 22,
+      "text": " is",
+      "controlled_interval_ms": [
+        7440,
+        7500
+      ],
+      "passive_interval_ms": [
+        7200,
+        7260
+      ],
+      "difference_ms": [
+        240,
+        240
+      ]
+    },
+    {
+      "ordinal": 23,
+      "text": " lat",
+      "controlled_interval_ms": [
+        7680,
+        7740
+      ],
+      "passive_interval_ms": [
+        7440,
+        7500
+      ],
+      "difference_ms": [
+        240,
+        240
+      ]
+    },
+    {
+      "ordinal": 24,
+      "text": "e.",
+      "controlled_interval_ms": [
+        7920,
+        7980
+      ],
+      "passive_interval_ms": [
+        7740,
+        7800
+      ],
+      "difference_ms": [
+        180,
+        180
+      ]
+    }
+  ],
+  "limits": "Flush-associated lexical displacement observed on this matched timeline; mechanism/exact correction/guarantees remain unestablished"
+}

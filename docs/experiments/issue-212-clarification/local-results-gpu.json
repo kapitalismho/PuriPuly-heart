@@ -1,0 +1,41 @@
+{
+  "baseline": "0f0ba5173da51250bb5926e4a2eead5e68adff81",
+  "command": [
+    "docs/experiments/issue-212-clarification/local_probe.py",
+    "gpu"
+  ],
+  "process_gate": {
+    "command": [
+      "powershell.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "$p = @(Get-Process -Name VRChat,vrserver,vrcompositor,PuriPulyHeartGpuWorker -ErrorAction SilentlyContinue); ConvertTo-Json -Compress -InputObject @($p | Select-Object ProcessName,Id)"
+    ],
+    "returncode": 0,
+    "matched_processes": []
+  },
+  "selected_worker": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\build\\gpu_worker\\PuriPulyHeartGpuWorker.exe",
+  "worker_size": 77884416,
+  "worker_sha256": "5ee4541f289e7aebb76808d3375dd45059518307aa67dee6d91d51cb28cc990d",
+  "binary_source_revision": "unknown; explicit parent staged binary, not certified as candidate source build",
+  "gpu_model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\qwen3-asr-1.7b-q6-k-transcribe-vulkan\\Qwen3-ASR-1.7B-Q6_K.gguf",
+  "gpu_model_present": false,
+  "scope": "Authenticated protocol2 startup and Vulkan discover only; no activate/warmup/transcribe/Nemotron",
+  "authenticated_contract2": true,
+  "devices": [
+    {
+      "device_id": "vulkan-index-0",
+      "registry_index": 0,
+      "name": "Vulkan0",
+      "description": "AMD Radeon RX 7900 XTX",
+      "device_type": "gpu",
+      "memory_total_bytes": 25753026560,
+      "memory_free_bytes": 24890653872
+    }
+  ],
+  "cleanup": {
+    "closed": true,
+    "returncode": 0
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "baseline": "0f0ba5173da51250bb5926e4a2eead5e68adff81",
+  "command": [
+    "docs/experiments/issue-212-clarification/local_probe.py",
+    "rolling-scoped"
+  ],
+  "kind": "Actual Rolling wrapper with fake scoped Scribe and independent Gemini member sessions; no wire server",
+  "old_member": "elevenlabs_scribe",
+  "new_member": "gemini_transcribe",
+  "old_member_independent": false,
+  "new_member_independent": true,
+  "late_old_terminal": {
+    "identity": {
+      "segment": {
+        "activation_generation": 1,
+        "segment_order": 1,
+        "segment_id": "dcd9e5c0-aa35-4529-a33a-614b6f080099",
+        "capture_epoch": 1
+      },
+      "provider_epoch_id": "scribe-old",
+      "provider_turn_id": "first",
+      "settings_scope": []
+    },
+    "outcome": "final",
+    "text": "no",
+    "final_language_runs": [],
+    "final_speaker_runs": [],
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "epoch_disposition": "reuse",
+    "failure_retryable": false,
+    "recovery_pending": false,
+    "provenance": [],
+    "included_contributions": []
+  },
+  "late_identity_preserved": true,
+  "delegated_control_calls": [
+    "('begin', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('dcd9e5c0-aa35-4529-a33a-614b6f080099'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()))",
+    "('begin_done', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('dcd9e5c0-aa35-4529-a33a-614b6f080099'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()))",
+    "('send', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('dcd9e5c0-aa35-4529-a33a-614b6f080099'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()), 1, 8, (AudioCaptureSpan(capture_epoch=1, callback_sequence=1, source_sample_rate_hz=16000, source_start_sample=0, source_end_sample=4, source_start_monotonic_s=0.0, source_end_monotonic_s=0.00025, discontinuity_before=None, normalized_sample_rate_hz=16000, normalized_start_sample=0, normalized_end_sample=4),), False)",
+    "('send_done', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('dcd9e5c0-aa35-4529-a33a-614b6f080099'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()), 1)",
+    "('seal', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('dcd9e5c0-aa35-4529-a33a-614b6f080099'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()), (AudioCaptureSpan(capture_epoch=1, callback_sequence=1, source_sample_rate_hz=16000, source_start_sample=0, source_end_sample=4, source_start_monotonic_s=0.0, source_end_monotonic_s=0.00025, discontinuity_before=None, normalized_sample_rate_hz=16000, normalized_start_sample=0, normalized_end_sample=4),), 'hardcut', 0)",
+    "('seal_done', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('dcd9e5c0-aa35-4529-a33a-614b6f080099'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()))"
+  ],
+  "old_seal_count": 1,
+  "automatic_successor_seal_count": 0,
+  "scope_note": "Corrects the mechanical remapper fixture's artificial independent Scribe capability; does not certify Scribe wire finalization or billing",
+  "cleanup": {
+    "old_closed": true,
+    "new_closed": true
+  }
+}

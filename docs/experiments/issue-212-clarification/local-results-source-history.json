@@ -1,0 +1,1510 @@
+{
+  "method": "Historical script sources reconstructed from final text by reversing the recorded successful surgical edits; NOT run-time captured hashes. Initial reconstruction byte count matches initial write tool response 12447. Common was shared immutable and unchanged during all runs; no run-time hash stamp was recorded by the original reports.",
+  "final_script_sha256": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
+  "final_common_sha256": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+  "versions": {
+    "9862-real": {
+      "sha256": "675cadee8e29751698a5c28717ad3b5aee827a537f77d89fc9117bca54d75e2d",
+      "utf8_bytes": 12447,
+      "source": "from __future__ import annotations\n\nimport argparse\nimport asyncio\nimport dataclasses\nimport gc\nimport hashlib\nimport importlib.metadata\nimport json\nimport subprocess\nimport sys\nimport urllib.request\nimport wave\nfrom pathlib import Path\n\nimport numpy as np\n\nfrom common import DIRECTORY, ROOT, pcm, settings_data, synthesize\n\nBASELINE = \"0f0ba5173da51250bb5926e4a2eead5e68adff81\"\nJA_REV = \"bef18eb066808c90bd0f5df5be685767b0732de8\"\nJA_URL = f\"https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/{JA_REV}/test_wavs/test_ja_1.wav\"\nJA_SHA = \"09abd330ce706a6e6969fe6bbc8275314af631fcee4e536afd0626570d263fbf\"\n\n\ndef sha(path):\n    h = hashlib.sha256()\n    with Path(path).open(\"rb\") as source:\n        for block in iter(lambda: source.read(1024 * 1024), b\"\"):\n            h.update(block)\n    return h.hexdigest()\n\n\ndef save(name, data):\n    (DIRECTORY / name).write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str) + \"\\n\", encoding=\"utf-8\")\n\n\ndef process_gate():\n    command = [\"powershell.exe\", \"-NoProfile\", \"-NonInteractive\", \"-Command\", \"$p = @(Get-Process -Name VRChat,vrserver,vrcompositor,PuriPulyHeartGpuWorker -ErrorAction SilentlyContinue); ConvertTo-Json -Compress -InputObject @($p | Select-Object ProcessName,Id)\"]\n    result = subprocess.run(command, capture_output=True, text=True, timeout=30)\n    if result.returncode:\n        raise RuntimeError(\"Process safety gate failed: \" + result.stderr)\n    processes = json.loads(result.stdout)\n    if processes:\n        raise RuntimeError(\"Active VR/worker processes; neural work not authorized\")\n    return {\"command\": command, \"returncode\": result.returncode, \"matched_processes\": processes}\n\n\ndef wav(name, raw):\n    path = DIRECTORY / \"audio\" / (name + \".wav\")\n    with wave.open(str(path), \"wb\") as writer:\n        writer.setnchannels(1)\n        writer.setsampwidth(2)\n        writer.setframerate(16000)\n        writer.writeframes(raw)\n    return path\n\n\ndef trimmed(name, source):\n    raw = pcm(source)\n    samples = np.frombuffer(raw, dtype=\"<i2\")\n    nonzero = np.flatnonzero(samples != 0)\n    start, end = int(nonzero[0]), int(nonzero[-1]) + 1\n    path = wav(name, raw[start * 2:end * 2])\n    return path, {\"parent\": str(source.relative_to(ROOT)), \"parent_sha256\": sha(source), \"sample_range\": [start, end], \"rule\": \"Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold\"}\n\n\ndef audio_metadata(path, mapping=None):\n    raw = pcm(path)\n    return {\"path\": str(path.relative_to(ROOT)), \"sha256\": sha(path), \"pcm_sha256\": hashlib.sha256(raw).hexdigest(), \"samples\": len(raw) // 2, \"seconds\": len(raw) / 32000, \"sample_rate_hz\": 16000, \"channels\": 1, \"sample_width_bytes\": 2, \"mapping\": mapping}\n\n\ndef prepare_audio():\n    no = DIRECTORY / \"audio/shared_no.wav\"\n    correction = DIRECTORY / \"audio/shared_correction.wav\"\n    no_trim, no_map = trimmed(\"local_no_trim\", no)\n    correction_trim, correction_map = trimmed(\"local_correction_trim\", correction)\n    old = pcm(no_trim)[-4800 * 2:]\n    context = wav(\"local_old_no_300ms_then_correction\", old + pcm(correction_trim))\n    mapping = {\"pieces\": [{\"input_range\": [0, 4800], \"source\": str(no_trim.relative_to(ROOT)), \"source_range\": [len(pcm(no_trim)) // 2 - 4800, len(pcm(no_trim)) // 2], \"ownership\": \"already_owned_context_only\"}, {\"input_range\": [4800, 4800 + len(pcm(correction_trim)) // 2], \"source\": str(correction_trim.relative_to(ROOT)), \"source_range\": [0, len(pcm(correction_trim)) // 2], \"ownership\": \"new_content\"}]}\n    ja = DIRECTORY / \"audio/local_official_ja_1.wav\"\n    if not ja.exists():\n        with urllib.request.urlopen(JA_URL, timeout=40) as response:\n            data = response.read(2_000_000)\n        if len(data) != 1248044 or hashlib.sha256(data).hexdigest() != JA_SHA:\n            raise ValueError(\"Pinned public Japanese sample hash/size mismatch\")\n        ja.write_bytes(data)\n    if sha(ja) != JA_SHA:\n        raise ValueError(\"Pinned public Japanese sample hash mismatch\")\n    # The upstream WAV is normalized below, never silently treated as 16 kHz.\n    with wave.open(str(ja), \"rb\") as reader:\n        original = {\"rate\": reader.getframerate(), \"channels\": reader.getnchannels(), \"width\": reader.getsampwidth(), \"frames\": reader.getnframes()}\n        if original[\"channels\"] != 1 or original[\"width\"] != 2:\n            raise ValueError(\"Unexpected official sample format\")\n        raw = reader.readframes(reader.getnframes())\n    samples = np.frombuffer(raw, dtype=\"<i2\").astype(np.float32) / 32768\n    if original[\"rate\"] != 16000:\n        from scipy.signal import resample_poly\n        from math import gcd\n        divisor = gcd(original[\"rate\"], 16000)\n        samples = resample_poly(samples, 16000 // divisor, original[\"rate\"] // divisor)\n    ja_clip = wav(\"local_ja_first_6s\", np.round(np.clip(samples[:96000], -1, 32767 / 32768) * 32768).astype(\"<i2\").tobytes())\n    ko = synthesize(\"local_ko\", \"아니요. 삼입니다.\", voice=\"Microsoft Heami Desktop\")\n    items = [(no, None), (no_trim, no_map), (correction, None), (correction_trim, correction_map), (context, mapping), (ja_clip, {\"public_source_url\": JA_URL, \"public_sha256\": JA_SHA, \"original_format\": original, \"selected_normalized_range\": [0, 96000], \"transcript_reference\": \"日本語ちゃんと聞き取れてますかちゃんと聞こえてんのちゃんと聞こえてるのじゃあマイクを持ってもらって\", \"reference_scope\": \"Full upstream sample; not a claimed exact six-second transcript\"}), (ko, {\"text\": \"아니요. 삼입니다.\", \"voice\": \"Microsoft Heami Desktop\"})]\n    return {path.stem: (path, audio_metadata(path, mapping)) for path, mapping in items}\n\n\nclass CapturingRecognizer:\n    \"\"\"Observe the real result during the existing production decode, no fake ASR.\"\"\"\n    def __init__(self, inner):\n        self.inner = inner\n        self.raw = None\n\n    def create_stream(self):\n        return self.inner.create_stream()\n\n    def decode_stream(self, stream):\n        self.inner.decode_stream(stream)\n        result = stream.result\n        fields = {}\n        for field in (\"text\", \"tokens\", \"timestamps\", \"durations\", \"lang\", \"language\", \"ys\", \"json\"):\n            try:\n                value = getattr(result, field)\n                if callable(value):\n                    value = value()\n                fields[field] = value\n            except AttributeError:\n                fields[field] = {\"absent\": True}\n            except Exception as error:\n                fields[field] = {\"access_error\": f\"{type(error).__name__}: {error}\"}\n        self.raw = fields\n\n\nasync def real_probes():\n    from puripuly_heart.core.local_stt_assets import default_local_stt_model_root, load_local_stt_asset_manifest, REQUIRED_CPU_LOCAL_STT_MODEL_IDS\n    from puripuly_heart.core.local_stt_catalog import inspect_required_cpu_model_installs, resolve_cpu_auto_model\n    from puripuly_heart.providers.stt.local_cpu import LocalCPUAutoSTTBackend\n\n    report = {\"baseline\": BASELINE, \"command\": sys.argv, \"python\": sys.version, \"executable\": sys.executable, \"kind\": \"actual production CPU loading/decode; no external inference\", \"process_gate\": process_gate(), \"runtime_versions\": {name: importlib.metadata.version(name) for name in (\"sherpa-onnx\", \"sherpa-onnx-core\", \"numpy\")}, \"models\": [], \"decodes\": [], \"auto\": []}\n    save(\"local-results-real.json\", report)\n    root = default_local_stt_model_root()\n    report[\"model_root\"] = str(root)\n    for model_id in REQUIRED_CPU_LOCAL_STT_MODEL_IDS:\n        manifest = load_local_stt_asset_manifest(model_id)\n        files = []\n        for file in manifest.files:\n            path = root / manifest.install_dirname / file.relative_path\n            digest = sha(path)\n            files.append({\"path\": str(path), \"size_bytes\": path.stat().st_size, \"sha256\": digest, \"expected_sha256\": file.sha256, \"hash_matches\": digest == file.sha256})\n        report[\"models\"].append({\"id\": model_id, \"files\": files, \"sources\": {key: value.to_dict() for key, value in manifest.sources.items()}})\n    snapshot = inspect_required_cpu_model_installs(root, verify_checksums=False)\n    report[\"actual_auto_install_gate\"] = {\"available\": snapshot.cpu_auto_available, \"states\": {model.model_id: model.state.status for model in snapshot.models}}\n    if not all(file[\"hash_matches\"] for model in report[\"models\"] for file in model[\"files\"]):\n        save(\"local-results-real.json\", report)\n        raise RuntimeError(\"Model checksum readiness failed\")\n    audio = prepare_audio()\n    report[\"audio\"] = {name: metadata for name, (_, metadata) in audio.items()}\n    english = [\"shared_no\", \"local_no_trim\", \"shared_correction\", \"local_correction_trim\", \"local_old_no_300ms_then_correction\"]\n    sequences = [(\"en\", english), (\"ko\", [\"local_ko\", *english]), (\"ja\", [\"local_ja_first_6s\"])]\n    for language, names in sequences:\n        report[\"process_gate_before_\" + language] = process_gate()\n        auto = LocalCPUAutoSTTBackend(source_language=language, model_root=root)\n        session = None\n        try:\n            session = await auto.open_session()\n            delegate = auto._delegate\n            report[\"auto\"].append({\"requested_language\": language, \"resolver_model\": resolve_cpu_auto_model(language), \"resolved_model\": auto.resolved_model_id, \"delegate_class\": type(delegate).__name__, \"session_class\": type(session).__name__, \"loaded\": auto.is_loaded, \"num_threads\": delegate.num_threads, \"runtime_provider\": delegate.provider})\n            real = delegate._recognizer\n            observer = CapturingRecognizer(real)\n            delegate._recognizer = observer\n            for name in names:\n                path, metadata = audio[name]\n                if language == \"ko\" and name != \"local_ko\":\n                    delegate.language_hint = \"English\"\n                row = {\"clip\": name, \"model\": delegate.model_id, \"delegate_class\": type(delegate).__name__, \"language_hint_at_decode\": delegate.language_hint, \"audio\": metadata}\n                report[\"decodes\"].append(row)\n                save(\"local-results-real.json\", report)\n                try:\n                    samples = np.frombuffer(pcm(path), dtype=\"<i2\").astype(np.float32) / 32768\n                    row[\"adapter_text\"] = await delegate.decode_f32(samples)\n                    row[\"raw_recognizer_result\"] = observer.raw\n                    row[\"outcome\"] = \"empty\" if not row[\"adapter_text\"] else \"text\"\n                except Exception as error:\n                    row[\"outcome\"] = \"failed\"\n                    row[\"error\"] = f\"{type(error).__name__}: {error}\"\n                save(\"local-results-real.json\", report)\n            # Existing Auto binds a delegate rather than resolving each assignment.\n            before = auto.resolved_model_id\n            auto.source_language = \"ja\" if language != \"ja\" else \"en\"\n            report[\"auto\"][-1][\"after_source_language_assignment\"] = {\"language\": auto.source_language, \"resolved_model\": auto.resolved_model_id, \"same_delegate\": auto._delegate is delegate, \"original_model\": before, \"observation\": \"Property assignment only; no application transition invoked\"}\n            delegate._recognizer = real\n        except Exception as error:\n            report.setdefault(\"load_failures\", []).append({\"language\": language, \"error\": f\"{type(error).__name__}: {error}\"})\n        finally:\n            if session is not None:\n                await session.close()\n            await auto.close()\n            report.setdefault(\"cleanup\", []).append({\"language\": language, \"auto_closed\": auto._closed, \"delegate_released\": auto._delegate is None})\n            session = None\n            delegate = None\n            real = None\n            observer = None\n            gc.collect()\n            save(\"local-results-real.json\", report)\n    for language in (\"en\", \"ja\", \"ko\", \"zh\", \"ar\", \"uk\", \"xx\"):\n        try:\n            result = resolve_cpu_auto_model(language)\n        except Exception as error:\n            result = f\"{type(error).__name__}: {error}\"\n        report.setdefault(\"auto_resolution\", {})[language] = result\n    save(\"local-results-real.json\", report)\n    print(json.dumps({\"decodes\": len(report[\"decodes\"]), \"load_failures\": report.get(\"load_failures\", []), \"output\": \"local-results-real.json\"}))\n\n\nif __name__ == \"__main__\":\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"stage\", choices=[\"real\"])\n    args = parser.parse_args()\n    asyncio.run(real_probes())\n"
+    },
+    "CA0A-components-invalid-gpu": {
+      "sha256": "1f75c69f93db9bd2962dabb2e063157e02e5dc0a875765a97c5f7e60f99f89bf",
+      "utf8_bytes": 28178,
+      "source": "from __future__ import annotations\n\nimport argparse\nimport asyncio\nimport dataclasses\nimport gc\nimport hashlib\nimport importlib.metadata\nimport json\nimport subprocess\nimport sys\nimport urllib.request\nimport wave\nfrom pathlib import Path\n\nimport numpy as np\n\nfrom common import DIRECTORY, ROOT, pcm, settings_data, synthesize\n\nBASELINE = \"0f0ba5173da51250bb5926e4a2eead5e68adff81\"\nJA_REV = \"bef18eb066808c90bd0f5df5be685767b0732de8\"\nJA_URL = f\"https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/{JA_REV}/test_wavs/test_ja_1.wav\"\nJA_SHA = \"09abd330ce706a6e6969fe6bbc8275314af631fcee4e536afd0626570d263fbf\"\n\n\ndef sha(path):\n    h = hashlib.sha256()\n    with Path(path).open(\"rb\") as source:\n        for block in iter(lambda: source.read(1024 * 1024), b\"\"):\n            h.update(block)\n    return h.hexdigest()\n\n\ndef save(name, data):\n    (DIRECTORY / name).write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str) + \"\\n\", encoding=\"utf-8\")\n\n\ndef process_gate():\n    command = [\"powershell.exe\", \"-NoProfile\", \"-NonInteractive\", \"-Command\", \"$p = @(Get-Process -Name VRChat,vrserver,vrcompositor,PuriPulyHeartGpuWorker -ErrorAction SilentlyContinue); ConvertTo-Json -Compress -InputObject @($p | Select-Object ProcessName,Id)\"]\n    result = subprocess.run(command, capture_output=True, text=True, timeout=30)\n    if result.returncode:\n        raise RuntimeError(\"Process safety gate failed: \" + result.stderr)\n    processes = json.loads(result.stdout)\n    if processes:\n        raise RuntimeError(\"Active VR/worker processes; neural work not authorized\")\n    return {\"command\": command, \"returncode\": result.returncode, \"matched_processes\": processes}\n\n\ndef wav(name, raw):\n    path = DIRECTORY / \"audio\" / (name + \".wav\")\n    with wave.open(str(path), \"wb\") as writer:\n        writer.setnchannels(1)\n        writer.setsampwidth(2)\n        writer.setframerate(16000)\n        writer.writeframes(raw)\n    return path\n\n\ndef trimmed(name, source):\n    raw = pcm(source)\n    samples = np.frombuffer(raw, dtype=\"<i2\")\n    nonzero = np.flatnonzero(samples != 0)\n    start, end = int(nonzero[0]), int(nonzero[-1]) + 1\n    path = wav(name, raw[start * 2:end * 2])\n    return path, {\"parent\": str(source.relative_to(ROOT)), \"parent_sha256\": sha(source), \"sample_range\": [start, end], \"rule\": \"Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold\"}\n\n\ndef audio_metadata(path, mapping=None):\n    raw = pcm(path)\n    return {\"path\": str(path.relative_to(ROOT)), \"sha256\": sha(path), \"pcm_sha256\": hashlib.sha256(raw).hexdigest(), \"samples\": len(raw) // 2, \"seconds\": len(raw) / 32000, \"sample_rate_hz\": 16000, \"channels\": 1, \"sample_width_bytes\": 2, \"mapping\": mapping}\n\n\ndef prepare_audio():\n    no = DIRECTORY / \"audio/shared_no.wav\"\n    correction = DIRECTORY / \"audio/shared_correction.wav\"\n    no_trim, no_map = trimmed(\"local_no_trim\", no)\n    correction_trim, correction_map = trimmed(\"local_correction_trim\", correction)\n    old = pcm(no_trim)[-4800 * 2:]\n    context = wav(\"local_old_no_300ms_then_correction\", old + pcm(correction_trim))\n    mapping = {\"pieces\": [{\"input_range\": [0, 4800], \"source\": str(no_trim.relative_to(ROOT)), \"source_range\": [len(pcm(no_trim)) // 2 - 4800, len(pcm(no_trim)) // 2], \"ownership\": \"already_owned_context_only\"}, {\"input_range\": [4800, 4800 + len(pcm(correction_trim)) // 2], \"source\": str(correction_trim.relative_to(ROOT)), \"source_range\": [0, len(pcm(correction_trim)) // 2], \"ownership\": \"new_content\"}]}\n    ja = DIRECTORY / \"audio/local_official_ja_1.wav\"\n    if not ja.exists():\n        with urllib.request.urlopen(JA_URL, timeout=40) as response:\n            data = response.read(2_000_000)\n        if len(data) != 1248044 or hashlib.sha256(data).hexdigest() != JA_SHA:\n            raise ValueError(\"Pinned public Japanese sample hash/size mismatch\")\n        ja.write_bytes(data)\n    if sha(ja) != JA_SHA:\n        raise ValueError(\"Pinned public Japanese sample hash mismatch\")\n    # The upstream WAV is normalized below, never silently treated as 16 kHz.\n    with wave.open(str(ja), \"rb\") as reader:\n        original = {\"rate\": reader.getframerate(), \"channels\": reader.getnchannels(), \"width\": reader.getsampwidth(), \"frames\": reader.getnframes()}\n        if original[\"channels\"] != 1 or original[\"width\"] != 2:\n            raise ValueError(\"Unexpected official sample format\")\n        raw = reader.readframes(reader.getnframes())\n    samples = np.frombuffer(raw, dtype=\"<i2\").astype(np.float32) / 32768\n    if original[\"rate\"] != 16000:\n        from scipy.signal import resample_poly\n        from math import gcd\n        divisor = gcd(original[\"rate\"], 16000)\n        samples = resample_poly(samples, 16000 // divisor, original[\"rate\"] // divisor)\n    ja_clip = wav(\"local_ja_first_6s\", np.round(np.clip(samples[:96000], -1, 32767 / 32768) * 32768).astype(\"<i2\").tobytes())\n    ko = synthesize(\"local_ko\", \"아니요. 삼입니다.\", voice=\"Microsoft Heami Desktop\")\n    items = [(no, None), (no_trim, no_map), (correction, None), (correction_trim, correction_map), (context, mapping), (ja_clip, {\"public_source_url\": JA_URL, \"public_sha256\": JA_SHA, \"original_format\": original, \"selected_normalized_range\": [0, 96000], \"transcript_reference\": \"日本語ちゃんと聞き取れてますかちゃんと聞こえてんのちゃんと聞こえてるのじゃあマイクを持ってもらって\", \"reference_scope\": \"Full upstream sample; not a claimed exact six-second transcript\"}), (ko, {\"text\": \"아니요. 삼입니다.\", \"voice\": \"Microsoft Heami Desktop\"})]\n    return {path.stem: (path, audio_metadata(path, mapping)) for path, mapping in items}\n\n\nclass CapturingRecognizer:\n    \"\"\"Observe the real result during the existing production decode, no fake ASR.\"\"\"\n    def __init__(self, inner):\n        self.inner = inner\n        self.raw = None\n\n    def create_stream(self):\n        return self.inner.create_stream()\n\n    def decode_stream(self, stream):\n        self.inner.decode_stream(stream)\n        result = stream.result\n        fields = {}\n        for field in (\"text\", \"tokens\", \"timestamps\", \"durations\", \"lang\", \"language\", \"ys\", \"json\"):\n            try:\n                value = getattr(result, field)\n                if callable(value):\n                    value = value()\n                fields[field] = value\n            except AttributeError:\n                fields[field] = {\"absent\": True}\n            except Exception as error:\n                fields[field] = {\"access_error\": f\"{type(error).__name__}: {error}\"}\n        self.raw = fields\n\n\nasync def real_probes():\n    from puripuly_heart.core.local_stt_assets import default_local_stt_model_root, load_local_stt_asset_manifest, REQUIRED_CPU_LOCAL_STT_MODEL_IDS\n    from puripuly_heart.core.local_stt_catalog import inspect_required_cpu_model_installs, resolve_cpu_auto_model\n    from puripuly_heart.providers.stt.local_cpu import LocalCPUAutoSTTBackend\n\n    report = {\"baseline\": BASELINE, \"command\": sys.argv, \"python\": sys.version, \"executable\": sys.executable, \"kind\": \"actual production CPU loading/decode; no external inference\", \"process_gate\": process_gate(), \"runtime_versions\": {name: importlib.metadata.version(name) for name in (\"sherpa-onnx\", \"sherpa-onnx-core\", \"numpy\")}, \"models\": [], \"decodes\": [], \"auto\": []}\n    save(\"local-results-real.json\", report)\n    root = default_local_stt_model_root()\n    report[\"model_root\"] = str(root)\n    for model_id in REQUIRED_CPU_LOCAL_STT_MODEL_IDS:\n        manifest = load_local_stt_asset_manifest(model_id)\n        files = []\n        for file in manifest.files:\n            path = root / manifest.install_dirname / file.relative_path\n            digest = sha(path)\n            files.append({\"path\": str(path), \"size_bytes\": path.stat().st_size, \"sha256\": digest, \"expected_sha256\": file.sha256, \"hash_matches\": digest == file.sha256})\n        report[\"models\"].append({\"id\": model_id, \"files\": files, \"sources\": {key: value.to_dict() for key, value in manifest.sources.items()}})\n    snapshot = inspect_required_cpu_model_installs(root, verify_checksums=False)\n    report[\"actual_auto_install_gate\"] = {\"available\": snapshot.cpu_auto_available, \"states\": {model.model_id: model.state.status for model in snapshot.models}}\n    if not all(file[\"hash_matches\"] for model in report[\"models\"] for file in model[\"files\"]):\n        save(\"local-results-real.json\", report)\n        raise RuntimeError(\"Model checksum readiness failed\")\n    audio = prepare_audio()\n    report[\"audio\"] = {name: metadata for name, (_, metadata) in audio.items()}\n    english = [\"shared_no\", \"local_no_trim\", \"shared_correction\", \"local_correction_trim\", \"local_old_no_300ms_then_correction\"]\n    sequences = [(\"en\", english), (\"ko\", [\"local_ko\", *english]), (\"ja\", [\"local_ja_first_6s\"])]\n    for language, names in sequences:\n        report[\"process_gate_before_\" + language] = process_gate()\n        auto = LocalCPUAutoSTTBackend(source_language=language, model_root=root)\n        session = None\n        try:\n            session = await auto.open_session()\n            delegate = auto._delegate\n            report[\"auto\"].append({\"requested_language\": language, \"resolver_model\": resolve_cpu_auto_model(language), \"resolved_model\": auto.resolved_model_id, \"delegate_class\": type(delegate).__name__, \"session_class\": type(session).__name__, \"loaded\": auto.is_loaded, \"num_threads\": delegate.num_threads, \"runtime_provider\": delegate.provider})\n            real = delegate._recognizer\n            observer = CapturingRecognizer(real)\n            delegate._recognizer = observer\n            for name in names:\n                path, metadata = audio[name]\n                if language == \"ko\" and name != \"local_ko\":\n                    delegate.language_hint = \"English\"\n                row = {\"clip\": name, \"model\": delegate.model_id, \"delegate_class\": type(delegate).__name__, \"language_hint_at_decode\": delegate.language_hint, \"audio\": metadata}\n                report[\"decodes\"].append(row)\n                save(\"local-results-real.json\", report)\n                try:\n                    samples = np.frombuffer(pcm(path), dtype=\"<i2\").astype(np.float32) / 32768\n                    row[\"adapter_text\"] = await delegate.decode_f32(samples)\n                    row[\"raw_recognizer_result\"] = observer.raw\n                    row[\"outcome\"] = \"empty\" if not row[\"adapter_text\"] else \"text\"\n                except Exception as error:\n                    row[\"outcome\"] = \"failed\"\n                    row[\"error\"] = f\"{type(error).__name__}: {error}\"\n                save(\"local-results-real.json\", report)\n            # Existing Auto binds a delegate rather than resolving each assignment.\n            before = auto.resolved_model_id\n            auto.source_language = \"ja\" if language != \"ja\" else \"en\"\n            report[\"auto\"][-1][\"after_source_language_assignment\"] = {\"language\": auto.source_language, \"resolved_model\": auto.resolved_model_id, \"same_delegate\": auto._delegate is delegate, \"original_model\": before, \"observation\": \"Property assignment only; no application transition invoked\"}\n            delegate._recognizer = real\n        except Exception as error:\n            report.setdefault(\"load_failures\", []).append({\"language\": language, \"error\": f\"{type(error).__name__}: {error}\"})\n        finally:\n            if session is not None:\n                await session.close()\n            await auto.close()\n            report.setdefault(\"cleanup\", []).append({\"language\": language, \"auto_closed\": auto._closed, \"delegate_released\": auto._delegate is None})\n            session = None\n            delegate = None\n            real = None\n            observer = None\n            gc.collect()\n            save(\"local-results-real.json\", report)\n    for language in (\"en\", \"ja\", \"ko\", \"zh\", \"ar\", \"uk\", \"xx\"):\n        try:\n            result = resolve_cpu_auto_model(language)\n        except Exception as error:\n            result = f\"{type(error).__name__}: {error}\"\n        report.setdefault(\"auto_resolution\", {})[language] = result\n    save(\"local-results-real.json\", report)\n    print(json.dumps({\"decodes\": len(report[\"decodes\"]), \"load_failures\": report.get(\"load_failures\", []), \"output\": \"local-results-real.json\"}))\n\n\ndef fixture_module(name, relative_path):\n    import importlib.util\n    spec = importlib.util.spec_from_file_location(name, ROOT / relative_path)\n    module = importlib.util.module_from_spec(spec)\n    sys.modules[name] = module\n    spec.loader.exec_module(module)\n    return module\n\n\nasync def gpu_probe():\n    from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory\n    from puripuly_heart.core.local_gpu_assets import local_gpu_model_path\n\n    parent = ROOT.parents[2]\n    executable = parent / \"build/gpu_worker/PuriPulyHeartGpuWorker.exe\"\n    report = {\"baseline\": BASELINE, \"command\": sys.argv, \"process_gate\": process_gate(), \"selected_worker\": str(executable), \"worker_size\": executable.stat().st_size, \"worker_sha256\": sha(executable), \"binary_source_revision\": \"unknown; explicit parent staged binary, not certified as candidate source build\", \"gpu_model_path\": str(local_gpu_model_path()), \"gpu_model_present\": local_gpu_model_path().is_file(), \"scope\": \"Authenticated protocol2 startup and Vulkan discover only; no activate/warmup/transcribe/Nemotron\"}\n    client = None\n    try:\n        client = await DefaultGpuWorkerProcessFactory(executable_path=executable, request_timeout_s=15).start(mode=\"asr\")\n        report[\"authenticated_contract2\"] = True\n        report[\"devices\"] = [dataclasses.asdict(device) for device in await client.discover()]\n    except Exception as error:\n        report[\"error\"] = f\"{type(error).__name__}: {error}\"\n    finally:\n        if client is not None:\n            await client.close()\n            report[\"cleanup\"] = {\"closed\": client.is_closed, \"returncode\": client.returncode}\n        save(\"local-results-gpu.json\", report)\n    print(json.dumps(report, ensure_ascii=True))\n\n\nasync def component_probes():\n    from dataclasses import replace\n    from types import SimpleNamespace\n    from uuid import uuid4\n    from puripuly_heart.app.services.local_asr.local_asr_selection import resolve_local_asr_selection\n    from puripuly_heart.config.provider_values import STTProviderName\n    from puripuly_heart.core.audio.ownership import AudioSegmentIdentity\n    from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions\n    from puripuly_heart.core.stt.backend import STTProviderTurnIdentity, STTProviderTurnRequest, STTProviderTurnTerminal, STTSessionProjection, STTRecognitionUnit, STTRecognitionUnitTerminal\n    from puripuly_heart.core.stt.rolling import RollingSTTBackend, RollingProviderDefinition\n    from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity\n    from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend\n    from puripuly_heart.providers.stt.custom import CustomSTTBackend\n\n    fixtures = fixture_module(\"local_probe_scoped_fixtures\", \"tests/core/test_stt_scoped_engine.py\")\n    custom_fixtures = fixture_module(\"local_probe_custom_fixtures\", \"tests/providers/test_custom_stt.py\")\n    report = {\"baseline\": BASELINE, \"command\": sys.argv, \"kind\": \"Bounded actual production owners with explicitly fake recognizer/member/HTTP/WebSocket; no server or acoustic certification\", \"claims\": {}}\n    save(\"local-results-components.json\", report)\n    report[\"claims\"][\"A-selection\"] = [dataclasses.asdict(resolve_local_asr_selection(provider, language, cpu_auto_available=available)) for provider, language, available in [(\"local_cpu_auto\", \"en\", True), (\"local_cpu_auto\", \"ja\", True), (\"local_cpu_auto\", \"ko\", True), (\"local_cpu_auto\", \"xx\", True), (\"local_cpu_auto\", \"en\", False), (\"local_parakeet_ja\", \"en\", True)]]\n\n    # Real scoped queue + decode lock, fake recognizer only. Freeze request settings,\n    # then change session options before queued A can read the mutable backend.\n    observed_options = []\n    class FakeRecognizer:\n        def create_stream(self):\n            class Stream:\n                result = SimpleNamespace(text=\"no\")\n                def __init__(self):\n                    self.options = {}\n                def set_option(self, name, value):\n                    self.options[name] = value\n                def accept_waveform(self, rate, samples):\n                    self.samples = samples.copy()\n            return Stream()\n        def decode_stream(self, stream):\n            observed_options.append({\"options\": dict(stream.options), \"samples\": len(stream.samples)})\n\n    backend = LocalQwenSherpaSTTBackend(model_dir=DIRECTORY, language_hint=\"English\")\n    backend._recognizer = FakeRecognizer()\n    session = await backend.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=\"epoch-options\"))\n    captured_events = []\n    async def consume():\n        async for event in session.turn_events():\n            captured_events.append(event)\n    consumer = asyncio.create_task(consume())\n    await backend._decode_lock.acquire()\n    try:\n        requests = []\n        for order in (1, 2):\n            identity = STTProviderTurnIdentity(AudioSegmentIdentity(1, order, uuid4(), 1), \"epoch-options\", f\"options-{order}\")\n            request_settings = replace(fixtures.settings(\"local_cpu_auto\"), source_language=\"en\" if order == 1 else \"ja\")\n            request = STTProviderTurnRequest(identity, request_settings, channel=\"peer\")\n            requests.append(request)\n            await session.begin_turn(request)\n            await session.send_turn_audio(identity, b\"\\x01\\x00\" * 160, payload_sequence=1, source_ranges=(), context_only=False)\n            await session.seal_turn(identity, sealed_content_ranges=(), seal_reason=\"silence\", observed_trailing_silence_ms=0)\n            if order == 1:\n                await backend.reconfigure_session_options(LocalASRSessionOptions(\"ja\", language_hint=\"Japanese\"))\n        backend._decode_lock.release()\n        await fixtures.wait_until(lambda: len([e for e in captured_events if isinstance(e, STTProviderTurnTerminal)]) == 2, timeout=5)\n        terminals = [e for e in captured_events if isinstance(e, STTProviderTurnTerminal)]\n        report[\"claims\"][\"A-queued-options\"] = {\"request_languages\": [request.settings.source_language for request in requests], \"observed_decode_options\": observed_options, \"terminals\": [dataclasses.asdict(event) for event in terminals], \"different_equal_text_identities\": terminals[0].identity != terminals[1].identity and terminals[0].text == terminals[1].text, \"first_request_retains_English_options\": observed_options[0][\"options\"].get(\"language\") == \"English\", \"result\": \"Current production queued decode reads reconfigured language; immutable request settings do not snapshot native options\"}\n    finally:\n        if backend._decode_lock.locked():\n            backend._decode_lock.release()\n        await session.close()\n        await backend.close()\n        await consumer\n    save(\"local-results-components.json\", report)\n\n    # Keep old Scribe session alive while next open resolves Gemini; no network.\n    old = fixtures.ControlledStreamSession()\n    new = fixtures.ControlledStreamSession()\n    configured = {\"scribe\": True}\n    class FakeBackend:\n        def __init__(self, inner):\n            self.inner = inner\n        async def open_session(self, **kwargs):\n            return self.inner\n    rolling = RollingSTTBackend(providers=(\n        RollingProviderDefinition(STTProviderName.ELEVENLABS_SCRIBE, lambda: FakeBackend(old), lambda: configured[\"scribe\"]),\n        RollingProviderDefinition(STTProviderName.GEMINI_TRANSCRIBE, lambda: FakeBackend(new), lambda: True),\n    ))\n    old_wrapper = await rolling.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=\"old\"))\n    configured[\"scribe\"] = False\n    new_wrapper = await rolling.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=\"new\"))\n    old_stream = RecognitionStreamIdentity(\"peer\", 1, 1, \"old\", (\"rolling\",))\n    new_stream = replace(old_stream, provider_epoch_id=\"new\")\n    await old_wrapper.begin_stream(old_stream)\n    await new_wrapper.begin_stream(new_stream)\n    old_event = STTRecognitionUnit(RecognitionUnitIdentity(old_stream, uuid4(), 1), \"no\")\n    new_event = STTRecognitionUnit(RecognitionUnitIdentity(new_stream, uuid4(), 1), \"no\")\n    # Use wrapper's existing remapper directly; delayed old source cannot acquire new epoch.\n    report[\"claims\"][\"A-Rolling-late\"] = {\"old_member_after_new_open\": old_wrapper.provider_name.value, \"new_member\": new_wrapper.provider_name.value, \"old_identity_preserved\": old_wrapper._remap_recognition_identity(old_event.identity) == old_event.identity, \"old_identity_rejected_by_new\": new_wrapper._remap_recognition_identity(old_event.identity) is None, \"new_identity_preserved\": new_wrapper._remap_recognition_identity(new_event.identity) == new_event.identity, \"replay_reuses_identity\": old_wrapper._remap_recognition_identity(old_event.identity) == old_wrapper._remap_recognition_identity(old_event.identity), \"equal_text_different_identity\": old_event.text == new_event.text and old_event.identity != new_event.identity}\n    await old_wrapper.end_stream(reason=\"source_discontinuity\")\n    report[\"claims\"][\"A-Rolling-late\"][\"delegated_old_controls\"] = [call for call in old.calls if call[0] == \"end_stream\"]\n    await old_wrapper.close()\n    await new_wrapper.close()\n    save(\"local-results-components.json\", report)\n\n    # Explicit discontinuity through engine + Rolling wrapper, not a proposed reducer.\n    emitted = []\n    inners = []\n    wrappers = []\n    async def engine_factory(_settings, epoch):\n        inner = fixtures.ControlledStreamSession()\n        inners.append(inner)\n        rb = RollingSTTBackend(providers=(RollingProviderDefinition(STTProviderName.GEMINI_TRANSCRIBE, lambda: FakeBackend(inner), lambda: True),))\n        wrapper = await rb.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=epoch))\n        wrappers.append(wrapper)\n        return wrapper\n    engine = fixtures.ScopedRecognitionEngine(engine_factory, event_sink=emitted.append, watchdog_resolver=lambda _: fixtures.watchdogs())\n    ledger = fixtures.PeerAudioSegmentLedger(activation_generation=3, settings=fixtures.settings(\"rolling_free\"))\n    try:\n        start, _, end = fixtures.segment_events(ledger, start_sample=0, now=100)\n        await engine.handle_stream_input(fixtures.stream_input(ledger, 2, 6, speech_observed=True))\n        await engine.handle_owned_vad_event(start)\n        await engine.handle_owned_vad_event(end)\n        previous = inners[0].stream\n        await engine.handle_stream_input(fixtures.OwnedStreamInput(fixtures.CaptureStreamInput(np.empty(0, dtype=np.float32), (), boundary_reason=\"source_discontinuity\"), ledger, ledger.settings, ledger.activation_generation))\n        successor = fixtures.PeerAudioSegmentLedger(activation_generation=3, settings=ledger.settings)\n        start2, _, _ = fixtures.segment_events(successor, start_sample=10, now=200)\n        await engine.handle_owned_vad_event(start2)\n        current = inners[-1].stream\n        inners[-1].emit(STTRecognitionUnit(RecognitionUnitIdentity(previous, uuid4(), 1), \"stale-no\"))\n        unit = STTRecognitionUnit(RecognitionUnitIdentity(current, uuid4(), 1), \"no\")\n        inners[-1].emit(unit)\n        inners[-1].emit(unit)  # replay same identity\n        inners[-1].emit(STTRecognitionUnit(RecognitionUnitIdentity(current, uuid4(), 2), \"no\"))\n        await fixtures.wait_until(lambda: len([e for e in emitted if isinstance(e, STTRecognitionUnitTerminal)]) == 2)\n        finals = [e for e in emitted if isinstance(e, STTRecognitionUnitTerminal)]\n        report[\"claims\"][\"A-Rolling-discontinuity\"] = {\"new_stream\": current != previous, \"terminal_texts\": [e.unit.text for e in finals], \"terminal_identities\": [dataclasses.asdict(e.unit.identity) for e in finals], \"old_controls\": [call for call in inners[0].calls if call[0] in (\"end_stream\", \"stop\", \"close\")], \"all_old_calls\": [str(call) for call in inners[0].calls], \"stale_rejected_replay_ignored_repetition_retained\": [e.unit.text for e in finals] == [\"no\", \"no\"]}\n    finally:\n        await engine.close()\n    save(\"local-results-components.json\", report)\n\n    # Safe configured-target presence only, no endpoint/credential output.\n    custom = settings_data().get(\"stt\", {}).get(\"custom\", {})\n    report[\"claims\"][\"C-configured-target\"] = {\"mode\": custom.get(\"mode\"), \"compatibility\": custom.get(\"compatibility\"), \"endpoint_present\": bool(custom.get(\"endpoint\")), \"model_present\": bool(custom.get(\"model\")), \"extra_model_present\": bool(custom.get(\"extra\", {}).get(\"model\")), \"named_server\": \"blocked when endpoint/model absent; no endpoint calls performed\"}\n    import io\n    captured_requests = []\n    async def handler(url, **kwargs):\n        raw_wav = kwargs[\"files\"][\"file\"][1]\n        with wave.open(io.BytesIO(raw_wav), \"rb\") as reader:\n            details = {\"rate\": reader.getframerate(), \"channels\": reader.getnchannels(), \"width\": reader.getsampwidth(), \"frames\": reader.getnframes(), \"pcm_sha256\": hashlib.sha256(reader.readframes(reader.getnframes())).hexdigest()}\n        captured_requests.append({\"url\": url, \"form\": kwargs[\"data\"], \"wav\": details})\n        return custom_fixtures._FakeResponse(200, {\"text\": \" no no \", \"language\": \"en\", \"words\": [{\"word\": \"no\", \"start\": 0, \"end\": 0.1}], \"segments\": [{\"id\": 1, \"start\": 0, \"end\": 0.36}], \"server_revision\": \"fixture\"})\n    client = custom_fixtures._FakeAsyncClient(handler)\n    custom_backend = CustomSTTBackend(\"offline\", \"openai_transcription\", \"http://example.invalid\", \"declared-model\", source_language=\"en\", extra={\"model\": \"extra-model\"}, http_client_factory=lambda **kwargs: client)\n    custom_session = await custom_backend.open_session()\n    try:\n        raw = pcm(DIRECTORY / \"audio/local_no_trim.wav\")\n        text = await custom_session._request_transcription(raw)\n        report[\"claims\"][\"C-offline-local-protocol\"] = {\"requests\": captured_requests, \"returned_text\": text, \"input_pcm_sha256\": hashlib.sha256(raw).hexdigest(), \"upstream_extra_fields\": [\"words\", \"segments\", \"language\", \"server_revision\"], \"preserved_value_type\": type(text).__name__, \"fixture_not_named_server\": True}\n    finally:\n        await custom_session.close()\n    ws = custom_fixtures._FakeWebSocket([], hang=True)\n    connect_calls = []\n    async def connect(url, **kwargs):\n        connect_calls.append({\"url\": url, \"headers\": kwargs.get(\"additional_headers\", kwargs.get(\"extra_headers\"))})\n        return ws\n    rt = CustomSTTBackend(\"realtime\", \"openai_realtime\", \"ws://example.invalid\", \"declared-model\", source_language=\"en\", websocket_connect=connect)\n    rt_session = await rt.open_session()\n    try:\n        await rt_session.send_audio(pcm(DIRECTORY / \"audio/local_no_trim.wav\"))\n        messages = [json.loads(message) for message in ws.sent]\n        append = next(message for message in messages if message[\"type\"] == \"input_audio_buffer.append\")\n        import base64\n        report[\"claims\"][\"C-realtime-local-format\"] = {\"connect\": connect_calls, \"session_update\": messages[0], \"append_bytes\": len(base64.b64decode(append[\"audio\"])), \"append_pcm_sha256\": hashlib.sha256(base64.b64decode(append[\"audio\"])).hexdigest(), \"adapter_rate\": rt.sample_rate_hz, \"wire_rate_declared\": \"input_audio_format\" in messages[0][\"session\"], \"fixture_not_named_server\": True}\n    finally:\n        await rt_session.close()\n    report[\"cleanup\"] = {\"fake_cpu_backend_closed\": backend._closed, \"fake_http_client_closed\": client.closed, \"fake_websocket_closed\": ws.closed, \"engine_closed\": True}\n    save(\"local-results-components.json\", report)\n    print(json.dumps({\"output\": \"local-results-components.json\", \"claims\": list(report[\"claims\"])}))\n\n\nif __name__ == \"__main__\":\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"stage\", choices=[\"real\", \"components\", \"gpu\"])\n    args = parser.parse_args()\n    asyncio.run({\"real\": real_probes, \"components\": component_probes, \"gpu\": gpu_probe}[args.stage]())\n"
+    },
+    "E7C5-discovery-gpu": {
+      "sha256": "c3a050f1e02b326dea4c63012fabf4c039ea1975fb9798991644be685d39a817",
+      "utf8_bytes": 28184,
+      "source": "from __future__ import annotations\n\nimport argparse\nimport asyncio\nimport dataclasses\nimport gc\nimport hashlib\nimport importlib.metadata\nimport json\nimport subprocess\nimport sys\nimport urllib.request\nimport wave\nfrom pathlib import Path\n\nimport numpy as np\n\nfrom common import DIRECTORY, ROOT, pcm, settings_data, synthesize\n\nBASELINE = \"0f0ba5173da51250bb5926e4a2eead5e68adff81\"\nJA_REV = \"bef18eb066808c90bd0f5df5be685767b0732de8\"\nJA_URL = f\"https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/{JA_REV}/test_wavs/test_ja_1.wav\"\nJA_SHA = \"09abd330ce706a6e6969fe6bbc8275314af631fcee4e536afd0626570d263fbf\"\n\n\ndef sha(path):\n    h = hashlib.sha256()\n    with Path(path).open(\"rb\") as source:\n        for block in iter(lambda: source.read(1024 * 1024), b\"\"):\n            h.update(block)\n    return h.hexdigest()\n\n\ndef save(name, data):\n    (DIRECTORY / name).write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str) + \"\\n\", encoding=\"utf-8\")\n\n\ndef process_gate():\n    command = [\"powershell.exe\", \"-NoProfile\", \"-NonInteractive\", \"-Command\", \"$p = @(Get-Process -Name VRChat,vrserver,vrcompositor,PuriPulyHeartGpuWorker -ErrorAction SilentlyContinue); ConvertTo-Json -Compress -InputObject @($p | Select-Object ProcessName,Id)\"]\n    result = subprocess.run(command, capture_output=True, text=True, timeout=30)\n    if result.returncode:\n        raise RuntimeError(\"Process safety gate failed: \" + result.stderr)\n    processes = json.loads(result.stdout)\n    if processes:\n        raise RuntimeError(\"Active VR/worker processes; neural work not authorized\")\n    return {\"command\": command, \"returncode\": result.returncode, \"matched_processes\": processes}\n\n\ndef wav(name, raw):\n    path = DIRECTORY / \"audio\" / (name + \".wav\")\n    with wave.open(str(path), \"wb\") as writer:\n        writer.setnchannels(1)\n        writer.setsampwidth(2)\n        writer.setframerate(16000)\n        writer.writeframes(raw)\n    return path\n\n\ndef trimmed(name, source):\n    raw = pcm(source)\n    samples = np.frombuffer(raw, dtype=\"<i2\")\n    nonzero = np.flatnonzero(samples != 0)\n    start, end = int(nonzero[0]), int(nonzero[-1]) + 1\n    path = wav(name, raw[start * 2:end * 2])\n    return path, {\"parent\": str(source.relative_to(ROOT)), \"parent_sha256\": sha(source), \"sample_range\": [start, end], \"rule\": \"Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold\"}\n\n\ndef audio_metadata(path, mapping=None):\n    raw = pcm(path)\n    return {\"path\": str(path.relative_to(ROOT)), \"sha256\": sha(path), \"pcm_sha256\": hashlib.sha256(raw).hexdigest(), \"samples\": len(raw) // 2, \"seconds\": len(raw) / 32000, \"sample_rate_hz\": 16000, \"channels\": 1, \"sample_width_bytes\": 2, \"mapping\": mapping}\n\n\ndef prepare_audio():\n    no = DIRECTORY / \"audio/shared_no.wav\"\n    correction = DIRECTORY / \"audio/shared_correction.wav\"\n    no_trim, no_map = trimmed(\"local_no_trim\", no)\n    correction_trim, correction_map = trimmed(\"local_correction_trim\", correction)\n    old = pcm(no_trim)[-4800 * 2:]\n    context = wav(\"local_old_no_300ms_then_correction\", old + pcm(correction_trim))\n    mapping = {\"pieces\": [{\"input_range\": [0, 4800], \"source\": str(no_trim.relative_to(ROOT)), \"source_range\": [len(pcm(no_trim)) // 2 - 4800, len(pcm(no_trim)) // 2], \"ownership\": \"already_owned_context_only\"}, {\"input_range\": [4800, 4800 + len(pcm(correction_trim)) // 2], \"source\": str(correction_trim.relative_to(ROOT)), \"source_range\": [0, len(pcm(correction_trim)) // 2], \"ownership\": \"new_content\"}]}\n    ja = DIRECTORY / \"audio/local_official_ja_1.wav\"\n    if not ja.exists():\n        with urllib.request.urlopen(JA_URL, timeout=40) as response:\n            data = response.read(2_000_000)\n        if len(data) != 1248044 or hashlib.sha256(data).hexdigest() != JA_SHA:\n            raise ValueError(\"Pinned public Japanese sample hash/size mismatch\")\n        ja.write_bytes(data)\n    if sha(ja) != JA_SHA:\n        raise ValueError(\"Pinned public Japanese sample hash mismatch\")\n    # The upstream WAV is normalized below, never silently treated as 16 kHz.\n    with wave.open(str(ja), \"rb\") as reader:\n        original = {\"rate\": reader.getframerate(), \"channels\": reader.getnchannels(), \"width\": reader.getsampwidth(), \"frames\": reader.getnframes()}\n        if original[\"channels\"] != 1 or original[\"width\"] != 2:\n            raise ValueError(\"Unexpected official sample format\")\n        raw = reader.readframes(reader.getnframes())\n    samples = np.frombuffer(raw, dtype=\"<i2\").astype(np.float32) / 32768\n    if original[\"rate\"] != 16000:\n        from scipy.signal import resample_poly\n        from math import gcd\n        divisor = gcd(original[\"rate\"], 16000)\n        samples = resample_poly(samples, 16000 // divisor, original[\"rate\"] // divisor)\n    ja_clip = wav(\"local_ja_first_6s\", np.round(np.clip(samples[:96000], -1, 32767 / 32768) * 32768).astype(\"<i2\").tobytes())\n    ko = synthesize(\"local_ko\", \"아니요. 삼입니다.\", voice=\"Microsoft Heami Desktop\")\n    items = [(no, None), (no_trim, no_map), (correction, None), (correction_trim, correction_map), (context, mapping), (ja_clip, {\"public_source_url\": JA_URL, \"public_sha256\": JA_SHA, \"original_format\": original, \"selected_normalized_range\": [0, 96000], \"transcript_reference\": \"日本語ちゃんと聞き取れてますかちゃんと聞こえてんのちゃんと聞こえてるのじゃあマイクを持ってもらって\", \"reference_scope\": \"Full upstream sample; not a claimed exact six-second transcript\"}), (ko, {\"text\": \"아니요. 삼입니다.\", \"voice\": \"Microsoft Heami Desktop\"})]\n    return {path.stem: (path, audio_metadata(path, mapping)) for path, mapping in items}\n\n\nclass CapturingRecognizer:\n    \"\"\"Observe the real result during the existing production decode, no fake ASR.\"\"\"\n    def __init__(self, inner):\n        self.inner = inner\n        self.raw = None\n\n    def create_stream(self):\n        return self.inner.create_stream()\n\n    def decode_stream(self, stream):\n        self.inner.decode_stream(stream)\n        result = stream.result\n        fields = {}\n        for field in (\"text\", \"tokens\", \"timestamps\", \"durations\", \"lang\", \"language\", \"ys\", \"json\"):\n            try:\n                value = getattr(result, field)\n                if callable(value):\n                    value = value()\n                fields[field] = value\n            except AttributeError:\n                fields[field] = {\"absent\": True}\n            except Exception as error:\n                fields[field] = {\"access_error\": f\"{type(error).__name__}: {error}\"}\n        self.raw = fields\n\n\nasync def real_probes():\n    from puripuly_heart.core.local_stt_assets import default_local_stt_model_root, load_local_stt_asset_manifest, REQUIRED_CPU_LOCAL_STT_MODEL_IDS\n    from puripuly_heart.core.local_stt_catalog import inspect_required_cpu_model_installs, resolve_cpu_auto_model\n    from puripuly_heart.providers.stt.local_cpu import LocalCPUAutoSTTBackend\n\n    report = {\"baseline\": BASELINE, \"command\": sys.argv, \"python\": sys.version, \"executable\": sys.executable, \"kind\": \"actual production CPU loading/decode; no external inference\", \"process_gate\": process_gate(), \"runtime_versions\": {name: importlib.metadata.version(name) for name in (\"sherpa-onnx\", \"sherpa-onnx-core\", \"numpy\")}, \"models\": [], \"decodes\": [], \"auto\": []}\n    save(\"local-results-real.json\", report)\n    root = default_local_stt_model_root()\n    report[\"model_root\"] = str(root)\n    for model_id in REQUIRED_CPU_LOCAL_STT_MODEL_IDS:\n        manifest = load_local_stt_asset_manifest(model_id)\n        files = []\n        for file in manifest.files:\n            path = root / manifest.install_dirname / file.relative_path\n            digest = sha(path)\n            files.append({\"path\": str(path), \"size_bytes\": path.stat().st_size, \"sha256\": digest, \"expected_sha256\": file.sha256, \"hash_matches\": digest == file.sha256})\n        report[\"models\"].append({\"id\": model_id, \"files\": files, \"sources\": {key: value.to_dict() for key, value in manifest.sources.items()}})\n    snapshot = inspect_required_cpu_model_installs(root, verify_checksums=False)\n    report[\"actual_auto_install_gate\"] = {\"available\": snapshot.cpu_auto_available, \"states\": {model.model_id: model.state.status for model in snapshot.models}}\n    if not all(file[\"hash_matches\"] for model in report[\"models\"] for file in model[\"files\"]):\n        save(\"local-results-real.json\", report)\n        raise RuntimeError(\"Model checksum readiness failed\")\n    audio = prepare_audio()\n    report[\"audio\"] = {name: metadata for name, (_, metadata) in audio.items()}\n    english = [\"shared_no\", \"local_no_trim\", \"shared_correction\", \"local_correction_trim\", \"local_old_no_300ms_then_correction\"]\n    sequences = [(\"en\", english), (\"ko\", [\"local_ko\", *english]), (\"ja\", [\"local_ja_first_6s\"])]\n    for language, names in sequences:\n        report[\"process_gate_before_\" + language] = process_gate()\n        auto = LocalCPUAutoSTTBackend(source_language=language, model_root=root)\n        session = None\n        try:\n            session = await auto.open_session()\n            delegate = auto._delegate\n            report[\"auto\"].append({\"requested_language\": language, \"resolver_model\": resolve_cpu_auto_model(language), \"resolved_model\": auto.resolved_model_id, \"delegate_class\": type(delegate).__name__, \"session_class\": type(session).__name__, \"loaded\": auto.is_loaded, \"num_threads\": delegate.num_threads, \"runtime_provider\": delegate.provider})\n            real = delegate._recognizer\n            observer = CapturingRecognizer(real)\n            delegate._recognizer = observer\n            for name in names:\n                path, metadata = audio[name]\n                if language == \"ko\" and name != \"local_ko\":\n                    delegate.language_hint = \"English\"\n                row = {\"clip\": name, \"model\": delegate.model_id, \"delegate_class\": type(delegate).__name__, \"language_hint_at_decode\": delegate.language_hint, \"audio\": metadata}\n                report[\"decodes\"].append(row)\n                save(\"local-results-real.json\", report)\n                try:\n                    samples = np.frombuffer(pcm(path), dtype=\"<i2\").astype(np.float32) / 32768\n                    row[\"adapter_text\"] = await delegate.decode_f32(samples)\n                    row[\"raw_recognizer_result\"] = observer.raw\n                    row[\"outcome\"] = \"empty\" if not row[\"adapter_text\"] else \"text\"\n                except Exception as error:\n                    row[\"outcome\"] = \"failed\"\n                    row[\"error\"] = f\"{type(error).__name__}: {error}\"\n                save(\"local-results-real.json\", report)\n            # Existing Auto binds a delegate rather than resolving each assignment.\n            before = auto.resolved_model_id\n            auto.source_language = \"ja\" if language != \"ja\" else \"en\"\n            report[\"auto\"][-1][\"after_source_language_assignment\"] = {\"language\": auto.source_language, \"resolved_model\": auto.resolved_model_id, \"same_delegate\": auto._delegate is delegate, \"original_model\": before, \"observation\": \"Property assignment only; no application transition invoked\"}\n            delegate._recognizer = real\n        except Exception as error:\n            report.setdefault(\"load_failures\", []).append({\"language\": language, \"error\": f\"{type(error).__name__}: {error}\"})\n        finally:\n            if session is not None:\n                await session.close()\n            await auto.close()\n            report.setdefault(\"cleanup\", []).append({\"language\": language, \"auto_closed\": auto._closed, \"delegate_released\": auto._delegate is None})\n            session = None\n            delegate = None\n            real = None\n            observer = None\n            gc.collect()\n            save(\"local-results-real.json\", report)\n    for language in (\"en\", \"ja\", \"ko\", \"zh\", \"ar\", \"uk\", \"xx\"):\n        try:\n            result = resolve_cpu_auto_model(language)\n        except Exception as error:\n            result = f\"{type(error).__name__}: {error}\"\n        report.setdefault(\"auto_resolution\", {})[language] = result\n    save(\"local-results-real.json\", report)\n    print(json.dumps({\"decodes\": len(report[\"decodes\"]), \"load_failures\": report.get(\"load_failures\", []), \"output\": \"local-results-real.json\"}))\n\n\ndef fixture_module(name, relative_path):\n    import importlib.util\n    spec = importlib.util.spec_from_file_location(name, ROOT / relative_path)\n    module = importlib.util.module_from_spec(spec)\n    sys.modules[name] = module\n    spec.loader.exec_module(module)\n    return module\n\n\nasync def gpu_probe():\n    from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory\n    from puripuly_heart.core.local_gpu_assets import local_gpu_model_path\n\n    parent = ROOT.parents[2]\n    executable = parent / \"build/gpu_worker/PuriPulyHeartGpuWorker.exe\"\n    report = {\"baseline\": BASELINE, \"command\": sys.argv, \"process_gate\": process_gate(), \"selected_worker\": str(executable), \"worker_size\": executable.stat().st_size, \"worker_sha256\": sha(executable), \"binary_source_revision\": \"unknown; explicit parent staged binary, not certified as candidate source build\", \"gpu_model_path\": str(local_gpu_model_path()), \"gpu_model_present\": local_gpu_model_path().is_file(), \"scope\": \"Authenticated protocol2 startup and Vulkan discover only; no activate/warmup/transcribe/Nemotron\"}\n    client = None\n    try:\n        client = await DefaultGpuWorkerProcessFactory(executable_path=executable, request_timeout_s=15).start(mode=\"discovery\")\n        report[\"authenticated_contract2\"] = True\n        report[\"devices\"] = [dataclasses.asdict(device) for device in await client.discover()]\n    except Exception as error:\n        report[\"error\"] = f\"{type(error).__name__}: {error}\"\n    finally:\n        if client is not None:\n            await client.close()\n            report[\"cleanup\"] = {\"closed\": client.is_closed, \"returncode\": client.returncode}\n        save(\"local-results-gpu.json\", report)\n    print(json.dumps(report, ensure_ascii=True))\n\n\nasync def component_probes():\n    from dataclasses import replace\n    from types import SimpleNamespace\n    from uuid import uuid4\n    from puripuly_heart.app.services.local_asr.local_asr_selection import resolve_local_asr_selection\n    from puripuly_heart.config.provider_values import STTProviderName\n    from puripuly_heart.core.audio.ownership import AudioSegmentIdentity\n    from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions\n    from puripuly_heart.core.stt.backend import STTProviderTurnIdentity, STTProviderTurnRequest, STTProviderTurnTerminal, STTSessionProjection, STTRecognitionUnit, STTRecognitionUnitTerminal\n    from puripuly_heart.core.stt.rolling import RollingSTTBackend, RollingProviderDefinition\n    from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity\n    from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend\n    from puripuly_heart.providers.stt.custom import CustomSTTBackend\n\n    fixtures = fixture_module(\"local_probe_scoped_fixtures\", \"tests/core/test_stt_scoped_engine.py\")\n    custom_fixtures = fixture_module(\"local_probe_custom_fixtures\", \"tests/providers/test_custom_stt.py\")\n    report = {\"baseline\": BASELINE, \"command\": sys.argv, \"kind\": \"Bounded actual production owners with explicitly fake recognizer/member/HTTP/WebSocket; no server or acoustic certification\", \"claims\": {}}\n    save(\"local-results-components.json\", report)\n    report[\"claims\"][\"A-selection\"] = [dataclasses.asdict(resolve_local_asr_selection(provider, language, cpu_auto_available=available)) for provider, language, available in [(\"local_cpu_auto\", \"en\", True), (\"local_cpu_auto\", \"ja\", True), (\"local_cpu_auto\", \"ko\", True), (\"local_cpu_auto\", \"xx\", True), (\"local_cpu_auto\", \"en\", False), (\"local_parakeet_ja\", \"en\", True)]]\n\n    # Real scoped queue + decode lock, fake recognizer only. Freeze request settings,\n    # then change session options before queued A can read the mutable backend.\n    observed_options = []\n    class FakeRecognizer:\n        def create_stream(self):\n            class Stream:\n                result = SimpleNamespace(text=\"no\")\n                def __init__(self):\n                    self.options = {}\n                def set_option(self, name, value):\n                    self.options[name] = value\n                def accept_waveform(self, rate, samples):\n                    self.samples = samples.copy()\n            return Stream()\n        def decode_stream(self, stream):\n            observed_options.append({\"options\": dict(stream.options), \"samples\": len(stream.samples)})\n\n    backend = LocalQwenSherpaSTTBackend(model_dir=DIRECTORY, language_hint=\"English\")\n    backend._recognizer = FakeRecognizer()\n    session = await backend.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=\"epoch-options\"))\n    captured_events = []\n    async def consume():\n        async for event in session.turn_events():\n            captured_events.append(event)\n    consumer = asyncio.create_task(consume())\n    await backend._decode_lock.acquire()\n    try:\n        requests = []\n        for order in (1, 2):\n            identity = STTProviderTurnIdentity(AudioSegmentIdentity(1, order, uuid4(), 1), \"epoch-options\", f\"options-{order}\")\n            request_settings = replace(fixtures.settings(\"local_cpu_auto\"), source_language=\"en\" if order == 1 else \"ja\")\n            request = STTProviderTurnRequest(identity, request_settings, channel=\"peer\")\n            requests.append(request)\n            await session.begin_turn(request)\n            await session.send_turn_audio(identity, b\"\\x01\\x00\" * 160, payload_sequence=1, source_ranges=(), context_only=False)\n            await session.seal_turn(identity, sealed_content_ranges=(), seal_reason=\"silence\", observed_trailing_silence_ms=0)\n            if order == 1:\n                await backend.reconfigure_session_options(LocalASRSessionOptions(\"ja\", language_hint=\"Japanese\"))\n        backend._decode_lock.release()\n        await fixtures.wait_until(lambda: len([e for e in captured_events if isinstance(e, STTProviderTurnTerminal)]) == 2, timeout=5)\n        terminals = [e for e in captured_events if isinstance(e, STTProviderTurnTerminal)]\n        report[\"claims\"][\"A-queued-options\"] = {\"request_languages\": [request.settings.source_language for request in requests], \"observed_decode_options\": observed_options, \"terminals\": [dataclasses.asdict(event) for event in terminals], \"different_equal_text_identities\": terminals[0].identity != terminals[1].identity and terminals[0].text == terminals[1].text, \"first_request_retains_English_options\": observed_options[0][\"options\"].get(\"language\") == \"English\", \"result\": \"Current production queued decode reads reconfigured language; immutable request settings do not snapshot native options\"}\n    finally:\n        if backend._decode_lock.locked():\n            backend._decode_lock.release()\n        await session.close()\n        await backend.close()\n        await consumer\n    save(\"local-results-components.json\", report)\n\n    # Keep old Scribe session alive while next open resolves Gemini; no network.\n    old = fixtures.ControlledStreamSession()\n    new = fixtures.ControlledStreamSession()\n    configured = {\"scribe\": True}\n    class FakeBackend:\n        def __init__(self, inner):\n            self.inner = inner\n        async def open_session(self, **kwargs):\n            return self.inner\n    rolling = RollingSTTBackend(providers=(\n        RollingProviderDefinition(STTProviderName.ELEVENLABS_SCRIBE, lambda: FakeBackend(old), lambda: configured[\"scribe\"]),\n        RollingProviderDefinition(STTProviderName.GEMINI_TRANSCRIBE, lambda: FakeBackend(new), lambda: True),\n    ))\n    old_wrapper = await rolling.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=\"old\"))\n    configured[\"scribe\"] = False\n    new_wrapper = await rolling.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=\"new\"))\n    old_stream = RecognitionStreamIdentity(\"peer\", 1, 1, \"old\", (\"rolling\",))\n    new_stream = replace(old_stream, provider_epoch_id=\"new\")\n    await old_wrapper.begin_stream(old_stream)\n    await new_wrapper.begin_stream(new_stream)\n    old_event = STTRecognitionUnit(RecognitionUnitIdentity(old_stream, uuid4(), 1), \"no\")\n    new_event = STTRecognitionUnit(RecognitionUnitIdentity(new_stream, uuid4(), 1), \"no\")\n    # Use wrapper's existing remapper directly; delayed old source cannot acquire new epoch.\n    report[\"claims\"][\"A-Rolling-late\"] = {\"old_member_after_new_open\": old_wrapper.provider_name.value, \"new_member\": new_wrapper.provider_name.value, \"old_identity_preserved\": old_wrapper._remap_recognition_identity(old_event.identity) == old_event.identity, \"old_identity_rejected_by_new\": new_wrapper._remap_recognition_identity(old_event.identity) is None, \"new_identity_preserved\": new_wrapper._remap_recognition_identity(new_event.identity) == new_event.identity, \"replay_reuses_identity\": old_wrapper._remap_recognition_identity(old_event.identity) == old_wrapper._remap_recognition_identity(old_event.identity), \"equal_text_different_identity\": old_event.text == new_event.text and old_event.identity != new_event.identity}\n    await old_wrapper.end_stream(reason=\"source_discontinuity\")\n    report[\"claims\"][\"A-Rolling-late\"][\"delegated_old_controls\"] = [call for call in old.calls if call[0] == \"end_stream\"]\n    await old_wrapper.close()\n    await new_wrapper.close()\n    save(\"local-results-components.json\", report)\n\n    # Explicit discontinuity through engine + Rolling wrapper, not a proposed reducer.\n    emitted = []\n    inners = []\n    wrappers = []\n    async def engine_factory(_settings, epoch):\n        inner = fixtures.ControlledStreamSession()\n        inners.append(inner)\n        rb = RollingSTTBackend(providers=(RollingProviderDefinition(STTProviderName.GEMINI_TRANSCRIBE, lambda: FakeBackend(inner), lambda: True),))\n        wrapper = await rb.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=epoch))\n        wrappers.append(wrapper)\n        return wrapper\n    engine = fixtures.ScopedRecognitionEngine(engine_factory, event_sink=emitted.append, watchdog_resolver=lambda _: fixtures.watchdogs())\n    ledger = fixtures.PeerAudioSegmentLedger(activation_generation=3, settings=fixtures.settings(\"rolling_free\"))\n    try:\n        start, _, end = fixtures.segment_events(ledger, start_sample=0, now=100)\n        await engine.handle_stream_input(fixtures.stream_input(ledger, 2, 6, speech_observed=True))\n        await engine.handle_owned_vad_event(start)\n        await engine.handle_owned_vad_event(end)\n        previous = inners[0].stream\n        await engine.handle_stream_input(fixtures.OwnedStreamInput(fixtures.CaptureStreamInput(np.empty(0, dtype=np.float32), (), boundary_reason=\"source_discontinuity\"), ledger, ledger.settings, ledger.activation_generation))\n        successor = fixtures.PeerAudioSegmentLedger(activation_generation=3, settings=ledger.settings)\n        start2, _, _ = fixtures.segment_events(successor, start_sample=10, now=200)\n        await engine.handle_owned_vad_event(start2)\n        current = inners[-1].stream\n        inners[-1].emit(STTRecognitionUnit(RecognitionUnitIdentity(previous, uuid4(), 1), \"stale-no\"))\n        unit = STTRecognitionUnit(RecognitionUnitIdentity(current, uuid4(), 1), \"no\")\n        inners[-1].emit(unit)\n        inners[-1].emit(unit)  # replay same identity\n        inners[-1].emit(STTRecognitionUnit(RecognitionUnitIdentity(current, uuid4(), 2), \"no\"))\n        await fixtures.wait_until(lambda: len([e for e in emitted if isinstance(e, STTRecognitionUnitTerminal)]) == 2)\n        finals = [e for e in emitted if isinstance(e, STTRecognitionUnitTerminal)]\n        report[\"claims\"][\"A-Rolling-discontinuity\"] = {\"new_stream\": current != previous, \"terminal_texts\": [e.unit.text for e in finals], \"terminal_identities\": [dataclasses.asdict(e.unit.identity) for e in finals], \"old_controls\": [call for call in inners[0].calls if call[0] in (\"end_stream\", \"stop\", \"close\")], \"all_old_calls\": [str(call) for call in inners[0].calls], \"stale_rejected_replay_ignored_repetition_retained\": [e.unit.text for e in finals] == [\"no\", \"no\"]}\n    finally:\n        await engine.close()\n    save(\"local-results-components.json\", report)\n\n    # Safe configured-target presence only, no endpoint/credential output.\n    custom = settings_data().get(\"stt\", {}).get(\"custom\", {})\n    report[\"claims\"][\"C-configured-target\"] = {\"mode\": custom.get(\"mode\"), \"compatibility\": custom.get(\"compatibility\"), \"endpoint_present\": bool(custom.get(\"endpoint\")), \"model_present\": bool(custom.get(\"model\")), \"extra_model_present\": bool(custom.get(\"extra\", {}).get(\"model\")), \"named_server\": \"blocked when endpoint/model absent; no endpoint calls performed\"}\n    import io\n    captured_requests = []\n    async def handler(url, **kwargs):\n        raw_wav = kwargs[\"files\"][\"file\"][1]\n        with wave.open(io.BytesIO(raw_wav), \"rb\") as reader:\n            details = {\"rate\": reader.getframerate(), \"channels\": reader.getnchannels(), \"width\": reader.getsampwidth(), \"frames\": reader.getnframes(), \"pcm_sha256\": hashlib.sha256(reader.readframes(reader.getnframes())).hexdigest()}\n        captured_requests.append({\"url\": url, \"form\": kwargs[\"data\"], \"wav\": details})\n        return custom_fixtures._FakeResponse(200, {\"text\": \" no no \", \"language\": \"en\", \"words\": [{\"word\": \"no\", \"start\": 0, \"end\": 0.1}], \"segments\": [{\"id\": 1, \"start\": 0, \"end\": 0.36}], \"server_revision\": \"fixture\"})\n    client = custom_fixtures._FakeAsyncClient(handler)\n    custom_backend = CustomSTTBackend(\"offline\", \"openai_transcription\", \"http://example.invalid\", \"declared-model\", source_language=\"en\", extra={\"model\": \"extra-model\"}, http_client_factory=lambda **kwargs: client)\n    custom_session = await custom_backend.open_session()\n    try:\n        raw = pcm(DIRECTORY / \"audio/local_no_trim.wav\")\n        text = await custom_session._request_transcription(raw)\n        report[\"claims\"][\"C-offline-local-protocol\"] = {\"requests\": captured_requests, \"returned_text\": text, \"input_pcm_sha256\": hashlib.sha256(raw).hexdigest(), \"upstream_extra_fields\": [\"words\", \"segments\", \"language\", \"server_revision\"], \"preserved_value_type\": type(text).__name__, \"fixture_not_named_server\": True}\n    finally:\n        await custom_session.close()\n    ws = custom_fixtures._FakeWebSocket([], hang=True)\n    connect_calls = []\n    async def connect(url, **kwargs):\n        connect_calls.append({\"url\": url, \"headers\": kwargs.get(\"additional_headers\", kwargs.get(\"extra_headers\"))})\n        return ws\n    rt = CustomSTTBackend(\"realtime\", \"openai_realtime\", \"ws://example.invalid\", \"declared-model\", source_language=\"en\", websocket_connect=connect)\n    rt_session = await rt.open_session()\n    try:\n        await rt_session.send_audio(pcm(DIRECTORY / \"audio/local_no_trim.wav\"))\n        messages = [json.loads(message) for message in ws.sent]\n        append = next(message for message in messages if message[\"type\"] == \"input_audio_buffer.append\")\n        import base64\n        report[\"claims\"][\"C-realtime-local-format\"] = {\"connect\": connect_calls, \"session_update\": messages[0], \"append_bytes\": len(base64.b64decode(append[\"audio\"])), \"append_pcm_sha256\": hashlib.sha256(base64.b64decode(append[\"audio\"])).hexdigest(), \"adapter_rate\": rt.sample_rate_hz, \"wire_rate_declared\": \"input_audio_format\" in messages[0][\"session\"], \"fixture_not_named_server\": True}\n    finally:\n        await rt_session.close()\n    report[\"cleanup\"] = {\"fake_cpu_backend_closed\": backend._closed, \"fake_http_client_closed\": client.closed, \"fake_websocket_closed\": ws.closed, \"engine_closed\": True}\n    save(\"local-results-components.json\", report)\n    print(json.dumps({\"output\": \"local-results-components.json\", \"claims\": list(report[\"claims\"])}))\n\n\nif __name__ == \"__main__\":\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"stage\", choices=[\"real\", \"components\", \"gpu\"])\n    args = parser.parse_args()\n    asyncio.run({\"real\": real_probes, \"components\": component_probes, \"gpu\": gpu_probe}[args.stage]())\n"
+    },
+    "A734-final-rolling": {
+      "sha256": "1ab58874cb292bb914d54944104fea566ad65d7071c5a4a5b71e92dfd1713e2e",
+      "utf8_bytes": 31703,
+      "source": "from __future__ import annotations\n\nimport argparse\nimport asyncio\nimport dataclasses\nimport gc\nimport hashlib\nimport importlib.metadata\nimport json\nimport subprocess\nimport sys\nimport urllib.request\nimport wave\nfrom pathlib import Path\n\nimport numpy as np\n\nfrom common import DIRECTORY, ROOT, pcm, settings_data, synthesize\n\nBASELINE = \"0f0ba5173da51250bb5926e4a2eead5e68adff81\"\nJA_REV = \"bef18eb066808c90bd0f5df5be685767b0732de8\"\nJA_URL = f\"https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/{JA_REV}/test_wavs/test_ja_1.wav\"\nJA_SHA = \"09abd330ce706a6e6969fe6bbc8275314af631fcee4e536afd0626570d263fbf\"\n\n\ndef sha(path):\n    h = hashlib.sha256()\n    with Path(path).open(\"rb\") as source:\n        for block in iter(lambda: source.read(1024 * 1024), b\"\"):\n            h.update(block)\n    return h.hexdigest()\n\n\ndef save(name, data):\n    (DIRECTORY / name).write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str) + \"\\n\", encoding=\"utf-8\")\n\n\ndef process_gate():\n    command = [\"powershell.exe\", \"-NoProfile\", \"-NonInteractive\", \"-Command\", \"$p = @(Get-Process -Name VRChat,vrserver,vrcompositor,PuriPulyHeartGpuWorker -ErrorAction SilentlyContinue); ConvertTo-Json -Compress -InputObject @($p | Select-Object ProcessName,Id)\"]\n    result = subprocess.run(command, capture_output=True, text=True, timeout=30)\n    if result.returncode:\n        raise RuntimeError(\"Process safety gate failed: \" + result.stderr)\n    processes = json.loads(result.stdout)\n    if processes:\n        raise RuntimeError(\"Active VR/worker processes; neural work not authorized\")\n    return {\"command\": command, \"returncode\": result.returncode, \"matched_processes\": processes}\n\n\ndef wav(name, raw):\n    path = DIRECTORY / \"audio\" / (name + \".wav\")\n    with wave.open(str(path), \"wb\") as writer:\n        writer.setnchannels(1)\n        writer.setsampwidth(2)\n        writer.setframerate(16000)\n        writer.writeframes(raw)\n    return path\n\n\ndef trimmed(name, source):\n    raw = pcm(source)\n    samples = np.frombuffer(raw, dtype=\"<i2\")\n    nonzero = np.flatnonzero(samples != 0)\n    start, end = int(nonzero[0]), int(nonzero[-1]) + 1\n    path = wav(name, raw[start * 2:end * 2])\n    return path, {\"parent\": str(source.relative_to(ROOT)), \"parent_sha256\": sha(source), \"sample_range\": [start, end], \"rule\": \"Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold\"}\n\n\ndef audio_metadata(path, mapping=None):\n    raw = pcm(path)\n    return {\"path\": str(path.relative_to(ROOT)), \"sha256\": sha(path), \"pcm_sha256\": hashlib.sha256(raw).hexdigest(), \"samples\": len(raw) // 2, \"seconds\": len(raw) / 32000, \"sample_rate_hz\": 16000, \"channels\": 1, \"sample_width_bytes\": 2, \"mapping\": mapping}\n\n\ndef prepare_audio():\n    no = DIRECTORY / \"audio/shared_no.wav\"\n    correction = DIRECTORY / \"audio/shared_correction.wav\"\n    no_trim, no_map = trimmed(\"local_no_trim\", no)\n    correction_trim, correction_map = trimmed(\"local_correction_trim\", correction)\n    old = pcm(no_trim)[-4800 * 2:]\n    context = wav(\"local_old_no_300ms_then_correction\", old + pcm(correction_trim))\n    mapping = {\"pieces\": [{\"input_range\": [0, 4800], \"source\": str(no_trim.relative_to(ROOT)), \"source_range\": [len(pcm(no_trim)) // 2 - 4800, len(pcm(no_trim)) // 2], \"ownership\": \"already_owned_context_only\"}, {\"input_range\": [4800, 4800 + len(pcm(correction_trim)) // 2], \"source\": str(correction_trim.relative_to(ROOT)), \"source_range\": [0, len(pcm(correction_trim)) // 2], \"ownership\": \"new_content\"}]}\n    ja = DIRECTORY / \"audio/local_official_ja_1.wav\"\n    if not ja.exists():\n        with urllib.request.urlopen(JA_URL, timeout=40) as response:\n            data = response.read(2_000_000)\n        if len(data) != 1248044 or hashlib.sha256(data).hexdigest() != JA_SHA:\n            raise ValueError(\"Pinned public Japanese sample hash/size mismatch\")\n        ja.write_bytes(data)\n    if sha(ja) != JA_SHA:\n        raise ValueError(\"Pinned public Japanese sample hash mismatch\")\n    # The upstream WAV is normalized below, never silently treated as 16 kHz.\n    with wave.open(str(ja), \"rb\") as reader:\n        original = {\"rate\": reader.getframerate(), \"channels\": reader.getnchannels(), \"width\": reader.getsampwidth(), \"frames\": reader.getnframes()}\n        if original[\"channels\"] != 1 or original[\"width\"] != 2:\n            raise ValueError(\"Unexpected official sample format\")\n        raw = reader.readframes(reader.getnframes())\n    samples = np.frombuffer(raw, dtype=\"<i2\").astype(np.float32) / 32768\n    if original[\"rate\"] != 16000:\n        from scipy.signal import resample_poly\n        from math import gcd\n        divisor = gcd(original[\"rate\"], 16000)\n        samples = resample_poly(samples, 16000 // divisor, original[\"rate\"] // divisor)\n    ja_clip = wav(\"local_ja_first_6s\", np.round(np.clip(samples[:96000], -1, 32767 / 32768) * 32768).astype(\"<i2\").tobytes())\n    ko = synthesize(\"local_ko\", \"아니요. 삼입니다.\", voice=\"Microsoft Heami Desktop\")\n    items = [(no, None), (no_trim, no_map), (correction, None), (correction_trim, correction_map), (context, mapping), (ja_clip, {\"public_source_url\": JA_URL, \"public_sha256\": JA_SHA, \"original_format\": original, \"selected_normalized_range\": [0, 96000], \"transcript_reference\": \"日本語ちゃんと聞き取れてますかちゃんと聞こえてんのちゃんと聞こえてるのじゃあマイクを持ってもらって\", \"reference_scope\": \"Full upstream sample; not a claimed exact six-second transcript\"}), (ko, {\"text\": \"아니요. 삼입니다.\", \"voice\": \"Microsoft Heami Desktop\"})]\n    return {path.stem: (path, audio_metadata(path, mapping)) for path, mapping in items}\n\n\nclass CapturingRecognizer:\n    \"\"\"Observe the real result during the existing production decode, no fake ASR.\"\"\"\n    def __init__(self, inner):\n        self.inner = inner\n        self.raw = None\n\n    def create_stream(self):\n        return self.inner.create_stream()\n\n    def decode_stream(self, stream):\n        self.inner.decode_stream(stream)\n        result = stream.result\n        fields = {}\n        for field in (\"text\", \"tokens\", \"timestamps\", \"durations\", \"lang\", \"language\", \"ys\", \"json\"):\n            try:\n                value = getattr(result, field)\n                if callable(value):\n                    value = value()\n                fields[field] = value\n            except AttributeError:\n                fields[field] = {\"absent\": True}\n            except Exception as error:\n                fields[field] = {\"access_error\": f\"{type(error).__name__}: {error}\"}\n        self.raw = fields\n\n\nasync def real_probes():\n    from puripuly_heart.core.local_stt_assets import default_local_stt_model_root, load_local_stt_asset_manifest, REQUIRED_CPU_LOCAL_STT_MODEL_IDS\n    from puripuly_heart.core.local_stt_catalog import inspect_required_cpu_model_installs, resolve_cpu_auto_model\n    from puripuly_heart.providers.stt.local_cpu import LocalCPUAutoSTTBackend\n\n    report = {\"baseline\": BASELINE, \"command\": sys.argv, \"python\": sys.version, \"executable\": sys.executable, \"kind\": \"actual production CPU loading/decode; no external inference\", \"process_gate\": process_gate(), \"runtime_versions\": {name: importlib.metadata.version(name) for name in (\"sherpa-onnx\", \"sherpa-onnx-core\", \"numpy\")}, \"models\": [], \"decodes\": [], \"auto\": []}\n    save(\"local-results-real.json\", report)\n    root = default_local_stt_model_root()\n    report[\"model_root\"] = str(root)\n    for model_id in REQUIRED_CPU_LOCAL_STT_MODEL_IDS:\n        manifest = load_local_stt_asset_manifest(model_id)\n        files = []\n        for file in manifest.files:\n            path = root / manifest.install_dirname / file.relative_path\n            digest = sha(path)\n            files.append({\"path\": str(path), \"size_bytes\": path.stat().st_size, \"sha256\": digest, \"expected_sha256\": file.sha256, \"hash_matches\": digest == file.sha256})\n        report[\"models\"].append({\"id\": model_id, \"files\": files, \"sources\": {key: value.to_dict() for key, value in manifest.sources.items()}})\n    snapshot = inspect_required_cpu_model_installs(root, verify_checksums=False)\n    report[\"actual_auto_install_gate\"] = {\"available\": snapshot.cpu_auto_available, \"states\": {model.model_id: model.state.status for model in snapshot.models}}\n    if not all(file[\"hash_matches\"] for model in report[\"models\"] for file in model[\"files\"]):\n        save(\"local-results-real.json\", report)\n        raise RuntimeError(\"Model checksum readiness failed\")\n    audio = prepare_audio()\n    report[\"audio\"] = {name: metadata for name, (_, metadata) in audio.items()}\n    english = [\"shared_no\", \"local_no_trim\", \"shared_correction\", \"local_correction_trim\", \"local_old_no_300ms_then_correction\"]\n    sequences = [(\"en\", english), (\"ko\", [\"local_ko\", *english]), (\"ja\", [\"local_ja_first_6s\"])]\n    for language, names in sequences:\n        report[\"process_gate_before_\" + language] = process_gate()\n        auto = LocalCPUAutoSTTBackend(source_language=language, model_root=root)\n        session = None\n        try:\n            session = await auto.open_session()\n            delegate = auto._delegate\n            report[\"auto\"].append({\"requested_language\": language, \"resolver_model\": resolve_cpu_auto_model(language), \"resolved_model\": auto.resolved_model_id, \"delegate_class\": type(delegate).__name__, \"session_class\": type(session).__name__, \"loaded\": auto.is_loaded, \"num_threads\": delegate.num_threads, \"runtime_provider\": delegate.provider})\n            real = delegate._recognizer\n            observer = CapturingRecognizer(real)\n            delegate._recognizer = observer\n            for name in names:\n                path, metadata = audio[name]\n                if language == \"ko\" and name != \"local_ko\":\n                    delegate.language_hint = \"English\"\n                row = {\"clip\": name, \"model\": delegate.model_id, \"delegate_class\": type(delegate).__name__, \"language_hint_at_decode\": delegate.language_hint, \"audio\": metadata}\n                report[\"decodes\"].append(row)\n                save(\"local-results-real.json\", report)\n                try:\n                    samples = np.frombuffer(pcm(path), dtype=\"<i2\").astype(np.float32) / 32768\n                    row[\"adapter_text\"] = await delegate.decode_f32(samples)\n                    row[\"raw_recognizer_result\"] = observer.raw\n                    row[\"outcome\"] = \"empty\" if not row[\"adapter_text\"] else \"text\"\n                except Exception as error:\n                    row[\"outcome\"] = \"failed\"\n                    row[\"error\"] = f\"{type(error).__name__}: {error}\"\n                save(\"local-results-real.json\", report)\n            # Existing Auto binds a delegate rather than resolving each assignment.\n            before = auto.resolved_model_id\n            auto.source_language = \"ja\" if language != \"ja\" else \"en\"\n            report[\"auto\"][-1][\"after_source_language_assignment\"] = {\"language\": auto.source_language, \"resolved_model\": auto.resolved_model_id, \"same_delegate\": auto._delegate is delegate, \"original_model\": before, \"observation\": \"Property assignment only; no application transition invoked\"}\n            delegate._recognizer = real\n        except Exception as error:\n            report.setdefault(\"load_failures\", []).append({\"language\": language, \"error\": f\"{type(error).__name__}: {error}\"})\n        finally:\n            if session is not None:\n                await session.close()\n            await auto.close()\n            report.setdefault(\"cleanup\", []).append({\"language\": language, \"auto_closed\": auto._closed, \"delegate_released\": auto._delegate is None})\n            session = None\n            delegate = None\n            real = None\n            observer = None\n            gc.collect()\n            save(\"local-results-real.json\", report)\n    for language in (\"en\", \"ja\", \"ko\", \"zh\", \"ar\", \"uk\", \"xx\"):\n        try:\n            result = resolve_cpu_auto_model(language)\n        except Exception as error:\n            result = f\"{type(error).__name__}: {error}\"\n        report.setdefault(\"auto_resolution\", {})[language] = result\n    save(\"local-results-real.json\", report)\n    print(json.dumps({\"decodes\": len(report[\"decodes\"]), \"load_failures\": report.get(\"load_failures\", []), \"output\": \"local-results-real.json\"}))\n\n\ndef fixture_module(name, relative_path):\n    import importlib.util\n    spec = importlib.util.spec_from_file_location(name, ROOT / relative_path)\n    module = importlib.util.module_from_spec(spec)\n    sys.modules[name] = module\n    spec.loader.exec_module(module)\n    return module\n\n\nasync def gpu_probe():\n    from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory\n    from puripuly_heart.core.local_gpu_assets import local_gpu_model_path\n\n    parent = ROOT.parents[2]\n    executable = parent / \"build/gpu_worker/PuriPulyHeartGpuWorker.exe\"\n    report = {\"baseline\": BASELINE, \"command\": sys.argv, \"process_gate\": process_gate(), \"selected_worker\": str(executable), \"worker_size\": executable.stat().st_size, \"worker_sha256\": sha(executable), \"binary_source_revision\": \"unknown; explicit parent staged binary, not certified as candidate source build\", \"gpu_model_path\": str(local_gpu_model_path()), \"gpu_model_present\": local_gpu_model_path().is_file(), \"scope\": \"Authenticated protocol2 startup and Vulkan discover only; no activate/warmup/transcribe/Nemotron\"}\n    client = None\n    try:\n        client = await DefaultGpuWorkerProcessFactory(executable_path=executable, request_timeout_s=15).start(mode=\"discovery\")\n        report[\"authenticated_contract2\"] = True\n        report[\"devices\"] = [dataclasses.asdict(device) for device in await client.discover()]\n    except Exception as error:\n        report[\"error\"] = f\"{type(error).__name__}: {error}\"\n    finally:\n        if client is not None:\n            await client.close()\n            report[\"cleanup\"] = {\"closed\": client.is_closed, \"returncode\": client.returncode}\n        save(\"local-results-gpu.json\", report)\n    print(json.dumps(report, ensure_ascii=True))\n\n\nasync def component_probes():\n    from dataclasses import replace\n    from types import SimpleNamespace\n    from uuid import uuid4\n    from puripuly_heart.app.services.local_asr.local_asr_selection import resolve_local_asr_selection\n    from puripuly_heart.config.provider_values import STTProviderName\n    from puripuly_heart.core.audio.ownership import AudioSegmentIdentity\n    from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions\n    from puripuly_heart.core.stt.backend import STTProviderTurnIdentity, STTProviderTurnRequest, STTProviderTurnTerminal, STTSessionProjection, STTRecognitionUnit, STTRecognitionUnitTerminal\n    from puripuly_heart.core.stt.rolling import RollingSTTBackend, RollingProviderDefinition\n    from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity\n    from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend\n    from puripuly_heart.providers.stt.custom import CustomSTTBackend\n\n    fixtures = fixture_module(\"local_probe_scoped_fixtures\", \"tests/core/test_stt_scoped_engine.py\")\n    custom_fixtures = fixture_module(\"local_probe_custom_fixtures\", \"tests/providers/test_custom_stt.py\")\n    report = {\"baseline\": BASELINE, \"command\": sys.argv, \"kind\": \"Bounded actual production owners with explicitly fake recognizer/member/HTTP/WebSocket; no server or acoustic certification\", \"claims\": {}}\n    save(\"local-results-components.json\", report)\n    report[\"claims\"][\"A-selection\"] = [dataclasses.asdict(resolve_local_asr_selection(provider, language, cpu_auto_available=available)) for provider, language, available in [(\"local_cpu_auto\", \"en\", True), (\"local_cpu_auto\", \"ja\", True), (\"local_cpu_auto\", \"ko\", True), (\"local_cpu_auto\", \"xx\", True), (\"local_cpu_auto\", \"en\", False), (\"local_parakeet_ja\", \"en\", True)]]\n\n    # Real scoped queue + decode lock, fake recognizer only. Freeze request settings,\n    # then change session options before queued A can read the mutable backend.\n    observed_options = []\n    class FakeRecognizer:\n        def create_stream(self):\n            class Stream:\n                result = SimpleNamespace(text=\"no\")\n                def __init__(self):\n                    self.options = {}\n                def set_option(self, name, value):\n                    self.options[name] = value\n                def accept_waveform(self, rate, samples):\n                    self.samples = samples.copy()\n            return Stream()\n        def decode_stream(self, stream):\n            observed_options.append({\"options\": dict(stream.options), \"samples\": len(stream.samples)})\n\n    backend = LocalQwenSherpaSTTBackend(model_dir=DIRECTORY, language_hint=\"English\")\n    backend._recognizer = FakeRecognizer()\n    session = await backend.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=\"epoch-options\"))\n    captured_events = []\n    async def consume():\n        async for event in session.turn_events():\n            captured_events.append(event)\n    consumer = asyncio.create_task(consume())\n    await backend._decode_lock.acquire()\n    try:\n        requests = []\n        for order in (1, 2):\n            identity = STTProviderTurnIdentity(AudioSegmentIdentity(1, order, uuid4(), 1), \"epoch-options\", f\"options-{order}\")\n            request_settings = replace(fixtures.settings(\"local_cpu_auto\"), source_language=\"en\" if order == 1 else \"ja\")\n            request = STTProviderTurnRequest(identity, request_settings, channel=\"peer\")\n            requests.append(request)\n            await session.begin_turn(request)\n            await session.send_turn_audio(identity, b\"\\x01\\x00\" * 160, payload_sequence=1, source_ranges=(), context_only=False)\n            await session.seal_turn(identity, sealed_content_ranges=(), seal_reason=\"silence\", observed_trailing_silence_ms=0)\n            if order == 1:\n                await backend.reconfigure_session_options(LocalASRSessionOptions(\"ja\", language_hint=\"Japanese\"))\n        backend._decode_lock.release()\n        await fixtures.wait_until(lambda: len([e for e in captured_events if isinstance(e, STTProviderTurnTerminal)]) == 2, timeout=5)\n        terminals = [e for e in captured_events if isinstance(e, STTProviderTurnTerminal)]\n        report[\"claims\"][\"A-queued-options\"] = {\"request_languages\": [request.settings.source_language for request in requests], \"observed_decode_options\": observed_options, \"terminals\": [dataclasses.asdict(event) for event in terminals], \"different_equal_text_identities\": terminals[0].identity != terminals[1].identity and terminals[0].text == terminals[1].text, \"first_request_retains_English_options\": observed_options[0][\"options\"].get(\"language\") == \"English\", \"result\": \"Current production queued decode reads reconfigured language; immutable request settings do not snapshot native options\"}\n    finally:\n        if backend._decode_lock.locked():\n            backend._decode_lock.release()\n        await session.close()\n        await backend.close()\n        await consumer\n    save(\"local-results-components.json\", report)\n\n    # Keep old Scribe session alive while next open resolves Gemini; no network.\n    old = fixtures.ControlledStreamSession()\n    new = fixtures.ControlledStreamSession()\n    configured = {\"scribe\": True}\n    class FakeBackend:\n        def __init__(self, inner):\n            self.inner = inner\n        async def open_session(self, **kwargs):\n            return self.inner\n    rolling = RollingSTTBackend(providers=(\n        RollingProviderDefinition(STTProviderName.ELEVENLABS_SCRIBE, lambda: FakeBackend(old), lambda: configured[\"scribe\"]),\n        RollingProviderDefinition(STTProviderName.GEMINI_TRANSCRIBE, lambda: FakeBackend(new), lambda: True),\n    ))\n    old_wrapper = await rolling.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=\"old\"))\n    configured[\"scribe\"] = False\n    new_wrapper = await rolling.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=\"new\"))\n    old_stream = RecognitionStreamIdentity(\"peer\", 1, 1, \"old\", (\"rolling\",))\n    new_stream = replace(old_stream, provider_epoch_id=\"new\")\n    await old_wrapper.begin_stream(old_stream)\n    await new_wrapper.begin_stream(new_stream)\n    old_event = STTRecognitionUnit(RecognitionUnitIdentity(old_stream, uuid4(), 1), \"no\")\n    new_event = STTRecognitionUnit(RecognitionUnitIdentity(new_stream, uuid4(), 1), \"no\")\n    # Use wrapper's existing remapper directly; delayed old source cannot acquire new epoch.\n    report[\"claims\"][\"A-Rolling-late\"] = {\"old_member_after_new_open\": old_wrapper.provider_name.value, \"new_member\": new_wrapper.provider_name.value, \"old_identity_preserved\": old_wrapper._remap_recognition_identity(old_event.identity) == old_event.identity, \"old_identity_rejected_by_new\": new_wrapper._remap_recognition_identity(old_event.identity) is None, \"new_identity_preserved\": new_wrapper._remap_recognition_identity(new_event.identity) == new_event.identity, \"replay_reuses_identity\": old_wrapper._remap_recognition_identity(old_event.identity) == old_wrapper._remap_recognition_identity(old_event.identity), \"equal_text_different_identity\": old_event.text == new_event.text and old_event.identity != new_event.identity}\n    await old_wrapper.end_stream(reason=\"source_discontinuity\")\n    report[\"claims\"][\"A-Rolling-late\"][\"delegated_old_controls\"] = [call for call in old.calls if call[0] == \"end_stream\"]\n    await old_wrapper.close()\n    await new_wrapper.close()\n    save(\"local-results-components.json\", report)\n\n    # Explicit discontinuity through engine + Rolling wrapper, not a proposed reducer.\n    emitted = []\n    inners = []\n    wrappers = []\n    async def engine_factory(_settings, epoch):\n        inner = fixtures.ControlledStreamSession()\n        inners.append(inner)\n        rb = RollingSTTBackend(providers=(RollingProviderDefinition(STTProviderName.GEMINI_TRANSCRIBE, lambda: FakeBackend(inner), lambda: True),))\n        wrapper = await rb.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=epoch))\n        wrappers.append(wrapper)\n        return wrapper\n    engine = fixtures.ScopedRecognitionEngine(engine_factory, event_sink=emitted.append, watchdog_resolver=lambda _: fixtures.watchdogs())\n    ledger = fixtures.PeerAudioSegmentLedger(activation_generation=3, settings=fixtures.settings(\"rolling_free\"))\n    try:\n        start, _, end = fixtures.segment_events(ledger, start_sample=0, now=100)\n        await engine.handle_stream_input(fixtures.stream_input(ledger, 2, 6, speech_observed=True))\n        await engine.handle_owned_vad_event(start)\n        await engine.handle_owned_vad_event(end)\n        previous = inners[0].stream\n        await engine.handle_stream_input(fixtures.OwnedStreamInput(fixtures.CaptureStreamInput(np.empty(0, dtype=np.float32), (), boundary_reason=\"source_discontinuity\"), ledger, ledger.settings, ledger.activation_generation))\n        successor = fixtures.PeerAudioSegmentLedger(activation_generation=3, settings=ledger.settings)\n        start2, _, _ = fixtures.segment_events(successor, start_sample=10, now=200)\n        await engine.handle_owned_vad_event(start2)\n        current = inners[-1].stream\n        inners[-1].emit(STTRecognitionUnit(RecognitionUnitIdentity(previous, uuid4(), 1), \"stale-no\"))\n        unit = STTRecognitionUnit(RecognitionUnitIdentity(current, uuid4(), 1), \"no\")\n        inners[-1].emit(unit)\n        inners[-1].emit(unit)  # replay same identity\n        inners[-1].emit(STTRecognitionUnit(RecognitionUnitIdentity(current, uuid4(), 2), \"no\"))\n        await fixtures.wait_until(lambda: len([e for e in emitted if isinstance(e, STTRecognitionUnitTerminal)]) == 2)\n        finals = [e for e in emitted if isinstance(e, STTRecognitionUnitTerminal)]\n        report[\"claims\"][\"A-Rolling-discontinuity\"] = {\"new_stream\": current != previous, \"terminal_texts\": [e.unit.text for e in finals], \"terminal_identities\": [dataclasses.asdict(e.unit.identity) for e in finals], \"old_controls\": [call for call in inners[0].calls if call[0] in (\"end_stream\", \"stop\", \"close\")], \"all_old_calls\": [str(call) for call in inners[0].calls], \"stale_rejected_replay_ignored_repetition_retained\": [e.unit.text for e in finals] == [\"no\", \"no\"]}\n    finally:\n        await engine.close()\n    save(\"local-results-components.json\", report)\n\n    # Safe configured-target presence only, no endpoint/credential output.\n    custom = settings_data().get(\"stt\", {}).get(\"custom\", {})\n    report[\"claims\"][\"C-configured-target\"] = {\"mode\": custom.get(\"mode\"), \"compatibility\": custom.get(\"compatibility\"), \"endpoint_present\": bool(custom.get(\"endpoint\")), \"model_present\": bool(custom.get(\"model\")), \"extra_model_present\": bool(custom.get(\"extra\", {}).get(\"model\")), \"named_server\": \"blocked when endpoint/model absent; no endpoint calls performed\"}\n    import io\n    captured_requests = []\n    async def handler(url, **kwargs):\n        raw_wav = kwargs[\"files\"][\"file\"][1]\n        with wave.open(io.BytesIO(raw_wav), \"rb\") as reader:\n            details = {\"rate\": reader.getframerate(), \"channels\": reader.getnchannels(), \"width\": reader.getsampwidth(), \"frames\": reader.getnframes(), \"pcm_sha256\": hashlib.sha256(reader.readframes(reader.getnframes())).hexdigest()}\n        captured_requests.append({\"url\": url, \"form\": kwargs[\"data\"], \"wav\": details})\n        return custom_fixtures._FakeResponse(200, {\"text\": \" no no \", \"language\": \"en\", \"words\": [{\"word\": \"no\", \"start\": 0, \"end\": 0.1}], \"segments\": [{\"id\": 1, \"start\": 0, \"end\": 0.36}], \"server_revision\": \"fixture\"})\n    client = custom_fixtures._FakeAsyncClient(handler)\n    custom_backend = CustomSTTBackend(\"offline\", \"openai_transcription\", \"http://example.invalid\", \"declared-model\", source_language=\"en\", extra={\"model\": \"extra-model\"}, http_client_factory=lambda **kwargs: client)\n    custom_session = await custom_backend.open_session()\n    try:\n        raw = pcm(DIRECTORY / \"audio/local_no_trim.wav\")\n        text = await custom_session._request_transcription(raw)\n        report[\"claims\"][\"C-offline-local-protocol\"] = {\"requests\": captured_requests, \"returned_text\": text, \"input_pcm_sha256\": hashlib.sha256(raw).hexdigest(), \"upstream_extra_fields\": [\"words\", \"segments\", \"language\", \"server_revision\"], \"preserved_value_type\": type(text).__name__, \"fixture_not_named_server\": True}\n    finally:\n        await custom_session.close()\n    ws = custom_fixtures._FakeWebSocket([], hang=True)\n    connect_calls = []\n    async def connect(url, **kwargs):\n        connect_calls.append({\"url\": url, \"headers\": kwargs.get(\"additional_headers\", kwargs.get(\"extra_headers\"))})\n        return ws\n    rt = CustomSTTBackend(\"realtime\", \"openai_realtime\", \"ws://example.invalid\", \"declared-model\", source_language=\"en\", websocket_connect=connect)\n    rt_session = await rt.open_session()\n    try:\n        await rt_session.send_audio(pcm(DIRECTORY / \"audio/local_no_trim.wav\"))\n        messages = [json.loads(message) for message in ws.sent]\n        append = next(message for message in messages if message[\"type\"] == \"input_audio_buffer.append\")\n        import base64\n        report[\"claims\"][\"C-realtime-local-format\"] = {\"connect\": connect_calls, \"session_update\": messages[0], \"append_bytes\": len(base64.b64decode(append[\"audio\"])), \"append_pcm_sha256\": hashlib.sha256(base64.b64decode(append[\"audio\"])).hexdigest(), \"adapter_rate\": rt.sample_rate_hz, \"wire_rate_declared\": \"input_audio_format\" in messages[0][\"session\"], \"fixture_not_named_server\": True}\n    finally:\n        await rt_session.close()\n    report[\"cleanup\"] = {\"fake_cpu_backend_closed\": backend._closed, \"fake_http_client_closed\": client.closed, \"fake_websocket_closed\": ws.closed, \"engine_closed\": True}\n    save(\"local-results-components.json\", report)\n    print(json.dumps({\"output\": \"local-results-components.json\", \"claims\": list(report[\"claims\"])}))\n\n\nasync def rolling_scoped_probe():\n    from uuid import uuid4\n    from puripuly_heart.config.provider_values import STTProviderName\n    from puripuly_heart.core.audio.ownership import AudioSegmentIdentity\n    from puripuly_heart.core.stt.backend import STTProviderTurnIdentity, STTProviderTurnRequest, STTProviderTurnTerminal, STTSessionProjection\n    from puripuly_heart.core.stt.rolling import RollingSTTBackend, RollingProviderDefinition\n    fixtures = fixture_module(\"local_probe_scoped_legal_fixtures\", \"tests/core/test_stt_scoped_engine.py\")\n    old = fixtures.ControlledScopedSession()  # Scribe correlated-turn contract, not independent units.\n    new = fixtures.ControlledStreamSession()\n    enabled = {\"scribe\": True}\n    class FakeBackend:\n        def __init__(self, inner):\n            self.inner = inner\n        async def open_session(self, **kwargs):\n            return self.inner\n    rolling = RollingSTTBackend(providers=(\n        RollingProviderDefinition(STTProviderName.ELEVENLABS_SCRIBE, lambda: FakeBackend(old), lambda: enabled[\"scribe\"]),\n        RollingProviderDefinition(STTProviderName.GEMINI_TRANSCRIBE, lambda: FakeBackend(new), lambda: True),\n    ))\n    first = await rolling.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=\"scribe-old\"))\n    identity = STTProviderTurnIdentity(AudioSegmentIdentity(1, 1, uuid4(), 1), \"scribe-old\", \"first\")\n    request = STTProviderTurnRequest(identity, fixtures.settings(\"rolling_free\"), channel=\"peer\")\n    capture = (fixtures.span(1, 0, 4),)\n    await first.begin_turn(request)\n    await first.send_turn_audio(identity, b\"\\x01\\x00\" * 4, payload_sequence=1, source_ranges=capture, context_only=False)\n    await first.seal_turn(identity, sealed_content_ranges=capture, seal_reason=\"hardcut\", observed_trailing_silence_ms=0)\n    enabled[\"scribe\"] = False\n    second = await rolling.open_session(projection=STTSessionProjection(mode=\"scoped\", provider_epoch_id=\"gemini-new\"))\n    old.emit(STTProviderTurnTerminal(identity, outcome=\"final\", text=\"no\", text_authority=\"authoritative\"))\n    events = first.turn_events()\n    try:\n        received = await asyncio.wait_for(anext(events), timeout=1)\n        report = {\"baseline\": BASELINE, \"command\": sys.argv, \"kind\": \"Actual Rolling wrapper with fake scoped Scribe and independent Gemini member sessions; no wire server\", \"old_member\": first.provider_name.value, \"new_member\": second.provider_name.value, \"old_member_independent\": first.independent_recognition_units, \"new_member_independent\": second.independent_recognition_units, \"late_old_terminal\": dataclasses.asdict(received), \"late_identity_preserved\": received.identity == identity, \"delegated_control_calls\": [str(call) for call in old.calls], \"old_seal_count\": sum(call[0] == \"seal\" for call in old.calls), \"automatic_successor_seal_count\": sum(call[0] == \"seal\" for call in new.calls), \"scope_note\": \"Corrects the mechanical remapper fixture's artificial independent Scribe capability; does not certify Scribe wire finalization or billing\"}\n    finally:\n        await events.aclose()\n        await first.close()\n        await second.close()\n    report[\"cleanup\"] = {\"old_closed\": (\"close\",) in old.calls, \"new_closed\": (\"close\",) in new.calls}\n    save(\"local-results-rolling.json\", report)\n    print(json.dumps({\"output\": \"local-results-rolling.json\", \"late_identity_preserved\": report[\"late_identity_preserved\"], \"old_seal_count\": report[\"old_seal_count\"]}))\n\n\nif __name__ == \"__main__\":\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"stage\", choices=[\"real\", \"components\", \"gpu\", \"rolling-scoped\"])\n    args = parser.parse_args()\n    asyncio.run({\"real\": real_probes, \"components\": component_probes, \"gpu\": gpu_probe, \"rolling-scoped\": rolling_scoped_probe}[args.stage]())\n"
+    }
+  },
+  "common_source": "from __future__ import annotations\n\nimport json\nimport os\nimport subprocess\nimport sys\nimport wave\nfrom pathlib import Path\n\nROOT = Path(__file__).resolve().parents[3]\nsys.path.insert(0, str(ROOT / \"src\"))\nDIRECTORY = Path(__file__).resolve().parent\n_SECRETS: list[str] = []\n\n\ndef settings_data() -> dict:\n    from puripuly_heart.config.paths import default_settings_path\n\n    path = default_settings_path()\n    data = json.loads(path.read_text(encoding=\"utf-8\")) if path.is_file() else {}\n    return data.get(\"intent\", data)\n\n\ndef secret(name: str, *environment_names: str, legacy: tuple[str, ...] = ()) -> str | None:\n    from puripuly_heart.config.paths import default_settings_path\n    from puripuly_heart.core.storage.secrets import EncryptedFileSecretStore, KeyringSecretStore\n\n    config = settings_data().get(\"secrets\", {})\n    if config.get(\"backend\", \"keyring\") == \"encrypted_file\":\n        path = Path(config.get(\"encrypted_file_path\", \"secrets.json\"))\n        if not path.is_absolute():\n            path = default_settings_path().parent / path\n        passphrase = os.environ.get(\"PURIPULY_HEART_SECRETS_PASSPHRASE\")\n        store = EncryptedFileSecretStore(path, passphrase=passphrase) if path.is_file() and passphrase else None\n    else:\n        store = KeyringSecretStore()\n    value = None\n    if store is not None:\n        for key in (name, *legacy):\n            value = store.get(key)\n            if value:\n                break\n    if not value:\n        value = next((os.environ[key] for key in environment_names if os.environ.get(key)), None)\n    if value and value not in _SECRETS:\n        _SECRETS.append(value)\n    return value\n\n\ndef safe_error(error: BaseException) -> str:\n    message = str(error)\n    for value in _SECRETS:\n        message = message.replace(value, \"[redacted]\")\n    return f\"{type(error).__name__}: {message[:1200]}\"\n\n\ndef synthesize(name: str, text: str, *, voice: str = \"Microsoft Zira Desktop\", rate: int = 0) -> Path:\n    directory = DIRECTORY / \"audio\"\n    directory.mkdir(exist_ok=True)\n    path = directory / f\"{name}.wav\"\n    metadata_path = path.with_suffix(\".json\")\n    expected = {\"text\": text, \"voice\": voice, \"rate\": rate, \"sample_rate\": 16000}\n    if path.is_file() and metadata_path.is_file():\n        if json.loads(metadata_path.read_text(encoding=\"utf-8\")) != expected:\n            raise ValueError(\"Existing synthetic audio parameters differ\")\n        return path\n    quote = lambda value: \"'\" + str(value).replace(\"'\", \"''\") + \"'\"\n    script = (\n        \"Add-Type -AssemblyName System.Speech; \"\n        \"$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; \"\n        \"try { \"\n        f\"$s.SelectVoice({quote(voice)}); $s.Rate = {int(rate)}; \"\n        \"$f = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, \"\n        \"[System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, \"\n        \"[System.Speech.AudioFormat.AudioChannel]::Mono); \"\n        f\"$s.SetOutputToWaveFile({quote(path)}, $f); $s.Speak({quote(text)}); \"\n        \"} finally { $s.Dispose() }\"\n    )\n    subprocess.run([\"powershell.exe\", \"-NoProfile\", \"-NonInteractive\", \"-Command\", script], check=True, capture_output=True, timeout=30)\n    with wave.open(str(path), \"rb\") as reader:\n        if (reader.getnchannels(), reader.getsampwidth(), reader.getframerate()) != (1, 2, 16000):\n            raise ValueError(\"Unexpected synthetic audio format\")\n    metadata_path.write_text(json.dumps(expected, ensure_ascii=False, indent=2) + \"\\n\", encoding=\"utf-8\")\n    return path\n\n\ndef pcm(path: Path) -> bytes:\n    with wave.open(str(path), \"rb\") as reader:\n        if (reader.getnchannels(), reader.getsampwidth(), reader.getframerate()) != (1, 2, 16000):\n            raise ValueError(\"Probe requires mono PCM16 16 kHz\")\n        return reader.readframes(reader.getnframes())\n",
+  "historical_results": {
+    "local-results-real.json": {
+      "baseline": "0f0ba5173da51250bb5926e4a2eead5e68adff81",
+      "command": [
+        "docs/experiments/issue-212-clarification/local_probe.py",
+        "real"
+      ],
+      "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+      "executable": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.venv\\Scripts\\python.exe",
+      "kind": "actual production CPU loading/decode; no external inference",
+      "process_gate": {
+        "command": [
+          "powershell.exe",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "$p = @(Get-Process -Name VRChat,vrserver,vrcompositor,PuriPulyHeartGpuWorker -ErrorAction SilentlyContinue); ConvertTo-Json -Compress -InputObject @($p | Select-Object ProcessName,Id)"
+        ],
+        "returncode": 0,
+        "matched_processes": []
+      },
+      "runtime_versions": {
+        "sherpa-onnx": "1.13.4",
+        "sherpa-onnx-core": "1.13.4",
+        "numpy": "2.5.1"
+      },
+      "models": [
+        {
+          "id": "parakeet-tdt-0.6b-v3-int8-sherpa",
+          "files": [
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\parakeet-tdt-0.6b-v3-int8-sherpa\\decoder.int8.onnx",
+              "size_bytes": 11845275,
+              "sha256": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+              "expected_sha256": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+              "hash_matches": true
+            },
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\parakeet-tdt-0.6b-v3-int8-sherpa\\encoder.int8.onnx",
+              "size_bytes": 652184281,
+              "sha256": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+              "expected_sha256": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+              "hash_matches": true
+            },
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\parakeet-tdt-0.6b-v3-int8-sherpa\\joiner.int8.onnx",
+              "size_bytes": 6355277,
+              "sha256": "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+              "expected_sha256": "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+              "hash_matches": true
+            },
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\parakeet-tdt-0.6b-v3-int8-sherpa\\tokens.txt",
+              "size_bytes": 93939,
+              "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+              "expected_sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+              "hash_matches": true
+            }
+          ],
+          "sources": {
+            "huggingface": {
+              "name": "huggingface",
+              "revision": "2bda32ec70b097a55adaa07d9a7173915b43cc78",
+              "repo_id": "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+              "download_url_template": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/{path}"
+            }
+          }
+        },
+        {
+          "id": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+          "files": [
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\parakeet-tdt-ctc-0.6b-ja-int8-sherpa\\model.int8.onnx",
+              "size_bytes": 655542604,
+              "sha256": "3addd00ef5bd1742078389e540b77394e4a508bdf2f4c9ad1b4a76d93e76598e",
+              "expected_sha256": "3addd00ef5bd1742078389e540b77394e4a508bdf2f4c9ad1b4a76d93e76598e",
+              "hash_matches": true
+            },
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\parakeet-tdt-ctc-0.6b-ja-int8-sherpa\\tokens.txt",
+              "size_bytes": 28557,
+              "sha256": "732f64c53909f2620c713f4106b487d92e6f54a6915b3cd3d1dbd32f9f4f392a",
+              "expected_sha256": "732f64c53909f2620c713f4106b487d92e6f54a6915b3cd3d1dbd32f9f4f392a",
+              "hash_matches": true
+            }
+          ],
+          "sources": {
+            "huggingface": {
+              "name": "huggingface",
+              "revision": "bef18eb066808c90bd0f5df5be685767b0732de8",
+              "repo_id": "csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8",
+              "download_url_template": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/bef18eb066808c90bd0f5df5be685767b0732de8/{path}"
+            }
+          }
+        },
+        {
+          "id": "qwen3-asr-0.6b-int8-sherpa",
+          "files": [
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\qwen3-asr-0.6b-int8-sherpa\\conv_frontend.onnx",
+              "size_bytes": 44148281,
+              "sha256": "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e",
+              "expected_sha256": "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e",
+              "hash_matches": true
+            },
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\qwen3-asr-0.6b-int8-sherpa\\decoder.int8.onnx",
+              "size_bytes": 756563239,
+              "sha256": "61e5f8249f9e7c82d5e01e1938c79fb3f5b3135f91664928033029e42451bd18",
+              "expected_sha256": "61e5f8249f9e7c82d5e01e1938c79fb3f5b3135f91664928033029e42451bd18",
+              "hash_matches": true
+            },
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\qwen3-asr-0.6b-int8-sherpa\\encoder.int8.onnx",
+              "size_bytes": 182491662,
+              "sha256": "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9",
+              "expected_sha256": "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9",
+              "hash_matches": true
+            },
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\qwen3-asr-0.6b-int8-sherpa\\tokenizer\\merges.txt",
+              "size_bytes": 1671853,
+              "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+              "expected_sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+              "hash_matches": true
+            },
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\qwen3-asr-0.6b-int8-sherpa\\tokenizer\\tokenizer_config.json",
+              "size_bytes": 12487,
+              "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
+              "expected_sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
+              "hash_matches": true
+            },
+            {
+              "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\qwen3-asr-0.6b-int8-sherpa\\tokenizer\\vocab.json",
+              "size_bytes": 2776833,
+              "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+              "expected_sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+              "hash_matches": true
+            }
+          ],
+          "sources": {
+            "huggingface": {
+              "name": "huggingface",
+              "revision": "2cc50d1abfe4d4f2df8d71f536d108bb40f943d2",
+              "repo_id": "csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+              "download_url_template": "https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/2cc50d1abfe4d4f2df8d71f536d108bb40f943d2/{path}"
+            },
+            "modelscope": {
+              "name": "modelscope",
+              "revision": "c69fb1666ccb59a82c09840c511a6c894e6a2482",
+              "repo_id": "zengshuishui/Qwen3-ASR-onnx",
+              "download_url_template": "https://www.modelscope.cn/api/v1/models/zengshuishui/Qwen3-ASR-onnx/repo?Revision=c69fb1666ccb59a82c09840c511a6c894e6a2482&FilePath={path}"
+            }
+          }
+        }
+      ],
+      "decodes": [
+        {
+          "clip": "shared_no",
+          "model": "parakeet-tdt-0.6b-v3-int8-sherpa",
+          "delegate_class": "LocalParakeetV3SherpaSTTBackend",
+          "language_hint_at_decode": null,
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+            "sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+            "pcm_sha256": "7ecb58a91e9b6b77aa497c3f98aa336fde279f326b49364867ce5b9fffb0570d",
+            "samples": 18160,
+            "seconds": 1.135,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": null
+          },
+          "adapter_text": "No.",
+          "raw_recognizer_result": {
+            "text": "No.",
+            "tokens": [
+              " No",
+              "."
+            ],
+            "timestamps": [
+              0.1599999964237213,
+              0.7199999690055847
+            ],
+            "durations": [
+              0.23999999463558197,
+              0.23999999463558197
+            ],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        },
+        {
+          "clip": "local_no_trim",
+          "model": "parakeet-tdt-0.6b-v3-int8-sherpa",
+          "delegate_class": "LocalParakeetV3SherpaSTTBackend",
+          "language_hint_at_decode": null,
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\local_no_trim.wav",
+            "sha256": "e474e0808b047ccbc2a678a22531adc9599cd07a2a5fccea0e7be8047b777c49",
+            "pcm_sha256": "cb998cbfc4cef3e63e8daf7fd252dccc6c27b94ce95c169470e1a0b0101cd2ca",
+            "samples": 5760,
+            "seconds": 0.36,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": {
+              "parent": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+              "parent_sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+              "sample_range": [
+                1200,
+                6960
+              ],
+              "rule": "Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold"
+            }
+          },
+          "adapter_text": "No.",
+          "raw_recognizer_result": {
+            "text": "No.",
+            "tokens": [
+              " No",
+              "."
+            ],
+            "timestamps": [
+              0.0,
+              0.1599999964237213
+            ],
+            "durations": [
+              0.1599999964237213,
+              0.07999999821186066
+            ],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        },
+        {
+          "clip": "shared_correction",
+          "model": "parakeet-tdt-0.6b-v3-int8-sherpa",
+          "delegate_class": "LocalParakeetV3SherpaSTTBackend",
+          "language_hint_at_decode": null,
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+            "sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+            "pcm_sha256": "cb204865bc4501df69f9e613bae31aad2557d1b63ec43237f46f6ef5279d84de",
+            "samples": 30720,
+            "seconds": 1.92,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": null
+          },
+          "adapter_text": "No. Three.",
+          "raw_recognizer_result": {
+            "text": "No. Three.",
+            "tokens": [
+              " No",
+              ".",
+              " Th",
+              "ree",
+              "."
+            ],
+            "timestamps": [
+              0.07999999821186066,
+              0.47999998927116394,
+              0.7199999690055847,
+              0.9599999785423279,
+              1.7599999904632568
+            ],
+            "durations": [
+              0.23999999463558197,
+              0.23999999463558197,
+              0.23999999463558197,
+              0.23999999463558197,
+              0.07999999821186066
+            ],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        },
+        {
+          "clip": "local_correction_trim",
+          "model": "parakeet-tdt-0.6b-v3-int8-sherpa",
+          "delegate_class": "LocalParakeetV3SherpaSTTBackend",
+          "language_hint_at_decode": null,
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\local_correction_trim.wav",
+            "sha256": "34a41d87d8752cc290945044af90309c36d7076c0a1f236394a095a78d7eadac",
+            "pcm_sha256": "b4a3f39ebd49960ca8ceca005524ffc93500ac85f93abb1e382357ae8b672f16",
+            "samples": 17839,
+            "seconds": 1.1149375,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": {
+              "parent": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+              "parent_sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+              "sample_range": [
+                1280,
+                19119
+              ],
+              "rule": "Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold"
+            }
+          },
+          "adapter_text": "No. Three.",
+          "raw_recognizer_result": {
+            "text": "No. Three.",
+            "tokens": [
+              " No",
+              ".",
+              " Th",
+              "ree",
+              "."
+            ],
+            "timestamps": [
+              0.0,
+              0.3199999928474426,
+              0.5600000023841858,
+              0.7199999690055847,
+              0.8799999952316284
+            ],
+            "durations": [
+              0.23999999463558197,
+              0.23999999463558197,
+              0.1599999964237213,
+              0.1599999964237213,
+              0.07999999821186066
+            ],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        },
+        {
+          "clip": "local_old_no_300ms_then_correction",
+          "model": "parakeet-tdt-0.6b-v3-int8-sherpa",
+          "delegate_class": "LocalParakeetV3SherpaSTTBackend",
+          "language_hint_at_decode": null,
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\local_old_no_300ms_then_correction.wav",
+            "sha256": "f9e21c5b07e0c5ba6c9f3eaa4fff6706fc83a26e825a7f80d42c875bc609ef41",
+            "pcm_sha256": "7beb0f0d2a168d9f30023a071f325aec185ff7c08854b760d62719823419d07f",
+            "samples": 22639,
+            "seconds": 1.4149375,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": {
+              "pieces": [
+                {
+                  "input_range": [
+                    0,
+                    4800
+                  ],
+                  "source": "docs\\experiments\\issue-212-clarification\\audio\\local_no_trim.wav",
+                  "source_range": [
+                    960,
+                    5760
+                  ],
+                  "ownership": "already_owned_context_only"
+                },
+                {
+                  "input_range": [
+                    4800,
+                    22639
+                  ],
+                  "source": "docs\\experiments\\issue-212-clarification\\audio\\local_correction_trim.wav",
+                  "source_range": [
+                    0,
+                    17839
+                  ],
+                  "ownership": "new_content"
+                }
+              ]
+            }
+          },
+          "adapter_text": "No no. Three.",
+          "raw_recognizer_result": {
+            "text": "No no. Three.",
+            "tokens": [
+              " No",
+              " no",
+              ".",
+              " Th",
+              "ree",
+              "."
+            ],
+            "timestamps": [
+              0.07999999821186066,
+              0.3999999761581421,
+              0.6399999856948853,
+              0.8799999952316284,
+              1.0399999618530273,
+              1.1999999284744263
+            ],
+            "durations": [
+              0.23999999463558197,
+              0.23999999463558197,
+              0.23999999463558197,
+              0.1599999964237213,
+              0.1599999964237213,
+              0.07999999821186066
+            ],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        },
+        {
+          "clip": "local_ko",
+          "model": "qwen3-asr-0.6b-int8-sherpa",
+          "delegate_class": "LocalQwenSherpaSTTBackend",
+          "language_hint_at_decode": "ko",
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\local_ko.wav",
+            "sha256": "d481624e480fe9605bfc259f21f2f338075818029ea602cb37f13a7695d8208d",
+            "pcm_sha256": "42050aa95db9d36f5439126dd625b349d58183920dfb69871e056d28049313aa",
+            "samples": 45920,
+            "seconds": 2.87,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": {
+              "text": "아니요. 삼입니다.",
+              "voice": "Microsoft Heami Desktop"
+            }
+          },
+          "adapter_text": "아니요 삼입니다.",
+          "raw_recognizer_result": {
+            "text": "아니요 삼입니다.",
+            "tokens": [
+              "아",
+              "니",
+              "요",
+              " ",
+              "삼",
+              "입니다",
+              "."
+            ],
+            "timestamps": [],
+            "durations": [],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        },
+        {
+          "clip": "shared_no",
+          "model": "qwen3-asr-0.6b-int8-sherpa",
+          "delegate_class": "LocalQwenSherpaSTTBackend",
+          "language_hint_at_decode": "English",
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+            "sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+            "pcm_sha256": "7ecb58a91e9b6b77aa497c3f98aa336fde279f326b49364867ce5b9fffb0570d",
+            "samples": 18160,
+            "seconds": 1.135,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": null
+          },
+          "adapter_text": "No.",
+          "raw_recognizer_result": {
+            "text": "No.",
+            "tokens": [
+              "No",
+              "."
+            ],
+            "timestamps": [],
+            "durations": [],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        },
+        {
+          "clip": "local_no_trim",
+          "model": "qwen3-asr-0.6b-int8-sherpa",
+          "delegate_class": "LocalQwenSherpaSTTBackend",
+          "language_hint_at_decode": "English",
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\local_no_trim.wav",
+            "sha256": "e474e0808b047ccbc2a678a22531adc9599cd07a2a5fccea0e7be8047b777c49",
+            "pcm_sha256": "cb998cbfc4cef3e63e8daf7fd252dccc6c27b94ce95c169470e1a0b0101cd2ca",
+            "samples": 5760,
+            "seconds": 0.36,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": {
+              "parent": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+              "parent_sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+              "sample_range": [
+                1200,
+                6960
+              ],
+              "rule": "Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold"
+            }
+          },
+          "adapter_text": "No.",
+          "raw_recognizer_result": {
+            "text": "No.",
+            "tokens": [
+              "No",
+              "."
+            ],
+            "timestamps": [],
+            "durations": [],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        },
+        {
+          "clip": "shared_correction",
+          "model": "qwen3-asr-0.6b-int8-sherpa",
+          "delegate_class": "LocalQwenSherpaSTTBackend",
+          "language_hint_at_decode": "English",
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+            "sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+            "pcm_sha256": "cb204865bc4501df69f9e613bae31aad2557d1b63ec43237f46f6ef5279d84de",
+            "samples": 30720,
+            "seconds": 1.92,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": null
+          },
+          "adapter_text": "No, three.",
+          "raw_recognizer_result": {
+            "text": "No, three.",
+            "tokens": [
+              "No",
+              ",",
+              " three",
+              "."
+            ],
+            "timestamps": [],
+            "durations": [],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        },
+        {
+          "clip": "local_correction_trim",
+          "model": "qwen3-asr-0.6b-int8-sherpa",
+          "delegate_class": "LocalQwenSherpaSTTBackend",
+          "language_hint_at_decode": "English",
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\local_correction_trim.wav",
+            "sha256": "34a41d87d8752cc290945044af90309c36d7076c0a1f236394a095a78d7eadac",
+            "pcm_sha256": "b4a3f39ebd49960ca8ceca005524ffc93500ac85f93abb1e382357ae8b672f16",
+            "samples": 17839,
+            "seconds": 1.1149375,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": {
+              "parent": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+              "parent_sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+              "sample_range": [
+                1280,
+                19119
+              ],
+              "rule": "Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold"
+            }
+          },
+          "adapter_text": "No, three.",
+          "raw_recognizer_result": {
+            "text": "No, three.",
+            "tokens": [
+              "No",
+              ",",
+              " three",
+              "."
+            ],
+            "timestamps": [],
+            "durations": [],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        },
+        {
+          "clip": "local_old_no_300ms_then_correction",
+          "model": "qwen3-asr-0.6b-int8-sherpa",
+          "delegate_class": "LocalQwenSherpaSTTBackend",
+          "language_hint_at_decode": "English",
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\local_old_no_300ms_then_correction.wav",
+            "sha256": "f9e21c5b07e0c5ba6c9f3eaa4fff6706fc83a26e825a7f80d42c875bc609ef41",
+            "pcm_sha256": "7beb0f0d2a168d9f30023a071f325aec185ff7c08854b760d62719823419d07f",
+            "samples": 22639,
+            "seconds": 1.4149375,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": {
+              "pieces": [
+                {
+                  "input_range": [
+                    0,
+                    4800
+                  ],
+                  "source": "docs\\experiments\\issue-212-clarification\\audio\\local_no_trim.wav",
+                  "source_range": [
+                    960,
+                    5760
+                  ],
+                  "ownership": "already_owned_context_only"
+                },
+                {
+                  "input_range": [
+                    4800,
+                    22639
+                  ],
+                  "source": "docs\\experiments\\issue-212-clarification\\audio\\local_correction_trim.wav",
+                  "source_range": [
+                    0,
+                    17839
+                  ],
+                  "ownership": "new_content"
+                }
+              ]
+            }
+          },
+          "adapter_text": "No, no, three.",
+          "raw_recognizer_result": {
+            "text": "No, no, three.",
+            "tokens": [
+              "No",
+              ",",
+              " no",
+              ",",
+              " three",
+              "."
+            ],
+            "timestamps": [],
+            "durations": [],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        },
+        {
+          "clip": "local_ja_first_6s",
+          "model": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+          "delegate_class": "LocalParakeetJapaneseSherpaSTTBackend",
+          "language_hint_at_decode": null,
+          "audio": {
+            "path": "docs\\experiments\\issue-212-clarification\\audio\\local_ja_first_6s.wav",
+            "sha256": "5f9995fe26963e69026e6a8bd46d1f2f8612a60812998d6dec5f98fba13ef50d",
+            "pcm_sha256": "7c6f533e506e5df8c0fa97d8552b0e9069f084821a1dde4787dbcfd4f25f71ea",
+            "samples": 96000,
+            "seconds": 6.0,
+            "sample_rate_hz": 16000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "mapping": {
+              "public_source_url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/bef18eb066808c90bd0f5df5be685767b0732de8/test_wavs/test_ja_1.wav",
+              "public_sha256": "09abd330ce706a6e6969fe6bbc8275314af631fcee4e536afd0626570d263fbf",
+              "original_format": {
+                "rate": 48000,
+                "channels": 1,
+                "width": 2,
+                "frames": 624000
+              },
+              "selected_normalized_range": [
+                0,
+                96000
+              ],
+              "transcript_reference": "日本語ちゃんと聞き取れてますかちゃんと聞こえてんのちゃんと聞こえてるのじゃあマイクを持ってもらって",
+              "reference_scope": "Full upstream sample; not a claimed exact six-second transcript"
+            }
+          },
+          "adapter_text": "日本語ちゃんと聞っといてますか?ちゃんと聞こえてます。",
+          "raw_recognizer_result": {
+            "text": "日本語ちゃんと聞っといてますか?ちゃんと聞こえてます。",
+            "tokens": [
+              " ",
+              "日本",
+              "語",
+              "ちゃん",
+              "と",
+              "聞",
+              "っと",
+              "いて",
+              "ます",
+              "か",
+              "?",
+              "ちゃん",
+              "と",
+              "聞",
+              "こ",
+              "えて",
+              "ます",
+              "。"
+            ],
+            "timestamps": [
+              0.0,
+              1.0399999618530273,
+              1.4399999380111694,
+              1.5999999046325684,
+              1.7599999904632568,
+              1.9199999570846558,
+              2.0799999237060547,
+              2.240000009536743,
+              2.4800000190734863,
+              2.6399998664855957,
+              4.639999866485596,
+              4.880000114440918,
+              5.119999885559082,
+              5.279999732971191,
+              5.440000057220459,
+              5.599999904632568,
+              5.759999752044678,
+              5.920000076293945
+            ],
+            "durations": [],
+            "lang": "",
+            "language": {
+              "absent": true
+            },
+            "ys": {
+              "absent": true
+            },
+            "json": {
+              "absent": true
+            }
+          },
+          "outcome": "text"
+        }
+      ],
+      "auto": [
+        {
+          "requested_language": "en",
+          "resolver_model": "parakeet-tdt-0.6b-v3-int8-sherpa",
+          "resolved_model": "parakeet-tdt-0.6b-v3-int8-sherpa",
+          "delegate_class": "LocalParakeetV3SherpaSTTBackend",
+          "session_class": "_LocalQwenSherpaSession",
+          "loaded": true,
+          "num_threads": 2,
+          "runtime_provider": "cpu",
+          "after_source_language_assignment": {
+            "language": "ja",
+            "resolved_model": "parakeet-tdt-0.6b-v3-int8-sherpa",
+            "same_delegate": true,
+            "original_model": "parakeet-tdt-0.6b-v3-int8-sherpa",
+            "observation": "Property assignment only; no application transition invoked"
+          }
+        },
+        {
+          "requested_language": "ko",
+          "resolver_model": "qwen3-asr-0.6b-int8-sherpa",
+          "resolved_model": "qwen3-asr-0.6b-int8-sherpa",
+          "delegate_class": "LocalQwenSherpaSTTBackend",
+          "session_class": "_LocalQwenSherpaSession",
+          "loaded": true,
+          "num_threads": 2,
+          "runtime_provider": "cpu",
+          "after_source_language_assignment": {
+            "language": "ja",
+            "resolved_model": "qwen3-asr-0.6b-int8-sherpa",
+            "same_delegate": true,
+            "original_model": "qwen3-asr-0.6b-int8-sherpa",
+            "observation": "Property assignment only; no application transition invoked"
+          }
+        },
+        {
+          "requested_language": "ja",
+          "resolver_model": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+          "resolved_model": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+          "delegate_class": "LocalParakeetJapaneseSherpaSTTBackend",
+          "session_class": "_LocalQwenSherpaSession",
+          "loaded": true,
+          "num_threads": 2,
+          "runtime_provider": "cpu",
+          "after_source_language_assignment": {
+            "language": "en",
+            "resolved_model": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+            "same_delegate": true,
+            "original_model": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+            "observation": "Property assignment only; no application transition invoked"
+          }
+        }
+      ],
+      "model_root": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models",
+      "actual_auto_install_gate": {
+        "available": true,
+        "states": {
+          "parakeet-tdt-0.6b-v3-int8-sherpa": "ready",
+          "parakeet-tdt-ctc-0.6b-ja-int8-sherpa": "ready",
+          "qwen3-asr-0.6b-int8-sherpa": "ready"
+        }
+      },
+      "audio": {
+        "shared_no": {
+          "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+          "sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+          "pcm_sha256": "7ecb58a91e9b6b77aa497c3f98aa336fde279f326b49364867ce5b9fffb0570d",
+          "samples": 18160,
+          "seconds": 1.135,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_width_bytes": 2,
+          "mapping": null
+        },
+        "local_no_trim": {
+          "path": "docs\\experiments\\issue-212-clarification\\audio\\local_no_trim.wav",
+          "sha256": "e474e0808b047ccbc2a678a22531adc9599cd07a2a5fccea0e7be8047b777c49",
+          "pcm_sha256": "cb998cbfc4cef3e63e8daf7fd252dccc6c27b94ce95c169470e1a0b0101cd2ca",
+          "samples": 5760,
+          "seconds": 0.36,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_width_bytes": 2,
+          "mapping": {
+            "parent": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+            "parent_sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+            "sample_range": [
+              1200,
+              6960
+            ],
+            "rule": "Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold"
+          }
+        },
+        "shared_correction": {
+          "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+          "sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+          "pcm_sha256": "cb204865bc4501df69f9e613bae31aad2557d1b63ec43237f46f6ef5279d84de",
+          "samples": 30720,
+          "seconds": 1.92,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_width_bytes": 2,
+          "mapping": null
+        },
+        "local_correction_trim": {
+          "path": "docs\\experiments\\issue-212-clarification\\audio\\local_correction_trim.wav",
+          "sha256": "34a41d87d8752cc290945044af90309c36d7076c0a1f236394a095a78d7eadac",
+          "pcm_sha256": "b4a3f39ebd49960ca8ceca005524ffc93500ac85f93abb1e382357ae8b672f16",
+          "samples": 17839,
+          "seconds": 1.1149375,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_width_bytes": 2,
+          "mapping": {
+            "parent": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+            "parent_sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+            "sample_range": [
+              1280,
+              19119
+            ],
+            "rule": "Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold"
+          }
+        },
+        "local_old_no_300ms_then_correction": {
+          "path": "docs\\experiments\\issue-212-clarification\\audio\\local_old_no_300ms_then_correction.wav",
+          "sha256": "f9e21c5b07e0c5ba6c9f3eaa4fff6706fc83a26e825a7f80d42c875bc609ef41",
+          "pcm_sha256": "7beb0f0d2a168d9f30023a071f325aec185ff7c08854b760d62719823419d07f",
+          "samples": 22639,
+          "seconds": 1.4149375,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_width_bytes": 2,
+          "mapping": {
+            "pieces": [
+              {
+                "input_range": [
+                  0,
+                  4800
+                ],
+                "source": "docs\\experiments\\issue-212-clarification\\audio\\local_no_trim.wav",
+                "source_range": [
+                  960,
+                  5760
+                ],
+                "ownership": "already_owned_context_only"
+              },
+              {
+                "input_range": [
+                  4800,
+                  22639
+                ],
+                "source": "docs\\experiments\\issue-212-clarification\\audio\\local_correction_trim.wav",
+                "source_range": [
+                  0,
+                  17839
+                ],
+                "ownership": "new_content"
+              }
+            ]
+          }
+        },
+        "local_ja_first_6s": {
+          "path": "docs\\experiments\\issue-212-clarification\\audio\\local_ja_first_6s.wav",
+          "sha256": "5f9995fe26963e69026e6a8bd46d1f2f8612a60812998d6dec5f98fba13ef50d",
+          "pcm_sha256": "7c6f533e506e5df8c0fa97d8552b0e9069f084821a1dde4787dbcfd4f25f71ea",
+          "samples": 96000,
+          "seconds": 6.0,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_width_bytes": 2,
+          "mapping": {
+            "public_source_url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/bef18eb066808c90bd0f5df5be685767b0732de8/test_wavs/test_ja_1.wav",
+            "public_sha256": "09abd330ce706a6e6969fe6bbc8275314af631fcee4e536afd0626570d263fbf",
+            "original_format": {
+              "rate": 48000,
+              "channels": 1,
+              "width": 2,
+              "frames": 624000
+            },
+            "selected_normalized_range": [
+              0,
+              96000
+            ],
+            "transcript_reference": "日本語ちゃんと聞き取れてますかちゃんと聞こえてんのちゃんと聞こえてるのじゃあマイクを持ってもらって",
+            "reference_scope": "Full upstream sample; not a claimed exact six-second transcript"
+          }
+        },
+        "local_ko": {
+          "path": "docs\\experiments\\issue-212-clarification\\audio\\local_ko.wav",
+          "sha256": "d481624e480fe9605bfc259f21f2f338075818029ea602cb37f13a7695d8208d",
+          "pcm_sha256": "42050aa95db9d36f5439126dd625b349d58183920dfb69871e056d28049313aa",
+          "samples": 45920,
+          "seconds": 2.87,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_width_bytes": 2,
+          "mapping": {
+            "text": "아니요. 삼입니다.",
+            "voice": "Microsoft Heami Desktop"
+          }
+        }
+      },
+      "process_gate_before_en": {
+        "command": [
+          "powershell.exe",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "$p = @(Get-Process -Name VRChat,vrserver,vrcompositor,PuriPulyHeartGpuWorker -ErrorAction SilentlyContinue); ConvertTo-Json -Compress -InputObject @($p | Select-Object ProcessName,Id)"
+        ],
+        "returncode": 0,
+        "matched_processes": []
+      },
+      "cleanup": [
+        {
+          "language": "en",
+          "auto_closed": true,
+          "delegate_released": true
+        },
+        {
+          "language": "ko",
+          "auto_closed": true,
+          "delegate_released": true
+        },
+        {
+          "language": "ja",
+          "auto_closed": true,
+          "delegate_released": true
+        }
+      ],
+      "process_gate_before_ko": {
+        "command": [
+          "powershell.exe",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "$p = @(Get-Process -Name VRChat,vrserver,vrcompositor,PuriPulyHeartGpuWorker -ErrorAction SilentlyContinue); ConvertTo-Json -Compress -InputObject @($p | Select-Object ProcessName,Id)"
+        ],
+        "returncode": 0,
+        "matched_processes": []
+      },
+      "process_gate_before_ja": {
+        "command": [
+          "powershell.exe",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "$p = @(Get-Process -Name VRChat,vrserver,vrcompositor,PuriPulyHeartGpuWorker -ErrorAction SilentlyContinue); ConvertTo-Json -Compress -InputObject @($p | Select-Object ProcessName,Id)"
+        ],
+        "returncode": 0,
+        "matched_processes": []
+      },
+      "auto_resolution": {
+        "en": "parakeet-tdt-0.6b-v3-int8-sherpa",
+        "ja": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+        "ko": "qwen3-asr-0.6b-int8-sherpa",
+        "zh": "qwen3-asr-0.6b-int8-sherpa",
+        "ar": "qwen3-asr-0.6b-int8-sherpa",
+        "uk": "parakeet-tdt-0.6b-v3-int8-sherpa",
+        "xx": "LocalSTTUnsupportedLanguageError: CPU Auto does not support source language: xx"
+      }
+    },
+    "local-results-components.json": {
+      "baseline": "0f0ba5173da51250bb5926e4a2eead5e68adff81",
+      "command": [
+        "docs/experiments/issue-212-clarification/local_probe.py",
+        "components"
+      ],
+      "kind": "Bounded actual production owners with explicitly fake recognizer/member/HTTP/WebSocket; no server or acoustic certification",
+      "claims": {
+        "A-selection": [
+          {
+            "requested_provider": "local_cpu_auto",
+            "effective_provider": "local_cpu_auto",
+            "source_language": "en",
+            "model_id": "parakeet-tdt-0.6b-v3-int8-sherpa",
+            "supported": true,
+            "fallback_applied": false
+          },
+          {
+            "requested_provider": "local_cpu_auto",
+            "effective_provider": "local_cpu_auto",
+            "source_language": "ja",
+            "model_id": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+            "supported": true,
+            "fallback_applied": false
+          },
+          {
+            "requested_provider": "local_cpu_auto",
+            "effective_provider": "local_cpu_auto",
+            "source_language": "ko",
+            "model_id": "qwen3-asr-0.6b-int8-sherpa",
+            "supported": true,
+            "fallback_applied": false
+          },
+          {
+            "requested_provider": "local_cpu_auto",
+            "effective_provider": "local_cpu_auto",
+            "source_language": "xx",
+            "model_id": null,
+            "supported": false,
+            "fallback_applied": false
+          },
+          {
+            "requested_provider": "local_cpu_auto",
+            "effective_provider": "local_qwen",
+            "source_language": "en",
+            "model_id": "qwen3-asr-0.6b-int8-sherpa",
+            "supported": true,
+            "fallback_applied": true
+          },
+          {
+            "requested_provider": "local_parakeet_ja",
+            "effective_provider": "local_qwen",
+            "source_language": "en",
+            "model_id": "qwen3-asr-0.6b-int8-sherpa",
+            "supported": true,
+            "fallback_applied": true
+          }
+        ],
+        "A-queued-options": {
+          "request_languages": [
+            "en",
+            "ja"
+          ],
+          "observed_decode_options": [
+            {
+              "options": {
+                "language": "Japanese"
+              },
+              "samples": 160
+            },
+            {
+              "options": {
+                "language": "Japanese"
+              },
+              "samples": 160
+            }
+          ],
+          "terminals": [
+            {
+              "identity": {
+                "segment": {
+                  "activation_generation": 1,
+                  "segment_order": 1,
+                  "segment_id": "509603a8-b224-4b0c-a98a-faf3f94f3cd3",
+                  "capture_epoch": 1
+                },
+                "provider_epoch_id": "epoch-options",
+                "provider_turn_id": "options-1",
+                "settings_scope": []
+              },
+              "outcome": "final",
+              "text": "no",
+              "final_language_runs": [],
+              "final_speaker_runs": [],
+              "text_authority": "authoritative",
+              "failure_reason": null,
+              "epoch_disposition": "reuse",
+              "failure_retryable": false,
+              "recovery_pending": false,
+              "provenance": [],
+              "included_contributions": []
+            },
+            {
+              "identity": {
+                "segment": {
+                  "activation_generation": 1,
+                  "segment_order": 2,
+                  "segment_id": "dc99745f-f835-41ee-866d-15a19cad1d74",
+                  "capture_epoch": 1
+                },
+                "provider_epoch_id": "epoch-options",
+                "provider_turn_id": "options-2",
+                "settings_scope": []
+              },
+              "outcome": "final",
+              "text": "no",
+              "final_language_runs": [],
+              "final_speaker_runs": [],
+              "text_authority": "authoritative",
+              "failure_reason": null,
+              "epoch_disposition": "reuse",
+              "failure_retryable": false,
+              "recovery_pending": false,
+              "provenance": [],
+              "included_contributions": []
+            }
+          ],
+          "different_equal_text_identities": true,
+          "first_request_retains_English_options": false,
+          "result": "Current production queued decode reads reconfigured language; immutable request settings do not snapshot native options"
+        },
+        "A-Rolling-late": {
+          "old_member_after_new_open": "elevenlabs_scribe",
+          "new_member": "gemini_transcribe",
+          "old_identity_preserved": true,
+          "old_identity_rejected_by_new": true,
+          "new_identity_preserved": true,
+          "replay_reuses_identity": true,
+          "equal_text_different_identity": true,
+          "delegated_old_controls": [
+            [
+              "end_stream",
+              "source_discontinuity"
+            ]
+          ]
+        },
+        "A-Rolling-discontinuity": {
+          "new_stream": true,
+          "terminal_texts": [
+            "no",
+            "no"
+          ],
+          "terminal_identities": [
+            {
+              "stream": {
+                "channel": "peer",
+                "activation_generation": 3,
+                "capture_epoch": 1,
+                "provider_epoch_id": "a7d180b4f9374f28aa9e01a30b31538a",
+                "settings_scope": [
+                  "rolling_free",
+                  [
+                    "a"
+                  ],
+                  [
+                    "a"
+                  ]
+                ]
+              },
+              "unit_id": "45f81107-e191-4c70-915a-d0a31ae43bc7",
+              "receipt_sequence": 1
+            },
+            {
+              "stream": {
+                "channel": "peer",
+                "activation_generation": 3,
+                "capture_epoch": 1,
+                "provider_epoch_id": "a7d180b4f9374f28aa9e01a30b31538a",
+                "settings_scope": [
+                  "rolling_free",
+                  [
+                    "a"
+                  ],
+                  [
+                    "a"
+                  ]
+                ]
+              },
+              "unit_id": "f87e0ed6-2109-4d36-800d-28e0e57ce2c4",
+              "receipt_sequence": 2
+            }
+          ],
+          "old_controls": [
+            [
+              "stop"
+            ],
+            [
+              "close"
+            ]
+          ],
+          "all_old_calls": [
+            "('begin', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=3, segment_order=1, segment_id=UUID('15ccf946-ba2c-4f7a-b3f8-7eba4d690277'), capture_epoch=1), provider_epoch_id='9309de4ba43041b7975c17f5dac0fa51', provider_turn_id='19fe81c4dd52418eb68158cf0d314276', settings_scope=('rolling_free', ('a',), ('a',))))",
+            "('begin_done', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=3, segment_order=1, segment_id=UUID('15ccf946-ba2c-4f7a-b3f8-7eba4d690277'), capture_epoch=1), provider_epoch_id='9309de4ba43041b7975c17f5dac0fa51', provider_turn_id='19fe81c4dd52418eb68158cf0d314276', settings_scope=('rolling_free', ('a',), ('a',))))",
+            "('seal', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=3, segment_order=1, segment_id=UUID('15ccf946-ba2c-4f7a-b3f8-7eba4d690277'), capture_epoch=1), provider_epoch_id='9309de4ba43041b7975c17f5dac0fa51', provider_turn_id='19fe81c4dd52418eb68158cf0d314276', settings_scope=('rolling_free', ('a',), ('a',))), (AudioCaptureSpan(capture_epoch=1, callback_sequence=1, source_sample_rate_hz=16000, source_start_sample=2, source_end_sample=10, source_start_monotonic_s=0.000125, source_end_monotonic_s=0.000625, discontinuity_before=None, normalized_sample_rate_hz=16000, normalized_start_sample=2, normalized_end_sample=10),), 'silence', 224)",
+            "('seal_done', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=3, segment_order=1, segment_id=UUID('15ccf946-ba2c-4f7a-b3f8-7eba4d690277'), capture_epoch=1), provider_epoch_id='9309de4ba43041b7975c17f5dac0fa51', provider_turn_id='19fe81c4dd52418eb68158cf0d314276', settings_scope=('rolling_free', ('a',), ('a',))))",
+            "('stop',)",
+            "('close',)"
+          ],
+          "stale_rejected_replay_ignored_repetition_retained": true
+        },
+        "C-configured-target": {
+          "mode": "offline",
+          "compatibility": "openai_transcription",
+          "endpoint_present": false,
+          "model_present": false,
+          "extra_model_present": false,
+          "named_server": "blocked when endpoint/model absent; no endpoint calls performed"
+        },
+        "C-offline-local-protocol": {
+          "requests": [
+            {
+              "url": "http://example.invalid/v1/audio/transcriptions?model=extra-model",
+              "form": {
+                "language": "en",
+                "model": "extra-model"
+              },
+              "wav": {
+                "rate": 16000,
+                "channels": 1,
+                "width": 2,
+                "frames": 5760,
+                "pcm_sha256": "cb998cbfc4cef3e63e8daf7fd252dccc6c27b94ce95c169470e1a0b0101cd2ca"
+              }
+            }
+          ],
+          "returned_text": "no no",
+          "input_pcm_sha256": "cb998cbfc4cef3e63e8daf7fd252dccc6c27b94ce95c169470e1a0b0101cd2ca",
+          "upstream_extra_fields": [
+            "words",
+            "segments",
+            "language",
+            "server_revision"
+          ],
+          "preserved_value_type": "str",
+          "fixture_not_named_server": true
+        },
+        "C-realtime-local-format": {
+          "connect": [
+            {
+              "url": "ws://example.invalid/v1/realtime?model=declared-model",
+              "headers": {
+                "OpenAI-Beta": "realtime=v1"
+              }
+            }
+          ],
+          "session_update": {
+            "type": "session.update",
+            "session": {
+              "input_audio_transcription": {
+                "model": "declared-model",
+                "language": "en"
+              },
+              "turn_detection": null
+            }
+          },
+          "append_bytes": 11520,
+          "append_pcm_sha256": "cb998cbfc4cef3e63e8daf7fd252dccc6c27b94ce95c169470e1a0b0101cd2ca",
+          "adapter_rate": 16000,
+          "wire_rate_declared": false,
+          "fixture_not_named_server": true
+        }
+      },
+      "cleanup": {
+        "fake_cpu_backend_closed": true,
+        "fake_http_client_closed": true,
+        "fake_websocket_closed": true,
+        "engine_closed": true
+      }
+    },
+    "local-results-rolling.json": {
+      "baseline": "0f0ba5173da51250bb5926e4a2eead5e68adff81",
+      "command": [
+        "docs/experiments/issue-212-clarification/local_probe.py",
+        "rolling-scoped"
+      ],
+      "kind": "Actual Rolling wrapper with fake scoped Scribe and independent Gemini member sessions; no wire server",
+      "old_member": "elevenlabs_scribe",
+      "new_member": "gemini_transcribe",
+      "old_member_independent": false,
+      "new_member_independent": true,
+      "late_old_terminal": {
+        "identity": {
+          "segment": {
+            "activation_generation": 1,
+            "segment_order": 1,
+            "segment_id": "7dd4f59a-6e33-4812-a976-0af322f7d5f2",
+            "capture_epoch": 1
+          },
+          "provider_epoch_id": "scribe-old",
+          "provider_turn_id": "first",
+          "settings_scope": []
+        },
+        "outcome": "final",
+        "text": "no",
+        "final_language_runs": [],
+        "final_speaker_runs": [],
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse",
+        "failure_retryable": false,
+        "recovery_pending": false,
+        "provenance": [],
+        "included_contributions": []
+      },
+      "late_identity_preserved": true,
+      "delegated_control_calls": [
+        "('begin', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('7dd4f59a-6e33-4812-a976-0af322f7d5f2'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()))",
+        "('begin_done', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('7dd4f59a-6e33-4812-a976-0af322f7d5f2'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()))",
+        "('send', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('7dd4f59a-6e33-4812-a976-0af322f7d5f2'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()), 1, 8, (AudioCaptureSpan(capture_epoch=1, callback_sequence=1, source_sample_rate_hz=16000, source_start_sample=0, source_end_sample=4, source_start_monotonic_s=0.0, source_end_monotonic_s=0.00025, discontinuity_before=None, normalized_sample_rate_hz=16000, normalized_start_sample=0, normalized_end_sample=4),), False)",
+        "('send_done', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('7dd4f59a-6e33-4812-a976-0af322f7d5f2'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()), 1)",
+        "('seal', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('7dd4f59a-6e33-4812-a976-0af322f7d5f2'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()), (AudioCaptureSpan(capture_epoch=1, callback_sequence=1, source_sample_rate_hz=16000, source_start_sample=0, source_end_sample=4, source_start_monotonic_s=0.0, source_end_monotonic_s=0.00025, discontinuity_before=None, normalized_sample_rate_hz=16000, normalized_start_sample=0, normalized_end_sample=4),), 'hardcut', 0)",
+        "('seal_done', STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('7dd4f59a-6e33-4812-a976-0af322f7d5f2'), capture_epoch=1), provider_epoch_id='scribe-old', provider_turn_id='first', settings_scope=()))"
+      ],
+      "old_seal_count": 1,
+      "automatic_successor_seal_count": 0,
+      "scope_note": "Corrects the mechanical remapper fixture's artificial independent Scribe capability; does not certify Scribe wire finalization or billing",
+      "cleanup": {
+        "old_closed": true,
+        "new_closed": true
+      }
+    },
+    "local-results-gpu.json": {
+      "baseline": "0f0ba5173da51250bb5926e4a2eead5e68adff81",
+      "command": [
+        "docs/experiments/issue-212-clarification/local_probe.py",
+        "gpu"
+      ],
+      "process_gate": {
+        "command": [
+          "powershell.exe",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "$p = @(Get-Process -Name VRChat,vrserver,vrcompositor,PuriPulyHeartGpuWorker -ErrorAction SilentlyContinue); ConvertTo-Json -Compress -InputObject @($p | Select-Object ProcessName,Id)"
+        ],
+        "returncode": 0,
+        "matched_processes": []
+      },
+      "selected_worker": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\build\\gpu_worker\\PuriPulyHeartGpuWorker.exe",
+      "worker_size": 77884416,
+      "worker_sha256": "5ee4541f289e7aebb76808d3375dd45059518307aa67dee6d91d51cb28cc990d",
+      "binary_source_revision": "unknown; explicit parent staged binary, not certified as candidate source build",
+      "gpu_model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart\\models\\qwen3-asr-1.7b-q6-k-transcribe-vulkan\\Qwen3-ASR-1.7B-Q6_K.gguf",
+      "gpu_model_present": false,
+      "scope": "Authenticated protocol2 startup and Vulkan discover only; no activate/warmup/transcribe/Nemotron",
+      "authenticated_contract2": true,
+      "devices": [
+        {
+          "device_id": "vulkan-index-0",
+          "registry_index": 0,
+          "name": "Vulkan0",
+          "description": "AMD Radeon RX 7900 XTX",
+          "device_type": "gpu",
+          "memory_total_bytes": 25753026560,
+          "memory_free_bytes": 24890653872
+        }
+      ],
+      "cleanup": {
+        "closed": true,
+        "returncode": 0
+      }
+    },
+    "local-results-gpu-mode-error.json": {
+      "baseline": "0f0ba5173da51250bb5926e4a2eead5e68adff81",
+      "command": "../../../.venv/Scripts/python.exe docs/experiments/issue-212-clarification/local_probe.py gpu",
+      "selected_worker": "C:/Users/salee/Documents/dev/puripuly_heart/build/gpu_worker/PuriPulyHeartGpuWorker.exe",
+      "worker_size": 77884416,
+      "worker_sha256": "5ee4541f289e7aebb76808d3375dd45059518307aa67dee6d91d51cb28cc990d",
+      "process_gate_matched": [],
+      "gpu_model_present": false,
+      "error": "GpuWorkerClosedError: worker exited before authentication with code 10",
+      "probe_error": "Experiment initially supplied invalid launch mode asr; native protocol supports discovery/persistent only. Exit 10 is launch-manifest rejection, not device or inference evidence. Corrected subsequent experiment uses discovery; no product repair.",
+      "authentication_completed": false,
+      "inference_attempted": false
+    }
+  },
+  "run_version_mapping": {
+    "real": "9862-real",
+    "components": "CA0A-components-invalid-gpu",
+    "initial invalidmode GPU": "CA0A-components-invalid-gpu",
+    "corrected discovery GPU": "E7C5-discovery-gpu",
+    "rolling-scoped": "A734-final-rolling"
+  }
+}

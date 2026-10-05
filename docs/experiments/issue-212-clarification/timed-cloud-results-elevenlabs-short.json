@@ -1,0 +1,427 @@
+{
+  "revision": "TIMED-CLOUD-WIRE-1",
+  "environment": {
+    "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "versions": {
+      "websockets": "16.1.1",
+      "deepgram-sdk": "5.3.4",
+      "elevenlabs": "2.65.0"
+    },
+    "source_sha256": {
+      "docs\\experiments\\issue-212-clarification\\timed_cloud_probe.py": "8f7beab760d50bc4e1ea5a0a72e9d321dcdae4b748582329d6e8c9590c492494",
+      "docs\\experiments\\issue-212-clarification\\common.py": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+      "docs\\asr-speaker-policy.md": "50afb6a8385705e1138eac7da71a8e80a62bf3f53cdec0993549738eb0229f5f",
+      "docs\\experiments\\issue-212\\evidence.md": "04cfa4bb3c609d5578cecfa5bbfc1934145b3676be148cc6341b2a1883ffe2a4"
+    },
+    "configured_routes": {
+      "soniox": {
+        "model": "stt-rt-v5",
+        "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket"
+      },
+      "deepgram": {
+        "model": "nova-3",
+        "endpoint": "wss://api.deepgram.com/v1/listen"
+      },
+      "elevenlabs": {
+        "model": "scribe_v2_realtime",
+        "endpoint": "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+      }
+    },
+    "audio": {
+      "a": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_a.wav",
+        "wav_sha256": "de9319443c5cebf7c0dd33eccb2eeb8b3219edb2b2adf42c1c2caab539360cbe",
+        "pcm_sha256": "fa4f27683fa43b4556a76da9b51d565039f5da424f04c54503db1da5b1325273",
+        "samples": 31120,
+        "duration_s": 1.945,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1796,
+          "active_end_sample_exclusive": 19242,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1476,
+          "end_sample_exclusive": 19562,
+          "duration_s": 1.130375,
+          "sha256": "1631dc77e659b172c23bb8ae645561575c0671de908c73002aa0814f0c92945d"
+        },
+        "active_trim": {
+          "start_sample": 1796,
+          "end_sample_exclusive": 19242,
+          "duration_s": 1.090375,
+          "sha256": "88fc76e36f693f0d58edd00bb4e865bb13c37d45f0188d3182504871dcc5384f"
+        }
+      },
+      "b": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_b.wav",
+        "wav_sha256": "0d0fad34b07659f83a03309b06f4314180060aba5687e13951a6e27bd902277d",
+        "pcm_sha256": "50af2eaf21519b0d21813fb9a59a6b1af17b704aef481c913f294f5f3e4cf68b",
+        "samples": 32400,
+        "duration_s": 2.025,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1796,
+          "active_end_sample_exclusive": 20219,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1476,
+          "end_sample_exclusive": 20539,
+          "duration_s": 1.1914375,
+          "sha256": "7a3cb982888651f16a32c97049da93f54d7b5eb9e575ca3bc38be0522ca7fa8a"
+        },
+        "active_trim": {
+          "start_sample": 1796,
+          "end_sample_exclusive": 20219,
+          "duration_s": 1.1514375,
+          "sha256": "fd2e3c50896fa0c00bcdcd116a94833bb2d24528f87ca4fbd39b339869d3eedf"
+        }
+      },
+      "no": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+        "wav_sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+        "pcm_sha256": "7ecb58a91e9b6b77aa497c3f98aa336fde279f326b49364867ce5b9fffb0570d",
+        "samples": 18160,
+        "duration_s": 1.135,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1727,
+          "active_end_sample_exclusive": 6361,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1407,
+          "end_sample_exclusive": 6681,
+          "duration_s": 0.329625,
+          "sha256": "59b6545ada47d8a6000f2fffd787e5a2db5af2a0686ec2bbc7dfc2f804d2af07"
+        },
+        "active_trim": {
+          "start_sample": 1727,
+          "end_sample_exclusive": 6361,
+          "duration_s": 0.289625,
+          "sha256": "2aaee5e1281fe84a0b13003341ed8e7cc8b7a9cd97da9c41e27bcb3e2a0418e2"
+        }
+      },
+      "correction": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+        "wav_sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+        "pcm_sha256": "cb204865bc4501df69f9e613bae31aad2557d1b63ec43237f46f6ef5279d84de",
+        "samples": 30720,
+        "duration_s": 1.92,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1633,
+          "active_end_sample_exclusive": 18862,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1313,
+          "end_sample_exclusive": 19182,
+          "duration_s": 1.1168125,
+          "sha256": "ea76608630cb558d7ae3497a2ebfb56d7829a75703b04643d51dfc43e5717ed1"
+        },
+        "active_trim": {
+          "start_sample": 1633,
+          "end_sample_exclusive": 18862,
+          "duration_s": 1.0768125,
+          "sha256": "c9bca2a2ab81851621c29ad54616e22e48c96c68621c819fef68e1067298d2bc"
+        }
+      }
+    },
+    "wire": "Raw native WebSockets using locked websockets; SDKs and packaged adapters bypassed; no product mutation",
+    "sample_rate": 16000,
+    "format": "mono PCM signed16 little endian",
+    "limits": {
+      "initial_connections_per_provider": 2,
+      "automatic_retries": 0,
+      "audio_ceiling_per_provider_s": 60
+    }
+  },
+  "argv": [
+    "--provider",
+    "elevenlabs",
+    "--sessions",
+    "short",
+    "--output",
+    "docs/experiments/issue-212-clarification/timed-cloud-results-elevenlabs-short.json"
+  ],
+  "prepared_without_connections": false,
+  "provider": "elevenlabs",
+  "sessions": [
+    {
+      "name": "short",
+      "events": [
+        {
+          "ordinal": 1,
+          "elapsed_s": 0.277673,
+          "sent_sample_cursor": 0,
+          "kind": "connected",
+          "endpoint": "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+        },
+        {
+          "ordinal": 2,
+          "elapsed_s": 0.277862,
+          "sent_sample_cursor": 1600,
+          "kind": "audio_written",
+          "label": "short_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 3,
+          "elapsed_s": 0.277923,
+          "sent_sample_cursor": 1600,
+          "kind": "received",
+          "payload": {
+            "message_type": "session_started",
+            "session_id": "session_id-1",
+            "config": {
+              "sample_rate": 16000,
+              "audio_format": "pcm_16000",
+              "language_code": "en",
+              "secondary_languages": [],
+              "timestamps_granularity": "word",
+              "vad_commit_strategy": false,
+              "vad_silence_threshold_secs": 1.5,
+              "vad_threshold": 0.4,
+              "min_speech_duration_ms": 100,
+              "min_silence_duration_ms": 100,
+              "max_tokens_to_recompute": 5,
+              "model_id": "scribe_v2_realtime",
+              "disable_logging": false,
+              "include_timestamps": true,
+              "include_language_detection": false,
+              "filter_background_audio": false,
+              "keyterms": [],
+              "no_verbatim": false,
+              "entity_detection": null,
+              "keepalive_interval_ms": null
+            }
+          }
+        },
+        {
+          "ordinal": 4,
+          "elapsed_s": 0.379791,
+          "sent_sample_cursor": 3200,
+          "kind": "audio_written",
+          "label": "shared_no_energy_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "318a9469f269fba75216eb4098d5b4931af14fa818208e25850069856baa105c"
+        },
+        {
+          "ordinal": 5,
+          "elapsed_s": 0.488289,
+          "sent_sample_cursor": 4800,
+          "kind": "audio_written",
+          "label": "shared_no_energy_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "50f6121e9ec3f6076c2efa6f4721601043951ffff31604bf7ed810f569387ecd"
+        },
+        {
+          "ordinal": 6,
+          "elapsed_s": 0.58211,
+          "sent_sample_cursor": 6400,
+          "kind": "audio_written",
+          "label": "shared_no_energy_trim",
+          "sample_count": 1600,
+          "pcm_sha256": "8753c97aad1d16474c8e3aba835f84cec0223a9e26d54e90c09a437a88c2dd26"
+        },
+        {
+          "ordinal": 7,
+          "elapsed_s": 0.689946,
+          "sent_sample_cursor": 6874,
+          "kind": "audio_written",
+          "label": "shared_no_energy_trim",
+          "sample_count": 474,
+          "pcm_sha256": "2903c77b9386940617b748d1838ff4e6642f82ad0792d636ad67d94019bda432"
+        },
+        {
+          "ordinal": 8,
+          "elapsed_s": 0.720925,
+          "sent_sample_cursor": 8474,
+          "kind": "audio_written",
+          "label": "short_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 9,
+          "elapsed_s": 0.829506,
+          "sent_sample_cursor": 10074,
+          "kind": "audio_written",
+          "label": "short_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 10,
+          "elapsed_s": 0.923085,
+          "sent_sample_cursor": 10074,
+          "kind": "control_written",
+          "control": "finalize"
+        },
+        {
+          "ordinal": 11,
+          "elapsed_s": 1.132716,
+          "sent_sample_cursor": 10074,
+          "kind": "received",
+          "payload": {
+            "message_type": "committed_transcript",
+            "text": "No."
+          }
+        },
+        {
+          "ordinal": 12,
+          "elapsed_s": 1.132762,
+          "sent_sample_cursor": 10074,
+          "kind": "completion_observed",
+          "after_receive_index": 1
+        },
+        {
+          "ordinal": 13,
+          "elapsed_s": 1.149935,
+          "sent_sample_cursor": 10074,
+          "kind": "received",
+          "payload": {
+            "message_type": "committed_transcript_with_timestamps",
+            "text": "No.",
+            "language_code": null,
+            "words": [
+              {
+                "text": "No.",
+                "start": 0.2,
+                "end": 0.36,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.7400709788004557,
+                "characters": [
+                  {
+                    "text": "N",
+                    "start": 0.2,
+                    "end": 0.26
+                  },
+                  {
+                    "text": "o",
+                    "start": 0.26,
+                    "end": 0.36
+                  },
+                  {
+                    "text": ".",
+                    "start": 0.36,
+                    "end": 0.36
+                  }
+                ],
+                "channel_index": null
+              }
+            ]
+          }
+        },
+        {
+          "ordinal": 14,
+          "elapsed_s": 3.932326,
+          "sent_sample_cursor": 10074,
+          "kind": "control_written",
+          "control": "empty_finalize"
+        },
+        {
+          "ordinal": 15,
+          "elapsed_s": 4.110288,
+          "sent_sample_cursor": 10074,
+          "kind": "received",
+          "payload": {
+            "message_type": "commit_throttled",
+            "error": "Commit request ignored: only 0.00s of uncommitted audio. You need at least 0.3s of uncommitted audio before committing."
+          }
+        },
+        {
+          "ordinal": 16,
+          "elapsed_s": 4.110328,
+          "sent_sample_cursor": 10074,
+          "kind": "bounded_observation_ended",
+          "wait_s": 4,
+          "completion_found": false,
+          "note": "Absence is censored, not a universal no-response guarantee"
+        },
+        {
+          "ordinal": 17,
+          "elapsed_s": 4.110335,
+          "sent_sample_cursor": 10074,
+          "kind": "bounded_observation_ended",
+          "wait_s": 1,
+          "completion_found": false,
+          "note": "Absence is censored, not a universal no-response guarantee"
+        },
+        {
+          "ordinal": 18,
+          "elapsed_s": 4.110342,
+          "sent_sample_cursor": 10074,
+          "kind": "client_close_requested"
+        },
+        {
+          "ordinal": 19,
+          "elapsed_s": 4.289569,
+          "sent_sample_cursor": 10074,
+          "kind": "transport_closed",
+          "code": 1000,
+          "reason": "commit_throttled"
+        }
+      ],
+      "input_map": [
+        {
+          "label": "short_leading_silence",
+          "provider_start_sample": 0,
+          "provider_end_sample": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "shared_no_energy_trim",
+          "provider_start_sample": 1600,
+          "provider_end_sample": 6874,
+          "pcm_sha256": "59b6545ada47d8a6000f2fffd787e5a2db5af2a0686ec2bbc7dfc2f804d2af07",
+          "source": "shared_no.wav:trim",
+          "synthetic_no_source": false
+        },
+        {
+          "label": "short_trailing_silence",
+          "provider_start_sample": 6874,
+          "provider_end_sample": 10074,
+          "pcm_sha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+          "source": null,
+          "synthetic_no_source": true
+        }
+      ],
+      "controls": [
+        {
+          "kind": "finalize",
+          "cursor_samples": 10074,
+          "elapsed_s": 0.923103
+        },
+        {
+          "kind": "empty_finalize",
+          "cursor_samples": 10074,
+          "elapsed_s": 3.93235
+        }
+      ],
+      "status": "provider-error",
+      "options": {
+        "model_id": "scribe_v2_realtime",
+        "audio_format": "pcm_16000",
+        "sample_rate": 16000,
+        "commit_strategy": "manual",
+        "language_code": "en",
+        "include_timestamps": "true",
+        "include_language_detection": "false",
+        "no_verbatim": "false",
+        "filter_background_audio": "false"
+      },
+      "sent_samples": 10074,
+      "sent_audio_s": 0.629625,
+      "wall_s": 4.289639
+    }
+  ],
+  "provider_branch_stopped": "error: no retries or further sessions"
+}

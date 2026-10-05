@@ -1,0 +1,2003 @@
+{
+  "revision": "TIMED-CLOUD-WIRE-1",
+  "environment": {
+    "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "versions": {
+      "websockets": "16.1.1",
+      "deepgram-sdk": "5.3.4",
+      "elevenlabs": "2.65.0"
+    },
+    "source_sha256": {
+      "docs\\experiments\\issue-212-clarification\\timed_cloud_probe.py": "9833a0ca16ba2bff7af4a94c4b0d2e6601164ab077cc68b4a6c7447ba8dd9d89",
+      "docs\\experiments\\issue-212-clarification\\common.py": "29e86a17b52b41a43404b1ad99b02591fbea19ae8fa7bb1f2808b03df484564a",
+      "docs\\asr-speaker-policy.md": "50afb6a8385705e1138eac7da71a8e80a62bf3f53cdec0993549738eb0229f5f",
+      "docs\\experiments\\issue-212\\evidence.md": "04cfa4bb3c609d5578cecfa5bbfc1934145b3676be148cc6341b2a1883ffe2a4"
+    },
+    "configured_routes": {
+      "soniox": {
+        "model": "stt-rt-v5",
+        "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket"
+      },
+      "deepgram": {
+        "model": "nova-3",
+        "endpoint": "wss://api.deepgram.com/v1/listen"
+      },
+      "elevenlabs": {
+        "model": "scribe_v2_realtime",
+        "endpoint": "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+      }
+    },
+    "audio": {
+      "a": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_a.wav",
+        "wav_sha256": "de9319443c5cebf7c0dd33eccb2eeb8b3219edb2b2adf42c1c2caab539360cbe",
+        "pcm_sha256": "fa4f27683fa43b4556a76da9b51d565039f5da424f04c54503db1da5b1325273",
+        "samples": 31120,
+        "duration_s": 1.945,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1796,
+          "active_end_sample_exclusive": 19242,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1476,
+          "end_sample_exclusive": 19562,
+          "duration_s": 1.130375,
+          "sha256": "1631dc77e659b172c23bb8ae645561575c0671de908c73002aa0814f0c92945d"
+        },
+        "active_trim": {
+          "start_sample": 1796,
+          "end_sample_exclusive": 19242,
+          "duration_s": 1.090375,
+          "sha256": "88fc76e36f693f0d58edd00bb4e865bb13c37d45f0188d3182504871dcc5384f"
+        }
+      },
+      "b": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_b.wav",
+        "wav_sha256": "0d0fad34b07659f83a03309b06f4314180060aba5687e13951a6e27bd902277d",
+        "pcm_sha256": "50af2eaf21519b0d21813fb9a59a6b1af17b704aef481c913f294f5f3e4cf68b",
+        "samples": 32400,
+        "duration_s": 2.025,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1796,
+          "active_end_sample_exclusive": 20219,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1476,
+          "end_sample_exclusive": 20539,
+          "duration_s": 1.1914375,
+          "sha256": "7a3cb982888651f16a32c97049da93f54d7b5eb9e575ca3bc38be0522ca7fa8a"
+        },
+        "active_trim": {
+          "start_sample": 1796,
+          "end_sample_exclusive": 20219,
+          "duration_s": 1.1514375,
+          "sha256": "fd2e3c50896fa0c00bcdcd116a94833bb2d24528f87ca4fbd39b339869d3eedf"
+        }
+      },
+      "no": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+        "wav_sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+        "pcm_sha256": "7ecb58a91e9b6b77aa497c3f98aa336fde279f326b49364867ce5b9fffb0570d",
+        "samples": 18160,
+        "duration_s": 1.135,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1727,
+          "active_end_sample_exclusive": 6361,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1407,
+          "end_sample_exclusive": 6681,
+          "duration_s": 0.329625,
+          "sha256": "59b6545ada47d8a6000f2fffd787e5a2db5af2a0686ec2bbc7dfc2f804d2af07"
+        },
+        "active_trim": {
+          "start_sample": 1727,
+          "end_sample_exclusive": 6361,
+          "duration_s": 0.289625,
+          "sha256": "2aaee5e1281fe84a0b13003341ed8e7cc8b7a9cd97da9c41e27bcb3e2a0418e2"
+        }
+      },
+      "correction": {
+        "path": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+        "wav_sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+        "pcm_sha256": "cb204865bc4501df69f9e613bae31aad2557d1b63ec43237f46f6ef5279d84de",
+        "samples": 30720,
+        "duration_s": 1.92,
+        "energy_annotation": {
+          "absolute_pcm_threshold": 200,
+          "active_start_sample": 1633,
+          "active_end_sample_exclusive": 18862,
+          "not_forced_alignment": true
+        },
+        "trim": {
+          "start_sample": 1313,
+          "end_sample_exclusive": 19182,
+          "duration_s": 1.1168125,
+          "sha256": "ea76608630cb558d7ae3497a2ebfb56d7829a75703b04643d51dfc43e5717ed1"
+        },
+        "active_trim": {
+          "start_sample": 1633,
+          "end_sample_exclusive": 18862,
+          "duration_s": 1.0768125,
+          "sha256": "c9bca2a2ab81851621c29ad54616e22e48c96c68621c819fef68e1067298d2bc"
+        }
+      }
+    },
+    "wire": "Raw native WebSockets using locked websockets; SDKs and packaged adapters bypassed; no product mutation",
+    "sample_rate": 16000,
+    "format": "mono PCM signed16 little endian",
+    "limits": {
+      "initial_connections_per_provider": 2,
+      "automatic_retries": 0,
+      "audio_ceiling_per_provider_s": 60
+    }
+  },
+  "argv": [
+    "--provider",
+    "elevenlabs",
+    "--output",
+    "docs/experiments/issue-212-clarification/timed-cloud-results-elevenlabs.json"
+  ],
+  "prepared_without_connections": false,
+  "provider": "elevenlabs",
+  "sessions": [
+    {
+      "name": "normal",
+      "events": [
+        {
+          "ordinal": 1,
+          "elapsed_s": 0.488736,
+          "sent_sample_cursor": 0,
+          "kind": "connected",
+          "endpoint": "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+        },
+        {
+          "ordinal": 2,
+          "elapsed_s": 0.489003,
+          "sent_sample_cursor": 1600,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 3,
+          "elapsed_s": 0.489078,
+          "sent_sample_cursor": 1600,
+          "kind": "received",
+          "payload": {
+            "message_type": "session_started",
+            "session_id": "session_id-1",
+            "config": {
+              "sample_rate": 16000,
+              "audio_format": "pcm_16000",
+              "language_code": "en",
+              "secondary_languages": [],
+              "timestamps_granularity": "word",
+              "vad_commit_strategy": false,
+              "vad_silence_threshold_secs": 1.5,
+              "vad_threshold": 0.4,
+              "min_speech_duration_ms": 100,
+              "min_silence_duration_ms": 100,
+              "max_tokens_to_recompute": 5,
+              "model_id": "scribe_v2_realtime",
+              "disable_logging": false,
+              "include_timestamps": true,
+              "include_language_detection": false,
+              "filter_background_audio": false,
+              "keyterms": [],
+              "no_verbatim": false,
+              "entity_detection": null,
+              "keepalive_interval_ms": null
+            }
+          }
+        },
+        {
+          "ordinal": 4,
+          "elapsed_s": 0.593081,
+          "sent_sample_cursor": 3200,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 5,
+          "elapsed_s": 0.703165,
+          "sent_sample_cursor": 4800,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 6,
+          "elapsed_s": 0.795623,
+          "sent_sample_cursor": 6400,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 7,
+          "elapsed_s": 0.889948,
+          "sent_sample_cursor": 8000,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 8,
+          "elapsed_s": 0.998928,
+          "sent_sample_cursor": 9600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "9846d79a24378082cfd9e78bd71f3f1cbdad11d9aca5aa8b9b3c5ada7326539a"
+        },
+        {
+          "ordinal": 9,
+          "elapsed_s": 1.107251,
+          "sent_sample_cursor": 11200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "06cc5dffb513bedfa782982a162c7f98740075e3ea3244b2fef8e2a99a2c90cf"
+        },
+        {
+          "ordinal": 10,
+          "elapsed_s": 1.200765,
+          "sent_sample_cursor": 12800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "2cfb71bd5336cacb28cb3c15671db7f287151dbc6f45babde1158a33bad4776a"
+        },
+        {
+          "ordinal": 11,
+          "elapsed_s": 1.309249,
+          "sent_sample_cursor": 14400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "536e69c139f5a967da251625a3b030d518752f3366eec9834c9f3639d6d605cb"
+        },
+        {
+          "ordinal": 12,
+          "elapsed_s": 1.402283,
+          "sent_sample_cursor": 16000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "ff72cb373a8b02ec427db7873540b4a95575d04a610934602a43fe6b811ddbb3"
+        },
+        {
+          "ordinal": 13,
+          "elapsed_s": 1.511447,
+          "sent_sample_cursor": 17600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "8b49d08006a79876ad60915891084233bb7e48585c1a40da3654c486c4004e7b"
+        },
+        {
+          "ordinal": 14,
+          "elapsed_s": 1.603958,
+          "sent_sample_cursor": 19200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "af0b5527980db1c2d5477f5a72b83a8ce9043af76759c2ca350557f571390c37"
+        },
+        {
+          "ordinal": 15,
+          "elapsed_s": 1.713375,
+          "sent_sample_cursor": 20800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "df6891f838adb0c96950f26f2ca4408d6f506dd47eec29fee2508d769cf63d43"
+        },
+        {
+          "ordinal": 16,
+          "elapsed_s": 1.806242,
+          "sent_sample_cursor": 22400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "378813344f230b811b33e256cfec32ffa7b2bd4187784f824eef881f7b123da3"
+        },
+        {
+          "ordinal": 17,
+          "elapsed_s": 1.914574,
+          "sent_sample_cursor": 24000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5855f8380cab2ec9eb65bf62387c3fbffafc51f08d28104e01c8dd08c98d03e1"
+        },
+        {
+          "ordinal": 18,
+          "elapsed_s": 2.00759,
+          "sent_sample_cursor": 25600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "f8f8b0606dca3ebff7caeff940900548882e8b96653dfa2f35d7e41a872f6ffa"
+        },
+        {
+          "ordinal": 19,
+          "elapsed_s": 2.10086,
+          "sent_sample_cursor": 27200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5e646e197d8bf4eae401a751d6c0385f8a31340163f22823524c15494efe442a"
+        },
+        {
+          "ordinal": 20,
+          "elapsed_s": 2.20861,
+          "sent_sample_cursor": 28800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "095e617f71af1d91c26eb56b218c1d9b490794b7e436ab6e4ff4cf9a3a7e7e31"
+        },
+        {
+          "ordinal": 21,
+          "elapsed_s": 2.301669,
+          "sent_sample_cursor": 30400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 22,
+          "elapsed_s": 2.410065,
+          "sent_sample_cursor": 32000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 23,
+          "elapsed_s": 2.503226,
+          "sent_sample_cursor": 33600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 24,
+          "elapsed_s": 2.611618,
+          "sent_sample_cursor": 35200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 25,
+          "elapsed_s": 2.705678,
+          "sent_sample_cursor": 36800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 26,
+          "elapsed_s": 2.713973,
+          "sent_sample_cursor": 36800,
+          "kind": "received",
+          "payload": {
+            "message_type": "partial_transcript",
+            "text": "The"
+          }
+        },
+        {
+          "ordinal": 27,
+          "elapsed_s": 2.814266,
+          "sent_sample_cursor": 38400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 28,
+          "elapsed_s": 2.814569,
+          "sent_sample_cursor": 38400,
+          "kind": "received",
+          "payload": {
+            "message_type": "partial_transcript",
+            "text": "The red boat is ready."
+          }
+        },
+        {
+          "ordinal": 29,
+          "elapsed_s": 2.907317,
+          "sent_sample_cursor": 39120,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 720,
+          "pcm_sha256": "52dbd4365b026555e3382c056240376d3aa319c7e46c1aa7c38caa4883570517"
+        },
+        {
+          "ordinal": 30,
+          "elapsed_s": 2.953497,
+          "sent_sample_cursor": 40720,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 31,
+          "elapsed_s": 3.06259,
+          "sent_sample_cursor": 42320,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 32,
+          "elapsed_s": 3.156476,
+          "sent_sample_cursor": 43920,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 33,
+          "elapsed_s": 3.265395,
+          "sent_sample_cursor": 45520,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 34,
+          "elapsed_s": 3.358733,
+          "sent_sample_cursor": 47120,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 35,
+          "elapsed_s": 3.466654,
+          "sent_sample_cursor": 48000,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 880,
+          "pcm_sha256": "52e28210c0be3be4e312d3ec209b5c49fc69abdd4c4aed923f1ce29ad25b0350"
+        },
+        {
+          "ordinal": 36,
+          "elapsed_s": 3.513204,
+          "sent_sample_cursor": 48000,
+          "kind": "control_written",
+          "control": "finalize"
+        },
+        {
+          "ordinal": 37,
+          "elapsed_s": 3.721822,
+          "sent_sample_cursor": 48000,
+          "kind": "received",
+          "payload": {
+            "message_type": "partial_transcript",
+            "text": "The red boat is ready."
+          }
+        },
+        {
+          "ordinal": 38,
+          "elapsed_s": 3.791134,
+          "sent_sample_cursor": 48000,
+          "kind": "received",
+          "payload": {
+            "message_type": "committed_transcript",
+            "text": "The red boat is ready."
+          }
+        },
+        {
+          "ordinal": 39,
+          "elapsed_s": 3.791164,
+          "sent_sample_cursor": 48000,
+          "kind": "completion_observed",
+          "after_receive_index": 3
+        },
+        {
+          "ordinal": 40,
+          "elapsed_s": 3.791288,
+          "sent_sample_cursor": 49600,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 41,
+          "elapsed_s": 3.806365,
+          "sent_sample_cursor": 49600,
+          "kind": "received",
+          "payload": {
+            "message_type": "committed_transcript_with_timestamps",
+            "text": "The red boat is ready.",
+            "language_code": null,
+            "words": [
+              {
+                "text": "The",
+                "start": 0.64,
+                "end": 0.72,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.7259197235107422,
+                "characters": [
+                  {
+                    "text": "T",
+                    "start": 0.64,
+                    "end": 0.66
+                  },
+                  {
+                    "text": "h",
+                    "start": 0.66,
+                    "end": 0.66
+                  },
+                  {
+                    "text": "e",
+                    "start": 0.66,
+                    "end": 0.72
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 0.72,
+                "end": 0.76,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.8677577972412109,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 0.72,
+                    "end": 0.76
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "red",
+                "start": 0.76,
+                "end": 0.92,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.8497994740804037,
+                "characters": [
+                  {
+                    "text": "r",
+                    "start": 0.76,
+                    "end": 0.8
+                  },
+                  {
+                    "text": "e",
+                    "start": 0.8,
+                    "end": 0.86
+                  },
+                  {
+                    "text": "d",
+                    "start": 0.86,
+                    "end": 0.92
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 0.92,
+                "end": 1.0,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.6304149627685547,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 0.92,
+                    "end": 1.0
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "boat",
+                "start": 1.0,
+                "end": 1.18,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.5739789009094238,
+                "characters": [
+                  {
+                    "text": "b",
+                    "start": 1.0,
+                    "end": 1.04
+                  },
+                  {
+                    "text": "o",
+                    "start": 1.04,
+                    "end": 1.08
+                  },
+                  {
+                    "text": "a",
+                    "start": 1.08,
+                    "end": 1.12
+                  },
+                  {
+                    "text": "t",
+                    "start": 1.12,
+                    "end": 1.18
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 1.18,
+                "end": 1.22,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.8085536956787109,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 1.18,
+                    "end": 1.22
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "is",
+                "start": 1.22,
+                "end": 1.34,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.6337080001831055,
+                "characters": [
+                  {
+                    "text": "i",
+                    "start": 1.22,
+                    "end": 1.3
+                  },
+                  {
+                    "text": "s",
+                    "start": 1.3,
+                    "end": 1.34
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 1.34,
+                "end": 1.38,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.7863559722900391,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 1.34,
+                    "end": 1.38
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "ready.",
+                "start": 1.4,
+                "end": 1.68,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.756219228108724,
+                "characters": [
+                  {
+                    "text": "r",
+                    "start": 1.4,
+                    "end": 1.42
+                  },
+                  {
+                    "text": "e",
+                    "start": 1.42,
+                    "end": 1.44
+                  },
+                  {
+                    "text": "a",
+                    "start": 1.44,
+                    "end": 1.5
+                  },
+                  {
+                    "text": "d",
+                    "start": 1.5,
+                    "end": 1.64
+                  },
+                  {
+                    "text": "y",
+                    "start": 1.64,
+                    "end": 1.68
+                  },
+                  {
+                    "text": ".",
+                    "start": 1.68,
+                    "end": 1.68
+                  }
+                ],
+                "channel_index": null
+              }
+            ]
+          }
+        },
+        {
+          "ordinal": 42,
+          "elapsed_s": 3.900825,
+          "sent_sample_cursor": 51200,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 43,
+          "elapsed_s": 3.993761,
+          "sent_sample_cursor": 52800,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 44,
+          "elapsed_s": 4.102411,
+          "sent_sample_cursor": 54400,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 45,
+          "elapsed_s": 4.195582,
+          "sent_sample_cursor": 56000,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 46,
+          "elapsed_s": 4.30518,
+          "sent_sample_cursor": 57600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "9846d79a24378082cfd9e78bd71f3f1cbdad11d9aca5aa8b9b3c5ada7326539a"
+        },
+        {
+          "ordinal": 47,
+          "elapsed_s": 4.414282,
+          "sent_sample_cursor": 59200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "06cc5dffb513bedfa782982a162c7f98740075e3ea3244b2fef8e2a99a2c90cf"
+        },
+        {
+          "ordinal": 48,
+          "elapsed_s": 4.506861,
+          "sent_sample_cursor": 60800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "2cfb71bd5336cacb28cb3c15671db7f287151dbc6f45babde1158a33bad4776a"
+        },
+        {
+          "ordinal": 49,
+          "elapsed_s": 4.616057,
+          "sent_sample_cursor": 62400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "536e69c139f5a967da251625a3b030d518752f3366eec9834c9f3639d6d605cb"
+        },
+        {
+          "ordinal": 50,
+          "elapsed_s": 4.708749,
+          "sent_sample_cursor": 64000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "ff72cb373a8b02ec427db7873540b4a95575d04a610934602a43fe6b811ddbb3"
+        },
+        {
+          "ordinal": 51,
+          "elapsed_s": 4.818997,
+          "sent_sample_cursor": 65600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "8b49d08006a79876ad60915891084233bb7e48585c1a40da3654c486c4004e7b"
+        },
+        {
+          "ordinal": 52,
+          "elapsed_s": 4.912098,
+          "sent_sample_cursor": 67200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "af0b5527980db1c2d5477f5a72b83a8ce9043af76759c2ca350557f571390c37"
+        },
+        {
+          "ordinal": 53,
+          "elapsed_s": 5.00538,
+          "sent_sample_cursor": 68800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "df6891f838adb0c96950f26f2ca4408d6f506dd47eec29fee2508d769cf63d43"
+        },
+        {
+          "ordinal": 54,
+          "elapsed_s": 5.033239,
+          "sent_sample_cursor": 68800,
+          "kind": "received",
+          "payload": {
+            "message_type": "partial_transcript",
+            "text": "The"
+          }
+        },
+        {
+          "ordinal": 55,
+          "elapsed_s": 5.114427,
+          "sent_sample_cursor": 70400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "378813344f230b811b33e256cfec32ffa7b2bd4187784f824eef881f7b123da3"
+        },
+        {
+          "ordinal": 56,
+          "elapsed_s": 5.207558,
+          "sent_sample_cursor": 72000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5855f8380cab2ec9eb65bf62387c3fbffafc51f08d28104e01c8dd08c98d03e1"
+        },
+        {
+          "ordinal": 57,
+          "elapsed_s": 5.316054,
+          "sent_sample_cursor": 73600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "f8f8b0606dca3ebff7caeff940900548882e8b96653dfa2f35d7e41a872f6ffa"
+        },
+        {
+          "ordinal": 58,
+          "elapsed_s": 5.409814,
+          "sent_sample_cursor": 75200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5e646e197d8bf4eae401a751d6c0385f8a31340163f22823524c15494efe442a"
+        },
+        {
+          "ordinal": 59,
+          "elapsed_s": 5.519097,
+          "sent_sample_cursor": 76800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "095e617f71af1d91c26eb56b218c1d9b490794b7e436ab6e4ff4cf9a3a7e7e31"
+        },
+        {
+          "ordinal": 60,
+          "elapsed_s": 5.612071,
+          "sent_sample_cursor": 78400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 61,
+          "elapsed_s": 5.720696,
+          "sent_sample_cursor": 80000,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 62,
+          "elapsed_s": 5.813486,
+          "sent_sample_cursor": 81600,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 63,
+          "elapsed_s": 5.906739,
+          "sent_sample_cursor": 83200,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 64,
+          "elapsed_s": 6.015645,
+          "sent_sample_cursor": 84800,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 65,
+          "elapsed_s": 6.037549,
+          "sent_sample_cursor": 84800,
+          "kind": "received",
+          "payload": {
+            "message_type": "partial_transcript",
+            "text": "The red boat is ready."
+          }
+        },
+        {
+          "ordinal": 66,
+          "elapsed_s": 6.108827,
+          "sent_sample_cursor": 86400,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 67,
+          "elapsed_s": 6.217761,
+          "sent_sample_cursor": 87120,
+          "kind": "audio_written",
+          "label": "shared_a",
+          "sample_count": 720,
+          "pcm_sha256": "52dbd4365b026555e3382c056240376d3aa319c7e46c1aa7c38caa4883570517"
+        },
+        {
+          "ordinal": 68,
+          "elapsed_s": 6.263772,
+          "sent_sample_cursor": 88720,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 69,
+          "elapsed_s": 6.37229,
+          "sent_sample_cursor": 90320,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 70,
+          "elapsed_s": 6.465211,
+          "sent_sample_cursor": 91920,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 71,
+          "elapsed_s": 6.57428,
+          "sent_sample_cursor": 93520,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 72,
+          "elapsed_s": 6.666954,
+          "sent_sample_cursor": 95120,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 73,
+          "elapsed_s": 6.775429,
+          "sent_sample_cursor": 96000,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 880,
+          "pcm_sha256": "52e28210c0be3be4e312d3ec209b5c49fc69abdd4c4aed923f1ce29ad25b0350"
+        },
+        {
+          "ordinal": 74,
+          "elapsed_s": 6.822033,
+          "sent_sample_cursor": 96000,
+          "kind": "control_written",
+          "control": "finalize"
+        },
+        {
+          "ordinal": 75,
+          "elapsed_s": 7.041652,
+          "sent_sample_cursor": 96000,
+          "kind": "received",
+          "payload": {
+            "message_type": "partial_transcript",
+            "text": "The red boat is ready."
+          }
+        },
+        {
+          "ordinal": 76,
+          "elapsed_s": 7.08651,
+          "sent_sample_cursor": 96000,
+          "kind": "received",
+          "payload": {
+            "message_type": "committed_transcript",
+            "text": "The red boat is ready."
+          }
+        },
+        {
+          "ordinal": 77,
+          "elapsed_s": 7.086536,
+          "sent_sample_cursor": 96000,
+          "kind": "completion_observed",
+          "after_receive_index": 8
+        },
+        {
+          "ordinal": 78,
+          "elapsed_s": 7.086672,
+          "sent_sample_cursor": 97600,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 79,
+          "elapsed_s": 7.101053,
+          "sent_sample_cursor": 97600,
+          "kind": "received",
+          "payload": {
+            "message_type": "committed_transcript_with_timestamps",
+            "text": "The red boat is ready.",
+            "language_code": null,
+            "words": [
+              {
+                "text": "The",
+                "start": 3.64,
+                "end": 3.72,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.7259197235107422,
+                "characters": [
+                  {
+                    "text": "T",
+                    "start": 3.64,
+                    "end": 3.66
+                  },
+                  {
+                    "text": "h",
+                    "start": 3.66,
+                    "end": 3.66
+                  },
+                  {
+                    "text": "e",
+                    "start": 3.66,
+                    "end": 3.72
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 3.72,
+                "end": 3.76,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.8677577972412109,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 3.72,
+                    "end": 3.76
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "red",
+                "start": 3.76,
+                "end": 3.92,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.8497994740804037,
+                "characters": [
+                  {
+                    "text": "r",
+                    "start": 3.76,
+                    "end": 3.8
+                  },
+                  {
+                    "text": "e",
+                    "start": 3.8,
+                    "end": 3.86
+                  },
+                  {
+                    "text": "d",
+                    "start": 3.86,
+                    "end": 3.92
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 3.92,
+                "end": 4.0,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.6304149627685547,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 3.92,
+                    "end": 4.0
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "boat",
+                "start": 4.0,
+                "end": 4.18,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.5739789009094238,
+                "characters": [
+                  {
+                    "text": "b",
+                    "start": 4.0,
+                    "end": 4.04
+                  },
+                  {
+                    "text": "o",
+                    "start": 4.04,
+                    "end": 4.08
+                  },
+                  {
+                    "text": "a",
+                    "start": 4.08,
+                    "end": 4.12
+                  },
+                  {
+                    "text": "t",
+                    "start": 4.12,
+                    "end": 4.18
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 4.18,
+                "end": 4.22,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.8085536956787109,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 4.18,
+                    "end": 4.22
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "is",
+                "start": 4.22,
+                "end": 4.34,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.6337080001831055,
+                "characters": [
+                  {
+                    "text": "i",
+                    "start": 4.22,
+                    "end": 4.3
+                  },
+                  {
+                    "text": "s",
+                    "start": 4.3,
+                    "end": 4.34
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 4.34,
+                "end": 4.38,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.7863559722900391,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 4.34,
+                    "end": 4.38
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "ready.",
+                "start": 4.4,
+                "end": 4.68,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.756219228108724,
+                "characters": [
+                  {
+                    "text": "r",
+                    "start": 4.4,
+                    "end": 4.42
+                  },
+                  {
+                    "text": "e",
+                    "start": 4.42,
+                    "end": 4.44
+                  },
+                  {
+                    "text": "a",
+                    "start": 4.44,
+                    "end": 4.5
+                  },
+                  {
+                    "text": "d",
+                    "start": 4.5,
+                    "end": 4.64
+                  },
+                  {
+                    "text": "y",
+                    "start": 4.64,
+                    "end": 4.68
+                  },
+                  {
+                    "text": ".",
+                    "start": 4.68,
+                    "end": 4.68
+                  }
+                ],
+                "channel_index": null
+              }
+            ]
+          }
+        },
+        {
+          "ordinal": 80,
+          "elapsed_s": 7.193993,
+          "sent_sample_cursor": 99200,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 81,
+          "elapsed_s": 7.302529,
+          "sent_sample_cursor": 100800,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 82,
+          "elapsed_s": 7.395665,
+          "sent_sample_cursor": 102400,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 83,
+          "elapsed_s": 7.488612,
+          "sent_sample_cursor": 104000,
+          "kind": "audio_written",
+          "label": "slot_leading_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 84,
+          "elapsed_s": 7.597621,
+          "sent_sample_cursor": 105600,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "bd93e1c0c76c60554f4c6d98b8028730dbbfa6ea82f5011e8fb0dcda22857cb6"
+        },
+        {
+          "ordinal": 85,
+          "elapsed_s": 7.706522,
+          "sent_sample_cursor": 107200,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "b3946e4a530dad81418d6221e9e408becbc955d1de7ed89e8240b1284808e0cc"
+        },
+        {
+          "ordinal": 86,
+          "elapsed_s": 7.79989,
+          "sent_sample_cursor": 108800,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "970d84097b616e85fd7f6ca6f1b680cbe442ee02c6e151b29055a4f67189f246"
+        },
+        {
+          "ordinal": 87,
+          "elapsed_s": 7.907452,
+          "sent_sample_cursor": 110400,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "0d64b1fa34cd8904402576997939e584476d2cc19c4583dfcfa8deaa733c137a"
+        },
+        {
+          "ordinal": 88,
+          "elapsed_s": 8.000848,
+          "sent_sample_cursor": 112000,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "adbefd95d02eeacf4e10c8cd0f9ab7197850607aedc634f195d18c48f037db26"
+        },
+        {
+          "ordinal": 89,
+          "elapsed_s": 8.109907,
+          "sent_sample_cursor": 113600,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "470b10769c35b7695d6478b76279dc921cc3883e509be2a0b2a04142c173659f"
+        },
+        {
+          "ordinal": 90,
+          "elapsed_s": 8.20332,
+          "sent_sample_cursor": 115200,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "3b67e2722ab173890b7a72c20901229808a4b210b28dc9d5809e42b78bcc73f3"
+        },
+        {
+          "ordinal": 91,
+          "elapsed_s": 8.312324,
+          "sent_sample_cursor": 116800,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "448c1b2efbc4486b2cfe659b2050eabcac270ab3d573b254b8dba985c6eec33a"
+        },
+        {
+          "ordinal": 92,
+          "elapsed_s": 8.349841,
+          "sent_sample_cursor": 116800,
+          "kind": "received",
+          "payload": {
+            "message_type": "partial_transcript",
+            "text": "The"
+          }
+        },
+        {
+          "ordinal": 93,
+          "elapsed_s": 8.405452,
+          "sent_sample_cursor": 118400,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "19561e8a145a3e476e0e091a5224aaa1b1130e020502afb53459f9576f4fa3fe"
+        },
+        {
+          "ordinal": 94,
+          "elapsed_s": 8.499309,
+          "sent_sample_cursor": 120000,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "3a08f1b665de81d0da8945072ae0c6673590179f3595249804cdb3b219beeecd"
+        },
+        {
+          "ordinal": 95,
+          "elapsed_s": 8.608042,
+          "sent_sample_cursor": 121600,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "3180dab737a1987aab9c0aa8c28f1d4b13562b8affeca579d30e5970ad43bda1"
+        },
+        {
+          "ordinal": 96,
+          "elapsed_s": 8.701104,
+          "sent_sample_cursor": 123200,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "6d90d96cf6cfc3dac75288b490dd8f6da199ba522a051884997de7410ea56d13"
+        },
+        {
+          "ordinal": 97,
+          "elapsed_s": 8.809471,
+          "sent_sample_cursor": 124800,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "76fc6956b9c337f98b86d161aa981665945a5a707b1967487511b1e796991ab0"
+        },
+        {
+          "ordinal": 98,
+          "elapsed_s": 8.903277,
+          "sent_sample_cursor": 126400,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 99,
+          "elapsed_s": 9.011303,
+          "sent_sample_cursor": 128000,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 100,
+          "elapsed_s": 9.105093,
+          "sent_sample_cursor": 129600,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 101,
+          "elapsed_s": 9.198939,
+          "sent_sample_cursor": 131200,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 102,
+          "elapsed_s": 9.255158,
+          "sent_sample_cursor": 131200,
+          "kind": "received",
+          "payload": {
+            "message_type": "partial_transcript",
+            "text": "The blue train is late."
+          }
+        },
+        {
+          "ordinal": 103,
+          "elapsed_s": 9.307293,
+          "sent_sample_cursor": 132800,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 104,
+          "elapsed_s": 9.399891,
+          "sent_sample_cursor": 134400,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 105,
+          "elapsed_s": 9.508652,
+          "sent_sample_cursor": 136000,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 106,
+          "elapsed_s": 9.601593,
+          "sent_sample_cursor": 136400,
+          "kind": "audio_written",
+          "label": "shared_b",
+          "sample_count": 400,
+          "pcm_sha256": "67042dfda5683aead81b6055d19c4dba238341f9dd82f49c0e7cc0c19c5f10d1"
+        },
+        {
+          "ordinal": 107,
+          "elapsed_s": 9.633094,
+          "sent_sample_cursor": 138000,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 108,
+          "elapsed_s": 9.741937,
+          "sent_sample_cursor": 139600,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 109,
+          "elapsed_s": 9.835039,
+          "sent_sample_cursor": 141200,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 110,
+          "elapsed_s": 9.943515,
+          "sent_sample_cursor": 142800,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1600,
+          "pcm_sha256": "5a312281df4bd8dfbb4d4a94ad0bf44d01bb8cfced1206b90e21b4ca0568cdb1"
+        },
+        {
+          "ordinal": 111,
+          "elapsed_s": 10.036206,
+          "sent_sample_cursor": 144000,
+          "kind": "audio_written",
+          "label": "slot_trailing_silence",
+          "sample_count": 1200,
+          "pcm_sha256": "a0ee989ed2a0a2e3626520afa4032e06144865c8c8f6357293c9f4cd2069eaf2"
+        },
+        {
+          "ordinal": 112,
+          "elapsed_s": 10.114202,
+          "sent_sample_cursor": 144000,
+          "kind": "control_written",
+          "control": "finalize"
+        },
+        {
+          "ordinal": 113,
+          "elapsed_s": 10.160124,
+          "sent_sample_cursor": 144000,
+          "kind": "received",
+          "payload": {
+            "message_type": "partial_transcript",
+            "text": "The blue train is late."
+          }
+        },
+        {
+          "ordinal": 114,
+          "elapsed_s": 10.339489,
+          "sent_sample_cursor": 144000,
+          "kind": "received",
+          "payload": {
+            "message_type": "committed_transcript",
+            "text": "The blue train is late."
+          }
+        },
+        {
+          "ordinal": 115,
+          "elapsed_s": 10.339534,
+          "sent_sample_cursor": 144000,
+          "kind": "completion_observed",
+          "after_receive_index": 13
+        },
+        {
+          "ordinal": 116,
+          "elapsed_s": 10.353409,
+          "sent_sample_cursor": 144000,
+          "kind": "received",
+          "payload": {
+            "message_type": "committed_transcript_with_timestamps",
+            "text": "The blue train is late.",
+            "language_code": null,
+            "words": [
+              {
+                "text": "The",
+                "start": 6.64,
+                "end": 6.7,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.9067211151123047,
+                "characters": [
+                  {
+                    "text": "T",
+                    "start": 6.64,
+                    "end": 6.64
+                  },
+                  {
+                    "text": "h",
+                    "start": 6.64,
+                    "end": 6.68
+                  },
+                  {
+                    "text": "e",
+                    "start": 6.68,
+                    "end": 6.7
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 6.7,
+                "end": 6.78,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.8453273773193359,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 6.7,
+                    "end": 6.78
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "blue",
+                "start": 6.78,
+                "end": 6.9,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.6257867813110352,
+                "characters": [
+                  {
+                    "text": "b",
+                    "start": 6.78,
+                    "end": 6.82
+                  },
+                  {
+                    "text": "l",
+                    "start": 6.82,
+                    "end": 6.84
+                  },
+                  {
+                    "text": "u",
+                    "start": 6.84,
+                    "end": 6.88
+                  },
+                  {
+                    "text": "e",
+                    "start": 6.88,
+                    "end": 6.9
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 6.9,
+                "end": 7.0,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.9486370086669922,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 6.9,
+                    "end": 7.0
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "train",
+                "start": 7.0,
+                "end": 7.24,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.6573841094970703,
+                "characters": [
+                  {
+                    "text": "t",
+                    "start": 7.0,
+                    "end": 7.06
+                  },
+                  {
+                    "text": "r",
+                    "start": 7.06,
+                    "end": 7.1
+                  },
+                  {
+                    "text": "a",
+                    "start": 7.1,
+                    "end": 7.12
+                  },
+                  {
+                    "text": "i",
+                    "start": 7.12,
+                    "end": 7.16
+                  },
+                  {
+                    "text": "n",
+                    "start": 7.16,
+                    "end": 7.24
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 7.24,
+                "end": 7.28,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.5455245971679688,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 7.24,
+                    "end": 7.28
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "is",
+                "start": 7.28,
+                "end": 7.42,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.7499532699584961,
+                "characters": [
+                  {
+                    "text": "i",
+                    "start": 7.28,
+                    "end": 7.36
+                  },
+                  {
+                    "text": "s",
+                    "start": 7.36,
+                    "end": 7.42
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": " ",
+                "start": 7.42,
+                "end": 7.46,
+                "type": "spacing",
+                "speaker_id": null,
+                "logprob": -0.7334403991699219,
+                "characters": [
+                  {
+                    "text": " ",
+                    "start": 7.42,
+                    "end": 7.46
+                  }
+                ],
+                "channel_index": null
+              },
+              {
+                "text": "late.",
+                "start": 7.46,
+                "end": 7.74,
+                "type": "word",
+                "speaker_id": null,
+                "logprob": -0.9936256408691406,
+                "characters": [
+                  {
+                    "text": "l",
+                    "start": 7.46,
+                    "end": 7.54
+                  },
+                  {
+                    "text": "a",
+                    "start": 7.54,
+                    "end": 7.62
+                  },
+                  {
+                    "text": "t",
+                    "start": 7.62,
+                    "end": 7.64
+                  },
+                  {
+                    "text": "e",
+                    "start": 7.72,
+                    "end": 7.74
+                  },
+                  {
+                    "text": ".",
+                    "start": 7.74,
+                    "end": 7.74
+                  }
+                ],
+                "channel_index": null
+              }
+            ]
+          }
+        },
+        {
+          "ordinal": 117,
+          "elapsed_s": 12.349741,
+          "sent_sample_cursor": 144000,
+          "kind": "bounded_observation_ended",
+          "wait_s": 2,
+          "completion_found": false,
+          "note": "Absence is censored, not a universal no-response guarantee"
+        },
+        {
+          "ordinal": 118,
+          "elapsed_s": 12.349785,
+          "sent_sample_cursor": 144000,
+          "kind": "client_close_requested"
+        },
+        {
+          "ordinal": 119,
+          "elapsed_s": 12.528436,
+          "sent_sample_cursor": 144000,
+          "kind": "receive_error",
+          "error": "ConnectionClosedError: sent 1000 (OK); no close frame received"
+        },
+        {
+          "ordinal": 120,
+          "elapsed_s": 12.528449,
+          "sent_sample_cursor": 144000,
+          "kind": "transport_closed",
+          "code": 1006,
+          "reason": ""
+        }
+      ],
+      "input_map": [
+        {
+          "label": "slot_leading_silence",
+          "provider_start_sample": 0,
+          "provider_end_sample": 8000,
+          "pcm_sha256": "f85f2c34eb2843d2aa5951ee6e8e76985655b2e3ae2cbdd76bdfd654ecf19997",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "shared_a",
+          "provider_start_sample": 8000,
+          "provider_end_sample": 39120,
+          "pcm_sha256": "fa4f27683fa43b4556a76da9b51d565039f5da424f04c54503db1da5b1325273",
+          "source": "shared_a.wav:all",
+          "synthetic_no_source": false
+        },
+        {
+          "label": "slot_trailing_silence",
+          "provider_start_sample": 39120,
+          "provider_end_sample": 48000,
+          "pcm_sha256": "f397d40e4da55ee1afdc4cd4b39078c14cfd12b4c0a24633726218833d59f70b",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "slot_leading_silence",
+          "provider_start_sample": 48000,
+          "provider_end_sample": 56000,
+          "pcm_sha256": "f85f2c34eb2843d2aa5951ee6e8e76985655b2e3ae2cbdd76bdfd654ecf19997",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "shared_a",
+          "provider_start_sample": 56000,
+          "provider_end_sample": 87120,
+          "pcm_sha256": "fa4f27683fa43b4556a76da9b51d565039f5da424f04c54503db1da5b1325273",
+          "source": "shared_a.wav:all",
+          "synthetic_no_source": false
+        },
+        {
+          "label": "slot_trailing_silence",
+          "provider_start_sample": 87120,
+          "provider_end_sample": 96000,
+          "pcm_sha256": "f397d40e4da55ee1afdc4cd4b39078c14cfd12b4c0a24633726218833d59f70b",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "slot_leading_silence",
+          "provider_start_sample": 96000,
+          "provider_end_sample": 104000,
+          "pcm_sha256": "f85f2c34eb2843d2aa5951ee6e8e76985655b2e3ae2cbdd76bdfd654ecf19997",
+          "source": null,
+          "synthetic_no_source": true
+        },
+        {
+          "label": "shared_b",
+          "provider_start_sample": 104000,
+          "provider_end_sample": 136400,
+          "pcm_sha256": "50af2eaf21519b0d21813fb9a59a6b1af17b704aef481c913f294f5f3e4cf68b",
+          "source": "shared_b.wav:all",
+          "synthetic_no_source": false
+        },
+        {
+          "label": "slot_trailing_silence",
+          "provider_start_sample": 136400,
+          "provider_end_sample": 144000,
+          "pcm_sha256": "a6b5bd491f247f64222e96c0d04c0311816393c536e477006030691a52e04326",
+          "source": null,
+          "synthetic_no_source": true
+        }
+      ],
+      "controls": [
+        {
+          "kind": "finalize",
+          "cursor_samples": 48000,
+          "elapsed_s": 3.513224
+        },
+        {
+          "kind": "finalize",
+          "cursor_samples": 96000,
+          "elapsed_s": 6.822056
+        },
+        {
+          "kind": "finalize",
+          "cursor_samples": 144000,
+          "elapsed_s": 10.114212
+        }
+      ],
+      "status": "bounded-observation-complete",
+      "options": {
+        "model_id": "scribe_v2_realtime",
+        "audio_format": "pcm_16000",
+        "sample_rate": 16000,
+        "commit_strategy": "manual",
+        "language_code": "en",
+        "include_timestamps": "true",
+        "include_language_detection": "false",
+        "no_verbatim": "false",
+        "filter_background_audio": "false"
+      },
+      "sent_samples": 144000,
+      "sent_audio_s": 9.0,
+      "wall_s": 12.528483
+    }
+  ],
+  "provider_branch_stopped": "error: no retries or further sessions"
+}
