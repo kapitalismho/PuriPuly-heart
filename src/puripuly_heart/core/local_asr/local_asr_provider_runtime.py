@@ -223,6 +223,7 @@ class ProviderGpuRuntimePort(Protocol):
         self,
         channel: ProviderRuntimeChannel,
         *,
+        owner: object,
         model_path: Path,
         model_id: str,
         device_id: str,
@@ -239,7 +240,9 @@ class ProviderGpuRuntimePort(Protocol):
         language_hint: str | None = None,
     ) -> GpuWorkerTranscription: ...
 
-    async def deactivate_channel(self, channel: ProviderRuntimeChannel) -> None: ...
+    async def deactivate_channel(
+        self, channel: ProviderRuntimeChannel, *, owner: object
+    ) -> None: ...
 
     async def close(self) -> None: ...
 

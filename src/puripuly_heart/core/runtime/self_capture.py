@@ -26,6 +26,8 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureDiagnostic,
     SelfCaptureDiagnosticEvent,
     SelfCaptureFailureReason,
+    SelfCaptureIngressError,
+    SelfCaptureProviderMutation,
     SelfCaptureProviderMutationStatus,
     SelfCaptureProviderPort,
     SelfCaptureProviderStatus,
@@ -863,6 +865,7 @@ class SelfCaptureSessionOwner:
             if self._is_superseded(generation):
                 return self.snapshot
             attachment_token = self._provider_attachment_token
+            result: SelfCaptureProviderMutation | None = None
             if self._attached_provider_matches(config):
                 result_status = SelfCaptureProviderMutationStatus.APPLIED
                 failure_reason = None
@@ -909,6 +912,9 @@ class SelfCaptureSessionOwner:
                     generation=generation,
                     reason=SelfCaptureFailureReason.PROVIDER_FAILED,
                     detail=failure_reason,
+                    failure_code=result.failure_code if result is not None else None,
+                    failure_type=result.failure_type if result is not None else failure_reason,
+                    failure_stage=result.failure_stage if result is not None else "provider_build",
                 )
             self._notify_state_changed()
             return self.snapshot
@@ -1180,6 +1186,7 @@ class SelfCaptureSessionOwner:
                     config,
                     SelfCaptureFailureReason.PROVIDER_FAILED,
                     exc,
+                    failure_stage="provider_build",
                 )
                 return
             if self._is_stale(generation):
@@ -1201,6 +1208,7 @@ class SelfCaptureSessionOwner:
                     generation,
                     config,
                     SelfCaptureFailureReason.PROVIDER_FAILED,
+                    mutation=result,
                 )
                 return
         self._provider_status = SelfCaptureProviderStatus.READY
@@ -1267,6 +1275,8 @@ class SelfCaptureSessionOwner:
                 generation,
                 SelfCaptureFailureReason.PROVIDER_FAILED,
                 exc,
+                failure_stage="ingress",
+                failure_code=exc.code if isinstance(exc, SelfCaptureIngressError) else None,
             )
             return
         self._state = SelfCaptureSessionState.RUNNING
@@ -1280,6 +1290,8 @@ class SelfCaptureSessionOwner:
                     generation=generation,
                     reason=SelfCaptureFailureReason.PROVIDER_FAILED,
                     detail=type(exc).__name__,
+                    failure_stage="provider_warmup",
+                    failure_type=type(exc).__name__,
                 )
 
     async def _transition_provider(
@@ -1314,6 +1326,8 @@ class SelfCaptureSessionOwner:
                 generation=generation,
                 reason=SelfCaptureFailureReason.PROVIDER_FAILED,
                 detail=type(exc).__name__,
+                failure_stage="provider_handoff",
+                failure_type=type(exc).__name__,
             )
             self._notify_state_changed()
             return
@@ -1351,6 +1365,9 @@ class SelfCaptureSessionOwner:
                 generation=generation,
                 reason=SelfCaptureFailureReason.PROVIDER_FAILED,
                 detail=result.reason,
+                failure_code=result.failure_code,
+                failure_type=result.failure_type,
+                failure_stage=result.failure_stage,
             )
         self._notify_state_changed()
 
@@ -1507,6 +1524,8 @@ class SelfCaptureSessionOwner:
         completed_task: asyncio.Task[None] | None = None,
         terminal: STTProviderTurnTerminal | None = None,
         recognition_reason: str | None = None,
+        failure_stage: str | None = None,
+        failure_code: str | None = None,
     ) -> None:
         if self._is_stale(generation):
             return
@@ -1521,6 +1540,11 @@ class SelfCaptureSessionOwner:
             generation=generation,
             reason=reason,
             detail=type(exc).__name__ if exc is not None else None,
+            failure_code=failure_code,
+            failure_type=(
+                type(exc).__name__ if exc is not None and failure_stage is not None else None
+            ),
+            failure_stage=failure_stage,
             terminal=terminal,
             recognition_reason=recognition_reason,
             desired_active_before=desired_active_before,
@@ -1543,6 +1567,8 @@ class SelfCaptureSessionOwner:
         exc: Exception | None = None,
         *,
         release_provider: bool = False,
+        mutation: SelfCaptureProviderMutation | None = None,
+        failure_stage: str | None = None,
     ) -> None:
         if self._is_superseded(generation):
             return
@@ -1562,7 +1588,18 @@ class SelfCaptureSessionOwner:
             SelfCaptureDiagnosticEvent.FAILURE,
             generation=generation,
             reason=reason,
-            detail=type(exc).__name__ if exc is not None else None,
+            detail=(
+                mutation.reason
+                if mutation is not None
+                else (type(exc).__name__ if exc is not None else None)
+            ),
+            failure_code=mutation.failure_code if mutation is not None else None,
+            failure_type=(
+                mutation.failure_type
+                if mutation is not None
+                else (type(exc).__name__ if exc is not None else None)
+            ),
+            failure_stage=mutation.failure_stage if mutation is not None else failure_stage,
             desired_active_before=desired_active_before,
             desired_active_after=self._desired_active,
             action=("deactivate" if desired_active_before and not self._desired_active else None),
@@ -1759,6 +1796,9 @@ class SelfCaptureSessionOwner:
         generation: int,
         reason: SelfCaptureFailureReason | None = None,
         detail: str | None = None,
+        failure_code: str | None = None,
+        failure_type: str | None = None,
+        failure_stage: str | None = None,
         terminal: STTProviderTurnTerminal | None = None,
         recognition_reason: str | None = None,
         desired_active_before: bool | None = None,
@@ -1776,6 +1816,9 @@ class SelfCaptureSessionOwner:
                 provider_id=self._config.provider_id if self._config is not None else None,
                 reason=reason,
                 detail=detail,
+                failure_code=failure_code,
+                failure_type=failure_type,
+                failure_stage=failure_stage,
                 recognition_reason=recognition_reason,
                 utterance_id=(
                     terminal.identity.segment.segment_id if terminal is not None else None

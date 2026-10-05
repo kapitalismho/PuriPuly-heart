@@ -391,7 +391,7 @@ class LocalASRProviderRuntimeOwner:
                 )
             channel = request.channel
             previous_provider_id = self._provider_ids[channel]
-            provider, failure_code, failure_type = await self._build_provider(
+            provider, failure_code, failure_type, failure_stage = await self._build_provider(
                 request,
                 on_terminal_failure=on_terminal_failure,
             )
@@ -400,7 +400,7 @@ class LocalASRProviderRuntimeOwner:
                     request,
                     previous_provider_id=previous_provider_id,
                     failure_code=failure_code or "unclassified",
-                    failure_stage="provider_build",
+                    failure_stage=failure_stage or "provider_build",
                     failure_type=failure_type,
                 )
             handle = self._handles[channel]
@@ -529,7 +529,7 @@ class LocalASRProviderRuntimeOwner:
                 )
             channel = request.channel
             previous_provider_id = self._provider_ids[channel]
-            provider, failure_code, failure_type = await self._build_provider(
+            provider, failure_code, failure_type, failure_stage = await self._build_provider(
                 request,
                 on_terminal_failure=on_terminal_failure,
             )
@@ -538,7 +538,7 @@ class LocalASRProviderRuntimeOwner:
                     request,
                     previous_provider_id=previous_provider_id,
                     failure_code=failure_code or "unclassified",
-                    failure_stage="provider_build",
+                    failure_stage=failure_stage or "provider_build",
                     failure_type=failure_type,
                 )
             self._pending_candidates[channel] = provider
@@ -1171,12 +1171,13 @@ class LocalASRProviderRuntimeOwner:
         request: ProviderRuntimeBuildRequest,
         *,
         on_terminal_failure: ProviderRuntimeTerminalFailureSink | None,
-    ) -> tuple[object | None, str | None, str | None]:
+    ) -> tuple[object | None, str | None, str | None, str | None]:
         channel = request.channel
         previous_phase = self._channel_phases[channel]
         self._channel_phases[channel] = "building"
         await self._publish_state()
         provider: object | None = None
+        failure_stage = "provider_build"
         try:
             result = self._provider_factory.create(
                 request,
@@ -1187,8 +1188,9 @@ class LocalASRProviderRuntimeOwner:
             if provider is None:
                 raise RuntimeError("provider factory returned no provider")
             if request.warmup:
+                failure_stage = "provider_warmup"
                 await _call_async_method(provider, "warmup")
-            return provider, None, None
+            return provider, None, None, None
         except asyncio.CancelledError:
             if provider is not None:
                 await _close_provider_for_discard(provider)
@@ -1203,7 +1205,7 @@ class LocalASRProviderRuntimeOwner:
                 previous_phase if self._handles[channel].provider is not None else "failed"
             )
             await self._emit_provider_failure(
-                event="provider_build",
+                event=failure_stage,
                 request=request,
                 exc=exc,
             )
@@ -1212,6 +1214,7 @@ class LocalASRProviderRuntimeOwner:
                 None,
                 _optional_string(getattr(exc, "code", None)) or "unclassified",
                 type(exc).__name__,
+                failure_stage,
             )
 
     async def _discard_pending_candidate(

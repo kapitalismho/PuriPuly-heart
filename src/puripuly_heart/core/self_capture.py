@@ -88,6 +88,9 @@ class SelfCaptureAdmission:
 class SelfCaptureProviderMutation:
     status: SelfCaptureProviderMutationStatus
     reason: str | None = None
+    failure_code: str | None = None
+    failure_type: str | None = None
+    failure_stage: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +110,9 @@ class SelfCaptureDiagnostic:
     desired_active_after: bool | None = None
     action: str | None = None
     target_state: SelfCaptureSessionState | None = None
+    failure_code: str | None = None
+    failure_type: str | None = None
+    failure_stage: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +131,15 @@ class SelfCaptureSessionSnapshot:
     has_loop_task: bool
     cleanup_debt: int
     closed: bool
+
+
+class SelfCaptureIngressError(RuntimeError):
+    def __init__(
+        self,
+        code: Literal["provider_unavailable", "gpu_not_ready", "self_channel_inactive"],
+    ) -> None:
+        self.code = code
+        super().__init__(code)
 
 
 SelfCaptureTerminalFailureHandler = Callable[[Exception], Awaitable[None]]
@@ -178,6 +193,7 @@ __all__ = [
     "SelfCaptureDiagnostic",
     "SelfCaptureDiagnosticEvent",
     "SelfCaptureFailureReason",
+    "SelfCaptureIngressError",
     "SelfCaptureProviderMutation",
     "SelfCaptureProviderMutationStatus",
     "SelfCaptureProviderPort",

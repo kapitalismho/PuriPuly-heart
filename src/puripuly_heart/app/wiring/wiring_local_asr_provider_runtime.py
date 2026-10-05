@@ -53,6 +53,7 @@ from puripuly_heart.core.stt.scoped_normalizer import STTNormalizationDiagnostic
 from puripuly_heart.providers.stt.gemini_transcribe import (
     GEMINI_TRANSCRIBE_MAX_SESSION_AGE_S,
 )
+from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 from puripuly_heart.providers.stt.soniox import SONIOX_MAX_SESSION_AGE_S
 
 from .wiring_stt_factory import create_stt_backend_from_resolved_config
@@ -224,6 +225,7 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                 settings,
             ),
             backend_close=close_backend,
+            backend_prepare=backend.prepare if isinstance(backend, LocalGpuSTTBackend) else None,
             event_drain_timeout_s=config.drain_timeout_s,
             terminal_failure_sink=on_terminal_failure,
             diagnostic_sink=(

@@ -157,6 +157,7 @@ class FakeGpuRuntime:
         self.state = "idle"
         self.discovery_state = "idle"
         self.active_channels = frozenset()
+        self.owners: dict[str, set[object]] = {}
         self.pending_count = 0
         self.worker_pid = None
         self.last_failure_code = None
@@ -190,12 +191,14 @@ class FakeGpuRuntime:
         self,
         channel: str,
         *,
+        owner: object,
         model_path: Path,
         model_id: str,
         device_id: str,
     ) -> GpuWorkerActivation:
         _ = model_path, model_id
         self.activation_calls.append((channel, device_id))
+        self.owners.setdefault(channel, set()).add(owner)
         self.active_channels = frozenset({*self.active_channels, channel})
         self.state = "ready"
         self.worker_pid = 4242
@@ -244,10 +247,15 @@ class FakeGpuRuntime:
             rtf=0.1,
         )
 
-    async def deactivate_channel(self, channel: str) -> None:
-        self.active_channels = frozenset(
-            active_channel for active_channel in self.active_channels if active_channel != channel
-        )
+    async def deactivate_channel(self, channel: str, *, owner: object) -> None:
+        owners = self.owners.get(channel)
+        if owners is None or owner not in owners:
+            return
+        owners.remove(owner)
+        if owners:
+            return
+        self.owners.pop(channel)
+        self.active_channels = frozenset(self.owners)
         if not self.active_channels:
             self.worker_pid = None
             self.state = "idle"
@@ -255,6 +263,7 @@ class FakeGpuRuntime:
     async def close(self) -> None:
         self.close_calls += 1
         self.active_channels = frozenset()
+        self.owners.clear()
         self.worker_pid = None
         self.state = "closed"
 
@@ -307,6 +316,7 @@ class FakeProvider:
         if self.provider_id == "local_qwen_gpu":
             await self.gpu_runtime.activate_channel(
                 self.channel,
+                owner=self,
                 model_path=Path("model.gguf"),
                 model_id=LOCAL_QWEN_GPU_MODEL_ID,
                 device_id=self.gpu_device_id,
@@ -319,7 +329,7 @@ class FakeProvider:
     async def close_backend(self) -> None:
         self.close_backend_calls += 1
         if self.provider_id == "local_qwen_gpu":
-            await self.gpu_runtime.deactivate_channel(self.channel)
+            await self.gpu_runtime.deactivate_channel(self.channel, owner=self)
 
     async def handle_vad_event(self, event: object) -> None:
         self.vad_events.append(event)
@@ -1605,3 +1615,70 @@ async def test_scoped_rotation_waits_for_old_physical_cleanup_before_new_epoch()
     assert old.close_calls >= 2
     assert new.events == [first_new]
     await owner.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["replace", "handoff"])
+@pytest.mark.parametrize("stage", ["provider_build", "provider_warmup"])
+async def test_provider_startup_failure_preserves_phase_and_current_provider(
+    operation: str,
+    stage: str,
+) -> None:
+    failure = GpuWorkerRequestError("heartbeat_timeout", {"raw_payload": "private-model-path"})
+
+    class FailingProvider(FakeProvider):
+        async def warmup(self) -> None:
+            raise failure
+
+    class FailingFactory(FakeProviderFactory):
+        async def create(self, request, *, gpu_runtime, on_terminal_failure=None):
+            if request.provider_id == "soniox":
+                if stage == "provider_build":
+                    raise failure
+                provider = FailingProvider(
+                    request.provider_id,
+                    gpu_runtime=gpu_runtime,
+                    channel=request.channel,
+                    gpu_device_id=request.gpu_device_id,
+                )
+                self.providers.append(provider)
+                return provider
+            return await super().create(
+                request,
+                gpu_runtime=gpu_runtime,
+                on_terminal_failure=on_terminal_failure,
+            )
+
+    provider_factory = FailingFactory()
+    owner, _, _, _ = _owner(provider_factory=provider_factory)
+    try:
+        await owner.replace_provider(
+            ProviderRuntimeBuildRequest(config=_resolved_config("self", "deepgram")),
+            start=True,
+        )
+        request = ProviderRuntimeBuildRequest(
+            config=_resolved_config("self", "soniox"), warmup=True
+        )
+        if operation == "replace":
+            result = await owner.replace_provider(request, start=True)
+        else:
+            result = await owner.handoff_provider(request, start=True)
+        assert result.status == "failed"
+        assert result.failure_stage == stage
+        assert result.failure_code == "heartbeat_timeout"
+        assert result.failure_type == "GpuWorkerRequestError"
+        assert owner.snapshot.channel_for("self").provider_id == "deepgram"
+        assert owner.snapshot.channel_for("self").phase == "running"
+        assert provider_factory.providers[0].close_calls == 0
+        assert provider_factory.providers[0].close_backend_calls == 0
+        if stage == "provider_warmup":
+            assert provider_factory.providers[1].close_calls == 1
+            assert provider_factory.providers[1].close_backend_calls == 1
+        failures = [item for item in owner.diagnostics if item.outcome == "failed"]
+        assert len(failures) == 1
+        assert failures[0].event == stage
+        assert failures[0].failure_code == "heartbeat_timeout"
+        assert failures[0].failure_type == "GpuWorkerRequestError"
+        assert "private-model-path" not in repr(failures)
+    finally:
+        await owner.close()

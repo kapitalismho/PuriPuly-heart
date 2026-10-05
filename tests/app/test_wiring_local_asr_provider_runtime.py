@@ -9,6 +9,7 @@ from uuid import uuid4
 import numpy as np
 import puripuly_heart.app.wiring_local_asr_provider_runtime as runtime_wiring
 import pytest
+from puripuly_heart.app.adapters.self_capture_provider import SelfCaptureProviderAdapter
 from puripuly_heart.app.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
     SharedSTTProviderFactory,
@@ -16,6 +17,7 @@ from puripuly_heart.app.wiring_local_asr_provider_runtime import (
 )
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 
+from puripuly_heart.app.ports.gpu_worker import GpuWorkerRequestError
 from puripuly_heart.app.wiring.wiring_stt_factory import build_peer_stt_provider_request
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.resolved import (
@@ -30,7 +32,10 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureSessionConfig,
     PeerCaptureTargetIntent,
 )
+from puripuly_heart.core.runtime.gpu_asr import SharedGpuASRRuntime
+from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 from puripuly_heart.core.stt.backend import PermanentSTTScopedSessionError, STTSessionProjection
 from puripuly_heart.core.stt.custom import (
     CustomSTTConfigurationError,
@@ -43,6 +48,15 @@ from puripuly_heart.core.stt.scoped_engine import (
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.custom import _OfflineOpenAITranscriptionSession
+from tests.core.runtime.test_gpu_asr import (
+    DEVICE,
+    FakeGpuWorkerClient,
+    FakeGpuWorkerFactory,
+)
+from tests.core.runtime.test_local_asr_provider_runtime import (
+    FakeProvisioningPort,
+    _resolved_config,
+)
 
 
 class _RuntimeLogging:
@@ -585,3 +599,334 @@ def test_custom_realtime_profile_releases_after_completed_write() -> None:
 
     assert profile.release_after_write is True
     assert profile.retained_bytes_per_sample == 2
+
+
+def _gpu_build_request(channel: str, *, warmup: bool) -> ProviderRuntimeBuildRequest:
+    return ProviderRuntimeBuildRequest(
+        config=_resolved_config(channel, "local_qwen_gpu"),
+        gpu_device_id=DEVICE.device_id,
+        warmup=warmup,
+        provider_signature=("local_qwen_gpu",),
+        runtime_signature=("local_qwen_gpu",),
+        recognition_projection="scoped",
+    )
+
+
+def _production_gpu_owner(
+    tmp_path: Path,
+    client: FakeGpuWorkerClient,
+) -> tuple[LocalASRProviderRuntimeOwner, FakeGpuWorkerFactory, asyncio.Queue, asyncio.Queue]:
+    worker_factory = FakeGpuWorkerFactory([FakeGpuWorkerClient(), client])
+    self_events = asyncio.Queue()
+    peer_events = asyncio.Queue()
+    owner = LocalASRProviderRuntimeOwner(
+        provider_factory=SharedSTTProviderFactory(
+            secrets=object(),
+            clock=FakeClock(),
+            reset_deadline_s=300.0,
+            gpu_model_path=tmp_path / "model.gguf",
+        ),
+        gpu_runtime_factory=lambda sink: SharedGpuASRRuntime(
+            process_factory=worker_factory,
+            diagnostic_sink=sink,
+        ),
+        provisioning=FakeProvisioningPort(),
+        self_event_handler=self_events.put,
+        peer_event_handler=peer_events.put,
+    )
+    return owner, worker_factory, self_events, peer_events
+
+
+async def _recognize_gpu_speech(
+    owner,
+    channel,
+    events,
+    *,
+    settings: AudioSegmentSettingsSnapshot | None = None,
+) -> object:
+    start, end = _retention_owned_events(
+        settings or _retention_settings("local_qwen_gpu"),
+        content_samples=1600,
+    )
+    await owner.handle_owned_vad_event(channel, start)
+    await owner.handle_owned_vad_event(channel, end)
+    return await asyncio.wait_for(events.get(), timeout=1)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer_active", [False, True])
+async def test_production_self_ingress_prepares_gpu_before_first_speech(
+    tmp_path: Path,
+    peer_active: bool,
+) -> None:
+    client = FakeGpuWorkerClient()
+    owner, workers, self_events, peer_events = _production_gpu_owner(tmp_path, client)
+    adapter = SelfCaptureProviderAdapter(owner, None)
+    config = SelfCaptureSessionConfig(
+        provider_id="local_qwen_gpu",
+        provider_signature=("local_qwen_gpu",),
+        capture_signature=("capture",),
+        runtime_signature=("local_qwen_gpu",),
+        target_sample_rate_hz=16000,
+        local_gpu=True,
+    )
+    try:
+        await owner.start()
+        if peer_active:
+            peer_result = await owner.replace_provider(
+                _gpu_build_request("peer", warmup=True),
+                start=True,
+            )
+            assert peer_result.status == "applied"
+            assert owner.snapshot.gpu.active_channels == frozenset({"peer"})
+            assert owner.snapshot.gpu.model_resident
+        else:
+            assert owner.snapshot.gpu.active_channels == frozenset()
+            assert not owner.snapshot.gpu.model_resident
+        assert not adapter.is_ready(config)
+        result = await owner.replace_provider(
+            _gpu_build_request("self", warmup=True),
+            start=False,
+        )
+        assert result.status == "applied"
+        assert adapter.is_ready(config)
+        await adapter.start_ingress()
+        expected_channels = frozenset({"self", "peer"} if peer_active else {"self"})
+        assert owner.snapshot.gpu.active_channels == expected_channels
+        assert owner.snapshot.gpu.phase == "ready"
+        assert owner.snapshot.gpu.model_resident
+        assert owner.snapshot.gpu.worker_pid == client.pid
+        assert workers.modes == ["discovery", "persistent"]
+        assert len(client.activate_calls) == 1
+        assert client.transcribe_calls == []
+        assert self_events.empty()
+        assert peer_events.empty()
+        await adapter.warmup()
+        assert len(client.activate_calls) == 1
+        terminal = await _recognize_gpu_speech(owner, "self", self_events)
+        assert terminal.outcome == "final"
+        assert terminal.text == "self-1"
+        assert len(client.activate_calls) == 1
+        await owner.release_channel("self", mode="abort")
+        if peer_active:
+            assert owner.snapshot.gpu.active_channels == frozenset({"peer"})
+            assert owner.snapshot.gpu.worker_pid == client.pid
+            assert client.close_calls == 0
+            peer_terminal = await _recognize_gpu_speech(owner, "peer", peer_events)
+            assert peer_terminal.outcome == "final"
+            assert peer_terminal.text == "peer-2"
+        else:
+            assert owner.snapshot.gpu.active_channels == frozenset()
+            assert client.close_calls == 1
+    finally:
+        await owner.close()
+    assert client.close_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_production_peer_without_warmup_stays_lazy_until_requested(
+    tmp_path: Path,
+) -> None:
+    client = FakeGpuWorkerClient()
+    owner, workers, _self_events, _peer_events = _production_gpu_owner(tmp_path, client)
+    try:
+        await owner.start()
+        result = await owner.replace_provider(
+            _gpu_build_request("peer", warmup=False),
+            start=True,
+        )
+        assert result.status == "applied"
+        assert workers.modes == ["discovery"]
+        assert owner.snapshot.gpu.active_channels == frozenset()
+        await owner.warmup_channel("peer")
+        assert workers.modes == ["discovery", "persistent"]
+        assert owner.snapshot.gpu.active_channels == frozenset({"peer"})
+        assert owner.snapshot.gpu.model_resident
+        assert client.transcribe_calls == []
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_production_failed_gpu_preparation_discards_backend_resources(
+    tmp_path: Path,
+) -> None:
+    client = FakeGpuWorkerClient(activation_error=GpuWorkerRequestError("model_missing"))
+    owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
+    try:
+        await owner.start()
+        result = await owner.replace_provider(
+            _gpu_build_request("self", warmup=True),
+            start=False,
+        )
+        assert result.status == "failed"
+        assert result.failure_code == "model_missing"
+        assert result.failure_stage == "provider_warmup"
+        assert result.failure_type == "GpuASRManualRetryRequired"
+        assert owner.current_provider("self") is None
+        assert owner.snapshot.gpu.active_channels == frozenset()
+        assert not owner.snapshot.gpu.model_resident
+        assert workers.modes == ["discovery", "persistent"]
+        assert client.close_calls == 1
+        assert client.transcribe_calls == []
+        assert self_events.empty()
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_production_cancelled_gpu_preparation_discards_backend_resources(
+    tmp_path: Path,
+) -> None:
+    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
+    await owner.start()
+    building = asyncio.create_task(
+        owner.replace_provider(_gpu_build_request("self", warmup=True), start=False)
+    )
+    try:
+        await asyncio.wait_for(client.activation_started.wait(), timeout=1)
+        building.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(building, timeout=1)
+        assert owner.current_provider("self") is None
+        assert owner.snapshot.gpu.active_channels == frozenset()
+        assert not owner.snapshot.gpu.model_resident
+        assert workers.modes == ["discovery", "persistent"]
+        assert client.close_calls == 1
+        assert client.transcribe_calls == []
+        assert self_events.empty()
+    finally:
+        client.activation_gate.set()
+        await asyncio.gather(building, return_exceptions=True)
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_scoped_gpu_warmup_cannot_revive_closing_or_closed_engine(
+    tmp_path: Path,
+) -> None:
+    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    owner, _workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
+    await owner.start()
+    result = await owner.replace_provider(
+        _gpu_build_request("self", warmup=False),
+        start=False,
+    )
+    assert result.status == "applied"
+    engine = owner.current_provider("self")
+    preparing = asyncio.create_task(engine.warmup())
+    closing = None
+    try:
+        await asyncio.wait_for(client.activation_started.wait(), timeout=1)
+        closing = asyncio.create_task(engine.close_backend())
+        async with asyncio.timeout(1):
+            while engine.is_live:
+                await asyncio.sleep(0)
+        with pytest.raises(RuntimeError, match="engine is closed"):
+            await engine.warmup()
+        client.activation_gate.set()
+        with pytest.raises(RuntimeError, match="engine is closed"):
+            await asyncio.wait_for(preparing, timeout=1)
+        await asyncio.wait_for(closing, timeout=1)
+        assert owner.snapshot.gpu.active_channels == frozenset()
+        assert client.close_calls == 1
+        assert client.transcribe_calls == []
+        assert self_events.empty()
+        with pytest.raises(RuntimeError, match="engine is closed"):
+            await engine.warmup()
+    finally:
+        client.activation_gate.set()
+        await asyncio.gather(
+            preparing,
+            *(() if closing is None else (closing,)),
+            return_exceptions=True,
+        )
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_production_same_channel_replacement_survives_retired_backend_close(
+    tmp_path: Path,
+) -> None:
+    client = FakeGpuWorkerClient()
+    owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
+    try:
+        await owner.start()
+        request = _gpu_build_request("self", warmup=True)
+        assert (await owner.replace_provider(request, start=True)).status == "applied"
+        retired = owner.current_provider("self")
+        replacement = replace(request, runtime_signature=("replacement_input",))
+        assert (await owner.replace_provider(replacement, start=True)).status == "applied"
+        current = owner.current_provider("self")
+        assert current is not retired
+        assert owner.snapshot.gpu.active_channels == frozenset({"self"})
+        assert owner.snapshot.gpu.model_resident
+        assert client.close_calls == 0
+        assert workers.modes == ["discovery", "persistent"]
+        assert len(client.activate_calls) == 1
+        terminal = await _recognize_gpu_speech(
+            owner,
+            "self",
+            self_events,
+            settings=replace(
+                _retention_settings("local_qwen_gpu"),
+                runtime_signature=replacement.runtime_signature,
+            ),
+        )
+        assert terminal.outcome == "final"
+        assert terminal.text == "self-1"
+        assert not retired.is_live
+        assert owner.snapshot.gpu.active_channels == frozenset({"self"})
+        assert client.close_calls == 0
+        await owner.release_channel("self", mode="abort")
+        assert owner.snapshot.gpu.active_channels == frozenset()
+        assert client.close_calls == 1
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_production_cancelled_same_channel_candidate_preserves_live_preparation(
+    tmp_path: Path,
+) -> None:
+    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
+    await owner.start()
+    request = _gpu_build_request("self", warmup=False)
+    assert (await owner.replace_provider(request, start=True)).status == "applied"
+    current = owner.current_provider("self")
+    warming = asyncio.create_task(owner.warmup_channel("self"))
+    candidate = None
+    try:
+        await asyncio.wait_for(client.activation_started.wait(), timeout=1)
+        candidate = asyncio.create_task(
+            owner.replace_provider(replace(request, warmup=True), start=True)
+        )
+        async with asyncio.timeout(1):
+            while len(owner._gpu_runtime._active_channels.get("self", ())) != 2:
+                await asyncio.sleep(0)
+        candidate.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(candidate, timeout=1)
+        assert owner.current_provider("self") is current
+        assert current.is_live
+        assert owner.snapshot.gpu.active_channels == frozenset({"self"})
+        assert client.close_calls == 0
+        assert not warming.done()
+        client.activation_gate.set()
+        await asyncio.wait_for(warming, timeout=1)
+        assert owner.snapshot.gpu.model_resident
+        assert workers.modes == ["discovery", "persistent"]
+        terminal = await _recognize_gpu_speech(owner, "self", self_events)
+        assert terminal.outcome == "final"
+        assert terminal.text == "self-1"
+    finally:
+        client.activation_gate.set()
+        await asyncio.gather(
+            warming,
+            *(() if candidate is None else (candidate,)),
+            return_exceptions=True,
+        )
+        await owner.close()
+    assert client.close_calls == 1

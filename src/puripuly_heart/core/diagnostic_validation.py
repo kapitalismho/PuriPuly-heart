@@ -192,6 +192,98 @@ _DESKTOP_OVERLAY_REPRO_FAILURE_REASONS: Final = frozenset(
         "artifact_invalid",
     }
 )
+_STT_STARTUP_FAILURE_STAGES: Final = frozenset(
+    {
+        "readiness",
+        "provider_build",
+        "provider_warmup",
+        "provider_replace",
+        "provider_handoff",
+        "ingress",
+    }
+)
+_STT_STARTUP_FAILURE_CODES: Final = frozenset(
+    {
+        "activation_failed",
+        "activation_cancelled",
+        "backend_failure",
+        "channel_cancel_timeout",
+        "device_change_requires_quiesce",
+        "device_unavailable",
+        "download_failed",
+        "downloading",
+        "event_stream_closed",
+        "frame_reader_failed",
+        "gpu_not_ready",
+        "heartbeat_timeout",
+        "invalid",
+        "manual_retry_required",
+        "missing",
+        "model_missing",
+        "model_invalid",
+        "no_supported_gpu",
+        "not_requested",
+        "out_of_memory",
+        "provider_readiness_unavailable",
+        "provider_unavailable",
+        "saved_device_missing",
+        "self_channel_inactive",
+        "strict_vulkan_rejected",
+        "unsupported_capability",
+        "warmup_failed",
+        "worker_closed",
+        "worker_failed",
+        "worker_process_exited",
+        "worker_recovery_failed",
+        "worker_shutdown_failed",
+    }
+)
+_STT_STARTUP_FAILURE_TYPES: Final = frozenset(
+    {
+        "RuntimeError",
+        "OSError",
+        "TimeoutError",
+        "ConnectionError",
+        "ValueError",
+        "TypeError",
+        "ImportError",
+        "ModuleNotFoundError",
+        "FileNotFoundError",
+        "PermissionError",
+        "GpuWorkerError",
+        "GpuWorkerRequestError",
+        "GpuWorkerClosedError",
+        "GpuASRRuntimeError",
+        "GpuASRManualRetryRequired",
+        "LocalSTTAssetError",
+        "LocalSTTModelMissingError",
+        "LocalSTTManifestInvalidError",
+        "LocalQwenRuntimeBootstrapError",
+        "LocalQwenSherpaLoadError",
+        "LocalParakeetSherpaLoadError",
+        "ProviderReadinessError",
+        "SelfCaptureIngressError",
+    }
+)
+
+
+def stt_startup_failure_stage(value: str | None) -> str:
+    if value is None:
+        return "none"
+    return value if value in _STT_STARTUP_FAILURE_STAGES else "unclassified"
+
+
+def stt_startup_failure_code(value: str | None) -> str:
+    if value is None:
+        return "none"
+    return value if value in _STT_STARTUP_FAILURE_CODES else "unclassified"
+
+
+def stt_startup_failure_type(value: str | None) -> str:
+    if value is None:
+        return "none"
+    return value if value in _STT_STARTUP_FAILURE_TYPES else "unclassified"
+
 
 _SAFE_REDACTION_MARKERS: Final = frozenset(
     {
@@ -1219,6 +1311,9 @@ __all__ = [
     "redact_message_params_for_sink",
     "redact_text_for_sink",
     "redact_user_message_ref_for_sink",
+    "stt_startup_failure_code",
+    "stt_startup_failure_stage",
+    "stt_startup_failure_type",
     "validate_diagnostics_for_sink",
     "validate_desktop_renderer_event",
     "validate_desktop_overlay_repro_record",

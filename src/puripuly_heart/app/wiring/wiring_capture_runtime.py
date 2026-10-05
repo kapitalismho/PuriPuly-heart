@@ -15,6 +15,11 @@ from puripuly_heart.core.audio.diagnostics import AudioFaultProfile, FaultInject
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.audio.source import AudioSource
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.diagnostic_validation import (
+    stt_startup_failure_code,
+    stt_startup_failure_stage,
+    stt_startup_failure_type,
+)
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     ProviderRuntimeBuildRequest,
@@ -96,6 +101,9 @@ class CaptureDiagnosticsAdapter:
             f"provider={diagnostic.provider_id if diagnostic.provider_id in _CAPTURE_PROVIDER_IDS else 'unclassified'}",
             f"cause={diagnostic.reason.value if diagnostic.reason is not None else 'none'}",
             f"detail={diagnostic.detail if diagnostic.detail in _CAPTURE_DETAIL_TYPES else 'none'}",
+            f"failure_stage={stt_startup_failure_stage(diagnostic.failure_stage)}",
+            f"failure_code={stt_startup_failure_code(diagnostic.failure_code)}",
+            f"failure_type={stt_startup_failure_type(diagnostic.failure_type)}",
             f"recognition_reason={recognition_cause(diagnostic.recognition_reason)}",
             f"utterance_id={diagnostic.utterance_id if diagnostic.utterance_id is not None else 'none'}",
             f"epoch={_safe_capture_id(diagnostic.epoch, allow_admission=True) if diagnostic.epoch is not None else 'none'}",

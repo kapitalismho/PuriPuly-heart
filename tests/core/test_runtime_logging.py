@@ -14,7 +14,10 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
+from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
+from puripuly_heart.app.wiring.wiring_capture_runtime import CaptureDiagnosticsAdapter
 from puripuly_heart.core import runtime_logging as runtime_logging_module
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
@@ -45,6 +48,12 @@ from puripuly_heart.core.runtime_logging import (
     RuntimeLoggingSinks,
     SessionRuntimeLoggingService,
     configure_main_logging,
+)
+from puripuly_heart.core.self_capture import (
+    SelfCaptureDiagnostic,
+    SelfCaptureDiagnosticEvent,
+    SelfCaptureFailureReason,
+    SelfCaptureSessionState,
 )
 
 
@@ -1557,3 +1566,110 @@ async def test_soniox_failure_metadata_survives_file_sink_without_external_conte
     assert "fake_key" not in persisted + live.getvalue()
     assert "synthetic-key" not in persisted + live.getvalue()
     assert "untrusted_record_redacted" not in summaries[0]
+
+
+@pytest.mark.parametrize(
+    ("stage", "code", "exception_class"),
+    [
+        ("readiness", "provider_readiness_unavailable", "ProviderReadinessError"),
+        ("provider_build", "worker_process_exited", "GpuWorkerClosedError"),
+        ("provider_warmup", "heartbeat_timeout", "GpuWorkerRequestError"),
+        ("provider_warmup", "model_missing", "GpuASRManualRetryRequired"),
+        ("ingress", "gpu_not_ready", "SelfCaptureIngressError"),
+        ("ingress", "self_channel_inactive", "SelfCaptureIngressError"),
+        ("ingress", "provider_unavailable", "SelfCaptureIngressError"),
+        ("private_stage_token", "private_cause_token", "PrivateExceptionToken"),
+        (
+            "provider_warmup token=private-secret",
+            "C:/private/model.gguf",
+            "transcript=private-secret",
+        ),
+    ],
+)
+def test_stt_startup_failure_identity_survives_persisted_redaction_without_external_tokens(
+    tmp_path,
+    stage: str,
+    code: str,
+    exception_class: str,
+) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.stt_startup.{uuid4()}")
+    root_logger.propagate = False
+    session_logger = logging.getLogger(f"test.runtime_logging.stt_startup.session.{uuid4()}")
+    session_logger.propagate = False
+    stream = io.StringIO()
+    stream_handler = logging.StreamHandler(stream)
+    log_file = tmp_path / "stt-startup.log"
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(message)s"))
+    runtime_logging = SessionRuntimeLoggingService(
+        root_logger=root_logger,
+        session_logger=session_logger,
+        sinks=RuntimeLoggingSinks(
+            stream_handler=stream_handler,
+            file_handler=file_handler,
+            log_file=log_file,
+        ),
+    )
+    capture = CaptureDiagnosticsAdapter(
+        debug_allowed=lambda: False,
+        capture_fault_profile=lambda: "none",
+        log_diagnostic=runtime_logging.emit_diagnostic,
+        log_basic=runtime_logging.emit_basic,
+    )
+    local_asr = LocalASRDiagnosticsOwner(
+        basic_log_sink=lambda message, level: runtime_logging.emit_basic(message, level=level),
+        diagnostic_log_sink=runtime_logging.emit_diagnostic,
+        gpu_effect_sink=lambda _effect: None,
+        gpu_discovery_origin_provider=lambda: "settings",
+        gpu_provider_id="local_qwen_gpu",
+    )
+    try:
+        capture.self_capture(
+            SelfCaptureDiagnostic(
+                event=SelfCaptureDiagnosticEvent.FAILURE,
+                generation=1,
+                state=SelfCaptureSessionState.STARTING,
+                provider_id="local_qwen_gpu",
+                reason=SelfCaptureFailureReason.PROVIDER_FAILED,
+                failure_stage=stage,
+                failure_code=code,
+                failure_type=exception_class,
+            )
+        )
+        local_asr.provider_runtime_diagnostic(
+            ProviderRuntimeDiagnostic(
+                event=stage if stage in {"provider_build", "provider_warmup"} else "provider_build",
+                outcome="failed",
+                channel="self",
+                provider_id="private_provider_token",
+                model_id="C:/private/model.gguf",
+                device_id="private_device_token",
+                failure_code=code,
+                failure_type=exception_class,
+            )
+        )
+        file_handler.flush()
+        persisted = log_file.read_text(encoding="utf-8")
+        records = persisted.splitlines()
+        assert len(records) == 2
+        assert records[0].startswith("[SelfCapture] failed ")
+        assert records[1].startswith("[LocalASR] failed ")
+        assert "cause=provider_failed" in records[0]
+        if stage.startswith("private") or "private-secret" in stage:
+            assert "failure_stage=unclassified" in records[0]
+            assert all("failure_code=unclassified" in record for record in records)
+            assert all("failure_type=unclassified" in record for record in records)
+        else:
+            assert f"failure_stage={stage}" in records[0]
+            assert all(f"failure_code={code}" in record for record in records)
+            assert all(f"failure_type={exception_class}" in record for record in records)
+        if stage in {"provider_build", "provider_warmup"}:
+            assert f"failure_stage={stage}" in records[1]
+        assert "private" not in persisted.casefold()
+        assert "PrivateExceptionToken" not in persisted
+        assert "C:/" not in persisted
+        assert "untrusted_record_redacted" not in persisted
+        assert "[LocalASR]" not in stream.getvalue()
+    finally:
+        runtime_logging.close()
+        file_handler.close()

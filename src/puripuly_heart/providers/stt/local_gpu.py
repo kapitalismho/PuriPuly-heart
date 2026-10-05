@@ -53,6 +53,7 @@ class LocalGpuSTTBackend(STTBackend):
     _lock: asyncio.Lock = field(init=False, repr=False)
     _closing: bool = field(init=False, default=False, repr=False)
     _quarantined_session: _LocalGpuSTTSession | None = field(init=False, default=None, repr=False)
+    _resource_owner: object = field(init=False, default_factory=object, repr=False)
 
     def __post_init__(self) -> None:
         if self.sample_rate_hz != 16_000:
@@ -61,11 +62,7 @@ class LocalGpuSTTBackend(STTBackend):
             raise ValueError("active_decode_timeout_s must be > 0")
         self._lock = asyncio.Lock()
 
-    async def open_session(
-        self,
-        *,
-        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
-    ) -> STTBackendSession:
+    async def prepare(self) -> None:
         async with self._lock:
             if self._closed or self._closing:
                 raise RuntimeError("Local GPU STT backend is closed")
@@ -74,11 +71,19 @@ class LocalGpuSTTBackend(STTBackend):
             if not self._active:
                 await self.runtime.activate_channel(
                     self.channel,
+                    owner=self._resource_owner,
                     model_path=self.model_path,
                     model_id=self.model_id,
                     device_id=self.device_id,
                 )
                 self._active = True
+
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ) -> STTBackendSession:
+        await self.prepare()
         return _LocalGpuSTTSession(backend=self, projection=projection)
 
     async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None:
@@ -95,9 +100,10 @@ class LocalGpuSTTBackend(STTBackend):
             await quarantined.close()
         async with self._lock:
             try:
-                active = self._active or self.channel in self.runtime.active_channels
-                if active:
-                    await self.runtime.deactivate_channel(self.channel)
+                await self.runtime.deactivate_channel(
+                    self.channel,
+                    owner=self._resource_owner,
+                )
             except BaseException:
                 self._closing = False
                 raise

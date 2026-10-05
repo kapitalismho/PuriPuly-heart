@@ -6,8 +6,10 @@ from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelRes
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     ProviderRuntimeBuildRequest,
+    ProviderRuntimeMutationResult,
 )
 from puripuly_heart.core.self_capture import (
+    SelfCaptureIngressError,
     SelfCaptureProviderMutation,
     SelfCaptureProviderMutationStatus,
     SelfCaptureSessionConfig,
@@ -51,10 +53,7 @@ class SelfCaptureProviderAdapter:
             start=start,
             on_terminal_failure=on_terminal_failure,
         )
-        return self._mutation(
-            result.status,
-            getattr(result, "failure_code", None) or result.failure_type,
-        )
+        return self._mutation(result)
 
     async def handoff(
         self,
@@ -69,31 +68,32 @@ class SelfCaptureProviderAdapter:
             start=start,
             on_terminal_failure=on_terminal_failure,
         )
-        return self._mutation(
-            result.status,
-            getattr(result, "failure_code", None) or result.failure_type,
-        )
+        return self._mutation(result)
 
     async def cancel_handoff(self) -> bool:
         return await self._require_runtime().cancel_handoff("self")
 
     async def start_ingress(self) -> None:
-        runtime = self._require_runtime()
+        if self._runtime is None:
+            raise SelfCaptureIngressError("provider_unavailable")
+        runtime = self._runtime
         await runtime.start_channel("self")
         config = self._config
         if config is None:
-            raise RuntimeError("Self provider runtime is unavailable")
+            raise SelfCaptureIngressError("provider_unavailable")
         channel = runtime.snapshot.channel_for("self")
         if (
             channel.provider_id != config.provider_id
             or not channel.has_resources
             or not channel.provider_live
         ):
-            raise RuntimeError("Self provider ingress did not become ready")
+            raise SelfCaptureIngressError("provider_unavailable")
         if config.local_gpu:
             gpu = runtime.snapshot.gpu
-            if gpu.phase != "ready" or "self" not in gpu.active_channels:
-                raise RuntimeError("Self GPU provider ingress did not become ready")
+            if gpu.phase != "ready":
+                raise SelfCaptureIngressError("gpu_not_ready")
+            if "self" not in gpu.active_channels:
+                raise SelfCaptureIngressError("self_channel_inactive")
 
     async def warmup(self) -> None:
         await self._require_runtime().warmup_channel("self")
@@ -134,12 +134,18 @@ class SelfCaptureProviderAdapter:
         return request
 
     @staticmethod
-    def _mutation(status: str, failure_type: str | None) -> SelfCaptureProviderMutation:
+    def _mutation(result: ProviderRuntimeMutationResult) -> SelfCaptureProviderMutation:
         try:
-            mapped_status = SelfCaptureProviderMutationStatus(status)
+            mapped_status = SelfCaptureProviderMutationStatus(result.status)
         except ValueError:
             mapped_status = SelfCaptureProviderMutationStatus.FAILED
-        return SelfCaptureProviderMutation(mapped_status, reason=failure_type)
+        return SelfCaptureProviderMutation(
+            mapped_status,
+            reason=result.failure_code or result.failure_type,
+            failure_code=result.failure_code,
+            failure_type=result.failure_type,
+            failure_stage=result.failure_stage,
+        )
 
 
 __all__ = ["SelfCaptureProviderAdapter"]

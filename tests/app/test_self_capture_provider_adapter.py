@@ -9,6 +9,7 @@ from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildR
 
 from puripuly_heart.config.resolved import ResolvedSTTConfig
 from puripuly_heart.core.self_capture import (
+    SelfCaptureIngressError,
     SelfCaptureProviderMutationStatus,
     SelfCaptureSessionConfig,
 )
@@ -56,8 +57,15 @@ class RecordingRuntime:
     def __init__(self) -> None:
         self.snapshot = _snapshot()
         self.calls: list[tuple[object, ...]] = []
-        self.replace_result = SimpleNamespace(status="applied", failure_type=None)
-        self.handoff_result = SimpleNamespace(status="failed", failure_type="provider_error")
+        self.replace_result = SimpleNamespace(
+            status="applied", failure_code=None, failure_type=None, failure_stage=None
+        )
+        self.handoff_result = SimpleNamespace(
+            status="failed",
+            failure_code="worker_process_exited",
+            failure_type="GpuWorkerClosedError",
+            failure_stage="provider_warmup",
+        )
 
     async def reset_provider_channel(self, channel):
         self.calls.append(("reset", channel))
@@ -126,7 +134,10 @@ async def test_mutations_forward_terminal_failure_owner_and_map_results() -> Non
 
     assert replaced.status is SelfCaptureProviderMutationStatus.APPLIED
     assert handed_off.status is SelfCaptureProviderMutationStatus.FAILED
-    assert handed_off.reason == "provider_error"
+    assert handed_off.reason == "worker_process_exited"
+    assert handed_off.failure_code == "worker_process_exited"
+    assert handed_off.failure_type == "GpuWorkerClosedError"
+    assert handed_off.failure_stage == "provider_warmup"
     assert runtime.calls == [
         ("reset", "self"),
         (
@@ -159,16 +170,31 @@ async def test_start_ingress_validates_provider_and_gpu_activation() -> None:
     assert runtime.calls == [("start", "self")]
 
     runtime.snapshot = _snapshot(provider_id="deepgram")
-    with pytest.raises(RuntimeError, match="ingress did not become ready"):
+    with pytest.raises(SelfCaptureIngressError) as unavailable:
         await adapter.start_ingress()
+    assert unavailable.value.code == "provider_unavailable"
 
     runtime.snapshot = _snapshot(
         provider_id="local_qwen_gpu",
         gpu_phase="ready",
         active_channels=frozenset(),
     )
-    with pytest.raises(RuntimeError, match="GPU provider ingress"):
+    with pytest.raises(SelfCaptureIngressError) as inactive:
         await adapter.start_ingress()
+    assert inactive.value.code == "self_channel_inactive"
+
+    runtime.snapshot = _snapshot(
+        provider_id="local_qwen_gpu",
+        gpu_phase="available",
+        active_channels=frozenset({"peer"}),
+    )
+    with pytest.raises(SelfCaptureIngressError) as gpu_not_ready:
+        await adapter.start_ingress()
+    assert gpu_not_ready.value.code == "gpu_not_ready"
+
+    with pytest.raises(SelfCaptureIngressError) as missing_runtime:
+        await SelfCaptureProviderAdapter(None, None).start_ingress()
+    assert missing_runtime.value.code == "provider_unavailable"
 
 
 @pytest.mark.asyncio

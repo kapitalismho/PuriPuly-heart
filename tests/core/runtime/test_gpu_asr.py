@@ -40,6 +40,8 @@ from puripuly_heart.core.stt.backend import (
 )
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 
+_GPU_OWNERS = {"self": object(), "peer": object()}
+
 DEVICE = GpuWorkerDevice(
     device_id="vulkan:0",
     registry_index=0,
@@ -187,6 +189,7 @@ async def _activate(
 ) -> GpuWorkerActivation:
     return await runtime.activate_channel(
         channel,
+        owner=_GPU_OWNERS[channel],
         model_path=Path("model.gguf"),
         model_id="qwen-gpu",
         device_id="vulkan:0",
@@ -206,11 +209,11 @@ async def test_one_worker_and_model_are_shared_until_last_channel_deactivates() 
     assert len(client.activate_calls) == 1
     assert runtime.active_channels == frozenset({"self", "peer"})
 
-    await runtime.deactivate_channel("self")
+    await runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"])
     assert client.close_calls == 0
     assert runtime.state == GpuASRRuntimeState.READY
 
-    await runtime.deactivate_channel("peer")
+    await runtime.deactivate_channel("peer", owner=_GPU_OWNERS["peer"])
     assert client.close_calls == 1
     assert runtime.state == GpuASRRuntimeState.STOPPED
     await runtime.close()
@@ -236,10 +239,11 @@ async def test_device_change_after_full_quiesce_accepts_both_channel_orders(
     await _activate(runtime, "peer")
 
     for channel in stop_order:
-        await runtime.deactivate_channel(channel)
+        await runtime.deactivate_channel(channel, owner=_GPU_OWNERS[channel])
     for channel in restore_order:
         await runtime.activate_channel(
             channel,
+            owner=_GPU_OWNERS[channel],
             model_path=Path("model.gguf"),
             model_id="qwen-gpu",
             device_id="vulkan:1",
@@ -449,7 +453,7 @@ async def test_last_disable_cancels_active_work_and_awaits_worker_close() -> Non
     )
     await client.started.wait()
 
-    await runtime.deactivate_channel("self")
+    await runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"])
 
     with pytest.raises(GpuASRWorkDiscarded):
         await work
@@ -504,7 +508,10 @@ async def test_terminal_shutdown_forces_noncooperative_worker_without_stopping_h
     await client.started.wait()
 
     if shutdown == "last_disable":
-        await asyncio.wait_for(runtime.deactivate_channel("self"), timeout=0.2)
+        await asyncio.wait_for(
+            runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"]),
+            timeout=0.2,
+        )
         expected_state = GpuASRRuntimeState.STOPPED
     else:
         await asyncio.wait_for(runtime.close(), timeout=0.2)
@@ -555,7 +562,7 @@ async def test_channel_disable_discards_only_its_work_and_retains_shared_worker(
     )
     await asyncio.sleep(0)
 
-    await runtime.deactivate_channel(disabled_channel)
+    await runtime.deactivate_channel(disabled_channel, owner=_GPU_OWNERS[disabled_channel])
     await _activate(runtime, disabled_channel)
 
     with pytest.raises(GpuASRWorkDiscarded, match="channel_disabled"):
@@ -595,7 +602,7 @@ async def test_channel_disable_rejects_unresolved_worker_result() -> None:
         )
     )
     await client.started.wait()
-    await runtime.deactivate_channel("self")
+    await runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"])
 
     with pytest.raises(GpuASRWorkDiscarded, match="channel_disabled"):
         await work
@@ -650,7 +657,10 @@ async def test_noncooperative_partial_channel_cancel_forces_bounded_worker_failu
     )
     await asyncio.sleep(0)
 
-    await asyncio.wait_for(runtime.deactivate_channel("self"), timeout=0.2)
+    await asyncio.wait_for(
+        runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"]),
+        timeout=0.2,
+    )
 
     with pytest.raises(GpuASRWorkDiscarded):
         await active
@@ -1412,7 +1422,7 @@ async def test_cancelled_last_channel_waiter_retains_cleanup_before_reactivation
             )
         ).text == "self-1"
         await asyncio.wait_for(asyncio.to_thread(entered.wait, 2), timeout=3)
-        waiter = asyncio.create_task(runtime.deactivate_channel("self"))
+        waiter = asyncio.create_task(runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"]))
         await asyncio.sleep(0)
         waiter.cancel()
         with pytest.raises(asyncio.CancelledError):
@@ -1430,4 +1440,45 @@ async def test_cancelled_last_channel_waiter_retains_cleanup_before_reactivation
     finally:
         release.set()
         monkeypatch.setattr(Path, "unlink", original_unlink)
+        await runtime.close()
+
+
+async def test_membership_owner_is_idempotent_and_only_last_owner_cancels_work() -> None:
+    client = FakeGpuWorkerClient(transcribe_gate=asyncio.Event())
+    factory = FakeGpuWorkerFactory([client])
+    runtime = SharedGpuASRRuntime(process_factory=factory, clock=FakeClock())
+    owners = (object(), object())
+    work = None
+    try:
+        for owner in (owners[0], owners[0], owners[1]):
+            await runtime.activate_channel(
+                "self",
+                owner=owner,
+                model_path=Path("model.gguf"),
+                model_id="qwen-gpu",
+                device_id=DEVICE.device_id,
+            )
+        assert factory.modes == ["persistent"]
+        assert len(client.activate_calls) == 1
+        work = asyncio.create_task(
+            runtime.submit("self", np.ones(1600, dtype=np.float32), speech_end_at=0)
+        )
+        await asyncio.wait_for(client.started.wait(), timeout=1)
+        await runtime.deactivate_channel("self", owner=object())
+        await runtime.deactivate_channel("self", owner=owners[0])
+        await runtime.deactivate_channel("self", owner=owners[0])
+        assert runtime.active_channels == frozenset({"self"})
+        assert runtime.state == GpuASRRuntimeState.READY
+        assert not work.done()
+        assert client.cancel_calls == []
+        assert client.close_calls == 0
+        await runtime.deactivate_channel("self", owner=owners[1])
+        with pytest.raises(GpuASRWorkDiscarded):
+            await work
+        assert runtime.active_channels == frozenset()
+        assert client.close_calls == 1
+    finally:
+        client.transcribe_gate.set()
+        if work is not None:
+            await asyncio.gather(work, return_exceptions=True)
         await runtime.close()

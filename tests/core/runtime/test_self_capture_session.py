@@ -22,6 +22,7 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureAdmissionStatus,
     SelfCaptureDiagnostic,
     SelfCaptureFailureReason,
+    SelfCaptureIngressError,
     SelfCaptureProviderMutation,
     SelfCaptureProviderMutationStatus,
     SelfCaptureProviderStatus,
@@ -1779,10 +1780,16 @@ async def test_same_signature_release_and_rebuild_rejects_retired_attachment_fai
 
 
 @pytest.mark.asyncio
-async def test_provider_ingress_start_failure_completes_and_releases_owned_resources() -> None:
+@pytest.mark.parametrize(
+    "cause", ["provider_unavailable", "gpu_not_ready", "self_channel_inactive"]
+)
+async def test_provider_ingress_start_failure_completes_and_releases_owned_resources(
+    cause: Literal["provider_unavailable", "gpu_not_ready", "self_channel_inactive"],
+) -> None:
     provider = RecordingProvider()
-    provider.start_failure = RuntimeError("provider ingress failed")
-    owner, _, _, sources, _, _ = build_owner(provider=provider)
+    provider.start_failure = SelfCaptureIngressError(cause)
+    diagnostics: list[SelfCaptureDiagnostic] = []
+    owner, _, _, sources, _, _ = build_owner(provider=provider, diagnostics=diagnostics)
 
     snapshot = await asyncio.wait_for(
         owner.apply_intent(config(), enabled=True),
@@ -1796,6 +1803,14 @@ async def test_provider_ingress_start_failure_completes_and_releases_owned_resou
     assert snapshot.has_loop_task is False
     assert sources[0].close_calls == 1
     assert provider.release_calls == [("abort", None)]
+    failures = [
+        item for item in diagnostics if item.reason is SelfCaptureFailureReason.PROVIDER_FAILED
+    ]
+    assert len(failures) == 1
+    assert failures[0].failure_stage == "ingress"
+    assert failures[0].failure_code == cause
+    assert failures[0].failure_type == "SelfCaptureIngressError"
+    assert failures[0].desired_active_after is False
 
 
 @pytest.mark.asyncio
@@ -2064,3 +2079,49 @@ async def test_overlapping_recoveries_adopt_their_exact_provider_callbacks() -> 
     assert owner.snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
     assert sources[2].close_calls == 1
     assert provider.release_calls == [("abort", None)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["activate", "prepare", "handoff"])
+@pytest.mark.parametrize("stage", ["provider_build", "provider_warmup", "readiness"])
+async def test_failed_provider_mutation_preserves_startup_failure_identity(
+    operation: str,
+    stage: str,
+) -> None:
+    provider = RecordingProvider()
+    diagnostics: list[SelfCaptureDiagnostic] = []
+    owner, _, _, sources, _, _ = build_owner(provider=provider, diagnostics=diagnostics)
+    mutation = SelfCaptureProviderMutation(
+        SelfCaptureProviderMutationStatus.FAILED,
+        reason="worker_process_exited",
+        failure_code="worker_process_exited",
+        failure_type="GpuWorkerClosedError",
+        failure_stage=stage,
+    )
+    try:
+        if operation == "handoff":
+            await owner.apply_intent(config("one"), enabled=True)
+            provider.handoff_result = mutation
+            snapshot = await owner.apply_intent(config("two"), enabled=True)
+            assert snapshot.effective_active is True
+            assert snapshot.provider_id == "provider-one"
+            assert sources[0].close_calls == 0
+        else:
+            provider.replace_result = mutation
+            if operation == "prepare":
+                snapshot = await owner.prepare_provider(config())
+            else:
+                snapshot = await owner.apply_intent(config(), enabled=True)
+            assert snapshot.state is SelfCaptureSessionState.FAULTED
+            assert snapshot.desired_active is False
+            assert sources == []
+        failures = [
+            item for item in diagnostics if item.reason is SelfCaptureFailureReason.PROVIDER_FAILED
+        ]
+        assert len(failures) == 1
+        assert failures[0].detail == mutation.reason
+        assert failures[0].failure_code == mutation.failure_code
+        assert failures[0].failure_type == mutation.failure_type
+        assert failures[0].failure_stage == stage
+    finally:
+        await owner.close()

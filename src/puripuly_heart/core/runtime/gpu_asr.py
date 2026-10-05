@@ -61,7 +61,9 @@ class GpuASRRuntimeError(RuntimeError):
 
 
 class GpuASRManualRetryRequired(GpuASRRuntimeError):
-    pass
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
 
 
 class GpuASRDecodeDropped(GpuASRRuntimeError):
@@ -154,7 +156,7 @@ class SharedGpuASRRuntime:
         self._discovery_lock = asyncio.Lock()
         self._queue_event = asyncio.Event()
         self._queue: list[_PendingWork] = []
-        self._active_channels: set[GpuASRChannel] = set()
+        self._active_channels: dict[GpuASRChannel, set[object]] = {}
         self._client: GpuWorkerClientPort | None = None
         self._activation: GpuWorkerActivation | None = None
         self._config: _ActivationConfig | None = None
@@ -236,6 +238,7 @@ class SharedGpuASRRuntime:
         self,
         channel: GpuASRChannel,
         *,
+        owner: object,
         model_path: Path,
         model_id: str,
         device_id: str,
@@ -253,7 +256,7 @@ class SharedGpuASRRuntime:
                 raise GpuASRRuntimeError("GPU runtime is stopping")
             if self._config is not None and self._config != config:
                 raise GpuASRRuntimeError("active GPU channels must share one model and device")
-            self._active_channels.add(channel)
+            self._active_channels.setdefault(channel, set()).add(owner)
             self._config = config
             if self._state == GpuASRRuntimeState.READY:
                 if self._activation is None:
@@ -358,16 +361,26 @@ class SharedGpuASRRuntime:
             self._queue_event.set()
         return await future
 
-    async def deactivate_channel(self, channel: GpuASRChannel) -> None:
+    async def deactivate_channel(self, channel: GpuASRChannel, *, owner: object) -> None:
         active: _PendingWork | None = None
         client: GpuWorkerClientPort | None = None
         pending_discarded = 0
         shutdown: asyncio.Task[None] | None = None
         async with self._lock:
+            owners = self._active_channels.get(channel)
+            if owners is not None and owner in owners:
+                owners.remove(owner)
+                if owners:
+                    return
+                self._active_channels.pop(channel)
+            elif self._active_channels or self._state in {
+                GpuASRRuntimeState.STOPPED,
+                GpuASRRuntimeState.CLOSED,
+            }:
+                return
             if self._shutdown_task is not None and not self._shutdown_task.done():
                 shutdown = self._shutdown_task
             else:
-                self._active_channels.discard(channel)
                 pending_discarded = self._discard_channel_pending_locked(
                     channel, "channel_disabled"
                 )

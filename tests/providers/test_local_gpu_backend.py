@@ -18,8 +18,10 @@ from puripuly_heart.core.audio.ownership import (
 )
 from puripuly_heart.core.runtime.gpu_asr import (
     GpuASRDecodeDropped,
+    GpuASRRuntimeState,
     GpuASRWorkDiscarded,
     GpuASRWorkExpired,
+    SharedGpuASRRuntime,
 )
 from puripuly_heart.core.stt.backend import (
     STTBackendTranscriptEvent,
@@ -29,6 +31,10 @@ from puripuly_heart.core.stt.backend import (
     STTSessionProjection,
 )
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
+from tests.core.runtime.test_gpu_asr import (
+    FakeGpuWorkerClient,
+    FakeGpuWorkerFactory,
+)
 
 SCOPED_PROJECTION = STTSessionProjection(mode="scoped", provider_epoch_id="gpu-epoch")
 
@@ -39,6 +45,7 @@ pytestmark = pytest.mark.asyncio
 class FakeSharedGpuRuntime:
     def __init__(self) -> None:
         self.active_channels: set[str] = set()
+        self.owners: dict[str, set[object]] = {}
         self.activations: list[tuple[str, Path, str, str]] = []
         self.submissions: list[tuple[str, np.ndarray, float, str | None]] = []
         self.deactivations: list[str] = []
@@ -50,11 +57,13 @@ class FakeSharedGpuRuntime:
         self,
         channel: str,
         *,
+        owner: object,
         model_path: Path,
         model_id: str,
         device_id: str,
     ) -> GpuWorkerActivation:
         self.active_channels.add(channel)
+        self.owners.setdefault(channel, set()).add(owner)
         self.activations.append((channel, model_path, model_id, device_id))
         return GpuWorkerActivation(
             device=GpuWorkerDevice(
@@ -106,10 +115,17 @@ class FakeSharedGpuRuntime:
             language_hint=language_hint,
         )
 
-    async def deactivate_channel(self, channel: str) -> None:
+    async def deactivate_channel(self, channel: str, *, owner: object) -> None:
+        owners = self.owners.get(channel)
+        if owners is None or owner not in owners:
+            return
         if self.deactivation_failures > 0:
             self.deactivation_failures -= 1
             raise RuntimeError("GPU shutdown failed")
+        owners.remove(owner)
+        if owners:
+            return
+        self.owners.pop(channel)
         self.active_channels.discard(channel)
         self.deactivations.append(channel)
 
@@ -396,6 +412,118 @@ async def test_backend_close_can_retry_after_runtime_shutdown_failure(tmp_path: 
 
     await backend.close()
     assert runtime.deactivations == ["self"]
+
+
+async def test_preparation_and_session_open_share_one_resource(tmp_path: Path) -> None:
+    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    factory = FakeGpuWorkerFactory([client])
+    runtime = SharedGpuASRRuntime(process_factory=factory)
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "model.gguf",
+        model_id="gpu-model",
+        device_id="vulkan:0",
+    )
+    preparing = asyncio.create_task(backend.prepare())
+    await asyncio.wait_for(client.activation_started.wait(), timeout=1)
+    opening = asyncio.create_task(backend.open_session(projection=SCOPED_PROJECTION))
+    preparing_again = asyncio.create_task(backend.prepare())
+    client.activation_gate.set()
+    try:
+        await asyncio.wait_for(preparing, timeout=1)
+        session = await asyncio.wait_for(opening, timeout=1)
+        await asyncio.wait_for(preparing_again, timeout=1)
+        assert factory.modes == ["persistent"]
+        assert len(client.activate_calls) == 1
+        assert runtime.active_channels == frozenset({"self"})
+        assert runtime.state == GpuASRRuntimeState.READY
+        assert client.transcribe_calls == []
+        await session.close()
+        assert not client.is_closed
+        await backend.close()
+        await backend.close()
+        assert client.close_calls == 1
+        assert runtime.active_channels == frozenset()
+        with pytest.raises(RuntimeError, match="backend is closed"):
+            await backend.prepare()
+        with pytest.raises(RuntimeError, match="backend is closed"):
+            await backend.open_session()
+    finally:
+        await backend.close()
+        await runtime.close()
+
+
+async def test_cancelled_preparation_releases_only_self_during_shared_activation(
+    tmp_path: Path,
+) -> None:
+    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    factory = FakeGpuWorkerFactory([client])
+    runtime = SharedGpuASRRuntime(process_factory=factory)
+    backends = {
+        channel: LocalGpuSTTBackend(
+            runtime=runtime,
+            channel=channel,
+            model_path=tmp_path / "model.gguf",
+            model_id="gpu-model",
+            device_id="vulkan:0",
+        )
+        for channel in ("self", "peer")
+    }
+    peer_preparing = asyncio.create_task(backends["peer"].prepare())
+    await asyncio.wait_for(client.activation_started.wait(), timeout=1)
+    self_preparing = asyncio.create_task(backends["self"].prepare())
+    try:
+        async with asyncio.timeout(1):
+            while "self" not in runtime.active_channels:
+                await asyncio.sleep(0)
+        self_preparing.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await self_preparing
+        await backends["self"].close()
+        assert runtime.active_channels == frozenset({"peer"})
+        assert client.close_calls == 0
+        assert not peer_preparing.done()
+        client.activation_gate.set()
+        await asyncio.wait_for(peer_preparing, timeout=1)
+        assert runtime.state == GpuASRRuntimeState.READY
+        assert factory.modes == ["persistent"]
+        assert len(client.activate_calls) == 1
+        assert client.transcribe_calls == []
+        await backends["peer"].close()
+        assert client.close_calls == 1
+    finally:
+        client.activation_gate.set()
+        await asyncio.gather(self_preparing, peer_preparing, return_exceptions=True)
+        for backend in backends.values():
+            await backend.close()
+        await runtime.close()
+
+
+async def test_close_serializes_with_resource_preparation(tmp_path: Path) -> None:
+    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    runtime = SharedGpuASRRuntime(process_factory=FakeGpuWorkerFactory([client]))
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "model.gguf",
+        model_id="gpu-model",
+        device_id="vulkan:0",
+    )
+    preparing = asyncio.create_task(backend.prepare())
+    await asyncio.wait_for(client.activation_started.wait(), timeout=1)
+    closing = asyncio.create_task(backend.close())
+    client.activation_gate.set()
+    try:
+        await asyncio.wait_for(preparing, timeout=1)
+        await asyncio.wait_for(closing, timeout=1)
+        assert runtime.active_channels == frozenset()
+        assert client.close_calls == 1
+        with pytest.raises(RuntimeError, match="backend is closed"):
+            await backend.prepare()
+    finally:
+        await backend.close()
+        await runtime.close()
 
 
 async def test_session_submits_float_audio_at_speech_end_without_blocking() -> None:
@@ -750,3 +878,43 @@ async def test_scoped_gpu_pending_capacity_reason_is_preserved() -> None:
     assert terminal.failure_reason == "pending_capacity"
     await session.close()
     await backend.close()
+
+
+async def test_failed_same_channel_preparation_cannot_release_live_owner(
+    tmp_path: Path,
+) -> None:
+    client = FakeGpuWorkerClient()
+    factory = FakeGpuWorkerFactory([client])
+    runtime = SharedGpuASRRuntime(process_factory=factory)
+    current = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "model.gguf",
+        model_id="gpu-model",
+        device_id="vulkan:0",
+    )
+    candidate = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "other-model.gguf",
+        model_id="other-model",
+        device_id="vulkan:0",
+    )
+    try:
+        await current.prepare()
+        with pytest.raises(RuntimeError, match="share one model and device"):
+            await candidate.prepare()
+        await candidate.close()
+        assert runtime.active_channels == frozenset({"self"})
+        assert runtime.state == GpuASRRuntimeState.READY
+        assert client.close_calls == 0
+        session = await current.open_session(projection=SCOPED_PROJECTION)
+        await session.close()
+        assert factory.modes == ["persistent"]
+        assert len(client.activate_calls) == 1
+        await current.close()
+        assert client.close_calls == 1
+    finally:
+        await candidate.close()
+        await current.close()
+        await runtime.close()

@@ -34,8 +34,8 @@ class _UnavailableGpuRuntime:
     async def discover_devices(self):
         return ()
 
-    async def activate_channel(self, channel, *, model_path, model_id, device_id):
-        _ = channel, model_path, model_id, device_id
+    async def activate_channel(self, channel, *, owner, model_path, model_id, device_id):
+        _ = channel, owner, model_path, model_id, device_id
         raise RuntimeError("prebuilt compatibility has no GPU worker")
 
     async def retry(self):
@@ -52,8 +52,8 @@ class _UnavailableGpuRuntime:
         _ = channel, samples_f32, speech_end_at, language_hint
         raise RuntimeError("prebuilt compatibility has no GPU worker")
 
-    async def deactivate_channel(self, channel) -> None:
-        _ = channel
+    async def deactivate_channel(self, channel, *, owner) -> None:
+        _ = channel, owner
 
     async def close(self) -> None:
         return

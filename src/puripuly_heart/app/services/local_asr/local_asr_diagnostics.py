@@ -5,6 +5,11 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from puripuly_heart.core.diagnostic_validation import (
+    stt_startup_failure_code,
+    stt_startup_failure_stage,
+    stt_startup_failure_type,
+)
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
 LocalASRBasicLogSink = Callable[[str, int], None]
@@ -112,6 +117,20 @@ class LocalASRDiagnosticsOwner:
         self,
         diagnostic: ProviderRuntimeDiagnostic,
     ) -> None:
+        if (
+            diagnostic.event in {"provider_build", "provider_warmup"}
+            and diagnostic.outcome == "failed"
+        ):
+            channel = (
+                diagnostic.channel if diagnostic.channel in {"self", "peer"} else "unclassified"
+            )
+            self.diagnostic_log_sink(
+                "[LocalASR] failed "
+                f"channel={channel} "
+                f"failure_stage={stt_startup_failure_stage(diagnostic.event)} "
+                f"failure_code={stt_startup_failure_code(diagnostic.failure_code)} "
+                f"failure_type={stt_startup_failure_type(diagnostic.failure_type)}"
+            )
         if diagnostic.event in {"provider_handoff", "provider_replace"}:
             self.basic_log_sink(
                 "[ASR] provider_transition "
