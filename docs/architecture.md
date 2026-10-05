@@ -184,6 +184,8 @@ Local execution uses Python-process ASR or a native GPU worker. The Python adapt
 
 Behavior: `tests/core/test_stt_scoped_engine.py`, `tests/providers/test_gemini_transcribe_lifecycle.py`, `tests/providers/test_soniox_reuse.py`.
 
+Investigation policy for the planned speaker-aware ASR integration: [versioned route matrix](asr-speaker-policy.md). Its proposed adapter changes and qualification gates are not claims about current runtime capability.
+
 ### Translation
 
 - Provider adapters own authentication, endpoint/model mapping, request/response formats, streaming, and provider errors.
