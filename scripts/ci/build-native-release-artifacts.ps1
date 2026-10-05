@@ -42,9 +42,16 @@ function Invoke-Checked {
         [Parameter(Mandatory = $true)][string]$FilePath,
         [Parameter()][string[]]$ArgumentList = @()
     )
-    & $FilePath @ArgumentList
-    if ($LASTEXITCODE -ne 0) {
-        throw "Command failed with exit code ${LASTEXITCODE}: $FilePath $($ArgumentList -join ' ')"
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-Host "Starting: $FilePath $($ArgumentList -join ' ')"
+    try {
+        & $FilePath @ArgumentList
+        if ($LASTEXITCODE -ne 0) {
+            throw "Command failed with exit code ${LASTEXITCODE}: $FilePath $($ArgumentList -join ' ')"
+        }
+    } finally {
+        $timer.Stop()
+        Write-Host ("Ended after {0:F3}s: {1}" -f $timer.Elapsed.TotalSeconds, $FilePath)
     }
 }
 
@@ -70,6 +77,8 @@ function Invoke-Headless {
     foreach ($argument in $ArgumentList) {
         $startInfo.ArgumentList.Add($argument)
     }
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-Host "Starting: $hostExe --headless $($ArgumentList -join ' ')"
     $process = [System.Diagnostics.Process]::Start($startInfo)
     try {
         $stdout = $process.StandardOutput.ReadToEndAsync()
@@ -84,6 +93,8 @@ function Invoke-Headless {
         return $text.Trim()
     } finally {
         $process.Dispose()
+        $timer.Stop()
+        Write-Host ("Ended after {0:F3}s: {1}" -f $timer.Elapsed.TotalSeconds, $hostExe)
     }
 }
 

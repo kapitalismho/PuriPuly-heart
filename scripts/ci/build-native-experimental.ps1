@@ -32,6 +32,8 @@ function Invoke-Checked {
         [string]$WorkingDirectory = $PWD
     )
     Push-Location $WorkingDirectory
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-Host "Starting: $FilePath $($ArgumentList -join ' ')"
     try {
         & $FilePath @ArgumentList
         if ($LASTEXITCODE -ne 0) {
@@ -39,6 +41,8 @@ function Invoke-Checked {
         }
     } finally {
         Pop-Location
+        $timer.Stop()
+        Write-Host ("Ended after {0:F3}s: {1}" -f $timer.Elapsed.TotalSeconds, $FilePath)
     }
 }
 

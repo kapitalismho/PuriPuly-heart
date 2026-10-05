@@ -36,16 +36,51 @@ function Invoke-External {
         [string]$FilePath,
 
         [Parameter()]
-        [string[]]$ArgumentList = @()
+        [string[]]$ArgumentList = @(),
+
+        [Parameter()]
+        [ValidateRange(0, 2147483)]
+        [int]$TimeoutSeconds = 0
     )
 
-    & $FilePath @ArgumentList
-    $exitCode = Get-Variable -Name LASTEXITCODE -ValueOnly -ErrorAction SilentlyContinue
-    if ($null -eq $exitCode) {
-        $exitCode = 0
-    }
-    if ($exitCode -ne 0) {
-        throw "Command failed with exit code ${exitCode}: $FilePath $($ArgumentList -join ' ')"
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $process = $null
+    Write-Host "Starting: $FilePath $($ArgumentList -join ' ')"
+    try {
+        if ($TimeoutSeconds -gt 0) {
+            $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+            $startInfo.FileName = $FilePath
+            $startInfo.WorkingDirectory = $PWD.Path
+            $startInfo.UseShellExecute = $false
+            foreach ($argument in $ArgumentList) {
+                $startInfo.ArgumentList.Add($argument)
+            }
+            $process = [System.Diagnostics.Process]::Start($startInfo)
+            if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+                & (Join-Path $env:SystemRoot "System32\taskkill.exe") /PID $process.Id /T /F | Out-Host
+                if ($LASTEXITCODE -ne 0 -and -not $process.HasExited) {
+                    throw "Could not terminate timed-out command: $FilePath"
+                }
+                $process.WaitForExit()
+                throw "Command timed out after ${TimeoutSeconds}s: $FilePath $($ArgumentList -join ' ')"
+            }
+            $exitCode = $process.ExitCode
+        } else {
+            & $FilePath @ArgumentList
+            $exitCode = Get-Variable -Name LASTEXITCODE -ValueOnly -ErrorAction SilentlyContinue
+            if ($null -eq $exitCode) {
+                $exitCode = 0
+            }
+        }
+        if ($exitCode -ne 0) {
+            throw "Command failed with exit code ${exitCode}: $FilePath $($ArgumentList -join ' ')"
+        }
+    } finally {
+        if ($null -ne $process) {
+            $process.Dispose()
+        }
+        $timer.Stop()
+        Write-Host ("Ended after {0:F3}s: {1}" -f $timer.Elapsed.TotalSeconds, $FilePath)
     }
 }
 
@@ -126,7 +161,6 @@ $cmakeCommand = Resolve-CommandPath -Name "cmake" -Fallbacks @(
 $curlCommand = Resolve-CommandPath -Name "curl.exe" -Fallbacks @(
     (Join-Path $env:SystemRoot "System32\curl.exe")
 )
-$tarCommand = Resolve-CommandPath -Name "tar"
 $pythonVersion = (& $pythonCommand --version 2>&1).Trim()
 $cmakeVersion = ((& $cmakeCommand --version 2>&1) | Select-Object -First 1).Trim()
 
@@ -190,7 +224,9 @@ if ($actualZeroconfSdistSha256 -ne $ZeroconfSdistSha256) {
 
 
 Write-Host "Extracting python-soxr source distribution..."
-Invoke-External -FilePath $tarCommand -ArgumentList @("-xf", $soxrSdistPath, "-C", $soxrExtractRoot)
+Invoke-External -FilePath $pythonCommand -TimeoutSeconds 60 -ArgumentList @(
+    "-I", "-m", "tarfile", "--filter", "data", "--extract", $soxrSdistPath, $soxrExtractRoot
+)
 $soxrSourceRoot = Get-ChildItem -Path $soxrExtractRoot -Directory | Select-Object -First 1
 if ($null -eq $soxrSourceRoot) {
     throw "Could not locate extracted python-soxr source directory in $soxrExtractRoot"
@@ -235,7 +271,9 @@ if ($libsoxrSourceSha256 -ne $expectedLibsoxrSourceSha256) {
 }
 
 Write-Host "Extracting libsoxr source archive..."
-Invoke-External -FilePath $tarCommand -ArgumentList @("-xf", $libsoxrSourcePath, "-C", $libsoxrExtractRoot)
+Invoke-External -FilePath $pythonCommand -TimeoutSeconds 60 -ArgumentList @(
+    "-I", "-m", "tarfile", "--filter", "data", "--extract", $libsoxrSourcePath, $libsoxrExtractRoot
+)
 $libsoxrSourceRoot = Get-ChildItem -Path $libsoxrExtractRoot -Directory | Select-Object -First 1
 if ($null -eq $libsoxrSourceRoot) {
     throw "Could not locate extracted libsoxr source directory in $libsoxrExtractRoot"
