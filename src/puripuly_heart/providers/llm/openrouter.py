@@ -482,6 +482,7 @@ class HttpxOpenRouterClient:
                 {"role": "user", "content": user_message},
             ],
             "reasoning": {"effort": "none"},
+            "temperature": 0.6,
             "provider": _build_provider_preferences(
                 self.provider_routing,
                 model=self.model,
@@ -491,8 +492,6 @@ class HttpxOpenRouterClient:
         }
         if explicit_cache:
             request_body["prompt_cache_options"] = {"mode": "explicit", "ttl": "30m"}
-        if self.model != OPENROUTER_MODEL_GPT_6_LUNA:
-            request_body["temperature"] = 0.6
         if len(self.models) == 1:
             request_body["model"] = self.models[0]
         else:

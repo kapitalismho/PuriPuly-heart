@@ -319,7 +319,7 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_luna_disables_reasoning_and_omits_temperature(
+async def test_httpx_openrouter_luna_disables_reasoning_and_sets_temperature(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_client = FakeAsyncClient()
@@ -343,7 +343,7 @@ async def test_httpx_openrouter_luna_disables_reasoning_and_omits_temperature(
     assert fake_client.last_request["json"]["model"] == OPENROUTER_MODEL_GPT_6_LUNA
     assert fake_client.last_request["json"]["reasoning"] == {"effort": "none"}
     assert fake_client.last_request["json"]["max_tokens"] == 37
-    assert "temperature" not in fake_client.last_request["json"]
+    assert fake_client.last_request["json"]["temperature"] == 0.6
     assert fake_client.last_request["json"]["prompt_cache_options"] == {
         "mode": "explicit",
         "ttl": "30m",

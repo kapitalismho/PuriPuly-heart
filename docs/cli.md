@@ -174,6 +174,8 @@ A file-based command can also express both channels explicitly:
 
 Use `asr set` with `--channel self|peer|both` for the same STT provider on the requested channel(s), or settings fields when the two channels need different providers. `settings choices` is the authority for currently available values and valid model/connection combinations. A successful persistence receipt is not proof that a provider is attached or active; inspect `asr status` / `providers.status` and its selected, runtime, capture-attached, activity, pending-handoff, and failure fields.
 
+GPT 6 Luna (`translation.model: gpt_6_luna`) sends `temperature: 0.6` with reasoning effort `none` on the `openrouter` and `official_byok` connections. The `chatgpt` connection omits `temperature`. These request parameters are fixed, not editable CLI settings.
+
 The finite command catalog also includes Soniox diarization, managed referral settings, custom and local provider settings, GPU device selection, both-channel provider updates, free-tier provider choices, Qwen region, model/connection history, prompts, languages, vocabulary, VAD, audio devices/host APIs, overlay values, OSC and telemetry settings. Use `capabilities` for field names and types, and `settings choices` for supported values rather than reproducing dynamic lists.
 
 In an already-running GUI, focused external changes preserve unrelated provider/prompt drafts; overlapping changes require explicit conflict resolution. A successful pending GUI apply acknowledges only its submitted values. Newer edits made while it was pending remain staged, and a failed apply retains its draft for retry.
