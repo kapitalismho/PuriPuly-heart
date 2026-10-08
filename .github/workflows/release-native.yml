@@ -3,11 +3,11 @@ name: Native Release
 on:
   push:
     tags:
-      - "native-v*"
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing native release tag, for example native-v2.8.0
+        description: Existing release tag, for example v2.8.1
         required: true
         type: string
 
@@ -57,9 +57,9 @@ jobs:
           from pathlib import Path
 
           tag = os.environ["TAG_NAME"]
-          match = re.fullmatch(r"native-v(\d+\.\d+\.\d+)", tag)
+          match = re.fullmatch(r"v(\d+\.\d+\.\d+)", tag)
           if match is None:
-              raise SystemExit(f"Expected native-vMAJOR.MINOR.PATCH tag, found {tag!r}")
+              raise SystemExit(f"Expected vMAJOR.MINOR.PATCH tag, found {tag!r}")
           version = match.group(1)
           source_sha = subprocess.check_output(
               ["git", "rev-parse", "HEAD"], text=True
@@ -219,7 +219,6 @@ jobs:
           ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.release_identity verify-build `
             --version $env:APP_VERSION `
             --tag $env:RELEASE_TAG `
-            --tag-prefix native-v `
             --source-sha $env:SOURCE_SHA `
             --build-origin github-hosted `
             --repository "${{ github.repository }}" `
@@ -286,7 +285,6 @@ jobs:
           PYTHONPATH=src python3 -m puripuly_heart.release_evidence.release_identity verify-publish \
             --version "$APP_VERSION" \
             --tag "$RELEASE_TAG" \
-            --tag-prefix native-v \
             --title "$RELEASE_TAG" \
             --installer-exe "PuriPulyHeart-Setup-$APP_VERSION.exe" \
             --body native-release-body.md \

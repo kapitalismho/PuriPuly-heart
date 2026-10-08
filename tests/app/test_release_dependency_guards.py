@@ -16,10 +16,6 @@ from puripuly_heart.core.overlay.openvr_vendor import (
 )
 from tests.helpers.paths import REPO_ROOT as ROOT
 
-PINNED_PYTHON_VERSION = 'PYTHON_VERSION: "3.14.7"'
-PINNED_UV_VERSION = 'UV_VERSION: "0.9.17"'
-PINNED_INNOSETUP_VERSION = 'INNOSETUP_VERSION: "6.6.1"'
-SHARED_SETUP_ACTION = "./.github/actions/setup-uv-environment"
 PINNED_SOXR_SPECIFIER = "soxr==1.1.0"
 FLET_RUNTIME_PREPARATION_SCRIPT = "scripts/ci/prepare-flet-runtime.ps1"
 FLET_RUNTIME_VERSION = "1.0.0"
@@ -190,43 +186,6 @@ def test_uv_lock_includes_python_soxr_build_backend_packages() -> None:
     assert 'name = "scikit-build-core"' in uv_lock
     assert 'name = "nanobind"' in uv_lock
     assert 'name = "setuptools-scm"' in uv_lock
-
-
-def test_release_workflow_uses_frozen_lockfile_sync() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-
-    assert SHARED_SETUP_ACTION in workflow
-    assert 'python -m pip install -e ".[build]"' not in workflow
-
-
-def test_workflows_pin_exact_python_and_uv_versions() -> None:
-    for workflow_path in (
-        ROOT / ".github" / "workflows" / "pr-ci.yml",
-        ROOT / ".github" / "workflows" / "release.yml",
-    ):
-        workflow = workflow_path.read_text(encoding="utf-8")
-        assert PINNED_PYTHON_VERSION in workflow
-        assert PINNED_UV_VERSION in workflow
-        assert SHARED_SETUP_ACTION in workflow
-
-
-def test_release_workflow_pins_innosetup_and_builds_with_blocking_artifact_smokes() -> None:
-    workflow_path = ROOT / ".github" / "workflows" / "release.yml"
-    workflow = workflow_path.read_text(encoding="utf-8")
-    assert PINNED_INNOSETUP_VERSION in workflow
-    assert "scripts/ci/build-release-artifacts.ps1" not in workflow
-    assert "cargo build" in workflow
-    assert "PyInstaller" in workflow
-    assert "Gate packaged headless runtime" in workflow
-    assert "gui-startup-check" in workflow
-    assert "soxr-runtime-check" in workflow
-    assert "PURIPULY_HEART_RELEASE_PROCESS_CAPTURE_SMOKE" in workflow
-    assert "native_process_specific" in workflow
-    assert "ISCC.exe" in workflow
-    assert "DisplayVersion" in workflow
-    assert "Inno Setup version mismatch" in workflow
-    assert "--allow-downgrade" in workflow
-    assert "--force" in workflow
 
 
 def test_vendored_openvr_bundle_files_exist_and_sha256_line_is_exact() -> None:

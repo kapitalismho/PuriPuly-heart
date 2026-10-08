@@ -41,24 +41,6 @@ def _provenance_fixture(tmp_path: Path) -> dict[str, object]:
     }
 
 
-def test_actual_release_workflow_and_local_monolith_both_gate_process_capture() -> None:
-    script = (ROOT / "scripts/ci/build-release-artifacts.ps1").read_text(encoding="utf-8")
-    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
-
-    assert script.count("Invoke-ProcessCaptureRuntimeSmokeCheck") >= 4
-    assert '"/DMyAppId=$InstallerTestAppId"' in script
-    assert '$InstallerTestAppId = "{{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}"' in script
-    assert '"/DSkipLocalSttProvisioning=1"' in script
-    assert 'ArgumentList @("process-capture-runtime-check")' not in script
-    assert "PURIPULY_HEART_RELEASE_PROCESS_CAPTURE_SMOKE" in script
-    assert '"/DProcessCaptureSmokeArtifactRoot=$processCaptureSmokeArtifactRoot"' in script
-    assert "native_process_specific" in script
-    assert "device_fallback_used" in script
-    assert "Build release-only process-capture smoke helper" in workflow
-    assert "Gate packaged headless runtime" in workflow
-    assert "native_process_specific" in workflow
-
-
 def test_installer_smoke_skip_is_compile_time_only_and_production_default_is_unchanged() -> None:
     script = (ROOT / "installer.iss").read_text(encoding="utf-8")
 

@@ -111,13 +111,12 @@ def test_release_surface_rejects_tag_version_disagreement() -> None:
 
 def test_native_release_surface_and_provenance_round_trip(tmp_path) -> None:
     version = "2.8.0"
-    tag = f"native-v{version}"
+    tag = f"v{version}"
     installer = tmp_path / identity.installer_filename(version)
     installer.write_bytes(b"native-installer")
     provenance = identity.build_provenance(
         version=version,
         tag=tag,
-        tag_prefix="native-v",
         source_sha=SOURCE_SHA,
         build_origin="github-hosted",
         repository="owner/repo",
@@ -132,12 +131,11 @@ def test_native_release_surface_and_provenance_round_trip(tmp_path) -> None:
 
     assert reloaded["tag"] == tag
     assert reloaded["version"] == version
-    assert identity.check_tag_matches_version(tag, version, tag_prefix="native-v") == tag
+    assert identity.check_tag_matches_version(tag, version) == tag
     assert (
         identity.verify_release_surface(
             version=version,
             tag=reloaded["tag"],
-            tag_prefix="native-v",
             title=tag,
             installer_exe=installer.name,
             body_text=f"Download `{installer.name}` below.",
@@ -148,23 +146,14 @@ def test_native_release_surface_and_provenance_round_trip(tmp_path) -> None:
     identity.verify_assets_against_provenance(reloaded, [installer])
 
 
-@pytest.mark.parametrize(
-    ("tag_prefix", "tag"),
-    [
-        ("v", "native-v2.8.0"),
-        ("native-v", "v2.8.0"),
-        ("native-v", "native-v2.8.1"),
-        ("v", "v2.8.1"),
-    ],
-)
-def test_release_identity_rejects_cross_channel_and_version_tags(tag_prefix, tag) -> None:
+@pytest.mark.parametrize("tag", ["native-v2.8.0", "v2.8.1", "2.8.0", "V2.8.0"])
+def test_release_identity_rejects_nonstandard_and_version_mismatched_tags(tag) -> None:
     with pytest.raises(RuntimeError, match="tag mismatch"):
-        identity.check_tag_matches_version(tag, "2.8.0", tag_prefix=tag_prefix)
+        identity.check_tag_matches_version(tag, "2.8.0")
     with pytest.raises(RuntimeError, match="tag mismatch"):
         identity.build_provenance(
             version="2.8.0",
             tag=tag,
-            tag_prefix=tag_prefix,
             source_sha=SOURCE_SHA,
             build_origin="local",
         )
@@ -172,7 +161,6 @@ def test_release_identity_rejects_cross_channel_and_version_tags(tag_prefix, tag
         identity.verify_release_surface(
             version="2.8.0",
             tag=tag,
-            tag_prefix=tag_prefix,
             title=tag,
             installer_exe="PuriPulyHeart-Setup-2.8.0.exe",
             body_text="Download `PuriPulyHeart-Setup-2.8.0.exe` below.",
@@ -180,40 +168,15 @@ def test_release_identity_rejects_cross_channel_and_version_tags(tag_prefix, tag
         )
 
 
-@pytest.mark.parametrize("tag_prefix", ["", "native", "native-vv", "V", "native-v "])
-def test_release_identity_rejects_unsupported_tag_prefixes(tag_prefix) -> None:
-    with pytest.raises(RuntimeError, match="tag prefix"):
-        identity.check_tag_matches_version("native-v2.8.0", "2.8.0", tag_prefix=tag_prefix)
-    with pytest.raises(RuntimeError, match="tag prefix"):
-        identity.build_provenance(
-            version="2.8.0",
-            tag="native-v2.8.0",
-            tag_prefix=tag_prefix,
-            source_sha=SOURCE_SHA,
-            build_origin="local",
-        )
-    with pytest.raises(RuntimeError, match="tag prefix"):
-        identity.verify_release_surface(
-            version="2.8.0",
-            tag="native-v2.8.0",
-            tag_prefix=tag_prefix,
-            title="native-v2.8.0",
-            installer_exe="PuriPulyHeart-Setup-2.8.0.exe",
-            body_text="Download `PuriPulyHeart-Setup-2.8.0.exe` below.",
-            asset_names=["PuriPulyHeart-Setup-2.8.0.exe"],
-        )
-
-
 @pytest.mark.parametrize("version", ["2.8.beta", "2.8.0-native", "2..0"])
-def test_native_release_identity_rejects_nonnumeric_versions(version) -> None:
-    tag = f"native-v{version}"
+def test_release_identity_rejects_nonnumeric_versions(version) -> None:
+    tag = f"v{version}"
     with pytest.raises(ValueError):
-        identity.check_tag_matches_version(tag, version, tag_prefix="native-v")
+        identity.check_tag_matches_version(tag, version)
     with pytest.raises(ValueError):
         identity.build_provenance(
             version=version,
             tag=tag,
-            tag_prefix="native-v",
             source_sha=SOURCE_SHA,
             build_origin="local",
         )
@@ -221,7 +184,6 @@ def test_native_release_identity_rejects_nonnumeric_versions(version) -> None:
         identity.verify_release_surface(
             version=version,
             tag=tag,
-            tag_prefix="native-v",
             title=tag,
             installer_exe=f"PuriPulyHeart-Setup-{version}.exe",
             body_text=f"Download `PuriPulyHeart-Setup-{version}.exe` below.",

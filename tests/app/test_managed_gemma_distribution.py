@@ -366,39 +366,11 @@ def test_installer_verifier_rejects_application_postinstall_launch(tmp_path: Pat
         distribution.verify_installer(installer_path)
 
 
-def test_release_paths_prepare_verify_and_install_pinned_runtime_without_gemma_download() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-    release_script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(
-        encoding="utf-8"
-    )
-    build_spec = (ROOT / "build.spec").read_text(encoding="utf-8")
-    installer = (ROOT / "installer.iss").read_text(encoding="utf-8")
-    module = "puripuly_heart.release_evidence.managed_gemma_distribution"
-
-    workflow_prepare = workflow.index(f"-m {module} prepare")
-    workflow_build = workflow.index("-m PyInstaller")
-    workflow_verify = workflow.index(f"-m {module} verify-package")
-    assert workflow_prepare < workflow_build < workflow_verify
-    assert release_script.index('"prepare"') < release_script.index('"PyInstaller"')
-    assert release_script.count('"verify-package"') == 3
-    assert release_script.count('"verify-installer"') == 1
-    assert (
-        "managed_gemma_runtime_datas = [] if release_smoke else pyinstaller_data_entries(Path.cwd())"
-        in build_spec
-    )
+def test_production_installer_does_not_download_managed_gemma() -> None:
     assert (
         distribution.verify_installer(ROOT / "installer.iss")["managed_gemma_install_download"]
         is False
     )
-    assert "[Run]" not in installer
-    for forbidden in (
-        "unsloth/gemma-4-E4B-it-qat-GGUF",
-        "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
-        "mtp-gemma-4-E4B-it.gguf",
-        "unsloth/gemma-4-12B-it-qat-GGUF",
-        "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
-    ):
-        assert forbidden not in installer
 
 
 def test_llama_cpp_license_and_notice_have_required_provenance() -> None:

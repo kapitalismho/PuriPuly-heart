@@ -15,7 +15,6 @@ SOXR_BUNDLE_FILENAME = "PuriPulyHeart-soxr-third-party-source-bundle.zip"
 PLACEHOLDER = "{{INSTALLER_EXE}}"
 LOCAL_ORIGIN = "local"
 HOSTED_ORIGIN = "github-hosted"
-TAG_PREFIXES = ("v", "native-v")
 _SHA40 = re.compile(r"[0-9a-f]{40}")
 _SHA64 = re.compile(r"[0-9a-f]{64}")
 
@@ -62,12 +61,10 @@ def installer_filename(version: str) -> str:
     return f"PuriPulyHeart-Setup-{text}.exe"
 
 
-def check_tag_matches_version(tag: str, version: str, *, tag_prefix: str = "v") -> str:
+def check_tag_matches_version(tag: str, version: str) -> str:
     expected_version = version.strip()
     version_tuple(expected_version)
-    if tag_prefix not in TAG_PREFIXES:
-        raise RuntimeError(f"release tag prefix must be one of {TAG_PREFIXES!r}")
-    expected_tag = f"{tag_prefix}{expected_version}"
+    expected_tag = f"v{expected_version}"
     if tag.strip() != expected_tag:
         raise RuntimeError(f"release tag mismatch: expected {expected_tag!r}, found {tag!r}")
     return expected_tag
@@ -191,7 +188,6 @@ def verify_release_surface(
     *,
     version: str,
     tag: str,
-    tag_prefix: str = "v",
     title: str,
     installer_exe: str,
     body_text: str,
@@ -204,7 +200,7 @@ def verify_release_surface(
         version_tuple(expected_version)
     except ValueError as exc:
         raise RuntimeError(f"release version is not a dotted numeric version: {version!r}") from exc
-    check_tag_matches_version(tag, expected_version, tag_prefix=tag_prefix)
+    check_tag_matches_version(tag, expected_version)
     if title.strip() != tag.strip():
         raise RuntimeError(f"release title mismatch: expected {tag!r}, found {title!r}")
     expected_installer = f"PuriPulyHeart-Setup-{expected_version}.exe"
@@ -247,7 +243,6 @@ def build_provenance(
     *,
     version: str,
     tag: str,
-    tag_prefix: str = "v",
     source_sha: str,
     build_origin: str,
     repository: str = "",
@@ -258,7 +253,7 @@ def build_provenance(
 ) -> dict[str, object]:
     expected_version = version.strip()
     version_tuple(expected_version)
-    expected_tag = check_tag_matches_version(tag, expected_version, tag_prefix=tag_prefix)
+    expected_tag = check_tag_matches_version(tag, expected_version)
     sha = _require_sha40(source_sha, "source SHA")
     if build_origin not in (LOCAL_ORIGIN, HOSTED_ORIGIN):
         raise RuntimeError(f"build origin must be {LOCAL_ORIGIN!r} or {HOSTED_ORIGIN!r}")
@@ -553,7 +548,6 @@ def _build_parser() -> argparse.ArgumentParser:
     build_parser = subparsers.add_parser("verify-build")
     build_parser.add_argument("--version", required=True)
     build_parser.add_argument("--tag", required=True)
-    build_parser.add_argument("--tag-prefix", choices=TAG_PREFIXES, default="v")
     build_parser.add_argument("--source-sha", required=True)
     build_parser.add_argument("--build-origin", default=LOCAL_ORIGIN)
     build_parser.add_argument("--repository", default="")
@@ -573,7 +567,6 @@ def _build_parser() -> argparse.ArgumentParser:
     publish_parser = subparsers.add_parser("verify-publish")
     publish_parser.add_argument("--version", required=True)
     publish_parser.add_argument("--tag", required=True)
-    publish_parser.add_argument("--tag-prefix", choices=TAG_PREFIXES, default="v")
     publish_parser.add_argument("--title", required=True)
     publish_parser.add_argument("--installer-exe", required=True)
     publish_parser.add_argument("--body", type=Path, required=True)
@@ -588,7 +581,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _run_verify_build(arguments: argparse.Namespace) -> dict[str, object]:
     expected_version = arguments.version.strip()
-    check_tag_matches_version(arguments.tag, expected_version, tag_prefix=arguments.tag_prefix)
+    check_tag_matches_version(arguments.tag, expected_version)
     expected_installer = installer_filename(expected_version)
     if Path(arguments.installer).name != expected_installer:
         raise RuntimeError(
@@ -648,7 +641,6 @@ def _run_verify_build(arguments: argparse.Namespace) -> dict[str, object]:
     provenance = build_provenance(
         version=expected_version,
         tag=arguments.tag,
-        tag_prefix=arguments.tag_prefix,
         source_sha=arguments.source_sha,
         build_origin=arguments.build_origin,
         repository=arguments.repository,
@@ -683,7 +675,6 @@ def _run_verify_publish(arguments: argparse.Namespace) -> dict[str, object]:
     expected_installer = verify_release_surface(
         version=arguments.version,
         tag=arguments.tag,
-        tag_prefix=arguments.tag_prefix,
         title=arguments.title,
         installer_exe=arguments.installer_exe,
         body_text=body_text,
