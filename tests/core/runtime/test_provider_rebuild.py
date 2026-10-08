@@ -4,11 +4,12 @@ import asyncio
 
 import pytest
 
+from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.provider_rebuild import ProviderRuntimeRebuildService
 
 
 @pytest.mark.asyncio
-async def test_rebuild_llm_provider_clears_before_creating_and_replaces_new_provider() -> None:
+async def test_rebuild_llm_provider_creates_before_replacing_provider() -> None:
     service = ProviderRuntimeRebuildService()
     events: list[tuple[str, object | None]] = []
 
@@ -26,7 +27,45 @@ async def test_rebuild_llm_provider_clears_before_creating_and_replaces_new_prov
 
     assert outcome.provider == "llm"
     assert outcome.error is None
-    assert events == [("replace", None), ("create", None), ("replace", "llm")]
+    assert events == [("create", None), ("replace", "llm")]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("raises", [False, True])
+async def test_llm_creation_failure_replaces_previous_provider_with_none(raises: bool) -> None:
+    close_calls: list[str] = []
+    expected_error = RuntimeError("llm unavailable")
+
+    class PreviousProvider:
+        async def close(self) -> None:
+            close_calls.append("close")
+
+    previous = PreviousProvider()
+    runtime = ProviderRuntimeHandle(name="llm", provider=previous)
+    old_generation = runtime.generation
+
+    async def replace_provider(provider: object | None) -> object | None:
+        return await runtime.replace_provider(provider, start=False)
+
+    def create_provider() -> None:
+        assert runtime.provider is previous
+        if raises:
+            raise expected_error
+
+    outcome = await ProviderRuntimeRebuildService().rebuild_llm_provider(
+        replace_provider=replace_provider,
+        create_provider=create_provider,
+    )
+
+    assert outcome.provider is None
+    assert outcome.error is (expected_error if raises else None)
+    assert runtime.provider is None
+    assert close_calls == ["close"]
+    assert not runtime.is_current_provider_generation(
+        provider=previous,
+        generation=old_generation,
+    )
+    await runtime.close()
 
 
 @pytest.mark.asyncio
@@ -53,7 +92,7 @@ async def test_rebuild_stt_provider_replaces_none_after_factory_failure() -> Non
 
 
 @pytest.mark.asyncio
-async def test_concurrent_llm_rebuilds_serialize_detach_create_and_install() -> None:
+async def test_concurrent_llm_rebuilds_serialize_create_and_install() -> None:
     service = ProviderRuntimeRebuildService()
     first_started = asyncio.Event()
     release_first = asyncio.Event()
@@ -88,7 +127,7 @@ async def test_concurrent_llm_rebuilds_serialize_detach_create_and_install() -> 
     )
     await asyncio.sleep(0)
 
-    assert events == [("replace", None), ("create", 1)]
+    assert events == [("create", 1)]
 
     release_first.set()
     first_outcome, second_outcome = await asyncio.gather(first, second)
@@ -96,10 +135,8 @@ async def test_concurrent_llm_rebuilds_serialize_detach_create_and_install() -> 
     assert first_outcome.provider == "llm-1"
     assert second_outcome.provider == "llm-2"
     assert events == [
-        ("replace", None),
         ("create", 1),
         ("replace", "llm-1"),
-        ("replace", None),
         ("create", 2),
         ("replace", "llm-2"),
     ]

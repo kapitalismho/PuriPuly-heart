@@ -30,6 +30,7 @@ from puripuly_heart.core.orchestrator.translation_request import (
 )
 from puripuly_heart.core.orchestrator.translation_turn import _final_transcript_segments
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
+from puripuly_heart.core.runtime.provider_rebuild import ProviderRuntimeRebuildService
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.stt.backend import STTProviderTurnIdentity, STTProviderTurnTerminal
 from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
@@ -728,6 +729,66 @@ async def test_process_propagates_parent_turn_and_target_identity_to_output() ->
     assert result.output.target_language == request.target_language
     assert result.output.turn_generation == 2
     assert result.output.turn_order == 7
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("channel", "source"),
+    [("self", "Mic"), ("self", "Manual"), ("peer", "Peer")],
+)
+async def test_engine_switch_translates_first_requests_while_previous_provider_closes(
+    channel: ChannelId,
+    source: str,
+) -> None:
+    close_started = asyncio.Event()
+    release_close = asyncio.Event()
+
+    class SlowClosingProvider(RecordingProvider):
+        async def close(self) -> None:
+            close_started.set()
+            await release_close.wait()
+
+    previous = SlowClosingProvider()
+    replacement = RecordingProvider(response="replacement translation")
+    fixture = build_owner(previous)
+
+    def request() -> TranslationProcessRequest:
+        return replace(
+            process_request(fixture, channel=channel),
+            source=source,
+            turn_kind="manual" if source == "Manual" else channel,
+        )
+
+    before = await fixture.owner.process(request())
+    assert before.outcome == "translated"
+    old_backend, old_generation = fixture.provider_runtime.current_provider_generation()
+
+    async def replace_provider(provider: object | None) -> object | None:
+        return await fixture.provider_runtime.replace_provider(provider, start=False)
+
+    rebuild = asyncio.create_task(
+        ProviderRuntimeRebuildService().rebuild_llm_provider(
+            replace_provider=replace_provider,
+            create_provider=lambda: LlmTranslationBackend(replacement),
+        )
+    )
+    try:
+        await asyncio.wait_for(close_started.wait(), timeout=1)
+        results = [await fixture.owner.process(request()) for _ in range(2)]
+        assert [result.outcome for result in results] == ["translated", "translated"]
+        assert [result.output.translation.text for result in results] == [
+            "replacement translation",
+            "replacement translation",
+        ]
+        assert len(replacement.calls) == 2
+        assert not fixture.provider_runtime.is_current_provider_generation(
+            provider=old_backend,
+            generation=old_generation,
+        )
+    finally:
+        release_close.set()
+        await rebuild
+        await fixture.provider_runtime.close()
 
 
 @pytest.mark.asyncio

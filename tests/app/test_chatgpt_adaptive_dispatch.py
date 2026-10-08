@@ -12,7 +12,15 @@ from puripuly_heart.config.runtime_resolution import (
     TranslationRuntimeIntent,
     resolve_llm_config,
 )
+from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
+from puripuly_heart.core.runtime.provider_rebuild import ProviderRuntimeRebuildService
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.translation_backend import (
+    LlmTranslationBackend,
+    TranslationBackend,
+    TranslationBackendRequest,
+)
+from puripuly_heart.domain.models import Translation
 
 
 class _Session:
@@ -176,4 +184,75 @@ async def test_composed_single_failure_retries_behind_an_already_waiting_request
         for execution in held:
             await execution.close()
     assert len(server.requests) == 3
+    assert all(socket.close_code == 1000 for socket in server.sockets)
+
+
+async def test_switch_from_used_luna_translates_while_websocket_cleanup_drains() -> None:
+    close_started = asyncio.Event()
+    release_close = asyncio.Event()
+
+    class SlowClosingSocket(_Socket):
+        async def close(self) -> None:
+            close_started.set()
+            await release_close.wait()
+            await super().close()
+
+    class SlowClosingServer(_Server):
+        async def connect(self, url: str, headers: Mapping[str, str]) -> _Socket:
+            socket = SlowClosingSocket(self)
+            self.sockets.append(socket)
+            return socket
+
+    class ReplacementBackend(TranslationBackend):
+        async def translate(self, request: TranslationBackendRequest) -> Translation:
+            return Translation(utterance_id=request.utterance_id, text="replacement translation")
+
+        async def close(self) -> None:
+            return
+
+    server = SlowClosingServer()
+    previous = await _composed_provider(server)
+    operation = asyncio.create_task(_translate(previous, "engine switch probe"))
+    async with asyncio.timeout(1):
+        first_socket, _ = await server.received.get()
+        second_socket, _ = await server.received.get()
+    first_socket.complete("Luna translation")
+    assert (await asyncio.wait_for(operation, 1)).text == "Luna translation"
+    runtime = ProviderRuntimeHandle(name="llm", provider=LlmTranslationBackend(previous))
+    previous_backend, previous_generation = runtime.current_provider_generation()
+    replacement = ReplacementBackend()
+
+    async def replace_provider(provider: object | None) -> object | None:
+        return await runtime.replace_provider(provider, start=False)
+
+    rebuild = asyncio.create_task(
+        ProviderRuntimeRebuildService().rebuild_llm_provider(
+            replace_provider=replace_provider,
+            create_provider=lambda: replacement,
+        )
+    )
+    try:
+        await asyncio.wait_for(close_started.wait(), 1)
+        assert not rebuild.done()
+        assert runtime.provider is replacement
+        assert not runtime.is_current_provider_generation(
+            provider=previous_backend,
+            generation=previous_generation,
+        )
+        for _ in range(2):
+            result = await runtime.provider.translate(
+                TranslationBackendRequest(
+                    utterance_id=uuid4(),
+                    text="after switch",
+                    system_prompt="Translate Korean to English.",
+                    source_language="Korean",
+                    target_language="English",
+                )
+            )
+            assert result.text == "replacement translation"
+    finally:
+        second_socket.complete("Retired Luna translation")
+        release_close.set()
+        await asyncio.wait_for(rebuild, 1)
+        await runtime.close()
     assert all(socket.close_code == 1000 for socket in server.sockets)

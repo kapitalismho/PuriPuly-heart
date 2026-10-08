@@ -264,7 +264,6 @@ async def test_llm_provider_rebuild_owner_delivers_success_projection_and_usage_
     await owner.rebuild()
 
     assert events == [
-        ("replace", None),
         ("create", "settings"),
         ("replace", provider),
         ("needs_key", False),
@@ -300,7 +299,6 @@ async def test_llm_provider_rebuild_owner_contains_factory_failure() -> None:
 
     assert events == [
         ("replace", None),
-        ("replace", None),
         ("needs_key", True),
         "usage",
         ("failure", "LLM provider not available"),
@@ -325,7 +323,7 @@ async def test_llm_provider_rebuild_owner_noops_without_runtime_context() -> Non
 
 
 @pytest.mark.asyncio
-async def test_managed_provider_rebuild_blocks_concurrent_enable_from_closing_byok_llm() -> None:
+async def test_managed_provider_rebuild_enables_replacement_while_byok_llm_closes() -> None:
     close_started = asyncio.Event()
     release_close = asyncio.Event()
     replacement_llm = object()
@@ -410,13 +408,13 @@ async def test_managed_provider_rebuild_blocks_concurrent_enable_from_closing_by
     rebuild_task = asyncio.create_task(rebuild.rebuild())
     await close_started.wait()
 
-    assert runtime.llm is None
-    assert await translation.set_enabled(True) is False
-    assert runtime.llm is None
-    assert runtime.translation_enabled is False
-    assert runtime_values == [False]
-    assert dashboard_values == [False]
-    assert context_clears == []
+    assert runtime.llm is replacement_llm
+    assert await translation.set_enabled(True) is True
+    assert runtime.llm is replacement_llm
+    assert runtime.translation_enabled is True
+    assert runtime_values == [True]
+    assert dashboard_values == []
+    assert context_clears == ["clear"]
 
     release_close.set()
     await rebuild_task

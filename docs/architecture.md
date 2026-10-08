@@ -190,10 +190,11 @@ Behavior: `tests/core/test_stt_scoped_engine.py`, `tests/providers/test_gemini_t
 - `TranslationTurnLifecycleOwner` owns bounded Self/Peer admission, parent turns, child translations, cancellation, and publication. `TranslationRequestOwner` owns request preparation and provider-generation authority.
 - Peer execution may be concurrent, but source-context preparation and publication preserve admitted order: segment order for turn-bound STT, receipt order for independent finals.
 - Channel execution limits are separate from provider-wide admission shared by Self and Peer. Self speculative selection stays in the Self owner.
+- LLM rebuild constructs the replacement before a single generation-changing installation. The replacement is available while the runtime handle joins previous-provider cleanup; construction failure still installs an unavailable provider and reports failed application.
 - Managed local Gemma remains behind `LLMProvider`; its application/runtime owners handle provisioning, readiness, and process lifecycle.
 - Bounded hedging is resolved runtime policy, not persisted fallback selection (`config/runtime_resolution.py`, `core/llm/fallback_racing.py`).
 
-Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/translation_request.py`. Behavior: `tests/core/test_translation_turn_owner.py`, `tests/core/test_translation_request_owner.py`, `tests/core/test_hedged_attempts.py`.
+Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/translation_request.py`, `core/runtime/provider_rebuild.py`, `core/runtime/provider_handle.py`. Behavior: `tests/core/test_translation_turn_owner.py`, `tests/core/test_translation_request_owner.py`, `tests/core/test_hedged_attempts.py`, `tests/core/runtime/test_provider_rebuild.py`, `tests/app/test_chatgpt_adaptive_dispatch.py`.
 
 ### ChatGPT connection
 

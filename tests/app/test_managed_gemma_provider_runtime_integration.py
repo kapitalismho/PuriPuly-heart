@@ -157,7 +157,7 @@ async def test_provider_is_installed_without_preparing_when_translation_is_off(
     await components.llm_rebuild.rebuild()
 
     assert runtime.provider is provider
-    assert events[:3] == [("replace", None), "create", ("replace", provider)]
+    assert events[:2] == ["create", ("replace", provider)]
     assert "prepare" not in events
 
 
@@ -192,6 +192,7 @@ async def test_provider_waits_for_readiness_when_translation_is_on(
 
     monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", create_backend)
     runtime = RecordingLlmRuntime(events)
+    previous = runtime.provider
     settings = _managed_settings()
     components = _components(
         settings=settings,
@@ -204,14 +205,14 @@ async def test_provider_waits_for_readiness_when_translation_is_on(
     rebuild = asyncio.create_task(components.llm_rebuild.rebuild())
     await entered.wait()
 
-    assert runtime.provider is None
-    assert events == [("replace", None), "prepare"]
+    assert runtime.provider is previous
+    assert events == ["prepare"]
 
     ready.set()
     await rebuild
 
     assert runtime.provider is provider
-    assert events[:4] == [("replace", None), "prepare", "create", ("replace", provider)]
+    assert events[:3] == ["prepare", "create", ("replace", provider)]
 
 
 @pytest.mark.asyncio
@@ -250,7 +251,7 @@ async def test_provider_prepares_when_peer_translation_is_on(
     await components.llm_rebuild.rebuild()
 
     assert runtime.provider is provider
-    assert events[:4] == [("replace", None), "prepare", "create", ("replace", provider)]
+    assert events[:3] == ["prepare", "create", ("replace", provider)]
 
 
 @pytest.mark.asyncio

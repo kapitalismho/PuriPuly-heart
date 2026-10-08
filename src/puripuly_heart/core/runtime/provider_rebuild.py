@@ -42,7 +42,6 @@ class ProviderRuntimeRebuildService:
         create_provider: ProviderFactory,
     ) -> ProviderRebuildOutcome:
         async with self._llm_rebuild_lock:
-            await replace_provider(None)
             outcome = await self._create_provider(create_provider)
             await replace_provider(outcome.provider)
             return outcome
