@@ -7,6 +7,8 @@ import inspect
 from collections.abc import Awaitable
 from typing import Callable
 
+from puripuly_heart.core.error_messages import openrouter_auth_failure_report
+
 SaveHandler = Callable[[str, str], object]
 VerifyHandler = Callable[[str, str], object]
 StatusHandler = Callable[[str], None]
@@ -161,7 +163,11 @@ class ApiKeyVerificationController:
             self._last_verified_hash = ""
             self._emit_message(
                 "snackbar.verification_error",
-                message=self.translate_error(str(exc)),
+                message=(
+                    openrouter_auth_failure_report(exc, stage="key_verification").message.key
+                    if self._provider == "openrouter"
+                    else self.translate_error(str(exc))
+                ),
             )
             return
 
@@ -197,6 +203,8 @@ class ApiKeyVerificationController:
 
     def translate_error(self, msg: str) -> str:
         """Translate common error messages to translatable message keys."""
+        if self._provider == "openrouter" and msg.startswith("error.openrouter_auth."):
+            return msg
         msg_lower = msg.lower()
         if msg_lower.startswith("qwen_model_unavailable:"):
             model = msg.split(":", 1)[1].strip() if ":" in msg else ""

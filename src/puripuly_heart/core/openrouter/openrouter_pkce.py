@@ -16,6 +16,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import httpx
 
 from puripuly_heart.core.oauth_callback_page import render_oauth_callback_completion_page
+from puripuly_heart.core.openrouter.authentication import (
+    OpenRouterAuthenticationError,
+    OpenRouterAuthStage,
+)
 
 OPENROUTER_AUTH_URL = "https://openrouter.ai/auth"
 OPENROUTER_AUTH_EXCHANGE_URL = "https://openrouter.ai/api/v1/auth/keys"
@@ -125,22 +129,45 @@ class OpenRouterPKCEClient:
         code_verifier: str,
         code_challenge_method: str,
     ) -> OpenRouterPKCEExchangeResult:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(
-                OPENROUTER_AUTH_EXCHANGE_URL,
-                json={
-                    "code": code,
-                    "code_verifier": code_verifier,
-                    "code_challenge_method": code_challenge_method,
-                },
-                headers={"Content-Type": "application/json"},
-            )
-            response.raise_for_status()
-            payload = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(
+                    OPENROUTER_AUTH_EXCHANGE_URL,
+                    json={
+                        "code": code,
+                        "code_verifier": code_verifier,
+                        "code_challenge_method": code_challenge_method,
+                    },
+                    headers={"Content-Type": "application/json"},
+                )
+                if not 200 <= response.status_code < 300:
+                    raise OpenRouterAuthenticationError.from_status(
+                        response.status_code, stage="code_exchange"
+                    )
+                try:
+                    payload = response.json()
+                except ValueError as exc:
+                    raise OpenRouterAuthenticationError(
+                        stage="code_exchange",
+                        reason="invalid_response",
+                        exception_type=type(exc).__name__,
+                    ) from None
+                if not isinstance(payload, dict) or not isinstance(payload.get("key"), str):
+                    raise OpenRouterAuthenticationError(
+                        stage="code_exchange", reason="invalid_response"
+                    )
+                if not payload["key"].strip():
+                    raise OpenRouterAuthenticationError(
+                        stage="code_exchange", reason="invalid_response"
+                    )
+        except Exception as exc:
+            raise OpenRouterAuthenticationError.from_exception(
+                exc, stage="code_exchange"
+            ) from None
 
         user_id = payload.get("user_id")
         return OpenRouterPKCEExchangeResult(
-            api_key=str(payload["key"]),
+            api_key=payload["key"],
             user_id=user_id if isinstance(user_id, str) else None,
         )
 
@@ -205,15 +232,24 @@ class OpenRouterPKCEClient:
         )
 
     async def run_desktop_flow(self) -> OpenRouterPKCEExchangeResult:
-        session = self.build_session()
-        self.current_authorization_url = session.authorization_url
-        listener = self._create_callback_listener(session)
+        try:
+            session = self.build_session()
+            self.current_authorization_url = session.authorization_url
+            listener = self._create_callback_listener(session)
+        except Exception as exc:
+            raise OpenRouterAuthenticationError.from_exception(
+                exc, stage="listener_start"
+            ) from None
+        stage: OpenRouterAuthStage = "browser_launch"
         try:
             if self.authorization_url_sink is not None:
                 self.authorization_url_sink(session.authorization_url)
-            if self.open_browser:
-                webbrowser.open(session.authorization_url)
+            if self.open_browser and not webbrowser.open(session.authorization_url):
+                raise OpenRouterAuthenticationError(stage="browser_launch", reason="setup")
+            stage = "callback_wait"
             code = await asyncio.to_thread(listener.wait_for_code)
+        except Exception as exc:
+            raise OpenRouterAuthenticationError.from_exception(exc, stage=stage) from None
         finally:
             listener.close()
 

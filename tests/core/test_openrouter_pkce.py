@@ -12,6 +12,7 @@ from puripuly_heart.core.openrouter_pkce import (
     OpenRouterPKCESession,
 )
 
+from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
 from puripuly_heart.ui.i18n import get_locale, set_locale
 
 
@@ -262,8 +263,11 @@ async def test_run_desktop_flow_closes_listener_and_skips_exchange_on_timeout(
     monkeypatch.setattr("puripuly_heart.core.openrouter_pkce.asyncio.to_thread", fake_to_thread)
     monkeypatch.setattr("puripuly_heart.core.openrouter_pkce.webbrowser.open", fake_open)
 
-    with pytest.raises(TimeoutError, match="timed out waiting for OpenRouter callback"):
+    with pytest.raises(OpenRouterAuthenticationError) as caught:
         await client.run_desktop_flow()
+    assert caught.value.stage == "callback_wait"
+    assert caught.value.reason == "callback_timeout"
+    assert caught.value.exception_type == "TimeoutError"
 
     assert seen == ["bind", "open", "to_thread", "wait", "close"]
 
@@ -328,3 +332,37 @@ async def test_run_desktop_flow_cancellation_unblocks_waiting_listener(
     assert listener_closed.is_set() is True
     finished = await asyncio.to_thread(wait_finished.wait, 1.0)
     assert finished is True
+
+
+@pytest.mark.asyncio
+async def test_browser_disabled_still_waits_and_exchanges_callback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = OpenRouterPKCEClient(callback_origin="http://127.0.0.1:43123", open_browser=False)
+    calls: list[str] = []
+
+    class Listener:
+        def wait_for_code(self) -> str:
+            calls.append("wait")
+            return "synthetic-code"
+
+        def close(self) -> None:
+            calls.append("closed")
+
+    def browser_must_not_open(_url: str) -> bool:
+        pytest.fail("browser-disabled flow must not launch a browser")
+
+    async def exchange_code(**_kwargs: str) -> OpenRouterPKCEExchangeResult:
+        calls.append("exchange")
+        return OpenRouterPKCEExchangeResult(api_key="synthetic-key", user_id=None)
+
+    monkeypatch.setattr(client, "_create_callback_listener", lambda _session: Listener())
+    monkeypatch.setattr(client, "exchange_code", exchange_code)
+    monkeypatch.setattr(
+        "puripuly_heart.core.openrouter_pkce.webbrowser.open", browser_must_not_open,
+    )
+
+    result = await client.run_desktop_flow()
+
+    assert result.api_key == "synthetic-key"
+    assert calls == ["wait", "closed", "exchange"]

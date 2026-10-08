@@ -166,8 +166,7 @@
         "src/puripuly_heart/ui/i18n.py"
       ],
       "fixture_or_guard_refs": [
-        "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_share_the_same_keys",
-        "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_do_not_keep_unused_runtime_keys"
+        "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_share_the_same_keys"
       ],
       "detail_owner_work_ref": "freeze-provider-config-prompt-and-i18n-fixtures"
     },

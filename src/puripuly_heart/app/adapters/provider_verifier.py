@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from puripuly_heart.app.ports.provider_verifier import (
@@ -15,12 +16,17 @@ from puripuly_heart.config.alibaba_connection import (
     validated_native_url,
     validated_websocket_url,
 )
+from puripuly_heart.core.error_messages import (
+    format_error_report_for_log,
+    openrouter_auth_failure_report,
+)
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_AUTH,
     DIAGNOSTIC_VISIBILITY_BASIC,
     ErrorDiagnostics,
 )
+from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
 from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
@@ -33,6 +39,8 @@ from puripuly_heart.providers.stt.elevenlabs_scribe import ElevenLabsScribeSTTBa
 from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
 from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
+
+logger = logging.getLogger(__name__)
 
 
 def _validated_compatible_url(base_url: str) -> str:
@@ -191,6 +199,18 @@ class ProviderVerifierAdapter(ProviderVerifierPort):
                 low_latency=_optional_context_bool(request, "low_latency"),
             )
         except Exception as exc:
+            if request.provider == "openrouter":
+                report = openrouter_auth_failure_report(exc, stage="key_verification")
+                logger.error("[OpenRouterAuth] failed " + format_error_report_for_log(report))
+                return ProviderVerificationResult(
+                    status=PROVIDER_VERIFICATION_STATUS_FAILED,
+                    provider=request.provider,
+                    secret_key=request.secret_key,
+                    secret_revision=request.secret_revision,
+                    evidence={"verifier": "provider_adapter", "provider": request.provider},
+                    message=report.message,
+                    diagnostics=report.diagnostics,
+                )
             return ProviderVerificationResult(
                 status=PROVIDER_VERIFICATION_STATUS_FAILED,
                 provider=request.provider,
@@ -225,6 +245,21 @@ class ProviderVerifierAdapter(ProviderVerifierPort):
                 diagnostics=None,
             )
 
+        if request.provider == "openrouter":
+            report = openrouter_auth_failure_report(
+                OpenRouterAuthenticationError.from_status(401, stage="key_verification"),
+                stage="key_verification",
+            )
+            logger.error("[OpenRouterAuth] failed " + format_error_report_for_log(report))
+            return ProviderVerificationResult(
+                status=PROVIDER_VERIFICATION_STATUS_FAILED,
+                provider=request.provider,
+                secret_key=request.secret_key,
+                secret_revision=request.secret_revision,
+                evidence={"verifier": "provider_adapter", "provider": request.provider},
+                message=report.message,
+                diagnostics=report.diagnostics,
+            )
         return ProviderVerificationResult(
             status=PROVIDER_VERIFICATION_STATUS_FAILED,
             provider=request.provider,

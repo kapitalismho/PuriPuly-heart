@@ -1012,3 +1012,171 @@ def test_embedded_bootstrap_only_persists_bounded_uncaught_error_diagnostics(
     assert blocked_payload["code"] == 255
     assert "builtins.LookupError" in blocked_payload["error"]
     assert not blocked_error_path.exists()
+
+
+@pytest.fixture
+def bootstrap_https_server(tmp_path: Path):
+    import datetime
+    import ipaddress
+    import ssl
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "bootstrap-test")])
+    now = datetime.datetime.now(datetime.UTC)
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=1))
+        .not_valid_after(now + datetime.timedelta(days=1))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .add_extension(
+            x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]),
+            critical=False,
+        )
+        .sign(key, hashes.SHA256())
+    )
+    ca_path = tmp_path / "ca.pem"
+    ca_path.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
+    key_path = tmp_path / "key.pem"
+    key_path.write_bytes(
+        key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"verified")
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(ca_path, key_path)
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield ca_path, f"https://127.0.0.1:{server.server_port}/"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
+@pytest.mark.parametrize(
+    "policy,httpx_result,requests_result",
+    [
+        ("file", "verified", "SSLError"),
+        ("directory", "ConnectError", "SSLError"),
+        ("requests", "ConnectError", "verified"),
+        ("curl", "ConnectError", "verified"),
+        ("unset", "ConnectError", "SSLError"),
+        ("invalid-file", "FileNotFoundError", "SSLError"),
+        ("invalid-requests", "ConnectError", "OSError"),
+    ],
+)
+def test_embedded_bootstrap_preserves_independent_ca_policy_and_tls_verification(
+    tmp_path: Path,
+    bootstrap_https_server,
+    policy: str,
+    httpx_result: str,
+    requests_result: str,
+) -> None:
+    import certifi
+
+    root = Path(__file__).resolve().parents[2]
+    ca_path, url = bootstrap_https_server
+    ca_directory = tmp_path / "empty-ca-directory"
+    ca_directory.mkdir()
+    policies = {
+        "file": {"SSL_CERT_FILE": str(ca_path)},
+        "directory": {"SSL_CERT_DIR": str(ca_directory)},
+        "requests": {"REQUESTS_CA_BUNDLE": str(ca_path)},
+        "curl": {"CURL_CA_BUNDLE": str(ca_path)},
+        "unset": {},
+        "invalid-file": {"SSL_CERT_FILE": str(tmp_path / "missing-ca.pem")},
+        "invalid-requests": {"REQUESTS_CA_BUNDLE": str(tmp_path / "missing-ca.pem")},
+    }
+    inherited = policies[policy]
+    modules = tmp_path / "startup"
+    modules.mkdir()
+    (modules / "dart_bridge.py").write_text(
+        "import json\n"
+        "def send_bytes(port, payload):\n"
+        "    print(json.dumps({'bootstrap': json.loads(payload)}))\n",
+        encoding="utf-8",
+    )
+    (modules / "_puripuly_native_runtime.py").write_text(
+        "def install(root): pass\n", encoding="utf-8"
+    )
+    ca_keys = ("SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
+    (modules / "probe.py").write_text(
+        "import json, os\n"
+        "import httpx, requests\n"
+        f"result = {{'environment': {{key: os.environ.get(key) for key in {ca_keys!r}}}}}\n"
+        "for name, library in [('httpx', httpx), ('requests', requests)]:\n"
+        "    try:\n"
+        f"        response = library.get({url!r}, timeout=5)\n"
+        "        response.raise_for_status()\n"
+        "        result[name] = response.text\n"
+        "    except Exception as exc:\n"
+        "        result[name] = type(exc).__name__\n"
+        "print(json.dumps(result))\n",
+        encoding="utf-8",
+    )
+    template = (root / "native/windows_host/python_bootstrap.py.in").read_text(encoding="utf-8")
+    script = (
+        template.replace("{argv}", "['PuriPulyHeart']")
+        .replace("{host_executable}", repr(str(tmp_path / "PuriPulyHeart.exe")))
+        .replace("{module_name}", repr("probe"))
+        .replace("{error_exit_code}", "255")
+    )
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in ca_keys and not key.upper().endswith("_PROXY")
+    }
+    environment.update(
+        inherited,
+        PYTHONPATH=os.pathsep.join((str(modules), str(root / "src"))),
+        LOCALAPPDATA=str(tmp_path / "profile"),
+        PURIPULY_HEART_NATIVE_RUNTIME_ROOT=str(tmp_path),
+        FLET_DART_BRIDGE_EXIT_PORT="7",
+        PYTHONDONTWRITEBYTECODE="1",
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=tmp_path,
+        env=environment,
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=True,
+    )
+    result, bridge = map(json.loads, completed.stdout.splitlines())
+    expected = dict.fromkeys(ca_keys)
+    expected.update(inherited)
+    if "SSL_CERT_FILE" not in inherited and "SSL_CERT_DIR" not in inherited:
+        expected["SSL_CERT_FILE"] = certifi.where()
+    if "REQUESTS_CA_BUNDLE" not in inherited and "CURL_CA_BUNDLE" not in inherited:
+        expected["REQUESTS_CA_BUNDLE"] = certifi.where()
+    assert result["environment"] == expected
+    assert result["httpx"] == httpx_result
+    assert result["requests"] == requests_result
+    assert bridge == {"bootstrap": {"code": 0, "error": ""}}

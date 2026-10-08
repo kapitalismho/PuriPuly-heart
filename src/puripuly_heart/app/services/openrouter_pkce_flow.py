@@ -28,11 +28,19 @@ from puripuly_heart.config.prompts import normalize_system_prompt_override
 from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
 )
+from puripuly_heart.core.error_messages import (
+    format_error_report_for_log,
+    openrouter_auth_failure_report,
+)
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TransactionResult,
+)
+from puripuly_heart.core.openrouter.authentication import (
+    OpenRouterAuthenticationError,
+    OpenRouterAuthStage,
 )
 from puripuly_heart.core.openrouter_credentials import OPENROUTER_BYOK_API_KEY_SECRET
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
@@ -149,21 +157,20 @@ class OpenRouterPkceApplicationOwner:
                     open_browser=open_browser,
                     authorization_url_sink=authorization_url_sink,
                 )
-        except Exception:
-            self._fail(
-                launch_source,
-                "OpenRouter PKCE flow failed",
-            )
+        except Exception as exc:
+            self._fail(launch_source, exc, stage="flow")
             return False
 
         try:
             verified = await self.verifier.verify_api_key("openrouter", result.api_key)
-        except Exception:
-            verified = False
+        except Exception as exc:
+            self._fail(launch_source, exc, stage="key_verification")
+            return False
         if not verified:
             self._fail(
                 launch_source,
-                "OpenRouter PKCE key verification failed",
+                OpenRouterAuthenticationError.from_status(401, stage="key_verification"),
+                stage="key_verification",
             )
             return False
 
@@ -243,7 +250,8 @@ class OpenRouterPkceApplicationOwner:
                     self.results.set(commit_result)
                     self._fail(
                         launch_source,
-                        "OpenRouter PKCE settings commit failed",
+                        OpenRouterAuthenticationError(stage="settings_commit", reason="setup"),
+                        stage="settings_commit",
                     )
                     return False
 
@@ -288,9 +296,14 @@ class OpenRouterPkceApplicationOwner:
             raise asyncio.CancelledError
         return succeeded
 
-    def _fail(self, launch_source: str, diagnostics: str) -> None:
-        self.failure_message_sink("openrouter.pkce.failed")
-        self.failure_diagnostics_sink(diagnostics)
+    def _fail(
+        self, launch_source: str, exception: Exception, *, stage: OpenRouterAuthStage
+    ) -> None:
+        report = openrouter_auth_failure_report(exception, stage=stage)
+        self.failure_message_sink(report.message.key)
+        self.failure_diagnostics_sink(
+            "[OpenRouterAuth] failed " + format_error_report_for_log(report)
+        )
         self.failure_route(launch_source)
 
 
