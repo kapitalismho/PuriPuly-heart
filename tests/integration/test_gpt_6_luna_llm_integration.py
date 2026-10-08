@@ -133,7 +133,7 @@ async def test_openrouter_gpt_6_luna_contextual_translation_smoke() -> None:
         await _run_contextual_korean_cases(
             route="openrouter",
             model=OPENROUTER_MODEL_GPT_6_LUNA,
-            temperature_setting="omitted",
+            temperature_setting="0.6",
             provider=provider,
             client=client,
         )
