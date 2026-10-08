@@ -498,7 +498,6 @@ if (-not [string]::IsNullOrWhiteSpace($cmakeCommandDirectory)) {
 $env:CMAKE = $cmakeCommand
 
 $overlayManifestPath = Join-Path $PWD "native/overlay/Cargo.toml"
-$gpuWorkerManifestPath = Join-Path $PWD "native/gpu_worker/Cargo.toml"
 $releaseBuildRoot = $env:PURIPULY_HEART_RELEASE_BUILD_ROOT
 if ([string]::IsNullOrWhiteSpace($releaseBuildRoot)) {
     $releaseBuildRoot = Join-Path $env:TEMP "PuriPulyHeart-ReleaseBuild-$AppVersion"
@@ -510,7 +509,6 @@ $overlayStagedPath = Join-Path $overlayBuildDir "PuriPulyHeartOverlay.exe"
 $overlayBundledDllPath = Join-Path $overlayBuildDir "openvr_api.dll"
 $gpuWorkerTargetDir = Join-Path $releaseBuildRoot "gpu-worker-target"
 $gpuWorkerBuildDir = Join-Path $PWD "build/gpu_worker"
-$gpuWorkerReleasePath = Join-Path $gpuWorkerTargetDir "release/PuriPulyHeartGpuWorker.exe"
 $gpuWorkerStagedPath = Join-Path $gpuWorkerBuildDir "PuriPulyHeartGpuWorker.exe"
 $openVrVendorDllPath = Join-Path $PWD "third_party/openvr/win64/openvr_api.dll"
 $openVrVendorSha256Path = Join-Path $PWD "third_party/openvr/win64/openvr_api.dll.sha256"
@@ -596,33 +594,18 @@ if (-not (Test-Path $overlayBundledDllPath)) {
 Assert-FileSha256Equals -Path $overlayBundledDllPath -ExpectedSha256 $PinnedOpenVrVendorDllSha256 -Label "Staged OpenVR runtime DLL"
 
 Write-Host "Building Rust GPU worker executable..."
-Invoke-External -FilePath $cargoCommand -ArgumentList @(
-    "build",
-    "--manifest-path",
-    $gpuWorkerManifestPath,
-    "--locked",
-    "--release",
-    "--bin",
-    "PuriPulyHeartGpuWorker",
-    "--target-dir",
-    $gpuWorkerTargetDir
-)
+& (Join-Path $PSScriptRoot "build-gpu-worker-release.ps1") -TargetDir $gpuWorkerTargetDir -OutputDir $gpuWorkerBuildDir
 
-if (-not (Test-Path $gpuWorkerReleasePath)) {
-    throw "Rust GPU worker executable not found: $gpuWorkerReleasePath"
+if (-not (Test-Path $gpuWorkerStagedPath)) {
+    throw "Rust GPU worker executable not found: $gpuWorkerStagedPath"
 }
-$gpuWorkerVersion = (& $gpuWorkerReleasePath --version | Out-String).Trim()
+$gpuWorkerVersion = (& $gpuWorkerStagedPath --version | Out-String).Trim()
 if ($gpuWorkerVersion -ne $AppVersion) {
     throw "Rust GPU worker version mismatch: expected $AppVersion, found $gpuWorkerVersion"
 }
-$gpuWorkerReleaseSha256 = Get-FileSha256 -Path $gpuWorkerReleasePath
+$gpuWorkerReleaseSha256 = Get-FileSha256 -Path $gpuWorkerStagedPath
 Write-Host "Built Rust GPU worker version=$gpuWorkerVersion sha256=$gpuWorkerReleaseSha256"
 
-New-Item -ItemType Directory -Force -Path $gpuWorkerBuildDir | Out-Null
-Copy-Item -Path $gpuWorkerReleasePath -Destination $gpuWorkerStagedPath -Force
-if (-not (Test-Path $gpuWorkerStagedPath)) {
-    throw "Staged GPU worker executable not found: $gpuWorkerStagedPath"
-}
 
 Write-Host "Smoke-testing staged overlay executable..."
 Invoke-External -FilePath $overlayStagedPath -ArgumentList @("--check-startup-contract")

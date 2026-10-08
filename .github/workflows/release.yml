@@ -197,23 +197,11 @@ jobs:
           Copy-Item third_party/openvr/win64/openvr_api.dll build/overlay/openvr_api.dll -Force
 
       - name: Build Rust GPU worker
-        env:
-          LIBCLANG_PATH: ${{ github.workspace }}\.venv\Lib\site-packages\clang\native
         shell: pwsh
         run: |
-          $env:CMAKE_PREFIX_PATH = $env:VULKAN_SDK
-          cargo build `
-            --manifest-path native/gpu_worker/Cargo.toml `
-            --locked `
-            --release `
-            --bin PuriPulyHeartGpuWorker `
-            --target-dir target/gpu-worker
-
-      - name: Stage GPU worker runtime
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path build/gpu_worker | Out-Null
-          Copy-Item target/gpu-worker/release/PuriPulyHeartGpuWorker.exe build/gpu_worker/PuriPulyHeartGpuWorker.exe -Force
+          ./scripts/ci/build-gpu-worker-release.ps1 `
+            -TargetDir target/gpu-worker `
+            -OutputDir build/gpu_worker
 
       - name: Build Windows executable
         shell: pwsh

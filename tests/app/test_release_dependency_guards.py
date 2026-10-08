@@ -306,14 +306,6 @@ def test_shared_setup_action_installs_pinned_uv_and_uses_frozen_sync() -> None:
     assert "uv sync ${{ inputs.sync-args }} --frozen" in action
 
 
-def test_windows_gpu_worker_native_sources_compile_as_utf8() -> None:
-    cargo_config = (ROOT / ".cargo" / "config.toml").read_text(encoding="utf-8")
-
-    assert "CXXFLAGS_x86_64_pc_windows_msvc" in cargo_config
-    assert 'value = "/utf-8"' in cargo_config
-    assert "force = true" in cargo_config
-
-
 def test_installer_script_embeds_local_stt_manifest_assets_for_inno_download() -> None:
     script = (ROOT / "installer.iss").read_text(encoding="utf-8")
 

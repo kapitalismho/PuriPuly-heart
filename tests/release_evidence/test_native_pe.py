@@ -328,3 +328,22 @@ def test_unpaired_debug_interpreter_module_is_not_silently_discarded(tmp_path: P
     with pytest.raises(ValueError, match="without its release pair"):
         stage_vc_runtime(root, build)
     assert debug.is_file()
+
+
+@pytest.mark.parametrize(
+    "module", ["transcribe.dll", "ggml-vulkan.dll", "ggml-cpu-x64.dll", "ggml-cpu-icelake.dll"]
+)
+def test_dynamic_gpu_modules_cannot_escape_native_import_closure(
+    tmp_path: Path, module: str
+) -> None:
+    root, evidence, _ = _staged(tmp_path)
+    _pe(root / module, ("builder-only.dll",))
+    with pytest.raises(FileNotFoundError, match=module):
+        validate_pe_dependencies(root, evidence)
+
+
+def test_dynamic_cpu_module_must_match_x64_payload(tmp_path: Path) -> None:
+    root, evidence, _ = _staged(tmp_path)
+    _pe(root / "ggml-cpu-x64.dll", machine=0x14C)
+    with pytest.raises(ValueError, match="x64"):
+        validate_pe_dependencies(root, evidence)
