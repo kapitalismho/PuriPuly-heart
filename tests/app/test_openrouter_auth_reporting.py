@@ -346,3 +346,40 @@ async def test_missing_callback_times_out_and_closes_real_listener(
     assert caught.value.reason == "callback_timeout"
     with socket.socket() as released:
         released.bind(("127.0.0.1", port))
+
+
+@pytest.mark.asyncio
+async def test_unsuccessful_browser_launch_is_reported_without_callback_wait_or_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    client = OpenRouterPKCEClient(callback_origin="http://127.0.0.1:43123")
+
+    class Listener:
+        def wait_for_code(self) -> str:
+            calls.append("wait")
+            pytest.fail("unsuccessful browser launch must not wait for a callback")
+
+        def close(self) -> None:
+            calls.append("closed")
+
+    def unsuccessful_browser(_url: str) -> bool:
+        calls.append("browser")
+        return False
+
+    monkeypatch.setattr(client, "_create_callback_listener", lambda _session: Listener())
+    monkeypatch.setattr(
+        "puripuly_heart.core.openrouter_pkce.webbrowser.open", unsuccessful_browser,
+    )
+    flow = OpenRouterPkceFlowOwner(client_factory=lambda: client)
+    owner, target, messages, diagnostics, routes = failure_application(tmp_path, flow, object())
+
+    assert await owner.connect(target=target, launch_source="settings") is False
+    assert messages == ["error.openrouter_auth.setup"]
+    assert "operation=browser_launch" in diagnostics[0]
+    assert "category=lifecycle" in diagnostics[0]
+    assert calls == ["browser", "closed"]
+    assert routes == ["settings"]
+    assert flow.active_client is None
+    assert flow.get_runtime().active_task_names == ()
+    assert not (tmp_path / "settings.json").exists()

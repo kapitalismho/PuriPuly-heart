@@ -244,8 +244,8 @@ class OpenRouterPKCEClient:
         try:
             if self.authorization_url_sink is not None:
                 self.authorization_url_sink(session.authorization_url)
-            if self.open_browser:
-                webbrowser.open(session.authorization_url)
+            if self.open_browser and not webbrowser.open(session.authorization_url):
+                raise OpenRouterAuthenticationError(stage="browser_launch", reason="setup")
             stage = "callback_wait"
             code = await asyncio.to_thread(listener.wait_for_code)
         except Exception as exc:

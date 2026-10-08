@@ -332,3 +332,37 @@ async def test_run_desktop_flow_cancellation_unblocks_waiting_listener(
     assert listener_closed.is_set() is True
     finished = await asyncio.to_thread(wait_finished.wait, 1.0)
     assert finished is True
+
+
+@pytest.mark.asyncio
+async def test_browser_disabled_still_waits_and_exchanges_callback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = OpenRouterPKCEClient(callback_origin="http://127.0.0.1:43123", open_browser=False)
+    calls: list[str] = []
+
+    class Listener:
+        def wait_for_code(self) -> str:
+            calls.append("wait")
+            return "synthetic-code"
+
+        def close(self) -> None:
+            calls.append("closed")
+
+    def browser_must_not_open(_url: str) -> bool:
+        pytest.fail("browser-disabled flow must not launch a browser")
+
+    async def exchange_code(**_kwargs: str) -> OpenRouterPKCEExchangeResult:
+        calls.append("exchange")
+        return OpenRouterPKCEExchangeResult(api_key="synthetic-key", user_id=None)
+
+    monkeypatch.setattr(client, "_create_callback_listener", lambda _session: Listener())
+    monkeypatch.setattr(client, "exchange_code", exchange_code)
+    monkeypatch.setattr(
+        "puripuly_heart.core.openrouter_pkce.webbrowser.open", browser_must_not_open,
+    )
+
+    result = await client.run_desktop_flow()
+
+    assert result.api_key == "synthetic-key"
+    assert calls == ["wait", "closed", "exchange"]
