@@ -359,7 +359,8 @@ async def test_browser_disabled_still_waits_and_exchanges_callback(
     monkeypatch.setattr(client, "_create_callback_listener", lambda _session: Listener())
     monkeypatch.setattr(client, "exchange_code", exchange_code)
     monkeypatch.setattr(
-        "puripuly_heart.core.openrouter_pkce.webbrowser.open", browser_must_not_open,
+        "puripuly_heart.core.openrouter_pkce.webbrowser.open",
+        browser_must_not_open,
     )
 
     result = await client.run_desktop_flow()

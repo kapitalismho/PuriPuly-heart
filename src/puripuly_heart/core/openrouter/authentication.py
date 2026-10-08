@@ -73,7 +73,9 @@ class OpenRouterAuthenticationError(RuntimeError):
         super().__init__(self.message_key)
 
     @classmethod
-    def from_status(cls, status: int, *, stage: OpenRouterAuthStage) -> OpenRouterAuthenticationError:
+    def from_status(
+        cls, status: int, *, stage: OpenRouterAuthStage
+    ) -> OpenRouterAuthenticationError:
         reason: OpenRouterAuthReason
         if status == 401:
             reason = "credential_rejected"

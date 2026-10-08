@@ -125,7 +125,9 @@ class NativeArtifactLayout:
             raise ValueError("native Python executable must be python.exe")
         if values["stdlib_archive"] != "python314.zip":
             raise ValueError("native standard library archive must be python314.zip")
-        if values["python_archive"] != str(PurePosixPath(values["application_root"]) / "python.zip"):
+        if values["python_archive"] != str(
+            PurePosixPath(values["application_root"]) / "python.zip"
+        ):
             raise ValueError("native Python archive must be application_root/python.zip")
         code_roots = [
             PurePosixPath(values[key])
@@ -133,9 +135,12 @@ class NativeArtifactLayout:
         ]
         if any(root == PurePosixPath(".") for root in code_roots) or any(
             left == right or left in right.parents or right in left.parents
-            for index, left in enumerate(code_roots) for right in code_roots[index + 1:]
+            for index, left in enumerate(code_roots)
+            for right in code_roots[index + 1 :]
         ):
-            raise ValueError("native Python code roots must be distinct non-overlapping directories")
+            raise ValueError(
+                "native Python code roots must be distinct non-overlapping directories"
+            )
         return cls(source.resolve(), values)
 
     def resolve(self, root: Path, key: str) -> Path:
@@ -540,16 +545,17 @@ def _validate_bytecode(data: bytes, name: str) -> str:
 
 
 def _validate_compiled_member(data: bytes, source: bytes, name: str) -> None:
-    if (
-        _validate_bytecode(data, name) != "unchecked-hash"
-        or data[8:16] != importlib.util.source_hash(source)
-    ):
+    if _validate_bytecode(data, name) != "unchecked-hash" or data[
+        8:16
+    ] != importlib.util.source_hash(source):
         raise ValueError(f"invalid unchecked-hash bytecode: {name}")
 
 
 def compile_runtime(target_root: Path, layout_path: Path) -> dict[str, Any]:
     if sys.flags.optimize != 0:
-        raise RuntimeError("native runtime bytecode must be compiled by an optimization-0 interpreter")
+        raise RuntimeError(
+            "native runtime bytecode must be compiled by an optimization-0 interpreter"
+        )
     target_root = target_root.resolve()
     layout = NativeArtifactLayout.load(layout_path)
     application_root = layout.resolve(target_root, "application_root")
@@ -571,22 +577,27 @@ def compile_runtime(target_root: Path, layout_path: Path) -> dict[str, Any]:
         )
         try:
             py_compile.compile(
-                str(source), cfile=str(destination),
-                dfile=source.relative_to(target_root).as_posix(), doraise=True, optimize=0,
+                str(source),
+                cfile=str(destination),
+                dfile=source.relative_to(target_root).as_posix(),
+                doraise=True,
+                optimize=0,
                 invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH,
             )
         except py_compile.PyCompileError as exc:
             failures.append(str(exc))
             continue
-        outputs.append({
-            "path": destination.relative_to(target_root).as_posix(),
-            "source": source.relative_to(target_root).as_posix(),
-            "sha256": _sha256(destination),
-            "source_sha256": _sha256(source),
-            "optimization": "0",
-            "invalidation_mode": "unchecked-hash",
-            "provenance": "build-derived",
-        })
+        outputs.append(
+            {
+                "path": destination.relative_to(target_root).as_posix(),
+                "source": source.relative_to(target_root).as_posix(),
+                "sha256": _sha256(destination),
+                "source_sha256": _sha256(source),
+                "optimization": "0",
+                "invalidation_mode": "unchecked-hash",
+                "provenance": "build-derived",
+            }
+        )
     if failures:
         raise RuntimeError("\n".join(failures))
     upstream = []
@@ -603,17 +614,21 @@ def compile_runtime(target_root: Path, layout_path: Path) -> dict[str, Any]:
             continue
         if path.with_suffix(".py").is_file():
             continue
-        upstream.append({
-            "path": path.relative_to(target_root).as_posix(),
-            "input_path": path.relative_to(target_root).as_posix(),
-            "sha256": _sha256(path),
-            "optimization": "upstream-unspecified",
-            "invalidation_mode": _validate_bytecode(path.read_bytes(), str(path)),
-            "provenance": "trusted-upstream-sourceless",
-        })
+        upstream.append(
+            {
+                "path": path.relative_to(target_root).as_posix(),
+                "input_path": path.relative_to(target_root).as_posix(),
+                "sha256": _sha256(path),
+                "optimization": "upstream-unspecified",
+                "invalidation_mode": _validate_bytecode(path.read_bytes(), str(path)),
+                "provenance": "trusted-upstream-sourceless",
+            }
+        )
     return {
-        "python": sys.version, "python_optimize": sys.flags.optimize,
-        "bytecode": outputs, "stdlib_bytecode": upstream,
+        "python": sys.version,
+        "python_optimize": sys.flags.optimize,
+        "bytecode": outputs,
+        "stdlib_bytecode": upstream,
     }
 
 
@@ -629,7 +644,9 @@ def _dependency_modules(root: Path) -> dict[str, str]:
 
     def package(parent: PurePosixPath, stem: str) -> bool:
         directory = parent / stem
-        return (directory / "__init__.py").as_posix() in paths or native_module(directory, "__init__")
+        return (directory / "__init__.py").as_posix() in paths or native_module(
+            directory, "__init__"
+        )
 
     modules = {}
     folded_names = set()
@@ -670,26 +687,27 @@ def _dependency_index(data: bytes) -> dict[str, str]:
     except (EOFError, ValueError, TypeError) as exc:
         raise ValueError("malformed dependency index") from exc
     if (
-        stream.tell() != len(data) or not isinstance(payload, dict)
-        or set(payload) != {"version", "modules"} or type(payload["version"]) is not int
-        or payload["version"] != 1 or not isinstance(payload["modules"], dict)
+        stream.tell() != len(data)
+        or not isinstance(payload, dict)
+        or set(payload) != {"version", "modules"}
+        or type(payload["version"]) is not int
+        or payload["version"] != 1
+        or not isinstance(payload["modules"], dict)
     ):
         raise ValueError("invalid dependency index schema")
     modules = payload["modules"]
     seen_names = set()
     seen_sources = set()
     for fullname, source in modules.items():
-        if (
-            not isinstance(fullname, str)
-            or not fullname
-            or not isinstance(source, str)
-        ):
+        if not isinstance(fullname, str) or not fullname or not isinstance(source, str):
             raise ValueError("invalid dependency index module")
         path = _safe_relative(source)
         parts = path.with_suffix("").parts
         expected = ".".join(parts[:-1] if parts[-1] == "__init__" and len(parts) > 1 else parts)
         if (
-            path.suffix != ".py" or fullname != expected or "__pycache__" in path.parts
+            path.suffix != ".py"
+            or fullname != expected
+            or "__pycache__" in path.parts
             or any(not part or "." in part for part in parts)
         ):
             raise ValueError(f"invalid dependency index source: {source}")
@@ -729,12 +747,16 @@ def _archive_members(
                 with archive.open(info) as stream:
                     signature = stream.read(4)
                 if signature[:2] == b"MZ" or signature in {
-                    b"\x7fELF", b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe",
-                    b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe",
+                    b"\x7fELF",
+                    b"\xfe\xed\xfa\xce",
+                    b"\xce\xfa\xed\xfe",
+                    b"\xfe\xed\xfa\xcf",
+                    b"\xcf\xfa\xed\xfe",
                 }:
                     raise ValueError(f"Python archive cannot contain native binaries: {name}")
             if not stdlib and (
-                name.startswith("product_bootstrap.") or name.startswith("prompts/")
+                name.startswith("product_bootstrap.")
+                or name.startswith("prompts/")
                 or (name.startswith("puripuly_heart/data/") and path.suffix not in {".py", ".pyc"})
             ):
                 raise ValueError(f"Python archive contains filesystem-only content: {name}")
@@ -758,9 +780,14 @@ def _archive_members(
                 else:
                     raise ValueError(f"Python archive bytecode lacks diagnostic source: {name}")
         required = (
-            {"encodings/__init__.pyc"} if stdlib else
-            {"puripuly_heart/__init__.pyc", "flet/__init__.pyc",
-             "flet/controls/material/icons.json", "_native_dependencies.index"}
+            {"encodings/__init__.pyc"}
+            if stdlib
+            else {
+                "puripuly_heart/__init__.pyc",
+                "flet/__init__.pyc",
+                "flet/controls/material/icons.json",
+                "_native_dependencies.index",
+            }
         )
         if not required <= members:
             raise ValueError(f"Python archive lacks required members: {sorted(required - members)}")
@@ -776,15 +803,21 @@ def _archive_members(
 
 
 def _write_archive(
-    destination: Path, members: dict[str, Path | bytes], records: dict[str, dict[str, str]],
+    destination: Path,
+    members: dict[str, Path | bytes],
+    records: dict[str, dict[str, str]],
     target_root: Path,
 ) -> dict[str, Any]:
     directories = {
-        parent.as_posix() + "/" for name in members for parent in PurePosixPath(name).parents
+        parent.as_posix() + "/"
+        for name in members
+        for parent in PurePosixPath(name).parents
         if parent != PurePosixPath(".")
     }
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+    with zipfile.ZipFile(
+        destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+    ) as archive:
         for name in sorted(set(members) | directories):
             info = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
@@ -804,13 +837,18 @@ def _write_archive(
             if name in records and digest.hexdigest() != records[name]["sha256"]:
                 raise ValueError(f"Python archive input changed while packing: {name}")
     return {
-        "path": destination.relative_to(target_root).as_posix(), "sha256": _sha256(destination),
+        "path": destination.relative_to(target_root).as_posix(),
+        "sha256": _sha256(destination),
         "members": [
-            {
-                "path": name,
-                "sha256": hashlib.sha256(b"").hexdigest(),
-                "provenance": "build-derived-directory",
-            } if name in directories else records[name]
+            (
+                {
+                    "path": name,
+                    "sha256": hashlib.sha256(b"").hexdigest(),
+                    "provenance": "build-derived-directory",
+                }
+                if name in directories
+                else records[name]
+            )
             for name in sorted(set(members) | directories)
         ],
     }
@@ -826,11 +864,16 @@ def bundle_runtime(target_root: Path, layout_path: Path, bytecode_path: Path) ->
     destination = layout.resolve(target_root, "python_archive")
     stdlib_destination = layout.resolve(target_root, "stdlib_archive")
     evidence = json.loads(bytecode_path.read_text(encoding="utf-8"))
-    if evidence.get("python_optimize") != 0 or "archive" in evidence or "stdlib_archive" in evidence:
+    if (
+        evidence.get("python_optimize") != 0
+        or "archive" in evidence
+        or "stdlib_archive" in evidence
+    ):
         raise ValueError("bundle-runtime requires optimization-0 prepackaging compile evidence")
     for required in (
         application_root / "puripuly_heart" / "__init__.py",
-        application_root / "product_bootstrap.py", flet_root / "__init__.py",
+        application_root / "product_bootstrap.py",
+        flet_root / "__init__.py",
         flet_root / "controls" / "material" / "icons.json",
     ):
         if not required.is_file():
@@ -862,7 +905,8 @@ def bundle_runtime(target_root: Path, layout_path: Path, bytecode_path: Path) ->
         if not path.is_file() or not source_path.is_file():
             raise FileNotFoundError(f"missing compiled input: {source}")
         if (
-            _sha256(path) != entry["sha256"] or _sha256(source_path) != entry.get("source_sha256")
+            _sha256(path) != entry["sha256"]
+            or _sha256(source_path) != entry.get("source_sha256")
             or entry.get("optimization") != "0"
             or entry.get("invalidation_mode") != "unchecked-hash"
             or entry.get("provenance") != "build-derived"
@@ -878,14 +922,20 @@ def bundle_runtime(target_root: Path, layout_path: Path, bytecode_path: Path) ->
     for entry in evidence.get("stdlib_bytecode", []):
         path = target_root.joinpath(*_safe_relative(entry["path"]).parts)
         if (
-            path not in all_files or not path.is_relative_to(stdlib_root) or path.suffix != ".pyc"
-            or "__pycache__" in path.parts or path.with_suffix(".py").exists()
-            or entry["path"] in upstream or "source" in entry or "source_sha256" in entry
+            path not in all_files
+            or not path.is_relative_to(stdlib_root)
+            or path.suffix != ".pyc"
+            or "__pycache__" in path.parts
+            or path.with_suffix(".py").exists()
+            or entry["path"] in upstream
+            or "source" in entry
+            or "source_sha256" in entry
             or entry.get("input_path") != entry["path"]
             or entry.get("provenance") != "trusted-upstream-sourceless"
             or entry.get("optimization") != "upstream-unspecified"
             or _sha256(path) != entry.get("sha256")
-            or _validate_bytecode(path.read_bytes(), entry["path"]) != entry.get("invalidation_mode")
+            or _validate_bytecode(path.read_bytes(), entry["path"])
+            != entry.get("invalidation_mode")
         ):
             raise ValueError(f"upstream bytecode evidence mismatch: {entry['path']}")
         upstream[entry["path"]] = entry
@@ -921,9 +971,9 @@ def bundle_runtime(target_root: Path, layout_path: Path, bytecode_path: Path) ->
                 relative.parts[0] == "prompts" or relative.parts[:2] == ("puripuly_heart", "data")
             )
             if suffix in {".pyd", ".dll", ".so", ".dylib", ".exe"} and (
-                stdlib or flet or (root == application_root and not (
-                    suffix == ".dll" and filesystem_resource
-                ))
+                stdlib
+                or flet
+                or (root == application_root and not (suffix == ".dll" and filesystem_resource))
             ):
                 raise ValueError(f"packed package contains unsupported native module: {path}")
             if root == application_root and (
@@ -937,20 +987,26 @@ def bundle_runtime(target_root: Path, layout_path: Path, bytecode_path: Path) ->
                     try:
                         original = (
                             Path(importlib.util.source_from_cache(str(path)))
-                            if "__pycache__" in relative.parts else path.with_suffix(".py")
+                            if "__pycache__" in relative.parts
+                            else path.with_suffix(".py")
                         )
                     except ValueError as exc:
                         raise ValueError(f"unsupported bytecode cache: {path}") from exc
                     if not original.is_file() or (
-                        root == application_root and "__pycache__" not in relative.parts
+                        root == application_root
+                        and "__pycache__" not in relative.parts
                         and path != application_root / "product_bootstrap.pyc"
                     ):
-                        raise ValueError(f"packed package contains unsupported sourceless module: {path}")
+                        raise ValueError(
+                            f"packed package contains unsupported sourceless module: {path}"
+                        )
                 cleanup.append(path)
                 continue
             if "__pycache__" in relative.parts:
                 if suffix == ".py":
-                    raise ValueError(f"packed package contains source inside a cache directory: {path}")
+                    raise ValueError(
+                        f"packed package contains source inside a cache directory: {path}"
+                    )
                 continue
             if suffix == ".py":
                 entry = compiled[source]
@@ -968,20 +1024,34 @@ def bundle_runtime(target_root: Path, layout_path: Path, bytecode_path: Path) ->
                 cleanup.append(path)
             elif root == application_root or (root == dependency_root and not flet):
                 continue
-            add(name, path, {
-                "source": source, "sha256": _sha256(path), "provenance": "build-input",
-            }, stdlib=stdlib)
+            add(
+                name,
+                path,
+                {
+                    "source": source,
+                    "sha256": _sha256(path),
+                    "provenance": "build-input",
+                },
+                stdlib=stdlib,
+            )
             if stdlib:
                 cleanup.append(path)
     index = marshal.dumps({"version": 1, "modules": _dependency_modules(dependency_root)})
-    add("_native_dependencies.index", index, {
-        "sha256": hashlib.sha256(index).hexdigest(), "provenance": "build-derived-index",
-    })
+    add(
+        "_native_dependencies.index",
+        index,
+        {
+            "sha256": hashlib.sha256(index).hexdigest(),
+            "provenance": "build-derived-index",
+        },
+    )
     temporary = destination.with_suffix(destination.suffix + ".tmp")
     stdlib_temporary = stdlib_destination.with_suffix(stdlib_destination.suffix + ".tmp")
     try:
         archive_record = _write_archive(temporary, members, records, target_root)
-        stdlib_record = _write_archive(stdlib_temporary, stdlib_members, stdlib_records, target_root)
+        stdlib_record = _write_archive(
+            stdlib_temporary, stdlib_members, stdlib_records, target_root
+        )
         if _archive_members(temporary, dependency_root=dependency_root) != members.keys():
             raise ValueError("Python archive differs from staged inputs")
         if _archive_members(stdlib_temporary, stdlib=True) != stdlib_members.keys():
@@ -1003,8 +1073,12 @@ def bundle_runtime(target_root: Path, layout_path: Path, bytecode_path: Path) ->
             shutil.rmtree(directory)
     return {
         **evidence,
-        "bytecode": [entry for entry in evidence["bytecode"] if entry["source"] not in archived_sources],
-        "stdlib_bytecode": [], "archive": archive_record, "stdlib_archive": stdlib_record,
+        "bytecode": [
+            entry for entry in evidence["bytecode"] if entry["source"] not in archived_sources
+        ],
+        "stdlib_bytecode": [],
+        "archive": archive_record,
+        "stdlib_archive": stdlib_record,
     }
 
 
@@ -1017,8 +1091,10 @@ def _validate_python_archive(target_root: Path, layout: NativeArtifactLayout) ->
     members = _archive_members(archive_path, dependency_root=dependency_root)
     stdlib_members = _archive_members(stdlib_path, stdlib=True)
     loose = [
-        path for root in (application_root, dependency_root, stdlib_root)
-        for path in root.rglob("*") if path.is_file()
+        path
+        for root in (application_root, dependency_root, stdlib_root)
+        for path in root.rglob("*")
+        if path.is_file()
         and (
             (path.suffix.lower() == ".pyc" and path != application_root / "product_bootstrap.pyc")
             or (path.suffix.lower() == ".py" and root != dependency_root)
@@ -1031,10 +1107,12 @@ def _validate_python_archive(target_root: Path, layout: NativeArtifactLayout) ->
         raise FileNotFoundError("native artifact lacks standalone product_bootstrap.pyc")
     return {
         "path": archive_path.relative_to(target_root.resolve()).as_posix(),
-        "sha256": _sha256(archive_path), "member_count": len(members),
+        "sha256": _sha256(archive_path),
+        "member_count": len(members),
         "stdlib_archive": {
             "path": stdlib_path.relative_to(target_root.resolve()).as_posix(),
-            "sha256": _sha256(stdlib_path), "member_count": len(stdlib_members),
+            "sha256": _sha256(stdlib_path),
+            "member_count": len(stdlib_members),
         },
     }
 
@@ -1044,7 +1122,9 @@ def _validate_bundle_evidence(
 ) -> None:
     target_root = target_root.resolve()
     if evidence.get("python_optimize") != 0 or evidence.get("stdlib_bytecode") != []:
-        raise ValueError("Python archive evidence must use optimization 0 and own deployed stdlib bytecode")
+        raise ValueError(
+            "Python archive evidence must use optimization 0 and own deployed stdlib bytecode"
+        )
     deployed = _validate_python_archive(target_root, layout)
     for key, deployed_record, root in (
         ("archive", deployed, layout.resolve(target_root, "application_root")),
@@ -1082,35 +1162,49 @@ def _validate_bundle_evidence(
                     expected_input = (root / name).relative_to(target_root).as_posix()
                     if key == "archive" and name.startswith("flet/"):
                         expected_input = (
-                            layout.resolve(target_root, "dependency_root") / name
-                        ).relative_to(target_root).as_posix()
-                    if entry.get("provenance") != "build-input" or entry.get("source") != expected_input:
+                            (layout.resolve(target_root, "dependency_root") / name)
+                            .relative_to(target_root)
+                            .as_posix()
+                        )
+                    if (
+                        entry.get("provenance") != "build-input"
+                        or entry.get("source") != expected_input
+                    ):
                         raise ValueError(f"Python archive input evidence mismatch: {name}")
                     continue
                 dependency = name.startswith("_native_dependencies/")
                 source_name = str(PurePosixPath(name).with_suffix(".py"))
                 if dependency:
                     relative = PurePosixPath(source_name).relative_to("_native_dependencies")
-                    source = layout.resolve(target_root, "dependency_root").joinpath(*relative.parts)
+                    source = layout.resolve(target_root, "dependency_root").joinpath(
+                        *relative.parts
+                    )
                     source_data = source.read_bytes()
                     expected_source = source.relative_to(target_root).as_posix()
                     if "source_member" in entry:
-                        raise ValueError(f"dependency source evidence must own retained source: {name}")
+                        raise ValueError(
+                            f"dependency source evidence must own retained source: {name}"
+                        )
                 else:
                     source_data = archive.read(source_name) if source_name in members else None
                     expected_source = (root / source_name).relative_to(target_root).as_posix()
                     if key == "archive" and name.startswith("flet/"):
                         expected_source = (
-                            layout.resolve(target_root, "dependency_root") / source_name
-                        ).relative_to(target_root).as_posix()
+                            (layout.resolve(target_root, "dependency_root") / source_name)
+                            .relative_to(target_root)
+                            .as_posix()
+                        )
                 if source_data is None:
                     if (
                         key != "stdlib_archive"
                         or entry.get("provenance") != "trusted-upstream-sourceless"
                         or entry.get("optimization") != "upstream-unspecified"
                         or entry.get("invalidation_mode") != _validate_bytecode(data, name)
-                        or entry.get("input_path") != (root / name).relative_to(target_root).as_posix()
-                        or "source" in entry or "source_sha256" in entry or "source_member" in entry
+                        or entry.get("input_path")
+                        != (root / name).relative_to(target_root).as_posix()
+                        or "source" in entry
+                        or "source_sha256" in entry
+                        or "source_member" in entry
                     ):
                         raise ValueError(f"upstream bytecode evidence mismatch: {name}")
                 else:
@@ -1132,13 +1226,14 @@ def _validate_bundle_evidence(
     if (
         _sha256(bootstrap) != entry.get("sha256")
         or entry.get("source") != bootstrap.with_suffix(".py").relative_to(target_root).as_posix()
-        or not isinstance(entry.get("source_sha256"), str) or len(entry["source_sha256"]) != 64
-        or entry.get("optimization") != "0" or entry.get("invalidation_mode") != "unchecked-hash"
+        or not isinstance(entry.get("source_sha256"), str)
+        or len(entry["source_sha256"]) != 64
+        or entry.get("optimization") != "0"
+        or entry.get("invalidation_mode") != "unchecked-hash"
         or entry.get("provenance") != "build-derived"
         or _validate_bytecode(bootstrap.read_bytes(), entry["path"]) != "unchecked-hash"
     ):
         raise ValueError("loose bytecode compile evidence mismatch")
-
 
 
 def validate_compliance(target_root: Path, repo_root: Path, soxr_manifest: Path) -> dict[str, Any]:

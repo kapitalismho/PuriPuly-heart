@@ -122,8 +122,15 @@ def test_production_export_includes_locked_httpx_socks_transport(tmp_path: Path)
     exported = tmp_path / "exported.txt"
     subprocess.run(
         [
-            uv, "export", "--locked", "--no-dev", "--no-emit-project",
-            "--format", "requirements-txt", "--output-file", str(exported),
+            uv,
+            "export",
+            "--locked",
+            "--no-dev",
+            "--no-emit-project",
+            "--format",
+            "requirements-txt",
+            "--output-file",
+            str(exported),
         ],
         cwd=ROOT,
         check=True,

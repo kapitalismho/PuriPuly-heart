@@ -78,8 +78,12 @@ def _activate(runtime_loader, monkeypatch, runtime_root, dependency_root):
 
 def _copy_socket_extension(directory: Path):
     spec = importlib.util.find_spec("_socket")
-    if spec is None or spec.origin is None or not any(
-        spec.origin.endswith(suffix) for suffix in importlib.machinery.EXTENSION_SUFFIXES
+    if (
+        spec is None
+        or spec.origin is None
+        or not any(
+            spec.origin.endswith(suffix) for suffix in importlib.machinery.EXTENSION_SUFFIXES
+        )
     ):
         pytest.skip("the interpreter does not provide _socket as a native extension")
     directory.mkdir(parents=True, exist_ok=True)
@@ -98,9 +102,7 @@ def mixed_runtime(tmp_path, monkeypatch, runtime_loader):
         "payload = (Path(__file__).parent / 'payload.txt').read_text(encoding='utf-8')\n"
     )
     logic_source = (
-        "VALUE = 'archived'\n"
-        "def explode():\n"
-        "    raise RuntimeError('archived failure')\n"
+        "VALUE = 'archived'\n" "def explode():\n" "    raise RuntimeError('archived failure')\n"
     )
     runtime_root, dependency_root, archive_path = _stage_runtime(
         tmp_path,
@@ -371,9 +373,7 @@ def test_configured_python_children_activate_archived_code(tmp_path, runtime_loa
     moved_archive = resource_root / "python.zip"
     archive_path.rename(moved_archive)
     _add_bootstrap(moved_archive)
-    environment = _child_environment(
-        runtime_root, dependency_root, moved_archive, configured=True
-    )
+    environment = _child_environment(runtime_root, dependency_root, moved_archive, configured=True)
     script = "import _native_test_child; print(_native_test_child.VALUE)"
     if mode == "module":
         arguments = ["-m", "_native_test_child"]
@@ -469,7 +469,11 @@ def test_unconfigured_python_does_not_activate_loader(tmp_path, runtime_loader):
     _add_bootstrap(archive_path)
 
     child = subprocess.run(
-        [sys.executable, "-c", "import _native_test_unconfigured; print(_native_test_unconfigured.VALUE)"],
+        [
+            sys.executable,
+            "-c",
+            "import _native_test_unconfigured; print(_native_test_unconfigured.VALUE)",
+        ],
         cwd=tmp_path,
         env=_child_environment(runtime_root, dependency_root, archive_path, configured=False),
         capture_output=True,

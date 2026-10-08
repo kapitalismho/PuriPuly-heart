@@ -28,9 +28,9 @@ def test_openvr_vendor_module_exposes_pinned_bundle_contract() -> None:
     module = _load_openvr_vendor_module()
     bundle = module.validate_vendored_openvr_bundle(ROOT / "third_party" / "openvr")
 
-    assert module.OPENVR_VENDOR_DLL_SHA256 == bundle.dll_sha256, (
-        "module hash pin must match the disk-hashed vendored bundle"
-    )
+    assert (
+        module.OPENVR_VENDOR_DLL_SHA256 == bundle.dll_sha256
+    ), "module hash pin must match the disk-hashed vendored bundle"
     assert module.OPENVR_VENDOR_SHA256_LINE == f"{bundle.dll_sha256} *openvr_api.dll"
 
 

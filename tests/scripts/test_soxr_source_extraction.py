@@ -50,10 +50,19 @@ def _invoke(runner: Path, arguments: list[str], timeout: int = 15) -> subprocess
     arguments_file.write_text(json.dumps(arguments), encoding="utf-8")
     return subprocess.run(
         [
-            str(POWERSHELL), "-NoProfile", "-NonInteractive", "-File", str(runner),
-            "-Source", str(REPO_ROOT / "scripts/ci/prepare-soxr-release-inputs.ps1"),
-            "-Python", sys.executable, "-ArgumentsFile", str(arguments_file),
-            "-TimeoutSeconds", str(timeout),
+            str(POWERSHELL),
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(runner),
+            "-Source",
+            str(REPO_ROOT / "scripts/ci/prepare-soxr-release-inputs.ps1"),
+            "-Python",
+            sys.executable,
+            "-ArgumentsFile",
+            str(arguments_file),
+            "-TimeoutSeconds",
+            str(timeout),
         ],
         capture_output=True,
         text=True,

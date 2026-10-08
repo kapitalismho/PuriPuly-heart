@@ -380,8 +380,10 @@ def staged_archive_runtime(tmp_path: Path) -> tuple[Path, Path, dict[str, object
     sdk_source = tmp_path / "sdk_input.py"
     sdk_source.write_text("VALUE = 77\n", encoding="utf-8")
     py_compile.compile(
-        str(sdk_source), cfile=str(stdlib / "sdk_probe.pyc"),
-        dfile="trusted-sdk/sdk_probe.py", doraise=True,
+        str(sdk_source),
+        cfile=str(stdlib / "sdk_probe.pyc"),
+        dfile="trusted-sdk/sdk_probe.py",
+        doraise=True,
         invalidation_mode=py_compile.PycInvalidationMode.TIMESTAMP,
     )
     sdk_source.unlink()
@@ -398,12 +400,12 @@ def staged_archive_runtime(tmp_path: Path) -> tuple[Path, Path, dict[str, object
         "from . import _socket\nfrom .code import VALUE\n", encoding="utf-8"
     )
     (mixed / "code.py").write_text(
-        "VALUE = 23\n"
-        "def fail():\n"
-        "    raise RuntimeError('physical source traceback')\n",
+        "VALUE = 23\n" "def fail():\n" "    raise RuntimeError('physical source traceback')\n",
         encoding="utf-8",
     )
-    (mixed / "_socket.py").write_text("raise AssertionError('native shadow lost')\n", encoding="utf-8")
+    (mixed / "_socket.py").write_text(
+        "raise AssertionError('native shadow lost')\n", encoding="utf-8"
+    )
     shutil.copy2(socket_spec.origin, mixed / Path(socket_spec.origin).name)
     (mixed / "payload.txt").write_text("mixed resource", encoding="utf-8")
     metadata = dependencies / "mixed-1.0.dist-info"
@@ -413,7 +415,9 @@ def staged_archive_runtime(tmp_path: Path) -> tuple[Path, Path, dict[str, object
     (dependencies / "shared_ns/child.py").write_text("VALUE = 5\n", encoding="utf-8")
     (dependencies / "choice").mkdir()
     (dependencies / "choice/__init__.py").write_text("VALUE = 31\n", encoding="utf-8")
-    (dependencies / "choice.py").write_text("raise AssertionError('module shadow lost')\n", encoding="utf-8")
+    (dependencies / "choice.py").write_text(
+        "raise AssertionError('module shadow lost')\n", encoding="utf-8"
+    )
     (dependencies / "masked").mkdir()
     (dependencies / "masked.py").write_text("VALUE = 17\n", encoding="utf-8")
     (dependencies / "masked/child.py").write_text("VALUE = 99\n", encoding="utf-8")
@@ -577,7 +581,8 @@ def test_bundle_cli_and_manifest_preserve_deployed_archive_and_member_evidence(
                     deployed.append(entry)
                     if entry["provenance"] == "build-derived":
                         source = (
-                            archive.read(entry["source_member"]) if "source_member" in entry
+                            archive.read(entry["source_member"])
+                            if "source_member" in entry
                             else (tmp_path / entry["source"]).read_bytes()
                         )
                         assert entry["source_sha256"] == hashlib.sha256(source).hexdigest()
@@ -706,9 +711,16 @@ def test_bundle_failure_preserves_every_remaining_staged_input(
 
 
 @pytest.mark.parametrize(
-    "damage", [
-        "archive-hash", "member-hash", "missing-member", "loose-hash",
-        "stdlib-hash", "upstream-provenance", "dependency-provenance", "index-provenance",
+    "damage",
+    [
+        "archive-hash",
+        "member-hash",
+        "missing-member",
+        "loose-hash",
+        "stdlib-hash",
+        "upstream-provenance",
+        "dependency-provenance",
+        "index-provenance",
     ],
 )
 def test_manifest_rejects_inconsistent_deployed_bytecode_evidence(
@@ -726,14 +738,16 @@ def test_manifest_rejects_inconsistent_deployed_bytecode_evidence(
         bundled["stdlib_archive"]["sha256"] = "0" * 64
     elif damage == "upstream-provenance":
         entry = next(
-            entry for entry in bundled["stdlib_archive"]["members"]
+            entry
+            for entry in bundled["stdlib_archive"]["members"]
             if entry["provenance"] == "trusted-upstream-sourceless"
         )
         entry["provenance"] = "build-derived"
         entry["source_sha256"] = "0" * 64
     elif damage in {"dependency-provenance", "index-provenance"}:
         name = (
-            "_native_dependencies/dependency.pyc" if damage == "dependency-provenance"
+            "_native_dependencies/dependency.pyc"
+            if damage == "dependency-provenance"
             else "_native_dependencies.index"
         )
         entry = next(entry for entry in bundled["archive"]["members"] if entry["path"] == name)
@@ -765,6 +779,7 @@ def test_validate_target_requires_the_deployed_python_archive(
     with pytest.raises(FileNotFoundError, match="python.zip"):
         validate_target(tmp_path, layout_path, tmp_path / "requirements.txt", tmp_path / "vc.json")
 
+
 @pytest.mark.skipif(sys.version_info[:2] != (3, 14), reason="native SDK uses CPython 3.14")
 def test_stdlib_archive_supports_early_interpreter_bootstrap_without_loose_lib(
     tmp_path: Path, staged_archive_runtime: tuple[Path, Path, dict[str, object]]
@@ -773,7 +788,9 @@ def test_stdlib_archive_supports_early_interpreter_bootstrap_without_loose_lib(
 
     layout, bytecode, _ = staged_archive_runtime
     shutil.copytree(
-        Path(encodings.__file__).parent, tmp_path / "Lib/encodings", dirs_exist_ok=True,
+        Path(encodings.__file__).parent,
+        tmp_path / "Lib/encodings",
+        dirs_exist_ok=True,
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
     )
     bytecode.write_text(json.dumps(compile_runtime(tmp_path, layout)), encoding="utf-8")
@@ -804,19 +821,37 @@ def test_stdlib_archive_supports_early_interpreter_bootstrap_without_loose_lib(
     script_path = tmp_path / "bootstrap_probe.py"
     script_path.write_text(script, encoding="utf-8")
     result = subprocess.run(
-        [executable, "-S", "-B", str(script_path)], cwd=tmp_path, env=environment,
-        capture_output=True, text=True, encoding="utf-8", check=True, timeout=30,
+        [executable, "-S", "-B", str(script_path)],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+        timeout=30,
     )
     assert result.stdout.strip() == "stdlib archive bootstrap"
     assert not (tmp_path / "Lib").exists()
 
 
 @pytest.mark.parametrize(
-    "damage", [
-        "duplicate", "case-collision", "traversal", "native", "malformed-index",
-        "index-traversal", "index-module-alias", "native-shadow", "package-shadow",
-        "missing-code", "malformed-code", "stdlib-native", "stdlib-malformed",
-        "file-directory-collision", "stdlib-disguised-native",
+    "damage",
+    [
+        "duplicate",
+        "case-collision",
+        "traversal",
+        "native",
+        "malformed-index",
+        "index-traversal",
+        "index-module-alias",
+        "native-shadow",
+        "package-shadow",
+        "missing-code",
+        "malformed-code",
+        "stdlib-native",
+        "stdlib-malformed",
+        "file-directory-collision",
+        "stdlib-disguised-native",
     ],
 )
 def test_manifest_rejects_corrupt_or_ambiguous_archives(
@@ -828,7 +863,9 @@ def test_manifest_rejects_corrupt_or_ambiguous_archives(
     archive_path = tmp_path / bundled["stdlib_archive" if stdlib else "archive"]["path"]
     with zipfile.ZipFile(archive_path) as original:
         members = [(info, original.read(info)) for info in original.infolist()]
-    index = next((data for info, data in members if info.filename == "_native_dependencies.index"), None)
+    index = next(
+        (data for info, data in members if info.filename == "_native_dependencies.index"), None
+    )
     changes = {}
     additions = []
     omit = set()
@@ -892,7 +929,8 @@ def test_manifest_rejects_source_drift_and_parallel_loose_content(
         (tmp_path / "site-packages/dependency.py").write_text("VALUE = 99\n", encoding="utf-8")
     else:
         relative = (
-            "site-packages/stale.pyc" if damage == "loose-dependency"
+            "site-packages/stale.pyc"
+            if damage == "loose-dependency"
             else "Lib/stale.txt" if damage == "loose-stdlib-resource" else "Lib/stale.pyc"
         )
         destination = tmp_path / relative
@@ -903,7 +941,6 @@ def test_manifest_rejects_source_drift_and_parallel_loose_content(
     provenance.write_text("{}", encoding="utf-8")
     with pytest.raises(ValueError):
         create_manifest(tmp_path, layout, provenance, bytecode, tmp_path / "manifest.json")
-
 
 
 def test_embedded_bootstrap_only_persists_bounded_uncaught_error_diagnostics(
@@ -941,11 +978,15 @@ def test_embedded_bootstrap_only_persists_bounded_uncaught_error_diagnostics(
                 if source.parts[0] == "site-packages":
                     relative = source.relative_to("site-packages").as_posix()
                     index[source.stem] = relative
-                    member = "_native_dependencies/" + str(Path(relative).with_suffix(".pyc")).replace("\\", "/")
+                    member = "_native_dependencies/" + str(
+                        Path(relative).with_suffix(".pyc")
+                    ).replace("\\", "/")
                 else:
                     member = source.with_suffix(".pyc").name
                 archive.write(tmp_path / entry["path"], member)
-            archive.writestr("_native_dependencies.index", marshal.dumps({"version": 1, "modules": index}))
+            archive.writestr(
+                "_native_dependencies.index", marshal.dumps({"version": 1, "modules": index})
+            )
         script = (
             template.replace("{argv}", "['PuriPulyHeart']")
             .replace("{host_executable}", repr(str(tmp_path / "PuriPulyHeart.exe")))
