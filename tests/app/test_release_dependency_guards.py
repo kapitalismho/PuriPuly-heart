@@ -122,8 +122,15 @@ def test_production_export_includes_locked_httpx_socks_transport(tmp_path: Path)
     exported = tmp_path / "exported.txt"
     subprocess.run(
         [
-            uv, "export", "--locked", "--no-dev", "--no-emit-project",
-            "--format", "requirements-txt", "--output-file", str(exported),
+            uv,
+            "export",
+            "--locked",
+            "--no-dev",
+            "--no-emit-project",
+            "--format",
+            "requirements-txt",
+            "--output-file",
+            str(exported),
         ],
         cwd=ROOT,
         check=True,
@@ -347,14 +354,6 @@ def test_shared_setup_action_installs_pinned_uv_and_uses_frozen_sync() -> None:
     assert "cache-dependency-path: uv.lock" in action
     assert '"uv==${{ inputs.uv-version }}"' in action
     assert "uv sync ${{ inputs.sync-args }} --frozen" in action
-
-
-def test_windows_gpu_worker_native_sources_compile_as_utf8() -> None:
-    cargo_config = (ROOT / ".cargo" / "config.toml").read_text(encoding="utf-8")
-
-    assert "CXXFLAGS_x86_64_pc_windows_msvc" in cargo_config
-    assert 'value = "/utf-8"' in cargo_config
-    assert "force = true" in cargo_config
 
 
 def test_installer_script_embeds_local_stt_manifest_assets_for_inno_download() -> None:

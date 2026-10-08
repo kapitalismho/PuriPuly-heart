@@ -161,9 +161,7 @@ class OpenRouterPKCEClient:
                         stage="code_exchange", reason="invalid_response"
                     )
         except Exception as exc:
-            raise OpenRouterAuthenticationError.from_exception(
-                exc, stage="code_exchange"
-            ) from None
+            raise OpenRouterAuthenticationError.from_exception(exc, stage="code_exchange") from None
 
         user_id = payload.get("user_id")
         return OpenRouterPKCEExchangeResult(
