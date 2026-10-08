@@ -26,6 +26,8 @@ Pushing a `vMAJOR.MINOR.PATCH` tag, such as `v2.8.1`, runs the [native release w
 
 The native Windows shell disables optional CMake JNI discovery before configuring Flutter plugins. Android-only transitive dependencies must not introduce a Java runtime dependency based on the build machine's installed JDK. Native DLL dependency closure validation remains enforced.
 
+The draft-release job installs the pinned `PYTHON_VERSION` before running release helpers. These helpers use the project's Python syntax and must not run with the Ubuntu image's default interpreter.
+
 Before creating a tag, commit matching versions in:
 
 - `pyproject.toml`

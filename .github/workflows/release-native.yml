@@ -267,6 +267,11 @@ jobs:
           ref: ${{ needs.verify-version.outputs.source-sha }}
           persist-credentials: false
 
+      - name: Setup release Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Download native release artifacts
         uses: actions/download-artifact@v8
         with:
