@@ -24,6 +24,8 @@ Thanks for taking an interest in this project.
 
 Pushing a `vMAJOR.MINOR.PATCH` tag, such as `v2.8.1`, runs the [native release workflow](workflows/release-native.yml). It builds the native Windows installer, verifies release artifacts and provenance, and creates a GitHub draft release. The legacy release workflow has been removed; `native-v*` tags no longer trigger a release.
 
+The native Windows shell disables optional CMake JNI discovery before configuring Flutter plugins. Android-only transitive dependencies must not introduce a Java runtime dependency based on the build machine's installed JDK. Native DLL dependency closure validation remains enforced.
+
 Before creating a tag, commit matching versions in:
 
 - `pyproject.toml`
@@ -39,5 +41,5 @@ git tag v2.8.1
 git push origin v2.8.1
 ```
 
-To rerun an existing release tag manually, use **Native Release → Run workflow** and enter the same `vMAJOR.MINOR.PATCH` tag. The workflow checks out that tag and rejects mismatched versions or source commits.
+To rerun an existing release tag manually, use **Native Release → Run workflow** and enter the same `vMAJOR.MINOR.PATCH` tag. The workflow checks out that tag and rejects mismatched versions or source commits. Rerunning does not pick up newer branch commits: commit source fixes and update an unpublished tag before retrying, or create a new version tag. Do not move a tag whose release has already been published.
 
