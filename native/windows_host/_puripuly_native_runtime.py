@@ -94,9 +94,7 @@ class _DependencyFinder:
                 continue
             if _path_key(search_path) == directory:
                 if preceding is not None:
-                    spec = importlib.machinery.PathFinder.find_spec(
-                        fullname, preceding, target
-                    )
+                    spec = importlib.machinery.PathFinder.find_spec(fullname, preceding, target)
                     if spec is not None and spec.loader is not None:
                         return spec
                 loader = _DependencyLoader(fullname, source, self._archive, member)
@@ -120,11 +118,12 @@ def install(runtime_root):
     archive_path = os.path.abspath(os.path.join(resource_root, "python.zip"))
     for finder in sys.meta_path:
         if isinstance(finder, _DependencyFinder):
-            if (
-                _path_key(finder.runtime_root) != _path_key(runtime_root)
-                or _path_key(finder.archive_path) != _path_key(archive_path)
-            ):
-                raise RuntimeError("native dependency loader is already configured for another runtime")
+            if _path_key(finder.runtime_root) != _path_key(runtime_root) or _path_key(
+                finder.archive_path
+            ) != _path_key(archive_path):
+                raise RuntimeError(
+                    "native dependency loader is already configured for another runtime"
+                )
             return
     position = sys.meta_path.index(importlib.machinery.PathFinder)
     finder = _DependencyFinder(runtime_root, archive_path)

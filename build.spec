@@ -88,14 +88,14 @@ if not overlay_staged_path.exists():
         f"{overlay_staged_path}. Build and stage the Rust overlay before PyInstaller packaging."
     )
 
-gpu_worker_staged_path = (
-    Path("build").resolve() / "gpu_worker" / "PuriPulyHeartGpuWorker.exe"
+from puripuly_heart.release_evidence.gpu_worker_distribution import (
+    GPU_WORKER_INVENTORY,
+    collect_gpu_worker_runtime_binaries,
+    validate_gpu_worker_runtime,
 )
-if not gpu_worker_staged_path.exists():
-    raise SystemExit(
-        "Staged GPU worker executable not found at "
-        f"{gpu_worker_staged_path}. Build and stage the Rust GPU worker before PyInstaller packaging."
-    )
+
+gpu_worker_staged_root = Path("build").resolve() / "gpu_worker"
+gpu_worker_runtime_binaries = collect_gpu_worker_runtime_binaries(gpu_worker_staged_root)
 
 from puripuly_heart.core.local_qwen_runtime import LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR
 
@@ -302,6 +302,7 @@ datas = (
     + third_party_license_metadata_datas
     + managed_gemma_runtime_datas
 )
+datas += [(str(gpu_worker_staged_root / GPU_WORKER_INVENTORY), ".")]
 
 if release_smoke:
     datas = []
@@ -318,7 +319,7 @@ proctap_runtime_binaries += collect_dynamic_libs("proctap", destdir="proctap")
 runtime_binaries += proctap_runtime_binaries
 runtime_binaries += collect_staged_soxr_runtime_binaries()
 runtime_binaries += collect_vendored_openvr_runtime_binaries()
-runtime_binaries += [(str(gpu_worker_staged_path), ".")]
+runtime_binaries += gpu_worker_runtime_binaries
 runtime_binaries += [(str(overlay_staged_path), ".")]
 hf_xet_native_extension = Path(get_module_file_attribute("hf_xet.hf_xet")).resolve()
 if not hf_xet_native_extension.is_file() or hf_xet_native_extension.name.lower() != "hf_xet.pyd":
@@ -479,6 +480,9 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=True,
-    upx_exclude=[],
+    upx_exclude=[Path(path).name for path, _ in gpu_worker_runtime_binaries],
     name=executable_name,
 )
+
+if not release_smoke:
+    validate_gpu_worker_runtime(Path(coll.name))

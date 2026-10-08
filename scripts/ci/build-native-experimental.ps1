@@ -233,6 +233,9 @@ requires-python = ">=3.14,<3.15"
 org = "com.salee"
 product = "PuriPuly <3"
 company = "salee"
+
+[tool.flet.flutter.pubspec.dependency_overrides]
+jni_flutter = "1.0.3"
 "@ | Set-Content -LiteralPath (Join-Path $fixtureRoot "pyproject.toml") -Encoding utf8
 
     $env:FLET_CACHE_DIR = $fletCache
@@ -335,11 +338,8 @@ company = "salee"
     Invoke-Checked -FilePath $cargoCommand -ArgumentList @(
         "build", "--manifest-path", (Join-Path $repoRoot "native\overlay\Cargo.toml"), "--locked", "--release", "--bin", "PuriPulyHeartOverlay", "--target-dir", $overlayTarget
     ) -WorkingDirectory $repoRoot
-    Invoke-Checked -FilePath $cargoCommand -ArgumentList @(
-        "build", "--manifest-path", (Join-Path $repoRoot "native\gpu_worker\Cargo.toml"), "--locked", "--release", "--bin", "PuriPulyHeartGpuWorker", "--target-dir", $gpuTarget
-    ) -WorkingDirectory $repoRoot
+    & (Join-Path $PSScriptRoot "build-gpu-worker-release.ps1") -TargetDir $gpuTarget -OutputDir $artifactRoot
     Copy-Item -LiteralPath (Join-Path $overlayTarget "release\PuriPulyHeartOverlay.exe") -Destination $artifactRoot -Force
-    Copy-Item -LiteralPath (Join-Path $gpuTarget "release\PuriPulyHeartGpuWorker.exe") -Destination $artifactRoot -Force
     Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\openvr\win64\openvr_api.dll") -Destination $artifactRoot -Force
     $cmakeCommand = (Get-Command cmake -ErrorAction Stop).Source
     Invoke-Checked -FilePath $cmakeCommand -ArgumentList @(

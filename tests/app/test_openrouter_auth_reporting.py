@@ -68,8 +68,15 @@ async def test_manual_verification_accepts_success_and_only_explicit_rejection(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("status", "reason"),
-    [(403, "access_denied"), (429, "rate_limit"), (500, "service_unavailable"),
-     (503, "service_unavailable"), (504, "timeout"), (302, "http"), (400, "http")],
+    [
+        (403, "access_denied"),
+        (429, "rate_limit"),
+        (500, "service_unavailable"),
+        (503, "service_unavailable"),
+        (504, "timeout"),
+        (302, "http"),
+        (400, "http"),
+    ],
 )
 async def test_manual_noncredential_http_failures_reach_ui_and_safe_metadata(
     monkeypatch: pytest.MonkeyPatch, status: int, reason: str
@@ -81,14 +88,17 @@ async def test_manual_noncredential_http_failures_reach_ui_and_safe_metadata(
         verification_owner=ProviderCredentialVerificationOwner(
             verifier=ProviderVerifierAdapter(),
             diagnostics_sink=lambda _event, metadata, exc: (
-                diagnostics.append(dict(metadata)), errors.append(exc)
+                diagnostics.append(dict(metadata)),
+                errors.append(exc),
             ),
         ),
         selected_model_provider=lambda _provider: None,
     )
     messages: list[tuple[str, str]] = []
     controller = ApiKeyVerificationController(
-        secret_key="openrouter_api_key", provider="openrouter", on_verify=owner.verify,
+        secret_key="openrouter_api_key",
+        provider="openrouter",
+        on_verify=owner.verify,
         on_message=lambda key, message: messages.append((key, message)),
     )
     controller.set_value_getter(lambda: SECRET)
@@ -112,14 +122,16 @@ def tls_error() -> httpx.ConnectError:
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("exception", "reason", "exception_type"),
-    [(tls_error(), "tls", "SSLCertVerificationError"),
-     (httpx.ProxyError(UNSAFE), "proxy", "ProxyError"),
-     (httpx.ConnectError(UNSAFE), "network", "ConnectError"),
-     (httpx.ReadTimeout(UNSAFE), "timeout", "ReadTimeout"),
-     (ImportError(UNSAFE), "setup", "ImportError"),
-     (FileNotFoundError(UNSAFE), "setup", "FileNotFoundError"),
-     (PermissionError(UNSAFE), "setup", "PermissionError"),
-     (ValueError(UNSAFE), "setup", "ValueError")],
+    [
+        (tls_error(), "tls", "SSLCertVerificationError"),
+        (httpx.ProxyError(UNSAFE), "proxy", "ProxyError"),
+        (httpx.ConnectError(UNSAFE), "network", "ConnectError"),
+        (httpx.ReadTimeout(UNSAFE), "timeout", "ReadTimeout"),
+        (ImportError(UNSAFE), "setup", "ImportError"),
+        (FileNotFoundError(UNSAFE), "setup", "FileNotFoundError"),
+        (PermissionError(UNSAFE), "setup", "PermissionError"),
+        (ValueError(UNSAFE), "setup", "ValueError"),
+    ],
 )
 async def test_transport_and_client_setup_failures_are_not_credential_rejection(
     monkeypatch: pytest.MonkeyPatch, exception: Exception, reason: str, exception_type: str
@@ -149,8 +161,11 @@ async def test_verification_adapter_preserves_noncredential_failure_contract(
     install_response(monkeypatch, httpx.Response(503, text=UNSAFE))
     result = await ProviderVerifierAdapter().verify_provider_secret(
         ProviderVerificationRequest(
-            provider="openrouter", secret_key="openrouter_api_key", secret_value=SECRET,
-            secret_revision="revision", context={"flow": "manual"},
+            provider="openrouter",
+            secret_key="openrouter_api_key",
+            secret_value=SECRET,
+            secret_revision="revision",
+            context={"flow": "manual"},
         )
     )
     assert result.status == "failed"
@@ -179,7 +194,7 @@ async def test_pkce_exchange_preserves_status_without_response_or_code(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("body", [UNSAFE, '[]', '{}', '{"key": null}', '{"key": ""}'])
+@pytest.mark.parametrize("body", [UNSAFE, "[]", "{}", '{"key": null}', '{"key": ""}'])
 async def test_pkce_unusable_success_payload_cannot_become_a_key(
     monkeypatch: pytest.MonkeyPatch, body: str
 ) -> None:
@@ -198,7 +213,9 @@ async def test_pkce_listener_bind_failure_is_classified_without_os_message() -> 
         occupied.bind(("127.0.0.1", 0))
         occupied.listen()
         port = occupied.getsockname()[1]
-        client = OpenRouterPKCEClient(callback_origin=f"http://127.0.0.1:{port}", open_browser=False)
+        client = OpenRouterPKCEClient(
+            callback_origin=f"http://127.0.0.1:{port}", open_browser=False
+        )
         with pytest.raises(OpenRouterAuthenticationError) as caught:
             await client.run_desktop_flow()
     assert caught.value.stage == "listener_start"
@@ -216,11 +233,16 @@ def failure_application(tmp_path: Path, flow: object, verifier: object):
     diagnostics: list[str] = []
     routes: list[str] = []
     owner = OpenRouterPkceApplicationOwner(
-        flow=cast(OpenRouterPkceFlowOwner, flow), verifier=verifier, settings=settings,
-        provider_settings=cast(object, None), provider_runtime=cast(object, None),
+        flow=cast(OpenRouterPkceFlowOwner, flow),
+        verifier=verifier,
+        settings=settings,
+        provider_settings=cast(object, None),
+        provider_runtime=cast(object, None),
         secret_store_factory=lambda _settings: pytest.fail("failure must not write credentials"),
-        failure_message_sink=messages.append, failure_diagnostics_sink=diagnostics.append,
-        failure_route=routes.append, results=SettingsTransactionResultOwner(),
+        failure_message_sink=messages.append,
+        failure_diagnostics_sink=diagnostics.append,
+        failure_route=routes.append,
+        results=SettingsTransactionResultOwner(),
     )
     target = OpenRouterPkceTarget(
         selection_alias=OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK,
@@ -275,9 +297,21 @@ def test_auth_failure_keys_resolve_in_every_supported_locale() -> None:
     try:
         for locale in ("en", "ko", "ja", "zh-CN", "ru"):
             set_locale(locale)
-            for reason in ("credential_rejected", "access_denied", "http", "rate_limit",
-                           "service_unavailable", "tls", "proxy", "network", "timeout",
-                           "callback_timeout", "setup", "invalid_response", "unknown"):
+            for reason in (
+                "credential_rejected",
+                "access_denied",
+                "http",
+                "rate_limit",
+                "service_unavailable",
+                "tls",
+                "proxy",
+                "network",
+                "timeout",
+                "callback_timeout",
+                "setup",
+                "invalid_response",
+                "unknown",
+            ):
                 key = f"error.openrouter_auth.{reason}"
                 assert t(key) != key
     finally:
@@ -309,7 +343,9 @@ async def test_ui_unexpected_exception_does_not_expose_secret_or_reject_key() ->
 
     messages: list[tuple[str, str]] = []
     controller = ApiKeyVerificationController(
-        secret_key="openrouter_api_key", provider="openrouter", on_verify=verify,
+        secret_key="openrouter_api_key",
+        provider="openrouter",
+        on_verify=verify,
         on_message=lambda key, message: messages.append((key, message)),
     )
     controller.set_value_getter(lambda: SECRET)
@@ -350,7 +386,8 @@ async def test_missing_callback_times_out_and_closes_real_listener(
 
 @pytest.mark.asyncio
 async def test_unsuccessful_browser_launch_is_reported_without_callback_wait_or_commit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[str] = []
     client = OpenRouterPKCEClient(callback_origin="http://127.0.0.1:43123")
@@ -369,7 +406,8 @@ async def test_unsuccessful_browser_launch_is_reported_without_callback_wait_or_
 
     monkeypatch.setattr(client, "_create_callback_listener", lambda _session: Listener())
     monkeypatch.setattr(
-        "puripuly_heart.core.openrouter_pkce.webbrowser.open", unsuccessful_browser,
+        "puripuly_heart.core.openrouter_pkce.webbrowser.open",
+        unsuccessful_browser,
     )
     flow = OpenRouterPkceFlowOwner(client_factory=lambda: client)
     owner, target, messages, diagnostics, routes = failure_application(tmp_path, flow, object())
