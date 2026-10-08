@@ -10,6 +10,11 @@ from puripuly_heart.config.alibaba_connection import (
     AlibabaRegionalSettings,
     resolve_alibaba_connection,
 )
+from puripuly_heart.core.error_messages import (
+    format_error_report_for_log,
+    openrouter_auth_failure_report,
+)
+from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
 
 ProviderCredentialVerificationStatus = Literal[
     "verified",
@@ -97,6 +102,10 @@ class ProviderCredentialVerificationOwner:
             )
         except Exception as exc:
             return self._error_outcome(request.provider, exc)
+        if provider == "openrouter" and not verified:
+            self._openrouter_report(
+                OpenRouterAuthenticationError.from_status(401, stage="key_verification")
+            )
         return ProviderCredentialVerificationOutcome(
             status=(PROVIDER_CREDENTIAL_VERIFIED if verified else PROVIDER_CREDENTIAL_FAILED),
             provider=request.provider,
@@ -141,6 +150,12 @@ class ProviderCredentialVerificationOwner:
         provider: str,
         exception: BaseException,
     ) -> ProviderCredentialVerificationOutcome:
+        if provider == "openrouter" and isinstance(exception, Exception):
+            return ProviderCredentialVerificationOutcome(
+                status=PROVIDER_CREDENTIAL_ERROR,
+                provider=provider,
+                error_text=self._openrouter_report(exception),
+            )
         alibaba = provider.startswith("alibaba_")
         self._emit(
             "provider_credential_verification_failed",
@@ -152,6 +167,18 @@ class ProviderCredentialVerificationOwner:
             provider=provider,
             error_text=("Alibaba verification failed" if alibaba else str(exception)),
         )
+
+    def _openrouter_report(self, exception: Exception) -> str:
+        report = openrouter_auth_failure_report(exception, stage="key_verification")
+        self._emit(
+            "provider_credential_verification_failed",
+            {
+                "provider": "openrouter",
+                "error_type": report.diagnostics.fields["exception_type"],
+                "report": "[OpenRouterAuth] failed " + format_error_report_for_log(report),
+            },
+        )
+        return report.message.key
 
     def _emit(
         self,
@@ -201,9 +228,11 @@ class ProviderCredentialVerificationInteractionOwner:
             return False, f"Unknown provider: {provider}"
         if outcome.status == PROVIDER_CREDENTIAL_ERROR:
             error_text = outcome.error_text or ""
-            if self.error_sink is not None:
+            if self.error_sink is not None and provider != "openrouter":
                 self.error_sink(provider, error_text)
             return False, error_text
+        if provider == "openrouter":
+            return False, "error.openrouter_auth.credential_rejected"
         return False, "Verification failed (check logs/console for details)"
 
 

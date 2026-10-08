@@ -37,6 +37,10 @@ from puripuly_heart.core.messages import (
     UserErrorReport,
     UserMessageRef,
 )
+from puripuly_heart.core.openrouter.authentication import (
+    OpenRouterAuthenticationError,
+    OpenRouterAuthStage,
+)
 
 
 def _legacy_raw_key_assignment_re(keys: frozenset[str]) -> re.Pattern[str]:
@@ -85,6 +89,28 @@ def provider_failure_report(
         provider=provider,
         operation=operation,
         extra_fields={},
+    )
+
+
+def openrouter_auth_failure_report(
+    exc: Exception,
+    *,
+    stage: OpenRouterAuthStage,
+) -> UserErrorReport:
+    failure = OpenRouterAuthenticationError.from_exception(exc, stage=stage)
+    return UserErrorReport(
+        message=UserMessageRef(key=failure.message_key, params={}, severity=SEVERITY_ERROR),
+        diagnostics=ErrorDiagnostics(
+            component="provider.openrouter.auth",
+            operation=failure.stage,
+            code=f"openrouter.auth.{failure.reason}",
+            category=failure.diagnostic_category,
+            visibility=DIAGNOSTIC_VISIBILITY_BASIC,
+            content_policy=CONTENT_POLICY_METADATA_ONLY,
+            status_code=failure.status_code,
+            retry_after_ms=None,
+            fields={"provider": "openrouter", "exception_type": failure.exception_type},
+        ),
     )
 
 
@@ -564,6 +590,7 @@ def _safe_label(value: object, default: str) -> str:
 
 __all__ = [
     "format_error_report_for_log",
+    "openrouter_auth_failure_report",
     "provider_failure_report",
     "sanitize_legacy_raw_user_visible_error_text",
     "stt_failure_report",

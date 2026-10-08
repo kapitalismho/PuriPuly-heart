@@ -1565,13 +1565,17 @@ def compose_application_runtime(
                     ),
                 ),
                 low_latency=(FIXED_TRANSLATION_POLICY.fast_translation_enabled),
-                diagnostics_sink=lambda event, metadata, exception: log_diagnostic(
-                    "[ProviderVerification] Credential verification "
-                    f"failed event={event} "
-                    f"provider={metadata.get('provider')} "
-                    f"error_type={metadata.get('error_type')}",
-                    level=logging.WARNING,
-                    exception=exception,
+                diagnostics_sink=lambda event, metadata, exception: (
+                    log_error(str(metadata["report"]))
+                    if metadata.get("provider") == "openrouter" and "report" in metadata
+                    else log_diagnostic(
+                        "[ProviderVerification] Credential verification "
+                        f"failed event={event} "
+                        f"provider={metadata.get('provider')} "
+                        f"error_type={metadata.get('error_type')}",
+                        level=logging.WARNING,
+                        exception=exception,
+                    )
                 ),
                 error_sink=lambda provider, error_text: log_error(
                     f"Verification error for {provider}: {error_text}"

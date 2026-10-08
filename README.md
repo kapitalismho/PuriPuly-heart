@@ -254,7 +254,9 @@ Just signing up gets you $200 in free credits.
 <details>
 <summary><h3>If clicking Authorize didn't authenticate you</h3></summary>
 
-If you clicked Authorize but you're still not authenticated, retry, or directly issue an API key as below and paste it in.
+You can bypass browser authorization by creating an API key as below and pasting it into the OpenRouter API Key field. Click outside the field to save and verify it; you do not need to press the authentication button again.
+
+Network, proxy, TLS certificate, and service errors do not mean your key is invalid. The app distinguishes these failures and automatically records safe diagnostic metadata without the key or authorization code. SOCKS5 proxies are supported; native Windows startup preserves explicitly configured CA certificate settings. Certificate verification stays enabled, and an unavailable proxy is not silently bypassed.
 
 6. Click your account in the top right, go to the API Keys tab on the left, then click the Create button in the center.
    ![step6](docs/images/openrouter/6.png)

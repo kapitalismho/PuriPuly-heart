@@ -98,6 +98,49 @@ def test_pyproject_pins_soxr_dependency() -> None:
     assert PINNED_SOXR_SPECIFIER in pyproject["project"]["dependencies"]
 
 
+def test_production_export_includes_locked_httpx_socks_transport(tmp_path: Path) -> None:
+    from packaging.requirements import Requirement
+
+    from puripuly_heart.release_evidence.native_distribution import filter_requirements
+
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    httpx = next(
+        Requirement(value)
+        for value in pyproject["project"]["dependencies"]
+        if Requirement(value).name == "httpx"
+    )
+    assert httpx.extras == {"socks"}
+    assert str(httpx.specifier) == ">=0.27"
+    lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
+    packages = {package["name"]: package for package in lock["package"]}
+    assert packages["httpx"]["optional-dependencies"]["socks"] == [{"name": "socksio"}]
+    assert {"name": "httpx", "extra": ["socks"]} in packages["puripuly-heart"]["dependencies"]
+    assert packages["socksio"]["wheels"]
+    uv = shutil.which("uv")
+    if uv is None:
+        pytest.skip("uv is required to exercise the native production dependency export")
+    exported = tmp_path / "exported.txt"
+    subprocess.run(
+        [
+            uv, "export", "--locked", "--no-dev", "--no-emit-project",
+            "--format", "requirements-txt", "--output-file", str(exported),
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    filtered = tmp_path / "native-requirements.txt"
+    filter_requirements(exported, filtered)
+    requirements = {
+        Requirement(line.split(" \\", 1)[0]).name: Requirement(line.split(" \\", 1)[0])
+        for line in filtered.read_text(encoding="utf-8").splitlines()
+        if line and not line[0].isspace() and not line.startswith(("#", "--"))
+    }
+    assert "httpx" in requirements
+    assert str(requirements["socksio"].specifier) == f"=={packages['socksio']['version']}"
+
+
 def test_pyproject_build_extra_covers_python_soxr_no_build_isolation_backend() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 

@@ -18,6 +18,7 @@ from puripuly_heart.config.llm_profiles import (
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
+from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
 from puripuly_heart.core.openrouter_credentials import normalize_managed_openrouter_user_identifier
 from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
 from puripuly_heart.core.openrouter_routing import (
@@ -378,9 +379,17 @@ class OpenRouterLLMProvider:
                     _OPENROUTER_KEY_URL,
                     headers={"Authorization": f"Bearer {api_key}"},
                 )
-                return response.status_code == 200
-        except Exception:
+        except Exception as exc:
+            raise OpenRouterAuthenticationError.from_exception(
+                exc, stage="key_verification"
+            ) from None
+        if response.status_code == 200:
+            return True
+        if response.status_code == 401:
             return False
+        raise OpenRouterAuthenticationError.from_status(
+            response.status_code, stage="key_verification"
+        )
 
     @staticmethod
     async def fetch_key_metadata(api_key: str) -> OpenRouterKeyMetadata | None:

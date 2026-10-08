@@ -250,7 +250,9 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 <details>
 <summary><h3>点击 Authorize 后仍未完成认证</h3></summary>
 
-如果点击 Authorize 后仍未通过认证，请重试，或按下方步骤手动申请 API 密钥并粘贴。
+可以按下方步骤创建 API 密钥并粘贴到 OpenRouter API Key 输入框，以跳过浏览器授权。点击输入框外即可保存并验证，无需再次点击认证按钮。
+
+网络、代理、TLS 证书或服务错误并不代表密钥无效。应用会区分故障类型，并自动记录不含密钥或授权码的安全诊断信息。支持 SOCKS5 代理，Windows 原生版会保留显式配置的 CA 证书设置。应用不会关闭证书验证，也不会在代理不可用时自动绕过代理。
 
 6. 点击右上角账户后，进入左侧的 API Keys 标签，再点击中央的 Create 按钮。
    ![step6](../images/openrouter/6.png)

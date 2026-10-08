@@ -12,6 +12,7 @@ from puripuly_heart.core.openrouter_pkce import (
     OpenRouterPKCESession,
 )
 
+from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
 from puripuly_heart.ui.i18n import get_locale, set_locale
 
 
@@ -262,8 +263,11 @@ async def test_run_desktop_flow_closes_listener_and_skips_exchange_on_timeout(
     monkeypatch.setattr("puripuly_heart.core.openrouter_pkce.asyncio.to_thread", fake_to_thread)
     monkeypatch.setattr("puripuly_heart.core.openrouter_pkce.webbrowser.open", fake_open)
 
-    with pytest.raises(TimeoutError, match="timed out waiting for OpenRouter callback"):
+    with pytest.raises(OpenRouterAuthenticationError) as caught:
         await client.run_desktop_flow()
+    assert caught.value.stage == "callback_wait"
+    assert caught.value.reason == "callback_timeout"
+    assert caught.value.exception_type == "TimeoutError"
 
     assert seen == ["bind", "open", "to_thread", "wait", "close"]
 

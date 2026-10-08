@@ -943,8 +943,7 @@
       "tests/config/test_runtime_resolution.py::test_runtime_resolution_resolved_llm_path_has_no_legacy_alias_literals"
     ],
     "i18n_parity": [
-      "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_share_the_same_keys",
-      "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_do_not_keep_unused_runtime_keys"
+      "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_share_the_same_keys"
     ],
     "packaging": [
       "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract",
