@@ -217,9 +217,9 @@ def verify_release_surface(
             f"release body does not reference the produced installer {expected_installer!r}"
         )
     basenames = sorted(Path(name).name for name in asset_names)
-    if expected_installer not in basenames:
+    if basenames != [expected_installer]:
         raise RuntimeError(
-            f"release assets do not include the produced installer "
+            f"release assets must contain only the produced installer "
             f"{expected_installer!r}: {basenames}"
         )
     return expected_installer
@@ -571,7 +571,7 @@ def _build_parser() -> argparse.ArgumentParser:
     publish_parser.add_argument("--installer-exe", required=True)
     publish_parser.add_argument("--body", type=Path, required=True)
     publish_parser.add_argument("--asset", dest="assets", type=Path, action="append", required=True)
-    publish_parser.add_argument("--provenance", type=Path, default=None)
+    publish_parser.add_argument("--provenance-json", required=True)
     licenses_parser = subparsers.add_parser("verify-packaged-licenses")
     licenses_parser.add_argument("--package-dir", type=Path, required=True)
     licenses_parser.add_argument("--repo-root", type=Path, default=None)
@@ -686,18 +686,14 @@ def _run_verify_publish(arguments: argparse.Namespace) -> dict[str, object]:
         "installer_exe": expected_installer,
         "assets": sorted(path.name for path in asset_paths),
     }
-    if arguments.provenance is not None:
-        provenance_path = Path(arguments.provenance).resolve()
-        if not provenance_path.is_file():
-            raise RuntimeError(f"provenance record not found: {arguments.provenance}")
-        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
-        if str(provenance.get("version", "")).strip() != arguments.version.strip():
-            raise RuntimeError("provenance version disagrees with the release version")
-        if str(provenance.get("tag", "")).strip() != arguments.tag.strip():
-            raise RuntimeError("provenance tag disagrees with the release tag")
-        verify_assets_against_provenance(provenance, asset_paths)
-        summary["provenance"] = str(provenance_path)
-        summary["build_origin"] = provenance.get("build_origin")
+    provenance = json.loads(arguments.provenance_json)
+    if str(provenance.get("version", "")).strip() != arguments.version.strip():
+        raise RuntimeError("provenance version disagrees with the release version")
+    if str(provenance.get("tag", "")).strip() != arguments.tag.strip():
+        raise RuntimeError("provenance tag disagrees with the release tag")
+    verify_assets_against_provenance(provenance, asset_paths)
+    summary["source_sha"] = provenance.get("source_sha")
+    summary["build_origin"] = provenance.get("build_origin")
     return summary
 
 

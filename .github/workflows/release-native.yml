@@ -100,6 +100,8 @@ jobs:
     name: Build native Windows installer
     runs-on: windows-2022
     needs: verify-version
+    outputs:
+      provenance: ${{ steps.identity.outputs.provenance }}
     steps:
       - name: Checkout verified native source
         uses: actions/checkout@v7
@@ -210,6 +212,7 @@ jobs:
             -InnoSetupCompiler $env:INNOSETUP_COMPILER
 
       - name: Verify native release identity and write provenance
+        id: identity
         shell: pwsh
         env:
           APP_VERSION: ${{ needs.verify-version.outputs.version }}
@@ -229,25 +232,18 @@ jobs:
             --gpu-worker-exe "$env:NATIVE_OUTPUT_ROOT/PuriPulyHeartGpuWorker.exe" `
             --overlay-exe "$env:NATIVE_OUTPUT_ROOT/PuriPulyHeartOverlay.exe" `
             --installer "installer_output/native/PuriPulyHeart-Setup-$env:APP_VERSION.exe" `
-            --soxr-bundle "installer_output/native/PuriPulyHeart-soxr-third-party-source-bundle.zip" `
-            --provenance-out "installer_output/native/release-provenance-$env:APP_VERSION.json"
+            --soxr-bundle "$env:NATIVE_BUILD_ROOT/soxr-release-inputs/PuriPulyHeart-soxr-third-party-source-bundle.zip" `
+            --provenance-out "$env:NATIVE_BUILD_ROOT/evidence/release-provenance-$env:APP_VERSION.json"
+          $provenance = Get-Content "$env:NATIVE_BUILD_ROOT/evidence/release-provenance-$env:APP_VERSION.json" -Raw |
+            ConvertFrom-Json | ConvertTo-Json -Depth 10 -Compress
+          "provenance=$provenance" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Upload native release artifacts
         uses: actions/upload-artifact@v7
         with:
           name: native-release-artifacts
-          path: installer_output/native/
+          path: installer_output/native/PuriPulyHeart-Setup-${{ needs.verify-version.outputs.version }}.exe
           if-no-files-found: error
-
-      - name: Upload native build evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: native-build-evidence
-          path: |
-            C:/d177/native-integration/release/build/evidence/
-            C:/d177/native-integration/release/inputs/verified-inputs.json
-          if-no-files-found: ignore
 
   publish-release:
     name: Create native GitHub draft release
@@ -260,6 +256,7 @@ jobs:
     env:
       APP_VERSION: ${{ needs.verify-version.outputs.version }}
       RELEASE_TAG: ${{ needs.verify-version.outputs.tag }}
+      RELEASE_PROVENANCE: ${{ needs.build-installer.outputs.provenance }}
     steps:
       - name: Checkout verified native source
         uses: actions/checkout@v7
@@ -294,8 +291,7 @@ jobs:
             --installer-exe "PuriPulyHeart-Setup-$APP_VERSION.exe" \
             --body native-release-body.md \
             --asset "native-release-artifacts/PuriPulyHeart-Setup-$APP_VERSION.exe" \
-            --asset "native-release-artifacts/PuriPulyHeart-soxr-third-party-source-bundle.zip" \
-            --provenance "native-release-artifacts/release-provenance-$APP_VERSION.json"
+            --provenance-json "$RELEASE_PROVENANCE"
 
       - name: Create native draft release
         uses: softprops/action-gh-release@v3
@@ -307,6 +303,17 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             native-release-artifacts/PuriPulyHeart-Setup-${{ env.APP_VERSION }}.exe
-            native-release-artifacts/PuriPulyHeart-Setup-${{ env.APP_VERSION }}.exe.sha256
-            native-release-artifacts/PuriPulyHeart-soxr-third-party-source-bundle.zip
-            native-release-artifacts/release-provenance-${{ env.APP_VERSION }}.json
+
+      - name: Keep only the native installer release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          installer="PuriPulyHeart-Setup-$APP_VERSION.exe"
+          obsolete_assets="$(gh release view "$RELEASE_TAG" --json assets --jq ".assets[] | select(.name != \"$installer\") | .name")"
+          while IFS= read -r asset; do
+            if [ -n "$asset" ]; then
+              gh release delete-asset "$RELEASE_TAG" "$asset" --yes
+            fi
+          done <<< "$obsolete_assets"
+          actual_assets="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')"
+          test "$actual_assets" = "$installer"
