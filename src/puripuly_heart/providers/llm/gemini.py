@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 from uuid import UUID
 
+from puripuly_heart.core import network_clients
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
@@ -129,10 +130,11 @@ class GeminiLLMProvider:
     ) -> bool:
         if not api_key:
             return False
+        client = None
         try:
             from google import genai  # type: ignore
 
-            client = genai.Client(api_key=api_key)
+            client = genai.Client(api_key=api_key, http_options=network_clients.genai_http_options())
             requested_model = _normalized_model_id(model)
             async for entry in await client.aio.models.list(config={"page_size": 1000}):
                 if not requested_model or _model_entry_matches(entry, requested_model):
@@ -140,6 +142,10 @@ class GeminiLLMProvider:
             return False
         except Exception:
             return False
+        finally:
+            if client is not None:
+                await client.aio.aclose()
+                client.close()
 
 
 @dataclass(slots=True)
@@ -156,7 +162,9 @@ class GoogleGenaiGeminiClient:
         if self._client is None:
             from google import genai  # type: ignore
 
-            self._client = genai.Client(api_key=self.api_key)
+            self._client = genai.Client(
+                api_key=self.api_key, http_options=network_clients.genai_http_options()
+            )
         return self._client
 
     def _build_request(
@@ -243,4 +251,7 @@ class GoogleGenaiGeminiClient:
         raise RuntimeError("Gemini response did not contain text")
 
     async def close(self) -> None:
-        self._client = None
+        if self._client is not None:
+            await self._client.aio.aclose()
+            self._client.close()
+            self._client = None

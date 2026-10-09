@@ -10,6 +10,7 @@ from uuid import UUID
 
 import httpx
 
+from puripuly_heart.core import network_clients
 from puripuly_heart.config.llm_profiles import (
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
@@ -374,7 +375,7 @@ class OpenRouterLLMProvider:
         if not api_key:
             return False
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with network_clients.external_async_client(timeout=10.0) as client:
                 response = await client.get(
                     _OPENROUTER_KEY_URL,
                     headers={"Authorization": f"Bearer {api_key}"},
@@ -396,7 +397,7 @@ class OpenRouterLLMProvider:
         if not api_key:
             return None
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with network_clients.external_async_client(timeout=10.0) as client:
                 response = await client.get(
                     _OPENROUTER_KEY_URL,
                     headers={"Authorization": f"Bearer {api_key}"},
@@ -452,7 +453,7 @@ class HttpxOpenRouterClient:
 
         async with self._client_lock:
             if self._client is None:
-                self._client = httpx.AsyncClient(timeout=self.timeout)
+                self._client = network_clients.external_async_client(timeout=self.timeout)
             return self._client
 
     def _build_request_body(

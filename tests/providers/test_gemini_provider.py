@@ -118,10 +118,16 @@ def _install_fake_google(monkeypatch, *, response_text: str | None) -> dict[str,
         def __init__(self):
             self.models = FakeModels()
 
+        async def aclose(self):
+            state["async_closed"] = True
+
     class FakeClient:
-        def __init__(self, api_key):
+        def __init__(self, api_key, http_options=None):
             self.api_key = api_key
             self.aio = FakeAio()
+
+        def close(self):
+            state["sync_closed"] = True
 
     genai_module = ModuleType("google.genai")
     genai_module.Client = FakeClient
@@ -154,10 +160,16 @@ def _install_fake_google_model_list(monkeypatch, *, names: list[str]) -> dict[st
         def __init__(self):
             self.models = FakeModels()
 
+        async def aclose(self):
+            state["async_closed"] = True
+
     class FakeClient:
-        def __init__(self, api_key):
+        def __init__(self, api_key, http_options=None):
             self.api_key = api_key
             self.aio = FakeAio()
+
+        def close(self):
+            state["sync_closed"] = True
 
     genai_module = ModuleType("google.genai")
     genai_module.Client = FakeClient
@@ -192,10 +204,16 @@ def _install_fake_google_model_entries(
         def __init__(self):
             self.models = FakeModels()
 
+        async def aclose(self):
+            state["async_closed"] = True
+
     class FakeClient:
-        def __init__(self, api_key):
+        def __init__(self, api_key, http_options=None):
             self.api_key = api_key
             self.aio = FakeAio()
+
+        def close(self):
+            state["sync_closed"] = True
 
     genai_module = ModuleType("google.genai")
     genai_module.Client = FakeClient

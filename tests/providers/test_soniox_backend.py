@@ -1078,7 +1078,9 @@ async def test_soniox_verify_api_key_handles_timeout(monkeypatch):
         def connect(*_args, **_kwargs):
             return FakeWebSocket()
 
-    monkeypatch.setitem(__import__("sys").modules, "websockets", FakeWebsockets)
+    monkeypatch.setattr(
+        "puripuly_heart.core.network_clients.external_websocket_connect", FakeWebsockets.connect
+    )
 
     assert await SonioxRealtimeSTTBackend.verify_api_key("secret") is True
     config = json.loads(str(seen["config"]))
@@ -1116,6 +1118,9 @@ async def test_soniox_session_start_send_recv_and_close(
         exceptions=SimpleNamespace(ConnectionClosedOK=type("ConnectionClosedOK", (Exception,), {})),
     )
     monkeypatch.setitem(sys.modules, "websockets", fake_websockets)
+    monkeypatch.setattr(
+        "puripuly_heart.core.network_clients.external_websocket_connect", connect
+    )
 
     session = _SonioxSession(
         api_key="k",
@@ -1267,6 +1272,9 @@ async def test_soniox_session_start_omits_context_when_no_terms(monkeypatch) -> 
         exceptions=SimpleNamespace(ConnectionClosedOK=type("ConnectionClosedOK", (Exception,), {})),
     )
     monkeypatch.setitem(sys.modules, "websockets", fake_websockets)
+    monkeypatch.setattr(
+        "puripuly_heart.core.network_clients.external_websocket_connect", connect
+    )
 
     session = _make_session()
     await session.start()

@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
@@ -352,9 +353,7 @@ class _QwenAudioSession(STTBackendSession):
         self._loop = asyncio.get_running_loop()
         factory = self.websocket_factory
         if factory is None:
-            import websockets
-
-            factory = websockets.connect
+            factory = network_clients.external_websocket_connect
         headers = {"Authorization": f"Bearer {self.api_key}"}
         try:
             try:

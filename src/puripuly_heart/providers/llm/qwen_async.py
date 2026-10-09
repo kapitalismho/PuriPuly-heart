@@ -9,6 +9,7 @@ from uuid import UUID
 
 import httpx
 
+from puripuly_heart.core import network_clients
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
@@ -214,7 +215,7 @@ class AsyncQwenLLMProvider:
         if not api_key:
             return False
         model = _normalize_qwen_model(model)
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with network_clients.external_async_client(timeout=10.0) as client:
             response = await client.post(
                 f"{base_url}/chat/completions",
                 headers={
@@ -263,7 +264,7 @@ class HttpxQwenClient:
 
         async with self._client_lock:
             if self._client is None:
-                self._client = httpx.AsyncClient(timeout=self.timeout)
+                self._client = network_clients.external_async_client(timeout=self.timeout)
             return self._client
 
     def _build_request_body(

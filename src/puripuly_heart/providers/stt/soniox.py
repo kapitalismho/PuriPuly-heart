@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from websockets.exceptions import ProtocolError
 
+from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
@@ -231,7 +232,7 @@ class SonioxRealtimeSTTBackend(STTBackend):
 
         async def _check() -> bool:
             try:
-                async with websockets.connect(endpoint, ping_interval=None, open_timeout=5) as ws:
+                async with network_clients.external_websocket_connect(endpoint, ping_interval=None, open_timeout=5) as ws:
                     config = {
                         "api_key": api_key,
                         "model": "stt-rt-v5",
@@ -326,9 +327,7 @@ class _SonioxSession(STTBackendSession):
             config["context"] = {"terms": self.context_terms}
 
         try:
-            self._ws = await websockets.connect(
-                self.endpoint, ping_interval=None, open_timeout=self.connect_timeout_s
-            )
+            self._ws = await network_clients.external_websocket_connect(self.endpoint, ping_interval=None, open_timeout=self.connect_timeout_s)
         except websockets.exceptions.InvalidStatus as exc:
             status = _safe_code(exc.response.status_code, maximum=999999)
             if status in _RETRYABLE_SERVER_ERRORS:

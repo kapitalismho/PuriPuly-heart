@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import urllib.error
+import httpx
 
 import pytest
+
+from puripuly_heart.core import network_clients
 
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 
@@ -51,40 +53,30 @@ async def test_deepgram_backend_requires_positive_connect_timeout() -> None:
 async def test_deepgram_backend_verify_api_key_handles_empty_and_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    class FakeResponse:
-        status = 200
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-    def fake_urlopen(_request, timeout=0):
-        assert timeout == 5
-        return FakeResponse()
-
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    seen = []
+    def respond(request):
+        seen.append(request)
+        return httpx.Response(200)
+    monkeypatch.setattr(
+        network_clients, "external_client",
+        lambda **kwargs: httpx.Client(transport=httpx.MockTransport(respond)),
+    )
 
     assert await DeepgramRealtimeSTTBackend.verify_api_key("") is False
     assert await DeepgramRealtimeSTTBackend.verify_api_key("secret") is True
+    assert len(seen) == 1
+    assert seen[0].headers["Authorization"] == "Token secret"
 
 
 @pytest.mark.asyncio
 async def test_deepgram_backend_verify_api_key_raises_on_http_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_urlopen(_request, timeout=0):
-        _ = timeout
-        raise urllib.error.HTTPError(
-            url="https://api.deepgram.com/v1/projects",
-            code=401,
-            msg="Unauthorized",
-            hdrs=None,
-            fp=None,
-        )
+    monkeypatch.setattr(
+        network_clients, "external_client",
+        lambda **kwargs: httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(401))),
+    )
 
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-
-    with pytest.raises(Exception, match="HTTP 401"):
+    with pytest.raises(httpx.HTTPStatusError) as caught:
         await DeepgramRealtimeSTTBackend.verify_api_key("secret")
+    assert caught.value.response.status_code == 401

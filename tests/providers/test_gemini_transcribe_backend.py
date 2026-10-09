@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import urllib.error
+import httpx
 
 import pytest
+
+from puripuly_heart.core import network_clients
 
 from puripuly_heart.providers.stt.gemini_transcribe import (
     GeminiTranscribeSTTBackend,
@@ -306,21 +308,14 @@ async def test_verify_api_key_uses_models_metadata_endpoint(
 ) -> None:
     seen_urls: list[str] = []
 
-    class FakeResponse:
-        status = 200
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-    def fake_urlopen(request, timeout=0):
-        seen_urls.append(request.full_url)
-        assert request.get_header("X-goog-api-key") == "secret"
-        return FakeResponse()
-
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    def respond(request):
+        seen_urls.append(str(request.url))
+        assert request.headers["x-goog-api-key"] == "secret"
+        return httpx.Response(200)
+    monkeypatch.setattr(
+        network_clients, "external_client",
+        lambda **kwargs: httpx.Client(transport=httpx.MockTransport(respond)),
+    )
 
     assert await GeminiTranscribeSTTBackend.verify_api_key("") is False
     assert await GeminiTranscribeSTTBackend.verify_api_key("secret") is True
@@ -329,20 +324,14 @@ async def test_verify_api_key_uses_models_metadata_endpoint(
 
 @pytest.mark.asyncio
 async def test_verify_api_key_raises_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_urlopen(_request, timeout=0):
-        _ = timeout
-        raise urllib.error.HTTPError(
-            url="https://generativelanguage.googleapis.com/v1beta/models",
-            code=401,
-            msg="Unauthorized",
-            hdrs=None,
-            fp=None,
-        )
+    monkeypatch.setattr(
+        network_clients, "external_client",
+        lambda **kwargs: httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(401))),
+    )
 
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-
-    with pytest.raises(Exception, match="HTTP 401"):
+    with pytest.raises(httpx.HTTPStatusError) as caught:
         await GeminiTranscribeSTTBackend.verify_api_key("secret")
+    assert caught.value.response.status_code == 401
 
 
 class _TurnScopedLiveSession(_FakeLiveSession):

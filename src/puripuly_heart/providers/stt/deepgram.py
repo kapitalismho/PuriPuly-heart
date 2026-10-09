@@ -81,23 +81,16 @@ class DeepgramRealtimeSTTBackend(STTBackend):
         if not api_key:
             return False
 
-        import urllib.error
-        import urllib.request
+        from puripuly_heart.core import network_clients
 
         def _check():
-            req = urllib.request.Request(
-                "https://api.deepgram.com/v1/projects",
-                headers={"Authorization": f"Token {api_key}"},
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=5) as response:
-                    if response.status == 200:
-                        return True
-                    return False
-            except urllib.error.HTTPError as e:
-                raise Exception(f"HTTP {e.code}: {e.reason}")
-            except Exception as e:
-                raise Exception(f"Connection failed: {e}")
+            with network_clients.external_client(timeout=5, follow_redirects=True) as client:
+                response = client.get(
+                    "https://api.deepgram.com/v1/projects",
+                    headers={"Authorization": f"Token {api_key}"},
+                )
+                response.raise_for_status()
+                return response.status_code == 200
 
         return await asyncio.to_thread(_check)
 
@@ -346,9 +339,8 @@ class _DeepgramSDKSession(STTBackendSession):
             from deepgram import DeepgramClient
             from deepgram.core.events import EventType
             from deepgram.extensions.types.sockets import ListenV1ControlMessage
-
-            # Create client with api_key
-            client = DeepgramClient(api_key=self.api_key)
+            from puripuly_heart.core import network_clients
+            from .sdk_network import deepgram_listen_connect
 
             # Connect with streaming options using v1.connect() API
             connect_kwargs: dict[str, Any] = {
@@ -365,9 +357,13 @@ class _DeepgramSDKSession(STTBackendSession):
             if self.keyterms and self._supports_keyterms():
                 connect_kwargs["keyterm"] = self.keyterms
 
-            with client.listen.v1.connect(
-                **connect_kwargs,
-            ) as connection:
+            with (
+                network_clients.external_client() as http_client,
+                deepgram_listen_connect(
+                    DeepgramClient(api_key=self.api_key, httpx_client=http_client),
+                    **connect_kwargs,
+                ) as connection,
+            ):
                 # Set up event handlers
                 def on_message(result: Any) -> None:
                     try:

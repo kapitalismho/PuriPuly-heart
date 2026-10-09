@@ -16,6 +16,7 @@ from uuid import uuid4
 
 import httpx
 
+from puripuly_heart.core import network_clients
 from .local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LOCAL_STT_MODEL_ID,
@@ -244,7 +245,7 @@ def _download_source_into_staging(
     try:
         _raise_if_cancelled(cancel_event)
         source = manifest.sources[source_name]
-        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+        with network_clients.external_client(timeout=30.0, follow_redirects=True) as client:
             for asset in manifest.files:
                 _raise_if_cancelled(cancel_event)
                 asset_path = staging_dir / asset.relative_path

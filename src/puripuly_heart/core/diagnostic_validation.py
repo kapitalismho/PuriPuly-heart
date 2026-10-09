@@ -26,6 +26,10 @@ from puripuly_heart.core.messages import (
     SafeMessageParam,
     UserMessageRef,
 )
+from puripuly_heart.core.network_diagnostics import (
+    TRANSPORT_ENUM_FIELDS,
+    TRANSPORT_NUMERIC_FIELDS,
+)
 
 DiagnosticSink: TypeAlias = Literal[
     "dashboard",
@@ -845,6 +849,11 @@ def _field_shape_reasons(
             continue
         if len(key) > DIAGNOSTIC_FIELD_KEY_MAX_LENGTH:
             reasons.append(DIAGNOSTIC_VALIDATION_REASON_FIELD_LIMIT_EXCEEDED)
+        if key in TRANSPORT_ENUM_FIELDS:
+            if type(value) is not str or value not in TRANSPORT_ENUM_FIELDS[key]:
+                reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSUPPORTED_FIELD_TYPE)
+        elif key in TRANSPORT_NUMERIC_FIELDS and type(value) is not int:
+            reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSUPPORTED_FIELD_TYPE)
         if _max_depth(value) > DIAGNOSTIC_FIELD_MAX_DEPTH:
             reasons.append(DIAGNOSTIC_VALIDATION_REASON_EXCESSIVE_DEPTH)
         if not _is_supported_diagnostic_value(value):

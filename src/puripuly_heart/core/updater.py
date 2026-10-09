@@ -10,8 +10,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
-
+from puripuly_heart.core import network_clients
 from puripuly_heart import GITHUB_REPO, __version__
 
 logger = logging.getLogger(__name__)
@@ -56,7 +55,7 @@ async def check_for_update() -> UpdateInfo | None:
     Network errors are silently ignored (returns None).
     """
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with network_clients.external_async_client(timeout=5.0) as client:
             resp = await client.get(
                 GITHUB_API_URL,
                 headers={"Accept": "application/vnd.github.v3+json"},

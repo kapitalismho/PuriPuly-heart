@@ -200,7 +200,7 @@ async def test_qwen_client_normalizes_legacy_plus_to_qwen38(monkeypatch):
         {"api_key": "", "base_http_api_url": "", "Generation": DummyGeneration},
     )
     monkeypatch.setitem(sys.modules, "dashscope", dummy)
-    monkeypatch.setattr("httpx.post", fake_httpx_post)
+    monkeypatch.setattr("httpx.Client.post", lambda self, url, **kwargs: fake_httpx_post(url, **kwargs))
 
     client = DashScopeQwenClient(
         api_key="k", model="qwen3.5-plus", base_url="https://example/api/v1"
@@ -343,7 +343,7 @@ async def test_qwen_client_logs_basic_request_failure_for_qwen38(
         {"api_key": "", "base_http_api_url": "", "Generation": DummyGeneration},
     )
     monkeypatch.setitem(sys.modules, "dashscope", dummy)
-    monkeypatch.setattr("httpx.post", fake_httpx_post)
+    monkeypatch.setattr("httpx.Client.post", lambda self, url, **kwargs: fake_httpx_post(url, **kwargs))
 
     client = DashScopeQwenClient(
         api_key="k", model="qwen3.8-flash", base_url="https://example/api/v1"
@@ -388,7 +388,7 @@ async def test_qwen_client_uses_runtime_logging_for_failure_breadcrumbs_for_qwen
         {"api_key": "", "base_http_api_url": "", "Generation": DummyGeneration},
     )
     monkeypatch.setitem(sys.modules, "dashscope", dummy)
-    monkeypatch.setattr("httpx.post", fake_httpx_post)
+    monkeypatch.setattr("httpx.Client.post", lambda self, url, **kwargs: fake_httpx_post(url, **kwargs))
     runtime_logging = SpyRuntimeLogging(detailed_return=False)
 
     client = DashScopeQwenClient(

@@ -413,7 +413,7 @@ async def test_adapter_preserves_worker_failure_metadata(tmp_path: Path) -> None
 
 
 @pytest.mark.asyncio
-async def test_adapter_sanitizes_invalid_ssl_paths_and_retries_without_xet(
+async def test_adapter_retries_native_download_failure_without_xet(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -453,8 +453,12 @@ async def test_adapter_sanitizes_invalid_ssl_paths_and_retries_without_xet(
         target.write_bytes(b"fixture")
         event_path.write_text(json.dumps({"type": "complete", "path": str(target)}) + "\\n", encoding="utf-8")
         """)
-    monkeypatch.setenv("SSL_CERT_FILE", str(tmp_path / "missing.pem"))
-    monkeypatch.setenv("SSL_CERT_DIR", str(tmp_path / "missing-certs"))
+    for name in tuple(os.environ):
+        if name.lower().endswith("_proxy") or name in ("SSL_CERT_FILE", "SSL_CERT_DIR"):
+            monkeypatch.delenv(name)
+    from puripuly_heart.core import external_network
+
+    monkeypatch.setattr(external_network, "_windows_proxy_settings", lambda: ({}, ""))
     monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
     adapter = HuggingFaceXetDownloadAdapter(
         worker_command_factory=lambda _request, request_path, event_path: [
@@ -494,3 +498,19 @@ async def test_adapter_sanitizes_invalid_ssl_paths_and_retries_without_xet(
             "cache_exists": False,
         },
     ]
+
+
+@pytest.mark.asyncio
+async def test_invalid_ca_prevents_worker_launch(tmp_path, monkeypatch):
+    monkeypatch.setenv("SSL_CERT_FILE", str(tmp_path / "missing.pem"))
+    def command(*args):
+        pytest.fail("Invalid explicit trust must fail before a worker is launched")
+    adapter = HuggingFaceXetDownloadAdapter(worker_command_factory=command)
+    request = HuggingFaceDownloadRequest(
+        repo_id="fixture/repo", revision="pinned", remote_path="model",
+        local_dir=tmp_path / "local", expected_size_bytes=7,
+    )
+    with pytest.raises(LocalSTTDownloadPortError) as caught:
+        await adapter.download(request, cancel_event=None, on_progress=None)
+    assert caught.value.failure_code == "network_configuration_failed"
+    assert caught.value.cause_type == "FileNotFoundError"

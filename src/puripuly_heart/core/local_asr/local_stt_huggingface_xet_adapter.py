@@ -10,8 +10,10 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+from urllib.parse import urlsplit
 
 from puripuly_heart.runtime_layout import current_runtime_layout
+from puripuly_heart.core.external_network import ProxyPolicy, select_tls
 
 from .local_stt_download_port import (
     HuggingFaceDownloadProgress,
@@ -26,7 +28,6 @@ _XET_TRANSFER_LOCK = threading.Lock()
 _WORKER_STOP_TIMEOUT_S = 5.0
 _WORKER_EVENT_LOCK = threading.Lock()
 _WORKER_EVENT_PATH: Path | None = None
-_SSL_PATH_ENV = (("SSL_CERT_FILE", "file"), ("SSL_CERT_DIR", "directory"))
 
 
 def _default_worker_command(
@@ -64,19 +65,35 @@ def _worker_payload(request: HuggingFaceDownloadRequest) -> dict[str, object]:
 
 def _worker_environment(*, disable_xet: bool) -> dict[str, str]:
     environment = os.environ.copy()
-    for name, path_type in _SSL_PATH_ENV:
-        value = environment.get(name)
-        if not value:
-            continue
-        path = Path(value)
-        try:
-            valid = path.is_file() if path_type == "file" else path.is_dir()
-        except OSError:
-            valid = False
-        if not valid:
-            environment.pop(name, None)
-    if disable_xet:
+    tls = select_tls(environment=environment)
+    policy = ProxyPolicy(environment=environment)
+    proxy_urls = [
+        policy.environment.get(scheme) or policy.environment.get("all") or policy.system.get(scheme)
+        for scheme in ("http", "https")
+    ]
+    uses_system = any(
+        not (policy.environment.get(scheme) or policy.environment.get("all")) and policy.system.get(scheme)
+        for scheme in ("http", "https")
+    )
+    incompatible_proxy = (
+        bool(any(proxy_urls) and policy.environment.get("no"))
+        or bool(uses_system and policy.system_bypass)
+        or any(
+            urlsplit(value).scheme not in ("http", "https", "socks5", "socks5h")
+            for value in proxy_urls if value
+        )
+    )
+    if disable_xet or tls.source in ("explicit_file", "explicit_directory") or incompatible_proxy:
         environment["HF_HUB_DISABLE_XET"] = "1"
+        return environment
+    for name in tuple(environment):
+        if name.lower().endswith("_proxy"):
+            environment.pop(name)
+    for scheme in ("http", "https"):
+        route = policy.route(f"{scheme}://huggingface.co")
+        if route.url:
+            urlsplit(route.url).port
+            environment[f"{scheme.upper()}_PROXY"] = route.url
     return environment
 
 
@@ -150,16 +167,26 @@ class HuggingFaceXetDownloadAdapter:
                 if not acquired:
                     await asyncio.sleep(0.05)
 
+            try:
+                environment = _worker_environment(disable_xet=False)
+            except Exception as exc:
+                raise LocalSTTDownloadPortError(
+                    "Hugging Face download network configuration failed",
+                    failure_code="network_configuration_failed",
+                    cause_type=type(exc).__name__,
+                    os_error_code=_os_error_code(exc),
+                ) from exc
+            http_only = environment.get("HF_HUB_DISABLE_XET", "").upper() in {"1", "ON", "YES", "TRUE"}
             request.local_dir.mkdir(parents=True, exist_ok=True)
             try:
                 return await self._download_attempt(
                     request,
                     cancel_event=cancel_event,
                     on_progress=on_progress,
-                    disable_xet=False,
+                    environment=environment,
                 )
             except LocalSTTDownloadPortError as exc:
-                if exc.failure_code != "download_failed":
+                if http_only or exc.failure_code != "download_failed":
                     raise
             shutil.rmtree(request.local_dir / ".cache", ignore_errors=True)
             if cancel_event is not None and cancel_event.is_set():
@@ -168,7 +195,7 @@ class HuggingFaceXetDownloadAdapter:
                 request,
                 cancel_event=cancel_event,
                 on_progress=on_progress,
-                disable_xet=True,
+                environment={**environment, "HF_HUB_DISABLE_XET": "1"},
             )
         finally:
             if acquired:
@@ -180,7 +207,7 @@ class HuggingFaceXetDownloadAdapter:
         *,
         cancel_event: threading.Event | None,
         on_progress: HuggingFaceProgressCallback | None,
-        disable_xet: bool,
+        environment: dict[str, str],
     ) -> Path:
         process: asyncio.subprocess.Process | None = None
         ipc_id = uuid4().hex
@@ -198,7 +225,7 @@ class HuggingFaceXetDownloadAdapter:
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                     creationflags=creationflags,
-                    env=_worker_environment(disable_xet=disable_xet),
+                    env=environment,
                 )
                 if process.pid is not None:
                     self._active_workers[int(process.pid)] = "running"
@@ -356,6 +383,10 @@ def _http_status_code(exc: BaseException) -> int | None:
 def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
     global _WORKER_EVENT_PATH
     previous_xet_cache = os.environ.get("HF_XET_CACHE")
+    previous_network_environment = {
+        name: value for name, value in os.environ.items()
+        if name.lower().endswith("_proxy") or name == "HF_HUB_DISABLE_XET"
+    }
     _WORKER_EVENT_PATH = event_path
     failure_code = "worker_request_failed"
     try:
@@ -363,8 +394,17 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
         local_dir = Path(str(payload["local_dir"])).resolve()
         xet_cache_dir = local_dir / ".cache" / "xet"
         os.environ["HF_XET_CACHE"] = str(xet_cache_dir)
+        failure_code = "network_configuration_failed"
+        environment = _worker_environment(disable_xet=False)
+        for name in tuple(os.environ):
+            if name.lower().endswith("_proxy") and name not in environment:
+                os.environ.pop(name)
+        os.environ.update(environment)
         failure_code = "worker_import_failed"
-        from huggingface_hub import hf_hub_download
+        from huggingface_hub import hf_hub_download, set_client_factory
+        from puripuly_heart.core.network_clients import external_client
+
+        set_client_factory(external_client)
 
         failure_code = "download_failed"
         downloaded_path = Path(
@@ -385,7 +425,10 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
             "type": "error",
             "failure_code": failure_code,
             "error_type": type(exc).__name__,
-            "message": str(exc),
+            "message": (
+                "Hugging Face download network configuration failed"
+                if failure_code == "network_configuration_failed" else str(exc)
+            ),
         }
         status_code = _http_status_code(exc)
         if status_code is not None:
@@ -396,6 +439,10 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
         _write_worker_message(message)
         return 1
     finally:
+        for name in tuple(os.environ):
+            if name.lower().endswith("_proxy") or name == "HF_HUB_DISABLE_XET":
+                os.environ.pop(name)
+        os.environ.update(previous_network_environment)
         if previous_xet_cache is None:
             os.environ.pop("HF_XET_CACHE", None)
         else:

@@ -215,7 +215,7 @@ def fake_deepgram_modules(monkeypatch: pytest.MonkeyPatch):
         v1 = FakeV1()
 
     class FakeClient:
-        def __init__(self, api_key: str):
+        def __init__(self, api_key: str, httpx_client=None):
             _ = api_key
             self.listen = FakeListen()
 
@@ -236,6 +236,10 @@ def fake_deepgram_modules(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setitem(sys.modules, "deepgram.extensions.types", deepgram_ext_types)
     monkeypatch.setitem(sys.modules, "deepgram.extensions.types.sockets", deepgram_sockets)
     monkeypatch.setattr(deepgram_module.threading, "Thread", NoopThread)
+    monkeypatch.setattr(
+        "puripuly_heart.providers.stt.sdk_network.deepgram_listen_connect",
+        lambda client, **kwargs: client.listen.v1.connect(**kwargs),
+    )
 
     return types.SimpleNamespace(
         connect_kwargs=connect_kwargs,
