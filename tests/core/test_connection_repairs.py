@@ -217,7 +217,7 @@ def huggingface_file_server(context=None):
         thread.join()
 
 
-@pytest.mark.parametrize("policy_case", ["direct_fallback", "system_fallback", "registry_bypass", "mixed", "bare_env", "explicit_ca", "explicit_disable", "failed_proxy"])
+@pytest.mark.parametrize("policy_case", ["direct_fallback", "direct_ip_fallback", "system_fallback", "registry_bypass", "mixed", "bare_env", "explicit_ca", "explicit_disable", "failed_proxy"])
 async def test_actual_huggingface_worker_retains_policy_and_downloads_redirect_hash(certificates, monkeypatch, tmp_path, policy_case):
     root, _, contexts = certificates
     monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
@@ -242,6 +242,8 @@ async def test_actual_huggingface_worker_retains_policy_and_downloads_redirect_h
             monkeypatch.setenv("HF_HUB_DISABLE_XET", "true")
         monkeypatch.setattr(external_network, "_windows_proxy_settings", lambda: (original_system, bypass))
         with huggingface_file_server(contexts["valid"] if policy_case == "explicit_ca" else None) as (endpoint, payload, requests):
+            if policy_case == "direct_ip_fallback":
+                endpoint = endpoint.replace("localhost", "127.0.0.1")
             script = '''
 import json, os, pathlib, sys
 from puripuly_heart.core import external_network
@@ -276,7 +278,7 @@ def download(**kwargs):
 huggingface_hub.hf_hub_download = download
 raise SystemExit(adapter.run_huggingface_xet_worker(request_path=request_path, event_path=event_path))
 '''
-            fallback = policy_case in ("direct_fallback", "system_fallback")
+            fallback = policy_case in ("direct_fallback", "direct_ip_fallback", "system_fallback")
             adapter = HuggingFaceXetDownloadAdapter(worker_command_factory=lambda request, request_path, event_path: [
                 sys.executable, "-c", script, str(request_path), str(event_path), endpoint,
                 "fallback" if fallback else "success",

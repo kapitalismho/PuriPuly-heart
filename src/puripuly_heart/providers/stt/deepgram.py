@@ -675,7 +675,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 pass
         await self.stop()
         if self._thread is not None:
-            self._thread.join(timeout=5.0)
+            await asyncio.to_thread(self._thread.join, timeout=5.0)
             self._thread = None
         self._event_projection.close()
 

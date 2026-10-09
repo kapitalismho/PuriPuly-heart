@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import socket
 import ssl
 import threading
 import time
@@ -244,3 +245,88 @@ async def test_scoped_deepgram_missing_open_preserves_timeout_or_cancellation_an
     assert not any(
         item.name == "deepgram-sdk" and item.is_alive() for item in threading.enumerate()
     )
+
+
+@pytest.mark.asyncio
+async def test_scoped_deepgram_pending_tls_cancellation_keeps_event_loop_responsive(
+    certificates, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _, _ = certificates
+    monkeypatch.setenv("SSL_CERT_FILE", str(root))
+    handshake_received = threading.Event()
+    release = threading.Event()
+    server_closed = threading.Event()
+    release_time = []
+    server_errors = []
+
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        listener.settimeout(3)
+
+        def pending_handshake():
+            try:
+                connection, _ = listener.accept()
+                with connection:
+                    connection.settimeout(3)
+                    if connection.recv(4096):
+                        handshake_received.set()
+                    release.wait(3)
+            except BaseException as exc:
+                server_errors.append(exc)
+            finally:
+                server_closed.set()
+
+        thread = threading.Thread(target=pending_handshake)
+        thread.start()
+        timer = None
+        heartbeat = None
+        opening = None
+        try:
+            local_sdk_client(monkeypatch, f"wss://127.0.0.1:{listener.getsockname()[1]}")
+            backend = DeepgramRealtimeSTTBackend(
+                api_key="synthetic-key", language="en", connect_timeout_s=10,
+            )
+            opening = asyncio.create_task(
+                backend.open_session(projection=STTSessionProjection("scoped", "pending-tls"))
+            )
+            assert await asyncio.to_thread(handshake_received.wait, 3)
+            started = time.monotonic()
+
+            def release_server():
+                release_time.append(time.monotonic() - started)
+                release.set()
+
+            async def tick():
+                await asyncio.sleep(0.05)
+                return time.monotonic() - started, release.is_set(), opening.done()
+
+            timer = threading.Timer(0.6, release_server)
+            timer.start()
+            heartbeat = asyncio.create_task(tick())
+            opening.cancel()
+            elapsed, released, cancellation_finished = await heartbeat
+            assert elapsed < 0.4
+            assert not released
+            assert not cancellation_finished
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(opening, 3)
+            assert release_time[0] >= 0.6
+            assert server_closed.is_set()
+            assert not server_errors
+            assert not any(
+                item.name == "deepgram-sdk" and item.is_alive() for item in threading.enumerate()
+            )
+        finally:
+            release.set()
+            if timer is not None:
+                timer.cancel()
+                await asyncio.to_thread(timer.join, 3)
+            if heartbeat is not None and not heartbeat.done():
+                heartbeat.cancel()
+                await asyncio.gather(heartbeat, return_exceptions=True)
+            if opening is not None and not opening.done():
+                opening.cancel()
+                await asyncio.gather(opening, return_exceptions=True)
+            await asyncio.to_thread(thread.join, 3)
+            assert not thread.is_alive()

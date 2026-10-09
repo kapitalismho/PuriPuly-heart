@@ -31,6 +31,7 @@ _WORKER_EVENT_LOCK = threading.Lock()
 _WORKER_EVENT_PATH: Path | None = None
 _WORKER_PROXY_POLICY_ENV = "PURIPULY_HEART_HF_PROXY_POLICY"
 _NATIVE_EMPTY_BYPASS = ","
+_NATIVE_ALL_BYPASS = "*,0.0.0.0/0,::/0"
 
 
 def _default_worker_command(
@@ -112,7 +113,7 @@ def _worker_environment(*, disable_xet: bool) -> dict[str, str]:
     for name in tuple(environment):
         if name.lower().endswith("_proxy"):
             environment.pop(name)
-    environment["NO_PROXY"] = _NATIVE_EMPTY_BYPASS if any(proxy_urls) else "*"
+    environment["NO_PROXY"] = _NATIVE_EMPTY_BYPASS if any(proxy_urls) else _NATIVE_ALL_BYPASS
     for scheme, proxy_url in zip(("http", "https"), proxy_urls):
         if proxy_url:
             urlsplit(proxy_url).port
