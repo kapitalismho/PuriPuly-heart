@@ -313,7 +313,7 @@ async def test_mock_transport_injection_does_not_resolve_invalid_environment(mon
         assert (await client.get("https://example.invalid")).text == "injected"
 
 
-async def test_socks5_http_and_async_sync_websocket_routes(certificates, monkeypatch):
+async def test_socks5_http_and_async_websocket_routes(certificates, monkeypatch):
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(root))
@@ -336,12 +336,7 @@ async def test_socks5_http_and_async_sync_websocket_routes(certificates, monkeyp
             async with network_clients.external_websocket_connect(url) as ws:
                 await ws.send("async")
                 assert await ws.recv() == "async"
-            def exchange():
-                with network_clients.external_sync_websocket_connect(url) as ws:
-                    ws.send("sync")
-                    return ws.recv()
-            assert await asyncio.to_thread(exchange) == "sync"
-        assert len(recorded) == 5
+        assert len(recorded) == 4
         assert all(method == "SOCKS5" for method, _ in recorded)
 
 

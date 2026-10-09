@@ -165,23 +165,6 @@ def external_websocket_connect(url: str, **kwargs: Any) -> ExternalWebSocketConn
     return ExternalWebSocketConnect(url, **kwargs)
 
 
-def external_sync_websocket_connect(url: str, **kwargs: Any) -> Any:
-    from websockets.sync.client import connect
-
-    tls = select_tls()
-    route = ProxyPolicy().route(url)
-    kwargs["proxy"] = route.url
-    if url.startswith("wss:"):
-        kwargs["ssl"] = tls.context
-    if route.url and route.url.startswith("https:"):
-        kwargs["proxy_ssl"] = tls.context
-    try:
-        return connect(url, **kwargs)
-    except Exception as exc:
-        annotate_connection_error(exc, url=url, tls=tls, route=route)
-        raise
-
-
 def genai_http_options(
     *,
     sync_transport: Any = None,

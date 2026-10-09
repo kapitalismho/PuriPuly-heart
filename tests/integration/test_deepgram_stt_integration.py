@@ -9,7 +9,6 @@ from tests.integration.helpers import (
     integration_mark,
     open_session,
     require_env,
-    require_module,
     stream_silence,
 )
 
@@ -19,13 +18,6 @@ pytestmark = integration_mark()
 @pytest.mark.asyncio
 async def test_deepgram_realtime_streaming_smoke():
     api_key = require_env("DEEPGRAM_API_KEY")
-
-    require_module(
-        "websocket",
-        reason=(
-            "websocket-client is required for this integration test; install with pip install websocket-client"
-        ),
-    )
 
     from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 

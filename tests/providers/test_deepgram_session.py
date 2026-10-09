@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import sys
-import types
+from contextlib import asynccontextmanager
 
 import pytest
 
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
-from puripuly_heart.providers.stt import deepgram as deepgram_module
 from puripuly_heart.providers.stt.deepgram import _FINALIZE, _STOP, _DeepgramSDKSession
-from tests.helpers.fakes import NoopThread, TargetThread
 
 
 def _make_session(
@@ -112,45 +109,8 @@ async def test_deepgram_session_emits_test_final() -> None:
 
 
 @pytest.mark.asyncio
-async def test_deepgram_session_start_success(monkeypatch) -> None:
-    session = _make_session()
-
-    def fake_run_sync():
-        session._connected.set()
-
-    async def fake_to_thread(func, *args, **kwargs):
-        return func(*args, **kwargs)
-
-    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(deepgram_module.threading, "Thread", TargetThread)
-    monkeypatch.setattr(session, "_run_sync", fake_run_sync)
-
-    await session.start()
-    assert session._connected.is_set() is True
-
-
-@pytest.mark.asyncio
-async def test_deepgram_session_start_timeout(monkeypatch) -> None:
-    session = _make_session()
-
-    def fake_run_sync():
-        return None
-
-    async def fake_to_thread(*_args, **_kwargs):
-        return False
-
-    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(deepgram_module.threading, "Thread", TargetThread)
-    monkeypatch.setattr(session, "_run_sync", fake_run_sync)
-
-    with pytest.raises(RuntimeError, match="connection timeout"):
-        await session.start()
-
-
-@pytest.mark.asyncio
 async def test_deepgram_session_report_error_is_emitted_once() -> None:
     session = _make_session()
-    session._loop = asyncio.get_running_loop()
 
     err = RuntimeError("boom")
     session._report_error(err)
@@ -163,147 +123,143 @@ async def test_deepgram_session_report_error_is_emitted_once() -> None:
 
 
 @pytest.fixture
-def fake_deepgram_modules(monkeypatch: pytest.MonkeyPatch):
-    sent_media: list[bytes] = []
-    sent_controls: list[str] = []
-    connect_kwargs: dict[str, object] = {}
+def controlled_connection(monkeypatch: pytest.MonkeyPatch):
+    from deepgram.core.events import EventType
 
-    class FakeEventType:
-        OPEN = "open"
-        MESSAGE = "message"
-        ERROR = "error"
-        CLOSE = "close"
+    from puripuly_heart.core import network_clients
 
-    class FakeControlMessage:
-        def __init__(self, type: str):
-            self.type = type
+    class Connection:
+        def __init__(self):
+            self.callbacks = {}
+            self.write_started = asyncio.Event()
+            self.write_gate = asyncio.Event()
+            self.write_gate.set()
+            self.listen_started = asyncio.Event()
+            self.closed = asyncio.Event()
+            self.written = []
+            self.write_error = None
 
-    class FakeConnection:
-        def __enter__(self):
-            return self
+        def on(self, event, callback):
+            self.callbacks[event] = callback
 
-        def __exit__(self, exc_type, exc, tb):
-            return False
+        async def start_listening(self):
+            self.callbacks[EventType.OPEN](None)
+            self.listen_started.set()
+            try:
+                await self.closed.wait()
+            finally:
+                self.callbacks[EventType.CLOSE](None)
 
-        def on(self, event_type, callback):
-            if event_type == FakeEventType.OPEN:
-                callback(object())
-            if event_type == FakeEventType.MESSAGE:
-                alt = types.SimpleNamespace(transcript="hello world")
-                result = types.SimpleNamespace(
-                    channel=types.SimpleNamespace(alternatives=[alt]),
-                    is_final=True,
-                    speech_final=False,
-                )
-                callback(result)
+        async def send_media(self, data):
+            self.write_started.set()
+            await self.write_gate.wait()
+            if self.write_error is not None:
+                raise self.write_error
+            self.written.append(data)
 
-        def start_listening(self):
-            return None
+        async def send_control(self, message):
+            self.written.append(message.type)
 
-        def send_control(self, message):
-            sent_controls.append(message.type)
+    connection = Connection()
+    clients = []
+    original_factory = network_clients.external_async_client
 
-        def send_media(self, data: bytes):
-            sent_media.append(data)
+    def client_factory(**kwargs):
+        client = original_factory(**kwargs)
+        clients.append(client)
+        return client
 
-    class FakeV1:
-        def connect(self, **kwargs):
-            connect_kwargs.update(kwargs)
-            return FakeConnection()
+    @asynccontextmanager
+    async def connect(*_args, **_kwargs):
+        try:
+            yield connection
+        finally:
+            connection.closed.set()
 
-    class FakeListen:
-        v1 = FakeV1()
-
-    class FakeClient:
-        def __init__(self, api_key: str, httpx_client=None):
-            _ = api_key
-            self.listen = FakeListen()
-
-    deepgram_pkg = types.ModuleType("deepgram")
-    deepgram_pkg.DeepgramClient = FakeClient
-    deepgram_core = types.ModuleType("deepgram.core")
-    deepgram_events = types.ModuleType("deepgram.core.events")
-    deepgram_events.EventType = FakeEventType
-    deepgram_ext = types.ModuleType("deepgram.extensions")
-    deepgram_ext_types = types.ModuleType("deepgram.extensions.types")
-    deepgram_sockets = types.ModuleType("deepgram.extensions.types.sockets")
-    deepgram_sockets.ListenV1ControlMessage = FakeControlMessage
-
-    monkeypatch.setitem(sys.modules, "deepgram", deepgram_pkg)
-    monkeypatch.setitem(sys.modules, "deepgram.core", deepgram_core)
-    monkeypatch.setitem(sys.modules, "deepgram.core.events", deepgram_events)
-    monkeypatch.setitem(sys.modules, "deepgram.extensions", deepgram_ext)
-    monkeypatch.setitem(sys.modules, "deepgram.extensions.types", deepgram_ext_types)
-    monkeypatch.setitem(sys.modules, "deepgram.extensions.types.sockets", deepgram_sockets)
-    monkeypatch.setattr(deepgram_module.threading, "Thread", NoopThread)
-    monkeypatch.setattr(
-        "puripuly_heart.providers.stt.sdk_network.deepgram_listen_connect",
-        lambda client, **kwargs: client.listen.v1.connect(**kwargs),
-    )
-
-    return types.SimpleNamespace(
-        connect_kwargs=connect_kwargs,
-        sent_media=sent_media,
-        sent_controls=sent_controls,
-    )
+    monkeypatch.setattr(network_clients, "external_async_client", client_factory)
+    monkeypatch.setattr("puripuly_heart.providers.stt.sdk_network.deepgram_listen_connect", connect)
+    return connection, clients
 
 
 @pytest.mark.asyncio
-async def test_deepgram_session_run_sync_handles_message_finalize_and_stop(
-    fake_deepgram_modules,
-) -> None:
-    session = _make_session(keyterms=["Puripuly", "VRChat"])
-    session._loop = asyncio.get_running_loop()
-    session._connect_started_at = 1.0
-
-    session._audio_q.put_nowait(_FINALIZE)
-    session._audio_q.put_nowait(_FINALIZE)
-    session._audio_q.put_nowait(b"pcm")
-    session._audio_q.put_nowait(_STOP)
-    session._run_sync()
-    await asyncio.sleep(0)
-
-    first = await session._event_projection._legacy_events.get()
-    assert isinstance(first, STTBackendTranscriptEvent)
-    assert first.text == "hello world"
-    assert fake_deepgram_modules.sent_controls == ["Finalize", "Finalize"]
-    assert fake_deepgram_modules.sent_media == [b"pcm"]
-    assert session._connected.is_set() is True
-    assert "diarize" not in fake_deepgram_modules.connect_kwargs
-    assert fake_deepgram_modules.connect_kwargs["keyterm"] == ["Puripuly", "VRChat"]
-
-    # _run_sync posts termination markers in stop path/finally.
-    tail: list[object] = []
-    while not session._event_projection._legacy_events.empty():
-        tail.append(session._event_projection._legacy_events.get_nowait())
-    assert None in tail
-
-
-@pytest.mark.asyncio
-async def test_deepgram_session_run_sync_omits_keyterm_when_empty(
-    fake_deepgram_modules,
-) -> None:
+async def test_deepgram_writer_ack_waits_for_write_and_close_drains_fifo(controlled_connection):
+    connection, clients = controlled_connection
     session = _make_session()
-    session._loop = asyncio.get_running_loop()
-    session._connect_started_at = 1.0
-
-    session._audio_q.put_nowait(_STOP)
-    session._run_sync()
+    await session.start()
+    connection.write_gate.clear()
+    first = asyncio.create_task(session._write_payload(b"first"))
+    await asyncio.wait_for(connection.write_started.wait(), 1)
+    second = asyncio.create_task(session._write_payload(b"second"))
     await asyncio.sleep(0)
-
-    assert "keyterm" not in fake_deepgram_modules.connect_kwargs
+    assert not first.done()
+    assert not second.done()
+    await session.on_speech_end()
+    closing = asyncio.create_task(session.close())
+    await asyncio.sleep(0)
+    assert not closing.done()
+    connection.write_gate.set()
+    await asyncio.wait_for(asyncio.gather(first, second, closing), 1)
+    assert connection.written == [b"first", b"second", "Finalize"]
+    assert connection.closed.is_set()
+    assert all(client.is_closed for client in clients)
+    assert all(task.done() for task in (session._send_task, session._recv_task, session._keepalive_task))
 
 
 @pytest.mark.asyncio
-async def test_deepgram_session_run_sync_omits_keyterm_for_unsupported_model(
-    fake_deepgram_modules,
-) -> None:
-    session = _make_session(model="nova-2", keyterms=["Puripuly"])
-    session._loop = asyncio.get_running_loop()
-    session._connect_started_at = 1.0
-
-    session._audio_q.put_nowait(_STOP)
-    session._run_sync()
+async def test_deepgram_writer_failure_fails_inflight_and_pending_writes(controlled_connection):
+    connection, clients = controlled_connection
+    session = _make_session()
+    await session.start()
+    connection.write_gate.clear()
+    error = OSError("controlled writer failure")
+    connection.write_error = error
+    first = asyncio.create_task(session._write_payload(b"first"))
+    await asyncio.wait_for(connection.write_started.wait(), 1)
+    second = asyncio.create_task(session._write_payload(b"second"))
     await asyncio.sleep(0)
+    connection.write_gate.set()
+    results = await asyncio.wait_for(asyncio.gather(first, second, return_exceptions=True), 1)
+    assert results[0] is error
+    assert isinstance(results[1], RuntimeError)
+    with pytest.raises(OSError, match="controlled writer failure"):
+        await anext(session.events())
+    await asyncio.wait_for(session.close(), 1)
+    assert connection.closed.is_set()
+    assert all(client.is_closed for client in clients)
+    assert all(task.done() for task in (session._send_task, session._recv_task, session._keepalive_task))
 
-    assert "keyterm" not in fake_deepgram_modules.connect_kwargs
+
+@pytest.mark.asyncio
+async def test_deepgram_legacy_audio_overflow_reserves_control_capacity():
+    session = _make_session()
+    for _ in range(256):
+        await session.send_audio(b"pcm")
+    with pytest.raises(RuntimeError, match="audio queue overflow"):
+        await session.send_audio(b"overflow")
+    await session.on_speech_end()
+    await session.on_speech_end()
+    await asyncio.wait_for(session.close(), 1)
+
+
+@pytest.mark.asyncio
+async def test_deepgram_cancelled_close_fails_blocked_writes_and_joins_owned_tasks(
+    controlled_connection,
+):
+    connection, clients = controlled_connection
+    session = _make_session()
+    await session.start()
+    connection.write_gate.clear()
+    first = asyncio.create_task(session._write_payload(b"first"))
+    await asyncio.wait_for(connection.write_started.wait(), 1)
+    second = asyncio.create_task(session._write_payload(b"second"))
+    await asyncio.sleep(0)
+    closing = asyncio.create_task(session.close())
+    await asyncio.sleep(0)
+    closing.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(closing, 1)
+    results = await asyncio.wait_for(asyncio.gather(first, second, return_exceptions=True), 1)
+    assert all(isinstance(result, RuntimeError) for result in results)
+    assert connection.closed.is_set()
+    assert all(client.is_closed for client in clients)
+    assert all(task.done() for task in (session._send_task, session._recv_task, session._keepalive_task))

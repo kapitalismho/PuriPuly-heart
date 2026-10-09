@@ -58,7 +58,7 @@ async def test_scribe_sdk_verified_proxy_audio_event_flow(certificates, monkeypa
 
 @pytest.mark.parametrize("https_proxy", [False, True])
 async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatch, https_proxy):
-    from deepgram import DeepgramClient
+    from deepgram import AsyncDeepgramClient
     from deepgram.environment import DeepgramClientEnvironment
 
     root, _, contexts = certificates
@@ -77,20 +77,20 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
         monkeypatch.setenv("ALL_PROXY", proxy)
         async with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
             url = f"wss://localhost:{server.sockets[0].getsockname()[1]}"
-            def operation():
-                with network_clients.external_client() as http_client:
-                    client = DeepgramClient(
+            async def operation():
+                async with network_clients.external_async_client() as http_client:
+                    client = AsyncDeepgramClient(
                         api_key="test-key", httpx_client=http_client,
                         environment=DeepgramClientEnvironment(base=url, production=url, agent=url),
                     )
-                    with deepgram_listen_connect(
+                    async with deepgram_listen_connect(
                         client, model="nova-3", language="en", encoding="linear16", sample_rate=16000,
                         channels=1, interim_results=False, punctuate=True, vad_events=False,
                         endpointing=False, keyterm=["first", "second"],
                     ) as connection:
-                        connection.send_media(b"\0\0")
-                        return connection.recv().channel["alternatives"][0]["transcript"]
-            assert await asyncio.wait_for(asyncio.to_thread(operation), 10) == "recognized"
+                        await connection.send_media(b"\0\0")
+                        return (await connection.recv()).channel["alternatives"][0]["transcript"]
+            assert await asyncio.wait_for(operation(), 10) == "recognized"
     path, headers, audio = requests[0]
     query = parse_qs(urlsplit(path).query)
     assert query["keyterm"] == ["first", "second"]

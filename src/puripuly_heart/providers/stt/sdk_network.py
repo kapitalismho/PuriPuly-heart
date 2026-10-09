@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
 from elevenlabs.realtime import CommitStrategy, ScribeRealtime
 from elevenlabs.realtime.connection import RealtimeConnection
+from websockets.asyncio.client import ClientConnection
+from websockets.exceptions import InvalidStatus
 
 from puripuly_heart.core import network_clients
 
@@ -34,11 +36,10 @@ class ExternalScribeRealtime(ScribeRealtime):
         return connection
 
 
-@contextmanager
-def deepgram_listen_connect(client: Any, **options: Any):
+@asynccontextmanager
+async def deepgram_listen_connect(client: Any, **options: Any):
     from deepgram.core.api_error import ApiError
-    from deepgram.listen.v1.socket_client import V1SocketClient
-    from websockets.exceptions import InvalidStatus
+    from deepgram.listen.v1.socket_client import AsyncV1SocketClient
 
     wrapper = client.listen.v1._client_wrapper
     url = wrapper.get_environment().production + "/v1/listen"
@@ -52,22 +53,24 @@ def deepgram_listen_connect(client: Any, **options: Any):
         else:
             query = query.add(name, value)
     headers = wrapper.get_headers()
-    try:
-        with network_clients.external_sync_websocket_connect(
-            url + f"?{query}", additional_headers=headers
-        ) as protocol:
-            yield V1SocketClient(websocket=protocol)
-    except InvalidStatus as exc:
-        status = exc.response.status_code
-        error = ApiError(
-            status_code=status,
-            headers=dict(headers),
-            body=(
-                "Websocket initialized with invalid credentials."
-                if status == 401
-                else "Unexpected error when initializing websocket connection."
-            ),
-        )
-        if hasattr(exc, "connection_diagnostics"):
-            error.connection_diagnostics = exc.connection_diagnostics
-        raise error from exc
+
+    class DeepgramConnection(ClientConnection):
+        async def handshake(self, *args: Any, **kwargs: Any) -> None:
+            try:
+                await super().handshake(*args, **kwargs)
+            except InvalidStatus as exc:
+                status = exc.response.status_code
+                raise ApiError(
+                    status_code=status,
+                    headers=dict(headers),
+                    body=(
+                        "Websocket initialized with invalid credentials."
+                        if status == 401
+                        else "Unexpected error when initializing websocket connection."
+                    ),
+                ) from exc
+
+    async with network_clients.external_websocket_connect(
+        url + f"?{query}", additional_headers=headers, create_connection=DeepgramConnection
+    ) as protocol:
+        yield AsyncV1SocketClient(websocket=protocol)
