@@ -157,15 +157,6 @@ Settings persistence owns intent; runtime owners own its application. The provid
 
 Implementation: `app/services/provider/provider_runtime_apply.py`. Behavior: `tests/app/test_stt_provider_apply_vertical.py`.
 
-## External Network Boundaries
-
-`core/external_network.py` resolves external TLS and proxy policy at connection-owner boundaries. `core/network_clients.py` and library-specific adapters apply that policy; existing provider and runtime owners retain client reuse, cancellation, and closure.
-
-- Default Windows cloud connections use native certificate-chain verification. Explicit CA overrides in the cloud policy do not silently gain additional default roots, and startup does not synthesize CA environment overrides.
-- External HTTP and WebSocket connections share proxy and bypass selection while preserving intentional protocol-specific overrides. Owners capture policy once and apply it to each destination, including scheme-less proxy addresses and effective default-port bypass rules. Local/custom connections remain direct and retain their existing transport-specific TLS behavior; failures do not authorize direct fallback, disabled verification, or request replay.
-- SDK realtime handshakes are configured separately from SDK HTTP clients. Narrow provider adapters contain version-coupled SDK seams without global SSL or SDK monkeypatches. GenAI HTTP clients are app-owned and explicitly closed by the existing LLM and Transcribe owners. GenAI Live retains SDK redirect handling for the same selected proxy route; redirects that change that route fail before a second connection rather than silently bypassing policy.
-- Download workers carry the captured environment and system proxy/bypass policy through child startup and the existing native-to-HTTP fallback. Native Xet owns its Windows verification independently; policies it cannot honor must use the existing managed HTTP path rather than silently broaden trust or change routes. The managed HTTP factory preserves Hugging Face's redirect, timeout, and request-hook contract.
-
 ## Provider Boundaries
 
 ### STT
@@ -230,7 +221,6 @@ Behavior: `tests/core/test_overlay_presenter.py`, `native/overlay/tests/runtime.
 
 - File delivery is asynchronous and bounded; producers do not wait for file I/O.
 - Technical diagnostics are metadata-only and exclude credentials, user text, and audio. Accepted conversation records use a separate secret-protected path.
-- OpenRouter authentication and normalized translation/recognition transport failures retain available certificate-verification codes and safe policy labels. Raw exception text, endpoint details, and CA file paths are not diagnostic payloads. Other providers' existing boolean credential-verification contracts remain unchanged.
 - Timing records describe application-observable stages, not physical display.
 
 Implementation: `core/runtime_logging.py`, `app/services/application_runtime_logging.py`. Behavior: `tests/core/test_runtime_logging.py`.
