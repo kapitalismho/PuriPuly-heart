@@ -1278,7 +1278,7 @@ wheels = [
 
 [[package]]
 name = "puripuly-heart"
-version = "2.8.1"
+version = "2.8.2"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
