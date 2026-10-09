@@ -124,6 +124,7 @@ class _DeepgramSDKSession(STTBackendSession):
     _keepalive_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _send_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
     _stopped: bool = field(init=False, default=False)
+    _close_deadline: float | None = field(init=False, default=None, repr=False)
     _connected: asyncio.Event = field(init=False, default_factory=asyncio.Event, repr=False)
     _startup_done: asyncio.Event = field(init=False, default_factory=asyncio.Event, repr=False)
     _startup_error: BaseException | None = field(init=False, default=None, repr=False)
@@ -345,6 +346,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 network_clients.external_async_client() as http_client,
                 deepgram_listen_connect(
                     AsyncDeepgramClient(api_key=self.api_key, httpx_client=http_client),
+                    _close_deadline=self._begin_close,
                     **connect_kwargs,
                 ) as connection,
             ):
@@ -625,7 +627,13 @@ class _DeepgramSDKSession(STTBackendSession):
 
         self._audio_q.put_nowait(_FINALIZE)
 
+    def _begin_close(self) -> float:
+        if self._close_deadline is None:
+            self._close_deadline = asyncio.get_running_loop().time() + 5.0
+        return self._close_deadline
+
     async def stop(self) -> None:
+        self._begin_close()
         if self._stopped:
             return
         self._stopped = True
@@ -637,26 +645,29 @@ class _DeepgramSDKSession(STTBackendSession):
                 self._fail_pending_writes()
 
     async def close(self) -> None:
+        deadline = self._begin_close()
         try:
-            await self.stop()
-            self._scoped_drain_task = None
-            drain_tasks = tuple(
-                task for task in self._drain_tasks if task is not asyncio.current_task()
-            )
-            for task in drain_tasks:
-                task.cancel()
-            await asyncio.gather(*drain_tasks, return_exceptions=True)
-            task = self._run_task
-            if task is not None:
-                if not self._connected.is_set():
-                    task.cancel()
-                try:
-                    await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
-                except TimeoutError:
-                    pass
-                except asyncio.CancelledError:
-                    if asyncio.current_task().cancelling():
-                        raise
+            try:
+                async with asyncio.timeout_at(deadline):
+                    await self.stop()
+                    self._scoped_drain_task = None
+                    drain_tasks = tuple(
+                        task for task in self._drain_tasks if task is not asyncio.current_task()
+                    )
+                    for task in drain_tasks:
+                        task.cancel()
+                    await asyncio.gather(*drain_tasks, return_exceptions=True)
+                    task = self._run_task
+                    if task is not None:
+                        if not self._connected.is_set():
+                            task.cancel()
+                        try:
+                            await asyncio.shield(task)
+                        except asyncio.CancelledError:
+                            if asyncio.current_task().cancelling():
+                                raise
+            except TimeoutError:
+                pass
         finally:
             task = self._run_task
             if task is not None and not task.done():

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -37,7 +38,9 @@ class ExternalScribeRealtime(ScribeRealtime):
 
 
 @asynccontextmanager
-async def deepgram_listen_connect(client: Any, **options: Any):
+async def deepgram_listen_connect(
+    client: Any, *, _close_deadline: Callable[[], float] | None = None, **options: Any
+):
     from deepgram.core.api_error import ApiError
     from deepgram.listen.v1.socket_client import AsyncV1SocketClient
 
@@ -69,6 +72,24 @@ async def deepgram_listen_connect(client: Any, **options: Any):
                         else "Unexpected error when initializing websocket connection."
                     ),
                 ) from exc
+
+        async def close(self, *args: Any, **kwargs: Any) -> None:
+            try:
+                if not asyncio.current_task().cancelling():
+                    if _close_deadline is None:
+                        await super().close(*args, **kwargs)
+                    else:
+                        async with asyncio.timeout_at(_close_deadline()):
+                            await super().close(*args, **kwargs)
+            except TimeoutError:
+                pass
+            finally:
+                if not self.connection_lost_waiter.done():
+                    self.transport.abort()
+                await self.wait_closed()
+                task = self.keepalive_task
+                if task is not None and task is not asyncio.current_task():
+                    await asyncio.gather(task, return_exceptions=True)
 
     async with network_clients.external_websocket_connect(
         url + f"?{query}", additional_headers=headers, create_connection=DeepgramConnection

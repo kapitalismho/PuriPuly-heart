@@ -15,6 +15,9 @@ from deepgram import AsyncDeepgramClient
 from deepgram.environment import DeepgramClientEnvironment
 from websockets.asyncio.server import serve
 from websockets.exceptions import InvalidStatus
+from websockets.frames import Frame, Opcode
+from websockets.protocol import State
+from websockets.server import ServerProtocol
 
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.error_messages import format_error_report_for_log, stt_failure_report
@@ -505,3 +508,161 @@ async def test_deepgram_real_tls_duplex_legacy_results_finalize_and_stop(
             await session.close()
     assert len(created_http_clients) == 1
     assert not any(task.get_name().startswith("deepgram") for task in asyncio.all_tasks())
+
+
+@asynccontextmanager
+async def unanswered_deepgram_peer(context):
+    close_received = asyncio.Event()
+    disconnected = asyncio.Event()
+    media = asyncio.Queue()
+    tasks = set()
+    writers = set()
+
+    async def handle(reader, writer):
+        writers.add(writer)
+        protocol = ServerProtocol()
+        try:
+            protocol.receive_data(await reader.readuntil(b"\r\n\r\n"))
+            request, = protocol.events_received()
+            protocol.send_response(protocol.accept(request))
+            for data in protocol.data_to_send():
+                writer.write(data)
+            await writer.drain()
+            while True:
+                try:
+                    data = await reader.read(65536)
+                except ConnectionResetError:
+                    disconnected.set()
+                    return
+                if not data:
+                    disconnected.set()
+                    return
+                protocol.receive_data(data)
+                for event in protocol.events_received():
+                    if isinstance(event, Frame):
+                        if event.opcode == Opcode.CLOSE:
+                            close_received.set()
+                        elif event.opcode == Opcode.BINARY:
+                            media.put_nowait(event.data)
+                protocol.data_to_send()
+        finally:
+            writers.discard(writer)
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except ConnectionResetError:
+                pass
+
+    def accept(reader, writer):
+        task = asyncio.create_task(handle(reader, writer))
+        tasks.add(task)
+        task.add_done_callback(tasks.discard)
+
+    server = await asyncio.start_server(accept, "::1", 0, ssl=context)
+    try:
+        yield server.sockets[0].getsockname()[1], close_received, disconnected, media
+    finally:
+        server.close()
+        await server.wait_closed()
+        for writer in tuple(writers):
+            writer.transport.abort()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("writer_blocked", [False, True], ids=["closing", "blocked-writer"])
+@pytest.mark.parametrize("cancel", [False, True], ids=["deadline", "caller-cancel"])
+async def test_deepgram_unanswered_close_terminates_real_transport_within_owner_budget(
+    certificates, monkeypatch: pytest.MonkeyPatch, created_http_clients,
+    writer_blocked, cancel,
+):
+    from deepgram.listen.v1.socket_client import AsyncV1SocketClient
+
+    root, _, contexts = certificates
+    monkeypatch.setenv("SSL_CERT_FILE", str(root))
+    connectors = []
+    original_connect = network_clients.external_websocket_connect
+
+    def connect(*args, **kwargs):
+        connector = original_connect(*args, **kwargs)
+        connectors.append(connector)
+        return connector
+
+    monkeypatch.setattr(network_clients, "external_websocket_connect", connect)
+    async with unanswered_deepgram_peer(contexts["valid"]) as (
+        port, close_received, disconnected, media,
+    ):
+        local_sdk_client(monkeypatch, f"wss://localhost:{port}")
+        session = await asyncio.wait_for(
+            DeepgramRealtimeSTTBackend(api_key="synthetic-key", language="en").open_session(), 2
+        )
+        protocol = connectors[0].connection
+        writes = []
+        closing = None
+        try:
+            await session.send_audio(b"first")
+            assert await asyncio.wait_for(media.get(), 1) == b"first"
+            if writer_blocked:
+                original_send = AsyncV1SocketClient.send_media
+                write_started = asyncio.Event()
+                release_write = asyncio.Event()
+
+                async def send_media(client, message):
+                    write_started.set()
+                    await release_write.wait()
+                    await original_send(client, message)
+
+                monkeypatch.setattr(AsyncV1SocketClient, "send_media", send_media)
+                writes.append(asyncio.create_task(session._write_payload(b"blocked")))
+                await asyncio.wait_for(write_started.wait(), 1)
+                writes.append(asyncio.create_task(session._write_payload(b"pending")))
+                await asyncio.sleep(0)
+            started = time.monotonic()
+            closing = asyncio.create_task(session.close())
+            if cancel:
+                if not writer_blocked:
+                    await asyncio.wait_for(close_received.wait(), 1)
+                await asyncio.sleep(0.05)
+                closing.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await asyncio.wait_for(closing, 1)
+            else:
+                await asyncio.wait_for(closing, 5.5)
+            elapsed = time.monotonic() - started
+            assert elapsed < (1.0 if cancel else 5.5)
+            if not cancel and not writer_blocked:
+                assert elapsed >= 4.5
+                assert close_received.is_set()
+            await asyncio.wait_for(disconnected.wait(), 1)
+            assert protocol.state is State.CLOSED
+            assert protocol.transport.is_closing()
+            assert protocol.connection_lost_waiter.done()
+            assert protocol.keepalive_task is not None
+            assert protocol.keepalive_task.done()
+            assert all(client.is_closed for client in created_http_clients)
+            assert session._run_task is None
+            assert all(
+                task.done() for task in
+                (session._send_task, session._recv_task, session._keepalive_task)
+            )
+            if writes:
+                results = await asyncio.wait_for(
+                    asyncio.gather(*writes, return_exceptions=True), 1
+                )
+                assert all(isinstance(result, RuntimeError) for result in results)
+                assert media.empty()
+            print(json.dumps({
+                "mode": "blocked-writer" if writer_blocked else "closing",
+                "cancelled": cancel, "elapsed_s": elapsed,
+                "peer_disconnected": disconnected.is_set(),
+                "protocol": protocol.state.name,
+                "websocket_keepalive_done": protocol.keepalive_task.done(),
+                "http_clients_closed": all(client.is_closed for client in created_http_clients),
+            }))
+        finally:
+            if closing is not None and not closing.done():
+                closing.cancel()
+                await asyncio.gather(closing, return_exceptions=True)
+            await session.close()
+            if writes:
+                await asyncio.gather(*writes, return_exceptions=True)
