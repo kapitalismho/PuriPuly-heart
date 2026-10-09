@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from typing import Mapping, Protocol
 from uuid import UUID
 
-import httpx
-
+from puripuly_heart.core import network_clients
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.llm.latency import current_attempt
+from puripuly_heart.core.network_requests import ExternalRequestsSession
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
@@ -198,7 +198,7 @@ class QwenLLMProvider:
         if _is_qwen_compatible_model(model):
             compatible_base_url = _to_compatible_base_url(base_url)
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with network_clients.external_async_client(timeout=10.0) as client:
                     response = await client.post(
                         f"{compatible_base_url}/chat/completions",
                         headers={
@@ -223,12 +223,14 @@ class QwenLLMProvider:
                 try:
                     dashscope.api_key = api_key
                     dashscope.base_http_api_url = base_url
-                    response = dashscope.Generation.call(
-                        model=model,
-                        messages=[{"role": "user", "content": "ping"}],
-                        max_tokens=1,
-                        result_format="message",
-                    )
+                    with ExternalRequestsSession() as session:
+                        response = dashscope.Generation.call(
+                            model=model,
+                            messages=[{"role": "user", "content": "ping"}],
+                            max_tokens=1,
+                            result_format="message",
+                            session=session,
+                        )
                     return response.status_code == 200
                 except Exception:
                     return False
@@ -318,15 +320,15 @@ class DashScopeQwenClient:
                 if observation is not None:
                     observation.transport = "http_json"
                     observation.mark_sent()
-                response = httpx.post(
-                    f"{compatible_base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=compatible_body,
-                    timeout=30.0,
-                )
+                with network_clients.external_client(timeout=30.0) as client:
+                    response = client.post(
+                        f"{compatible_base_url}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json=compatible_body,
+                    )
                 if response.status_code != 200:
                     error_message = ""
                     with contextlib.suppress(Exception):
@@ -369,7 +371,8 @@ class DashScopeQwenClient:
             if observation is not None:
                 observation.transport = "sdk_json"
                 observation.mark_sent()
-            response = dashscope.Generation.call(**call_kwargs)
+            with ExternalRequestsSession() as session:
+                response = dashscope.Generation.call(**call_kwargs, session=session)
             if observation is not None:
                 observation.record_openai_response(response)
                 usage = getattr(response, "usage", None)

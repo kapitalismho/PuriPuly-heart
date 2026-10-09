@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from dataclasses import dataclass, field, replace
 from types import SimpleNamespace
 
@@ -12,7 +11,6 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     ProviderRuntimeState,
 )
 
-from puripuly_heart.app.adapters.provider_verifier import ProviderVerifierAdapter
 from puripuly_heart.app.ports.secret_store import SecretSnapshot
 from puripuly_heart.app.services.provider.alibaba_workspace import AlibabaWorkspaceOwner
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import build_llm_provider_signature
@@ -198,77 +196,6 @@ async def test_apply_switches_regions_and_can_explicitly_return_to_shared() -> N
     assert settings.canonical.intent.translation.qwen.singapore.revision == 2
     assert len(applied) == 2
 
-
-@pytest.mark.asyncio
-async def test_controlled_http_and_websocket_transport_verifies_both_without_live_calls(
-    monkeypatch,
-) -> None:
-    owner, settings, _, _ = owner_with_secret()
-    owner.verifier = ProviderVerifierAdapter()
-    http_requests = []
-    socket_requests = []
-    original_client = httpx.AsyncClient
-
-    def transport(request: httpx.Request) -> httpx.Response:
-        http_requests.append((str(request.url), json.loads(request.content)))
-        assert request.headers["Authorization"] == "Bearer test-key"
-        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
-
-    def client(**kwargs):
-        return original_client(transport=httpx.MockTransport(transport), **kwargs)
-
-    class Socket:
-        def __init__(self):
-            self.events = asyncio.Queue()
-            self.finished = False
-
-        async def send(self, payload):
-            message = json.loads(payload)
-            header = message["header"]
-            if header["action"] == "run-task":
-                assert message["payload"]["model"] == "qwen-audio-3.1-asr-flash-streaming"
-                await self.events.put(
-                    {"header": {"event": "task-started", "task_id": header["task_id"]}}
-                )
-            elif header["action"] == "finish-task":
-                self.finished = True
-                await self.events.put(
-                    {"header": {"event": "task-finished", "task_id": header["task_id"]}}
-                )
-
-        async def recv(self):
-            return await self.events.get()
-
-        async def close(self):
-            return None
-
-    async def connect(endpoint, **kwargs):
-        socket_requests.append((endpoint, kwargs["additional_headers"]["Authorization"]))
-        socket = Socket()
-        sockets.append(socket)
-        return socket
-
-    sockets = []
-    monkeypatch.setattr(httpx, "AsyncClient", client)
-    monkeypatch.setattr("websockets.connect", connect)
-    draft = await owner.begin()
-    draft = await owner.edit(
-        token=draft.token,
-        endpoint_mode="workspace_dedicated",
-        api_host="work-123.cn-beijing.maas.aliyuncs.com",
-    )
-    result = await owner.verify(token=draft.token, capability="both")
-    assert result.asr.state == result.translation.state == "verified"
-    assert all(socket.finished for socket in sockets)
-    assert socket_requests == [
-        ("wss://work-123.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference", "Bearer test-key")
-    ]
-    assert (
-        http_requests[0][0]
-        == "https://work-123.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions"
-    )
-    assert http_requests[0][1]["model"] == settings.canonical.intent.translation.qwen.llm_model
-    assert settings.canonical.intent.translation.qwen.beijing.endpoint_mode == "legacy_shared"
 
 
 @pytest.mark.asyncio

@@ -134,7 +134,7 @@ async def test_actual_adapter_reuses_one_epoch_for_final_and_empty(
     async def deepgram_write(session: _DeepgramSDKSession, payload: object) -> None:
         deepgram_writes.append((session, payload))
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", deepgram_write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", deepgram_write)
 
     async def open_member(epoch: str):
         if member is STTProviderName.DEEPGRAM:
@@ -701,7 +701,7 @@ async def test_rolling_connection_lifetime_follows_selected_provider(
     async def deepgram_write(session, payload):
         return None
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", deepgram_write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", deepgram_write)
 
     async def open_member(epoch):
         if member is STTProviderName.GEMINI_TRANSCRIBE:

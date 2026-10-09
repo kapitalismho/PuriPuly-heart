@@ -37,6 +37,12 @@ from puripuly_heart.core.messages import (
     UserErrorReport,
     UserMessageRef,
 )
+from puripuly_heart.core.network_diagnostics import (
+    TRANSPORT_FIELD_KEYS,
+    classify_transport_error,
+    safe_transport_fields,
+    transport_exception_chain,
+)
 from puripuly_heart.core.openrouter.authentication import (
     OpenRouterAuthenticationError,
     OpenRouterAuthStage,
@@ -109,7 +115,11 @@ def openrouter_auth_failure_report(
             content_policy=CONTENT_POLICY_METADATA_ONLY,
             status_code=failure.status_code,
             retry_after_ms=None,
-            fields={"provider": "openrouter", "exception_type": failure.exception_type},
+            fields={
+                "provider": "openrouter",
+                "exception_type": failure.exception_type,
+                **safe_transport_fields(failure),
+            },
         ),
     )
 
@@ -162,6 +172,7 @@ def format_error_report_for_log(
         "managed_code",
         "managed_error_class",
         "managed_subcode",
+        *TRANSPORT_FIELD_KEYS,
     ):
         value = diagnostics.fields.get(key)
         if value is not None:
@@ -353,6 +364,8 @@ def _failure_report(
     fields: dict[str, DiagnosticFieldValue] = dict(extra_fields)
     fields["exception_type"] = type(exc).__name__ if exc is not None else "UnknownError"
     fields["provider"] = provider_label
+    if exc is not None:
+        fields.update(safe_transport_fields(exc))
     fields.update(_managed_diagnostic_fields(exc))
     fields.update(shared_fields)
     return UserErrorReport(
@@ -460,6 +473,11 @@ def _classify_failure(
         if explicit_category in DIAGNOSTIC_CATEGORIES:
             return explicit_category
 
+    transport = classify_transport_error(exc) if exc is not None else None
+    if transport == "timeout":
+        return DIAGNOSTIC_CATEGORY_TIMEOUT
+    if transport is not None:
+        return DIAGNOSTIC_CATEGORY_NETWORK
     if _is_timeout_exception(exc) or "timeout" in text or "timed out" in text:
         return DIAGNOSTIC_CATEGORY_TIMEOUT
     if isinstance(exc, ConnectionError | OSError) or any(
@@ -570,13 +588,7 @@ def _exception_text_for_classification(exc: BaseException) -> str:
 
 
 def _exception_chain(exc: BaseException | None) -> Iterator[BaseException]:
-    seen: set[int] = set()
-    current = exc
-    while current is not None and id(current) not in seen:
-        seen.add(id(current))
-        yield current
-        cause = current.__cause__
-        current = cause if cause is not None else current.__context__
+    yield from transport_exception_chain(exc)
 
 
 def _is_timeout_exception(exc: BaseException | None) -> bool:

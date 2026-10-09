@@ -152,7 +152,6 @@ def _deepgram_session(
             provider_epoch_id=epoch or f"epoch-{order}",
         ),
     )
-    session._loop = asyncio.get_running_loop()
     return session
 
 
@@ -163,7 +162,7 @@ async def test_non_soniox_provider_does_not_add_audio_at_listen_hard_boundary(mo
     async def write(_session, payload) -> None:
         writes.append(payload)
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     session = _deepgram_session()
     request = _request("deepgram")
     await session.begin_turn(request)
@@ -191,7 +190,7 @@ async def test_deepgram_actual_result_shape_reuses_acknowledged_epoch_and_detect
         writes.append((session, payload))
         await gate.wait()
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     session = _deepgram_session()
     assert session._audio_q.maxsize == 258
     request_a = _request("deepgram")
@@ -272,7 +271,7 @@ async def test_deepgram_empty_error_abort_and_two_drain_path(monkeypatch) -> Non
     async def write(_session, payload) -> None:
         writes.append(payload)
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     empty = _deepgram_session()
     request = _request("deepgram")
     await empty.begin_turn(request)
@@ -948,7 +947,6 @@ def _deepgram_engine(
             drain_timeout_s=0.2,
             projection=STTSessionProjection("scoped", provider_epoch_id),
         )
-        session._loop = asyncio.get_running_loop()
         sessions.append(session)
         return session
 
@@ -981,7 +979,7 @@ async def test_shared_engine_real_owner_and_deepgram_adapter_serve_both_clients(
         writes.append((session, payload))
         await write_gate.wait()
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     peer_sessions: list[_DeepgramSDKSession] = []
     self_sessions: list[_DeepgramSDKSession] = []
     peer_events: list[object] = []
@@ -1074,7 +1072,7 @@ async def test_two_scoped_deepgram_clients_isolate_abort_and_native_late_result(
     async def write(_session: _DeepgramSDKSession, _payload: object) -> None:
         return None
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     peer_sessions: list[_DeepgramSDKSession] = []
     self_sessions: list[_DeepgramSDKSession] = []
     peer_events: list[object] = []
@@ -1117,6 +1115,7 @@ async def test_two_scoped_deepgram_clients_isolate_abort_and_native_late_result(
         _deepgram_result("", from_finalize=True, is_final=False)
     )
     await peer_end_task
+    await _wait(lambda: any(isinstance(event, STTProviderTurnTerminal) for event in peer_events))
 
     assert [
         (event.outcome, event.failure_reason)
@@ -1137,7 +1136,7 @@ async def test_scoped_configuration_handoff_is_channel_local_with_concrete_adapt
     async def write(_session: _DeepgramSDKSession, _payload: object) -> None:
         return None
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     peer_sessions: list[_DeepgramSDKSession] = []
     old_self_sessions: list[_DeepgramSDKSession] = []
     new_self_sessions: list[_DeepgramSDKSession] = []
@@ -1194,6 +1193,7 @@ async def test_scoped_configuration_handoff_is_channel_local_with_concrete_adapt
     peer_session._build_transcript_event(_deepgram_result("peer-survived"))
     peer_session._build_transcript_event(_deepgram_result("", from_finalize=True, is_final=False))
     await peer_end_task
+    await _wait(lambda: any(isinstance(event, STTProviderTurnTerminal) for event in peer_events))
     assert [event.text for event in self_events if isinstance(event, STTProviderTurnTerminal)] == [
         "new-self"
     ]
@@ -1217,7 +1217,7 @@ async def test_each_concrete_streaming_protocol_serves_self_and_peer_concurrentl
     async def deepgram_write(_session, _payload) -> None:
         return None
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", deepgram_write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", deepgram_write)
     sessions: list[object] = []
     native_boundaries: list[object | None] = []
     for order in (1, 2):

@@ -29,6 +29,7 @@ from puripuly_heart.app.services.openrouter_pkce_flow import (
 )
 from puripuly_heart.config.provider_values import OpenRouterSelectionAlias
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core import network_clients
 from puripuly_heart.core.diagnostic_validation import validate_diagnostics_for_sink
 from puripuly_heart.core.error_messages import (
     format_error_report_for_log,
@@ -48,10 +49,10 @@ UNSAFE = f"https://user:proxy-password@host/path?code={SECRET} body={SECRET}"
 def install_response(monkeypatch: pytest.MonkeyPatch, response: httpx.Response) -> None:
     real_client = httpx.AsyncClient
     monkeypatch.setattr(
-        httpx,
-        "AsyncClient",
+        network_clients,
+        "external_async_client",
         lambda **kwargs: real_client(
-            **kwargs, transport=httpx.MockTransport(lambda _request: response), trust_env=False
+            **{**kwargs, "transport": httpx.MockTransport(lambda _request: response), "trust_env": False}
         ),
     )
 
@@ -139,7 +140,7 @@ async def test_transport_and_client_setup_failures_are_not_credential_rejection(
     def fail(**_kwargs: object) -> None:
         raise exception
 
-    monkeypatch.setattr(httpx, "AsyncClient", fail)
+    monkeypatch.setattr(network_clients, "external_async_client", fail)
     with pytest.raises(OpenRouterAuthenticationError) as caught:
         await OpenRouterLLMProvider.verify_api_key(SECRET)
     failure = caught.value
@@ -421,3 +422,78 @@ async def test_unsuccessful_browser_launch_is_reported_without_callback_wait_or_
     assert flow.active_client is None
     assert flow.get_runtime().active_task_names == ()
     assert not (tmp_path / "settings.json").exists()
+
+
+@pytest.mark.asyncio
+async def test_tls_codes_survive_real_auth_normalization_and_persisted_log_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import io
+    import logging
+    from logging.handlers import RotatingFileHandler
+    from uuid import uuid4
+
+    from puripuly_heart.app.services.application_runtime_logging import (
+        ApplicationRuntimeLoggingOwner,
+    )
+    from puripuly_heart.core.error_messages import provider_failure_report
+    from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
+
+    log_file = tmp_path / "transport.log"
+    file_handler = RotatingFileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(message)s"))
+    root = logging.getLogger(f"test.transport.root.{uuid4()}")
+    root.propagate = False
+    session = logging.getLogger(f"test.transport.session.{uuid4()}")
+    session.propagate = False
+    service = SessionRuntimeLoggingService(
+        root_logger=root,
+        session_logger=session,
+        sinks=SimpleNamespace(
+            stream_handler=logging.StreamHandler(io.StringIO()),
+            file_handler=file_handler,
+            log_file=log_file,
+        ),
+    )
+    owner = ApplicationRuntimeLoggingOwner(
+        presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
+        service_factory=lambda: service,
+        fallback_logger=root,
+    )
+    try:
+        for code in (20, 62):
+            cause = ssl.SSLCertVerificationError(1, UNSAFE)
+            cause.verify_code = code
+            failure = httpx.ConnectError(UNSAFE)
+            failure.__cause__ = cause
+            failure.connection_diagnostics = {
+                "transport": "https", "tls_source": "windows",
+                "proxy_source": "direct", "tls_backend": "native",
+                "proxy_url": UNSAFE,
+            }
+
+            def fail(**_kwargs: object) -> None:
+                raise failure
+
+            monkeypatch.setattr(network_clients, "external_async_client", fail)
+            with pytest.raises(OpenRouterAuthenticationError) as caught:
+                await OpenRouterLLMProvider.verify_api_key(SECRET)
+            normalized = caught.value
+            normalized.__cause__ = normalized.__context__ = None
+            for report in (
+                openrouter_auth_failure_report(normalized, stage="key_verification"),
+                provider_failure_report(normalized, provider="openrouter", operation="translate"),
+            ):
+                assert report.diagnostics.fields["tls_verify_code"] == code
+                owner.emit_basic(format_error_report_for_log(report))
+    finally:
+        service.close()
+        file_handler.close()
+    persisted = log_file.read_text(encoding="utf-8")
+    assert persisted.count("tls_verify_code=20") == 2
+    assert persisted.count("tls_verify_code=62") == 2
+    assert "tls_backend=native" in persisted
+    assert "tls_source=windows" in persisted
+    assert "os_errno=1" not in persisted
+    assert SECRET not in persisted
+    assert "proxy-password" not in persisted

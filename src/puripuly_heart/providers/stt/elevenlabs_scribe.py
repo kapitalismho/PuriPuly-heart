@@ -110,7 +110,6 @@ async def verify_scribe_realtime_connection(
         CommitStrategy,
         RealtimeAudioOptions,
         RealtimeEvents,
-        ScribeRealtime,
     )
 
     if not api_key:
@@ -139,7 +138,9 @@ async def verify_scribe_realtime_connection(
                 scribe_connect_factory(options), timeout=connect_timeout_s
             )
         else:
-            scribe = ScribeRealtime(api_key=api_key)
+            from .sdk_network import ExternalScribeRealtime
+
+            scribe = ExternalScribeRealtime(api_key=api_key)
             connection = await asyncio.wait_for(scribe.connect(options), timeout=connect_timeout_s)
     except (asyncio.TimeoutError, TimeoutError) as exc:
         raise TimeoutError(
@@ -290,7 +291,6 @@ class _ElevenLabsScribeSession(STTBackendSession):
             CommitStrategy,
             RealtimeAudioOptions,
             RealtimeEvents,
-            ScribeRealtime,
         )
 
         options = RealtimeAudioOptions(
@@ -306,7 +306,9 @@ class _ElevenLabsScribeSession(STTBackendSession):
                 self.scribe_connect_factory(options), timeout=self.connect_timeout_s
             )
         else:
-            scribe = ScribeRealtime(api_key=self.api_key)
+            from .sdk_network import ExternalScribeRealtime
+
+            scribe = ExternalScribeRealtime(api_key=self.api_key)
             connection = await asyncio.wait_for(
                 scribe.connect(options), timeout=self.connect_timeout_s
             )

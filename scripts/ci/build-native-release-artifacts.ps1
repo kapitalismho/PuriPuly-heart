@@ -216,10 +216,8 @@ try {
     )
     Invoke-Checked -FilePath $ToolPython -ArgumentList @("-c", $metadataCheck, $appVersion, $installerPath)
     $hash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    "$hash  $([System.IO.Path]::GetFileName($installerPath))" | Set-Content -LiteralPath "$installerPath.sha256" -Encoding ascii
-    Copy-Item -LiteralPath (Join-Path $BuildRoot "soxr-release-inputs\PuriPulyHeart-soxr-third-party-source-bundle.zip") -Destination $InstallerOutputDir -Force
     Write-Host "Native installer: $installerPath"
-    Write-Host "SHA256: $installerPath.sha256"
+    Write-Host "SHA256: $hash"
     Write-Host "Build evidence: $evidenceRoot"
 } finally {
     Pop-Location

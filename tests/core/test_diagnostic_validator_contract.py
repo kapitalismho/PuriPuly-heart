@@ -574,3 +574,26 @@ def test_conversation_text_preserves_language_but_redacts_secrets_and_bounds_siz
     assert oversized.text.endswith("…[truncated]")
     assert len(oversized.text) < 5000
     assert oversized.redacted is True
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("transport", "https://injected-user:password@host"),
+        ("tls_source", "C:/Users/private/certificate.pem"),
+        ("tls_backend", "injected-secret"),
+        ("proxy_source", "injected-secret"),
+        ("tls_verify_code", True),
+        ("os_errno", "injected-secret"),
+        ("winerror", 1.5),
+    ],
+)
+def test_transport_metadata_requires_allowlisted_enums_and_integer_codes(
+    key: str, value: object
+) -> None:
+    result = _validator().validate_diagnostics_for_sink(
+        _diagnostics(fields={key: value}),
+        "persisted_logs",
+    )
+    assert result.status == "rejected"
+    assert result.diagnostics is None

@@ -110,26 +110,5 @@ class RecordingOscQueue:
         self.process_due_calls += 1
 
 
-class _BaseThreadStub:
-    def __init__(self, target=None, name=None, daemon=None):
-        _ = (name, daemon)
-        self._target = target
-
-    def join(self, timeout=None):
-        _ = timeout
-        return None
-
-
-class TargetThread(_BaseThreadStub):
-    def start(self):
-        if self._target:
-            self._target()
-
-
-class NoopThread(_BaseThreadStub):
-    def start(self):
-        return None
-
-
 def samples(value: float, n: int = 512) -> np.ndarray:
     return np.full((n,), value, dtype=np.float32)

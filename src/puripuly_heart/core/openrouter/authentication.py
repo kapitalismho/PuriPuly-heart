@@ -7,6 +7,11 @@ from typing import Literal
 import httpx
 
 from puripuly_heart.core.messages import DiagnosticCategory
+from puripuly_heart.core.network_diagnostics import (
+    classify_transport_error,
+    safe_transport_fields,
+    transport_exception_chain,
+)
 
 OpenRouterAuthStage = Literal[
     "listener_start",
@@ -71,6 +76,7 @@ class OpenRouterAuthenticationError(RuntimeError):
         self.diagnostic_category = _CATEGORIES[reason]
         self.message_key = f"error.openrouter_auth.{reason}"
         super().__init__(self.message_key)
+        self.diagnostic_transport_fields = safe_transport_fields(self)
 
     @classmethod
     def from_status(
@@ -98,30 +104,28 @@ class OpenRouterAuthenticationError(RuntimeError):
         if isinstance(exc, cls):
             return exc
         if isinstance(exc, httpx.HTTPStatusError):
-            return cls.from_status(exc.response.status_code, stage=stage)
-        chain: list[BaseException] = []
-        current: BaseException | None = exc
-        while current is not None and all(current is not item for item in chain):
-            chain.append(current)
-            current = current.__cause__ if current.__cause__ is not None else current.__context__
-        reason: OpenRouterAuthReason = "unknown"
-        classified = exc
-        for item in chain:
-            if isinstance(item, ssl.SSLError):
-                reason, classified = "tls", item
-                break
-            if isinstance(item, httpx.ProxyError):
-                reason, classified = "proxy", item
-                break
-        if reason == "unknown":
-            if any(isinstance(item, (TimeoutError, httpx.TimeoutException)) for item in chain):
-                reason = "callback_timeout" if stage == "callback_wait" else "timeout"
-            elif stage in ("listener_start", "browser_launch", "settings_commit"):
+            failure = cls.from_status(exc.response.status_code, stage=stage)
+            failure.diagnostic_transport_fields = safe_transport_fields(exc)
+            return failure
+        transport = classify_transport_error(exc)
+        reason: OpenRouterAuthReason = transport or "unknown"
+        classified = next(
+            (
+                item
+                for item in transport_exception_chain(exc)
+                if isinstance(item, (ssl.SSLError, httpx.ProxyError))
+            ),
+            exc,
+        )
+        if transport == "timeout":
+            reason = "callback_timeout" if stage == "callback_wait" else "timeout"
+        elif transport not in ("tls", "proxy"):
+            if stage in ("listener_start", "browser_launch", "settings_commit"):
                 reason = "setup"
             elif isinstance(
                 exc, (ImportError, ValueError, FileNotFoundError, PermissionError, httpx.InvalidURL)
             ):
                 reason = "setup"
-            elif isinstance(exc, (httpx.TransportError, ConnectionError, OSError)):
-                reason = "network"
-        return cls(stage=stage, reason=reason, exception_type=type(classified).__name__)
+        failure = cls(stage=stage, reason=reason, exception_type=type(classified).__name__)
+        failure.diagnostic_transport_fields = safe_transport_fields(exc)
+        return failure

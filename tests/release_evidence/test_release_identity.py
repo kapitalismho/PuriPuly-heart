@@ -47,10 +47,7 @@ def test_release_surface_accepts_matching_tag_title_body_and_assets() -> None:
             title=TAG,
             installer_exe=INSTALLER_EXE,
             body_text=body,
-            asset_names=[
-                INSTALLER_EXE,
-                "PuriPulyHeart-soxr-third-party-source-bundle.zip",
-            ],
+            asset_names=[INSTALLER_EXE],
         )
         == INSTALLER_EXE
     )
@@ -86,14 +83,28 @@ def test_release_surface_rejects_disagreeing_title_body_and_asset_selection() ->
             body_text="Download the installer below.",
             asset_names=[INSTALLER_EXE],
         )
-    with pytest.raises(RuntimeError, match="do not include"):
+
+
+@pytest.mark.parametrize(
+    "asset_names",
+    [
+        [],
+        ["PuriPulyHeart-soxr-third-party-source-bundle.zip"],
+        [INSTALLER_EXE, f"{INSTALLER_EXE}.sha256"],
+        [INSTALLER_EXE, "PuriPulyHeart-soxr-third-party-source-bundle.zip"],
+        [INSTALLER_EXE, "release-provenance-2.6.1.json"],
+        [INSTALLER_EXE, INSTALLER_EXE],
+    ],
+)
+def test_release_surface_rejects_missing_extra_and_duplicate_assets(asset_names) -> None:
+    with pytest.raises(RuntimeError):
         identity.verify_release_surface(
             version=VERSION,
             tag=TAG,
             title=TAG,
             installer_exe=INSTALLER_EXE,
-            body_text=body,
-            asset_names=["PuriPulyHeart-soxr-third-party-source-bundle.zip"],
+            body_text=f"Download `{INSTALLER_EXE}` below.",
+            asset_names=asset_names,
         )
 
 
@@ -144,6 +155,50 @@ def test_native_release_surface_and_provenance_round_trip(tmp_path) -> None:
         == installer.name
     )
     identity.verify_assets_against_provenance(reloaded, [installer])
+
+
+@pytest.mark.parametrize("mutation", ["bytes", "version", "tag", "unrecorded"])
+def test_publish_rejects_detached_inline_provenance(tmp_path, mutation) -> None:
+    installer = tmp_path / INSTALLER_EXE
+    installer.write_bytes(b"native-installer")
+    body = tmp_path / "body.md"
+    body.write_text(f"Download `{INSTALLER_EXE}` below.", encoding="utf-8")
+    provenance = identity.build_provenance(
+        version=VERSION,
+        tag=TAG,
+        source_sha=SOURCE_SHA,
+        build_origin="local",
+        artifacts=_artifact_entries([installer]),
+    )
+    if mutation == "bytes":
+        installer.write_bytes(b"NATIVE-INSTALLER")
+    elif mutation == "version":
+        provenance["version"] = "2.8.2"
+    elif mutation == "tag":
+        provenance["tag"] = "v2.8.2"
+    else:
+        provenance["artifacts"][0]["filename"] = "other.exe"
+
+    with pytest.raises(RuntimeError):
+        identity.main(
+            [
+                "verify-publish",
+                "--version",
+                VERSION,
+                "--tag",
+                TAG,
+                "--title",
+                TAG,
+                "--installer-exe",
+                INSTALLER_EXE,
+                "--body",
+                str(body),
+                "--asset",
+                str(installer),
+                "--provenance-json",
+                json.dumps(provenance),
+            ]
+        )
 
 
 @pytest.mark.parametrize("tag", ["native-v2.8.0", "v2.8.1", "2.8.0", "V2.8.0"])

@@ -62,7 +62,6 @@ def _session(*, drain_timeout_s: float = 1.0) -> _DeepgramSDKSession:
         drain_timeout_s=drain_timeout_s,
         projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch"),
     )
-    session._loop = asyncio.get_running_loop()
     return session
 
 
@@ -135,7 +134,7 @@ async def test_acknowledged_turns_reuse_one_session_for_identical_and_empty_resu
     async def write(_session: _DeepgramSDKSession, payload: object) -> None:
         writes.append(payload)
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     session = _session()
 
     for order, metadata_ack in ((1, False), (2, True)):
@@ -203,7 +202,7 @@ async def test_installed_empty_alternatives_finalize_ack_is_authoritative_empty_
     async def write(_session: _DeepgramSDKSession, payload: object) -> None:
         writes.append(payload)
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     session = _session(drain_timeout_s=0.001)
     request = _request(1)
     await session.begin_turn(request)
@@ -259,7 +258,7 @@ async def test_final_fragment_waits_for_ack_and_close_fallback_is_irreversible(
             close_started.set()
             await release_close.wait()
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     session = _session(drain_timeout_s=0.001)
     request = _request(1)
     await session.begin_turn(request)
@@ -303,7 +302,7 @@ async def test_close_cancels_blocked_close_stream_drain_task(
             close_stream_started.set()
             await blocked.wait()
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     session = _session(drain_timeout_s=0.001)
     request = _request(1)
     await session.begin_turn(request)
@@ -345,7 +344,7 @@ async def test_callback_captured_for_old_turn_is_rejected_after_reuse(
     async def write(_session: _DeepgramSDKSession, _payload: object) -> None:
         return None
 
-    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     session = _session()
     first = _request(1)
     await session.begin_turn(first)

@@ -1264,6 +1264,13 @@ def render_template(
     (runner_root / "native_layout.generated.h").write_text(
         layout.render_cpp_header(), encoding="utf-8", newline="\n"
     )
+    cmake_path = runner_root.parent / "CMakeLists.txt"
+    cmake = cmake_path.read_text(encoding="utf-8").replace(
+        "include(flutter/generated_plugins.cmake)",
+        "set(CMAKE_DISABLE_FIND_PACKAGE_JNI TRUE)\ninclude(flutter/generated_plugins.cmake)",
+        1,
+    )
+    cmake_path.write_text(cmake, encoding="utf-8", newline="\n")
     lib_root = template_root / "{{cookiecutter.out_dir}}" / "lib"
     bootstrap = python_bootstrap_path.read_text(encoding="utf-8")
     dart_bootstrap = "const pythonScript = r'''\n" + bootstrap + "\n''';\n"

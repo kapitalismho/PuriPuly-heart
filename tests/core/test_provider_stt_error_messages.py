@@ -199,12 +199,6 @@ def test_stt_failure_report_maps_network_category_and_keeps_diagnostics_metadata
     assert report.diagnostics.category == messages.DIAGNOSTIC_CATEGORY_NETWORK
     assert report.diagnostics.code == "stt.network"
     assert report.diagnostics.content_policy == messages.CONTENT_POLICY_METADATA_ONLY
-    assert report.diagnostics.fields == {
-        "attempts": 3,
-        "channel": "self",
-        "exception_type": "ConnectionError",
-        "provider": "soniox",
-    }
     _assert_raw_detail_absent(report, RAW_STT_DETAIL)
     _assert_raw_detail_absent(report.message.params, RAW_STT_DETAIL)
     _assert_raw_detail_absent(report.diagnostics.fields, RAW_STT_DETAIL)

@@ -13,8 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-import httpx
-
+from puripuly_heart.core import network_clients
 from puripuly_heart.core.oauth_callback_page import render_oauth_callback_completion_page
 from puripuly_heart.core.openrouter.authentication import (
     OpenRouterAuthenticationError,
@@ -130,7 +129,7 @@ class OpenRouterPKCEClient:
         code_challenge_method: str,
     ) -> OpenRouterPKCEExchangeResult:
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with network_clients.external_async_client(timeout=15.0) as client:
                 response = await client.post(
                     OPENROUTER_AUTH_EXCHANGE_URL,
                     json={

@@ -2977,7 +2977,7 @@ class DesktopOverlayRenderer:
         timeout_s = max(0.1, self.manifest.startup_deadline_ms / 1000.0)
         try:
             return await asyncio.wait_for(
-                websockets.connect(self.manifest.bridge_url, ping_interval=None),
+                websockets.connect(self.manifest.bridge_url, ping_interval=None, proxy=None),
                 timeout=timeout_s,
             )
         except Exception as exc:

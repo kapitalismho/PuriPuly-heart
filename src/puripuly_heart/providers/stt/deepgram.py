@@ -9,9 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import queue
-import threading
-import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Sequence
 
@@ -81,23 +78,16 @@ class DeepgramRealtimeSTTBackend(STTBackend):
         if not api_key:
             return False
 
-        import urllib.error
-        import urllib.request
+        from puripuly_heart.core import network_clients
 
         def _check():
-            req = urllib.request.Request(
-                "https://api.deepgram.com/v1/projects",
-                headers={"Authorization": f"Token {api_key}"},
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=5) as response:
-                    if response.status == 200:
-                        return True
-                    return False
-            except urllib.error.HTTPError as e:
-                raise Exception(f"HTTP {e.code}: {e.reason}")
-            except Exception as e:
-                raise Exception(f"Connection failed: {e}")
+            with network_clients.external_client(timeout=5, follow_redirects=True) as client:
+                response = client.get(
+                    "https://api.deepgram.com/v1/projects",
+                    headers={"Authorization": f"Token {api_key}"},
+                )
+                response.raise_for_status()
+                return response.status_code == 200
 
         return await asyncio.to_thread(_check)
 
@@ -108,14 +98,13 @@ _CLOSE_STREAM = object()
 
 
 @dataclass(frozen=True, slots=True)
-class _ThreadWrite:
+class _AudioWrite:
     payload: bytes | object
     completion: asyncio.Future[None]
 
 
 @dataclass(slots=True)
 class _DeepgramSDKSession(STTBackendSession):
-    """Internal session using official Deepgram SDK v5 with threading."""
 
     api_key: str
     model: str
@@ -128,11 +117,17 @@ class _DeepgramSDKSession(STTBackendSession):
     projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
 
     _event_projection: STTSessionEventProjection = field(init=False, repr=False)
-    _audio_q: queue.Queue[bytes | object | _ThreadWrite] = field(init=False, repr=False)
-    _thread: threading.Thread | None = field(init=False, default=None, repr=False)
+    _audio_q: asyncio.Queue[bytes | object | _AudioWrite] = field(init=False, repr=False)
+    _run_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _send_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _recv_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _keepalive_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _send_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
     _stopped: bool = field(init=False, default=False)
-    _loop: asyncio.AbstractEventLoop | None = field(init=False, default=None, repr=False)
-    _connected: threading.Event = field(init=False, repr=False)
+    _close_deadline: float | None = field(init=False, default=None, repr=False)
+    _connected: asyncio.Event = field(init=False, default_factory=asyncio.Event, repr=False)
+    _startup_done: asyncio.Event = field(init=False, default_factory=asyncio.Event, repr=False)
+    _startup_error: BaseException | None = field(init=False, default=None, repr=False)
     _error_reported: bool = field(init=False, default=False, repr=False)
     _scoped_fragments: list[str] = field(init=False, default_factory=list, repr=False)
     _scoped_provenance: list[STTNativeProvenance] = field(
@@ -140,11 +135,11 @@ class _DeepgramSDKSession(STTBackendSession):
     )
     _scoped_close_sent: bool = field(init=False, default=False, repr=False)
     _scoped_drain_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _drain_tasks: set[asyncio.Task[None]] = field(init=False, default_factory=set, repr=False)
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
-        self._audio_q = queue.Queue(maxsize=258)
-        self._connected = threading.Event()
+        self._audio_q = asyncio.Queue(maxsize=258)
 
     def _supports_keyterms(self) -> bool:
         return self.model.strip().lower() == _DEEPGRAM_KEYTERM_MODEL
@@ -173,38 +168,18 @@ class _DeepgramSDKSession(STTBackendSession):
             from_finalize=from_finalize,
         )
         if self._event_projection.is_scoped:
-            self._schedule_scoped_result(
+            self._handle_scoped_result(
+                self._event_projection.active_identity,
                 raw_transcript,
-                is_final=bool(is_final),
-                from_finalize=from_finalize,
-                provenance=provenance,
+                bool(is_final),
+                from_finalize,
+                provenance,
             )
         if self._event_projection.is_scoped or not (is_final or speech_final or from_finalize):
             return None
         if not transcript:
             return STTBackendTranscriptEvent(text="", is_final=True)
         return STTBackendTranscriptEvent(text=transcript, is_final=True)
-
-    def _schedule_scoped_result(
-        self,
-        text: str,
-        *,
-        is_final: bool,
-        from_finalize: bool,
-        provenance: STTNativeProvenance,
-    ) -> None:
-        loop = self._loop
-        if loop is None:
-            return
-        identity = self._event_projection.active_identity
-        loop.call_soon_threadsafe(
-            self._handle_scoped_result,
-            identity,
-            text,
-            is_final,
-            from_finalize,
-            provenance,
-        )
 
     def _handle_scoped_result(
         self,
@@ -327,30 +302,32 @@ class _DeepgramSDKSession(STTBackendSession):
         )
 
     async def start(self) -> None:
-        self._loop = asyncio.get_running_loop()
-        self._thread = threading.Thread(target=self._run_sync, name="deepgram-sdk", daemon=True)
-        self._thread.start()
-
-        # Wait for connection to be established
-        connected = await asyncio.to_thread(self._connected.wait, self.connect_timeout_s)
-        if not connected:
-            exc = RuntimeError("Deepgram SDK connection timeout")
-            logger.warning("[STT] Deepgram connection timeout after %.1fs", self.connect_timeout_s)
-            self._report_error(exc)
-            await self.stop()
-            raise exc
-
-    def _run_sync(self) -> None:
-        """Run Deepgram SDK connection in a separate thread."""
+        self._run_task = asyncio.create_task(self._run(), name="deepgram-sdk")
         try:
-            from deepgram import DeepgramClient
+            try:
+                await asyncio.wait_for(self._startup_done.wait(), self.connect_timeout_s)
+            except TimeoutError as cause:
+                exc = RuntimeError("Deepgram SDK connection timeout")
+                logger.warning("[STT] Deepgram connection timeout after %.1fs", self.connect_timeout_s)
+                self._report_error(exc)
+                raise exc from cause
+            if self._startup_error is not None:
+                raise self._startup_error
+            if not self._connected.is_set():
+                raise RuntimeError("Deepgram connection closed")
+        except BaseException:
+            await self.close()
+            raise
+
+    async def _run(self) -> None:
+        try:
+            from deepgram import AsyncDeepgramClient
             from deepgram.core.events import EventType
-            from deepgram.extensions.types.sockets import ListenV1ControlMessage
 
-            # Create client with api_key
-            client = DeepgramClient(api_key=self.api_key)
+            from puripuly_heart.core import network_clients
 
-            # Connect with streaming options using v1.connect() API
+            from .sdk_network import deepgram_listen_connect
+
             connect_kwargs: dict[str, Any] = {
                 "model": self.model,
                 "language": self.language,
@@ -359,16 +336,20 @@ class _DeepgramSDKSession(STTBackendSession):
                 "channels": 1,
                 "interim_results": False,
                 "punctuate": True,
-                "vad_events": False,  # Disabled: using local VAD + Finalize
-                "endpointing": False,  # Disabled: using local VAD for speech boundaries
+                "vad_events": False,
+                "endpointing": False,
             }
             if self.keyterms and self._supports_keyterms():
                 connect_kwargs["keyterm"] = self.keyterms
 
-            with client.listen.v1.connect(
-                **connect_kwargs,
-            ) as connection:
-                # Set up event handlers
+            async with (
+                network_clients.external_async_client() as http_client,
+                deepgram_listen_connect(
+                    AsyncDeepgramClient(api_key=self.api_key, httpx_client=http_client),
+                    _close_deadline=self._begin_close,
+                    **connect_kwargs,
+                ) as connection,
+            ):
                 def on_message(result: Any) -> None:
                     try:
                         event = self._build_transcript_event(result)
@@ -378,129 +359,127 @@ class _DeepgramSDKSession(STTBackendSession):
                         logger.debug("Deepgram parse failed cause=%s", type(exc).__name__)
 
                 def on_error(error: Any) -> None:
-                    logger.warning("Deepgram transport failed")
                     if not self._stopped:
-                        exc = RuntimeError("Deepgram transport failed")
+                        exc = (
+                            error
+                            if isinstance(error, BaseException)
+                            else RuntimeError("Deepgram transport failed")
+                        )
+                        logger.warning("Deepgram transport failed")
                         self._report_error(exc)
-                        if self._loop is not None:
-                            self._loop.call_soon_threadsafe(
-                                self._scoped_transport_end,
-                                False,
-                                "deepgram_transport_error",
-                            )
+                        self._scoped_transport_end(False, "deepgram_transport_error")
                         self._stopped = True
-                        try:
-                            self._audio_q.put_nowait(_STOP)
-                        except Exception:
-                            pass
 
                 def on_close(close_event: Any) -> None:
                     _ = close_event
                     orderly = self._scoped_close_sent or self._stopped
-                    if self._loop is not None:
-                        self._loop.call_soon_threadsafe(
-                            self._scoped_transport_end,
-                            orderly,
-                            "deepgram_connection_closed",
-                        )
-                    if not self._stopped and not self._scoped_close_sent:
+                    self._scoped_transport_end(orderly, "deepgram_connection_closed")
+                    if not orderly:
                         self._report_error(RuntimeError("Deepgram connection closed"))
-                        self._stopped = True
-                        try:
-                            self._audio_q.put_nowait(_STOP)
-                        except Exception:
-                            pass
+                    self._stopped = True
 
                 def on_open(open_event: Any) -> None:
                     _ = open_event
                     self._connected.set()
+                    self._startup_done.set()
 
                 connection.on(EventType.OPEN, on_open)
                 connection.on(EventType.MESSAGE, on_message)
                 connection.on(EventType.ERROR, on_error)
                 connection.on(EventType.CLOSE, on_close)
-
-                # Start listening in a separate thread (it's blocking)
-                def listening_thread():
-                    try:
-                        connection.start_listening()
-                    except Exception:
-                        pass
-
-                listen_thread = threading.Thread(target=listening_thread, daemon=True)
-                listen_thread.start()
-
-                # Start keepalive thread (sends KeepAlive every 5 seconds to prevent 10-second timeout)
-                def keepalive_thread():
-                    while not self._stopped:
-                        time.sleep(5.0)
-                        if self._stopped:
-                            break
-                        try:
-                            connection.send_control(ListenV1ControlMessage(type="KeepAlive"))
-                        except Exception as exc:
-                            logger.debug(
-                                "Deepgram keepalive failed cause=%s",
-                                type(exc).__name__,
-                            )
-                            break
-
-                ka_thread = threading.Thread(target=keepalive_thread, daemon=True)
-                ka_thread.start()
-
-                # Audio sending loop
-                while True:
-                    try:
-                        data = self._audio_q.get(timeout=0.1)
-                    except queue.Empty:
-                        if self._stopped:
-                            break
-                        continue
-
-                    if data is _STOP:
-                        self._put_event(None)
-                        break
-
-                    completion: asyncio.Future[None] | None = None
-                    payload = data
-                    if isinstance(data, _ThreadWrite):
-                        completion = data.completion
-                        payload = data.payload
-                    try:
-                        if payload is _FINALIZE:
-                            connection.send_control(ListenV1ControlMessage(type="Finalize"))
-                        elif payload is _CLOSE_STREAM:
-                            connection.send_control(ListenV1ControlMessage(type="CloseStream"))
-                        elif isinstance(payload, bytes):
-                            connection.send_media(payload)
-                            pass
-                    except Exception as exc:
-                        logger.warning(
-                            "Deepgram writer failed cause=%s",
-                            type(exc).__name__,
-                        )
-                        self._resolve_thread_write(completion, exc)
-                        if self._loop is not None:
-                            self._loop.call_soon_threadsafe(
-                                self._scoped_transport_end,
-                                False,
-                                "deepgram_write_failed",
-                            )
-                        break
-                    else:
-                        self._resolve_thread_write(completion, None)
-
-        except BaseException as exc:
-            logger.exception("Deepgram SDK thread error")
-            self._put_event(exc)
-        finally:
-            self._put_event(None)
-            if self._loop is not None:
-                self._loop.call_soon_threadsafe(
-                    self._scoped_transport_end,
-                    self._scoped_close_sent or self._stopped,
-                    "deepgram_writer_ended",
+                self._recv_task = asyncio.create_task(
+                    self._listen_loop(connection), name="deepgram-listen"
                 )
+                self._send_task = asyncio.create_task(
+                    self._send_loop(connection), name="deepgram-send"
+                )
+                self._keepalive_task = asyncio.create_task(
+                    self._keepalive_loop(connection), name="deepgram-keepalive"
+                )
+                tasks = (self._recv_task, self._send_task, self._keepalive_task)
+                try:
+                    await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    self._stopped = True
+                    tasks += tuple(self._drain_tasks)
+                    for task in tasks:
+                        task.cancel()
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                    self._scoped_drain_task = None
+                    self._fail_pending_writes()
+        except asyncio.CancelledError:
+            raise
+        except BaseException as exc:
+            logger.warning("Deepgram SDK failed cause=%s", type(exc).__name__)
+            if not self._connected.is_set():
+                self._startup_error = exc
+            self._report_error(exc)
+        finally:
+            self._stopped = True
+            self._startup_done.set()
+            self._put_event(None)
+            self._scoped_transport_end(
+                self._scoped_close_sent, "deepgram_writer_ended"
+            )
+
+    async def _listen_loop(self, connection: Any) -> None:
+        try:
+            await connection.start_listening()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self._report_error(exc)
+            self._scoped_transport_end(False, "deepgram_transport_error")
+
+    async def _send_loop(self, connection: Any) -> None:
+        from deepgram.extensions.types.sockets import ListenV1ControlMessage
+
+        data: bytes | object | _AudioWrite = _STOP
+        try:
+            while True:
+                if self._stopped and self._audio_q.empty():
+                    return
+                data = await self._audio_q.get()
+                if data is _STOP:
+                    return
+                payload = data.payload if isinstance(data, _AudioWrite) else data
+                async with self._send_lock:
+                    if payload is _FINALIZE:
+                        await connection.send_control(ListenV1ControlMessage(type="Finalize"))
+                    elif payload is _CLOSE_STREAM:
+                        await connection.send_control(ListenV1ControlMessage(type="CloseStream"))
+                    elif isinstance(payload, bytes):
+                        await connection.send_media(payload)
+                self._resolve_write(getattr(data, "completion", None), None)
+        except asyncio.CancelledError:
+            self._resolve_write(
+                getattr(data, "completion", None), RuntimeError("Deepgram writer stopped")
+            )
+            raise
+        except Exception as exc:
+            logger.warning("Deepgram writer failed cause=%s", type(exc).__name__)
+            self._resolve_write(getattr(data, "completion", None), exc)
+            self._report_error(exc)
+            self._scoped_transport_end(False, "deepgram_write_failed")
+        finally:
+            self._fail_pending_writes()
+
+    async def _keepalive_loop(self, connection: Any) -> None:
+        from deepgram.extensions.types.sockets import ListenV1ControlMessage
+
+        try:
+            while not self._stopped:
+                await asyncio.sleep(5.0)
+                if self._stopped:
+                    return
+                async with self._send_lock:
+                    await connection.send_control(ListenV1ControlMessage(type="KeepAlive"))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.debug("Deepgram keepalive failed cause=%s", type(exc).__name__)
+            self._report_error(exc)
+            self._scoped_transport_end(False, "deepgram_keepalive_failed")
 
     def _report_error(self, exc: BaseException) -> None:
         if self._error_reported:
@@ -509,33 +488,32 @@ class _DeepgramSDKSession(STTBackendSession):
         self._put_event(exc)
 
     def _put_event(self, event: STTBackendTranscriptEvent | BaseException | None) -> None:
-        if self._event_projection.is_legacy and self._loop is not None:
-            self._loop.call_soon_threadsafe(self._event_projection.put_legacy, event)
+        if self._event_projection.is_legacy:
+            self._event_projection.put_legacy(event)
 
-    def _resolve_thread_write(
-        self,
+    @staticmethod
+    def _resolve_write(
         completion: asyncio.Future[None] | None,
         error: BaseException | None,
     ) -> None:
-        loop = self._loop
-        if completion is None or loop is None:
+        if completion is None or completion.done():
             return
+        if error is None:
+            completion.set_result(None)
+        else:
+            completion.set_exception(error)
 
-        def resolve() -> None:
-            if completion.done():
-                return
-            if error is None:
-                completion.set_result(None)
-            else:
-                completion.set_exception(error)
+    def _fail_pending_writes(self) -> None:
+        error = RuntimeError("Deepgram writer stopped")
+        while not self._audio_q.empty():
+            item = self._audio_q.get_nowait()
+            self._resolve_write(getattr(item, "completion", None), error)
 
-        loop.call_soon_threadsafe(resolve)
-
-    async def _write_thread_payload(self, payload: bytes | object) -> None:
+    async def _write_payload(self, payload: bytes | object) -> None:
         if self._stopped:
             raise RuntimeError("Deepgram session is closed")
         completion = asyncio.get_running_loop().create_future()
-        self._audio_q.put_nowait(_ThreadWrite(payload=payload, completion=completion))
+        self._audio_q.put_nowait(_AudioWrite(payload=payload, completion=completion))
         await completion
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
@@ -555,7 +533,7 @@ class _DeepgramSDKSession(STTBackendSession):
         context_only: bool,
     ) -> None:
         self._event_projection.validate_payload(identity, payload_sequence)
-        await self._write_thread_payload(pcm16le)
+        await self._write_payload(pcm16le)
         self._event_projection.payload_written(identity, payload_sequence)
 
     async def seal_turn(
@@ -568,9 +546,12 @@ class _DeepgramSDKSession(STTBackendSession):
     ) -> None:
         self._event_projection.seal(identity)
         _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
-        await self._write_thread_payload(_FINALIZE)
+        await self._write_payload(_FINALIZE)
         if self._event_projection.is_current(identity):
-            self._scoped_drain_task = asyncio.create_task(self._missing_finalize_ack(identity))
+            task = asyncio.create_task(self._missing_finalize_ack(identity), name="deepgram-drain")
+            self._scoped_drain_task = task
+            self._drain_tasks.add(task)
+            task.add_done_callback(self._drain_tasks.discard)
 
     async def _missing_finalize_ack(self, identity: STTProviderTurnIdentity) -> None:
         try:
@@ -578,7 +559,7 @@ class _DeepgramSDKSession(STTBackendSession):
             if not self._event_projection.is_current(identity):
                 return
             self._scoped_close_sent = True
-            await self._write_thread_payload(_CLOSE_STREAM)
+            await self._write_payload(_CLOSE_STREAM)
             await asyncio.sleep(self.drain_timeout_s)
         except asyncio.CancelledError:
             return
@@ -616,7 +597,7 @@ class _DeepgramSDKSession(STTBackendSession):
         self._scoped_provenance.clear()
         self._scoped_close_sent = True
         if not self._stopped:
-            await self._write_thread_payload(_CLOSE_STREAM)
+            await self._write_payload(_CLOSE_STREAM)
         self._event_projection.end_epoch(
             orderly=False,
             reason=reason,
@@ -646,27 +627,55 @@ class _DeepgramSDKSession(STTBackendSession):
 
         self._audio_q.put_nowait(_FINALIZE)
 
+    def _begin_close(self) -> float:
+        if self._close_deadline is None:
+            self._close_deadline = asyncio.get_running_loop().time() + 5.0
+        return self._close_deadline
+
     async def stop(self) -> None:
+        self._begin_close()
         if self._stopped:
             return
         self._stopped = True
         self._scoped_close_sent = True
-        self._audio_q.put_nowait(_STOP)
+        try:
+            self._audio_q.put_nowait(_STOP)
+        except asyncio.QueueFull:
+            if self._send_task is None or self._send_task.done():
+                self._fail_pending_writes()
 
     async def close(self) -> None:
-        task = self._scoped_drain_task
-        self._scoped_drain_task = None
-        if task is not None and task is not asyncio.current_task():
-            task.cancel()
+        deadline = self._begin_close()
+        try:
             try:
-                await task
-            except asyncio.CancelledError:
+                async with asyncio.timeout_at(deadline):
+                    await self.stop()
+                    self._scoped_drain_task = None
+                    drain_tasks = tuple(
+                        task for task in self._drain_tasks if task is not asyncio.current_task()
+                    )
+                    for task in drain_tasks:
+                        task.cancel()
+                    await asyncio.gather(*drain_tasks, return_exceptions=True)
+                    task = self._run_task
+                    if task is not None:
+                        if not self._connected.is_set():
+                            task.cancel()
+                        try:
+                            await asyncio.shield(task)
+                        except asyncio.CancelledError:
+                            if asyncio.current_task().cancelling():
+                                raise
+            except TimeoutError:
                 pass
-        await self.stop()
-        if self._thread is not None:
-            self._thread.join(timeout=5.0)
-            self._thread = None
-        self._event_projection.close()
+        finally:
+            task = self._run_task
+            if task is not None and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+            self._run_task = None
+            self._fail_pending_writes()
+            self._event_projection.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         async for event in self._event_projection.events():

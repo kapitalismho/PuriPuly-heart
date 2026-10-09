@@ -9,7 +9,6 @@ import re
 import shutil
 import subprocess
 import tempfile
-import urllib.request
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -27,6 +26,7 @@ from puripuly_heart.core.local_translation.runtime_profile import (
     LLAMA_CPP_VULKAN_ARCHIVE_SHA256,
     LLAMA_CPP_VULKAN_ARCHIVE_SIZE,
 )
+from puripuly_heart.core.network_clients import external_client
 
 MANIFEST_SCHEMA = "puripuly-heart/llama-cpp-runtime-distribution/v1"
 RELEASE_URL = f"https://github.com/ggml-org/llama.cpp/releases/tag/{LLAMA_CPP_BUILD}"
@@ -131,10 +131,15 @@ def _download(contract: ArchiveContract, destination: Path) -> None:
             destination.unlink()
     partial = destination.with_name(f"{destination.name}.partial")
     partial.unlink(missing_ok=True)
-    request = urllib.request.Request(contract.url, headers={"User-Agent": "PuriPulyHeart-build"})
     try:
-        with urllib.request.urlopen(request) as response, partial.open("wb") as output:
-            shutil.copyfileobj(response, output, length=1024 * 1024)
+        with (
+            external_client(follow_redirects=True, timeout=None) as client,
+            client.stream("GET", contract.url, headers={"User-Agent": "PuriPulyHeart-build"}) as response,
+            partial.open("wb") as output,
+        ):
+            response.raise_for_status()
+            for chunk in response.iter_bytes(chunk_size=1024 * 1024):
+                output.write(chunk)
             output.flush()
             os.fsync(output.fileno())
         _validate_identity(

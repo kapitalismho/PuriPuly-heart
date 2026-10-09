@@ -47,7 +47,7 @@ async def test_check_for_update_returns_info(monkeypatch):
     response = DummyResponse(200, data)
 
     monkeypatch.setattr(updater, "__version__", "0.1.0")
-    monkeypatch.setattr(updater.httpx, "AsyncClient", lambda timeout=5.0: DummyClient(response))
+    monkeypatch.setattr(updater.network_clients, "external_async_client", lambda timeout=5.0: DummyClient(response))
 
     info = await updater.check_for_update()
 
@@ -60,6 +60,6 @@ async def test_check_for_update_returns_info(monkeypatch):
 @pytest.mark.asyncio
 async def test_check_for_update_returns_none_on_error(monkeypatch):
     response = DummyResponse(500, {})
-    monkeypatch.setattr(updater.httpx, "AsyncClient", lambda timeout=5.0: DummyClient(response))
+    monkeypatch.setattr(updater.network_clients, "external_async_client", lambda timeout=5.0: DummyClient(response))
 
     assert await updater.check_for_update() is None

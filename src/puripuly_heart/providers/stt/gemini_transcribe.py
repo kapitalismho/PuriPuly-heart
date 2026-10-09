@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Callable, ClassVar, Sequence
 from uuid import uuid4
 
+from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
@@ -83,11 +84,16 @@ def _build_live_config_sync(language_codes: Sequence[str], custom_vocabulary: Se
 
 
 def _create_transports_sync() -> tuple[Any, Any]:
-    import httpx
+    from puripuly_heart.core.external_network import ProxyPolicy, select_tls
 
-    sync_transport = httpx.Client(timeout=None, follow_redirects=True)
+    tls, policy = select_tls(), ProxyPolicy()
+    sync_transport = network_clients.external_client(
+        tls=tls, policy=policy, timeout=None, follow_redirects=True
+    )
     try:
-        async_transport = httpx.AsyncClient(timeout=None, follow_redirects=True)
+        async_transport = network_clients.external_async_client(
+            tls=tls, policy=policy, timeout=None, follow_redirects=True
+        )
     except BaseException:
         with contextlib.suppress(Exception):
             sync_transport.close()
@@ -98,13 +104,21 @@ def _create_transports_sync() -> tuple[Any, Any]:
 def _build_http_options_sync(sync_transport: Any, async_transport: Any) -> Any:
     from google.genai import types
 
-    return types.HttpOptions(httpx_client=sync_transport, httpx_async_client=async_transport)
+    return types.HttpOptions(
+        **network_clients.genai_http_options(
+            sync_transport=sync_transport, async_transport=async_transport
+        )
+    )
 
 
 def _create_genai_client_sync(api_key: str, http_options: Any) -> Any:
     from google import genai
 
-    return genai.Client(api_key=api_key, http_options=http_options)
+    from .genai_network import configure_live_network
+
+    client = genai.Client(api_key=api_key, http_options=http_options)
+    configure_live_network(client, http_options)
+    return client
 
 
 def _prepare_gemini_resources_sync(
@@ -298,20 +312,13 @@ class GeminiTranscribeSTTBackend(STTBackend):
             return False
 
         def _check() -> bool:
-            import urllib.error
-            import urllib.request
-
-            req = urllib.request.Request(
-                "https://generativelanguage.googleapis.com/v1beta/models",
-                headers={"x-goog-api-key": api_key},
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=5) as response:
-                    return response.status == 200
-            except urllib.error.HTTPError as e:
-                raise Exception(f"HTTP {e.code}: {e.reason}")
-            except Exception as e:
-                raise Exception(f"Connection failed: {e}")
+            with network_clients.external_client(timeout=5, follow_redirects=True) as client:
+                response = client.get(
+                    "https://generativelanguage.googleapis.com/v1beta/models",
+                    headers={"x-goog-api-key": api_key},
+                )
+                response.raise_for_status()
+                return response.status_code == 200
 
         return await asyncio.to_thread(_check)
 
@@ -419,7 +426,11 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         self._handshake_task = handshake_task
         try:
             live_session = await asyncio.wait_for(handshake_task, timeout=self.connect_timeout_s)
-        except BaseException:
+        except BaseException as exc:
+            if isinstance(exc, Exception) and self.live_connect_factory is None:
+                from .genai_network import annotate_live_error
+
+                annotate_live_error(exc, resources.client)
             try:
                 await self._teardown()
             except asyncio.CancelledError, Exception:

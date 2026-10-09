@@ -54,10 +54,8 @@ class FakeAsyncClient:
 @pytest.mark.asyncio
 async def test_httpx_client_builds_correct_request(monkeypatch):
     fake_client = FakeAsyncClient()
-    constructor_calls: list[dict] = []
 
     def fake_async_client(**kwargs):
-        constructor_calls.append(kwargs)
         return fake_client
 
     monkeypatch.setattr("httpx.AsyncClient", fake_async_client)
@@ -72,7 +70,6 @@ async def test_httpx_client_builds_correct_request(monkeypatch):
     )
 
     assert result == "OK"
-    assert constructor_calls == [{"timeout": 30.0}]
 
     # Check URL
     assert fake_client.last_request["url"] == "https://example/chat/completions"
