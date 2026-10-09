@@ -84,9 +84,16 @@ def _build_live_config_sync(language_codes: Sequence[str], custom_vocabulary: Se
 
 
 def _create_transports_sync() -> tuple[Any, Any]:
-    sync_transport = network_clients.external_client(timeout=None, follow_redirects=True)
+    from puripuly_heart.core.external_network import ProxyPolicy, select_tls
+
+    tls, policy = select_tls(), ProxyPolicy()
+    sync_transport = network_clients.external_client(
+        tls=tls, policy=policy, timeout=None, follow_redirects=True
+    )
     try:
-        async_transport = network_clients.external_async_client(timeout=None, follow_redirects=True)
+        async_transport = network_clients.external_async_client(
+            tls=tls, policy=policy, timeout=None, follow_redirects=True
+        )
     except BaseException:
         with contextlib.suppress(Exception):
             sync_transport.close()

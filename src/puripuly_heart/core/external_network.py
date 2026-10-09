@@ -100,12 +100,21 @@ class ProxyPolicy:
         else:
             self.system, bypass = dict(system), ""
         self.system_bypass = bypass if system_bypass is None else system_bypass
+        self.environment = {
+            name: value if name == "no" or "://" in value else f"http://{value}"
+            for name, value in self.environment.items()
+        }
+        self.system = {
+            name: value if "://" in value else f"http://{value}"
+            for name, value in self.system.items()
+        }
 
     def route(self, url: str) -> ProxyRoute:
         parsed = urlsplit(url)
         scheme = parsed.scheme.lower()
         host = parsed.hostname or ""
-        authority = f"{host}:{parsed.port}" if parsed.port else host
+        port = parsed.port or {"http": 80, "https": 443, "ws": 80, "wss": 443}.get(scheme)
+        authority = f"{host}:{port}" if port else host
         if urllib.request.proxy_bypass_environment(authority, self.environment):
             return ProxyRoute(None, "bypass")
         protocol = "https" if scheme == "wss" else "http" if scheme == "ws" else scheme

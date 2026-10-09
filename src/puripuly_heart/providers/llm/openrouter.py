@@ -10,12 +10,12 @@ from uuid import UUID
 
 import httpx
 
-from puripuly_heart.core import network_clients
 from puripuly_heart.config.llm_profiles import (
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
     OPENROUTER_MODEL_GPT_6_LUNA,
 )
+from puripuly_heart.core import network_clients
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort

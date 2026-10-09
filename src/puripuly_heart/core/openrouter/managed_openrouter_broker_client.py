@@ -7,7 +7,6 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from puripuly_heart.core import network_clients
 from puripuly_heart.app.ports.broker_client import (
     ManagedKeyDeliveryAckMetadata,
     ManagedKeyDeliveryAckRequest,
@@ -26,7 +25,7 @@ from puripuly_heart.app.ports.broker_client import (
     QqManagedStatusResult,
 )
 from puripuly_heart.config.provider_values import normalize_owned_referral_id
-from puripuly_heart.core import messages
+from puripuly_heart.core import messages, network_clients
 
 from .managed_openrouter_release import (
     ManagedOpenRouterChallengeSuccess,

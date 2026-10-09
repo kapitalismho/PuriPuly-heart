@@ -1123,13 +1123,13 @@ def bootstrap_https_server(tmp_path: Path):
 @pytest.mark.parametrize(
     "policy,httpx_result,requests_result",
     [
-        ("file", "verified", "SSLError"),
-        ("directory", "ConnectError", "SSLError"),
-        ("requests", "ConnectError", "verified"),
-        ("curl", "ConnectError", "verified"),
-        ("unset", "ConnectError", "SSLError"),
-        ("invalid-file", "FileNotFoundError", "SSLError"),
-        ("invalid-requests", "ConnectError", "OSError"),
+        ("file", "verified", "peer_rejected"),
+        ("directory", "peer_rejected", "peer_rejected"),
+        ("requests", "peer_rejected", "verified"),
+        ("curl", "peer_rejected", "verified"),
+        ("unset", "peer_rejected", "peer_rejected"),
+        ("invalid-file", "configuration_failed", "peer_rejected"),
+        ("invalid-requests", "peer_rejected", "configuration_failed"),
     ],
 )
 def test_embedded_bootstrap_preserves_independent_ca_policy_and_tls_verification(
@@ -1139,8 +1139,6 @@ def test_embedded_bootstrap_preserves_independent_ca_policy_and_tls_verification
     httpx_result: str,
     requests_result: str,
 ) -> None:
-    import certifi
-
     root = Path(__file__).resolve().parents[2]
     ca_path, url = bootstrap_https_server
     ca_directory = tmp_path / "empty-ca-directory"
@@ -1170,14 +1168,22 @@ def test_embedded_bootstrap_preserves_independent_ca_policy_and_tls_verification
     (modules / "probe.py").write_text(
         "import json, os\n"
         "import httpx, requests\n"
+        "from puripuly_heart.core.network_clients import external_client\n"
+        "from puripuly_heart.core.network_requests import ExternalRequestsSession\n"
         f"result = {{'environment': {{key: os.environ.get(key) for key in {ca_keys!r}}}}}\n"
-        "for name, library in [('httpx', httpx), ('requests', requests)]:\n"
+        "for name, factory in [('httpx', external_client), ('requests', ExternalRequestsSession)]:\n"
         "    try:\n"
-        f"        response = library.get({url!r}, timeout=5)\n"
-        "        response.raise_for_status()\n"
-        "        result[name] = response.text\n"
-        "    except Exception as exc:\n"
-        "        result[name] = type(exc).__name__\n"
+        "        client = factory()\n"
+        "    except OSError:\n"
+        "        result[name] = 'configuration_failed'\n"
+        "        continue\n"
+        "    with client:\n"
+        "        try:\n"
+        f"            response = client.get({url!r}, timeout=5)\n"
+        "            response.raise_for_status()\n"
+        "            result[name] = response.text\n"
+        "        except (httpx.ConnectError, requests.exceptions.SSLError):\n"
+        "            result[name] = 'peer_rejected'\n"
         "print(json.dumps(result))\n",
         encoding="utf-8",
     )
@@ -1200,6 +1206,7 @@ def test_embedded_bootstrap_preserves_independent_ca_policy_and_tls_verification
         PURIPULY_HEART_NATIVE_RUNTIME_ROOT=str(tmp_path),
         FLET_DART_BRIDGE_EXIT_PORT="7",
         PYTHONDONTWRITEBYTECODE="1",
+        NO_PROXY="*",
     )
     completed = subprocess.run(
         [sys.executable, "-c", script],
@@ -1213,10 +1220,6 @@ def test_embedded_bootstrap_preserves_independent_ca_policy_and_tls_verification
     result, bridge = map(json.loads, completed.stdout.splitlines())
     expected = dict.fromkeys(ca_keys)
     expected.update(inherited)
-    if "SSL_CERT_FILE" not in inherited and "SSL_CERT_DIR" not in inherited:
-        expected["SSL_CERT_FILE"] = certifi.where()
-    if "REQUESTS_CA_BUNDLE" not in inherited and "CURL_CA_BUNDLE" not in inherited:
-        expected["REQUESTS_CA_BUNDLE"] = certifi.where()
     assert result["environment"] == expected
     assert result["httpx"] == httpx_result
     assert result["requests"] == requests_result

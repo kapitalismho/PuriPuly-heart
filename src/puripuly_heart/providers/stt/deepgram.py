@@ -126,6 +126,8 @@ class _DeepgramSDKSession(STTBackendSession):
     _stopped: bool = field(init=False, default=False)
     _loop: asyncio.AbstractEventLoop | None = field(init=False, default=None, repr=False)
     _connected: threading.Event = field(init=False, repr=False)
+    _startup_done: threading.Event = field(init=False, repr=False)
+    _startup_error: BaseException | None = field(init=False, default=None, repr=False)
     _error_reported: bool = field(init=False, default=False, repr=False)
     _scoped_fragments: list[str] = field(init=False, default_factory=list, repr=False)
     _scoped_provenance: list[STTNativeProvenance] = field(
@@ -138,6 +140,7 @@ class _DeepgramSDKSession(STTBackendSession):
         self._event_projection = STTSessionEventProjection(self.projection)
         self._audio_q = queue.Queue(maxsize=258)
         self._connected = threading.Event()
+        self._startup_done = threading.Event()
 
     def _supports_keyterms(self) -> bool:
         return self.model.strip().lower() == _DEEPGRAM_KEYTERM_MODEL
@@ -324,14 +327,20 @@ class _DeepgramSDKSession(STTBackendSession):
         self._thread = threading.Thread(target=self._run_sync, name="deepgram-sdk", daemon=True)
         self._thread.start()
 
-        # Wait for connection to be established
-        connected = await asyncio.to_thread(self._connected.wait, self.connect_timeout_s)
-        if not connected:
-            exc = RuntimeError("Deepgram SDK connection timeout")
-            logger.warning("[STT] Deepgram connection timeout after %.1fs", self.connect_timeout_s)
-            self._report_error(exc)
-            await self.stop()
-            raise exc
+        try:
+            if not self._connected.is_set():
+                await asyncio.to_thread(self._startup_done.wait, self.connect_timeout_s)
+            if self._startup_error is not None:
+                raise self._startup_error
+            if not self._connected.is_set():
+                exc = RuntimeError("Deepgram SDK connection timeout")
+                logger.warning("[STT] Deepgram connection timeout after %.1fs", self.connect_timeout_s)
+                self._report_error(exc)
+                raise exc
+        except BaseException:
+            self._startup_done.set()
+            await self.close()
+            raise
 
     def _run_sync(self) -> None:
         """Run Deepgram SDK connection in a separate thread."""
@@ -339,7 +348,9 @@ class _DeepgramSDKSession(STTBackendSession):
             from deepgram import DeepgramClient
             from deepgram.core.events import EventType
             from deepgram.extensions.types.sockets import ListenV1ControlMessage
+
             from puripuly_heart.core import network_clients
+
             from .sdk_network import deepgram_listen_connect
 
             # Connect with streaming options using v1.connect() API
@@ -410,6 +421,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 def on_open(open_event: Any) -> None:
                     _ = open_event
                     self._connected.set()
+                    self._startup_done.set()
 
                 connection.on(EventType.OPEN, on_open)
                 connection.on(EventType.MESSAGE, on_message)
@@ -487,7 +499,10 @@ class _DeepgramSDKSession(STTBackendSession):
                         self._resolve_thread_write(completion, None)
 
         except BaseException as exc:
-            logger.exception("Deepgram SDK thread error")
+            logger.warning("Deepgram SDK thread failed cause=%s", type(exc).__name__)
+            if not self._connected.is_set():
+                self._startup_error = exc
+                self._startup_done.set()
             self._put_event(exc)
         finally:
             self._put_event(None)

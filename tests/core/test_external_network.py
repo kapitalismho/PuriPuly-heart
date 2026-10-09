@@ -379,8 +379,11 @@ async def test_local_http_and_custom_realtime_remain_direct(monkeypatch):
 @pytest.mark.parametrize("policy_case", ["direct_bypass_only", "explicit_ca", "proxy_bypass", "proxy_normalized"])
 async def test_huggingface_child_selects_compatible_transport(certificates, monkeypatch, tmp_path, policy_case):
     import sys
+
     from puripuly_heart.core.local_asr.local_stt_download_port import HuggingFaceDownloadRequest
-    from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import HuggingFaceXetDownloadAdapter
+    from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
+        HuggingFaceXetDownloadAdapter,
+    )
 
     root, _, _ = certificates
     monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)

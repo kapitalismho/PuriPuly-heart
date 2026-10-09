@@ -9,6 +9,7 @@ import httpx
 
 from puripuly_heart.core import network_clients
 
+
 @dataclass(frozen=True, slots=True)
 class AppActiveDayTelemetryState:
     enabled: bool

@@ -7,13 +7,14 @@ import shutil
 import subprocess
 import threading
 from collections.abc import Callable, Sequence
+from functools import partial
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 from urllib.parse import urlsplit
+from uuid import uuid4
 
-from puripuly_heart.runtime_layout import current_runtime_layout
 from puripuly_heart.core.external_network import ProxyPolicy, select_tls
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 from .local_stt_download_port import (
     HuggingFaceDownloadProgress,
@@ -28,6 +29,8 @@ _XET_TRANSFER_LOCK = threading.Lock()
 _WORKER_STOP_TIMEOUT_S = 5.0
 _WORKER_EVENT_LOCK = threading.Lock()
 _WORKER_EVENT_PATH: Path | None = None
+_WORKER_PROXY_POLICY_ENV = "PURIPULY_HEART_HF_PROXY_POLICY"
+_NATIVE_EMPTY_BYPASS = ","
 
 
 def _default_worker_command(
@@ -63,21 +66,41 @@ def _worker_payload(request: HuggingFaceDownloadRequest) -> dict[str, object]:
     }
 
 
+def _worker_policy(environment: dict[str, str]) -> ProxyPolicy:
+    snapshot = environment.get(_WORKER_PROXY_POLICY_ENV)
+    if snapshot is None:
+        return ProxyPolicy(environment=environment)
+    selected = json.loads(snapshot)
+    return ProxyPolicy(
+        environment={f"{name}_proxy": value for name, value in selected["environment"].items()},
+        system=selected["system"],
+        system_bypass=selected["system_bypass"],
+    )
+
+
 def _worker_environment(*, disable_xet: bool) -> dict[str, str]:
     environment = os.environ.copy()
     tls = select_tls(environment=environment)
-    policy = ProxyPolicy(environment=environment)
+    policy = _worker_policy(environment)
+    environment[_WORKER_PROXY_POLICY_ENV] = json.dumps({
+        "environment": policy.environment,
+        "system": policy.system,
+        "system_bypass": policy.system_bypass,
+    })
     proxy_urls = [
-        policy.environment.get(scheme) or policy.environment.get("all") or policy.system.get(scheme)
+        policy.environment.get(scheme) or policy.environment.get("all")
+        or policy.system.get(scheme) or policy.system.get("all")
         for scheme in ("http", "https")
     ]
     uses_system = any(
-        not (policy.environment.get(scheme) or policy.environment.get("all")) and policy.system.get(scheme)
+        not (policy.environment.get(scheme) or policy.environment.get("all"))
+        and (policy.system.get(scheme) or policy.system.get("all"))
         for scheme in ("http", "https")
     )
     incompatible_proxy = (
         bool(any(proxy_urls) and policy.environment.get("no"))
         or bool(uses_system and policy.system_bypass)
+        or bool(any(proxy_urls) and not all(proxy_urls))
         or any(
             urlsplit(value).scheme not in ("http", "https", "socks5", "socks5h")
             for value in proxy_urls if value
@@ -89,11 +112,11 @@ def _worker_environment(*, disable_xet: bool) -> dict[str, str]:
     for name in tuple(environment):
         if name.lower().endswith("_proxy"):
             environment.pop(name)
-    for scheme in ("http", "https"):
-        route = policy.route(f"{scheme}://huggingface.co")
-        if route.url:
-            urlsplit(route.url).port
-            environment[f"{scheme.upper()}_PROXY"] = route.url
+    environment["NO_PROXY"] = _NATIVE_EMPTY_BYPASS if any(proxy_urls) else "*"
+    for scheme, proxy_url in zip(("http", "https"), proxy_urls):
+        if proxy_url:
+            urlsplit(proxy_url).port
+            environment[f"{scheme.upper()}_PROXY"] = proxy_url
     return environment
 
 
@@ -385,7 +408,8 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
     previous_xet_cache = os.environ.get("HF_XET_CACHE")
     previous_network_environment = {
         name: value for name, value in os.environ.items()
-        if name.lower().endswith("_proxy") or name == "HF_HUB_DISABLE_XET"
+        if name.lower().endswith("_proxy")
+        or name in ("HF_HUB_DISABLE_XET", _WORKER_PROXY_POLICY_ENV)
     }
     _WORKER_EVENT_PATH = event_path
     failure_code = "worker_request_failed"
@@ -402,9 +426,17 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
         os.environ.update(environment)
         failure_code = "worker_import_failed"
         from huggingface_hub import hf_hub_download, set_client_factory
+        from huggingface_hub.utils._http import hf_request_event_hook
+
         from puripuly_heart.core.network_clients import external_client
 
-        set_client_factory(external_client)
+        set_client_factory(partial(
+            external_client,
+            policy=_worker_policy(environment),
+            follow_redirects=True,
+            timeout=None,
+            event_hooks={"request": [hf_request_event_hook]},
+        ))
 
         failure_code = "download_failed"
         downloaded_path = Path(
@@ -440,7 +472,9 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
         return 1
     finally:
         for name in tuple(os.environ):
-            if name.lower().endswith("_proxy") or name == "HF_HUB_DISABLE_XET":
+            if name.lower().endswith("_proxy") or name in (
+                "HF_HUB_DISABLE_XET", _WORKER_PROXY_POLICY_ENV
+            ):
                 os.environ.pop(name)
         os.environ.update(previous_network_environment)
         if previous_xet_cache is None:

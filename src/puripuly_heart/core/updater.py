@@ -10,8 +10,10 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from puripuly_heart.core import network_clients
+import httpx
+
 from puripuly_heart import GITHUB_REPO, __version__
+from puripuly_heart.core import network_clients
 
 logger = logging.getLogger(__name__)
 

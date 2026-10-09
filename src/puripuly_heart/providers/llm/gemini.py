@@ -16,6 +16,21 @@ GEMINI_FLASH_GA_MODEL = "gemini-3.8-flash"
 LEGACY_GEMINI_31_FLASH_LITE_MODEL = "gemini-3.1-flash-lite"
 
 
+async def _close_owned_client(client: Any, http_options: dict[str, Any] | None) -> None:
+    try:
+        if client is not None:
+            try:
+                await client.aio.aclose()
+            finally:
+                client.close()
+    finally:
+        if http_options is not None:
+            try:
+                await http_options["httpx_async_client"].aclose()
+            finally:
+                http_options["httpx_client"].close()
+
+
 def _normalized_model_id(value: object) -> str:
     if not isinstance(value, str):
         return ""
@@ -131,10 +146,12 @@ class GeminiLLMProvider:
         if not api_key:
             return False
         client = None
+        http_options = None
         try:
             from google import genai  # type: ignore
 
-            client = genai.Client(api_key=api_key, http_options=network_clients.genai_http_options())
+            http_options = network_clients.genai_http_options()
+            client = genai.Client(api_key=api_key, http_options=http_options)
             requested_model = _normalized_model_id(model)
             async for entry in await client.aio.models.list(config={"page_size": 1000}):
                 if not requested_model or _model_entry_matches(entry, requested_model):
@@ -143,9 +160,7 @@ class GeminiLLMProvider:
         except Exception:
             return False
         finally:
-            if client is not None:
-                await client.aio.aclose()
-                client.close()
+            await _close_owned_client(client, http_options)
 
 
 @dataclass(slots=True)
@@ -154,6 +169,7 @@ class GoogleGenaiGeminiClient:
     model: str
     runtime_logging: ProviderObservationPort | None = None
     _client: Any = field(init=False, default=None, repr=False)
+    _http_options: dict[str, Any] | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
         self.model = _normalized_model_id(self.model)
@@ -162,8 +178,10 @@ class GoogleGenaiGeminiClient:
         if self._client is None:
             from google import genai  # type: ignore
 
+            if self._http_options is None:
+                self._http_options = network_clients.genai_http_options()
             self._client = genai.Client(
-                api_key=self.api_key, http_options=network_clients.genai_http_options()
+                api_key=self.api_key, http_options=self._http_options
             )
         return self._client
 
@@ -251,7 +269,7 @@ class GoogleGenaiGeminiClient:
         raise RuntimeError("Gemini response did not contain text")
 
     async def close(self) -> None:
-        if self._client is not None:
-            await self._client.aio.aclose()
-            self._client.close()
-            self._client = None
+        client, http_options = self._client, self._http_options
+        self._client = None
+        self._http_options = None
+        await _close_owned_client(client, http_options)

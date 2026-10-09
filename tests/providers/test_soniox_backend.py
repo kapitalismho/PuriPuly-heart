@@ -192,7 +192,7 @@ async def test_soniox_rejected_open_only_retries_known_server_statuses(
     async def rejected_connect(*_args, **_kwargs):
         raise InvalidStatus(SimpleNamespace(status_code=status))
 
-    monkeypatch.setattr("websockets.connect", rejected_connect)
+    monkeypatch.setattr("puripuly_heart.core.network_clients.external_websocket_connect", rejected_connect)
     backend = SonioxRealtimeSTTBackend(api_key="k", language_hints=["en"])
     error_type = PermanentSTTScopedSessionError if permanent else InvalidStatus
     with pytest.raises(error_type):
@@ -219,7 +219,7 @@ async def test_soniox_open_config_send_distinguishes_protocol_from_transport(
     async def connect(*_args, **_kwargs):
         return WebSocket()
 
-    monkeypatch.setattr("websockets.connect", connect)
+    monkeypatch.setattr("puripuly_heart.core.network_clients.external_websocket_connect", connect)
     backend = SonioxRealtimeSTTBackend(api_key="k", language_hints=["en"])
     error_type = PermanentSTTScopedSessionError if permanent else ConnectionResetError
     with pytest.raises(error_type):

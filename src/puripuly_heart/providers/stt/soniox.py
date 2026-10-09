@@ -228,7 +228,6 @@ class SonioxRealtimeSTTBackend(STTBackend):
         if not api_key:
             return False
 
-        import websockets
 
         async def _check() -> bool:
             try:

@@ -1,12 +1,25 @@
 from __future__ import annotations
 
-import httpx
+import asyncio
+import ssl
+import threading
+import time
+from contextlib import contextmanager
 
+import httpx
 import pytest
+from deepgram import DeepgramClient
+from deepgram.environment import DeepgramClientEnvironment
+from websockets.sync.server import serve
 
 from puripuly_heart.core import network_clients
-
+from puripuly_heart.core.error_messages import format_error_report_for_log, stt_failure_report
+from puripuly_heart.core.stt.backend import STTSessionProjection
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+from tests.core.test_external_network import certificates as certificates
+from tests.core.test_external_network import (
+    isolated_network_environment as isolated_network_environment,
+)
 
 
 @pytest.mark.asyncio
@@ -80,3 +93,154 @@ async def test_deepgram_backend_verify_api_key_raises_on_http_error(
     with pytest.raises(httpx.HTTPStatusError) as caught:
         await DeepgramRealtimeSTTBackend.verify_api_key("secret")
     assert caught.value.response.status_code == 401
+
+
+def local_sdk_client(monkeypatch: pytest.MonkeyPatch, url: str) -> None:
+    def client(**kwargs):
+        return DeepgramClient(
+            **kwargs,
+            environment=DeepgramClientEnvironment(base=url, production=url, agent=url),
+        )
+
+    monkeypatch.setattr("deepgram.DeepgramClient", client)
+
+
+@pytest.mark.asyncio
+async def test_scoped_deepgram_real_tls_failure_reaches_safe_report_without_startup_timeout(
+    certificates, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    root, _, contexts = certificates
+    monkeypatch.setenv("SSL_CERT_FILE", str(root))
+    reached_handler = threading.Event()
+
+    def handler(socket):
+        reached_handler.set()
+
+    with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            local_sdk_client(monkeypatch, f"wss://127.0.0.1:{server.socket.getsockname()[1]}")
+            backend = DeepgramRealtimeSTTBackend(
+                api_key="synthetic-private-key", language="en", connect_timeout_s=10,
+            )
+            started = time.monotonic()
+            with pytest.raises(ssl.SSLCertVerificationError) as caught:
+                await asyncio.wait_for(
+                    backend.open_session(projection=STTSessionProjection("scoped", "tls-failure")),
+                    timeout=3,
+                )
+            assert time.monotonic() - started < 3
+            report = stt_failure_report(
+                caught.value, provider="deepgram", operation="open_session", channel="self",
+            )
+            assert report.diagnostics.category == "network"
+            assert report.diagnostics.fields["tls_verify_code"] == 64
+            assert report.diagnostics.fields["tls_backend"] == "openssl"
+            assert report.diagnostics.fields["tls_source"] == "explicit_file"
+            assert report.diagnostics.fields["transport"] == "wss"
+            assert not reached_handler.is_set()
+            rendered = format_error_report_for_log(report, sink="persisted_logs")
+            assert "tls_verify_code=64" in rendered
+            assert "127.0.0.1" not in rendered + caplog.text
+            assert "synthetic-private-key" not in rendered + caplog.text
+            assert str(root) not in rendered + caplog.text
+            assert all(record.exc_info is None for record in caplog.records)
+            assert not any(
+                item.name == "deepgram-sdk" and item.is_alive() for item in threading.enumerate()
+            )
+        finally:
+            server.shutdown()
+            thread.join(timeout=5)
+            assert not thread.is_alive()
+
+
+@pytest.mark.asyncio
+async def test_scoped_deepgram_real_success_opens_and_closes_sdk_session(
+    certificates, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _, contexts = certificates
+    monkeypatch.setenv("SSL_CERT_FILE", str(root))
+    received = []
+    audio_received = threading.Event()
+
+    def handler(socket):
+        received.append(socket.recv())
+        audio_received.set()
+        socket.recv()
+
+    with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            local_sdk_client(monkeypatch, f"wss://localhost:{server.socket.getsockname()[1]}")
+            backend = DeepgramRealtimeSTTBackend(api_key="synthetic-key", language="en")
+            session = await asyncio.wait_for(
+                backend.open_session(projection=STTSessionProjection("scoped", "success")),
+                timeout=3,
+            )
+            try:
+                await session.send_audio(b"\\0\\0")
+                assert await asyncio.to_thread(audio_received.wait, 3)
+                assert received == [b"\\0\\0"]
+            finally:
+                await session.close()
+            assert not any(
+                item.name == "deepgram-sdk" and item.is_alive() for item in threading.enumerate()
+            )
+        finally:
+            server.shutdown()
+            thread.join(timeout=5)
+            assert not thread.is_alive()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_scoped_deepgram_missing_open_preserves_timeout_or_cancellation_and_closes(
+    monkeypatch: pytest.MonkeyPatch, cancel: bool
+) -> None:
+    entered = threading.Event()
+    closed = threading.Event()
+
+    class Connection:
+        def on(self, *_args):
+            pass
+
+        def start_listening(self):
+            pass
+
+    @contextmanager
+    def connect(*_args, **_kwargs):
+        entered.set()
+        try:
+            yield Connection()
+        finally:
+            closed.set()
+
+    monkeypatch.setattr("puripuly_heart.providers.stt.sdk_network.deepgram_listen_connect", connect)
+    monkeypatch.setattr(
+        network_clients, "external_client", lambda **kwargs: httpx.Client(trust_env=False)
+    )
+    backend = DeepgramRealtimeSTTBackend(
+        api_key="synthetic-key", language="en", connect_timeout_s=10 if cancel else 0.1,
+    )
+    task = asyncio.create_task(
+        backend.open_session(projection=STTSessionProjection("scoped", "missing-open"))
+    )
+    assert await asyncio.to_thread(entered.wait, 3)
+    if cancel:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    else:
+        with pytest.raises(RuntimeError, match="connection timeout") as caught:
+            await task
+        report = stt_failure_report(
+            caught.value, provider="deepgram", operation="open_session", channel="self",
+        )
+        assert report.diagnostics.category == "timeout"
+        assert report.diagnostics.fields["tls_backend"] == "unknown"
+    assert closed.is_set()
+    assert not any(
+        item.name == "deepgram-sdk" and item.is_alive() for item in threading.enumerate()
+    )

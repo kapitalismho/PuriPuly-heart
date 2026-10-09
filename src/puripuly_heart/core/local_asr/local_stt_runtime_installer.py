@@ -14,9 +14,8 @@ from pathlib import Path
 from typing import IO, Awaitable, Callable, Literal
 from uuid import uuid4
 
-import httpx
-
 from puripuly_heart.core import network_clients
+
 from .local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LOCAL_STT_MODEL_ID,

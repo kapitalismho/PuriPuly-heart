@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import httpx
 
+import httpx
 import pytest
 
 from puripuly_heart.core import network_clients
-
 from puripuly_heart.providers.stt.gemini_transcribe import (
     GeminiTranscribeSTTBackend,
     gemini_transcribe_language_codes,

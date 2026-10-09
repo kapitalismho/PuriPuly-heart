@@ -29,8 +29,8 @@ from puripuly_heart.app.services.openrouter_pkce_flow import (
 )
 from puripuly_heart.config.provider_values import OpenRouterSelectionAlias
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.diagnostic_validation import validate_diagnostics_for_sink
 from puripuly_heart.core import network_clients
+from puripuly_heart.core.diagnostic_validation import validate_diagnostics_for_sink
 from puripuly_heart.core.error_messages import (
     format_error_report_for_log,
     openrouter_auth_failure_report,
@@ -433,7 +433,9 @@ async def test_tls_codes_survive_real_auth_normalization_and_persisted_log_owner
     from logging.handlers import RotatingFileHandler
     from uuid import uuid4
 
-    from puripuly_heart.app.services.application_runtime_logging import ApplicationRuntimeLoggingOwner
+    from puripuly_heart.app.services.application_runtime_logging import (
+        ApplicationRuntimeLoggingOwner,
+    )
     from puripuly_heart.core.error_messages import provider_failure_report
     from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
 

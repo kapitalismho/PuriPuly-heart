@@ -11,8 +11,8 @@ from uuid import UUID
 
 from websockets.exceptions import InvalidStatus
 
-from puripuly_heart.core import network_clients
 from puripuly_heart.config.runtime_resolution import OPENAI_MODEL_GPT_6_LUNA
+from puripuly_heart.core import network_clients
 from puripuly_heart.core.chatgpt.oauth import ChatGptAuthError, ChatGptReauthRequired
 from puripuly_heart.core.chatgpt.session import ChatGptAccessTokenPort
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report

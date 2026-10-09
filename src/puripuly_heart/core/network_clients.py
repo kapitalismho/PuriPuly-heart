@@ -4,7 +4,7 @@ import threading
 from typing import Any
 
 import httpx
-import websockets
+from websockets.asyncio.client import connect
 
 from .external_network import (
     ProxyPolicy,
@@ -116,23 +116,38 @@ def external_client(
     return httpx.Client(**options)
 
 
+class _PolicyWebSocketConnect(connect):
+    def __init__(self, url: str, tls: TLSSelection, policy: ProxyPolicy, **kwargs: Any) -> None:
+        self.tls = tls
+        self.policy = policy
+        self.route = policy.route(url)
+        kwargs["proxy"] = self.route.url
+        super().__init__(url, **kwargs)
+
+    async def create_connection(self) -> Any:
+        self.route = self.policy.route(self.uri)
+        self.proxy = self.route.url
+        if self.uri.startswith("wss:"):
+            self.connection_kwargs["ssl"] = self.tls.context
+        if self.route.url and self.route.url.startswith("https:"):
+            self.connection_kwargs["proxy_ssl"] = self.tls.context
+        else:
+            self.connection_kwargs.pop("proxy_ssl", None)
+        return await super().create_connection()
+
+
 class ExternalWebSocketConnect:
     def __init__(self, url: str, **kwargs: Any) -> None:
-        self.url = url
         self.tls = select_tls()
-        self.route = ProxyPolicy().route(url)
-        kwargs["proxy"] = self.route.url
-        if url.startswith("wss:"):
-            kwargs["ssl"] = self.tls.context
-        if self.route.url and self.route.url.startswith("https:"):
-            kwargs["proxy_ssl"] = self.tls.context
-        self.connect = websockets.connect(url, **kwargs)
+        self.connect = _PolicyWebSocketConnect(url, self.tls, ProxyPolicy(), **kwargs)
 
     async def _open(self) -> Any:
         try:
             return await self.connect
         except Exception as exc:
-            annotate_connection_error(exc, url=self.url, tls=self.tls, route=self.route)
+            annotate_connection_error(
+                exc, url=self.connect.uri, tls=self.tls, route=self.connect.route
+            )
             raise
 
     def __await__(self):
@@ -172,23 +187,28 @@ def genai_http_options(
     sync_transport: Any = None,
     async_transport: Any = None,
 ) -> dict[str, Any]:
-    tls = select_tls()
-    policy = ProxyPolicy()
-    options: dict[str, Any] = {
-        "client_args": {
-            "verify": tls.context,
-            "transport": _HTTPTransport(tls, policy),
-            "trust_env": False,
-        },
-        "async_client_args": {
-            "verify": tls.context,
-            "ssl": tls.context,
-            "transport": _AsyncHTTPTransport(tls, policy),
-            "trust_env": False,
-        },
+    transport = getattr(sync_transport, "_transport", None)
+    if isinstance(transport, _HTTPTransport):
+        tls, policy = transport.tls, transport.policy
+    else:
+        tls, policy = select_tls(), ProxyPolicy()
+    owns_sync = sync_transport is None
+    if sync_transport is None:
+        sync_transport = external_client(
+            tls=tls, policy=policy, timeout=None, follow_redirects=True
+        )
+    try:
+        if async_transport is None:
+            async_transport = external_async_client(
+                tls=tls, policy=policy, timeout=None, follow_redirects=True
+            )
+    except BaseException:
+        if owns_sync:
+            sync_transport.close()
+        raise
+    return {
+        "client_args": {"verify": tls.context, "trust_env": False},
+        "async_client_args": {"verify": tls.context, "ssl": tls.context, "trust_env": False},
+        "httpx_client": sync_transport,
+        "httpx_async_client": async_transport,
     }
-    if sync_transport is not None:
-        options["httpx_client"] = sync_transport
-    if async_transport is not None:
-        options["httpx_async_client"] = async_transport
-    return options

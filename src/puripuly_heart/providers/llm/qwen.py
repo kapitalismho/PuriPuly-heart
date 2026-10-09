@@ -10,8 +10,8 @@ from uuid import UUID
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.llm.latency import current_attempt
-from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.network_requests import ExternalRequestsSession
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 

@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import BinaryIO, Sequence
 
-from puripuly_heart.core.network_clients import external_client
 from puripuly_heart.core.local_translation.runtime_profile import (
     LLAMA_CPP_BUILD,
     LLAMA_CPP_COMMIT,
@@ -27,6 +26,7 @@ from puripuly_heart.core.local_translation.runtime_profile import (
     LLAMA_CPP_VULKAN_ARCHIVE_SHA256,
     LLAMA_CPP_VULKAN_ARCHIVE_SIZE,
 )
+from puripuly_heart.core.network_clients import external_client
 
 MANIFEST_SCHEMA = "puripuly-heart/llama-cpp-runtime-distribution/v1"
 RELEASE_URL = f"https://github.com/ggml-org/llama.cpp/releases/tag/{LLAMA_CPP_BUILD}"
