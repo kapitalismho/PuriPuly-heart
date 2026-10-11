@@ -5,6 +5,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from puripuly_heart.app.services.speaker_application import (
@@ -18,7 +19,14 @@ from puripuly_heart.config.settings_vnext.schema import (
     SpeakerIntent,
 )
 from puripuly_heart.config.settings_vnext.serialization import from_dict, to_dict
-from puripuly_heart.core.speaker import BackendReady, BackendUpdate, SpeakerRuntime
+from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.audio.ownership import CaptureStreamInput
+from puripuly_heart.core.speaker import (
+    BackendReady,
+    BackendUpdate,
+    ProbabilityFrame,
+    SpeakerRuntime,
+)
 
 
 class Assets:
@@ -69,6 +77,99 @@ class Backend:
 
     async def stop(self):
         self.stops += 1
+
+
+class EvidenceBackend(Backend):
+    def __init__(self):
+        super().__init__()
+        self.signatures = []
+
+    async def reset(self, epoch):
+        await super().reset(epoch)
+        self.signatures.clear()
+
+    async def feed(self, pcm, compact_start_sample):
+        signature = round(float(np.mean(pcm)), 2)
+        if signature not in self.signatures:
+            self.signatures.append(signature)
+        slot = self.signatures.index(signature)
+        probabilities = [0.03] * 8
+        probabilities[slot] = 0.83
+        end = compact_start_sample + len(pcm)
+        return BackendUpdate(
+            end,
+            end,
+            (ProbabilityFrame(compact_start_sample, end, tuple(probabilities)),),
+        )
+
+
+def speaker_input(start, amplitude):
+    end = start + 20
+    capture = AudioCaptureSpan(
+        1,
+        start // 20,
+        16_000,
+        start,
+        end,
+        start / 16_000,
+        end / 16_000,
+        normalized_sample_rate_hz=16_000,
+        normalized_start_sample=start,
+        normalized_end_sample=end,
+    )
+    return CaptureStreamInput(np.full(20, amplitude, np.float32), (capture,), speech_observed=True)
+
+
+async def emitted_frames(owner):
+    for _ in range(100):
+        await asyncio.sleep(0)
+        frames = [item for item in owner.drain_evidence(100) if item.frame is not None]
+        if frames:
+            return frames
+    pytest.fail("real product owner did not emit speaker evidence")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("replacement", ["disable_reenable", "profile_replacement"])
+async def test_same_capture_runtime_recreation_emits_distinct_monotonic_identity_epochs(
+    replacement,
+):
+    backends = []
+
+    def factory(*_):
+        backend = EvidenceBackend()
+        backends.append(backend)
+        return SpeakerRuntime(backend)
+
+    owner = SpeakerApplicationOwner(assets=Assets(), runtime_factory=factory)
+    intent = SpeakerIntent(enabled=True, profile="1.04", vulkan_device_id="0")
+    try:
+        await owner.apply(intent)
+        owner.observe_input("same-physical-capture", speaker_input(0, 0.25))
+        old = (await emitted_frames(owner))[0]
+        old_key = (old.speaker_epoch, int(np.argmax(old.frame.probabilities)))
+        if replacement == "disable_reenable":
+            await owner.apply(SpeakerIntent())
+            await owner.apply(intent)
+        else:
+            await owner.apply(replace(intent, profile="0.64"))
+        owner.observe_input("same-physical-capture", speaker_input(20, 0.5))
+        new = (await emitted_frames(owner))[0]
+        new_key = (new.speaker_epoch, int(np.argmax(new.frame.probabilities)))
+        assert new.capture_session_id == old.capture_session_id == "same-physical-capture"
+        assert new.speaker_epoch > old.speaker_epoch
+        assert old_key[1] == new_key[1] == 0
+        assert old_key != new_key
+        assert old.speaker_epoch == old_key[0]
+        assert old.source_map[0].capture.normalized_start_sample == 0
+        assert new.source_map[0].capture.normalized_start_sample == 20
+        assert len(backends) == 2
+        assert backends[0].signatures == [0.25]
+        assert backends[1].signatures == [0.5]
+        assert [backend.starts for backend in backends] == [1, 1]
+        assert backends[0].stops == 1
+    finally:
+        await owner.close()
 
 
 def test_intent_has_no_profile_device_or_consent_default():

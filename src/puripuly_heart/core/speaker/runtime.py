@@ -6,6 +6,8 @@ import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from itertools import count
+from threading import Lock
 
 import numpy as np
 
@@ -20,6 +22,14 @@ from puripuly_heart.core.speaker.contracts import (
     SpeakerEvidence,
     SpeakerSnapshot,
 )
+
+_EPOCHS = count(1)
+_EPOCH_LOCK = Lock()
+
+
+def _next_epoch() -> int:
+    with _EPOCH_LOCK:
+        return next(_EPOCHS)
 
 
 @dataclass(slots=True)
@@ -126,7 +136,7 @@ class SpeakerRuntime:
             + tuple(span for block in self._ring for span in block.capture)
         )
         self._emit(reason=reason, source_map=discarded[: self._limits.max_map_pieces])
-        self._epoch += 1
+        self._epoch = _next_epoch()
         self._graceful_eof = False
         self._queue.clear()
         self._ring.clear()
@@ -202,7 +212,7 @@ class SpeakerRuntime:
                 return
             self._sessions.add(capture_session_id)
             self._session = capture_session_id
-            self._epoch += 1
+            self._epoch = _next_epoch()
             self._compact = self._processed = self._immutable = 0
             self._wake.set()
         elif capture_session_id != self._session or self._source_eof:

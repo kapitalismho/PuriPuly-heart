@@ -215,12 +215,15 @@ async def test_reset_new_epoch_and_stale_inflight_result():
     await backend.entered.wait()
     old_epoch = runtime.snapshot().speaker_epoch
     runtime.reset()
+    first_reset_epoch = runtime.snapshot().speaker_epoch
     runtime.reset()
+    second_reset_epoch = runtime.snapshot().speaker_epoch
+    assert old_epoch < first_reset_epoch < second_reset_epoch
     runtime.observe_input("physical", event(20, amplitude=0.5))
     backend.gate.set()
     await settled(runtime)
     evidence = raw(runtime.drain_evidence(100))
-    assert all(item.speaker_epoch == old_epoch + 2 for item in evidence)
+    assert all(item.speaker_epoch == second_reset_epoch for item in evidence)
     assert all(item.source_map[0].capture.normalized_start_sample >= 20 for item in evidence)
     assert evidence[0].frame.probabilities[0] == 0.83
     assert backend.starts == 1
@@ -250,7 +253,7 @@ async def test_original_once_discontinuity_and_capture_replacement_fences():
     )
     runtime.observe_input("capture-A", replace(changed, capture=(span,)))
     await settled(runtime)
-    assert runtime.snapshot().speaker_epoch == epoch + 1
+    assert runtime.snapshot().speaker_epoch > epoch
     runtime.end_capture("capture-A", "capture_replaced")
     runtime.observe_input("capture-B", event(0, epoch=2))
     runtime.end_capture("capture-A", "late-stop")
@@ -303,6 +306,8 @@ async def test_long_input_slow_consumer_bounded_progress_and_copying():
     for index in range(10_000):
         runtime.observe_input("physical", event(index * 3200, count=3200))
         await settled(runtime)
+        if index == 0:
+            epoch = runtime.snapshot().speaker_epoch
         snapshot = runtime.snapshot()
         assert snapshot.retained_map_pieces <= limits.max_map_pieces
         assert snapshot.pending_samples <= limits.max_pending_samples
@@ -311,7 +316,7 @@ async def test_long_input_slow_consumer_bounded_progress_and_copying():
     snapshot = runtime.snapshot()
     assert backend.fed == 32_000_000
     assert backend.max_pending <= 159
-    assert snapshot.speaker_epoch == 1
+    assert snapshot.speaker_epoch == epoch
     assert snapshot.overloads == 0
     assert snapshot.evidence_evictions == 199_984
     assert snapshot.max_copy_samples == 3200
@@ -395,7 +400,7 @@ async def test_known_lost_source_gap_and_map_horizon_failure():
     epoch = runtime.snapshot().speaker_epoch
     runtime.observe_input("physical", event(40))
     await settled(runtime)
-    assert runtime.snapshot().speaker_epoch == epoch + 1
+    assert runtime.snapshot().speaker_epoch > epoch
     assert any(item.reason == "source_coverage_gap" for item in runtime.drain_evidence(100))
     await runtime.stop()
 
@@ -529,7 +534,8 @@ async def test_internal_discontinuity_cannot_link_slots_across_lost_coverage():
     evidence = runtime.drain_evidence(100)
     assert any(item.reason == "source_coverage_gap" and item.source_map for item in evidence)
     results = raw(evidence)
-    assert results[0].speaker_epoch == 2
+    gap = next(item for item in evidence if item.reason == "source_coverage_gap")
+    assert results[0].speaker_epoch > gap.speaker_epoch
     assert results[0].source_map[0].capture.normalized_start_sample == 20
     assert results[0].frame.probabilities[0] == 0.83
     await runtime.stop()
@@ -596,11 +602,13 @@ async def test_returned_mapping_budget_is_independent_of_segment_count():
     for index in range(20):
         runtime.observe_input("physical", event(index * 20))
         await settled(runtime)
+        if index == 0:
+            epoch = runtime.snapshot().speaker_epoch
         assert runtime.snapshot().evidence_map_pieces <= 8
     snapshot = runtime.snapshot()
     assert snapshot.evidence_items == 8
     assert snapshot.evidence_evictions == 32
-    assert snapshot.speaker_epoch == 1
+    assert snapshot.speaker_epoch == epoch
     assert backend.fed == 400
     evidence = runtime.drain_evidence(100)
     assert sum(len(item.source_map) for item in evidence) == 8
@@ -711,7 +719,7 @@ async def test_new_capture_after_completed_graceful_eof_starts_fresh_compact_axi
     await settled(runtime)
     new = raw(runtime.drain_evidence(100))
     assert new[0].frame.start_sample == 0
-    assert new[0].speaker_epoch == epoch + 1
+    assert new[0].speaker_epoch > epoch
     assert new[0].capture_session_id == "new-physical"
     assert backend.fed == 20
     assert runtime.snapshot().ready
@@ -750,16 +758,17 @@ async def test_failed_cleanup_retains_product_owner_until_successful_retry():
     assert snapshot.error == "backend_stop_failed: native child cleanup failed"
     assert snapshot.owned_tasks == 0
     assert snapshot.capture_session_id is None
-    assert snapshot.speaker_epoch == epoch + 1
+    cleanup_epoch = snapshot.speaker_epoch
+    assert cleanup_epoch > epoch
     runtime.observe_input("new-physical", event(0, epoch=2))
     assert runtime.snapshot().capture_session_id is None
     runtime.reset()
-    assert runtime.snapshot().speaker_epoch == epoch + 1
+    assert runtime.snapshot().speaker_epoch == cleanup_epoch
     await disable()
     assert owner is None
     assert runtime.snapshot().state == "stopped"
     assert runtime.snapshot().error is None
-    assert runtime.snapshot().speaker_epoch == epoch + 1
+    assert runtime.snapshot().speaker_epoch == cleanup_epoch
     assert backend.stops == 2
     await runtime.stop()
     assert backend.stops == 2
@@ -857,3 +866,47 @@ async def test_backend_cleanup_cancellation_is_debt_not_stopped_success():
     assert runtime.snapshot().state == "stopped"
     assert runtime.snapshot().error is None
     assert backend.stops == 2
+
+
+@pytest.mark.asyncio
+async def test_shared_epoch_allocator_fences_interleaved_runtime_identities():
+    first_backend = DeterministicBackend(tail=0)
+    second_backend = DeterministicBackend(tail=0)
+    first = SpeakerRuntime(first_backend)
+    second = SpeakerRuntime(second_backend)
+    await first.start()
+    await second.start()
+    try:
+        first.observe_input("same-physical", event(0))
+        second.observe_input("same-physical", event(20, amplitude=0.5))
+        await settled(first)
+        await settled(second)
+        old_first = raw(first.drain_evidence(100))[0]
+        old_second = raw(second.drain_evidence(100))[0]
+        assert old_first.speaker_epoch < old_second.speaker_epoch
+        assert old_first.frame.probabilities[0] == old_second.frame.probabilities[0] == 0.83
+        first.reset()
+        first.observe_input("same-physical", event(20, amplitude=0.5))
+        await settled(first)
+        new_first = raw(first.drain_evidence(100))[0]
+        assert old_second.speaker_epoch < new_first.speaker_epoch
+        assert second.snapshot().speaker_epoch == old_second.speaker_epoch
+        second.reset()
+        second.observe_input("same-physical", event(40))
+        await settled(second)
+        new_second = raw(second.drain_evidence(100))[0]
+        assert new_first.speaker_epoch < new_second.speaker_epoch
+        assert (
+            len(
+                {
+                    old_first.speaker_epoch,
+                    old_second.speaker_epoch,
+                    new_first.speaker_epoch,
+                    new_second.speaker_epoch,
+                }
+            )
+            == 4
+        )
+    finally:
+        await first.stop()
+        await second.stop()

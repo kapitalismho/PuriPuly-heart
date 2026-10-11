@@ -67,18 +67,18 @@
   },
   "final_distribution": {
     "relative_to_scratch": "dist",
-    "native_artifact_manifest_sha256": "3c5c10436b21f8eeefe067517ac161b8a08542da04c042574c263298709b1da8",
+    "native_artifact_manifest_sha256": "22bdc585a2e7941a29ed89737d3ca603b1acaef6b83050f27bed688908bdaf09",
     "python_executable": "python.exe",
     "python_executable_sha256": "4942b86a6597e5aee0128daa00050ed79bc21f6e709a78eb19cbfeb0c2f39ac9",
     "application_archive": "app/python.zip",
-    "application_archive_sha256": "6f7a4569034b5b853bc58b9bf6aec463449625ff10498d75003c0fa490f37e6b",
+    "application_archive_sha256": "301acec827643623c5319f19ed9b9645fd380c3a6a7d8d7579dae3498a2dea97",
     "final_source_snapshot": {
       "application_python_sources_checked": 555,
       "method": "Compared every final current src/puripuly_heart Python source SHA256 with the corresponding compiled-source record in bytecode.json archive members; asserted exact source-name coverage. Also compared both packaged Nemotron policy/model source JSON files with current source.",
       "mismatches": [],
       "nemotron-runtime.sources.json_sha256": "11e135ff3780e13aca8f9724c1c475369b098957ca989359f4b7fc5cca5e2da1",
       "nemotron-3-diarization-f16-vulkan.manifest.json_sha256": "af753dca12bd54d44ab2db3c4855576531657ff52653012e1bedc1e1e48d1e2a",
-      "barrier": "Final assembly began after core, native and product owners confirmed final source-formatting freeze."
+      "barrier": "Original full assembly followed all formatting freezes. Final one-module application archive refresh followed the core epoch-repair freeze; no native recompilation."
     }
   },
   "commands_and_results": [
@@ -118,6 +118,8 @@
     }
   ],
   "packaged_smoke_observations": {
+    "application_archive_sha256_observed": "6f7a4569034b5b853bc58b9bf6aec463449625ff10498d75003c0fa490f37e6b",
+    "applicability_after_epoch_repair": "These actual private-DLL/no-device/device/profile/backend-inference results remain applicable: runtime binaries, CRTs, licenses, model, adapter/worker sources and hardware are unchanged. This earlier backend-only smoke did not test product runtime recreation; that behavior is covered by the new actual packaged owner smoke below.",
     "worker_module": "dist/app/python.zip/puripuly_heart/app/adapters/nemotron/worker.pyc",
     "interpreter": "dist/python.exe, not source-tools Python",
     "loaded_neural_modules": ["nemotron/bin/nemo_speech_asr_c.dll", "nemotron/bin/nemo_speech_asr.dll", "nemotron/bin/ggml.dll", "nemotron/bin/ggml-base.dll", "nemotron/bin/ggml-vulkan.dll", "nemotron/bin/ggml-cpu.dll"],
@@ -134,16 +136,60 @@
     "probability_frontier_limit": "Immutable emitted probabilities, not immutable identity certainty; processed cursor is consumed mel-hop prefix and excludes submitted lookahead."
   },
   "retained_receipts_relative_to_scratch": {
-    "build/evidence/bytecode.json": "966107011e8a897b67468575be96b93cd5a60cf3a1735beddca512cad8cd691b",
-    "build/evidence/packaged-target-validation.json": "9e0d62d13edbe086dda42714dd3607878fa8db9ca0f66d1d87f1a14d3a8264d0",
+    "build/evidence/bytecode.json": "dbde7f46ac5579215a3bb908b6cd3121be7a7a07cf035821159780a8de8dd673",
+    "build/evidence/packaged-target-validation.json": "3022b4922e7dc63c54eac8bce50c6dd1fca287354b0e8067424f8c59ed0687aa",
     "build/evidence/packaged-compliance-validation.json": "ee7392be124ba49556474be968614d2cb2cdf9058ae01a099f7b09150a3b5dd0",
-    "build/evidence/packaged-source-snapshot.json": "9528a00fed6b776a88ab09c73dc544bbf0268e6a1bf2a59d2907715d9d83160c",
-    "build/evidence/packaged-nemotron-smoke.json": "58ebfe6c99387aaf50d2c5083694118ca8af26bcd6c2a797ba0d2874725579a8"
+    "build/evidence/packaged-source-snapshot.json": "10fe46eb85b74ad1a0e08cda55d66e9acd8269915b0892637b1328657242b5d3",
+    "build/evidence/packaged-nemotron-smoke.json": "58ebfe6c99387aaf50d2c5083694118ca8af26bcd6c2a797ba0d2874725579a8",
+    "build/evidence/epoch-archive-refresh.json": "c5ee14afeb01864776549d7ce6574fe111a11e0edfe1dd8a3793c3b0934652a3",
+    "build/evidence/packaged-epoch-recreation.json": "5fa36a12d204c4752fcf308411242cc1c2e9f26fa238fd2afad9bbab1b84be6c"
   },
   "provisional_supersession": [
     {"runtime_manifest_sha256": "b44cc1426ba3d331a04bbfed8b0321cd55d8d2aff9c3ef47ba664d927ce253ec", "status": "Earlier two assemblies and real-model smoke are historical/provisional only. Superseded by physical-GPU-guarded runtime; updated distribution validator rejects this old missing-policy artifact."},
     {"runtime_manifest_sha256": "4615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9", "application_archive_sha256": "b43aa7f347a40caa7ec9effb9cd2a09fcf00940e0d3149bcecddc460ab438ea1", "status": "First guarded assembly superseded because source audit found six formatting-only module mismatches. Final assembly after all source barriers, archive 6f7a4569034b5b853bc58b9bf6aec463449625ff10498d75003c0fa490f37e6b, has zero mismatches and passed actual packaged smoke."}
   ],
+  "epoch_repair_refresh": {
+    "status": "passed and frozen",
+    "core_record": "native/nemotron/epoch-repair-verification.json",
+    "affected_source": "src/puripuly_heart/core/speaker/runtime.py",
+    "previous_source_sha256": "94a9e5080732a5d9b3d565b295a36ffb177dfc6cf30683afdf8026c24e931ccf",
+    "final_source_sha256": "45669a92129130d57c88ecdef720d262ce72dd1f18760a332f2ec07f1c85d1ad",
+    "previous_application_archive_sha256": "6f7a4569034b5b853bc58b9bf6aec463449625ff10498d75003c0fa490f37e6b",
+    "final_application_archive_sha256": "301acec827643623c5319f19ed9b9645fd380c3a6a7d8d7579dae3498a2dea97",
+    "method": "After the core repair was frozen, the actual packaged optimization-0 interpreter ran existing compile_runtime on an isolated single-module input. Existing reproducible _write_archive regenerated the application archive with only runtime.py and runtime.pyc replaced; 9243 other nondirectory archive members retained their exact bytes. Existing manifest and native_installer_cleanup commands refreshed distribution/build-artifact inventories and cleanup include, followed by existing validate-target and validate-compliance commands.",
+    "native_recompiled": false,
+    "refresh_seconds": 7.22,
+    "inventory_and_target_compliance_seconds": 35.74,
+    "target_result": "exit 0; final repaired distribution accepted",
+    "compliance_result": "exit 0; byte-identical compliance receipt retained",
+    "exact_source_result": "All 555 application sources and both policy/model JSON resources match current frozen source; zero mismatches.",
+    "inventory_change_result": "Exact before/after distribution inventory comparison found only app/python.zip changed; every other payload file hash is unchanged. Build/artifact and dist final artifact manifests are byte-identical.",
+    "stdlib_archive_sha256_unchanged": "dab49e06da1315c5e3aa333639a8778ea62e34d8fd1783d5833b1b64954f9460",
+    "actual_packaged_owner_smoke": {
+      "result": "exit 0 in 3.70 seconds; actual SpeakerApplicationOwner/default factory/NemotronBackend",
+      "interpreter": "dist/python.exe",
+      "owner_module": "dist/app/python.zip/puripuly_heart/app/services/speaker_application.pyc",
+      "repaired_runtime_module": "dist/app/python.zip/puripuly_heart/core/speaker/runtime.pyc",
+      "isolation": "Unrelated temporary working directory and isolated LOCALAPPDATA/APPDATA; RuntimeLayout.python_child_environment; no source path added to the packaged child.",
+      "scenario": "Enable profile 1.04, feed constructed zero PCM with speech VAD flag, disable, re-enable profile 1.04 on the same physical capture, feed again, close.",
+      "same_capture_session_id": "same-physical-capture",
+      "same_capture_epoch": 7,
+      "emitted_speaker_epochs": [1, 3],
+      "emitted_frames_per_stage": [360, 360],
+      "submitted_samples_per_stage": [64000, 64000],
+      "original_source_ranges": [[0, 64000], [64000, 128000]],
+      "first_compact_frame_per_stage": [[0, 160], [0, 160]],
+      "processed_and_immutable_samples_per_stage": [57600, 57600],
+      "retained_old_evidence": "Old emitted evidence retained its old epoch after recreation; distinct new emitted epoch strictly increased.",
+      "device_ordinal": 0,
+      "model_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+      "runtime_manifest_sha256": "4615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9",
+      "final_state": "closed",
+      "stderr": ""
+    },
+    "prior_evidence_applicability": "The old 6f7a application archive and its exact target/source manifests are superseded for final-candidate completion by the repaired 301ace archive and new receipts. Pre-epoch-repair bytecode/target/compliance/source/inventory receipts were preserved with pre-epoch-repair- prefixes. Native DLL/CRT/license/model/hardware/backend-profile qualification remains valid because exact payload inventory and unchanged module records establish unchanged relevant inputs. No native rebuild or irrelevant repeated model profiles/source tests ran; old cross-runtime epoch correctness is not claimed.",
+    "limits": "Synthetic input and actual emitted product evidence prove process-local same-capture recreation fencing, not acoustic identity/accuracy, long-wall-clock behavior or cross-process identity. Extended repaired source regressions remain core-worker evidence."
+  },
   "remaining_limits": [
     "No packaging prerequisite remains unavailable. Final artifact and source staging use the frozen guarded runtime.",
     "The packaged smoke is short synthetic-zero inference on selected Vulkan device 0; not speaker accuracy, long-session performance, software-Vulkan execution, or every GPU/driver qualification.",

@@ -1,0 +1,273 @@
+{
+  "schema_version": 1,
+  "observed_at_utc": "2026-10-11T23:27:04.442318+00:00",
+  "finding": "checkpoint-epoch-reuse",
+  "scope": "Accepted P2 repair: speaker evidence epoch uniqueness across same-process runtime/product recreation. No native changes, rebuild, model acquisition, release, or identity/accuracy policy changes.",
+  "implementation": {
+    "allocator": "One module-lifetime itertools.count(1), guarded by threading.Lock, shared by every SpeakerRuntime instance in the product process; each capture adoption and meaningful fence obtains next unique int.",
+    "epoch_zero": "Unattached initial snapshot sentinel only; original input capture adoption obtains a positive allocated identity epoch before any evidence is emitted.",
+    "lifetime": "Allocator is not reset by feature disable/re-enable, profile/device replacement, pipeline/runtime recreation, manual reset, or output history eviction. No cross-process/biometric identity guarantee.",
+    "compatibility": "Existing exported int speaker_epoch and backend reset(epoch:int) API unchanged; no product factory/source changes.",
+    "sources_sha256": {
+      "src/puripuly_heart/core/speaker/runtime.py": "45669a92129130d57c88ecdef720d262ce72dd1f18760a332f2ec07f1c85d1ad",
+      "tests/core/speaker/test_runtime.py": "112759ec3d8744641e07bc7380f87de64c813383037116ef99c79638cf8515e8",
+      "tests/app/test_speaker_application.py": "cf473339d06311aa5c82f817d613d0393e60abd2ea03cbe564efa60d69cf399c"
+    }
+  },
+  "checks": [
+    {
+      "command": ".venv/Scripts/python.exe -m pytest tests/core/speaker tests/app/test_speaker_application.py",
+      "status": "passed",
+      "result": "43 passed in 4.61s",
+      "coverage": "All previous core pause/manual-reset/overload/discontinuity/stale-event/EOF/retry cases plus interleaved runtime epochs; real SpeakerApplicationOwner emitted-evidence regressions for same-capture disable/re-enable and profile replacement."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m black --check src/puripuly_heart/core/speaker tests/core/speaker tests/app/test_speaker_application.py",
+      "status": "passed",
+      "result": "Five files unchanged"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/speaker tests/core/speaker tests/app/test_speaker_application.py",
+      "status": "passed",
+      "result": "All checks passed"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B -c <deterministic product epoch smoke source below>",
+      "exit_code": 0,
+      "status": "passed",
+      "observed": {
+        "status": "passed",
+        "kind": "deterministic actual product owner",
+        "records": [
+          {
+            "epoch": 1,
+            "session": "same-physical-capture",
+            "slot": 0,
+            "source_start": 0,
+            "profile": "1.04"
+          },
+          {
+            "epoch": 3,
+            "session": "same-physical-capture",
+            "slot": 0,
+            "source_start": 20,
+            "profile": "1.04"
+          },
+          {
+            "epoch": 5,
+            "session": "same-physical-capture",
+            "slot": 0,
+            "source_start": 40,
+            "profile": "0.64"
+          }
+        ],
+        "backend_instances": 3,
+        "backend_starts": [
+          1,
+          1,
+          1
+        ],
+        "backend_stops": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B -c <actual native product epoch smoke source below>",
+      "exit_code": 0,
+      "status": "passed",
+      "observed": {
+        "status": "passed",
+        "kind": "actual product owner/default factory/NemotronBackend",
+        "input": "constructed zero PCM at normalized 16kHz; VAD marked speech solely to exercise inference; no acoustic accuracy claim",
+        "model_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+        "runtime_manifest_sha256": "4615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9",
+        "device_ordinal": 0,
+        "records": [
+          {
+            "stage": 0,
+            "profile": "1.04",
+            "epoch": 1,
+            "session": "same-physical-capture",
+            "frames": 360,
+            "submitted_original_samples": 64000,
+            "source_start": 0,
+            "source_end": 64000,
+            "first_compact_frame": [
+              0,
+              160
+            ],
+            "last_compact_frame": [
+              57440,
+              57600
+            ],
+            "first_raw_probabilities": [
+              0.002780781127512455,
+              0.0004769506922457367,
+              0.00012427753244992346,
+              7.282031583599746e-05,
+              2.8987260520807467e-05,
+              2.272273377457168e-06,
+              3.178249485813467e-08,
+              7.057864848114548e-10
+            ],
+            "processed": 57600,
+            "immutable": 57600,
+            "diagnostics": {
+              "backend": "Vulkan",
+              "device_ordinal": "0",
+              "profile": "1.04",
+              "geometry": "9/4/0/264/264/222",
+              "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+              "tensor_formats": "{\"F16\": 125, \"F32\": 231}",
+              "source_revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+              "neural_cpu_fallback": "forbidden",
+              "probability_frontier": "immutable emitted probabilities, not identity certainty",
+              "processed_cursor": "consumed mel hop prefix; excludes submitted lookahead",
+              "accumulation": "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            },
+            "peaks": {
+              "pending_samples": 3200,
+              "pending_items": 1,
+              "retained_map_pieces": 7,
+              "evidence_items": 0,
+              "owned_tasks": 1
+            }
+          },
+          {
+            "stage": 1,
+            "profile": "1.04",
+            "epoch": 3,
+            "session": "same-physical-capture",
+            "frames": 360,
+            "submitted_original_samples": 64000,
+            "source_start": 64000,
+            "source_end": 128000,
+            "first_compact_frame": [
+              0,
+              160
+            ],
+            "last_compact_frame": [
+              57440,
+              57600
+            ],
+            "first_raw_probabilities": [
+              0.002780781127512455,
+              0.0004769506922457367,
+              0.00012427753244992346,
+              7.282031583599746e-05,
+              2.8987260520807467e-05,
+              2.272273377457168e-06,
+              3.178249485813467e-08,
+              7.057864848114548e-10
+            ],
+            "processed": 57600,
+            "immutable": 57600,
+            "diagnostics": {
+              "backend": "Vulkan",
+              "device_ordinal": "0",
+              "profile": "1.04",
+              "geometry": "9/4/0/264/264/222",
+              "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+              "tensor_formats": "{\"F16\": 125, \"F32\": 231}",
+              "source_revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+              "neural_cpu_fallback": "forbidden",
+              "probability_frontier": "immutable emitted probabilities, not identity certainty",
+              "processed_cursor": "consumed mel hop prefix; excludes submitted lookahead",
+              "accumulation": "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            },
+            "peaks": {
+              "pending_samples": 3200,
+              "pending_items": 1,
+              "retained_map_pieces": 7,
+              "evidence_items": 0,
+              "owned_tasks": 1
+            }
+          },
+          {
+            "stage": 2,
+            "profile": "0.64",
+            "epoch": 5,
+            "session": "same-physical-capture",
+            "frames": 336,
+            "submitted_original_samples": 64000,
+            "source_start": 128000,
+            "source_end": 192000,
+            "first_compact_frame": [
+              0,
+              160
+            ],
+            "last_compact_frame": [
+              53600,
+              53760
+            ],
+            "first_raw_probabilities": [
+              0.00279488367959857,
+              0.00048179374425671995,
+              0.0001256489340448752,
+              7.278224802576005e-05,
+              2.894027784350328e-05,
+              2.2879969492350938e-06,
+              3.2346591183340934e-08,
+              7.22484683191027e-10
+            ],
+            "processed": 53760,
+            "immutable": 53760,
+            "diagnostics": {
+              "backend": "Vulkan",
+              "device_ordinal": "0",
+              "profile": "0.64",
+              "geometry": "6/2/0/264/264/222",
+              "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+              "tensor_formats": "{\"F16\": 125, \"F32\": 231}",
+              "source_revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+              "neural_cpu_fallback": "forbidden",
+              "probability_frontier": "immutable emitted probabilities, not identity certainty",
+              "processed_cursor": "consumed mel hop prefix; excludes submitted lookahead",
+              "accumulation": "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            },
+            "peaks": {
+              "pending_samples": 3200,
+              "pending_items": 1,
+              "retained_map_pieces": 5,
+              "evidence_items": 0,
+              "owned_tasks": 1
+            }
+          }
+        ],
+        "total_original_samples": 192000,
+        "source_duration_s": 12.0,
+        "final_state": "closed",
+        "limitations": [
+          "No native rebuild",
+          "No natural conversation/identity accuracy/overlap qualification",
+          "No concurrent ASR/VRChat competition or long wall-clock qualification",
+          "Pinned Bonenk artifact; original NVIDIA conversion lineage not newly validated"
+        ]
+      }
+    }
+  ],
+  "reproduction_sources": {
+    "deterministic_product_smoke": "import asyncio,json,sys\nsys.path[:0]=['src','tests/app']\nfrom dataclasses import replace\nfrom puripuly_heart.app.services.speaker_application import SpeakerApplicationOwner\nfrom puripuly_heart.config.settings_vnext.schema import SpeakerIntent\nfrom puripuly_heart.core.speaker import SpeakerRuntime\nfrom test_speaker_application import Assets,EvidenceBackend,speaker_input,emitted_frames\nasync def smoke():\n backends=[]\n def factory(*_):\n  b=EvidenceBackend();backends.append(b);return SpeakerRuntime(b)\n owner=SpeakerApplicationOwner(assets=Assets(),runtime_factory=factory)\n intent=SpeakerIntent(enabled=True,profile='1.04',vulkan_device_id='0');records=[]\n try:\n  for index,amplitude in enumerate((.25,.5,.75)):\n   if index==1:await owner.apply(SpeakerIntent())\n   if index==2:intent=replace(intent,profile='0.64')\n   await owner.apply(intent);owner.observe_input('same-physical-capture',speaker_input(index*20,amplitude))\n   e=(await emitted_frames(owner))[0]\n   records.append(dict(epoch=e.speaker_epoch,session=e.capture_session_id,slot=max(range(8),key=lambda s:e.frame.probabilities[s]),source_start=e.source_map[0].capture.normalized_start_sample,profile=intent.profile))\n  assert records[0]['epoch']<records[1]['epoch']<records[2]['epoch']\n  assert len({r['session'] for r in records})==1 and all(r['slot']==0 for r in records)\n  assert len(backends)==3 and all(b.starts==1 for b in backends)\n finally:await owner.close()\n assert all(b.stops==1 for b in backends)\n print(json.dumps(dict(status='passed',kind='deterministic actual product owner',records=records,backend_instances=len(backends),backend_starts=[b.starts for b in backends],backend_stops=[b.stops for b in backends])))\nasyncio.run(smoke())",
+    "actual_native_product_smoke": "import asyncio,hashlib,json,sys,time\nfrom dataclasses import replace\nfrom pathlib import Path\nsys.path.insert(0,'src')\nimport numpy as np\nfrom puripuly_heart.app.services.speaker_application import NativeSpeakerAssets,SpeakerApplicationOwner\nfrom puripuly_heart.config.settings_vnext.schema import SpeakerIntent\nfrom puripuly_heart.core.audio.format import AudioCaptureSpan\nfrom puripuly_heart.core.audio.ownership import CaptureStreamInput\nasync def smoke():\n model=Path.home()/'AppData/Local/Temp/puripuly-nemotron-bonenk/model.gguf'\n runtime=Path('build/nemotron').resolve()\n owner=SpeakerApplicationOwner(assets=NativeSpeakerAssets(artifact_path=model,runtime_dir=runtime))\n intent=SpeakerIntent(enabled=True,profile='1.04',vulkan_device_id='0')\n records=[];retained=[];source=0\n async def idle():\n  deadline=time.monotonic()+60\n  while True:\n   state=owner.snapshot()['runtime']\n   if state is None or not state.ready:raise RuntimeError(str(owner.snapshot()['reason']))\n   if not state.pending_items:return\n   if time.monotonic()>deadline:raise TimeoutError('bounded native feed drain')\n   await asyncio.sleep(.002)\n try:\n  for stage in range(3):\n   if stage==1:await owner.apply(SpeakerIntent())\n   if stage==2:intent=replace(intent,profile='0.64')\n   status=await owner.apply(intent)\n   if status['runtime'] is None or not status['runtime'].ready:raise RuntimeError(str(status['reason']))\n   frames=[];start=source;peaks=dict(pending_samples=0,pending_items=0,retained_map_pieces=0,evidence_items=0,owned_tasks=0)\n   for sequence in range(20):\n    pcm=np.zeros(3200,np.float32)\n    capture=AudioCaptureSpan(7,stage*20+sequence,16000,source,source+3200,1000+source/16000,1000+(source+3200)/16000,normalized_sample_rate_hz=16000,normalized_start_sample=source,normalized_end_sample=source+3200)\n    owner.observe_input('same-physical-capture',CaptureStreamInput(pcm,(capture,),speech_observed=True));source+=3200\n    state=owner.snapshot()['runtime']\n    for key in peaks:peaks[key]=max(peaks[key],getattr(state,key))\n    await idle();frames.extend(e for e in owner.drain_evidence(1024) if e.frame is not None)\n   assert frames and all(len(e.frame.probabilities)==8 for e in frames)\n   state=owner.snapshot()['runtime'];first,last=frames[0],frames[-1]\n   assert first.capture_session_id=='same-physical-capture' and first.source_map[0].capture.normalized_start_sample==start\n   assert first.frame.start_sample==0 and len({e.speaker_epoch for e in frames})==1\n   retained.append(first)\n   records.append(dict(stage=stage,profile=intent.profile,epoch=first.speaker_epoch,session=first.capture_session_id,frames=len(frames),submitted_original_samples=64000,source_start=start,source_end=source,first_compact_frame=[first.frame.start_sample,first.frame.end_sample],last_compact_frame=[last.frame.start_sample,last.frame.end_sample],first_raw_probabilities=list(first.frame.probabilities),processed=state.processed_through_sample,immutable=state.immutable_through_sample,diagnostics=dict(state.diagnostics),peaks=peaks))\n  assert records[0]['epoch']<records[1]['epoch']<records[2]['epoch']\n  assert len({r['session'] for r in records})==1\n  assert [e.speaker_epoch for e in retained]==[r['epoch'] for r in records]\n  metadata=owner.snapshot()['assets'].metadata\n  model_sha=metadata['artifact']['sha256']\n finally:await owner.close()\n assert owner.snapshot()['state']=='closed' and owner.snapshot()['runtime'] is None\n print(json.dumps(dict(status='passed',kind='actual product owner/default factory/NemotronBackend',input='constructed zero PCM at normalized 16kHz; VAD marked speech solely to exercise inference; no acoustic accuracy claim',model_sha256=model_sha,runtime_manifest_sha256=hashlib.sha256((runtime/'runtime-manifest.json').read_bytes()).hexdigest(),device_ordinal=0,records=records,total_original_samples=source,source_duration_s=source/16000,final_state=owner.snapshot()['state'],limitations=['No native rebuild','No natural conversation/identity accuracy/overlap qualification','No concurrent ASR/VRChat competition or long wall-clock qualification','Pinned Bonenk artifact; original NVIDIA conversion lineage not newly validated'])))\nasyncio.run(smoke())"
+  },
+  "hardware_context": {
+    "new_run": "Real default product factory/NemotronBackend selected explicit Vulkan ordinal0 and both official profiles; strict existing runtime policy stayed enabled.",
+    "retained_qualification": "native/nemotron/verification.json identifies AMD Radeon RX7900XTX and AMD26.8.1; no new hardware/driver enumeration or native rebuild performed here."
+  },
+  "evidence_applicability": {
+    "superseded": "Prior cross-runtime lifecycle/identity-continuity applicability is superseded by this accepted repair and new same-capture recreation traces.",
+    "retained": "Existing native scheduler/F16/profile geometry/delta-bound/precision/provenance observations remain applicable; native source/runtime/model bytes unchanged and original observed source hashes preserved in existing records.",
+    "archive": "Final packaged-source archive must be refreshed to include runtime.py repair; packaged recreation verification remains packaging owner work."
+  },
+  "limits": [
+    "Observed epoch values1,3,5 are a single-process trace, not an API promise or test assumption. Behavioral tests compare distinctness/monotonicity, and history eviction preserves the current epoch.",
+    "Native smoke supplied192000 constructed zero PCM samples at16kHz:12seconds total source duration,4seconds per stage; VAD marked speech only to exercise model inference. No natural speech, speaker accuracy, returning-speaker key, overlap accuracy, or universal resource claim.",
+    "Native sampled pre-drain pending/map/task figures are bounded observations, not continuously sampled universal peaks.",
+    "The same physical capture id/source cursor persists while native instances are recreated sequentially; no concurrent GPU-ASR/VRChat contention qualification.",
+    "Approved Bonenk artifact SHA2569b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38 and runtime manifest SHA2564615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9 observed; original NVIDIA conversion lineage not newly reproduced.",
+    "No Git, maintained documentation, product source, native code, or other surface mutations."
+  ]
+}
