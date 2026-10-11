@@ -230,6 +230,27 @@ def build_parser() -> argparse.ArgumentParser:
     gpu_sub = gpu.add_subparsers(dest="action", required=True)
     gpu_sub.add_parser("status")
     gpu_sub.add_parser("discover").add_argument("--no-wait", action="store_true")
+    speaker = sub.add_parser("speaker", help="Control independent local Vulkan speaker analysis")
+    speaker_sub = speaker.add_subparsers(dest="action", required=True)
+    speaker_sub.add_parser("status")
+    for action in ("prepare", "cancel", "reset"):
+        speaker_sub.add_parser(action).add_argument("--no-wait", action="store_true")
+    speaker_configure = speaker_sub.add_parser("configure")
+    speaker_configure.add_argument("--enabled", choices=("on", "off"))
+    speaker_configure.add_argument("--profile", choices=("1.04", "0.64"))
+    speaker_configure.add_argument("--device", help="Explicit nonnegative Vulkan device index")
+    speaker_configure.add_argument("--download-consent", choices=("on", "off"))
+    speaker_configure.add_argument("--no-wait", action="store_true")
+    speaker_install = speaker_sub.add_parser(
+        "install",
+        help="Install pinned F16 weights with independent consent, or import --source locally",
+    )
+    speaker_install.add_argument(
+        "--source",
+        type=Path,
+        help="Verified local F16 artifact; omit for consented pinned download",
+    )
+    speaker_install.add_argument("--no-wait", action="store_true")
     overlay = sub.add_parser("overlay", help="Inspect and control overlay output")
     overlay_sub = overlay.add_subparsers(dest="action", required=True)
     overlay_sub.add_parser("status")
@@ -706,6 +727,7 @@ async def _run(args: argparse.Namespace) -> int:
         ("auth", "status"): "auth.status",
         ("models", "status"): "models.status",
         ("gpu", "status"): "gpu.status",
+        ("speaker", "status"): "speaker.status",
         ("overlay", "status"): "overlay.status",
         ("osc", "status"): "osc.status",
         ("capture", "terms"): "consent.peer_translation",
@@ -732,6 +754,7 @@ async def _run(args: argparse.Namespace) -> int:
         "models",
         "gemma",
         "gpu",
+        "speaker",
         "overlay",
         "auth",
     ):
@@ -797,6 +820,19 @@ async def _run(args: argparse.Namespace) -> int:
             name, values = f"gemma.{args.action}", {}
         elif args.domain == "gpu":
             name, values = "gpu.discover", {}
+        elif args.domain == "speaker":
+            name, values = f"speaker.{args.action}", {}
+            if args.action == "configure":
+                if args.enabled is not None:
+                    values["enabled"] = args.enabled == "on"
+                if args.profile is not None:
+                    values["profile"] = args.profile
+                if args.device is not None:
+                    values["vulkan_device_id"] = args.device
+                if args.download_consent is not None:
+                    values["download_consent"] = args.download_consent == "on"
+            elif args.action == "install" and args.source is not None:
+                values["source_path"] = str(args.source)
         elif args.domain == "overlay":
             name = {
                 "reset-position": "overlay.position.reset",

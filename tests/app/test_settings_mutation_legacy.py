@@ -78,7 +78,7 @@ def test_order22_patch_carries_cloud_free_tier_provider_pool() -> None:
     }
 
 
-def test_order22_patch_carries_soniox_speaker_diarization() -> None:
+def test_legacy_soniox_speaker_field_is_not_an_editable_product_patch() -> None:
     previous = AppSettingsVNext()
     next_settings = replace(
         previous,
@@ -88,7 +88,7 @@ def test_order22_patch_carries_soniox_speaker_diarization() -> None:
                 previous.intent.stt,
                 soniox=replace(
                     previous.intent.stt.soniox,
-                    enable_speaker_diarization=False,
+                    enable_speaker_diarization=True,
                 ),
             ),
         ),
@@ -96,7 +96,7 @@ def test_order22_patch_carries_soniox_speaker_diarization() -> None:
 
     patch = build_stt_language_audio_settings_path_patch(previous, next_settings)
 
-    assert patch == {"intent.stt.soniox.enable_speaker_diarization": False}
+    assert patch == {}
 
 
 def test_mutable_patch_values_are_isolated_from_canonical_settings_and_future_patches() -> None:
@@ -191,7 +191,6 @@ def test_order22_stt_language_audio_patch_records_initial_covered_surface_list()
         "intent.stt.soniox.endpoint",
         "intent.stt.soniox.keepalive_interval_s",
         "intent.stt.soniox.trailing_silence_ms",
-        "intent.stt.soniox.enable_speaker_diarization",
         "intent.stt.custom.mode",
         "intent.stt.custom.compatibility",
         "intent.stt.custom.endpoint",

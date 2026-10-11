@@ -1104,7 +1104,7 @@ def test_current_schema_normalizes_legacy_telemetry_fields_without_extensions() 
         "anonymous_id": None,
         "last_sent_date_utc": None,
     }
-    assert "consent" not in json.dumps(serialized)
+    assert '"consent":' not in json.dumps(serialized)
     assert "sent_translation_success_dates_utc" not in json.dumps(serialized)
 
 

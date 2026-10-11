@@ -374,7 +374,7 @@ class SonioxSTTIntent:
     endpoint: str = "wss://stt-rt.soniox.com/transcribe-websocket"
     keepalive_interval_s: float = 10.0
     trailing_silence_ms: int = 100
-    enable_speaker_diarization: bool = True
+    enable_speaker_diarization: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -770,6 +770,31 @@ class PromptIntent:
 
 
 @dataclass(frozen=True, slots=True)
+class SpeakerIntent:
+    enabled: bool = False
+    profile: Literal["1.04", "0.64"] | None = None
+    vulkan_device_id: str | None = None
+    download_consent: bool = False
+
+    def __post_init__(self) -> None:
+        if type(self.enabled) is not bool or type(self.download_consent) is not bool:
+            raise ValueError("speaker enablement and download consent must be booleans")
+        if self.profile not in {None, "1.04", "0.64"}:
+            raise ValueError("speaker profile must be explicitly 1.04 or 0.64")
+        device = self.vulkan_device_id
+        if device is not None:
+            if not isinstance(device, str) or not device.isdecimal():
+                raise ValueError(
+                    "speaker Vulkan device must be an explicit nonnegative device index"
+                )
+            object.__setattr__(self, "vulkan_device_id", device.strip())
+        if self.enabled and (self.profile is None or device is None):
+            raise ValueError(
+                "enabling speaker analysis requires an explicit profile and Vulkan device"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class UserIntentSettings:
     translation: TranslationIntent = field(default_factory=TranslationIntent)
     local_llm: LocalLLMIntent = field(default_factory=LocalLLMIntent)
@@ -786,6 +811,7 @@ class UserIntentSettings:
     integrated_context: IntegratedContextIntent = field(default_factory=IntegratedContextIntent)
     telemetry: TelemetryIntent = field(default_factory=TelemetryIntent)
     prompts: PromptIntent = field(default_factory=PromptIntent)
+    speaker: SpeakerIntent = field(default_factory=SpeakerIntent)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1125,6 +1151,7 @@ __all__ = [
     "STTIntent",
     "SecretsIntent",
     "SonioxSTTIntent",
+    "SpeakerIntent",
     "TranslationIntent",
     "TelemetryIntent",
     "TelemetryOperationalState",

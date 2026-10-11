@@ -1,0 +1,3326 @@
+{
+  "schema_version": 1,
+  "observed_at_utc": "2026-10-11T22:51:00.241631+00:00",
+  "scope": "Initial native Nemotron #213 Windows Vulkan implementation qualification on the user-approved Bonenk F16 artifact. Not speaker accuracy, universal-duration/performance, VRChat/GPU-ASR competition, or official checkpoint lineage acceptance.",
+  "model": {
+    "sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+    "version": "v3",
+    "num_speakers": 8,
+    "sample_rate": 16000,
+    "file_type": 1,
+    "tensor_formats": {
+      "F32": 231,
+      "F16": 125
+    },
+    "size_bytes": 201832928,
+    "tensor_count": 356,
+    "schema_version": 1,
+    "source": {
+      "repository": "Bonenk/Nemotron-3-Diarization-GGUF",
+      "revision": "25cf0d6b0c91b679376df0f6ef3087b4fd96af1f",
+      "filename": "Nemotron-3-Diarization.f16.gguf",
+      "url": "https://huggingface.co/Bonenk/Nemotron-3-Diarization-GGUF/resolve/25cf0d6b0c91b679376df0f6ef3087b4fd96af1f/Nemotron-3-Diarization.f16.gguf",
+      "license": "OpenMDW-1.1",
+      "base_model": "nvidia/Nemotron-3-Diarization"
+    },
+    "provenance": {
+      "publisher_statement": "conversion of NVIDIA Nemotron-3-Diarization into NeMo Sortformer V3 layout",
+      "verified": "pinned publisher artifact SHA256/geometry/precision; loader and GPU qualification recorded separately",
+      "limitation": "publisher conversion recipe and original NVIDIA checkpoint checksum lineage are not independently reproduced"
+    }
+  },
+  "runtime_manifest_sha256": "4615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9",
+  "native_build": {
+    "schema_version": 1,
+    "abi": "puripuly-nemotron-1",
+    "source": {
+      "repository": "NVIDIA/NeMo-Speech.cpp",
+      "revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+    },
+    "dependencies": {
+      "llama.cpp": "bd4f514db14d87fded667787a7a963bfbaa98e89",
+      "vcpkg": "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+    },
+    "archives": {
+      "nemo": {
+        "repository": "NVIDIA/NeMo-Speech.cpp",
+        "revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+        "url": "https://codeload.github.com/NVIDIA/NeMo-Speech.cpp/zip/b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+        "sha256": "069d7042685996011d5f1878a06737195421b142f91859a561610b6971ae8b8a"
+      },
+      "llama.cpp": {
+        "repository": "ggml-org/llama.cpp",
+        "revision": "bd4f514db14d87fded667787a7a963bfbaa98e89",
+        "url": "https://codeload.github.com/ggml-org/llama.cpp/zip/bd4f514db14d87fded667787a7a963bfbaa98e89",
+        "sha256": "d74b36880a15ad7e6889dc1bb1db7489e929e4110cc613b9716cfc31bc33bbe7"
+      },
+      "vcpkg": {
+        "repository": "microsoft/vcpkg",
+        "revision": "9e593bb18ea69cc5095e012465dcd675a822ed0d",
+        "url": "https://codeload.github.com/microsoft/vcpkg/zip/9e593bb18ea69cc5095e012465dcd675a822ed0d",
+        "sha256": "92ea07cd3ad4b3bbe65e6e7088b4074eddab371d7bb70107c6e7ceefcb5d5c3e"
+      }
+    },
+    "patches": {
+      "native/nemotron/patches.json": "e81a179f2a71b76b8869a4a2710983c23f219717b344cf5c37af86574f90b748"
+    },
+    "policy": {
+      "backend": "Vulkan",
+      "neural_cpu_fallback": false,
+      "precision": "F16",
+      "schedule_guard": true,
+      "physical_gpu_only": true
+    },
+    "build": {
+      "generator": "Ninja",
+      "configuration": "Release",
+      "nemo_ggml_patch_set": false,
+      "ggml_physical_device_classification_patch": true,
+      "cmake_cache_sha256": "a5cebcc4a00fb750b285894b67fc2c1c3ddfb29498e7a943df3cedfdd9fbf7cf",
+      "neural_schedule": "selected Vulkan GPU checked before cached/direct and scheduler compute; CPU frontend permitted",
+      "accumulation": "backend-selected Vulkan shader accumulation; F16 weights, F32 auxiliary weights/activations; no all-F16 claim"
+    },
+    "files": {
+      "bin/concrt140.dll": "2405355f0a58067b258f8df33c327e3a3d716eaac5a3a5aebb757842d85bd376",
+      "bin/ggml-base.dll": "5dc9ef70f2583eae97659145b03421c7531265671d808c372b621771d6ab6f1c",
+      "bin/ggml-cpu.dll": "03f16942bc4c4092a1738627c9d099cd4c6d50220e5cdae12f38626ef734df57",
+      "bin/ggml-vulkan.dll": "044345dfec12ac0c4a863bfaf0ace67c818af07f1eb75082ecdcdb608f7b8d24",
+      "bin/ggml.dll": "38c9b7e2d9724418986ce124fa43f49d22e3880c83c86a12ae03824690d15e21",
+      "bin/msvcp140.dll": "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9",
+      "bin/msvcp140_1.dll": "bfad5aef4c63a669e3c140655cdfdf395b6c979b400a447bd5dcb65ed8826c3d",
+      "bin/msvcp140_2.dll": "3ea06f0ee098b4823cb79599df3780e7f23cce52c19aac31d2a0d47efe33a5e9",
+      "bin/msvcp140_atomic_wait.dll": "640b2aefced484d0368eea5bdd06addd0658a3a70a49256e560d6923b404a479",
+      "bin/msvcp140_codecvt_ids.dll": "f2069a52880ec885ee7f0511186100eb7fada0411a2b4948fafea7735b878a18",
+      "bin/nemo_speech_asr.dll": "934cadbbae518b0982a667ee2d534d4cf9bcf0841e3a53946e18b6478b92d734",
+      "bin/nemo_speech_asr_c.dll": "158f330a9b8ce664f4388238d0a1cf7cf871520eb3d209aeeb392ddc0b80bf8e",
+      "bin/vcruntime140.dll": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066",
+      "bin/vcruntime140_1.dll": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f",
+      "include/nemo_speech/asr.h": "12f3e017391ae19daabe59d2d50541f0aabb010228d075426b4a9834337422fa",
+      "include/nemo_speech/diar.h": "83dfd5e16859c2c7c6da740826aced4253b26cec3087630941770e41057f66a2",
+      "lib/cmake/NeMoSpeech/NeMoSpeechConfig.cmake": "2c636e6dd73e6df561386e6dff4ce6e51126bb9af7268f6815bf70e51121c25a",
+      "lib/cmake/NeMoSpeech/NeMoSpeechConfigVersion.cmake": "47f41ec43987a0d4fe23653504d4427dc1753b6a83167ba7dacf62e45487b6a4",
+      "lib/nemo_speech_asr_c.lib": "abcadb6022483dcd95d0927465a9c1b1846b78075a008ad70d9e3ec7ce7c07d5",
+      "share/doc/nemo-speech/CONTRIBUTING.md": "dab40307a65b606e687f7731273817794293c16e8d67ba7d836e83a96478c367",
+      "share/doc/nemo-speech/docs/api.md": "eb23ac5107ffbd2fb797eefcb2ce6deb50c4560e526d08d3b39d7b0bc07fdef1",
+      "share/doc/nemo-speech/docs/asr/configuration.md": "c4be8d65c0a4abcdf064d4124a767ae9626cdf5c3b476b124dd22651d02f9c73",
+      "share/doc/nemo-speech/docs/asr/customization.md": "3849d88f25926a1196737b11420027ee1f451abbc9b7307f799190036b4c622d",
+      "share/doc/nemo-speech/docs/asr/models.md": "dd89dde01f1b77a095750f4fadcf4762b971103e7026f52ef88096e19f9fe769",
+      "share/doc/nemo-speech/docs/build.md": "1adaeccf203a4561be08fa0bd3effb46f6bc1fae07b4d6020449a9b1dde75c74",
+      "share/doc/nemo-speech/docs/cli.md": "bbf0c8b54a67261e3f6dddadbbd7bcbbf915c9a157d068ca75cf189a3927614b",
+      "share/doc/nemo-speech/docs/clients.md": "c4977349b3fed97eee0700543ef77e58d3ea2c07b1b89ba8510adb2e3476cd6c",
+      "share/doc/nemo-speech/docs/development/asr-batching.md": "351e7cc131aa055a032aa2cb74b261320fab47793ace608b757abdce84b500a7",
+      "share/doc/nemo-speech/docs/development/cublas-shim.md": "126b2e92e74451cb999932474ddabab44e9d1064607dbafd7e36b36cb6ae4679",
+      "share/doc/nemo-speech/docs/development/diagnostics.md": "e82ced430db61edd107af84d2ac096bb6ddfa1c1d48c2a8a284469592cf7e97a",
+      "share/doc/nemo-speech/docs/development/README.md": "91b7eeb45247c5ccb86c728e100926f690bce39a13d7c2fe185ddf03eecc8847",
+      "share/doc/nemo-speech/docs/development/releasing.md": "c4445d64f55519613c0e698b24c1a7f94ea10c5ba301cc8f483015f6b725370b",
+      "share/doc/nemo-speech/docs/development/windows-build.md": "4b7f3efa6f8d3242edcef47a658d381c1d7800cd94d50e44738f60d3a075c278",
+      "share/doc/nemo-speech/docs/install.md": "bec102a2ac4f4566db8f9be6d1c5143cd5345c6a199e018b3083ab48594afc64",
+      "share/doc/nemo-speech/docs/model-conversion.md": "063a4651ac62559390241520d54d4ac47e9e952708205ce290304c7012d95f68",
+      "share/doc/nemo-speech/docs/nmt/configuration.md": "fc32f28f71114b049382d850d8c91bdb4d2a7a8cd17e96e05cb8b17f61ecf875",
+      "share/doc/nemo-speech/docs/nmt/models.md": "a0f5874b51448351ad36e2a572db16b8647e0b58a19043411e9303ac224a2451",
+      "share/doc/nemo-speech/docs/README.md": "0bd53c4c04a1a6670d440a626b04e19ce3354006807882e9d5f8e36d37b4b936",
+      "share/doc/nemo-speech/docs/s2s/clients.md": "a8c19f0b745b6ad6bdbfb3c9fee588f260d88b1f3036376a35cba507b5069ed9",
+      "share/doc/nemo-speech/docs/s2s/configuration.md": "2178cb877efd78a344d646a479e117babb332e86ea68d116840a5ab6ee48e7ca",
+      "share/doc/nemo-speech/docs/s2s/docker.md": "f430241ae0296304bac4fc20d6df04f7c8194021c282f06f486c8e7b36e2c750",
+      "share/doc/nemo-speech/docs/s2s/models.md": "4e4a8089fd8f0b4c9d7fe7d07af5466dbe98b9e2531065374c20662a1f7d65a7",
+      "share/doc/nemo-speech/docs/s2s/README.md": "b07a3b137188bc1a29ee21b071c78f01adc452bf22b7cb7307f6cc8290cd503e",
+      "share/doc/nemo-speech/docs/sdk.md": "290466ffb5ca4064abaeecfab4d0b351ce6b983d434057a67782a834622c6def",
+      "share/doc/nemo-speech/docs/server.md": "01b99ed2681cf2227ef525cbb5f22605411ee046bfc15f7a9fb40649a15fea19",
+      "share/doc/nemo-speech/docs/troubleshooting.md": "50cc4f3c85e397c78e5ab77065f0d9ed44058de62d634fee6aab2ca532927063",
+      "share/doc/nemo-speech/docs/tts/configuration.md": "5d60b9e3dc3b51b23622653b8a3463758c79e4386b1f5229b0d97ca3adf07532",
+      "share/doc/nemo-speech/docs/tts/models.md": "125e5ab5020661a20ba97d1cab4f55c92e08f7a10d86f4c0ad5dc6131ca60938",
+      "share/doc/nemo-speech/README.md": "54f85f532a1bfe23324ced98b4ad0da675d8e98b4f3d4552644f74be23b1d6b2",
+      "share/licenses/nemo-speech/LICENSE": "eaaca34b26b27c7be5a5099a0b9ddf9913f2db0aa96f6d5854435f2916d6fdc3",
+      "share/licenses/nemo-speech/NOTICE": "d5ea773d67035e676503579ecf7d5836a124649d7fe99d59ec3c50cd101e1a80",
+      "share/licenses/nemo-speech/third_party/abseil/copyright": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747",
+      "share/licenses/nemo-speech/third_party/ggml/LICENSE": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
+      "share/licenses/nemo-speech/third_party/protobuf/copyright": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d",
+      "share/licenses/nemo-speech/third_party/sentencepiece/copyright": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "share/licenses/nemo-speech/third_party/utf8-range/copyright": "02de69b64fc36d9e938f418e52723e42f0b2b226d58a9cb3c8dcbdf7059f5074",
+      "share/licenses/nemo-speech/THIRD_PARTY_NOTICES.md": "fd8fcc0c71abde95b1b742a74c70aa27d2b4f2811fc19f64378b6845d8f3254a",
+      "share/nemo-speech/config/asr.example.yaml": "c406506f22ef5baa008138c28817dd18445407e404bfb507630469d203798716",
+      "share/nemo-speech/config/diar.example.yaml": "ac0e5d93af9fb37c9a03ab0039acd5af0790c36a2b12cc8d181212a1fbd01b5b",
+      "share/nemo-speech/config/nmt.example.yaml": "313214fe93f9f9f57897823d2d3fe20e7a9986fc18b1df37063985389874d46f",
+      "share/nemo-speech/config/README.md": "981118a586fa2cdaab5bed0f0775292002821007ee1da5740a8a77877db50c89",
+      "share/nemo-speech/config/server.example.yaml": "afe8b2575c036156322a93aaf2f328f925e6685e3cddc9604c0fca37a9406d0c",
+      "share/nemo-speech/config/tts.example.yaml": "a1ccdd6886f25d635aaffd4501c3b9626f7c7b264f280ca72273bb3b14bb651a",
+      "share/nemo-speech/config/voicechat.yaml": "9013c7a390fc3f8c68c6833400a55aadd91543e01a49db32e64a81a1b32ef17b",
+      "share/nemo-speech/model-index.json": "4d5d88c93b006b33b2e02e5c214e97e6c28e96f8673b0d744ccfa1e8f4a255b7"
+    }
+  },
+  "environment": {
+    "os": "Windows 10.0.22631 x64",
+    "vulkan_sdk": "1.4.350.0",
+    "cmake": "4.3.1",
+    "ninja": "1.13.0.git.kitware.jobserver-pipe-1",
+    "compiler": "MSVC 19.44.35222.0",
+    "gpu": {
+      "ordinal": 0,
+      "name": "AMD Radeon RX 7900 XTX",
+      "physical_type": "DISCRETE_GPU",
+      "vendor_id": "0x1002",
+      "device_id": "0x744c",
+      "api_version": "1.4.349",
+      "driver_version": "2.0.395",
+      "driver_name": "AMD proprietary driver",
+      "driver_info": "26.8.1 (LLPC)",
+      "conformance_version": "1.4.3.3"
+    },
+    "gpu_observation_command": "vulkaninfo --summary"
+  },
+  "resolved_native_dependencies": {
+    "sentencepiece": "0.2.1",
+    "abseil": "20260107.1#3",
+    "protobuf": "6.33.4#2",
+    "utf8-range": "6.33.4",
+    "triplet": "x64-windows-static-md"
+  },
+  "settings": {
+    "profiles": {
+      "1.04": [
+        9,
+        4,
+        0,
+        264,
+        264,
+        222
+      ],
+      "0.64": [
+        6,
+        2,
+        0,
+        264,
+        264,
+        222
+      ]
+    },
+    "geometry_order": [
+      "chunk",
+      "right_context",
+      "left_context",
+      "fifo",
+      "speaker_cache",
+      "update_period"
+    ],
+    "coarse_frame_ms": 80,
+    "probability_frame_ms": 10,
+    "probability_channels": 8,
+    "active_slots_policy": "empty; raw probabilities preserved; no confidence/activity threshold introduced",
+    "winning_default_profile": null,
+    "GGML_VK_DISABLE_GRAPH_OPTIMIZE": "1",
+    "NEMO_SPEECH_SCHEDULE_CAPTURE": "1",
+    "cpu_preprocessing": "permitted",
+    "cpu_accel_neural_compute": "rejected before every cached/direct/scheduled compute",
+    "cxx_flags": "/utf-8 /EHsc"
+  },
+  "public_inputs": [
+    {
+      "filename": "common_voice_en_11289258.mp3",
+      "sha256": "19865499680804b33e8ac1f3a7b96fa8762e31be6a143c9e711bba72984272ad",
+      "license": "CC0-1.0",
+      "corpus": "Common Voice 17.0/en",
+      "repository": "fsicoli/common_voice_17_0",
+      "revision": "8262c16bf297c87a9cd88c51997c4758ed7a8ba2"
+    },
+    {
+      "filename": "common_voice_en_12274.mp3",
+      "sha256": "cccded3f9d5a5bb4c28110b8273e217cc44d5d9e9de95eb70fd19208dce9b4f5",
+      "license": "CC0-1.0",
+      "corpus": "Common Voice 17.0/en",
+      "repository": "fsicoli/common_voice_17_0",
+      "revision": "8262c16bf297c87a9cd88c51997c4758ed7a8ba2"
+    }
+  ],
+  "commands": {
+    "build": "pwsh -NoProfile -File scripts/ci/build-nemotron-runtime.ps1 -OutputDir <RUNTIME> -CacheDir <SOURCE_CACHE> -Python <PRODUCT_PYTHON> -VulkanSdk <VULKAN_SDK_1.4.350.0> -Jobs 4",
+    "protocol": "<PRODUCT_PYTHON> -m pytest tests/app/adapters/nemotron -q",
+    "owner": "<PRODUCT_PYTHON> native/nemotron/probe_owner.py --model <BONENK>/model.gguf --runtime <RUNTIME> --device 0 --audio-a <PUBLIC_CORPUS>/common_voice_en_11289258.mp3 --audio-b <PUBLIC_CORPUS>/common_voice_en_12274.mp3 --output <EVIDENCE>/owner.json",
+    "adapter_co_asr": "<PRODUCT_PYTHON> native/nemotron/probe.py --model <BONENK>/model.gguf --runtime <RUNTIME> --device 0 --audio-a <PUBLIC_CORPUS>/common_voice_en_11289258.mp3 --audio-b <PUBLIC_CORPUS>/common_voice_en_12274.mp3 --asr-root <LOCAL_ASR_MODELS> --output <EVIDENCE>/adapter.json",
+    "precision": "<PRODUCT_PYTHON> native/nemotron/probe_precision.py --model <BONENK>/model.gguf --runtime <RUNTIME> --device 0 --audio <PUBLIC_CORPUS>/common_voice_en_11289258.mp3 --output <EVIDENCE>/precision.json",
+    "physical_guard": "<PRODUCT_PYTHON> native/nemotron/verify_physical_guard.py --source <SOURCE_CACHE>/nemo-code --vcvars <VCVARS64> --vulkan-sdk <VULKAN_SDK_1.4.350.0> --output <EVIDENCE>/physical-guard.json"
+  },
+  "model_free_checks": {
+    "adapter_tests": {
+      "status": "passed",
+      "cases": 23,
+      "covers": "bounded framed IPC, private persistent child, pause/resume, repeated reset, wrong model/precision/head geometry, provenance/inventory/policy failure, byte-preserving approved F16 import, conversion/import cancellation, concurrent/in-flight stop/spawn cancellation, and real worker entrypoint warning regression"
+    },
+    "physical_guard": {
+      "status": "passed",
+      "scope": "compiled actual patched classification switch and strict selection predicate with real Vulkan/ggml enum headers; model-free deterministic CPU/Other/unknown and integrated/discrete/virtual GPU cases",
+      "software_cpu_icd_inference": "not exercised; no software CPU ICD installed",
+      "cases": 6,
+      "observed": "PHYSICAL_GPU_CLASSIFICATION_AND_SELECTION_PREDICATE_PASSED",
+      "patched_source_sha256": {
+        "llama.cpp/ggml/src/ggml-vulkan/ggml-vulkan.cpp": "910d35e352a9c34388518918e7f39377288dcc2b606dd4ed3a6eeebef0776712",
+        "src/runtime/ggml/backend.cpp": "5d697e40147c14556888ae248e542a24b269d0e37b34ccd7c1c84c4168040fa0"
+      },
+      "harness_sha256": "3eac6f55c216830ef26e80263daae878575d670755f3a56ad649ccab1e99a4dc"
+    },
+    "official_converter": {
+      "status": "model-free prerequisites passed; checkpoint conversion not run",
+      "environment": "isolated Python 3.12 hash-locked requirements",
+      "pins": {
+        "numpy": "1.26.4",
+        "PyYAML": "6.0.2",
+        "huggingface-hub": "0.34.4",
+        "torch": "2.8.0+cpu"
+      },
+      "checks": [
+        "pinned convert_model.py --help exited 0",
+        "no-consent acquisition raised PermissionError before model download"
+      ],
+      "official_checkpoint_downloaded": false
+    }
+  },
+  "cached_conversion_probe_only": {
+    "status": "passed",
+    "tensors_checked": 360,
+    "values_checked": 99260363,
+    "source_sha256": "7cfc1a9f5907a509c861a8be5c4de68c01d122bae8b761487b50f4b63d8adb3c",
+    "output": {
+      "sha256": "2948faa9666883698076dd0cc51e8116dcec51a9ce7c85d1125dc53c0f9f838d",
+      "version": "v3",
+      "num_speakers": 8,
+      "sample_rate": 16000,
+      "file_type": 1,
+      "tensor_formats": {
+        "F32": 233,
+        "F16": 127
+      },
+      "size_bytes": 199018528,
+      "tensor_count": 360
+    },
+    "verified": "every target value equals exact source cast under pinned official dtype selection; auxiliary F32 unchanged",
+    "lineage": "source-checkpoint relationship remains unverified"
+  },
+  "adapter_actual": {
+    "1.04": {
+      "status": "passed",
+      "ready": {
+        "tail_padding_samples": 17152,
+        "max_revision_samples": 17152,
+        "diagnostics": {
+          "backend": "Vulkan",
+          "device_ordinal": "0",
+          "profile": "1.04",
+          "geometry": "9/4/0/264/264/222",
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "tensor_formats": "{\"F16\": 125, \"F32\": 231}",
+          "source_revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+          "neural_cpu_fallback": "forbidden",
+          "probability_frontier": "immutable emitted probabilities, not identity certainty",
+          "processed_cursor": "consumed mel hop prefix; excludes submitted lookahead",
+          "accumulation": "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+        }
+      },
+      "bounded_output": {
+        "native_probability_capacity_frames": 1024,
+        "worker_result_capacity_frames": 1024,
+        "parent_retained_stderr_bytes": 16384,
+        "ipc_metadata_bytes": 8192,
+        "ipc_payload_bytes": 65536
+      },
+      "max_frames_per_update": 72,
+      "wall_seconds": 18.433986899995944,
+      "raw_probability_sha256": "a7cfac4ecce0c382cdaf9147782b17aec85f7722264fb44b55fe6cc6f83f430f",
+      "resets": [
+        {
+          "epoch": 2,
+          "same_child": true
+        },
+        {
+          "epoch": 3,
+          "same_child": true
+        },
+        {
+          "epoch": 4,
+          "same_child": true
+        }
+      ],
+      "pauses": [
+        {
+          "submitted": 73216,
+          "processed": 57600,
+          "immutable": 57600
+        },
+        {
+          "submitted": 153664,
+          "processed": 138240,
+          "immutable": 138240
+        }
+      ],
+      "max_submitted_samples": 2003008,
+      "observed_max_total_lag_samples": 16704,
+      "probability_frames_drained": 12456,
+      "evidence_scope": "adapter-only actual Vulkan; 30 repeated A clips continuous speech plus causal synthetic padding; not SpeakerRuntime source mapping"
+    },
+    "0.64": {
+      "status": "passed",
+      "ready": {
+        "tail_padding_samples": 10752,
+        "max_revision_samples": 10752,
+        "diagnostics": {
+          "backend": "Vulkan",
+          "device_ordinal": "0",
+          "profile": "0.64",
+          "geometry": "6/2/0/264/264/222",
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "tensor_formats": "{\"F16\": 125, \"F32\": 231}",
+          "source_revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+          "neural_cpu_fallback": "forbidden",
+          "probability_frontier": "immutable emitted probabilities, not identity certainty",
+          "processed_cursor": "consumed mel hop prefix; excludes submitted lookahead",
+          "accumulation": "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+        }
+      },
+      "bounded_output": {
+        "native_probability_capacity_frames": 1024,
+        "worker_result_capacity_frames": 1024,
+        "parent_retained_stderr_bytes": 16384,
+        "ipc_metadata_bytes": 8192,
+        "ipc_payload_bytes": 65536
+      },
+      "max_frames_per_update": 48,
+      "wall_seconds": 23.28703829999722,
+      "raw_probability_sha256": "d15d7965fbdb767aeb4e242d231ad4b8e34d7feaae6dcae450e0688f48180fa0",
+      "resets": [
+        {
+          "epoch": 2,
+          "same_child": true
+        },
+        {
+          "epoch": 3,
+          "same_child": true
+        },
+        {
+          "epoch": 4,
+          "same_child": true
+        }
+      ],
+      "pauses": [
+        {
+          "submitted": 66816,
+          "processed": 61440,
+          "immutable": 61440
+        },
+        {
+          "submitted": 140864,
+          "processed": 130560,
+          "immutable": 130560
+        }
+      ],
+      "max_submitted_samples": 1990208,
+      "observed_max_total_lag_samples": 10304,
+      "probability_frames_drained": 12384,
+      "evidence_scope": "adapter-only actual Vulkan; 30 repeated A clips continuous speech plus causal synthetic padding; not SpeakerRuntime source mapping"
+    }
+  },
+  "owner_actual": {
+    "1.04": {
+      "status": "passed",
+      "checks": {
+        "causal_tail_pause": {
+          "status": "passed"
+        },
+        "return_key": {
+          "status": "passed",
+          "first_A": {
+            "slot": 0,
+            "mean_raw_probabilities": [
+              0.57572035542281,
+              0.00032659299805825665,
+              0.00014643552655147434,
+              0.00017774765078952567,
+              0.00016771918961621976,
+              0.0001211527227969627,
+              0.00011255743331566338,
+              5.472096863145266e-05
+            ],
+            "frame_count": 360
+          },
+          "B": {
+            "slot": 1,
+            "mean_raw_probabilities": [
+              2.1506762846455415e-05,
+              0.4567468401437741,
+              0.00011948616591149478,
+              2.9720642719544713e-05,
+              3.209129669489192e-05,
+              4.013093928146212e-05,
+              7.606084004656665e-05,
+              3.7327162187097286e-05
+            ],
+            "frame_count": 322
+          },
+          "return_A": {
+            "slot": 0,
+            "mean_raw_probabilities": [
+              0.582321980385071,
+              3.0469523770509314e-05,
+              5.60692168178889e-06,
+              3.271802104620747e-06,
+              1.9920922439532596e-06,
+              4.3231643919959076e-07,
+              1.0468834475852626e-07,
+              2.0317613836372402e-08
+            ],
+            "frame_count": 360
+          },
+          "meaning": "same-epoch raw slot with highest fixture mean, not identity/confidence policy or accuracy guarantee"
+        },
+        "overlap_representation": {
+          "status": "passed",
+          "meaning": "eight independent raw channels preserved; no forced single-active-slot or new threshold; acoustic overlap accuracy not scored"
+        },
+        "slow_consumer": {
+          "status": "passed",
+          "evictions": 1672,
+          "retained_items": 128,
+          "duration_input_samples": 280320
+        },
+        "manual_reset": {
+          "status": "passed"
+        },
+        "source_discontinuity": {
+          "status": "passed"
+        },
+        "graceful_eof": {
+          "status": "passed",
+          "same_epoch": true,
+          "reasons": [
+            "vad_pause",
+            "source_eof"
+          ],
+          "coverage_pending": false
+        },
+        "successor_reset": {
+          "status": "passed"
+        },
+        "late_callback": {
+          "status": "passed"
+        },
+        "stale_result": {
+          "status": "passed",
+          "old_native_update_frames": 72,
+          "delivery": "deterministically held a completed real native GPU update until after owner epoch reset; rejection established from public zero frontiers and absence of emitted frames, not stale-callback counter"
+        },
+        "inflight_stop": {
+          "status": "passed"
+        }
+      },
+      "capacity_peaks": {
+        "pending_samples": 18304,
+        "pending_items": 6,
+        "retained_map_pieces": 16,
+        "evidence_items": 128,
+        "owned_tasks": 1
+      },
+      "snapshot_trace": [
+        {
+          "label": "ready",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 0,
+          "capture_session_id": null,
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 0,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 0,
+          "max_copy_samples": 0,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "ordinary_pause",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "public-fixture-session",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 7,
+          "onset_samples": 8000,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 17,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 112064,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 92160,
+          "immutable_through_sample": 92160,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "pause_without_new_input",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "public-fixture-session",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 7,
+          "onset_samples": 8000,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 17,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 112064,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 92160,
+          "immutable_through_sample": 92160,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "returning_A_same_epoch",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "public-fixture-session",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 6,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 34,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 271424,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 253440,
+          "immutable_through_sample": 253440,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "slow_consumer_before",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "public-fixture-session",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 11,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 34,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 326720,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 299520,
+          "immutable_through_sample": 299520,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "slow_consumer_after",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "public-fixture-session",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 7,
+          "onset_samples": 0,
+          "evidence_items": 128,
+          "evidence_map_pieces": 140,
+          "evidence_evictions": 1706,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 607040,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 587520,
+          "immutable_through_sample": 587520,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "manual_reset",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 2,
+          "capture_session_id": "public-fixture-session",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 1,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1706,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 608640,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "real_source_discontinuity",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 3,
+          "capture_session_id": "public-fixture-session",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 1,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1706,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 610240,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "graceful_eof_after_immediate_end",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 3,
+          "capture_session_id": null,
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 0,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1706,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 611840,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 11520,
+          "immutable_through_sample": 11520,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "successor_new_epoch_compact_zero",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 4,
+          "capture_session_id": "public-successor-capture",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 1,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1706,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 613440,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "late_old_capture_callback",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 4,
+          "capture_session_id": "public-successor-capture",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 1,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1706,
+          "overloads": 0,
+          "stale_events": 1,
+          "copied_samples": 613440,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "before_inflight_reset",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 4,
+          "capture_session_id": "public-successor-capture",
+          "paused": false,
+          "pending_samples": 16000,
+          "pending_items": 1,
+          "retained_map_pieces": 2,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1706,
+          "overloads": 0,
+          "stale_events": 1,
+          "copied_samples": 629440,
+          "max_copy_samples": 16000,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "after_inflight_reset",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 5,
+          "capture_session_id": "public-successor-capture",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 0,
+          "onset_samples": 0,
+          "evidence_items": 1,
+          "evidence_map_pieces": 2,
+          "evidence_evictions": 1706,
+          "overloads": 0,
+          "stale_events": 1,
+          "copied_samples": 629440,
+          "max_copy_samples": 16000,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "before_real_inflight_stop",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 5,
+          "capture_session_id": "public-successor-capture",
+          "paused": false,
+          "pending_samples": 16000,
+          "pending_items": 1,
+          "retained_map_pieces": 1,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1706,
+          "overloads": 0,
+          "stale_events": 1,
+          "copied_samples": 645440,
+          "max_copy_samples": 16000,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "1.04"
+            ],
+            [
+              "geometry",
+              "9/4/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "stopped",
+          "state": "stopped",
+          "ready": false,
+          "speaker_epoch": 6,
+          "capture_session_id": null,
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 0,
+          "onset_samples": 0,
+          "evidence_items": 1,
+          "evidence_map_pieces": 1,
+          "evidence_evictions": 1706,
+          "overloads": 0,
+          "stale_events": 1,
+          "copied_samples": 645440,
+          "max_copy_samples": 16000,
+          "owned_tasks": 0,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [],
+          "error": null
+        }
+      ],
+      "evidence_sha256": "378ec000d11aa36f341d890cfde30032f0ed5eb2707111be81c7edd2e9fe45ad",
+      "eof_original_end_3200_examples": [
+        {
+          "capture_session_id": "public-fixture-session",
+          "speaker_epoch": 3,
+          "observation_ready_monotonic_s": 35289.1623844,
+          "source_map": [
+            {
+              "compact_start_sample": 3040,
+              "compact_end_sample": 3200,
+              "capture": {
+                "capture_epoch": 8,
+                "callback_sequence": 389,
+                "source_sample_rate_hz": 16000,
+                "source_start_sample": 3040,
+                "source_end_sample": 3200,
+                "source_start_monotonic_s": 1000.19,
+                "source_end_monotonic_s": 1000.2,
+                "discontinuity_before": null,
+                "normalized_sample_rate_hz": 16000,
+                "normalized_start_sample": 3040,
+                "normalized_end_sample": 3200
+              },
+              "kind": "original"
+            }
+          ],
+          "processed_through_sample": 11520,
+          "immutable_through_sample": 11520,
+          "frame": {
+            "start_sample": 3040,
+            "end_sample": 3200,
+            "probabilities": [
+              0.006510821171104908,
+              0.00037416614941321313,
+              8.925663132686168e-05,
+              6.945841596461833e-05,
+              2.4488883354933932e-05,
+              1.8271007320436183e-06,
+              3.057953534835178e-08,
+              5.531596292129848e-10
+            ],
+            "active_slots": []
+          },
+          "range_state": "closed",
+          "reason": null
+        }
+      ],
+      "evidence_scope": "actual SpeakerRuntime public snapshot/drain with real GPU updates; stale update delivery deterministically held after actual native completion; other owner paths not mocked"
+    },
+    "0.64": {
+      "status": "passed",
+      "checks": {
+        "causal_tail_pause": {
+          "status": "passed"
+        },
+        "return_key": {
+          "status": "passed",
+          "first_A": {
+            "slot": 0,
+            "mean_raw_probabilities": [
+              0.6114841349375898,
+              0.000370174755416775,
+              0.00021550710403231288,
+              0.0002673063857010388,
+              0.00022216909461156948,
+              0.0001619886498844179,
+              0.00015699330057994266,
+              7.557465868026837e-05
+            ],
+            "frame_count": 336
+          },
+          "B": {
+            "slot": 1,
+            "mean_raw_probabilities": [
+              0.00013386076205447955,
+              0.3911268802358059,
+              0.00013740053265091313,
+              4.586947571616624e-05,
+              4.814921339033595e-05,
+              4.9391312485685496e-05,
+              7.60565110794156e-05,
+              3.556006954465088e-05
+            ],
+            "frame_count": 378
+          },
+          "return_A": {
+            "slot": 0,
+            "mean_raw_probabilities": [
+              0.5619699095831981,
+              8.614309490797225e-06,
+              3.4410031081056843e-06,
+              2.8507405722600034e-06,
+              1.4556367553772373e-06,
+              4.0776339249861406e-07,
+              1.2299940901616192e-07,
+              2.8020877715493168e-08
+            ],
+            "frame_count": 376
+          },
+          "meaning": "same-epoch raw slot with highest fixture mean, not identity/confidence policy or accuracy guarantee"
+        },
+        "overlap_representation": {
+          "status": "passed",
+          "meaning": "eight independent raw channels preserved; no forced single-active-slot or new threshold; acoustic overlap accuracy not scored"
+        },
+        "slow_consumer": {
+          "status": "passed",
+          "evictions": 1600,
+          "retained_items": 128,
+          "duration_input_samples": 280320
+        },
+        "manual_reset": {
+          "status": "passed"
+        },
+        "source_discontinuity": {
+          "status": "passed"
+        },
+        "graceful_eof": {
+          "status": "passed",
+          "same_epoch": true,
+          "reasons": [
+            "vad_pause",
+            "source_eof"
+          ],
+          "coverage_pending": false
+        },
+        "successor_reset": {
+          "status": "passed"
+        },
+        "late_callback": {
+          "status": "passed"
+        },
+        "stale_result": {
+          "status": "passed",
+          "old_native_update_frames": 48,
+          "delivery": "deterministically held a completed real native GPU update until after owner epoch reset; rejection established from public zero frontiers and absence of emitted frames, not stale-callback counter"
+        },
+        "inflight_stop": {
+          "status": "passed"
+        }
+      },
+      "capacity_peaks": {
+        "pending_samples": 16000,
+        "pending_items": 6,
+        "retained_map_pieces": 9,
+        "evidence_items": 128,
+        "owned_tasks": 1
+      },
+      "snapshot_trace": [
+        {
+          "label": "ready",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 0,
+          "capture_session_id": null,
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 0,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 0,
+          "max_copy_samples": 0,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "ordinary_pause",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "public-fixture-session",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 6,
+          "onset_samples": 8000,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 112064,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 76800,
+          "immutable_through_sample": 76800,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "pause_without_new_input",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "public-fixture-session",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 6,
+          "onset_samples": 8000,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 112064,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 76800,
+          "immutable_through_sample": 76800,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "returning_A_same_epoch",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "public-fixture-session",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 4,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 271424,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 230400,
+          "immutable_through_sample": 230400,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "slow_consumer_before",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "public-fixture-session",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 4,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 326720,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 284160,
+          "immutable_through_sample": 284160,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "slow_consumer_after",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "public-fixture-session",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 7,
+          "onset_samples": 0,
+          "evidence_items": 128,
+          "evidence_map_pieces": 141,
+          "evidence_evictions": 1600,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 607040,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 560640,
+          "immutable_through_sample": 560640,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "manual_reset",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 2,
+          "capture_session_id": "public-fixture-session",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 1,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1600,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 608640,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "real_source_discontinuity",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 3,
+          "capture_session_id": "public-fixture-session",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 1,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1600,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 610240,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "graceful_eof_after_immediate_end",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 3,
+          "capture_session_id": null,
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 0,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1600,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 611840,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 7680,
+          "immutable_through_sample": 7680,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "successor_new_epoch_compact_zero",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 4,
+          "capture_session_id": "public-successor-capture",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 1,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1600,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 613440,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "late_old_capture_callback",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 4,
+          "capture_session_id": "public-successor-capture",
+          "paused": false,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 1,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1600,
+          "overloads": 0,
+          "stale_events": 1,
+          "copied_samples": 613440,
+          "max_copy_samples": 1600,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "before_inflight_reset",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 4,
+          "capture_session_id": "public-successor-capture",
+          "paused": false,
+          "pending_samples": 16000,
+          "pending_items": 1,
+          "retained_map_pieces": 2,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1600,
+          "overloads": 0,
+          "stale_events": 1,
+          "copied_samples": 629440,
+          "max_copy_samples": 16000,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "after_inflight_reset",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 5,
+          "capture_session_id": "public-successor-capture",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 0,
+          "onset_samples": 0,
+          "evidence_items": 1,
+          "evidence_map_pieces": 2,
+          "evidence_evictions": 1600,
+          "overloads": 0,
+          "stale_events": 1,
+          "copied_samples": 629440,
+          "max_copy_samples": 16000,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "before_real_inflight_stop",
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 5,
+          "capture_session_id": "public-successor-capture",
+          "paused": false,
+          "pending_samples": 16000,
+          "pending_items": 1,
+          "retained_map_pieces": 1,
+          "onset_samples": 0,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 1600,
+          "overloads": 0,
+          "stale_events": 1,
+          "copied_samples": 645440,
+          "max_copy_samples": 16000,
+          "owned_tasks": 1,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        {
+          "label": "stopped",
+          "state": "stopped",
+          "ready": false,
+          "speaker_epoch": 6,
+          "capture_session_id": null,
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 0,
+          "onset_samples": 0,
+          "evidence_items": 1,
+          "evidence_map_pieces": 1,
+          "evidence_evictions": 1600,
+          "overloads": 0,
+          "stale_events": 1,
+          "copied_samples": 645440,
+          "max_copy_samples": 16000,
+          "owned_tasks": 0,
+          "processed_through_sample": 0,
+          "immutable_through_sample": 0,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 128,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [],
+          "error": null
+        }
+      ],
+      "evidence_sha256": "8ef1c762d478f70256296b44184f74b813d5267f2d420c12639e9451148dc24a",
+      "eof_original_end_3200_examples": [
+        {
+          "capture_session_id": "public-fixture-session",
+          "speaker_epoch": 3,
+          "observation_ready_monotonic_s": 35298.0479595,
+          "source_map": [
+            {
+              "compact_start_sample": 3040,
+              "compact_end_sample": 3200,
+              "capture": {
+                "capture_epoch": 8,
+                "callback_sequence": 389,
+                "source_sample_rate_hz": 16000,
+                "source_start_sample": 3040,
+                "source_end_sample": 3200,
+                "source_start_monotonic_s": 1000.19,
+                "source_end_monotonic_s": 1000.2,
+                "discontinuity_before": null,
+                "normalized_sample_rate_hz": 16000,
+                "normalized_start_sample": 3040,
+                "normalized_end_sample": 3200
+              },
+              "kind": "original"
+            }
+          ],
+          "processed_through_sample": 7680,
+          "immutable_through_sample": 7680,
+          "frame": {
+            "start_sample": 3040,
+            "end_sample": 3200,
+            "probabilities": [
+              0.00834012869745493,
+              0.0004752981476485729,
+              0.00012647738913074136,
+              8.676460129208863e-05,
+              3.102792470599525e-05,
+              2.571857521616039e-06,
+              4.581034929174166e-08,
+              8.854147970360771e-10
+            ],
+            "active_slots": []
+          },
+          "range_state": "closed",
+          "reason": null
+        }
+      ],
+      "evidence_scope": "actual SpeakerRuntime public snapshot/drain with real GPU updates; stale update delivery deterministically held after actual native completion; other owner paths not mocked"
+    }
+  },
+  "precision_actual": {
+    "scope": "actual lazily compiled/requested Vulkan pipeline statistics for up to three seconds of approved public fixture; not a universal per-node accumulator guarantee",
+    "public_fixture": {
+      "filename": "common_voice_en_11289258.mp3",
+      "sha256": "19865499680804b33e8ac1f3a7b96fa8762e31be6a143c9e711bba72984272ad"
+    },
+    "profiles": {
+      "1.04": {
+        "frames": 216,
+        "ready_diagnostics": {
+          "backend": "Vulkan",
+          "device_ordinal": "0",
+          "profile": "1.04",
+          "geometry": "9/4/0/264/264/222",
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "tensor_formats": "{\"F16\": 125, \"F32\": 231}",
+          "source_revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+          "neural_cpu_fallback": "forbidden",
+          "probability_frontier": "immutable emitted probabilities, not identity certainty",
+          "processed_cursor": "consumed mel hop prefix; excludes submitted lookahead",
+          "accumulation": "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+        },
+        "observed_pipeline_names": [
+          "matmul_f32_f32_aligned_0",
+          "norm_f32",
+          "mul_f32_f32_f32",
+          "add_f32_f32_f32",
+          "matmul_f16_f32_f16acc_aligned_0",
+          "rope_neox_f32",
+          "flash_attn_f32_f16_cm1",
+          "contig_cpy_f32_f32",
+          "add_f32_f32_f32_norepeat",
+          "gelu_erf_f32",
+          "cpy_transpose_32",
+          "im2col_f32_f16",
+          "matmul_f16_f16acc_aligned_0",
+          "relu_f32",
+          "matmul_f32_f32_aligned_1",
+          "matmul_f32_f32_0",
+          "sigmoid_f32",
+          "concat_i32"
+        ],
+        "statistics_stderr_tail": "ggml_vulkan: pipeline stats for matmul_f32_f32_aligned_0:\nggml_vulkan:   numUsedVgprs: 94\nggml_vulkan:   numUsedSgprs: 40\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 6144\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for norm_f32:\nggml_vulkan:   numUsedVgprs: 9\nggml_vulkan:   numUsedSgprs: 40\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 4096\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for mul_f32_f32_f32:\nggml_vulkan:   numUsedVgprs: 14\nggml_vulkan:   numUsedSgprs: 42\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for add_f32_f32_f32:\nggml_vulkan:   numUsedVgprs: 14\nggml_vulkan:   numUsedSgprs: 42\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for matmul_f16_f32_f16acc_aligned_0:\nggml_vulkan:   numUsedVgprs: 94\nggml_vulkan:   numUsedSgprs: 41\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 5632\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for rope_neox_f32:\nggml_vulkan:   numUsedVgprs: 8\nggml_vulkan:   numUsedSgprs: 34\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for flash_attn_f32_f16_cm1:\nggml_vulkan:   numUsedVgprs: 125\nggml_vulkan:   numUsedSgprs: 59\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 18944\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for contig_cpy_f32_f32:\nggml_vulkan:   numUsedVgprs: 7\nggml_vulkan:   numUsedSgprs: 19\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for add_f32_f32_f32_norepeat:\nggml_vulkan:   numUsedVgprs: 11\nggml_vulkan:   numUsedSgprs: 38\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for gelu_erf_f32:\nggml_vulkan:   numUsedVgprs: 12\nggml_vulkan:   numUsedSgprs: 34\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for cpy_transpose_32:\nggml_vulkan:   numUsedVgprs: 31\nggml_vulkan:   numUsedSgprs: 70\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 4608\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for im2col_f32_f16:\nggml_vulkan:   numUsedVgprs: 22\nggml_vulkan:   numUsedSgprs: 86\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for matmul_f16_f16acc_aligned_0:\nggml_vulkan:   numUsedVgprs: 93\nggml_vulkan:   numUsedSgprs: 41\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 5632\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for relu_f32:\nggml_vulkan:   numUsedVgprs: 8\nggml_vulkan:   numUsedSgprs: 32\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for matmul_f32_f32_aligned_1:\nggml_vulkan:   numUsedVgprs: 142\nggml_vulkan:   numUsedSgprs: 42\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 12288\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for matmul_f32_f32_0:\nggml_vulkan:   numUsedVgprs: 120\nggml_vulkan:   numUsedSgprs: 40\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 6144\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for sigmoid_f32:\nggml_vulkan:   numUsedVgprs: 8\nggml_vulkan:   numUsedSgprs: 32\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for concat_i32:\nggml_vulkan:   numUsedVgprs: 9\nggml_vulkan:   numUsedSgprs: 31\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0",
+        "bounded_stderr_bytes": 4363
+      },
+      "0.64": {
+        "frames": 240,
+        "ready_diagnostics": {
+          "backend": "Vulkan",
+          "device_ordinal": "0",
+          "profile": "0.64",
+          "geometry": "6/2/0/264/264/222",
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "tensor_formats": "{\"F16\": 125, \"F32\": 231}",
+          "source_revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+          "neural_cpu_fallback": "forbidden",
+          "probability_frontier": "immutable emitted probabilities, not identity certainty",
+          "processed_cursor": "consumed mel hop prefix; excludes submitted lookahead",
+          "accumulation": "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+        },
+        "observed_pipeline_names": [
+          "mul_mat_vec_f32_f32_f32",
+          "norm_f32",
+          "mul_f32_f32_f32",
+          "add_f32_f32_f32",
+          "mul_mat_vec_f16_f32_f32",
+          "rope_neox_f32",
+          "flash_attn_f32_f16_cm1",
+          "contig_cpy_f32_f32",
+          "add_f32_f32_f32_norepeat",
+          "gelu_erf_f32",
+          "cpy_transpose_32",
+          "im2col_f32_f16",
+          "matmul_f16_f16acc_0",
+          "relu_f32",
+          "matmul_f32_f32_aligned_1",
+          "matmul_f32_f32_0",
+          "sigmoid_f32",
+          "concat_i32",
+          "matmul_f16_f32_f16acc_aligned_0",
+          "matmul_f16_f16acc_aligned_0",
+          "split_k_reduce"
+        ],
+        "statistics_stderr_tail": "ggml_vulkan: pipeline stats for mul_mat_vec_f32_f32_f32:\nggml_vulkan:   numUsedVgprs: 172\nggml_vulkan:   numUsedSgprs: 66\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for norm_f32:\nggml_vulkan:   numUsedVgprs: 9\nggml_vulkan:   numUsedSgprs: 40\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 4096\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for mul_f32_f32_f32:\nggml_vulkan:   numUsedVgprs: 14\nggml_vulkan:   numUsedSgprs: 42\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for add_f32_f32_f32:\nggml_vulkan:   numUsedVgprs: 14\nggml_vulkan:   numUsedSgprs: 42\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for mul_mat_vec_f16_f32_f32:\nggml_vulkan:   numUsedVgprs: 197\nggml_vulkan:   numUsedSgprs: 69\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 272\nggml_vulkan: pipeline stats for rope_neox_f32:\nggml_vulkan:   numUsedVgprs: 8\nggml_vulkan:   numUsedSgprs: 34\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for flash_attn_f32_f16_cm1:\nggml_vulkan:   numUsedVgprs: 125\nggml_vulkan:   numUsedSgprs: 59\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 18944\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for contig_cpy_f32_f32:\nggml_vulkan:   numUsedVgprs: 7\nggml_vulkan:   numUsedSgprs: 19\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for add_f32_f32_f32_norepeat:\nggml_vulkan:   numUsedVgprs: 11\nggml_vulkan:   numUsedSgprs: 38\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for gelu_erf_f32:\nggml_vulkan:   numUsedVgprs: 12\nggml_vulkan:   numUsedSgprs: 34\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for cpy_transpose_32:\nggml_vulkan:   numUsedVgprs: 31\nggml_vulkan:   numUsedSgprs: 70\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 4608\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for im2col_f32_f16:\nggml_vulkan:   numUsedVgprs: 22\nggml_vulkan:   numUsedSgprs: 86\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for matmul_f16_f16acc_0:\nggml_vulkan:   numUsedVgprs: 119\nggml_vulkan:   numUsedSgprs: 40\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 5632\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for relu_f32:\nggml_vulkan:   numUsedVgprs: 8\nggml_vulkan:   numUsedSgprs: 32\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for matmul_f32_f32_aligned_1:\nggml_vulkan:   numUsedVgprs: 142\nggml_vulkan:   numUsedSgprs: 42\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 12288\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for matmul_f32_f32_0:\nggml_vulkan:   numUsedVgprs: 120\nggml_vulkan:   numUsedSgprs: 40\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 6144\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for sigmoid_f32:\nggml_vulkan:   numUsedVgprs: 8\nggml_vulkan:   numUsedSgprs: 32\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for concat_i32:\nggml_vulkan:   numUsedVgprs: 9\nggml_vulkan:   numUsedSgprs: 31\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for matmul_f16_f32_f16acc_aligned_0:\nggml_vulkan:   numUsedVgprs: 94\nggml_vulkan:   numUsedSgprs: 41\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 5632\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for matmul_f16_f16acc_aligned_0:\nggml_vulkan:   numUsedVgprs: 93\nggml_vulkan:   numUsedSgprs: 41\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 5632\nggml_vulkan:   scratchMemUsageInBytes: 0\nggml_vulkan: pipeline stats for split_k_reduce:\nggml_vulkan:   numUsedVgprs: 10\nggml_vulkan:   numUsedSgprs: 24\nggml_vulkan:   ldsSizePerLocalWorkGroup: 65536\nggml_vulkan:   ldsUsageSizeInBytes: 0\nggml_vulkan:   scratchMemUsageInBytes: 0",
+        "bounded_stderr_bytes": 5095
+      }
+    }
+  },
+  "qualification_limits": [
+    "Publisher Bonenk conversion recipe and original NVIDIA checkpoint checksum lineage not independently reproduced. Exact approved publisher artifact pin/hash verified.",
+    "Official .nemo conversion tooling has model-free prerequisite/consent checks, not an exercised original-checkpoint conversion. No official checkpoint download occurred.",
+    "Cached F32 conversion has exhaustive exact-value cast evidence but unknown original checkpoint lineage and cannot enable production readiness.",
+    "Controlled repeated public read-speech fixture and digitally mixed A+B do not score natural conversational diarization or acoustic overlap accuracy.",
+    "Co-resident ASR selected for this probe is CPU Parakeet; no GPU-ASR/VRChat GPU contention measured.",
+    "Requested lazy pipeline names prove observed matrix/vector precision choices for this fixture; flash_attn_f32_f16_cm1 name does not uniquely identify its accumulator. No all-F16 execution claim.",
+    "No software CPU Vulkan ICD installed: CPU/Other rejection exercised by compiled actual classification/selection source fragments, not a real software ICD inference.",
+    "No universal duration, latency or performance claim. Packaging/product restaging verification belongs to their owners."
+  ],
+  "co_residency": {
+    "status": "passed",
+    "provider": "local_parakeet_v3",
+    "model": "parakeet-tdt-0.6b-v3-int8-sherpa",
+    "nemotron_child_pid": 36304,
+    "asr_recognizer_resident": true,
+    "scope": "selected CPU local ASR plus Vulkan Nemotron; not GPU-ASR/VRChat competition",
+    "asr_result_present": true,
+    "installation_provenance": {
+      "manifest_version": 1,
+      "model_id": "parakeet-tdt-0.6b-v3-int8-sherpa",
+      "engine": "sherpa-onnx",
+      "install_dirname": "parakeet-tdt-0.6b-v3-int8-sherpa",
+      "selected_source": "huggingface",
+      "selected_revision": "2bda32ec70b097a55adaa07d9a7173915b43cc78"
+    },
+    "model_file_sha256": {
+      "encoder.int8.onnx": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+      "decoder.int8.onnx": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+      "joiner.int8.onnx": "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+      "tokens.txt": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
+    }
+  },
+  "asr_after_speaker_fault": {
+    "status": "passed",
+    "result_present": true
+  },
+  "missing_device": {
+    "status": "passed",
+    "rejected": "Nemotron selected Vulkan device ordinal is unavailable"
+  },
+  "actual_inflight_stop": {
+    "status": "passed",
+    "request_inflight_at_stop": true,
+    "child_returncode": 1,
+    "outcome": "inflight_fenced"
+  },
+  "qualification_code_sha256": {
+    "native/nemotron/acquire_preconverted.py": "004af0d69bc2cf3b119044074a21e5998ddcdfb7e3575e447956040d02b4656e",
+    "native/nemotron/convert.py": "464fe4fb2d81f52a6c5a1f445fe22a03db2e3f4acd166602956f976bbdc4dfcf",
+    "native/nemotron/convert_official.py": "15a5838f2edf88d4d6fda950bab2df7cff06bdaae931ea069c68b302b91abb9e",
+    "native/nemotron/prepare.py": "1d4913adf13e58ee1b96f9b3ae2336960f334e71d443cac64211532567a0f711",
+    "native/nemotron/probe.py": "31504fafb69845542efb140f1f11ebcde30b8fc8a19fabbcde1ce1fc06053b04",
+    "native/nemotron/probe_owner.py": "fa884be562153784799538c722954083fe809cd5727e1b4397f76e09a15e19ca",
+    "native/nemotron/probe_precision.py": "07383ea9adabe67e3ecc0204c2c60bf9138944c51155f6cd64145d2e3eea5687",
+    "native/nemotron/verify_conversion.py": "2113fd1d65f1982bcafd6bd364e7bbebaeca9e63a599e69900d02b3079de31cb",
+    "native/nemotron/verify_physical_guard.py": "2d5b776ee4e7eb627e0f5ea4670afccefc63c1812938bfe03c63c061de178f05",
+    "src/puripuly_heart/app/adapters/nemotron/artifacts.py": "a0d4546240e4d008628cf1c853432b83cc96fb68cea009fd8f7f8cba72778c09",
+    "src/puripuly_heart/app/adapters/nemotron/backend.py": "44d1d33e0df135775c3869eeee54561099bc34e191970c8a80db1b524ebbd417",
+    "src/puripuly_heart/app/adapters/nemotron/protocol.py": "046686f10d92d9c127f3c21ffe78b4d9fd825ef97b256cf54e4a502a3c7bef56",
+    "src/puripuly_heart/app/adapters/nemotron/worker.py": "ce7655c8f65a76625ce9863ea365576595ea361b4be8fc7a0b560535b7ae83f4",
+    "src/puripuly_heart/app/adapters/nemotron/__init__.py": "7b7fdd0fad8c8104e674b852041b8cd617f20ab0da92599c8d6c41520ba8eaa7",
+    "native/nemotron/patches.json": "e81a179f2a71b76b8869a4a2710983c23f219717b344cf5c37af86574f90b748",
+    "native/nemotron/conversion-requirements.lock": "37f198fea93b73e970d6d28e67e3f4708fe11c9544ab94e7948ca21b8fac20f4",
+    "scripts/ci/build-nemotron-runtime.ps1": "72c8bf245ff8a0c44f0fa6811f374481c5da43dfc6a319c5e0101c7563db5fb6",
+    "src/puripuly_heart/core/speaker/runtime.py": "94a9e5080732a5d9b3d565b295a36ffb177dfc6cf30683afdf8026c24e931ccf",
+    "src/puripuly_heart/core/speaker/contracts.py": "d29459925d34ec39daae2ee56858d49aa1fec4fb903ed46943ae0b9401cac9de",
+    "src/puripuly_heart/data/models/nemotron-runtime.sources.json": "11e135ff3780e13aca8f9724c1c475369b098957ca989359f4b7fc5cca5e2da1",
+    "src/puripuly_heart/data/models/nemotron-3-diarization-f16-vulkan.manifest.json": "af753dca12bd54d44ab2db3c4855576531657ff52653012e1bedc1e1e48d1e2a"
+  },
+  "observed_run_code_sha256": {
+    "native/nemotron/acquire_preconverted.py": "75b4ef3c131added197141ebe3573d3f15aa05d15fa43b62e6bd551952d92be4",
+    "native/nemotron/convert.py": "464fe4fb2d81f52a6c5a1f445fe22a03db2e3f4acd166602956f976bbdc4dfcf",
+    "native/nemotron/convert_official.py": "cef51eb26846ea161f885cabe65ab2043e527e993bf427149fb37046ce01f0c0",
+    "native/nemotron/prepare.py": "2c2ab5db1521118d3b52d96134e1580a45e75c4faa4781946d4d501e5d79c9c6",
+    "native/nemotron/probe.py": "804eca08cb8bfae5b5ed72f68d8d9769cf58915640d2eaddd0b3bd1c4fc30fbc",
+    "native/nemotron/probe_owner.py": "4ca9db0ba6cfd6b31fa5e7b03179035ac95c7c07da55a5bcfe0fbf8ed2018433",
+    "native/nemotron/probe_precision.py": "86cf91bcb01cd2ae3600bad517f6ec3181874c4b748edb6fa3c86eb292e09b41",
+    "native/nemotron/verify_conversion.py": "8dda7c84fde8d703ffa20d27293b19272d163ba3ebd47b854873b1e173a2d268",
+    "native/nemotron/verify_physical_guard.py": "9fb0b87361a698e29c462f640b3abcc3435f4ea940c3ee86097fa2c7ea894c50",
+    "src/puripuly_heart/app/adapters/nemotron/artifacts.py": "d470a3c719fc07c2a6168e233540eddb2e1ead8012dacf0f32dc728c88111af5",
+    "src/puripuly_heart/app/adapters/nemotron/backend.py": "7a923a790f41ab37da5ca4e12adac36bf7515cdf769e399d85e333467a3290a0",
+    "src/puripuly_heart/app/adapters/nemotron/protocol.py": "046686f10d92d9c127f3c21ffe78b4d9fd825ef97b256cf54e4a502a3c7bef56",
+    "src/puripuly_heart/app/adapters/nemotron/worker.py": "fcd274772128c5f9bb484f2b196af6ee891eb3b67755c9a8f286d51160ce3bd0",
+    "src/puripuly_heart/app/adapters/nemotron/__init__.py": "eda40af082b67cd78bd2c83299a760b21268a00ea49d2d4833516d45cd4af35d",
+    "native/nemotron/patches.json": "e81a179f2a71b76b8869a4a2710983c23f219717b344cf5c37af86574f90b748",
+    "native/nemotron/conversion-requirements.lock": "37f198fea93b73e970d6d28e67e3f4708fe11c9544ab94e7948ca21b8fac20f4",
+    "scripts/ci/build-nemotron-runtime.ps1": "72c8bf245ff8a0c44f0fa6811f374481c5da43dfc6a319c5e0101c7563db5fb6",
+    "src/puripuly_heart/core/speaker/runtime.py": "167a01ce0351e4311229c907e030afd1f937482e8e4cec53d205a3795cf58f36",
+    "src/puripuly_heart/core/speaker/contracts.py": "d29459925d34ec39daae2ee56858d49aa1fec4fb903ed46943ae0b9401cac9de",
+    "src/puripuly_heart/data/models/nemotron-runtime.sources.json": "11e135ff3780e13aca8f9724c1c475369b098957ca989359f4b7fc5cca5e2da1",
+    "src/puripuly_heart/data/models/nemotron-3-diarization-f16-vulkan.manifest.json": "af753dca12bd54d44ab2db3c4855576531657ff52653012e1bedc1e1e48d1e2a"
+  },
+  "formatting_only_applicability": {
+    "scope": "Director-authorized narrow formatting repair: six import blocks sorted; unused prepare.py io import removed; scoped Black formatting only. No algorithm/policy change. Core worker independently reported Black-only runtime.py/test formatting and returned frozen.",
+    "owned_python_changed_sources": {
+      "native/nemotron/acquire_preconverted.py": {
+        "before_sha256": "75b4ef3c131added197141ebe3573d3f15aa05d15fa43b62e6bd551952d92be4",
+        "after_sha256": "004af0d69bc2cf3b119044074a21e5998ddcdfb7e3575e447956040d02b4656e"
+      },
+      "native/nemotron/convert_official.py": {
+        "before_sha256": "cef51eb26846ea161f885cabe65ab2043e527e993bf427149fb37046ce01f0c0",
+        "after_sha256": "15a5838f2edf88d4d6fda950bab2df7cff06bdaae931ea069c68b302b91abb9e"
+      },
+      "native/nemotron/prepare.py": {
+        "before_sha256": "2c2ab5db1521118d3b52d96134e1580a45e75c4faa4781946d4d501e5d79c9c6",
+        "after_sha256": "1d4913adf13e58ee1b96f9b3ae2336960f334e71d443cac64211532567a0f711"
+      },
+      "native/nemotron/probe.py": {
+        "before_sha256": "804eca08cb8bfae5b5ed72f68d8d9769cf58915640d2eaddd0b3bd1c4fc30fbc",
+        "after_sha256": "31504fafb69845542efb140f1f11ebcde30b8fc8a19fabbcde1ce1fc06053b04"
+      },
+      "native/nemotron/probe_owner.py": {
+        "before_sha256": "4ca9db0ba6cfd6b31fa5e7b03179035ac95c7c07da55a5bcfe0fbf8ed2018433",
+        "after_sha256": "fa884be562153784799538c722954083fe809cd5727e1b4397f76e09a15e19ca"
+      },
+      "native/nemotron/probe_precision.py": {
+        "before_sha256": "86cf91bcb01cd2ae3600bad517f6ec3181874c4b748edb6fa3c86eb292e09b41",
+        "after_sha256": "07383ea9adabe67e3ecc0204c2c60bf9138944c51155f6cd64145d2e3eea5687"
+      },
+      "native/nemotron/verify_conversion.py": {
+        "before_sha256": "8dda7c84fde8d703ffa20d27293b19272d163ba3ebd47b854873b1e173a2d268",
+        "after_sha256": "2113fd1d65f1982bcafd6bd364e7bbebaeca9e63a599e69900d02b3079de31cb"
+      },
+      "native/nemotron/verify_physical_guard.py": {
+        "before_sha256": "9fb0b87361a698e29c462f640b3abcc3435f4ea940c3ee86097fa2c7ea894c50",
+        "after_sha256": "2d5b776ee4e7eb627e0f5ea4670afccefc63c1812938bfe03c63c061de178f05"
+      },
+      "src/puripuly_heart/app/adapters/nemotron/__init__.py": {
+        "before_sha256": "eda40af082b67cd78bd2c83299a760b21268a00ea49d2d4833516d45cd4af35d",
+        "after_sha256": "7b7fdd0fad8c8104e674b852041b8cd617f20ab0da92599c8d6c41520ba8eaa7"
+      },
+      "src/puripuly_heart/app/adapters/nemotron/artifacts.py": {
+        "before_sha256": "d470a3c719fc07c2a6168e233540eddb2e1ead8012dacf0f32dc728c88111af5",
+        "after_sha256": "a0d4546240e4d008628cf1c853432b83cc96fb68cea009fd8f7f8cba72778c09"
+      },
+      "src/puripuly_heart/app/adapters/nemotron/backend.py": {
+        "before_sha256": "7a923a790f41ab37da5ca4e12adac36bf7515cdf769e399d85e333467a3290a0",
+        "after_sha256": "44d1d33e0df135775c3869eeee54561099bc34e191970c8a80db1b524ebbd417"
+      },
+      "src/puripuly_heart/app/adapters/nemotron/worker.py": {
+        "before_sha256": "fcd274772128c5f9bb484f2b196af6ee891eb3b67755c9a8f286d51160ce3bd0",
+        "after_sha256": "ce7655c8f65a76625ce9863ea365576595ea361b4be8fc7a0b560535b7ae83f4"
+      },
+      "tests/app/adapters/nemotron/fake_worker.py": {
+        "before_sha256": "3efd57c94e30f90c4f5911290c0e76ea362db2fc2a2392d341ea90cb35feae1e",
+        "after_sha256": "512cc779ce2933fb979a4908c8c3ed411c7311caac9934a5e7143e0e8ed947b3"
+      },
+      "tests/app/adapters/nemotron/test_artifacts.py": {
+        "before_sha256": "a81fd5a6757758101a6d8516f58df4ed9840fe14e3acd6914c9bc6fdac132c14",
+        "after_sha256": "4782a0b34f07e2a8faa5910337e1fd64036a1b58e9a345711938cebdd418be04"
+      },
+      "tests/app/adapters/nemotron/test_backend.py": {
+        "before_sha256": "6d43ff141910a2b0f59ddb5bb0b62fc059286c3a2b669db7077fb0a0aa5680e7",
+        "after_sha256": "80e1c73af96fdc7b6fc9b21d30f6ee6f3e772b8490a3bccb1aeec7d41daf06b0"
+      }
+    },
+    "core_runtime_changed_source": {
+      "before_sha256": "167a01ce0351e4311229c907e030afd1f937482e8e4cec53d205a3795cf58f36",
+      "after_sha256": "94a9e5080732a5d9b3d565b295a36ffb177dfc6cf30683afdf8026c24e931ccf"
+    },
+    "applicability": "Original real GPU/build/owner/ASR observations and original tested source hashes are retained under observed_run_code_sha256. qualification_code_sha256 identifies final formatting candidate. Native patch, DLL/runtime manifest and model bytes/hashes are unchanged; existing observed behavior evidence is reused, not a new GPU/build run.",
+    "normalized_owned_executable_ast": "unchanged after ignoring top-level import ordering and removal of the reported unused io import",
+    "checks": {
+      "ruff_fix": "7 reported errors fixed; 0 remaining",
+      "black": "14 files reformatted; 3 unchanged",
+      "black_check": "17 scoped Python files unchanged; passed",
+      "ruff_check": "all checks passed",
+      "commands": [
+        "<PRODUCT_PYTHON> -m ruff check --fix native/nemotron src/puripuly_heart/app/adapters/nemotron tests/app/adapters/nemotron",
+        "<PRODUCT_PYTHON> -m black native/nemotron src/puripuly_heart/app/adapters/nemotron tests/app/adapters/nemotron",
+        "<PRODUCT_PYTHON> -m black --check native/nemotron src/puripuly_heart/app/adapters/nemotron tests/app/adapters/nemotron",
+        "<PRODUCT_PYTHON> -m ruff check native/nemotron src/puripuly_heart/app/adapters/nemotron tests/app/adapters/nemotron"
+      ]
+    },
+    "gpu_build_rerun": false
+  }
+}

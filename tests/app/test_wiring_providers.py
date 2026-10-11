@@ -1920,13 +1920,13 @@ def test_self_soniox_is_strict_while_manual_peer_uses_a_soft_hint() -> None:
     assert self_backend.language_hints_strict is True
     assert peer_backend.language_hints == ["en"]
     assert peer_backend.language_hints_strict is False
-    assert self_backend.enable_speaker_diarization is True
-    assert peer_backend.enable_speaker_diarization is True
+    assert self_backend.enable_speaker_diarization is False
+    assert peer_backend.enable_speaker_diarization is False
 
 
-def test_soniox_speaker_diarization_setting_rebuilds_and_configures_both_channels() -> None:
-    enabled_settings = _vnext(stt_provider="soniox", peer_stt_provider="soniox")
-    settings = enabled_settings
+def test_legacy_soniox_speaker_flag_neither_rebuilds_nor_configures_product_channels() -> None:
+    disabled_settings = _vnext(stt_provider="soniox", peer_stt_provider="soniox")
+    settings = disabled_settings
     settings = replace(
         settings,
         intent=replace(
@@ -1935,7 +1935,7 @@ def test_soniox_speaker_diarization_setting_rebuilds_and_configures_both_channel
                 settings.intent.stt,
                 soniox=replace(
                     settings.intent.stt.soniox,
-                    enable_speaker_diarization=False,
+                    enable_speaker_diarization=True,
                 ),
             ),
         ),
@@ -1946,11 +1946,11 @@ def test_soniox_speaker_diarization_setting_rebuilds_and_configures_both_channel
     self_backend = create_stt_backend(settings, secrets=secrets)
     peer_backend = create_peer_stt_backend(settings, secrets=secrets)
 
-    assert build_self_stt_runtime_signature(settings) != build_self_stt_runtime_signature(
-        enabled_settings
+    assert build_self_stt_runtime_signature(settings) == build_self_stt_runtime_signature(
+        disabled_settings
     )
-    assert build_peer_stt_provider_signature(settings) != build_peer_stt_provider_signature(
-        enabled_settings
+    assert build_peer_stt_provider_signature(settings) == build_peer_stt_provider_signature(
+        disabled_settings
     )
     assert self_backend.enable_speaker_diarization is False
     assert peer_backend.enable_speaker_diarization is False

@@ -144,6 +144,10 @@ from puripuly_heart.app.services.settings_runtime_effects import (
     SettingsRuntimeEffectsState,
 )
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
+from puripuly_heart.app.services.speaker_application import (
+    NativeSpeakerAssets,
+    SpeakerApplicationOwner,
+)
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
 from puripuly_heart.app.wiring import (
@@ -404,10 +408,6 @@ def _copy_provider_prompt_apply_fields(
                 target.intent.stt,
                 provider=source.intent.stt.provider,
                 cloud_free_tier_providers=list(source.intent.stt.cloud_free_tier_providers),
-                soniox=replace(
-                    target.intent.stt.soniox,
-                    enable_speaker_diarization=source.intent.stt.soniox.enable_speaker_diarization,
-                ),
             ),
             peer_stt=replace(target.intent.peer_stt, provider=source.intent.peer_stt.provider),
             translation=copy.deepcopy(source.intent.translation),
@@ -518,6 +518,7 @@ def compose_application_runtime(
     vrchat_presence: VrchatOscPresenceProbeOwner | None = None
     managed_account: ManagedAccountComponents | None = None
     runtime_components: RuntimeCompositionComponents | None = None
+    speaker = SpeakerApplicationOwner(assets=NativeSpeakerAssets())
 
     def current_settings() -> AppSettingsVNext | None:
         return settings.canonical
@@ -1815,6 +1816,7 @@ def compose_application_runtime(
         peer_state_sink=on_peer_capture_state,
         peer_diagnostic_sink=require_peer().owner.on_runtime_diagnostic,
         local_asr_diagnostic_sink=(require_local_asr_diagnostics().transition_diagnostic),
+        speaker_observer=speaker,
     )
 
     def self_capture_owner() -> SelfCaptureSessionOwner:
@@ -2241,6 +2243,7 @@ def compose_application_runtime(
         start_event_bridge=start_event_bridge,
         wait_for_event_bridge=wait_for_event_bridge,
         sync_clipboard=sync_clipboard,
+        start_speaker=lambda value: speaker.apply(value.intent.speaker),
     )
     startup = compose_application_startup(startup_adapter)
 
@@ -2284,6 +2287,7 @@ def compose_application_runtime(
         audio_test=lambda: audio_test,
         close_managed_gemma_owner=managed_gemma.close,
         local_asr_provisioning=lambda: provisioning,
+        speaker=lambda: speaker,
     )
 
     def model_assets_active_ids() -> frozenset[str]:
@@ -2433,6 +2437,7 @@ def compose_application_runtime(
         localize=presentation.localize,
         gemma_selection=managed_gemma_selection,
         selection_committed=index_selection.selection_changed,
+        speaker=lambda: speaker,
     )
     application.attach_control(control)
     settings.observe_commits(control._publish_committed)
@@ -2461,6 +2466,12 @@ def compose_application_runtime(
                 owner_name="ApplicationControlOwner",
                 callback_name="drain_operations",
                 callback=control.drain_operations,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="SpeakerApplicationOwner",
+                callback_name="close",
+                callback=speaker.close,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,

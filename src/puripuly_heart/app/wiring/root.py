@@ -177,6 +177,7 @@ def compose_peer_capture_session_owner(
     state_changed=None,
     diagnostic_sink=None,
     local_asr_diagnostic_sink=None,
+    speaker_observer=None,
 ) -> PeerCaptureSessionOwner:
     return PeerCaptureSessionOwner(
         admission=admission,
@@ -191,6 +192,7 @@ def compose_peer_capture_session_owner(
         state_changed=state_changed,
         diagnostic_sink=diagnostic_sink,
         local_asr_diagnostic_sink=local_asr_diagnostic_sink,
+        speaker_observer=speaker_observer,
     )
 
 

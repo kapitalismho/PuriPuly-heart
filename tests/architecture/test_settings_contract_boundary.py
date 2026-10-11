@@ -139,7 +139,6 @@ def test_settings_view_implements_the_explicit_contract() -> None:
         "translation_provider_control",
         "translation_connection_control",
         "cloud_free_tier_control",
-        "soniox_speaker_diarization_control",
         "gpu_device_control",
         "gpu_llm_control",
         "model_assets_control",

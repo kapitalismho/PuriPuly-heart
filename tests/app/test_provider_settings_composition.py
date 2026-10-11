@@ -13,13 +13,12 @@ from puripuly_heart.ui.views.settings import SettingsView
 
 
 @pytest.mark.parametrize("already_selected", [False, True])
-@pytest.mark.parametrize("peer_provider", ["soniox", "rolling_free"])
-async def test_peer_provider_options_survive_composed_apply_and_reload(
+async def test_cloud_free_tier_options_survive_composed_apply_and_reload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     already_selected: bool,
-    peer_provider: str,
 ) -> None:
+    peer_provider = "rolling_free"
     monkeypatch.setattr(SettingsView, "_populate_host_apis", lambda self: None)
     monkeypatch.setattr(SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(SettingsView, "_load_secrets", lambda self, *args: None)
@@ -58,12 +57,8 @@ async def test_peer_provider_options_survive_composed_apply_and_reload(
     selected_label = view._peer_stt_text.content.value
 
     for selection in (False, True, False):
-        if peer_provider == "soniox":
-            view._on_soniox_speaker_diarization_click(None)
-        else:
-            pool = ("deepgram",) if selection else ("elevenlabs_scribe", "gemini_transcribe")
-            view._on_cloud_free_tier_changed(pool)
-
+        pool = ("deepgram",) if selection else ("elevenlabs_scribe", "gemini_transcribe")
+        view._on_cloud_free_tier_changed(pool)
         assert len(pending) == 1
         intent = pending.pop()
         assert intent is not None
@@ -79,13 +74,7 @@ async def test_peer_provider_options_survive_composed_apply_and_reload(
         for settings in (canonical, loaded.settings):
             assert settings.intent.peer_stt.provider == peer_provider
             assert settings.intent.stt.provider == "soniox"
-            if peer_provider == "soniox":
-                assert settings.intent.stt.soniox.enable_speaker_diarization is selection
-            else:
-                assert tuple(settings.intent.stt.cloud_free_tier_providers) == pool
+            assert tuple(settings.intent.stt.cloud_free_tier_providers) == pool
         assert view._peer_stt_text.content.value == selected_label
         assert not view.has_provider_changes
-        if peer_provider == "soniox":
-            assert not view.soniox_speaker_diarization_control().ignore_interactions
-        else:
-            assert not view.cloud_free_tier_control().ignore_interactions
+        assert not view.cloud_free_tier_control().ignore_interactions

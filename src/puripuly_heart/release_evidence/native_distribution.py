@@ -25,6 +25,9 @@ from packaging.requirements import Requirement
 
 from puripuly_heart.release_evidence.gpu_worker_distribution import validate_gpu_worker_runtime
 from puripuly_heart.release_evidence.native_pe import stage_vc_runtime, validate_pe_dependencies
+from puripuly_heart.release_evidence.nemotron_distribution import (
+    validate_runtime as validate_nemotron_runtime,
+)
 
 _LAYOUT_SCHEMA = "puripuly-heart/native-artifact-layout/v1"
 _MANIFEST_SCHEMA = "puripuly-heart/native-artifact-manifest/v1"
@@ -472,6 +475,9 @@ def validate_target(
     if missing:
         raise FileNotFoundError(f"native artifact is incomplete: {missing}")
     gpu_worker_runtime = validate_gpu_worker_runtime(required_paths["gpu_worker_executable"].parent)
+    nemotron_runtime = validate_nemotron_runtime(
+        layout.resolve(target_root, "native_runtime_root") / "nemotron"
+    )
     python_archive = _validate_python_archive(target_root, layout)
     site_packages = required_paths["dependency_root"]
     dependencies = validate_dependencies(site_packages, requirements_path)
@@ -501,6 +507,7 @@ def validate_target(
         "python_archive": python_archive,
         "portaudio_runtime": portaudio_runtime,
         "gpu_worker_runtime": gpu_worker_runtime,
+        "nemotron_runtime": nemotron_runtime,
         "pe_dependencies": pe_dependencies,
         "paths": {
             key: str(value.relative_to(target_root)) for key, value in required_paths.items()
@@ -1249,6 +1256,7 @@ def validate_compliance(target_root: Path, repo_root: Path, soxr_manifest: Path)
             dependency_root="site-packages",
         ),
         "soxr": verify_soxr_packaging(target_root, repo_root, soxr_manifest),
+        "nemotron_runtime": validate_nemotron_runtime(target_root / "nemotron"),
     }
 
 

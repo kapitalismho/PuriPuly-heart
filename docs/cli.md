@@ -306,6 +306,30 @@ Get-Content -Raw .\message.txt | puripuly.exe text submit --stdin
 - Query diagnostic history for the original operation and inspect the affected destination separately.
 - An applied admission is not retroactively rewritten as successful translation or display.
 
+## Local speaker evidence
+
+The Peer speaker runtime is independent of ASR selection and disabled by default. It requires a compatible native Nemotron payload, an installed eight-channel F16 model, an explicit Vulkan device index, and an explicit profile. `1.04` and `0.64` identify full streaming configurations, not measured response times; neither is a selected production default.
+
+```powershell
+puripuly.exe speaker status
+puripuly.exe speaker configure --profile 1.04 --device 0
+puripuly.exe speaker configure --download-consent on
+puripuly.exe speaker install
+puripuly.exe speaker prepare
+puripuly.exe speaker configure --enabled on
+puripuly.exe speaker reset
+puripuly.exe speaker configure --enabled off
+puripuly.exe speaker cancel
+```
+
+Choose the actual Vulkan device and profile explicitly; the example values are not automatic selections. Model acquisition consent is separate from Peer capture consent, ASR-model consent, and feature enablement. `speaker install` acquires the pinned Bonenk eight-channel F16 artifact through the existing model installer; without consent it returns `action_required` with `speaker_download_consent`. Activation never downloads a model. Installation requires the feature to be disabled.
+
+For an already-downloaded supported artifact, use `speaker install --source C:\Models\Nemotron-3-Diarization.f16.gguf`. Local import needs no network consent, but still verifies the supported checksum, tensor contract and provenance before staging in writable model storage. The pinned community artifact is not a claim that its publisher's original conversion was independently reproduced; unverified local conversions are not product-ready models.
+
+`speaker status` reports configured intent separately from effective readiness and unavailable reasons. An absent model/runtime, unavailable Vulkan device, or inference failure does not switch to CPU diarization or native Soniox speaker decisions. Normal recognition and translation continue with gray unavailable attribution. Disabling the feature stops only its speaker resources.
+
+`speaker reset` starts a new speaker epoch without unnecessarily reloading weights. Ordinary VAD pauses, ASR request completion and server endpoints do not reset it. `speaker cancel` cancels the owned model installation; it does not cancel ASR work.
+
 ## Typed settings and provider changes
 
 - Read the current `revision` through `settings.current`.

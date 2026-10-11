@@ -1,0 +1,4 @@
+numpy==1.26.4
+PyYAML==6.0.2
+huggingface-hub==0.34.4
+torch @ https://download.pytorch.org/whl/cpu/torch-2.8.0%2Bcpu-cp312-cp312-win_amd64.whl

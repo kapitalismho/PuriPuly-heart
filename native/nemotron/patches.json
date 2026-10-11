@@ -1,0 +1,227 @@
+{
+  "schema_version": 1,
+  "revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+  "files": {
+    "src/runtime/ggml/runtime.h": {
+      "before_sha256": "8b16754a48bc69a9d0f9d2bc29913e9cf4a7e9b5321bd118780093010c5c0f25",
+      "after_sha256": "4c7dfa3f6766be26d9a9b3cec40b2ba7692736f766b6f5afe3c72aea02f5c9b9",
+      "edits": [
+        {
+          "start": 204,
+          "old": "",
+          "new": "    bool strict_vulkan = false;\n"
+        }
+      ]
+    },
+    "src/runtime/ggml/backend.cpp": {
+      "before_sha256": "92ea19f833c9ba132c81cfe33693ab1090d436e25c2aaea7e6186315f5265394",
+      "after_sha256": "5d697e40147c14556888ae248e542a24b269d0e37b34ccd7c1c84c4168040fa0",
+      "edits": [
+        {
+          "start": 87,
+          "old": "        int idx = 0;\n        for (int i = 0; i < dev_count; i++) {\n            ggml_backend_dev_t dev_cur = ggml_backend_dev_get(i);\n            GGMLF_LOG_INFO(\"Device %d: %s\\n\", i, ggml_backend_dev_name(dev_cur));\n            const auto dev_type = ggml_backend_dev_type(dev_cur);\n            if (dev_type == GGML_BACKEND_DEVICE_TYPE_GPU ||\n                dev_type == GGML_BACKEND_DEVICE_TYPE_IGPU) {\n                // Register buffer types only for the selected device.\n                if (idx == params.gpu_device_idx) {\n                    dev = dev_cur;\n                    auto* buft = ggml_backend_dev_buffer_type(dev);\n                    if (buft) {\n                        buft_list.emplace_back(dev, buft);\n",
+          "new": "        if (params.strict_vulkan) {\n            auto reg = ggml_backend_reg_by_name(\"Vulkan\");\n            if (!reg || params.gpu_device_idx < 0 ||\n                static_cast<size_t>(params.gpu_device_idx) >= ggml_backend_reg_dev_count(reg))\n                throw std::runtime_error(\"Nemotron selected Vulkan device ordinal is unavailable\");\n            dev = ggml_backend_reg_dev_get(reg, params.gpu_device_idx);\n            const auto type = ggml_backend_dev_type(dev);\n            if (type != GGML_BACKEND_DEVICE_TYPE_GPU && type != GGML_BACKEND_DEVICE_TYPE_IGPU)\n                throw std::runtime_error(\"Nemotron selected Vulkan physical device is not a GPU\");\n            auto* buft = ggml_backend_dev_buffer_type(dev);\n            if (buft)\n                buft_list.emplace_back(dev, buft);\n        } else {\n            int idx = 0;\n            for (int i = 0; i < dev_count; i++) {\n                ggml_backend_dev_t dev_cur = ggml_backend_dev_get(i);\n                GGMLF_LOG_INFO(\"Device %d: %s\\n\", i, ggml_backend_dev_name(dev_cur));\n                const auto dev_type = ggml_backend_dev_type(dev_cur);\n                if (dev_type == GGML_BACKEND_DEVICE_TYPE_GPU ||\n                    dev_type == GGML_BACKEND_DEVICE_TYPE_IGPU) {\n                    if (idx == params.gpu_device_idx) {\n                        dev = dev_cur;\n                        auto* buft = ggml_backend_dev_buffer_type(dev);\n                        if (buft)\n                            buft_list.emplace_back(dev, buft);\n"
+        },
+        {
+          "start": 101,
+          "old": "                }\n\n                if (++idx > params.gpu_device_idx) {\n                    break;\n",
+          "new": "                    if (++idx > params.gpu_device_idx)\n                        break;\n"
+        },
+        {
+          "start": 123,
+          "old": "",
+          "new": "    if (params.strict_vulkan) {\n        auto reg = dev ? ggml_backend_dev_backend_reg(dev) : nullptr;\n        const auto type = dev ? ggml_backend_dev_type(dev) : GGML_BACKEND_DEVICE_TYPE_CPU;\n        if (!gpu_backend || !reg || std::string(ggml_backend_reg_name(reg)) != \"Vulkan\" ||\n            (type != GGML_BACKEND_DEVICE_TYPE_GPU && type != GGML_BACKEND_DEVICE_TYPE_IGPU))\n            throw std::runtime_error(\"Nemotron selected device is not a Vulkan GPU\");\n    }\n"
+        },
+        {
+          "start": 126,
+          "old": "        if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_ACCEL) {\n",
+          "new": "        if (!params.strict_vulkan && ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_ACCEL) {\n"
+        }
+      ]
+    },
+    "src/runtime/ggml/session.cpp": {
+      "before_sha256": "b37a3a1b5810d9034a847aa0923d5ae7063ec70f8f43080fec36c01db6e6d81c",
+      "after_sha256": "13fdc2a8e238149c2fd31d3c8d0be9bc43e67f0b6fb60f18fb351d8225ed81e8",
+      "edits": [
+        {
+          "start": 60,
+          "old": "",
+          "new": "}\n\nstatic void\nrequire_vulkan_schedule(\n    BackendManager* manager, ggml_cgraph* graph, ggml_backend_sched_t sched,\n    ggml_backend_t direct = nullptr) {\n    if (!manager->get_params().strict_vulkan)\n        return;\n    const auto selected = manager->gpu_backend_handle();\n    const auto dev = selected ? ggml_backend_get_device(selected) : nullptr;\n    const auto reg = dev ? ggml_backend_dev_backend_reg(dev) : nullptr;\n    if (!reg || std::string(ggml_backend_reg_name(reg)) != \"Vulkan\")\n        throw std::runtime_error(\"Nemotron Vulkan device lost\");\n    for (int i = 0; i < ggml_graph_n_nodes(graph); ++i) {\n        const auto node = ggml_graph_node(graph, i);\n        if ((node->flags & GGML_TENSOR_FLAG_COMPUTE) == 0)\n            continue;\n        const auto backend = direct ? direct : ggml_backend_sched_get_tensor_backend(sched, node);\n        if (backend != selected || !ggml_backend_supports_op(selected, node))\n            throw std::runtime_error(\n                std::string(\"Nemotron forbids neural CPU/ACCEL fallback: \") +\n                ggml_op_name(node->op) + \" \" + node->name);\n    }\n"
+        },
+        {
+          "start": 806,
+          "old": "",
+          "new": "            require_vulkan_schedule(backend_manager_, cr.gf, nullptr, cr.direct_backend);\n"
+        },
+        {
+          "start": 848,
+          "old": "",
+          "new": "        require_vulkan_schedule(backend_manager_, cr.gf, sched.get());\n"
+        }
+      ]
+    },
+    "src/asr/diar/diar_pipeline.h": {
+      "before_sha256": "c664afce8c70d644dcc515bce69b3cd18bd3c59305a06350e89da37ad8f4c8c3",
+      "after_sha256": "4b0abf77555ac11ec99d7992110b12605a5aa226858f877a02fc7e95f6ae0eec",
+      "edits": [
+        {
+          "start": 136,
+          "old": "    // Total emitted native-cadence frames (monotonic; includes frames whose raw\n    // probabilities were compacted away, see below).\n",
+          "new": ""
+        },
+        {
+          "start": 139,
+          "old": "    // Frames before this frontier cannot be revised. V2 additionally excludes\n    // its birth-gate history; V3 uses native probabilities with no birth gate.\n",
+          "new": ""
+        },
+        {
+          "start": 142,
+          "old": "    // Retained per-frame speaker probabilities, frame-major, covering frames\n    // [frame_probs_base(), n_frames()). For streams below the compaction\n    // horizon frame_probs_base() is 0 and this is the whole timeline.\n",
+          "new": ""
+        },
+        {
+          "start": 148,
+          "old": "",
+          "new": "    int64_t consumed_samples() const { return mel_consumed_ * m_.fe().hop_length(); }\n    void drain_probabilities(float* out, size_t capacity_frames, int64_t* first, size_t* count);\n"
+        },
+        {
+          "start": 149,
+          "old": "    // Long-stream memory bound. The raw probability timeline would otherwise\n    // grow forever (n_spk floats per native output frame) and every segments()\n    // call would re-segment all of it. Once more than `trigger_frames` are\n    // retained, the prefix up to an all-speaker-silent gap (leaving at least\n    // `retain_frames`)\n    // is converted to frozen segments (using the library-default segmentation\n    // config) and its raw probabilities are dropped. Cutting only inside a\n    // silent gap longer than the postprocessing's temporal reach makes\n    // frozen + recomputed-tail segments EXACTLY equal to a full recompute\n    // under the same config; a per-call segments() config only affects the\n    // retained tail. If no such gap exists yet, compaction retries later.\n    // Defaults retain roughly the latest 10 minutes after a 20-minute trigger.\n    void set_compaction(int64_t trigger_frames, int64_t retain_frames);\n",
+          "new": ""
+        },
+        {
+          "start": 183,
+          "old": "    void maybe_compact();\n",
+          "new": ""
+        },
+        {
+          "start": 208,
+          "old": "    std::vector<float> probs_;              // retained timeline tail (see frame_probs_base)\n    int64_t probs_base_ = 0;                // emitted frames compacted off the front\n    std::vector<DiarSegment> frozen_segs_;  // finalized segments before probs_base_\n    // Initialized to ~20 min trigger / ~10 min retained at native cadence.\n    int64_t compact_trigger_frames_ = 0;\n    int64_t compact_retain_frames_ = 0;\n",
+          "new": "    std::vector<float> probs_;\n    int64_t probs_base_ = 0;\n"
+        }
+      ]
+    },
+    "src/asr/diar/diar_pipeline.cpp": {
+      "before_sha256": "343b04ea976d3a8a108bf4d0ffc3210c0bb764e7b31725609d58ab1fe2da2cbe",
+      "after_sha256": "a972987d936c85d6130ee962afa5fc9033fc7813f0e98b34df3cedc65b058a34",
+      "edits": [
+        {
+          "start": 96,
+          "old": "    compact_trigger_frames_ = static_cast<int64_t>(std::ceil(20.0 * 60.0 / sec_per_frame_));\n    compact_retain_frames_ = static_cast<int64_t>(std::ceil(10.0 * 60.0 / sec_per_frame_));\n",
+          "new": ""
+        },
+        {
+          "start": 117,
+          "old": "    frozen_segs_.clear();\n",
+          "new": ""
+        },
+        {
+          "start": 135,
+          "old": "",
+          "new": "    if (n_samples > 16000)\n        throw std::invalid_argument(\"Nemotron PCM push exceeds 16000 samples\");\n"
+        },
+        {
+          "start": 246,
+          "old": "",
+          "new": "    if (probs_.size() + emitted.size() > 1024 * static_cast<size_t>(n_spk_))\n        throw std::runtime_error(\"Nemotron probability drain required\");\n"
+        },
+        {
+          "start": 261,
+          "old": "    maybe_compact();\n",
+          "new": ""
+        },
+        {
+          "start": 302,
+          "old": "",
+          "new": "}\n\nvoid\nDiarStream::drain_probabilities(\n    float* out, size_t capacity_frames, int64_t* first, size_t* count) {\n    if (!out || !first || !count || capacity_frames == 0 || capacity_frames > 1024)\n        throw std::invalid_argument(\"invalid Nemotron drain capacity\");\n    if (provisional_frames_ != 0)\n        throw std::runtime_error(\"Nemotron raw drain does not allow previews\");\n    *first = probs_base_;\n    *count = std::min(capacity_frames, probs_.size() / static_cast<size_t>(n_spk_));\n    const size_t values = *count * static_cast<size_t>(n_spk_);\n    std::copy_n(probs_.data(), values, out);\n    probs_.erase(probs_.begin(), probs_.begin() + values);\n    probs_base_ += static_cast<int64_t>(*count);\n"
+        },
+        {
+          "start": 389,
+          "old": "    if (frozen_segs_.empty())\n        return tail;\n    // Shift the tail onto the global clock and append after the frozen prefix.\n    // The compaction cut sits inside an all-speaker-silent gap wider than the\n    // postprocessing's temporal reach, so prefix and tail segments can never\n    // pad or merge across it; frozen ends strictly precede tail starts.\n",
+          "new": ""
+        },
+        {
+          "start": 396,
+          "old": "    std::vector<Segment> out = frozen_segs_;\n    out.reserve(out.size() + tail.size());\n    for (auto& sg : tail) out.push_back({sg.t0 + base_sec, sg.t1 + base_sec, sg.speaker});\n    return out;\n",
+          "new": "    for (auto& sg : tail) {\n        sg.t0 += base_sec;\n        sg.t1 += base_sec;\n    }\n    return tail;\n"
+        },
+        {
+          "start": 401,
+          "old": "\nvoid\nDiarStream::set_compaction(int64_t trigger_frames, int64_t retain_frames) {\n    if (retain_frames <= 0 || trigger_frames <= retain_frames)\n        throw std::invalid_argument(\"compaction: need trigger_frames > retain_frames > 0\");\n    compact_trigger_frames_ = trigger_frames;\n    compact_retain_frames_ = retain_frames;\n}\n\nvoid\nDiarStream::maybe_compact() {\n    const int64_t retained = static_cast<int64_t>(probs_.size()) / n_spk_;\n    if (retained <= compact_trigger_frames_)\n        return;\n    // A cut is safe only where every speaker is silent for longer than the\n    // postprocessing's temporal reach: below min(onset, offset) nothing opens\n    // (> onset required) and anything open closes (< offset), and a gap wider\n    // than min_duration_off + both pads can never be bridged by merging or\n    // edge padding. Freezing the prefix at such a cut therefore yields\n    // exactly the segments a full recompute would produce there.\n    const DiarSegmentationCfg cfg;  // library defaults; see header contract\n    const float thr = std::min(cfg.onset, cfg.offset);\n    const int64_t gap_need = static_cast<int64_t>(\n        std::ceil((cfg.min_duration_off + cfg.pad_onset + cfg.pad_offset + 0.5) / sec_per_frame_));\n    const int64_t cut_limit = retained - compact_retain_frames_;\n    int64_t run = 0, best_cut = -1;\n    for (int64_t f = 0; f < cut_limit; f++) {\n        bool silent = true;\n        for (int s = 0; s < n_spk_ && silent; s++) silent = probs_[f * n_spk_ + s] < thr;\n        run = silent ? run + 1 : 0;\n        if (run >= gap_need)\n            best_cut = f - gap_need / 2;  // middle of the gap\n    }\n    if (best_cut <= 0)\n        return;  // no safe gap yet; retry as more audio arrives\n    auto prefix = diar_segments_from_probs(probs_.data(), best_cut, n_spk_, sec_per_frame_, cfg);\n    const double base_sec = probs_base_ * sec_per_frame_;\n    for (const auto& sg : prefix)\n        frozen_segs_.push_back({sg.t0 + base_sec, sg.t1 + base_sec, sg.speaker});\n    probs_.erase(probs_.begin(), probs_.begin() + best_cut * n_spk_);\n    probs_base_ += best_cut;\n}\n",
+          "new": ""
+        }
+      ]
+    },
+    "src/asr/diar/diarizer.h": {
+      "before_sha256": "c20e110335bb7fed2aaaf02f391c7b9861b0a37dd8cdbda33e1a363fabfa964b",
+      "after_sha256": "cd5a0bd9cf087cc713889eca6eabefc229bc2ffef6b2f2f9f8526ead4bc3bd6d",
+      "edits": [
+        {
+          "start": 38,
+          "old": "",
+          "new": "    int64_t consumed_samples() const { return stream_->consumed_samples(); }\n    int64_t immutable_frames() const { return stream_->stable_frames(); }\n    void drain_probabilities(float* out, size_t capacity, int64_t* first, size_t* count) {\n        stream_->drain_probabilities(out, capacity, first, count);\n    }\n"
+        }
+      ]
+    },
+    "src/asr/diar/diarizer.cpp": {
+      "before_sha256": "1536bc044bc17fcc4c7913f983c5314ebef6fd2df14649cef4024832424f2b82",
+      "after_sha256": "1cb482d531e554a024d1af0b7f429a28fed1d56f70605e61986d15c662726133",
+      "edits": [
+        {
+          "start": 17,
+          "old": "",
+          "new": "    if (gpu < 0)\n        throw std::invalid_argument(\"Nemotron requires an explicitly selected Vulkan GPU\");\n    params.strict_vulkan = true;\n"
+        }
+      ]
+    },
+    "src/asr/c_api.cpp": {
+      "before_sha256": "d031ee096eefc0d5ed597bd8897fe05d0fe538fbe4f2119d2533a606400862fe",
+      "after_sha256": "45d60a5f49f36e71e351f3d0d2ead7dd1c29ae8e179f1d77635064d65c2aca61",
+      "edits": [
+        {
+          "start": 631,
+          "old": "",
+          "new": "int64_t\npuripuly_nemotron_consumed_samples(const nemo_speech_diar_stream* stream) {\n    return stream && stream->impl ? stream->impl->consumed_samples() : -1;\n}\n\nint64_t\npuripuly_nemotron_immutable_frames(const nemo_speech_diar_stream* stream) {\n    return stream && stream->impl ? stream->impl->immutable_frames() : -1;\n}\n\nnemo_speech_asr_status\npuripuly_nemotron_drain(\n    nemo_speech_diar_stream* stream, float* out, size_t capacity_frames,\n    int64_t* first_frame, size_t* count) {\n    return guard([&] {\n        if (!stream || !stream->impl)\n            throw std::invalid_argument(\"not a live Nemotron stream\");\n        stream->impl->drain_probabilities(out, capacity_frames, first_frame, count);\n        return NEMO_SPEECH_ASR_OK;\n    });\n}\n\n"
+        }
+      ]
+    },
+    "include/nemo_speech/diar.h": {
+      "before_sha256": "4839f70ccab30af3ed9949751792a547f3a8a4129848f64c8cd69889bd433afd",
+      "after_sha256": "83dfd5e16859c2c7c6da740826aced4253b26cec3087630941770e41057f66a2",
+      "edits": [
+        {
+          "start": 139,
+          "old": "",
+          "new": "NEMO_SPEECH_ASR_API int64_t\npuripuly_nemotron_consumed_samples(const nemo_speech_diar_stream* stream);\nNEMO_SPEECH_ASR_API int64_t\npuripuly_nemotron_immutable_frames(const nemo_speech_diar_stream* stream);\nNEMO_SPEECH_ASR_API nemo_speech_asr_status puripuly_nemotron_drain(\n    nemo_speech_diar_stream* stream, float* out, size_t capacity_frames,\n    int64_t* first_frame, size_t* count);\n\n"
+        }
+      ]
+    },
+    "llama.cpp/ggml/src/ggml-vulkan/ggml-vulkan.cpp": {
+      "before_sha256": "de106168ffdef3b2b94dd5e8d2984d173684c02f67a46fd32d12768e1732b339",
+      "after_sha256": "910d35e352a9c34388518918e7f39377288dcc2b606dd4ed3a6eeebef0776712",
+      "edits": [
+        {
+          "start": 14997,
+          "old": "    return ctx->is_integrated_gpu ? GGML_BACKEND_DEVICE_TYPE_IGPU : GGML_BACKEND_DEVICE_TYPE_GPU;\n",
+          "new": "    return ctx->type;\n"
+        },
+        {
+          "start": 15838,
+          "old": "                ctx->is_integrated_gpu = ggml_backend_vk_get_device_type(i) == vk::PhysicalDeviceType::eIntegratedGpu;\n",
+          "new": "                const auto physical_type = ggml_backend_vk_get_device_type(i);\n                ctx->is_integrated_gpu = physical_type == vk::PhysicalDeviceType::eIntegratedGpu;\n                switch (physical_type) {\n                    case vk::PhysicalDeviceType::eIntegratedGpu:\n                        ctx->type = GGML_BACKEND_DEVICE_TYPE_IGPU;\n                        break;\n                    case vk::PhysicalDeviceType::eDiscreteGpu:\n                    case vk::PhysicalDeviceType::eVirtualGpu:\n                        ctx->type = GGML_BACKEND_DEVICE_TYPE_GPU;\n                        break;\n                    case vk::PhysicalDeviceType::eCpu:\n                        ctx->type = GGML_BACKEND_DEVICE_TYPE_CPU;\n                        break;\n                    default:\n                        ctx->type = GGML_BACKEND_DEVICE_TYPE_ACCEL;\n                        break;\n                }\n"
+        }
+      ]
+    },
+    "llama.cpp/ggml/src/ggml-vulkan/ggml-vulkan-types.h": {
+      "before_sha256": "a53f2b75c9f8ec7b980ccd5d4da4d97c90589021baa6e4f2eb6796c4eb0119f5",
+      "after_sha256": "31ba35819160c94262597913be64b4854d9d393d8ee08eeeabef4c7cb088f6c8",
+      "edits": [
+        {
+          "start": 1429,
+          "old": "",
+          "new": "    enum ggml_backend_dev_type type;\n"
+        }
+      ]
+    }
+  }
+}

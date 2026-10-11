@@ -135,6 +135,7 @@ class CaptureOwnerFactory:
     peer_state_sink: Callable[[PeerCaptureSessionSnapshot], None]
     peer_diagnostic_sink: Callable[[PeerCaptureDiagnostic], None]
     local_asr_diagnostic_sink: Callable[[object], None]
+    speaker_observer: object | None = None
 
     def compose_self(
         self,
@@ -193,6 +194,7 @@ class CaptureOwnerFactory:
             state_changed=self.peer_state_sink,
             diagnostic_sink=self.peer_diagnostic_sink,
             local_asr_diagnostic_sink=self.local_asr_diagnostic_sink,
+            speaker_observer=self.speaker_observer,
         )
 
     def self_provider_request(

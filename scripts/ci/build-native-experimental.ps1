@@ -16,6 +16,12 @@ param(
     [string]$BuildRoot = "C:\d177\native-integration",
 
     [Parameter()]
+    [string]$NemotronRuntimeDir = "",
+
+    [Parameter()]
+    [switch]$RequireNemotronRuntime,
+
+    [Parameter()]
     [string]$OutputDir = "dist\native\PuriPulyHeart"
 )
 
@@ -119,6 +125,12 @@ foreach ($required in @($ToolPython, $PinnedInputRoot, $PythonEmbedArchive, $Sox
     if (-not (Test-Path -LiteralPath $required)) {
         throw "Required native build input not found: $required"
     }
+}
+if ($RequireNemotronRuntime -and [string]::IsNullOrWhiteSpace($NemotronRuntimeDir)) {
+    throw "RequireNemotronRuntime requires an explicitly built -NemotronRuntimeDir."
+}
+if (-not [string]::IsNullOrWhiteSpace($NemotronRuntimeDir)) {
+    $NemotronRuntimeDir = [System.IO.Path]::GetFullPath($NemotronRuntimeDir)
 }
 
 Push-Location $repoRoot
@@ -341,6 +353,12 @@ jni_flutter = "1.0.3"
     & (Join-Path $PSScriptRoot "build-gpu-worker-release.ps1") -TargetDir $gpuTarget -OutputDir $artifactRoot
     Copy-Item -LiteralPath (Join-Path $overlayTarget "release\PuriPulyHeartOverlay.exe") -Destination $artifactRoot -Force
     Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\openvr\win64\openvr_api.dll") -Destination $artifactRoot -Force
+    if (-not [string]::IsNullOrWhiteSpace($NemotronRuntimeDir)) {
+        Invoke-Checked -FilePath $ToolPython -ArgumentList @(
+            "-m", "puripuly_heart.release_evidence.nemotron_distribution",
+            $NemotronRuntimeDir, "--required", "--stage-to", (Join-Path $artifactRoot "nemotron")
+        ) -WorkingDirectory $repoRoot
+    }
     $cmakeCommand = (Get-Command cmake -ErrorAction Stop).Source
     Invoke-Checked -FilePath $cmakeCommand -ArgumentList @(
         "-S", (Join-Path $repoRoot "native\windows_host\console"),

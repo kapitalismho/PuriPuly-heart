@@ -86,7 +86,7 @@ async def test_non_diarized_gold_does_not_block_identified_speaker_scope() -> No
 
 
 @pytest.mark.asyncio
-async def test_gemini_peer_without_diarization_uses_gold_across_readable_updates() -> None:
+async def test_gemini_peer_without_speaker_evidence_uses_gray_across_readable_updates() -> None:
     clock = FakeClock(_now=26.0)
     adapter = OverlayEventAdapter(clock=clock)
     presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
@@ -113,10 +113,10 @@ async def test_gemini_peer_without_diarization_uses_gold_across_readable_updates
         )
     )
 
-    assert assignment.attribution.state == "non_diarized"
-    assert presenter.snapshot().blocks[0].speaker_style == "gold"
+    assert assignment.attribution.state == "not_ready"
+    assert presenter.snapshot().blocks[0].speaker_style == "gray"
     await presenter.emit(_peer_event(adapter, transcript.utterance_id, "revised", assignment))
-    assert presenter.snapshot().blocks[0].speaker_style == "gold"
+    assert presenter.snapshot().blocks[0].speaker_style == "gray"
     await presenter.close()
 
 
@@ -129,7 +129,7 @@ async def test_speaker_identity_color_survives_non_diarized_turn() -> None:
     for order, speaker, expected_style in (
         (1, "A", "gold"),
         (2, "B", "cyan"),
-        (3, None, "gold"),
+        (3, None, "gray"),
         (4, "B", "cyan"),
     ):
         text = f"turn {order}"

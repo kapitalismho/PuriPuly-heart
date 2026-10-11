@@ -50,7 +50,6 @@ from puripuly_heart.app.ports.settings_view import (
     QwenSingaporeApiHostEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
-    SonioxSpeakerDiarizationEdit,
     SttGpuDeviceEdit,
     SystemPromptEdit,
     TranslationHttpExtensionEdit,
@@ -125,6 +124,11 @@ COMMANDS = {
     "gemma.prepare": "Prepare managed local Gemma model assets",
     "gemma.cancel": "Cancel managed local Gemma preparation",
     "models.retry": "Retry GPU activation after installation",
+    "speaker.configure": "Configure independent speaker analysis (explicit device/profile on enable)",
+    "speaker.install": "Install pinned preconverted Nemotron weights with independent consent, or import a local artifact",
+    "speaker.prepare": "Inspect independent speaker model and runtime readiness",
+    "speaker.cancel": "Cancel speaker model acquisition",
+    "speaker.reset": "Reset speaker epoch without unloading weights",
     "gpu.discover": "Discover available GPU devices",
     "secrets.set": "Store provider credential (value never returned)",
     "secrets.delete": "Delete provider credential",
@@ -148,6 +152,7 @@ QUERIES = {
     "providers.status",
     "gpu.status",
     "models.status",
+    "speaker.status",
     "secrets.presence",
     "auth.status",
     "overlay.status",
@@ -219,6 +224,18 @@ COMMAND_ARGUMENTS = {
     "models.delete": {"model_id": "models.status assets ID"},
     "gemma.prepare": {},
     "gemma.cancel": {},
+    "speaker.configure": {
+        "enabled": "optional boolean",
+        "profile": ["1.04", "0.64", None],
+        "vulkan_device_id": "optional explicit nonnegative Vulkan device index string or null",
+        "download_consent": "optional explicit boolean, independent of ASR",
+    },
+    "speaker.install": {
+        "source_path": "optional verified local F16 artifact path; absent downloads pinned F16 with explicit speaker consent"
+    },
+    "speaker.prepare": {},
+    "speaker.cancel": {},
+    "speaker.reset": {},
     "overlay.position.reset": {},
     "overlay.calibrate": {
         "action": ["begin", "change", "apply", "cancel"],
@@ -258,7 +275,6 @@ PROVIDER_EDITS = {
     "stt.custom.endpoint": CustomSttEndpointEdit,
     "stt.custom.model": CustomSttModelEdit,
     "stt.custom.extra_json": CustomSttExtraEdit,
-    "stt.soniox.enable_speaker_diarization": SonioxSpeakerDiarizationEdit,
     "prompts.system_prompt_override": SystemPromptEdit,
 }
 SETTINGS_FIELDS = (
@@ -293,7 +309,6 @@ BOOLEAN_FIELDS = frozenset(
         "overlay.translation.enabled",
         "overlay.peer_original.enabled",
         "overlay.swap_caption_languages",
-        "stt.soniox.enable_speaker_diarization",
         "telemetry.enabled",
     }
 )
@@ -466,6 +481,7 @@ class ApplicationControlOwner:
     gemma_selection: Callable[[AppSettingsVNext], ManagedGemmaTranslationSelection]
     instance_id: str | None = None
     selection_committed: Callable[[AppSettingsVNext], None] | None = None
+    speaker: Callable[[], object | None] = lambda: None
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _resource_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _stop_requested: asyncio.Event = field(default_factory=asyncio.Event)
@@ -562,7 +578,7 @@ class ApplicationControlOwner:
                 key: {
                     "description": value,
                     "arguments": COMMAND_ARGUMENTS[key],
-                    "cancellable": key in {"models.install", "gemma.prepare"},
+                    "cancellable": key in {"models.install", "gemma.prepare", "speaker.install"},
                 }
                 for key, value in COMMANDS.items()
             },
@@ -1219,6 +1235,9 @@ class ApplicationControlOwner:
                 "state": _json(owner.snapshot) if owner is not None else None,
                 "runtime": self._gpu_runtime_snapshot(),
             }
+        if name == "speaker.status":
+            owner = self.speaker()
+            return {**base, "speaker": _json(owner.snapshot()) if owner is not None else None}
         if name == "models.status":
             owner = self.provisioning()
             gemma = self.gemma()
@@ -1547,6 +1566,7 @@ class ApplicationControlOwner:
                 "models.download",
                 "models.import",
                 "models.delete",
+                "speaker.cancel",
             } or (command == "audio.test" and arguments.get("enabled") is False)
             resource_lock = (
                 None
@@ -1554,6 +1574,7 @@ class ApplicationControlOwner:
                 or safe_capture_off
                 or safe_locale
                 or command == "secrets.verify"
+                or command.startswith("speaker.")
                 else self._resource_lock
             )
             if resource_lock is not None:
@@ -1578,6 +1599,55 @@ class ApplicationControlOwner:
                             self.application.translation_preparation_needs_refresh(preparation)
                         ):
                             refresh_preparation = True
+                        elif command in {"speaker.configure", "speaker.install", "speaker.prepare"}:
+                            _validate_command_args(
+                                command, arguments, locale_choices=self.locale_choices
+                            )
+                            owner = self.speaker()
+                            if owner is None:
+                                result = {
+                                    "status": "failed",
+                                    "error": {"code": "speaker_owner_unavailable"},
+                                }
+                            elif command == "speaker.configure":
+                                canonical = self.settings.committed_settings
+                                if canonical is None:
+                                    raise RuntimeError("settings not loaded")
+                                intent = replace(canonical.intent.speaker, **arguments)
+                                updated = replace(
+                                    canonical, intent=replace(canonical.intent, speaker=intent)
+                                )
+                                await self.application.apply_settings(updated)
+                                committed = self.settings.committed_settings
+                                if committed is None or committed.intent.speaker != intent:
+                                    result = {"status": "persistence_failed"}
+                                else:
+                                    deferred = ("speaker", asyncio.create_task(owner.apply(intent)))
+                            elif command == "speaker.install":
+                                source_path = arguments.get("source_path")
+                                if (
+                                    source_path is None
+                                    and not self.settings.committed_settings.intent.speaker.download_consent
+                                ):
+                                    result = {
+                                        "status": "action_required",
+                                        "action": "speaker_download_consent",
+                                    }
+                                else:
+                                    deferred = (
+                                        "speaker",
+                                        asyncio.create_task(
+                                            owner.install(
+                                                source_path=(
+                                                    Path(source_path)
+                                                    if source_path is not None
+                                                    else None
+                                                )
+                                            )
+                                        ),
+                                    )
+                            else:
+                                deferred = ("speaker", asyncio.create_task(owner.prepare()))
                         elif command == "models.install":
                             _validate_command_args(
                                 command, arguments, locale_choices=self.locale_choices
@@ -1636,6 +1706,16 @@ class ApplicationControlOwner:
                             raise asyncio.CancelledError
                         if deferred[0] == "install":
                             result = await self._install_result(deferred[1])
+                        elif deferred[0] == "speaker":
+                            speaker_result = await deferred[1]
+                            result = {
+                                "status": (
+                                    "degraded"
+                                    if speaker_result["state"] == "unavailable"
+                                    else "applied"
+                                ),
+                                "speaker": _json(speaker_result),
+                            }
                         else:
                             result = self._text_admission_data(
                                 await self.application.submit_text(deferred[1])
@@ -1888,6 +1968,15 @@ class ApplicationControlOwner:
         if command == "app.stop":
             self._stop_requested.set()
             return {"status": "applied", "cleanup_outcome": "unobserved"}
+        if command in {"speaker.cancel", "speaker.reset"}:
+            owner = self.speaker()
+            if owner is None:
+                return {"status": "failed", "error": {"code": "speaker_owner_unavailable"}}
+            if command == "speaker.cancel":
+                await owner.cancel_install()
+            else:
+                owner.reset()
+            return {"status": "applied", "speaker": _json(owner.snapshot())}
         if command == "capture.set":
             enabled = _boolean(args, "enabled")
             channel = args["channel"]
@@ -2913,6 +3002,25 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
     allowed = COMMAND_ARGUMENTS[command].keys()
     if args.keys() - allowed:
         raise InvalidArgumentsError("unknown command arguments")
+    if command == "speaker.configure":
+        from puripuly_heart.config.settings_vnext.schema import SpeakerIntent
+
+        if not args:
+            raise InvalidArgumentsError("speaker.configure requires settings")
+        for key in ("enabled", "download_consent"):
+            if key in args and type(args[key]) is not bool:
+                raise InvalidArgumentsError("speaker consent/enablement must be boolean")
+        try:
+            SpeakerIntent(profile=args.get("profile"), vulkan_device_id=args.get("vulkan_device_id"))
+        except ValueError as exc:
+            raise InvalidArgumentsError(str(exc)) from exc
+        return
+    if command == "speaker.install":
+        if "source_path" in args and (
+            type(args["source_path"]) is not str or not args["source_path"].strip()
+        ):
+            raise InvalidArgumentsError("speaker.install source_path must be a local path")
+        return
     required = {
         "capture.set": {"channel", "enabled"},
         "translation.set": {"enabled"},

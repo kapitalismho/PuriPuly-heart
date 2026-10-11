@@ -42,6 +42,7 @@ core runtime and domain contracts
 | VRChat OSC           | Bidirectional control, canonical state, chatbox output, mute      |
 | Overlay processes    | Desktop and VR subtitle presentation                              |
 | GPU worker           | Native local GPU ASR                                              |
+| Speaker worker       | Isolated local Vulkan speaker evidence, independent of ASR         |
 | Broker               | Managed identity, entitlement, credentials, telemetry             |
 | Local storage        | Settings, secrets, diagnostics, model assets                      |
 
@@ -61,6 +62,8 @@ Broker is a control-plane dependency, not part of the normal utterance data path
 | Peer capture owner      | Peer audio source, segmentation, and capture lifecycle | `core/runtime/peer_channel.py`                       |
 | Audio test owner        | VAD-only audio testing and capture restoration | `app/services/audio_test.py`, `core/runtime/audio_test.py` |
 | Local ASR runtime       | Local recognition channels and backend transitions         | `core/runtime/local_asr_provider_runtime.py`         |
+| Speaker application owner | Independent intent, consent, model acquisition, readiness and cleanup debt | `app/services/speaker_application.py` |
+| Speaker evidence runtime | Original-source evidence, bounded stream state, speaker epochs and worker lifetime | `core/speaker/runtime.py`, `app/adapters/nemotron/` |
 | Managed local translation | Local model provisioning and runtime lifecycle | `app/services/managed_gemma_translation.py` and `core/local_translation/runtime.py` |
 | Model assets application | Explicit local-model asset operations and provisioning coordination | `app/services/model_assets.py` |
 | Translation turn owner  | Request lifecycle, cancellation, stale-result rejection    | `core/orchestrator/translation_turn.py`                 |
@@ -253,6 +256,21 @@ Implementation: `core/storage/secrets.py`, `app/adapters/sync_secret_store.py`, 
 
 Implementation: `core/stt/scoped_engine.py`, `core/stt/session_projection.py`. Behavior: `tests/core/test_stt_scoped_engine.py`.
 
+### Local speaker evidence
+
+`SpeakerRuntime` owns Peer speaker evidence independently of the selected ASR. The initial adapter runs Nemotron-3-Diarization in an isolated private child process with resident model weights, explicit Vulkan device selection, and no CPU neural-inference fallback.
+
+- Peer capture supplies each original normalized input range and the existing VAD observation once, before provider routing or ASR onset/continuation replay. Physical capture identity, ASR activation, and speaker epoch are distinct.
+- Ordinary VAD pauses preserve frontend, lookahead, FIFO and speaker-cache state. Pending speech tails use causally available real context and explicitly mapped synthetic padding, never a future speech island or terminal finish.
+- Evidence preserves eight-channel probabilities, overlap, piecewise original-source coverage, actual observation-ready time, and separate processed and immutable-probability frontiers. Probability immutability is not an accuracy or permanent-identity guarantee.
+- PCM, source maps, raw results, returned evidence, IPC and pending work have independent bounds. Slow consumers cannot retain a whole session; missing speech causes explicit unavailable coverage and a new epoch rather than delayed backlog replay.
+- Source children, ASR finalization, hard-rollover context and server endpoints do not reset valid speaker state. Orderly source EOF drains already-owned bounded tails; replacement, loss, manual reset and stop fence stale work.
+- Speaker failure or disable affects only speaker resources. Native Soniox speaker decisions are not a fallback; unavailable attribution remains gray while recognition and translation continue.
+
+The native adapter implements the backend-neutral contract in `core/speaker/contracts.py`. Behavior: `tests/core/speaker/test_runtime.py`. Speaker-boundary application to ASR and caption grouping are separate integration outcomes.
+
+Native build and model provenance: `scripts/ci/build-nemotron-runtime.ps1`, `data/models/nemotron-runtime.sources.json`, and `data/models/nemotron-3-diarization-f16-vulkan.manifest.json`. Reproducible qualification commands, tensor/accumulation observations and measured limits are recorded in [`native/nemotron/verification.json`](../native/nemotron/verification.json). The initial qualification uses a pinned Bonenk F16 artifact on Windows Vulkan with local CPU-ASR co-residency; it does not select a production profile or qualify GPU-ASR/VRChat contention.
+
 ### Translation
 
 - **Provider and request ownership**
@@ -438,6 +456,7 @@ References:
 - Import and resource-loading adapters preserve application contracts across source and packaged hosts.
   - Native libraries and filesystem-backed resources remain accessible through their runtime layout.
 - Installer cleanup owns only verified distribution files. It does not own modified or unlisted files or writable user data.
+- The optional Nemotron payload lives under the independent native `nemotron/` directory with its exact-build manifest and licenses. Its private GGML libraries must not resolve against the ASR payload. Native assembly accepts `-NemotronRuntimeDir` and can require it with `-RequireNemotronRuntime`; model weights are installed separately in writable storage after explicit consent.
 
 Build policy and validation: `scripts/ci/build-native-experimental.ps1`, `release_evidence/native_distribution.py`. Runtime behavior: `tests/release_evidence/test_native_runtime_layout.py`, `tests/release_evidence/test_native_python_runtime.py`, `tests/release_evidence/test_native_bootstrap.py`.
 

@@ -208,7 +208,13 @@ def stage_vc_runtime(target_root: Path, cmake_build_dir: Path) -> dict[str, Any]
         destinations.update(image.path for image in images if image.path.name.lower() == name)
         digest = _sha256(source)
         for destination in sorted(destinations):
-            shutil.copy2(source, destination)
+            if destination.is_relative_to(target_root / "nemotron"):
+                if not destination.is_file() or _sha256(destination) != digest:
+                    raise ValueError(
+                        f"Nemotron CRT differs from selected official release runtime: {destination}"
+                    )
+            else:
+                shutil.copy2(source, destination)
             modules.append(
                 {
                     "path": destination.relative_to(target_root).as_posix(),
@@ -306,6 +312,8 @@ def validate_pe_dependencies(target_root: Path, vc_runtime_path: Path) -> dict[s
         wheel_libraries = wheel_directories[package_key]
         if wheel_libraries is not None:
             search.append(wheel_libraries)
+        # The diarizer's ggml build must never resolve against the ASR DLLs.
+        nemotron_image = image.path.is_relative_to(target_root / "nemotron")
         imports = []
         for kind, name in image.imports:
             if _DEBUG_DLL.fullmatch(name) or name in {"ucrtbased.dll", "python314_d.dll"}:
@@ -319,7 +327,12 @@ def validate_pe_dependencies(target_root: Path, vc_runtime_path: Path) -> dict[s
                     (
                         by_directory[directory][name]
                         for directory in search
-                        if name in by_directory.get(directory, {})
+                        if (
+                            not nemotron_image
+                            or directory == image.path.parent
+                            or _VC_NAME.fullmatch(name)
+                        )
+                        and name in by_directory.get(directory, {})
                     ),
                     None,
                 )

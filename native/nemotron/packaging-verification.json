@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "issue": "kapitalismho/PuriPuly-heart#213",
+  "status": "packaging qualification passed; owned surfaces frozen for Director integration and review",
+  "scope": "Actual throwaway Windows native distribution assembly, exact final application source archive, target/compliance validation, and packaged-interpreter private-worker/DLL/model smoke. Not release, publication, installation, speaker accuracy, or universal hardware qualification.",
+  "sanitization": "Local root aliases replace user-specific paths. No credentials, private audio, transcripts, raw model outputs, device UUIDs, or user configuration are retained.",
+  "root_aliases": {
+    "REPO": "current issue-213 worktree",
+    "TOOLS": "existing safe native-build tools virtual environment",
+    "PINNED_INPUTS": "existing verified native release inputs cache",
+    "SCRATCH": "C:/d177/native-integration/issue213-packaging",
+    "RUNTIME": "temporary qualified puripuly-nemotron-runtime-physical-gpu directory",
+    "MODEL": "temporary user-approved Bonenk model.gguf outside the distribution"
+  },
+  "runtime": {
+    "packaged_relative_root": "nemotron",
+    "source_staged_relative_root": "build/nemotron",
+    "manifest_sha256": "4615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9",
+    "source": {
+      "repository": "NVIDIA/NeMo-Speech.cpp",
+      "revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+      "archive_sha256": "069d7042685996011d5f1878a06737195421b142f91859a561610b6971ae8b8a"
+    },
+    "dependencies": {
+      "llama.cpp": "bd4f514db14d87fded667787a7a963bfbaa98e89",
+      "vcpkg": "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+    },
+    "patches_sha256": "e81a179f2a71b76b8869a4a2710983c23f219717b344cf5c37af86574f90b748",
+    "policy": {
+      "backend": "Vulkan",
+      "neural_cpu_fallback": false,
+      "physical_gpu_only": true,
+      "precision": "F16",
+      "schedule_guard": true
+    },
+    "exact_inventory_file_count": 65,
+    "neural_dll_sha256": {
+      "bin/nemo_speech_asr_c.dll": "158f330a9b8ce664f4388238d0a1cf7cf871520eb3d209aeeb392ddc0b80bf8e",
+      "bin/nemo_speech_asr.dll": "934cadbbae518b0982a667ee2d534d4cf9bcf0841e3a53946e18b6478b92d734",
+      "bin/ggml.dll": "38c9b7e2d9724418986ce124fa43f49d22e3880c83c86a12ae03824690d15e21",
+      "bin/ggml-base.dll": "5dc9ef70f2583eae97659145b03421c7531265671d808c372b621771d6ab6f1c",
+      "bin/ggml-cpu.dll": "03f16942bc4c4092a1738627c9d099cd4c6d50220e5cdae12f38626ef734df57",
+      "bin/ggml-vulkan.dll": "044345dfec12ac0c4a863bfaf0ace67c818af07f1eb75082ecdcdb608f7b8d24"
+    },
+    "required_notices_present_and_hash_checked": [
+      "share/licenses/nemo-speech/LICENSE",
+      "share/licenses/nemo-speech/NOTICE",
+      "share/licenses/nemo-speech/THIRD_PARTY_NOTICES.md",
+      "share/licenses/nemo-speech/third_party/ggml/LICENSE",
+      "share/licenses/nemo-speech/third_party/abseil/copyright",
+      "share/licenses/nemo-speech/third_party/protobuf/copyright",
+      "share/licenses/nemo-speech/third_party/sentencepiece/copyright",
+      "share/licenses/nemo-speech/third_party/utf8-range/copyright"
+    ],
+    "refresh_ownership": "Before replacing source staging, the old directory was verified against its exact previously staged manifest hash, file set, individual hashes and absence of symlinks. The qualified replacement was staged separately and validated before moving into build/nemotron. No unrelated files were overwritten. Product worker was notified of the refreshed qualified artifact."
+  },
+  "model": {
+    "user_approved": true,
+    "bundled": false,
+    "sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+    "repository": "Bonenk/Nemotron-3-Diarization-GGUF",
+    "revision": "25cf0d6b0c91b679376df0f6ef3087b4fd96af1f",
+    "filename": "Nemotron-3-Diarization.f16.gguf",
+    "license": "OpenMDW-1.1",
+    "tensor_formats_observed_in_packaged_ready": {"F16": 125, "F32": 231},
+    "lineage_limit": "Pinned publisher artifact, not independently reproduced NVIDIA checkpoint-to-GGUF conversion lineage. F32 auxiliary tensors/activations are present; this is not an all-F16 accumulation claim."
+  },
+  "final_distribution": {
+    "relative_to_scratch": "dist",
+    "native_artifact_manifest_sha256": "3c5c10436b21f8eeefe067517ac161b8a08542da04c042574c263298709b1da8",
+    "python_executable": "python.exe",
+    "python_executable_sha256": "4942b86a6597e5aee0128daa00050ed79bc21f6e709a78eb19cbfeb0c2f39ac9",
+    "application_archive": "app/python.zip",
+    "application_archive_sha256": "6f7a4569034b5b853bc58b9bf6aec463449625ff10498d75003c0fa490f37e6b",
+    "final_source_snapshot": {
+      "application_python_sources_checked": 555,
+      "method": "Compared every final current src/puripuly_heart Python source SHA256 with the corresponding compiled-source record in bytecode.json archive members; asserted exact source-name coverage. Also compared both packaged Nemotron policy/model source JSON files with current source.",
+      "mismatches": [],
+      "nemotron-runtime.sources.json_sha256": "11e135ff3780e13aca8f9724c1c475369b098957ca989359f4b7fc5cca5e2da1",
+      "nemotron-3-diarization-f16-vulkan.manifest.json_sha256": "af753dca12bd54d44ab2db3c4855576531657ff52653012e1bedc1e1e48d1e2a",
+      "barrier": "Final assembly began after core, native and product owners confirmed final source-formatting freeze."
+    }
+  },
+  "commands_and_results": [
+    {
+      "command": "pwsh -NoProfile -File scripts/ci/build-native-experimental.ps1 -ToolPython $TOOLS/python.exe -PinnedInputRoot $PINNED_INPUTS -PythonEmbedArchive $PINNED_INPUTS/python-3.14.7-embed-amd64.zip -SoxrBuildEnvironment $TOOLS -BuildRoot $SCRATCH/build -OutputDir $SCRATCH/dist -NemotronRuntimeDir $RUNTIME -RequireNemotronRuntime",
+      "environment": "Visual Studio 2022 BuildTools vcvars64; VULKAN_SDK and CMAKE_PREFIX_PATH select SDK 1.4.350.0; existing safe Flutter/pip/llama/overlay caches reused.",
+      "result": "exit 0; actual build completed in 381.14 seconds. Existing native host, GPU worker, OpenVR staging, pinned Python compile/bundle, target/compliance checks, artifact manifest and installer-cleanup include generation completed. No installer compile/install, release or publish action ran.",
+      "execution_log": "artifact://176"
+    },
+    {
+      "command": "$TOOLS/python.exe -m puripuly_heart.release_evidence.native_distribution validate-target --target-root $SCRATCH/dist --layout native/windows_host/artifact-layout.json --requirements $SCRATCH/build/requirements-export.txt --vc-runtime $SCRATCH/build/evidence/vc-runtime.json --output $SCRATCH/build/evidence/packaged-target-validation.json",
+      "result": "exit 0; final copied distribution accepted, Nemotron bundled=true and qualified manifest SHA256 matched"
+    },
+    {
+      "command": "$TOOLS/python.exe -m puripuly_heart.release_evidence.native_distribution validate-compliance --target-root $SCRATCH/dist --repo-root $REPO --soxr-manifest $SCRATCH/build/soxr-release-inputs/manifest.json --output $SCRATCH/build/evidence/packaged-compliance-validation.json",
+      "result": "exit 0; final copied distribution compliance accepted, including exact Nemotron runtime and required license inventory"
+    },
+    {
+      "command": "Task-local source snapshot audit against $SCRATCH/build/evidence/bytecode.json and $SCRATCH/dist",
+      "result": "exit 0; all 555 application Python sources and both Nemotron JSON resources matched final frozen source"
+    },
+    {
+      "command": "Task-local packaged smoke driver launched $SCRATCH/dist/python.exe from unrelated temporary working directories using RuntimeLayout.python_child_environment; actual private stdio worker and public NemotronBackend API exercised with $MODEL",
+      "result": "exit 0 in 4.05 seconds; packaged module origin, private DLL loading, no-device rejection, stop, unavailable device and both real Vulkan profiles passed"
+    },
+    {
+      "command": "python -m pytest tests/release_evidence/test_nemotron_distribution.py tests/release_evidence/test_native_pe.py tests/release_evidence/test_native_distribution.py::test_validate_target_requires_the_deployed_python_archive tests/release_evidence/test_native_distribution.py::test_bundle_cli_and_manifest_preserve_deployed_archive_and_member_evidence tests/release_evidence/test_native_installer_cleanup.py::test_generator_never_overwrites_manifests_and_invalid_input_creates_no_include -o addopts= -q",
+      "result": "54 passed in 7.18 seconds; retained across subsequent formatting-only changes as authorized. No repeated broad tests."
+    },
+    {
+      "command": "python -m black --check src/puripuly_heart/release_evidence/nemotron_distribution.py src/puripuly_heart/release_evidence/native_distribution.py src/puripuly_heart/release_evidence/native_pe.py tests/release_evidence/test_nemotron_distribution.py tests/release_evidence/test_native_pe.py; python -m ruff check <the same five owned paths>",
+      "result": "both exit 0; five files Black-clean; Ruff all checks passed"
+    },
+    {
+      "command": "PowerShell parser checks of both changed CI scripts and actual build-native-experimental.ps1 invocation with -RequireNemotronRuntime but no -NemotronRuntimeDir",
+      "result": "both scripts parsed; actual required-input invocation rejected with the expected explicit-directory error before any build"
+    }
+  ],
+  "packaged_smoke_observations": {
+    "worker_module": "dist/app/python.zip/puripuly_heart/app/adapters/nemotron/worker.pyc",
+    "interpreter": "dist/python.exe, not source-tools Python",
+    "loaded_neural_modules": ["nemotron/bin/nemo_speech_asr_c.dll", "nemotron/bin/nemo_speech_asr.dll", "nemotron/bin/ggml.dll", "nemotron/bin/ggml-base.dll", "nemotron/bin/ggml-vulkan.dll", "nemotron/bin/ggml-cpu.dll"],
+    "dll_isolation": "Windows EnumProcessModules/GetModuleFileNameW asserted every loaded NeMo/ggml module belonged to the private nemotron/bin directory, not ASR/root copies. Presence of ggml-cpu.dll is not a claim that neural CPU fallback is allowed.",
+    "model_free_no_device": {"exit_code": 0, "ok": false, "error": "explicit Vulkan device and official profile required", "stderr": ""},
+    "model_free_stop": {"exit_code": 0, "ok": true},
+    "unavailable_device": {"ordinal": 9999, "error": "Nemotron selected Vulkan device ordinal is unavailable"},
+    "model_input": "Three one-second chunks of synthetic float32 zero PCM at 16 kHz per profile; 48000 submitted samples per profile; no microphone or private audio.",
+    "profiles": [
+      {"profile": "1.04", "device_ordinal": 0, "geometry": "9/4/0/264/264/222", "processed_samples": [0, 23040, 34560], "immutable_samples": [0, 23040, 34560], "emitted_frame_counts": [0, 144, 72], "stop": "completed"},
+      {"profile": "0.64", "device_ordinal": 0, "geometry": "6/2/0/264/264/222", "processed_samples": [7680, 23040, 38400], "immutable_samples": [7680, 23040, 38400], "emitted_frame_counts": [48, 96, 96], "stop": "completed"}
+    ],
+    "stderr": "",
+    "probability_frontier_limit": "Immutable emitted probabilities, not immutable identity certainty; processed cursor is consumed mel-hop prefix and excludes submitted lookahead."
+  },
+  "retained_receipts_relative_to_scratch": {
+    "build/evidence/bytecode.json": "966107011e8a897b67468575be96b93cd5a60cf3a1735beddca512cad8cd691b",
+    "build/evidence/packaged-target-validation.json": "9e0d62d13edbe086dda42714dd3607878fa8db9ca0f66d1d87f1a14d3a8264d0",
+    "build/evidence/packaged-compliance-validation.json": "ee7392be124ba49556474be968614d2cb2cdf9058ae01a099f7b09150a3b5dd0",
+    "build/evidence/packaged-source-snapshot.json": "9528a00fed6b776a88ab09c73dc544bbf0268e6a1bf2a59d2907715d9d83160c",
+    "build/evidence/packaged-nemotron-smoke.json": "58ebfe6c99387aaf50d2c5083694118ca8af26bcd6c2a797ba0d2874725579a8"
+  },
+  "provisional_supersession": [
+    {"runtime_manifest_sha256": "b44cc1426ba3d331a04bbfed8b0321cd55d8d2aff9c3ef47ba664d927ce253ec", "status": "Earlier two assemblies and real-model smoke are historical/provisional only. Superseded by physical-GPU-guarded runtime; updated distribution validator rejects this old missing-policy artifact."},
+    {"runtime_manifest_sha256": "4615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9", "application_archive_sha256": "b43aa7f347a40caa7ec9effb9cd2a09fcf00940e0d3149bcecddc460ab438ea1", "status": "First guarded assembly superseded because source audit found six formatting-only module mismatches. Final assembly after all source barriers, archive 6f7a4569034b5b853bc58b9bf6aec463449625ff10498d75003c0fa490f37e6b, has zero mismatches and passed actual packaged smoke."}
+  ],
+  "remaining_limits": [
+    "No packaging prerequisite remains unavailable. Final artifact and source staging use the frozen guarded runtime.",
+    "The packaged smoke is short synthetic-zero inference on selected Vulkan device 0; not speaker accuracy, long-session performance, software-Vulkan execution, or every GPU/driver qualification.",
+    "Extended owner/cancellation/EOF/reset/discontinuity/co-residency and physical-device classification evidence is native/product worker evidence, not independently rerun here; see native/nemotron/verification.json and product-verification.json.",
+    "Earlier broad pytest attempts timed out and are not passing-suite evidence. Task-related survivor queries found no remaining prior timed-out pytest processes; no unrelated process was interrupted.",
+    "No Nemotron model weights were bundled or automatically downloaded by packaging, and no feature consent/profile/device requirement was bypassed.",
+    "No maintained docs, Git state, native runtime source, installer installation, release or publication were changed by this packaging assignment."
+  ]
+}

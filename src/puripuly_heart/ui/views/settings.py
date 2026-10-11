@@ -68,7 +68,6 @@ from puripuly_heart.app.ports.settings_view import (
     QwenSingaporeApiHostEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
-    SonioxSpeakerDiarizationEdit,
     SttGpuDeviceEdit,
     SystemPromptEdit,
     TranslationHttpExtensionEdit,
@@ -197,7 +196,6 @@ _DRAFT_PROVIDER_FIELDS: dict[type, str] = {
     SelfSttProviderEdit: "stt_provider",
     PeerSttProviderEdit: "peer_stt_provider",
     CloudFreeTierProvidersEdit: "cloud_free_tier_providers",
-    SonioxSpeakerDiarizationEdit: "soniox_speaker_diarization_enabled",
     SttGpuDeviceEdit: "stt_gpu_device_id",
     QwenRegionEdit: "qwen_region",
     QwenBeijingApiHostEdit: "qwen_api_host_beijing",
@@ -569,9 +567,6 @@ class SettingsView(ft.Column):
     def cloud_free_tier_control(self) -> ft.Control:
         return self._cloud_free_tier_card
 
-    def soniox_speaker_diarization_control(self) -> ft.Control:
-        return self._soniox_speaker_diarization_card
-
     def gpu_device_control(self) -> ft.Control:
         return self._gpu_device_card
 
@@ -777,7 +772,6 @@ class SettingsView(ft.Column):
             self._desktop_overlay_view_logs_action,
             self._translation_connection_text,
             self._cloud_free_tier_text,
-            self._soniox_speaker_diarization_text,
             self._telemetry_enabled_text,
             self._http_extension_text,
             self._http_extension_path_text,
@@ -2188,23 +2182,6 @@ class SettingsView(ft.Column):
             title=self._translation_connection_title,
             value=self._translation_connection_text,
         )
-        self._soniox_speaker_diarization_title = ft.Text(
-            t("settings.soniox_speaker_diarization"),
-            size=24,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_SECONDARY,
-        )
-        self._soniox_speaker_diarization_text = self._build_clickable_text(
-            t("settings.soniox_speaker_diarization.inactive"),
-            self._on_soniox_speaker_diarization_click,
-        )
-        self._soniox_speaker_diarization_card = self._wrap_unit_card(
-            title=self._soniox_speaker_diarization_title,
-            value=self._soniox_speaker_diarization_text,
-        )
-        self._soniox_speaker_diarization_text.on_click = None
-        self._soniox_speaker_diarization_text.on_hover = None
-        self._soniox_speaker_diarization_card.ignore_interactions = True
         self._cloud_free_tier_title = ft.Text(
             t("settings.cloud_free_tier"),
             size=24,
@@ -3776,7 +3753,6 @@ class SettingsView(ft.Column):
             ),
         )
         self._sync_cloud_free_tier_card(display_provider)
-        self._sync_soniox_speaker_diarization_card(display_provider)
         self._update_api_visibility()
         self._sync_gpu_device_card()
 
@@ -4349,7 +4325,6 @@ class SettingsView(ft.Column):
                 if control is not None
             )
         self._sync_cloud_free_tier_card(settings)
-        self._sync_soniox_speaker_diarization_card(settings)
 
     # --- Event Handlers ---
     def _on_stt_click(self, e) -> None:
@@ -4550,57 +4525,6 @@ class SettingsView(ft.Column):
             self._cloud_free_tier_text.update()
         if is_control_mounted(self._cloud_free_tier_card):
             self._cloud_free_tier_card.update()
-
-    def _soniox_speaker_diarization_active(
-        self,
-        settings: ProviderSettingsSnapshot | None,
-    ) -> bool:
-        if settings is None:
-            return False
-        return self._effective_peer_stt_provider(settings) == STTProviderName.SONIOX
-
-    def _sync_soniox_speaker_diarization_card(
-        self,
-        settings: ProviderSettingsSnapshot | None = None,
-    ) -> None:
-        if settings is None:
-            settings = self._build_settings_with_provider_draft()
-        active = self._soniox_speaker_diarization_active(settings)
-        if active and settings is not None:
-            label = t(
-                "settings.option.on"
-                if settings.soniox_speaker_diarization_enabled
-                else "settings.option.off"
-            )
-        else:
-            label = t("settings.soniox_speaker_diarization.inactive")
-        self._set_unit_card_value_text(self._soniox_speaker_diarization_text, label)
-        self._soniox_speaker_diarization_text.on_click = (
-            self._on_soniox_speaker_diarization_click if active else None
-        )
-        self._soniox_speaker_diarization_text.on_hover = self._on_text_hover if active else None
-        if not active:
-            self._soniox_speaker_diarization_text.content.color = COLOR_ON_BACKGROUND
-        self._soniox_speaker_diarization_card.ignore_interactions = not active
-        _update_control_if_mounted(self._soniox_speaker_diarization_text)
-        _update_control_if_mounted(self._soniox_speaker_diarization_card)
-
-    def _on_soniox_speaker_diarization_click(self, _event) -> None:
-        settings = self._build_settings_with_provider_draft()
-        if not self._soniox_speaker_diarization_active(settings):
-            return
-        assert settings is not None
-        enabled = not settings.soniox_speaker_diarization_enabled
-        draft = self._ensure_provider_settings_draft()
-        self._provider_draft = replace(
-            draft,
-            soniox_speaker_diarization_enabled=enabled,
-        )
-        self._record_provider_edit(SonioxSpeakerDiarizationEdit(enabled))
-        self.has_provider_changes = True
-        self._sync_soniox_speaker_diarization_card(self._provider_draft)
-        if self.on_providers_changed is not None:
-            self.on_providers_changed()
 
     def _on_cloud_free_tier_click(self, e) -> None:
         if not is_control_mounted(self):
@@ -6746,8 +6670,6 @@ class SettingsView(ft.Column):
         self._audio_test_title.value = t("settings.audio_test")
         self._translation_connection_title.value = t("settings.translation_connection")
         self._cloud_free_tier_title.value = t("settings.cloud_free_tier")
-        self._soniox_speaker_diarization_title.value = t("settings.soniox_speaker_diarization")
-        self._sync_soniox_speaker_diarization_card()
         self._sync_cloud_free_tier_card()
         self._local_llm_connection_title.value = t("settings.local_llm.connection")
         self._custom_stt_connection_title.value = t("settings.custom_stt.title")

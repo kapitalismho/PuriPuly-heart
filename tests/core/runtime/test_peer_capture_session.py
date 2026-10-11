@@ -245,6 +245,7 @@ def make_owner(
     run_audio_loop=None,
     sink: FakeVadSink | None = None,
     smart_turn_owner=None,
+    speaker_observer=None,
     diagnostics: list | None = None,
     state_changes: list | None = None,
     clock=None,
@@ -283,6 +284,7 @@ def make_owner(
         run_audio_loop=run_audio_loop or default_loop,
         vad_sink=vad_sink,
         smart_turn_owner=smart_turn_owner,
+        speaker_observer=speaker_observer,
         state_changed=state_changes.append if state_changes is not None else None,
         diagnostic_sink=diagnostics.append if diagnostics is not None else None,
     )

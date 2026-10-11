@@ -215,8 +215,8 @@ async def _terminal_from_soniox_tokens(
 @pytest.mark.parametrize(
     ("mode", "style"),
     [
-        ("off", "gold"),
-        ("unsupported", "gold"),
+        ("off", "gray"),
+        ("unsupported", "gray"),
         ("missing", "gray"),
         ("malformed", "gray"),
         ("invalid-runs", "gray"),

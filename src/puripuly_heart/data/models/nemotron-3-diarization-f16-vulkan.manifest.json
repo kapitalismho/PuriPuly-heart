@@ -1,0 +1,30 @@
+{
+  "manifest_version": 1,
+  "installed_manifest_version": 1,
+  "model_id": "nemotron-3-diarization-f16-vulkan",
+  "engine": "nemo-speech-vulkan",
+  "license": "OpenMDW-1.1",
+  "upstream_repo": "nvidia/Nemotron-3-Diarization",
+  "install_dirname": "nemotron-3-diarization-f16-vulkan",
+  "installed_manifest_filename": "installed-manifest.json",
+  "sources": {
+    "huggingface": {
+      "name": "huggingface",
+      "repo_id": "Bonenk/Nemotron-3-Diarization-GGUF",
+      "revision": "25cf0d6b0c91b679376df0f6ef3087b4fd96af1f",
+      "download_url_template": "https://huggingface.co/Bonenk/Nemotron-3-Diarization-GGUF/resolve/25cf0d6b0c91b679376df0f6ef3087b4fd96af1f/{path}"
+    }
+  },
+  "files": [
+    {
+      "relative_path": "model.gguf",
+      "source_path_overrides": {"huggingface": "Nemotron-3-Diarization.f16.gguf"},
+      "size_bytes": 201832928,
+      "sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+    }
+  ],
+  "tensor_formats": {"F16": 125, "F32": 231},
+  "tensor_count": 356,
+  "provenance_limitation": "Pinned community artifact acquired and qualified on Windows Vulkan. Publisher declares NVIDIA checkpoint origin; original checkpoint checksum lineage and publisher conversion recipe are not independently reproduced.",
+  "validation_record": "native/nemotron/verification.json"
+}

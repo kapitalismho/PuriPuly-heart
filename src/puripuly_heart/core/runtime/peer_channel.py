@@ -5,9 +5,9 @@ import contextlib
 import inspect
 import logging
 from collections import deque
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Awaitable, Callable, Literal, Protocol, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from puripuly_heart.config.resolved import (
     ResolvedDesktopAudioCaptureTarget,
@@ -179,9 +179,16 @@ class _VadSink(Protocol):
     async def observe_pending_source_work(self, *, pending: bool) -> None: ...
 
 
+class PeerSpeakerInputObserver(Protocol):
+    def observe_input(self, capture_session_id: str, event: CaptureStreamInput) -> None: ...
+
+    def end_capture(self, capture_session_id: str, reason: str) -> None: ...
+
+
 @dataclass(slots=True)
 class _CaptureGeneration:
     value: int
+    capture_session_id: str = field(default_factory=lambda: uuid4().hex)
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,6 +243,13 @@ class _GenerationGuardedVadSink:
         await self._submit(event)
 
     async def handle_stream_input(self, event: CaptureStreamInput) -> None:
+        if self.runtime._speaker_observer is not None:
+            try:
+                self.runtime._speaker_observer.observe_input(
+                    self.capture_generation.capture_session_id, event
+                )
+            except Exception:
+                logger.exception("peer speaker input unavailable")
         if not self.runtime.is_current_generation(self.capture_generation.value):
             return
         ledger = self.runtime.segment_ledger
@@ -714,6 +728,7 @@ class PeerCaptureSessionOwner:
         diagnostic_sink: Callable[[PeerCaptureDiagnostic], object] | None = None,
         local_asr_diagnostic_sink: LocalASRTransitionDiagnosticSink | None = None,
         smart_turn_owner: SmartTurnInferenceOwner | None = None,
+        speaker_observer: PeerSpeakerInputObserver | None = None,
     ) -> None:
         if not callable(getattr(vad_sink, "handle_owned_vad_event", None)):
             raise TypeError("Peer capture VAD sink requires owned VAD ingress")
@@ -726,6 +741,7 @@ class PeerCaptureSessionOwner:
         self._vad_factory = vad_factory
         self._run_audio_loop = run_audio_loop
         self._vad_sink = vad_sink
+        self._speaker_observer = speaker_observer
         self._state_changed = state_changed
         self._diagnostic_sink = diagnostic_sink
         self._local_asr_diagnostic_sink = local_asr_diagnostic_sink
@@ -1835,6 +1851,9 @@ class PeerCaptureSessionOwner:
                 smart_turn_owner=self._smart_turn_owner,
             )
             drain = self._terminal_reason_from_source(source) in {None, "closed"}
+            self._end_speaker_capture(
+                capture_generation, "source_eof" if drain else "capture_failed"
+            )
             if drain and not provider_ingress_ready.is_set():
                 async with self._activation_lock:
                     drain = provider_ingress_ready.is_set()
@@ -1843,6 +1862,7 @@ class PeerCaptureSessionOwner:
             else:
                 await guarded_sink.abort()
         except asyncio.CancelledError:
+            self._end_speaker_capture(capture_generation, "capture_stopped")
             try:
                 await guarded_sink.abort()
             except Exception as cleanup_exc:
@@ -1872,6 +1892,7 @@ class PeerCaptureSessionOwner:
                 severity="error" if current else "info",
                 disposition="failed" if current else "superseded",
             )
+            self._end_speaker_capture(capture_generation, "capture_failed")
             cleanup_failures: list[Exception] = []
             try:
                 await guarded_sink.abort()
@@ -1914,6 +1935,13 @@ class PeerCaptureSessionOwner:
             )
         else:
             await self._complete_current_generation(capture_generation.value)
+
+    def _end_speaker_capture(self, capture_generation: _CaptureGeneration, reason: str) -> None:
+        if self._speaker_observer is not None:
+            try:
+                self._speaker_observer.end_capture(capture_generation.capture_session_id, reason)
+            except Exception:
+                logger.exception("peer speaker detach failed")
 
     async def _complete_current_generation(self, generation: int) -> None:
         async with self._activation_lock:

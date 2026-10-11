@@ -1,0 +1,707 @@
+{
+  "schema_version": 1,
+  "record_type": "sanitized_product_owned_execution_evidence",
+  "issue": 213,
+  "authority": "Exclusive task-local record grant; no product/core/native/build source mutations in this recording step.",
+  "environment": {
+    "platform": "Windows x64",
+    "execution": "source checkout; unmodified authenticated existing CLI/headless host; separate real native Flet caption window",
+    "isolation": "Temporary canonical sandbox configuration, application data/model cache and Hugging Face snapshot cache; no user host/config changes. Authentication and temporary secret values are deliberately omitted."
+  },
+  "artifact_identity": {
+    "runtime_manifest_relative_path": "build/nemotron/runtime-manifest.json",
+    "runtime_manifest_sha256": "4615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9",
+    "runtime_source": {
+      "repository": "NVIDIA/NeMo-Speech.cpp",
+      "revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+    },
+    "runtime_dependencies": {
+      "llama.cpp": "bd4f514db14d87fded667787a7a963bfbaa98e89",
+      "vcpkg": "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+    },
+    "runtime_patches": {
+      "native/nemotron/patches.json": "e81a179f2a71b76b8869a4a2710983c23f219717b344cf5c37af86574f90b748"
+    },
+    "runtime_policy": {
+      "backend": "Vulkan",
+      "neural_cpu_fallback": false,
+      "precision": "F16",
+      "schedule_guard": true,
+      "physical_gpu_only": true
+    },
+    "runtime_inventory_sha256": {
+      "bin/concrt140.dll": "2405355f0a58067b258f8df33c327e3a3d716eaac5a3a5aebb757842d85bd376",
+      "bin/ggml-base.dll": "5dc9ef70f2583eae97659145b03421c7531265671d808c372b621771d6ab6f1c",
+      "bin/ggml-cpu.dll": "03f16942bc4c4092a1738627c9d099cd4c6d50220e5cdae12f38626ef734df57",
+      "bin/ggml-vulkan.dll": "044345dfec12ac0c4a863bfaf0ace67c818af07f1eb75082ecdcdb608f7b8d24",
+      "bin/ggml.dll": "38c9b7e2d9724418986ce124fa43f49d22e3880c83c86a12ae03824690d15e21",
+      "bin/msvcp140.dll": "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9",
+      "bin/msvcp140_1.dll": "bfad5aef4c63a669e3c140655cdfdf395b6c979b400a447bd5dcb65ed8826c3d",
+      "bin/msvcp140_2.dll": "3ea06f0ee098b4823cb79599df3780e7f23cce52c19aac31d2a0d47efe33a5e9",
+      "bin/msvcp140_atomic_wait.dll": "640b2aefced484d0368eea5bdd06addd0658a3a70a49256e560d6923b404a479",
+      "bin/msvcp140_codecvt_ids.dll": "f2069a52880ec885ee7f0511186100eb7fada0411a2b4948fafea7735b878a18",
+      "bin/nemo_speech_asr.dll": "934cadbbae518b0982a667ee2d534d4cf9bcf0841e3a53946e18b6478b92d734",
+      "bin/nemo_speech_asr_c.dll": "158f330a9b8ce664f4388238d0a1cf7cf871520eb3d209aeeb392ddc0b80bf8e",
+      "bin/vcruntime140.dll": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066",
+      "bin/vcruntime140_1.dll": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f",
+      "include/nemo_speech/asr.h": "12f3e017391ae19daabe59d2d50541f0aabb010228d075426b4a9834337422fa",
+      "include/nemo_speech/diar.h": "83dfd5e16859c2c7c6da740826aced4253b26cec3087630941770e41057f66a2",
+      "lib/cmake/NeMoSpeech/NeMoSpeechConfig.cmake": "2c636e6dd73e6df561386e6dff4ce6e51126bb9af7268f6815bf70e51121c25a",
+      "lib/cmake/NeMoSpeech/NeMoSpeechConfigVersion.cmake": "47f41ec43987a0d4fe23653504d4427dc1753b6a83167ba7dacf62e45487b6a4",
+      "lib/nemo_speech_asr_c.lib": "abcadb6022483dcd95d0927465a9c1b1846b78075a008ad70d9e3ec7ce7c07d5",
+      "share/doc/nemo-speech/CONTRIBUTING.md": "dab40307a65b606e687f7731273817794293c16e8d67ba7d836e83a96478c367",
+      "share/doc/nemo-speech/docs/api.md": "eb23ac5107ffbd2fb797eefcb2ce6deb50c4560e526d08d3b39d7b0bc07fdef1",
+      "share/doc/nemo-speech/docs/asr/configuration.md": "c4be8d65c0a4abcdf064d4124a767ae9626cdf5c3b476b124dd22651d02f9c73",
+      "share/doc/nemo-speech/docs/asr/customization.md": "3849d88f25926a1196737b11420027ee1f451abbc9b7307f799190036b4c622d",
+      "share/doc/nemo-speech/docs/asr/models.md": "dd89dde01f1b77a095750f4fadcf4762b971103e7026f52ef88096e19f9fe769",
+      "share/doc/nemo-speech/docs/build.md": "1adaeccf203a4561be08fa0bd3effb46f6bc1fae07b4d6020449a9b1dde75c74",
+      "share/doc/nemo-speech/docs/cli.md": "bbf0c8b54a67261e3f6dddadbbd7bcbbf915c9a157d068ca75cf189a3927614b",
+      "share/doc/nemo-speech/docs/clients.md": "c4977349b3fed97eee0700543ef77e58d3ea2c07b1b89ba8510adb2e3476cd6c",
+      "share/doc/nemo-speech/docs/development/asr-batching.md": "351e7cc131aa055a032aa2cb74b261320fab47793ace608b757abdce84b500a7",
+      "share/doc/nemo-speech/docs/development/cublas-shim.md": "126b2e92e74451cb999932474ddabab44e9d1064607dbafd7e36b36cb6ae4679",
+      "share/doc/nemo-speech/docs/development/diagnostics.md": "e82ced430db61edd107af84d2ac096bb6ddfa1c1d48c2a8a284469592cf7e97a",
+      "share/doc/nemo-speech/docs/development/README.md": "91b7eeb45247c5ccb86c728e100926f690bce39a13d7c2fe185ddf03eecc8847",
+      "share/doc/nemo-speech/docs/development/releasing.md": "c4445d64f55519613c0e698b24c1a7f94ea10c5ba301cc8f483015f6b725370b",
+      "share/doc/nemo-speech/docs/development/windows-build.md": "4b7f3efa6f8d3242edcef47a658d381c1d7800cd94d50e44738f60d3a075c278",
+      "share/doc/nemo-speech/docs/install.md": "bec102a2ac4f4566db8f9be6d1c5143cd5345c6a199e018b3083ab48594afc64",
+      "share/doc/nemo-speech/docs/model-conversion.md": "063a4651ac62559390241520d54d4ac47e9e952708205ce290304c7012d95f68",
+      "share/doc/nemo-speech/docs/nmt/configuration.md": "fc32f28f71114b049382d850d8c91bdb4d2a7a8cd17e96e05cb8b17f61ecf875",
+      "share/doc/nemo-speech/docs/nmt/models.md": "a0f5874b51448351ad36e2a572db16b8647e0b58a19043411e9303ac224a2451",
+      "share/doc/nemo-speech/docs/README.md": "0bd53c4c04a1a6670d440a626b04e19ce3354006807882e9d5f8e36d37b4b936",
+      "share/doc/nemo-speech/docs/s2s/clients.md": "a8c19f0b745b6ad6bdbfb3c9fee588f260d88b1f3036376a35cba507b5069ed9",
+      "share/doc/nemo-speech/docs/s2s/configuration.md": "2178cb877efd78a344d646a479e117babb332e86ea68d116840a5ab6ee48e7ca",
+      "share/doc/nemo-speech/docs/s2s/docker.md": "f430241ae0296304bac4fc20d6df04f7c8194021c282f06f486c8e7b36e2c750",
+      "share/doc/nemo-speech/docs/s2s/models.md": "4e4a8089fd8f0b4c9d7fe7d07af5466dbe98b9e2531065374c20662a1f7d65a7",
+      "share/doc/nemo-speech/docs/s2s/README.md": "b07a3b137188bc1a29ee21b071c78f01adc452bf22b7cb7307f6cc8290cd503e",
+      "share/doc/nemo-speech/docs/sdk.md": "290466ffb5ca4064abaeecfab4d0b351ce6b983d434057a67782a834622c6def",
+      "share/doc/nemo-speech/docs/server.md": "01b99ed2681cf2227ef525cbb5f22605411ee046bfc15f7a9fb40649a15fea19",
+      "share/doc/nemo-speech/docs/troubleshooting.md": "50cc4f3c85e397c78e5ab77065f0d9ed44058de62d634fee6aab2ca532927063",
+      "share/doc/nemo-speech/docs/tts/configuration.md": "5d60b9e3dc3b51b23622653b8a3463758c79e4386b1f5229b0d97ca3adf07532",
+      "share/doc/nemo-speech/docs/tts/models.md": "125e5ab5020661a20ba97d1cab4f55c92e08f7a10d86f4c0ad5dc6131ca60938",
+      "share/doc/nemo-speech/README.md": "54f85f532a1bfe23324ced98b4ad0da675d8e98b4f3d4552644f74be23b1d6b2",
+      "share/licenses/nemo-speech/LICENSE": "eaaca34b26b27c7be5a5099a0b9ddf9913f2db0aa96f6d5854435f2916d6fdc3",
+      "share/licenses/nemo-speech/NOTICE": "d5ea773d67035e676503579ecf7d5836a124649d7fe99d59ec3c50cd101e1a80",
+      "share/licenses/nemo-speech/third_party/abseil/copyright": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747",
+      "share/licenses/nemo-speech/third_party/ggml/LICENSE": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
+      "share/licenses/nemo-speech/third_party/protobuf/copyright": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d",
+      "share/licenses/nemo-speech/third_party/sentencepiece/copyright": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "share/licenses/nemo-speech/third_party/utf8-range/copyright": "02de69b64fc36d9e938f418e52723e42f0b2b226d58a9cb3c8dcbdf7059f5074",
+      "share/licenses/nemo-speech/THIRD_PARTY_NOTICES.md": "fd8fcc0c71abde95b1b742a74c70aa27d2b4f2811fc19f64378b6845d8f3254a",
+      "share/nemo-speech/config/asr.example.yaml": "c406506f22ef5baa008138c28817dd18445407e404bfb507630469d203798716",
+      "share/nemo-speech/config/diar.example.yaml": "ac0e5d93af9fb37c9a03ab0039acd5af0790c36a2b12cc8d181212a1fbd01b5b",
+      "share/nemo-speech/config/nmt.example.yaml": "313214fe93f9f9f57897823d2d3fe20e7a9986fc18b1df37063985389874d46f",
+      "share/nemo-speech/config/README.md": "981118a586fa2cdaab5bed0f0775292002821007ee1da5740a8a77877db50c89",
+      "share/nemo-speech/config/server.example.yaml": "afe8b2575c036156322a93aaf2f328f925e6685e3cddc9604c0fca37a9406d0c",
+      "share/nemo-speech/config/tts.example.yaml": "a1ccdd6886f25d635aaffd4501c3b9626f7c7b264f280ca72273bb3b14bb651a",
+      "share/nemo-speech/config/voicechat.yaml": "9013c7a390fc3f8c68c6833400a55aadd91543e01a49db32e64a81a1b32ef17b",
+      "share/nemo-speech/model-index.json": "4d5d88c93b006b33b2e02e5c214e97e6c28e96f8673b0d744ccfa1e8f4a255b7"
+    },
+    "source_archive_pins": {
+      "nemo": {
+        "repository": "NVIDIA/NeMo-Speech.cpp",
+        "revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+        "archive_sha256": "069d7042685996011d5f1878a06737195421b142f91859a561610b6971ae8b8a"
+      },
+      "llama.cpp": {
+        "repository": "ggml-org/llama.cpp",
+        "revision": "bd4f514db14d87fded667787a7a963bfbaa98e89",
+        "archive_sha256": "d74b36880a15ad7e6889dc1bb1db7489e929e4110cc613b9716cfc31bc33bbe7"
+      },
+      "vcpkg": {
+        "repository": "microsoft/vcpkg",
+        "revision": "9e593bb18ea69cc5095e012465dcd675a822ed0d",
+        "archive_sha256": "92ea07cd3ad4b3bbe65e6e7088b4074eddab371d7bb70107c6e7ceefcb5d5c3e"
+      }
+    },
+    "model": {
+      "repository": "Bonenk/Nemotron-3-Diarization-GGUF",
+      "revision": "25cf0d6b0c91b679376df0f6ef3087b4fd96af1f",
+      "remote_filename": "Nemotron-3-Diarization.f16.gguf",
+      "installed_filename": "model.gguf",
+      "sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+      "size_bytes": 201832928,
+      "tensor_formats": {
+        "F16": 125,
+        "F32": 231
+      },
+      "tensor_count": 356,
+      "lineage_limit": "Pinned community artifact qualified by native owner; publisher original NVIDIA checkpoint checksum and conversion recipe not independently reproduced. No official .nemo acquisition."
+    },
+    "hash_evidence_scope": "Final runtime-manifest SHA was directly measured before final CLI smoke; inventory/source/patch identity is the native-validated runtime metadata observed through actual CLI readiness. Source archive pins are recorded repository manifest inputs, not a claim that this product worker redownloaded/rebuilt them."
+  },
+  "owned_python_checks": [
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--extra",
+        "dev",
+        "black",
+        "src/puripuly_heart/config/settings_vnext/schema.py"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": null
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--extra",
+        "dev",
+        "black",
+        "--check",
+        "src/puripuly_heart/core/runtime/peer_channel.py",
+        "src/puripuly_heart/core/speaker_identity.py",
+        "src/puripuly_heart/app/wiring/root.py",
+        "src/puripuly_heart/app/wiring/wiring_capture_runtime.py",
+        "src/puripuly_heart/app/wiring/wiring_stt_factory.py",
+        "src/puripuly_heart/config/settings_vnext/schema.py",
+        "src/puripuly_heart/config/runtime_resolution.py",
+        "src/puripuly_heart/app/services/speaker_application.py",
+        "src/puripuly_heart/app/services/application_control.py",
+        "src/puripuly_heart/composition/application_runtime.py",
+        "src/puripuly_heart/composition/application_startup.py",
+        "src/puripuly_heart/app/adapters/application_runtime_shutdown.py",
+        "src/puripuly_heart/cli/main.py",
+        "src/puripuly_heart/app/ports/settings_view.py",
+        "src/puripuly_heart/app/services/settings/settings_application.py",
+        "src/puripuly_heart/app/services/settings/settings_mutation_legacy.py",
+        "src/puripuly_heart/ui/settings/contract.py",
+        "src/puripuly_heart/ui/settings/renderer.py",
+        "src/puripuly_heart/ui/views/settings.py",
+        "tests/app/test_speaker_application.py",
+        "tests/app/test_speaker_assets.py",
+        "tests/core/runtime/test_peer_speaker_capture.py",
+        "tests/core/runtime/test_peer_capture_session.py",
+        "tests/app/test_soniox_product_authority.py",
+        "tests/app/test_wiring_providers.py",
+        "tests/app/test_settings_view_boundary.py",
+        "tests/app/test_provider_settings_composition.py",
+        "tests/app/test_settings_mutation_legacy.py",
+        "tests/ui/test_settings_surface_contract.py",
+        "tests/ui/test_settings_view_branches.py",
+        "tests/architecture/test_settings_contract_boundary.py",
+        "tests/config/test_settings_vnext_migration_serialization.py",
+        "tests/core/test_overlay_speaker_modes.py",
+        "tests/integration/test_speaker_identity_pipeline.py"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": null
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--extra",
+        "dev",
+        "ruff",
+        "check",
+        "src/puripuly_heart/core/runtime/peer_channel.py",
+        "src/puripuly_heart/core/speaker_identity.py",
+        "src/puripuly_heart/app/wiring/root.py",
+        "src/puripuly_heart/app/wiring/wiring_capture_runtime.py",
+        "src/puripuly_heart/app/wiring/wiring_stt_factory.py",
+        "src/puripuly_heart/config/settings_vnext/schema.py",
+        "src/puripuly_heart/config/runtime_resolution.py",
+        "src/puripuly_heart/app/services/speaker_application.py",
+        "src/puripuly_heart/app/services/application_control.py",
+        "src/puripuly_heart/composition/application_runtime.py",
+        "src/puripuly_heart/composition/application_startup.py",
+        "src/puripuly_heart/app/adapters/application_runtime_shutdown.py",
+        "src/puripuly_heart/cli/main.py",
+        "src/puripuly_heart/app/ports/settings_view.py",
+        "src/puripuly_heart/app/services/settings/settings_application.py",
+        "src/puripuly_heart/app/services/settings/settings_mutation_legacy.py",
+        "src/puripuly_heart/ui/settings/contract.py",
+        "src/puripuly_heart/ui/settings/renderer.py",
+        "src/puripuly_heart/ui/views/settings.py",
+        "tests/app/test_speaker_application.py",
+        "tests/app/test_speaker_assets.py",
+        "tests/core/runtime/test_peer_speaker_capture.py",
+        "tests/core/runtime/test_peer_capture_session.py",
+        "tests/app/test_soniox_product_authority.py",
+        "tests/app/test_wiring_providers.py",
+        "tests/app/test_settings_view_boundary.py",
+        "tests/app/test_provider_settings_composition.py",
+        "tests/app/test_settings_mutation_legacy.py",
+        "tests/ui/test_settings_surface_contract.py",
+        "tests/ui/test_settings_view_branches.py",
+        "tests/architecture/test_settings_contract_boundary.py",
+        "tests/config/test_settings_vnext_migration_serialization.py",
+        "tests/core/test_overlay_speaker_modes.py",
+        "tests/integration/test_speaker_identity_pipeline.py"
+      ],
+      "exit": 0,
+      "stdout": "All checks passed!\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--extra",
+        "dev",
+        "pytest",
+        "-o",
+        "addopts=",
+        "tests/app/test_speaker_application.py",
+        "tests/app/test_speaker_assets.py",
+        "tests/core/runtime/test_peer_speaker_capture.py",
+        "tests/config/test_settings_vnext_migration_serialization.py::test_current_schema_normalizes_legacy_telemetry_fields_without_extensions",
+        "-q"
+      ],
+      "exit": 0,
+      "stdout": "....................                                                     [100%]\n20 passed in 2.40s\n",
+      "stderr": ""
+    }
+  ],
+  "related_test_run": {
+    "command": "uv run --extra dev pytest -o addopts= tests/app/test_speaker_application.py tests/app/test_speaker_assets.py tests/core/runtime/test_peer_speaker_capture.py tests/core/runtime/test_peer_capture_session.py tests/app/test_soniox_product_authority.py tests/app/test_wiring_providers.py tests/app/test_settings_view_boundary.py tests/app/test_provider_settings_composition.py tests/app/test_settings_mutation_legacy.py tests/ui/test_settings_surface_contract.py tests/ui/test_settings_view_branches.py::test_api_translation_connection_row_places_cloud_free_tier_card tests/ui/test_settings_view_branches.py::test_native_soniox_speaker_control_is_removed tests/ui/test_settings_view_branches.py::test_general_osc_card_is_locale_independent tests/ui/test_settings_view_branches.py::test_api_tab_places_independent_managed_key_card_above_api_keys tests/architecture/test_settings_contract_boundary.py tests/app/test_application_control_contract.py tests/config/test_settings_vnext_schema.py tests/config/test_settings_vnext_migration_serialization.py tests/config/test_runtime_resolution.py tests/app/test_canonical_settings_persistence.py tests/core/test_speaker_identity.py tests/core/test_overlay_speaker_modes.py tests/integration/test_speaker_identity_pipeline.py tests/app/test_application_shutdown.py tests/app/test_application_startup_settings.py tests/app/test_application_runtime_lifecycle.py -q",
+    "passed": 683,
+    "failed": 1,
+    "duration_seconds": 41.56,
+    "status": "prior run before final affected-fixture repair; not an all-green combined final rerun",
+    "failed_case": "tests/core/runtime/test_peer_speaker_capture.py::test_overloaded_stalled_speaker_does_not_block_ready_live_asr",
+    "failure": "Fixture max_pending_samples=512 contradicted default onset_context_samples=8000; constructor rejected it.",
+    "repair": "Use valid mapped original capture inputs, keep default onset context, set pending capacity8192 and submit20x512 samples to induce actual bounded overload while ready ASR receives every original input.",
+    "final_affected_result": "Final explicit affected-scope command in owned_python_checks:20 passed in2.40s, including this fixture and native cleanup debt/retry cases.",
+    "earlier_fixture_findings": [
+      "Initial new stall fixture omitted required original normalized source mapping; corrected instead of loosening product/core input requirements.",
+      "max_input_samples bounds one chunk, not total pending work; fixture now sets actual max_pending_samples.",
+      "Legacy telemetry test substring consent also matched legitimate new download_consent; corrected to exact legacy JSON key \"consent\": and passed."
+    ]
+  },
+  "cli_smoke": {
+    "result": "passed against final refreshed physical-GPU-only runtime, after native/packaging staging barrier",
+    "authentication": "Existing authenticated application control transport exercised by stock CLI; no capability tokens, credentials, instance identifiers or transport endpoints retained in this record.",
+    "preconditions": [
+      "Use a fresh full canonical sandbox configuration with OSC off and isolated temporary test secret storage; never a user configuration.",
+      "Set LOCALAPPDATA=<SANDBOX_APPDATA> and HF_HOME=<SANDBOX_HF_CACHE> before launching host.",
+      "Set HF_HUB_OFFLINE=1. Place already approved exact pinned model bytes in <SANDBOX_HF_CACHE>/hub/models--Bonenk--Nemotron-3-Diarization-GGUF/snapshots/25cf0d6b0c91b679376df0f6ef3087b4fd96af1f/Nemotron-3-Diarization.f16.gguf using a local hardlink/copy.",
+      "Stage the qualified runtime at build/nemotron using packaging owner workflow and verify its manifest identity matches artifact_identity.",
+      "Vulkan device ordinal0 was explicitly selected in this observed run; on another host explicitly select a qualifying physical GPU index. Neither profile is a default/winner."
+    ],
+    "acquisition": "No-source install really traversed shared Hugging Face downloader worker, checksum, staging, installed manifest and native adoption using approved bytes in isolated offline cache. No new model network acquisition is claimed. Local --source import also exercised.",
+    "steps": [
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 app start --background",
+        "exit_code": 0,
+        "terminal_status": "ready",
+        "action": null
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker status",
+        "exit_code": 0,
+        "terminal_status": null,
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": false,
+            "profile": null,
+            "vulkan_device_id": null,
+            "download_consent": false
+          },
+          "state": "disabled",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": null,
+          "artifact_sha256": null,
+          "runtime_ready": null,
+          "runtime_state": null,
+          "runtime_policy": null
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker install",
+        "exit_code": 5,
+        "terminal_status": "action_required",
+        "action": "speaker_download_consent"
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker configure --download-consent on",
+        "exit_code": 0,
+        "terminal_status": "applied",
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": false,
+            "profile": null,
+            "vulkan_device_id": null,
+            "download_consent": true
+          },
+          "state": "disabled",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": null,
+          "artifact_sha256": null,
+          "runtime_ready": null,
+          "runtime_state": null,
+          "runtime_policy": null
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker install",
+        "exit_code": 0,
+        "terminal_status": "applied",
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": false,
+            "profile": null,
+            "vulkan_device_id": null,
+            "download_consent": true
+          },
+          "state": "disabled",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": true,
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "runtime_ready": null,
+          "runtime_state": null,
+          "runtime_policy": {
+            "backend": "Vulkan",
+            "neural_cpu_fallback": false,
+            "precision": "F16",
+            "schedule_guard": true,
+            "physical_gpu_only": true
+          }
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker prepare",
+        "exit_code": 0,
+        "terminal_status": "applied",
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": false,
+            "profile": null,
+            "vulkan_device_id": null,
+            "download_consent": true
+          },
+          "state": "disabled",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": true,
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "runtime_ready": null,
+          "runtime_state": null,
+          "runtime_policy": {
+            "backend": "Vulkan",
+            "neural_cpu_fallback": false,
+            "precision": "F16",
+            "schedule_guard": true,
+            "physical_gpu_only": true
+          }
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker configure --profile 1.04 --device 0 --enabled on",
+        "exit_code": 0,
+        "terminal_status": "applied",
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": true,
+            "profile": "1.04",
+            "vulkan_device_id": "0",
+            "download_consent": true
+          },
+          "state": "ready",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": true,
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "runtime_ready": true,
+          "runtime_state": "ready",
+          "runtime_policy": {
+            "backend": "Vulkan",
+            "neural_cpu_fallback": false,
+            "precision": "F16",
+            "schedule_guard": true,
+            "physical_gpu_only": true
+          }
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker status",
+        "exit_code": 0,
+        "terminal_status": null,
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": true,
+            "profile": "1.04",
+            "vulkan_device_id": "0",
+            "download_consent": true
+          },
+          "state": "ready",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": true,
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "runtime_ready": true,
+          "runtime_state": "ready",
+          "runtime_policy": {
+            "backend": "Vulkan",
+            "neural_cpu_fallback": false,
+            "precision": "F16",
+            "schedule_guard": true,
+            "physical_gpu_only": true
+          }
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker reset",
+        "exit_code": 0,
+        "terminal_status": "applied",
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": true,
+            "profile": "1.04",
+            "vulkan_device_id": "0",
+            "download_consent": true
+          },
+          "state": "ready",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": true,
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "runtime_ready": true,
+          "runtime_state": "ready",
+          "runtime_policy": {
+            "backend": "Vulkan",
+            "neural_cpu_fallback": false,
+            "precision": "F16",
+            "schedule_guard": true,
+            "physical_gpu_only": true
+          }
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker configure --enabled off",
+        "exit_code": 0,
+        "terminal_status": "applied",
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": false,
+            "profile": "1.04",
+            "vulkan_device_id": "0",
+            "download_consent": true
+          },
+          "state": "disabled",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": true,
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "runtime_ready": null,
+          "runtime_state": null,
+          "runtime_policy": {
+            "backend": "Vulkan",
+            "neural_cpu_fallback": false,
+            "precision": "F16",
+            "schedule_guard": true,
+            "physical_gpu_only": true
+          }
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker configure --profile 0.64 --device 0 --enabled on",
+        "exit_code": 0,
+        "terminal_status": "applied",
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": true,
+            "profile": "0.64",
+            "vulkan_device_id": "0",
+            "download_consent": true
+          },
+          "state": "ready",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": true,
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "runtime_ready": true,
+          "runtime_state": "ready",
+          "runtime_policy": {
+            "backend": "Vulkan",
+            "neural_cpu_fallback": false,
+            "precision": "F16",
+            "schedule_guard": true,
+            "physical_gpu_only": true
+          }
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker status",
+        "exit_code": 0,
+        "terminal_status": null,
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": true,
+            "profile": "0.64",
+            "vulkan_device_id": "0",
+            "download_consent": true
+          },
+          "state": "ready",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": true,
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "runtime_ready": true,
+          "runtime_state": "ready",
+          "runtime_policy": {
+            "backend": "Vulkan",
+            "neural_cpu_fallback": false,
+            "precision": "F16",
+            "schedule_guard": true,
+            "physical_gpu_only": true
+          }
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker configure --enabled off",
+        "exit_code": 0,
+        "terminal_status": "applied",
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": false,
+            "profile": "0.64",
+            "vulkan_device_id": "0",
+            "download_consent": true
+          },
+          "state": "disabled",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": true,
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "runtime_ready": null,
+          "runtime_state": null,
+          "runtime_policy": {
+            "backend": "Vulkan",
+            "neural_cpu_fallback": false,
+            "precision": "F16",
+            "schedule_guard": true,
+            "physical_gpu_only": true
+          }
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker cancel",
+        "exit_code": 0,
+        "terminal_status": "applied",
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": false,
+            "profile": "0.64",
+            "vulkan_device_id": "0",
+            "download_consent": true
+          },
+          "state": "disabled",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": true,
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "runtime_ready": null,
+          "runtime_state": null,
+          "runtime_policy": {
+            "backend": "Vulkan",
+            "neural_cpu_fallback": false,
+            "precision": "F16",
+            "schedule_guard": true,
+            "physical_gpu_only": true
+          }
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 speaker install --source <QUALIFIED_LOCAL_F16_ARTIFACT>",
+        "exit_code": 0,
+        "terminal_status": "applied",
+        "action": null,
+        "effective_speaker": {
+          "intent": {
+            "enabled": false,
+            "profile": "0.64",
+            "vulkan_device_id": "0",
+            "download_consent": true
+          },
+          "state": "disabled",
+          "reason": null,
+          "cleanup_pending": false,
+          "assets_ready": true,
+          "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+          "runtime_ready": null,
+          "runtime_state": null,
+          "runtime_policy": {
+            "backend": "Vulkan",
+            "neural_cpu_fallback": false,
+            "precision": "F16",
+            "schedule_guard": true,
+            "physical_gpu_only": true
+          }
+        }
+      },
+      {
+        "command": "uv run python -m puripuly_heart.cli.main --config <SANDBOX_CONFIG> --timeout 60 app stop",
+        "exit_code": 0,
+        "terminal_status": "stopped",
+        "action": null
+      }
+    ],
+    "cleanup": "Observed app stop returned stopped/exit0 before deleting sandbox model/HF test caches. Execution JSON and sanitized local records retained.",
+    "superseded_evidence": "Earlier old-runtime GPU startup was genuine but provisional after physical device classification repair; final guarded smoke recorded here supersedes its native readiness claim."
+  },
+  "gui_smoke": {
+    "command": "uv run python -c \"<TASK_LOCAL_SYNTHETIC_CAPTION_SURFACE_SMOKE>\"",
+    "recipe": "Create a synthetic peer recognition transcript without speaker runs; use actual PeerSpeakerIdentityAllocator, OverlayEventAdapter and OverlayPresenter; start default FletDesktopRendererWindow without a fake app runner; inspect mounted caption control/visual state; close window and presenter. No audio or private transcript input.",
+    "exit_code": 0,
+    "observed": {
+      "attribution": "not_ready",
+      "speaker_style": "gray",
+      "actual_native_flet_process": true,
+      "native_startup_phases": [
+        "page_configured",
+        "native_ready",
+        "visible_confirmed",
+        "ready"
+      ],
+      "page_mounted": true,
+      "window_visible": true,
+      "surface_visible": true,
+      "slot_count": 1,
+      "line_count": 1,
+      "caption_text_control_color": "#B4B4B4",
+      "native_process_graceful_exit_code": 0
+    },
+    "limits": "Actual mounted/visible desktop caption surface and real control tree, not screenshot pixel measurement, long-running visual quality or VR compositor qualification. Synthetic caption content, process identifiers and local endpoint details omitted."
+  },
+  "behavior_scope": [
+    "Application-owned disabled/null-profile/null-device/no-consent defaults and independent acquisition/readiness/lifetime.",
+    "Original16kHz input and existing VAD fact fanout before ASR provider gating/routing/replay using stable physical capture session identity.",
+    "True EOF/stop/loss detach semantics; original ASR input delivery continues during stalled/overloaded speaker worker.",
+    "Soniox native product authority forced off; obsolete exposed controls removed; historical persisted flag intentionally ignored.",
+    "Existing gray not_ready fallback and actual existing caption surface.",
+    "Retain actual core runtime cleanup debt, expose cleanup_pending, block replacement, retry same backend without reload and close assets in finally."
+  ],
+  "limits": [
+    "This worker did not independently claim public-audio diarization accuracy or CPU-Parakeet coexistence; native/nemotron/verification.json belongs to native owner evidence.",
+    "Director owns final shared integration checks, commit/review and acceptance; no all-green full combined rerun or review approval is implied.",
+    "No private audio/transcripts, paid services, production enable, implicit download consent, official .nemo download or model network redownload were used.",
+    "No Git mutations, maintained documentation changes, or previously excluded core/native/build source edits by this product recording step."
+  ],
+  "local_raw_evidence_references": [
+    "local://nemotron-213-product-evidence.md",
+    "local://nemotron-213-product-checks.json",
+    "local://nemotron-213-product-guarded-cli-evidence.json",
+    "local://nemotron-213-product-cli-evidence.json"
+  ],
+  "sanitization": "Whitelisted effective feature state and public provenance only. Filesystem command locations use placeholders; no raw host/config/log JSON, authentication/capability tokens, credentials, user-specific paths, endpoints, identifiers, audio or private transcript content copied."
+}

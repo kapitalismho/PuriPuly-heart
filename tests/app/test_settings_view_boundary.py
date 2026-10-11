@@ -39,7 +39,6 @@ from puripuly_heart.app.ports.settings_view import (
     QwenSingaporeApiHostEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
-    SonioxSpeakerDiarizationEdit,
     SttGpuDeviceEdit,
     SystemPromptEdit,
     TranslationSelectionEdit,
@@ -637,22 +636,15 @@ def test_cloud_free_tier_provider_selection_persists() -> None:
     ]
 
 
-def test_soniox_speaker_diarization_preference_persists_independently_of_provider() -> None:
-    from puripuly_heart.composition.application_runtime import (
-        _copy_provider_prompt_apply_fields,
-    )
+def test_native_soniox_authority_is_not_a_public_settings_intent() -> None:
+    from dataclasses import fields
 
-    current = AppSettingsVNext()
-    updated = materialize_provider_apply_intent(
-        current,
-        ProviderApplyIntent((SonioxSpeakerDiarizationEdit(False),)),
-        materialize_translation=materialize_canonical_translation_settings,
-    )
-    merged = _copy_provider_prompt_apply_fields(updated, current)
+    from puripuly_heart.app.ports import settings_view
 
-    assert updated.intent.stt.provider == current.intent.stt.provider
-    assert updated.intent.stt.soniox.enable_speaker_diarization is False
-    assert merged.intent.stt.soniox.enable_speaker_diarization is False
+    assert not hasattr(settings_view, "SonioxSpeakerDiarizationEdit")
+    assert "soniox_speaker_diarization_enabled" not in {
+        item.name for item in fields(settings_view.ProviderSettingsSnapshot)
+    }
 
 
 def test_provider_apply_merge_keeps_cloud_free_tier_pool() -> None:

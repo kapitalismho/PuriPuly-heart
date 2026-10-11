@@ -56,6 +56,7 @@ class ApplicationStartupAdapter:
     start_event_bridge: Callable[[UIEventBridgePort], None]
     wait_for_event_bridge: Callable[[], Awaitable[None]]
     sync_clipboard: Callable[[], Awaitable[None]]
+    start_speaker: Callable[[AppSettingsVNext], Awaitable[object]] | None = None
 
     async def prepare_startup_settings(self) -> ApplicationStartupState:
         loaded_settings = self.settings_loader()
@@ -276,6 +277,8 @@ class ApplicationStartupAdapter:
         await callbacks.open_peer_ingress()
         await callbacks.start_translation_turns()
         await callbacks.start_local_asr()
+        if self.start_speaker is not None:
+            await self.start_speaker(settings)
 
     async def start_application_events(self) -> None:
         bridge = self.create_event_bridge(self.runtime_logging)

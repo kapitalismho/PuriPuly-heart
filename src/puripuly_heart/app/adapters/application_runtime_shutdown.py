@@ -52,6 +52,7 @@ class ApplicationRuntimeShutdownAdapter:
     audio_test: Callable[[], AudioTestRuntime | None]
     close_managed_gemma_owner: Callable[[], Awaitable[None]] | None = None
     local_asr_provisioning: Callable[[], object | None] | None = None
+    speaker: Callable[[], object | None] | None = None
 
     def application_shutdown_runtime_states(
         self,
@@ -140,6 +141,19 @@ class ApplicationRuntimeShutdownAdapter:
                         child_states=child_states,
                     )
                 )
+        speaker = self.speaker() if self.speaker is not None else None
+        if speaker is not None:
+            snapshot = speaker.snapshot()
+            states.append(
+                ApplicationShutdownRuntimeState(
+                    owner_name="SpeakerApplicationOwner",
+                    generation=snapshot["generation"],
+                    active_native_operations=(
+                        ("speaker-runtime",) if snapshot["runtime"] is not None else ()
+                    ),
+                    child_states=(("cleanup-pending",) if snapshot["cleanup_pending"] else ()),
+                )
+            )
         return tuple(states)
 
     def effective_osc_ports(self) -> tuple[int | None, int | None]:

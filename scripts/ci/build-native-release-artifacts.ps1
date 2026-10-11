@@ -25,6 +25,12 @@ param(
     [string]$OutputDir = "C:\d177\native-integration\release\dist",
 
     [Parameter()]
+    [string]$NemotronRuntimeDir = "",
+
+    [Parameter()]
+    [switch]$RequireNemotronRuntime,
+
+    [Parameter()]
     [string]$InstallerOutputDir = "installer_output\native",
 
     [Parameter()]
@@ -106,6 +112,12 @@ $SoxrBuildEnvironment = Resolve-RepoPath $SoxrBuildEnvironment
 $BuildRoot = Resolve-RepoPath $BuildRoot
 $OutputDir = Resolve-RepoPath $OutputDir
 $InstallerOutputDir = Resolve-RepoPath $InstallerOutputDir
+if (-not [string]::IsNullOrWhiteSpace($NemotronRuntimeDir)) {
+    $NemotronRuntimeDir = Resolve-RepoPath $NemotronRuntimeDir
+}
+if ($RequireNemotronRuntime -and [string]::IsNullOrWhiteSpace($NemotronRuntimeDir) -and -not $SkipNativeBuild) {
+    throw "RequireNemotronRuntime requires -NemotronRuntimeDir when building."
+}
 if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler)) {
     $iscc = @(
         (Join-Path $env:ProgramFiles "Inno Setup 7\ISCC.exe"),
@@ -156,9 +168,22 @@ try {
             "-PythonEmbedArchive", $PythonEmbedArchive,
             "-SoxrBuildEnvironment", $SoxrBuildEnvironment,
             "-BuildRoot", $BuildRoot,
-            "-OutputDir", $OutputDir
+            "-OutputDir", $OutputDir,
+            "-NemotronRuntimeDir", $NemotronRuntimeDir,
+            "-RequireNemotronRuntime:$RequireNemotronRuntime"
         )
     }
+    $nemotronArguments = @(
+        "-m", "puripuly_heart.release_evidence.nemotron_distribution",
+        (Join-Path $OutputDir "nemotron")
+    )
+    if ($RequireNemotronRuntime -or -not [string]::IsNullOrWhiteSpace($NemotronRuntimeDir)) {
+        $nemotronArguments += "--required"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($NemotronRuntimeDir)) {
+        $nemotronArguments += @("--expected-runtime", $NemotronRuntimeDir)
+    }
+    Invoke-Checked -FilePath $ToolPython -ArgumentList $nemotronArguments
     $nativeModule = "puripuly_heart.release_evidence.native_distribution"
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(
         "-m", $nativeModule, "validate-target",

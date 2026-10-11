@@ -226,3 +226,36 @@ def test_dynamic_cpu_module_must_match_x64_payload(tmp_path: Path) -> None:
     write_pe(root / "ggml-cpu-x64.dll", machine=0x14C)
     with pytest.raises(ValueError, match="x64"):
         validate_pe_dependencies(root, evidence)
+
+
+def test_nemotron_cannot_resolve_asr_ggml_but_reuses_official_crt(tmp_path: Path) -> None:
+    root, evidence, _ = _staged(tmp_path)
+    _pe(root / "ggml.dll", ("KERNEL32.dll",))
+    _pe(root / "nemotron/bin/nemo_speech_asr_c.dll", ("ggml.dll", "msvcp140_1.dll"))
+    with pytest.raises(FileNotFoundError, match="nemotron/bin/nemo_speech_asr_c.dll"):
+        validate_pe_dependencies(root, evidence)
+    _pe(root / "nemotron/bin/ggml.dll", ("vulkan-1.dll",))
+    report = validate_pe_dependencies(root, evidence)
+    diar = next(
+        item for item in report["images"] if item["path"] == "nemotron/bin/nemo_speech_asr_c.dll"
+    )
+    imports = {item["name"]: item for item in diar["imports"]}
+    assert imports["ggml.dll"]["path"] == "nemotron/bin/ggml.dll"
+    assert imports["msvcp140_1.dll"]["path"] == "msvcp140_1.dll"
+
+
+def test_official_crt_staging_preserves_exact_nemotron_build(tmp_path: Path) -> None:
+    build, crt = _toolchain(tmp_path)
+    root = tmp_path / "artifact"
+    private = root / "nemotron/bin/msvcp140_1.dll"
+    private.parent.mkdir(parents=True)
+    original = (crt / "msvcp140_1.dll").read_bytes()
+    private.write_bytes(original)
+    result = stage_vc_runtime(root, build)
+    assert private.read_bytes() == original
+    assert any(entry["path"] == "nemotron/bin/msvcp140_1.dll" for entry in result["modules"])
+    _pe(private, ("KERNEL32.dll",), version="14.44.35212.0")
+    changed = private.read_bytes()
+    with pytest.raises(ValueError, match="Nemotron CRT differs"):
+        stage_vc_runtime(root, build)
+    assert private.read_bytes() == changed

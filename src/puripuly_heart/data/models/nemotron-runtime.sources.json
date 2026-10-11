@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "patches": {"native/nemotron/patches.json": "e81a179f2a71b76b8869a4a2710983c23f219717b344cf5c37af86574f90b748"},
+  "archives": {
+    "nemo": {
+      "repository": "NVIDIA/NeMo-Speech.cpp",
+      "revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+      "url": "https://codeload.github.com/NVIDIA/NeMo-Speech.cpp/zip/b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+      "sha256": "069d7042685996011d5f1878a06737195421b142f91859a561610b6971ae8b8a"
+    },
+    "llama.cpp": {
+      "repository": "ggml-org/llama.cpp",
+      "revision": "bd4f514db14d87fded667787a7a963bfbaa98e89",
+      "url": "https://codeload.github.com/ggml-org/llama.cpp/zip/bd4f514db14d87fded667787a7a963bfbaa98e89",
+      "sha256": "d74b36880a15ad7e6889dc1bb1db7489e929e4110cc613b9716cfc31bc33bbe7"
+    },
+    "vcpkg": {
+      "repository": "microsoft/vcpkg",
+      "revision": "9e593bb18ea69cc5095e012465dcd675a822ed0d",
+      "url": "https://codeload.github.com/microsoft/vcpkg/zip/9e593bb18ea69cc5095e012465dcd675a822ed0d",
+      "sha256": "92ea07cd3ad4b3bbe65e6e7088b4074eddab371d7bb70107c6e7ceefcb5d5c3e"
+    }
+  }
+}
