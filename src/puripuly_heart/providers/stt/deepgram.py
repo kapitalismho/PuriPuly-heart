@@ -180,6 +180,7 @@ class _DeepgramSDKSession(STTBackendSession):
     _final_segment_ids: dict[tuple[object, ...], None] = field(
         init=False, default_factory=dict, repr=False
     )
+    _final_receipts: dict[int, Any] = field(init=False, default_factory=dict, repr=False)
     _sent_samples: int = field(init=False, default=0, repr=False)
     _finalize_control_id: str | None = field(init=False, default=None, repr=False)
     _scoped_close_written: bool = field(init=False, default=False, repr=False)
@@ -240,17 +241,30 @@ class _DeepgramSDKSession(STTBackendSession):
         start = getattr(result, "start", None)
         duration = getattr(result, "duration", None)
         segment_key = None
-        if isinstance(start, (int, float)) and isinstance(duration, (int, float)):
-            segment_key = (
-                request_id,
-                tuple(getattr(result, "channel_index", ()) or ()),
-                start,
-                duration,
-            )
-            if is_final and raw_transcript and segment_key not in self._final_segment_ids:
-                if self._last_final_start is not None and start < self._last_final_start:
+        source_order_unresolved = False
+        if is_final and raw_transcript:
+            receipt_id = id(result)
+            if self._final_receipts.get(receipt_id) is result:
+                return None
+            self._final_receipts[receipt_id] = result
+            if len(self._final_receipts) > 256:
+                del self._final_receipts[next(iter(self._final_receipts))]
+            if isinstance(start, (int, float)) and isinstance(duration, (int, float)):
+                segment_key = (
+                    request_id,
+                    tuple(getattr(result, "channel_index", ()) or ()),
+                    start,
+                    duration,
+                )
+                source_order_unresolved = segment_key in self._final_segment_ids
+                if source_order_unresolved or (
+                    self._last_final_start is not None and start < self._last_final_start
+                ):
                     self._clock_discontinuous = True
                 self._last_final_start = start
+                self._final_segment_ids[segment_key] = None
+                if len(self._final_segment_ids) > 256:
+                    del self._final_segment_ids[next(iter(self._final_segment_ids))]
         qualified = qualified and not self._clock_discontinuous
         clock_id = f"deepgram:{self.projection.provider_epoch_id or request_id or 'connection'}"
         provenance = STTNativeProvenance(
@@ -282,13 +296,6 @@ class _DeepgramSDKSession(STTBackendSession):
             native_model_metadata=model_metadata,
         )
         if self._event_projection.is_scoped:
-            if is_final and raw_transcript and segment_key is not None:
-                if segment_key in self._final_segment_ids:
-                    raw_transcript = ""
-                else:
-                    self._final_segment_ids[segment_key] = None
-                    if len(self._final_segment_ids) > 256:
-                        del self._final_segment_ids[next(iter(self._final_segment_ids))]
             identity = self._event_projection.active_identity
             if identity is not None and is_final and raw_transcript:
                 text_start = self._scoped_text_length
@@ -335,6 +342,21 @@ class _DeepgramSDKSession(STTBackendSession):
                         )
                     )
                 provenance = replace(provenance, text_timing=tuple(timings))
+            if source_order_unresolved:
+                reason = "deepgram_final_source_order_unresolved"
+                self._terminalize_scoped(
+                    provenance=replace(provenance, unresolved_source_text=raw_transcript),
+                    epoch_disposition="retire",
+                    degraded_reason=reason,
+                    empty_is_success=False,
+                )
+                self._event_projection.end_epoch(
+                    orderly=False,
+                    reason=reason,
+                    provider_turn_id=identity.provider_turn_id if identity is not None else None,
+                )
+                self._stopped = True
+                return None
             self._handle_scoped_result(
                 identity,
                 raw_transcript,
@@ -432,7 +454,10 @@ class _DeepgramSDKSession(STTBackendSession):
         if task is not None and task is not asyncio.current_task():
             task.cancel()
         text = "".join(self._scoped_fragments)
-        if degraded_reason is not None and text:
+        if provenance is not None and provenance.unresolved_source_text is not None:
+            outcome = "failed"
+            authority = "none"
+        elif degraded_reason is not None and text:
             outcome = "degraded"
             authority = "degraded"
         elif degraded_reason is not None and not empty_is_success:

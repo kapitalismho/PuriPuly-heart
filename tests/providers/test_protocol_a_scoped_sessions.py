@@ -527,6 +527,7 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
         CommittedTranscriptPayload,
         CommittedTranscriptWithTimestampsPayload,
         PartialTranscriptPayload,
+        TranscriptionWord,
     )
 
     for payload_type in (CommittedTranscriptPayload, CommittedTranscriptWithTimestampsPayload):
@@ -587,7 +588,12 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
         seal_reason="silence",
         observed_trailing_silence_ms=0,
     )
-    session._on_committed_with_timestamps(CommittedTranscriptWithTimestampsPayload(text="same"))
+    session._on_committed_with_timestamps(
+        CommittedTranscriptWithTimestampsPayload(
+            text="same",
+            words=[TranscriptionWord(text="same", type="word", start=1.0, end=1.2)],
+        )
+    )
     terminal_b = await _next(session)
     assert (terminal_b.text, terminal_b.epoch_disposition) == ("same", "reuse")
     assert terminal_a.identity != terminal_b.identity
@@ -1343,6 +1349,89 @@ async def test_actual_native_word_boundaries_partition_source_without_word_jobs(
         await finish(harness)
         assert len(trace.items) == len(sources)
         assert len(translation.calls) == len(sources)
+    finally:
+        await wrapper.close()
+        await close(harness)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_id", ["deepgram", "elevenlabs_scribe"])
+async def test_sdk_clock_collision_preserves_prior_context_without_publishing_rejected_source(
+    provider_id, monkeypatch
+):
+    from elevenlabs.types import CommittedTranscriptWithTimestampsPayload, TranscriptionWord
+
+    from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt
+    from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
+    from puripuly_heart.core.stt.streaming_speaker import StreamingSpeakerSession
+    from tests.core.test_source_context_contract import (
+        ControlledProvider,
+        close,
+        finish,
+        harness_for,
+        source_fixture,
+    )
+    from tests.core.test_streaming_speaker import evidence, next_text, send, span
+
+    async def write(_session, _payload):
+        return None
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
+    snapshot, identity = source_fixture()
+    request = STTProviderTurnRequest(identity, snapshot.settings)
+    if provider_id == "deepgram":
+        native = _deepgram_session(epoch=identity.provider_epoch_id)
+    else:
+        native, _ = _scribe_session(epoch=identity.provider_epoch_id, model="scribe_v2_realtime")
+
+    def emit(text, start, end):
+        if provider_id == "deepgram":
+            native._build_transcript_event(
+                _deepgram_result(text, start=start, duration=end - start)
+            )
+        else:
+            native._on_committed_with_timestamps(
+                CommittedTranscriptWithTimestampsPayload(
+                    text=text,
+                    words=[TranscriptionWord(text=text, type="word", start=start, end=end)],
+                )
+            )
+
+    wrapper = StreamingSpeakerSession(native)
+    translation = ControlledProvider()
+    harness, trace = harness_for(translation)
+    normalizer = STTScopedTurnNormalizer(identity)
+    try:
+        await wrapper.begin_turn(request)
+        await send(wrapper, request, 0, 40000, 1)
+        await wrapper.observe_speaker_evidence((evidence(0, 40000, 0),))
+        for text, start, end in (("First.", 0.1, 0.3), ("Second.", 2.0, 2.2)):
+            emit(text, start, end)
+            outgoing = normalizer.apply_update(await next_text(wrapper.turn_events()))
+            await harness.peer_owner.handle_provider_turn_update(snapshot, outgoing)
+            await finish(harness)
+        await wrapper.seal_turn(
+            identity,
+            sealed_content_ranges=(span(0, 40000),),
+            seal_reason="silence",
+            observed_trailing_silence_ms=200,
+        )
+        emit("Correction.", 0.1, 0.3)
+        terminal = normalizer.apply_terminal(
+            await asyncio.wait_for(anext(wrapper.turn_events()), 1)
+        )
+        assert terminal.text == "First.Second."
+        assert terminal.epoch_disposition == "retire"
+        assert terminal.provenance[-1].unresolved_source_text == "Correction."
+        assert len(terminal.included_contributions) == 2
+        await harness.peer_owner.handle_provider_turn_terminal(
+            AudioSegmentTerminalReceipt(identity.segment, "failed", snapshot, 11), terminal
+        )
+        await finish(harness)
+        assert [item.source_child.raw_text for item in trace.items] == ["First.", "Second."]
+        assert len(translation.calls) == 2
+        assert native._event_projection.active_identity is None
+        assert native._event_projection.retired
     finally:
         await wrapper.close()
         await close(harness)

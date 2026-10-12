@@ -160,6 +160,7 @@ class STTProviderEventBuffer:
             return False
         self._events = retained
         self._events.append(event)
+        self._recognition_bytes = sum(_recognition_bytes(queued) for queued in self._events)
         self._retire_epoch(epoch_id)
         self._recognition_bytes = sum(_recognition_bytes(queued) for queued in self._events)
         self._wake.set()
@@ -197,13 +198,23 @@ def _recognition_bytes(event: STTProviderTurnEvent) -> int:
         return event.unit.retained_bytes
     if isinstance(event, STTRecognitionUnit):
         return event.retained_bytes
-    if (
-        isinstance(event, (STTProviderTurnUpdate, STTProviderTurnTerminal))
-        and event.recognition_origins
-    ):
-        return len(event.text.encode("utf-8")) + sum(
-            128 + (origin.native.retained_bytes if origin.native is not None else 0)
-            for origin in event.recognition_origins
+    if isinstance(event, (STTProviderTurnUpdate, STTProviderTurnTerminal)):
+        origin_bytes = (
+            len(event.text.encode("utf-8"))
+            + sum(
+                128 + (origin.native.retained_bytes if origin.native is not None else 0)
+                for origin in event.recognition_origins
+            )
+            if event.recognition_origins
+            else 0
+        )
+        provenance = (
+            (event.provenance,) if isinstance(event, STTProviderTurnUpdate) else event.provenance
+        )
+        return origin_bytes + sum(
+            len(item.unresolved_source_text.encode("utf-8"))
+            for item in provenance
+            if item.unresolved_source_text is not None
         )
     return 0
 

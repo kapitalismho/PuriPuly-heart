@@ -891,3 +891,106 @@ async def test_soniox_cancelled_graceful_close_still_reclaims_socket_and_tasks()
     assert websocket.closed is True
     assert session._send_task.done()
     assert session._recv_task.done()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["provider_error", "receive", "write", "keepalive"])
+@pytest.mark.parametrize("active", [False, True])
+async def test_connection_owned_failure_drains_only_unreleased_immutable_tokens(failure, active):
+    session, _ = _session()
+    try:
+        first = _request(1)
+        await session.begin_turn(first)
+        await _seal(session, first)
+        session._handle_message(
+            json.dumps(
+                {
+                    "tokens": [
+                        {"text": "first", "is_final": True},
+                        {"text": "<fin>", "is_final": True},
+                    ]
+                }
+            )
+        )
+        assert isinstance(await _next(session), STTProviderTurnUpdate)
+        assert (await _next(session)).text == "first"
+        stream = session._stream_identity
+        session._handle_message(
+            json.dumps(
+                {
+                    "tokens": [
+                        {"text": "same", "is_final": True},
+                        {"text": "<end>", "is_final": True},
+                    ]
+                }
+            )
+        )
+        prefix = await _next(session)
+        assert isinstance(prefix, STTRecognitionUnit)
+        assert prefix.text == "same"
+        if active:
+            await session.begin_turn(_request(2))
+        session._handle_message(
+            json.dumps(
+                {
+                    "tokens": [
+                        {"text": "same", "is_final": True, "start_ms": -120.5, "end_ms": -60},
+                        {"text": " !", "is_final": True, "start_ms": -60, "end_ms": 3.25},
+                        {"text": "provisional", "is_final": False},
+                    ],
+                    "final_audio_proc_ms": 360.5,
+                }
+            )
+        )
+        if failure == "provider_error":
+            session._handle_message(
+                json.dumps(
+                    {
+                        "error_code": 503,
+                        "error_type": "service_unavailable",
+                    }
+                )
+            )
+        else:
+            session._scoped_transport_failure(
+                f"soniox_{failure}_failed",
+                orderly=False,
+                exception=OSError("local failure"),
+            )
+        tail = await _next(session)
+        assert isinstance(tail, STTRecognitionUnit)
+        assert tail.text == "same !"
+        assert tail.identity.stream == prefix.identity.stream == stream
+        assert tail.identity.receipt_sequence == prefix.identity.receipt_sequence + 1
+        assert tail.identity.unit_id != prefix.identity.unit_id
+        assert tail.provenance.barrier == "drain"
+        assert tail.provenance.native_audio_progress == (("final_audio_proc_ms", 360.5),)
+        assert tail.provenance.audio_clocks[0].qualified is False
+        assert tail.provenance.audio_clocks[0].origin_sent_sample is None
+        assert [(timing.raw_start, timing.raw_end) for timing in tail.provenance.text_timing] == [
+            (-120.5, -60),
+            (-60, 3.25),
+        ]
+        assert tail.final_speaker_runs == ()
+        if active:
+            terminal = await _next(session)
+            assert terminal.outcome == "failed"
+            assert terminal.text == ""
+        ended = await _next(session)
+        assert isinstance(ended, STTProviderEpochEnded)
+        assert not ended.orderly
+        assert ended.failure_retryable is True
+        assert session._scoped_tokens == session._scoped_contributions == []
+        session._scoped_transport_failure("soniox_receive_failed", orderly=False)
+        session._handle_message(
+            json.dumps(
+                {
+                    "tokens": [{"text": "repeated cleanup", "is_final": True}],
+                    "finished": True,
+                }
+            )
+        )
+        assert session._event_projection.scoped_event_depth == 0
+        assert session._receipt_sequence == 2
+    finally:
+        await session.close()

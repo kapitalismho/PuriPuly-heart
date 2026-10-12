@@ -183,6 +183,126 @@ async def test_supported_prefix_releases_before_end_and_successor_progresses():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("assembly", ["append", "replace"])
+async def test_consumed_text_preserves_later_audio_boundary_and_pending_successor(assembly):
+    from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt
+    from tests.core.test_source_context_contract import (
+        ControlledProvider,
+        close,
+        finish,
+        harness_for,
+        source_fixture,
+    )
+
+    snapshot, identity = source_fixture()
+    req = STTProviderTurnRequest(
+        identity, snapshot.settings, display_group_id=snapshot.display_group_id
+    )
+    provider = Provider()
+    session = StreamingSpeakerSession(provider)
+    harness, trace = harness_for(ControlledProvider())
+    normalizer = STTScopedTurnNormalizer(identity)
+    events = session.turn_events()
+    first_text, successor_text = "Alpha. ", "Beta. "
+    text = first_text + successor_text
+    try:
+        await session.begin_turn(req)
+        await send(session, req, 0, 3200, 1)
+        await session.observe_speaker_evidence((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+        provider.events.put(update(req, first_text))
+        normalizer.apply_update(await next_text(events))
+        first_release = normalizer.apply_update(await next_text(events))
+        await harness.peer_owner.handle_provider_turn_update(snapshot, first_release)
+        await finish(harness)
+        first = trace.items[0].source_child
+        assert first.raw_text == first_text
+        assert first.speaker.speaker_id == "0"
+
+        await session.observe_speaker_evidence((evidence(3200, 4800, 2, ready=4.0),))
+        boundary = await asyncio.wait_for(anext(events), 1)
+        assert isinstance(boundary, STTProviderAudioBoundary)
+        assert boundary.boundary.normalized_sample == 3200
+        assert boundary.boundary.observed_at_monotonic_s == 4.0
+
+        event = update(req, successor_text if assembly == "append" else text)
+        provider.events.put(
+            replace(
+                event,
+                sequence=2,
+                assembly=assembly,
+                contribution=STTTextContribution("phrase-2", len(first_text), len(text)),
+                provenance=replace(
+                    event.provenance,
+                    native_event_id="receipt-2",
+                    text_timing=(
+                        STTTextTiming(
+                            "phrase-2",
+                            len(first_text),
+                            len(text),
+                            "word_interval",
+                            0.2,
+                            0.3,
+                            clock_id="clock",
+                            complete_boundary=True,
+                        ),
+                    ),
+                ),
+            )
+        )
+        pending = normalizer.apply_update(await next_text(events))
+        assert pending.text == text
+        assert pending.source_release is None
+        assert pending.final_speaker_runs[-1].attribution_state == "unavailable"
+        await send(session, req, 3200, 4000, 2)
+        await session.observe_speaker_evidence((evidence(4800, 6400, 3, ready=5.0),))
+        await send(session, req, 4000, 4800, 3)
+        boundary = await asyncio.wait_for(anext(events), 1)
+        assert isinstance(boundary, STTProviderAudioBoundary)
+        assert boundary.boundary.normalized_sample == 4800
+        assert boundary.boundary.observed_at_monotonic_s == 5.0
+        successor = normalizer.apply_update(await next_text(events))
+        assert (successor.source_release.text_start, successor.source_release.text_end) == (
+            len(first_text),
+            len(text),
+        )
+        assert successor.final_speaker_runs[-1].speaker_id == "2"
+        assert successor.source_audio[-1].source_ranges == (span(3200, 4000), span(4000, 4800))
+        await harness.peer_owner.handle_provider_turn_update(snapshot, successor)
+        await harness.peer_owner.handle_provider_turn_update(snapshot, successor)
+        await finish(harness)
+        assert [item.source_child.raw_text for item in trace.items] == [
+            first_text,
+            successor_text,
+        ]
+        assert [item.source_child.speaker.speaker_id for item in trace.items] == ["0", "2"]
+
+        provider.events.put(
+            STTProviderTurnTerminal(
+                identity, "final", text + "Tail!", text_authority="authoritative"
+            )
+        )
+        terminal = normalizer.apply_terminal(await asyncio.wait_for(anext(events), 1))
+        assert "".join(run.text for run in terminal.final_speaker_runs) == text + "Tail!"
+        receipt = AudioSegmentTerminalReceipt(identity.segment, "final", snapshot, 6.0)
+        await harness.peer_owner.handle_provider_turn_terminal(receipt, terminal)
+        await harness.peer_owner.handle_provider_turn_terminal(receipt, terminal)
+        await finish(harness)
+        assert trace.items[0].source_child is first
+        assert [item.source_child.raw_text for item in trace.items] == [
+            first_text,
+            successor_text,
+            "Tail!",
+        ]
+        assert len(harness.peer_runtime.translation_history) == 3
+        assert snapshot.state == "open"
+        assert not provider.sealed
+    finally:
+        await session.close()
+        await events.aclose()
+        await close(harness)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("semantics,qualified", [("word_interval", False), ("token_point", True)])
 async def test_unknown_clock_or_point_never_becomes_interval(semantics, qualified):
     provider, req = Provider(), request()

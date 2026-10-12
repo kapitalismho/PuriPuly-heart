@@ -199,6 +199,12 @@ class _StreamRecovery:
 
 
 @dataclass(slots=True)
+class _RecognitionAuthority:
+    generation: int
+    last_receipt_sequence: int = 0
+
+
+@dataclass(slots=True)
 class ScopedRecognitionEngine:
     session_factory: STTScopedSessionFactory
     channel: Literal["self", "peer"] = "peer"
@@ -235,10 +241,9 @@ class ScopedRecognitionEngine:
     _recognition_stream: RecognitionStreamIdentity | None = field(
         init=False, default=None, repr=False
     )
-    _last_receipt_sequence: int = field(init=False, default=0, repr=False)
     _estimated_speech_scope: tuple[object, ...] | None = field(init=False, default=None, repr=False)
     _estimated_last_speech_at: float | None = field(init=False, default=None, repr=False)
-    _recognition_authorities: OrderedDict[RecognitionStreamIdentity, int] = field(
+    _recognition_authorities: OrderedDict[RecognitionStreamIdentity, _RecognitionAuthority] = field(
         init=False, default_factory=OrderedDict, repr=False
     )
     _session_watchdogs: STTRecognitionWatchdogs | None = field(
@@ -372,9 +377,15 @@ class ScopedRecognitionEngine:
         return not self._closed
 
     def is_current_recognition_stream(self, stream: RecognitionStreamIdentity) -> bool:
+        authority = self._recognition_authorities.get(stream)
         return (
             not self._closed
-            and self._recognition_authorities.get(stream) == self._authority_generation
+            and authority is not None
+            and authority.generation == self._authority_generation
+            and (
+                self.accepted_settings_scope is None
+                or stream.settings_scope == self.accepted_settings_scope
+            )
         )
 
     @property
@@ -606,7 +617,6 @@ class ScopedRecognitionEngine:
             self._estimated_speech_scope = None
             self._estimated_last_speech_at = None
             self._recognition_stream = stream
-            self._last_receipt_sequence = 0
         recovery = self._stream_recovery
         frontier = (
             recovery.source_frontier
@@ -624,7 +634,10 @@ class ScopedRecognitionEngine:
             self._stream_recovery = _StreamRecovery(
                 stream, settings, self._authority_generation, frontier, pending=False
             )
-        self._recognition_authorities[stream] = self._authority_generation
+        if stream not in self._recognition_authorities:
+            self._recognition_authorities[stream] = _RecognitionAuthority(
+                self._authority_generation
+            )
         self._recognition_authorities.move_to_end(stream)
         while len(self._recognition_authorities) > 4096:
             self._recognition_authorities.popitem(last=False)
@@ -992,6 +1005,12 @@ class ScopedRecognitionEngine:
             owned.segment.identity.capture_epoch,
             self._settings_scope(settings),
         )
+        if any(
+            (registered.activation_generation, registered.capture_epoch, registered.settings_scope)
+            != speech_scope
+            for registered in self._recognition_authorities
+        ):
+            self._recognition_authorities.clear()
         startup_last_speech_at = (
             self._estimated_last_speech_at
             if self._estimated_speech_scope == speech_scope
@@ -1395,6 +1414,7 @@ class ScopedRecognitionEngine:
                     reason="provider_session_lifetime_exceeded", resume_stream=True
                 )
             else:
+                self._recognition_authorities.clear()
                 self._retire_current_session(watchdogs)
         if self.cleanup_debt:
             await self._await_cleanup_debt(watchdogs.readiness_timeout_s)
@@ -1707,15 +1727,22 @@ class ScopedRecognitionEngine:
                         await self._emit(event)
                     continue
                 if isinstance(event, STTRecognitionUnit):
+                    stream = event.identity.stream
+                    authority = self._recognition_authorities.get(stream)
                     if (
-                        epoch_id != self._provider_epoch_id
-                        or event.identity.stream != self._recognition_stream
-                        or event.identity.receipt_sequence <= self._last_receipt_sequence
+                        stream.provider_epoch_id != epoch_id
+                        or authority is None
+                        or not self.is_current_recognition_stream(stream)
+                        or event.identity.receipt_sequence <= authority.last_receipt_sequence
                     ):
                         continue
-                    self._last_receipt_sequence = event.identity.receipt_sequence
-                    stream = event.identity.stream
-                    if event.text.strip():
+                    authority.last_receipt_sequence = event.identity.receipt_sequence
+                    if (
+                        event.text.strip()
+                        and epoch_id == self._provider_epoch_id
+                        and isinstance(session, STTIndependentRecognitionSession)
+                        and session.accepts_stream_input
+                    ):
                         self._last_native_speech_at_s = self.monotonic_clock()
                         self._schedule_lifetime_check()
                     native = event.provenance.transcription
@@ -2507,7 +2534,6 @@ class ScopedRecognitionEngine:
         self._session = None
         self._session_initial_readiness_pending = False
         self._recognition_stream = None
-        self._last_receipt_sequence = 0
         self._session_consumer = None
         self._session_opened_at_s = None
         self._session_scope = None

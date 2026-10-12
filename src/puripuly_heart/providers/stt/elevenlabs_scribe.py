@@ -6,6 +6,7 @@ import asyncio
 import base64
 import contextlib
 import logging
+import math
 import time
 from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Callable, Sequence
@@ -346,6 +347,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
     _sent_samples: int = field(init=False, default=0, repr=False)
     _commit_sent_sample: int | None = field(init=False, default=None, repr=False)
     _seen_cwt: dict[tuple[object, ...], None] = field(init=False, default_factory=dict, repr=False)
+    _cwt_receipts: dict[int, Any] = field(init=False, default_factory=dict, repr=False)
     _completed_commits: int = field(init=False, default=0, repr=False)
     _last_cwt_start: float | None = field(init=False, default=None, repr=False)
     _clock_discontinuous: bool = field(init=False, default=False, repr=False)
@@ -473,40 +475,70 @@ class _ElevenLabsScribeSession(STTBackendSession):
         except TypeError, ValueError:
             self._protocol_failure("scribe_timestamped_transcript_missing_text")
             return
+        identity = self._event_projection.active_identity
+        if self._event_projection.is_scoped and identity is None:
+            self._protocol_failure("scribe_unsolicited_timestamped_transcript")
+            return
+        receipt_id = id(data)
+        if self._cwt_receipts.get(receipt_id) is data:
+            return
+        self._cwt_receipts[receipt_id] = data
+        if len(self._cwt_receipts) > 256:
+            del self._cwt_receipts[next(iter(self._cwt_receipts))]
         words = self._event_value(data, "words") or ()
         key = tuple(
             (self._event_value(word, "start"), self._event_value(word, "end")) for word in words
         )
-        if (
-            self.model == ELEVENLABS_SCRIBE_STT_MODEL
-            and key
-            and any(start is not None or end is not None for start, end in key)
-        ):
-            if key in self._seen_cwt:
-                return
+        locatable = any(
+            isinstance(start, (int, float))
+            and isinstance(end, (int, float))
+            and math.isfinite(start)
+            and math.isfinite(end)
+            and 0 <= start < end
+            for start, end in key
+        )
+        source_order_unresolved = locatable and key in self._seen_cwt
+        starts = [
+            start for start, _end in key if isinstance(start, (int, float)) and math.isfinite(start)
+        ]
+        if starts:
+            start = min(starts)
+            if source_order_unresolved or (
+                self._last_cwt_start is not None and start < self._last_cwt_start
+            ):
+                self._clock_discontinuous = True
+            self._last_cwt_start = start
+        if locatable:
             self._seen_cwt[key] = None
             if len(self._seen_cwt) > 256:
                 del self._seen_cwt[next(iter(self._seen_cwt))]
-        starts = [start for start, _end in key if isinstance(start, (int, float))]
-        if starts:
-            start = min(starts)
-            if self._last_cwt_start is not None and start < self._last_cwt_start:
-                self._clock_discontinuous = True
-            self._last_cwt_start = start
+        provenance = self._event_provenance(data, barrier="committed_transcript_with_timestamps")
+        if source_order_unresolved or (text and not locatable and self._completed_commits):
+            reason = "scribe_timestamped_source_order_unresolved"
+            if self._event_projection.is_scoped:
+                self._scoped_provenance.append(replace(provenance, unresolved_source_text=text))
+            self._protocol_failure(reason)
+            return
         if self._event_projection.is_legacy:
             self._cancel_plain_fallback()
             self._pending_plain = None
             self._enqueue_connection_event(STTBackendTranscriptEvent(text=text, is_final=True))
             self._completed_commits += 1
             return
-        identity = self._event_projection.active_identity
         if identity is None:
-            self._protocol_failure("scribe_unsolicited_timestamped_transcript")
             return
-        provenance = self._event_provenance(data, barrier="committed_transcript_with_timestamps")
         if self._event_projection.sealed and self._commit_identity == identity:
             if self._commit_write_in_flight:
-                if self._pending_committed is None:
+                if self._pending_committed is not None:
+                    _owner, pending_text, pending_provenance = self._pending_committed
+                    self._scoped_provenance.extend(
+                        (
+                            replace(pending_provenance, unresolved_source_text=pending_text),
+                            replace(provenance, unresolved_source_text=text),
+                        )
+                    )
+                    self._protocol_failure("scribe_timestamped_source_order_unresolved")
+                else:
                     self._pending_committed = (identity, text, provenance)
                 return
             self._finish_committed(identity, text, provenance)
@@ -752,6 +784,15 @@ class _ElevenLabsScribeSession(STTBackendSession):
                     estimated=True,
                 )
             )
+        if barrier == "committed_transcript_with_timestamps" and text:
+            qualified = qualified and any(
+                isinstance(timing.raw_start, (int, float))
+                and isinstance(timing.raw_end, (int, float))
+                and math.isfinite(timing.raw_start)
+                and math.isfinite(timing.raw_end)
+                and 0 <= timing.raw_start < timing.raw_end
+                for timing in timings
+            )
         return STTNativeProvenance(
             barrier=barrier,
             capabilities=STTSourceCapabilities(
@@ -826,11 +867,13 @@ class _ElevenLabsScribeSession(STTBackendSession):
                 STTProviderTurnTerminal(
                     identity=identity,
                     outcome="failed",
+                    text="".join(self._scoped_fragments),
                     text_authority="none",
                     failure_reason=reason,
                     epoch_disposition="retire",
                     provenance=tuple(self._scoped_provenance),
                     failure_diagnostics=diagnostics,
+                    included_contributions=tuple(self._scoped_contributions),
                 )
             )
             self._clear_scoped_turn()

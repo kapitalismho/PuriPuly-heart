@@ -654,6 +654,7 @@ class StreamingSpeakerSession:
         event = turn.latest
         if (
             event is None
+            or turn.released >= len(event.text)
             or event.provenance.capabilities is None
             or event.provenance.capabilities.policy != "timed"
         ):

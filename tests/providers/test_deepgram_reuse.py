@@ -840,3 +840,66 @@ async def test_native_word_languages_are_retained_without_native_speaker_authori
     assert update.final_speaker_runs == ()
     assert update.provenance.transcription.language_code is None
     session._scoped_transport_end(False, "test_finished")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("correction", ["Correction.", "First."])
+async def test_reused_interval_records_unresolved_raw_without_duplicate_or_lost_prefix(correction):
+    from puripuly_heart.core.stt.backend import STTContributionConsumptionLedger
+    from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
+
+    session = _session()
+    request = _request(1)
+    await session.begin_turn(request)
+    normalizer = STTScopedTurnNormalizer(request.identity)
+    consumption = STTContributionConsumptionLedger()
+    for text, start in (("First.", 0.1), ("Second.", 2.0)):
+        session._build_transcript_event(_timed_result(text, start))
+        assert consumption.consume(normalizer.apply_update(await _next(session))) == text
+    session._build_transcript_event(_timed_result(correction, 0.1))
+    terminal = await _next(session)
+    assert isinstance(terminal, STTProviderTurnTerminal)
+    assert terminal.outcome == "failed"
+    assert terminal.epoch_disposition == "retire"
+    assert terminal.failure_reason == "deepgram_final_source_order_unresolved"
+    assert terminal.text == "First.Second."
+    assert len(terminal.included_contributions) == 2
+    assert terminal.provenance[-1].unresolved_source_text == correction
+    assert not terminal.provenance[-1].audio_clocks[0].qualified
+    assert dict(terminal.provenance[-1].native_model_metadata)["name"] == "general-nova-3"
+    normalized = normalizer.apply_terminal(terminal)
+    assert normalized.provenance[-1].unresolved_source_text == correction
+    assert consumption.consume(normalized) == ""
+    assert isinstance(await _next(session), STTProviderEpochEnded)
+    assert session._event_projection.active_identity is None
+    with pytest.raises(RuntimeError):
+        await session.begin_turn(_request(2))
+    recovered = _session()
+    next_request = _request(2)
+    await recovered.begin_turn(next_request)
+    recovered._build_transcript_event(_timed_result("Next.", 0.1))
+    assert (await _next(recovered)).text == "Next."
+    recovered._scoped_transport_end(False, "test_finished")
+
+
+@pytest.mark.asyncio
+async def test_unresolved_raw_payload_obeys_existing_event_buffer_byte_limit():
+    from puripuly_heart.core.stt.backend import STTNativeProvenance
+    from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
+
+    buffer = STTProviderEventBuffer()
+    terminal = STTProviderTurnTerminal(
+        identity=_request(1).identity,
+        outcome="failed",
+        failure_reason="source_order_unresolved",
+        epoch_disposition="retire",
+        provenance=(
+            STTNativeProvenance(
+                unresolved_source_text="不" * (buffer.MAX_RECOGNITION_BYTES // 3 + 1)
+            ),
+        ),
+    )
+    assert buffer.put(terminal) is False
+    ended = await buffer.get()
+    assert isinstance(ended, STTProviderEpochEnded)
+    assert ended.reason == "provider_event_buffer_overflow"

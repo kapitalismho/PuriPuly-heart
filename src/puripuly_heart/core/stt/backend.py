@@ -168,6 +168,7 @@ class STTNativeProvenance:
     control_kind: str | None = None
     control_sent_sample: int | None = None
     native_model_metadata: tuple[tuple[str, str], ...] = ()
+    unresolved_source_text: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -1142,7 +1142,9 @@ class _SonioxSession(STTBackendSession):
         identity = self._event_projection.active_identity
         if identity is None and self._event_projection.retired:
             return
-        if orderly:
+        if orderly or (
+            self._independent_source_mode and reason != "soniox_recognition_buffer_overflow"
+        ):
             self._release_scoped_source("drain", {})
         trigger = (
             "provider_error"

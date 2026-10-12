@@ -163,7 +163,11 @@ async def test_consecutive_final_empty_and_identical_turns_reuse_one_connection(
             await _seal(session, request)
             connection.emit(
                 "committed_transcript_with_timestamps",
-                {"message_type": "committed_transcript_with_timestamps", "text": text},
+                (
+                    _cwt(text, float(order), float(order) + 0.2)
+                    if text
+                    else {"message_type": "committed_transcript_with_timestamps", "text": text}
+                ),
             )
             terminal = await _next(session)
             assert isinstance(terminal, STTProviderTurnTerminal)
@@ -467,7 +471,7 @@ async def test_captured_completed_turn_identity_cannot_finish_successor() -> Non
         assert session._event_projection.active_identity == second.identity
         connection.emit(
             "committed_transcript_with_timestamps",
-            {"message_type": "committed_transcript_with_timestamps", "text": "same"},
+            _cwt("same", 1.0, 1.2),
         )
         terminal = await _next(session)
         assert isinstance(terminal, STTProviderTurnTerminal)
@@ -512,6 +516,7 @@ async def test_cwt_own_text_wins_without_plain_string_pairing_and_preserves_null
         assert evidence.transcription.language_code == "zh"
         assert evidence.transcription.speaker_label is None
         assert evidence.text_timing[0].raw_end is None
+        assert not evidence.audio_clocks[0].qualified
         assert evidence.control_kind == "commit"
         assert evidence.control_id == "turn-1:commit"
         assert session._plain_fallback_task is None
@@ -636,5 +641,89 @@ async def test_scribe_native_clock_reset_keeps_raw_text_and_disables_only_timing
         assert not provenance.audio_clocks[0].qualified
         assert provenance.text_timing[0].raw_start == 0.1
         assert terminal.epoch_disposition == "reuse"
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("correction", ["Correction.", "First."])
+async def test_clock_collision_is_explicit_unresolved_source_not_interval_dedup(correction) -> None:
+    connection = _ControlledConnection()
+    session, _ = await _session(connection)
+    try:
+        for order, (text, start, end) in enumerate(
+            (("First.", 0.1, 0.3), ("Second.", 2.0, 2.2)), 1
+        ):
+            request = _request(order)
+            await session.begin_turn(request)
+            await _seal(session, request)
+            connection.emit("committed_transcript_with_timestamps", _cwt(text, start, end))
+            assert (await _next(session)).text == text
+        current = _request(3)
+        await session.begin_turn(current)
+        await _seal(session, current)
+        connection.emit("committed_transcript_with_timestamps", _cwt(correction, 0.1, 0.3))
+        terminal = await _next(session)
+        assert terminal.identity == current.identity
+        assert (terminal.outcome, terminal.text, terminal.text_authority) == ("failed", "", "none")
+        assert terminal.epoch_disposition == "retire"
+        assert terminal.failure_reason == "scribe_timestamped_source_order_unresolved"
+        assert terminal.included_contributions == ()
+        rejected = terminal.provenance[-1]
+        assert rejected.unresolved_source_text == correction
+        assert not rejected.audio_clocks[0].qualified
+        assert session._clock_discontinuous
+        assert session._event_projection.active_identity is None
+        assert isinstance(await _next(session), STTProviderEpochEnded)
+    finally:
+        await session.close()
+    recovered, _ = await _session(_ControlledConnection())
+    try:
+        request = _request(4)
+        await recovered.begin_turn(request)
+        await _seal(recovered, request)
+        recovered._on_committed_with_timestamps(_cwt("Next.", 0.1, 0.3))
+        terminal = await _next(recovered)
+        assert (terminal.text, terminal.outcome, terminal.epoch_disposition) == (
+            "Next.",
+            "final",
+            "reuse",
+        )
+        assert terminal.provenance[-1].audio_clocks[0].qualified
+    finally:
+        await recovered.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("metadata", ["missing", "null"])
+async def test_unlocatable_cwt_cannot_adopt_sealed_successor(metadata) -> None:
+    connection = _ControlledConnection()
+    session, _ = await _session(connection)
+    first = _request(1)
+    second = _request(2)
+    payload = _cwt("First.", None, None)
+    if metadata == "missing":
+        del payload["words"]
+    try:
+        await session.begin_turn(first)
+        await _seal(session, first)
+        connection.emit("committed_transcript_with_timestamps", payload)
+        first_terminal = await _next(session)
+        assert first_terminal.text == "First."
+        assert not first_terminal.provenance[-1].audio_clocks[0].qualified
+        await session.begin_turn(second)
+        await _seal(session, second)
+        connection.emit("committed_transcript_with_timestamps", payload)
+        assert session._event_projection.active_identity == second.identity
+        assert session._event_projection.scoped_event_depth == 0
+        connection.emit("committed_transcript_with_timestamps", dict(payload))
+        failed = await _next(session)
+        assert failed.identity == second.identity
+        assert failed.outcome == "failed"
+        assert failed.text == ""
+        assert failed.included_contributions == ()
+        assert failed.failure_reason == "scribe_timestamped_source_order_unresolved"
+        assert failed.provenance[-1].unresolved_source_text == "First."
+        assert isinstance(await _next(session), STTProviderEpochEnded)
     finally:
         await session.close()

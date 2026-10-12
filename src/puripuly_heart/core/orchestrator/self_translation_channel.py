@@ -424,6 +424,11 @@ class SelfTranslationChannelOwner:
         self._require_ingress()
         if unit.identity.stream.channel != "self":
             raise ValueError("Self translation owner received non-Self recognition unit")
+        buffer = self.merge_buffer
+        if buffer is not None and buffer.recognition_scope is not None:
+            await self._commit_recognition_barrier(
+                buffer, reason="recognition_source_order_barrier"
+            )
         transcript = recognition_transcript(unit, created_at=self.clock.now())
         self.diagnostics.record_recognition_latency(unit)
         await self._handle_transcript(transcript, is_final=True, source="Mic")
@@ -632,7 +637,9 @@ class SelfTranslationChannelOwner:
             and buffer.recognition_scope is not None
             and buffer.recognition_scope != recognition_scope
         ):
-            await self._commit_recognition_configuration_barrier(buffer)
+            await self._commit_recognition_barrier(
+                buffer, reason="recognition_configuration_barrier"
+            )
         elif buffer is not None and buffer.recognition_scope is None and not buffer.parts:
             buffer.recognition_scope = recognition_scope
         publication_id = self._scoped_publication_ids.get(identity)
@@ -709,9 +716,11 @@ class SelfTranslationChannelOwner:
     def _recognition_scope(identity: STTProviderTurnIdentity) -> tuple[object, ...]:
         return identity.settings_scope
 
-    async def _commit_recognition_configuration_barrier(
+    async def _commit_recognition_barrier(
         self,
         buffer: _MergeBuffer,
+        *,
+        reason: str,
     ) -> None:
         for key, observation in tuple(self._acoustic_continuations.items()):
             if observation.recognition_scope == buffer.recognition_scope:
@@ -721,7 +730,7 @@ class SelfTranslationChannelOwner:
         self._clear_resume_state(buffer)
         buffer.awaiting_vad_end = False
         buffer.awaiting_vad_utterance_id = None
-        await self._commit_merge(buffer, reason="recognition_configuration_barrier")
+        await self._commit_merge(buffer, reason=reason)
 
     def _inherit_scoped_publication_end(
         self,

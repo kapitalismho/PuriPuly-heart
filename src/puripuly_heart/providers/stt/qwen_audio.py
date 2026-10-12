@@ -315,6 +315,7 @@ class _QwenAudioSession(STTBackendSession):
         return task
 
 
+
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if request.channel != self.backend.channel:
             raise QwenAudioProtocolError("Qwen Audio channel ownership mismatch")

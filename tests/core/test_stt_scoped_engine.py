@@ -4128,7 +4128,7 @@ async def test_independent_final_freezes_latest_source_speech_before_deferred_de
         session.emit(STTRecognitionUnit(RecognitionUnitIdentity(session.stream, uuid4(), 1), "one"))
         await asyncio.wait_for(delivery_entered.wait(), timeout=1)
         session.emit(STTRecognitionUnit(RecognitionUnitIdentity(session.stream, uuid4(), 2), "two"))
-        await wait_until(lambda: engine._last_receipt_sequence == 2)
+        await wait_until(lambda: engine._event_buffer.depth == 1)
         await engine.handle_stream_input(stream_input(ledger, 14, 18, speech_observed=True))
         await engine.handle_owned_vad_event(end)
         release_delivery.set()
