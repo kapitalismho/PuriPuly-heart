@@ -26,6 +26,9 @@ from puripuly_heart.core.external_network import ProxyPolicy, select_tls
 from puripuly_heart.core.network_requests import ExternalRequestsSession
 
 
+TEST_AUTHORIZATION = "Bearer synthetic-network-test-key"
+
+
 @pytest.fixture(autouse=True)
 def isolated_network_environment(monkeypatch):
     for name in tuple(os.environ):
@@ -225,7 +228,9 @@ def test_proxy_override_and_common_bypass():
 async def test_explicit_ca_https_and_wss(certificates, monkeypatch, directory):
     root, ca_dir, contexts = certificates
     monkeypatch.setenv("SSL_CERT_DIR" if directory else "SSL_CERT_FILE", str(ca_dir if directory else root))
+    received_authorization = []
     async def echo(ws):
+        received_authorization.append(ws.request.headers.get_all("Authorization"))
         async for message in ws:
             await ws.send(message)
     with http_server(contexts["valid"]) as port:
@@ -233,9 +238,13 @@ async def test_explicit_ca_https_and_wss(certificates, monkeypatch, directory):
             assert (await client.get(f"https://localhost:{port}")).text == "ok"
         assert await asyncio.to_thread(lambda: _sync_get(f"https://localhost:{port}")) == "ok"
     async with serve(echo, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
-        async with network_clients.external_websocket_connect(f"wss://localhost:{server.sockets[0].getsockname()[1]}") as ws:
+        async with network_clients.external_websocket_connect(
+            f"wss://localhost:{server.sockets[0].getsockname()[1]}",
+            additional_headers={"Authorization": TEST_AUTHORIZATION},
+        ) as ws:
             await ws.send("verified")
             assert await ws.recv() == "verified"
+    assert received_authorization == [[TEST_AUTHORIZATION]]
 
 
 def _sync_get(url):
@@ -270,7 +279,9 @@ async def test_https_wss_proxy_parity(certificates, monkeypatch, https_proxy, pr
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(root))
+    received_authorization = []
     async def echo(ws):
+        received_authorization.append(ws.request.headers.get_all("Authorization"))
         async for message in ws:
             await ws.send(message)
     async with recording_proxy(contexts["valid"] if https_proxy else None) as (proxy, recorded):
@@ -284,9 +295,12 @@ async def test_https_wss_proxy_parity(certificates, monkeypatch, https_proxy, pr
             assert await asyncio.to_thread(request) == "ok"
         async with serve(echo, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
             url = f"wss://localhost:{server.sockets[0].getsockname()[1]}"
-            async with network_clients.external_websocket_connect(url) as ws:
+            async with network_clients.external_websocket_connect(
+                url, additional_headers={"Authorization": TEST_AUTHORIZATION}
+            ) as ws:
                 await ws.send("proxied")
                 assert await ws.recv() == "proxied"
+        assert received_authorization == [[TEST_AUTHORIZATION]]
         assert len(recorded) == 3
         assert all(method == "CONNECT" for method, _ in recorded)
 
@@ -296,14 +310,20 @@ async def test_no_proxy_bypasses_both_transports(certificates, monkeypatch):
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:1")
     monkeypatch.setenv("NO_PROXY", "localhost")
+    received_authorization = []
     async def echo(ws):
+        received_authorization.append(ws.request.headers.get_all("Authorization"))
         await ws.send("direct")
     with http_server(contexts["valid"]) as port:
         async with network_clients.external_async_client() as client:
             assert (await client.get(f"https://localhost:{port}")).status_code == 200
     async with serve(echo, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
-        async with network_clients.external_websocket_connect(f"wss://localhost:{server.sockets[0].getsockname()[1]}") as ws:
+        async with network_clients.external_websocket_connect(
+            f"wss://localhost:{server.sockets[0].getsockname()[1]}",
+            additional_headers={"Authorization": TEST_AUTHORIZATION},
+        ) as ws:
             assert await ws.recv() == "direct"
+    assert received_authorization == [[TEST_AUTHORIZATION]]
 
 
 async def test_mock_transport_injection_does_not_resolve_invalid_environment(monkeypatch):
@@ -317,7 +337,9 @@ async def test_socks5_http_and_async_websocket_routes(certificates, monkeypatch)
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(root))
+    received_authorization = []
     async def echo(ws):
+        received_authorization.append(ws.request.headers.get_all("Authorization"))
         async for message in ws:
             await ws.send(message)
     async with recording_proxy(socks=True) as (proxy, recorded):
@@ -333,9 +355,12 @@ async def test_socks5_http_and_async_websocket_routes(certificates, monkeypatch)
             assert await asyncio.to_thread(request) == "ok"
         async with serve(echo, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
             url = f"wss://localhost:{server.sockets[0].getsockname()[1]}"
-            async with network_clients.external_websocket_connect(url) as ws:
+            async with network_clients.external_websocket_connect(
+                url, additional_headers={"Authorization": TEST_AUTHORIZATION}
+            ) as ws:
                 await ws.send("async")
                 assert await ws.recv() == "async"
+        assert received_authorization == [[TEST_AUTHORIZATION]]
         assert len(recorded) == 4
         assert all(method == "SOCKS5" for method, _ in recorded)
 

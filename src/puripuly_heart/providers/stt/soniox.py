@@ -44,11 +44,11 @@ _SELECTIVE_PAUSE_MAX_MS = 7000
 _MAX_TURN_FINAL_TOKENS = 16384
 SONIOX_MAX_SESSION_AGE_S = 299.0 * 60.0
 _RETRYABLE_SERVER_ERRORS = {
-    408: "request_timeout",
-    413: "max_duration_reached",
-    429: "limit_exceeded",
-    500: "internal_error",
-    503: "service_unavailable",
+    408: ("request_timeout",),
+    413: ("max_duration_reached",),
+    429: ("limit_exceeded", "max_concurrent_connections_reached"),
+    500: ("internal_error",),
+    503: ("service_unavailable",),
 }
 _RETRYABLE_TRANSPORT_REASONS = frozenset(
     {
@@ -98,12 +98,12 @@ def _safe_code(value: object, *, maximum: int) -> int | str:
 
 
 def _retryable_server_error(data: dict[str, Any], code: int | str) -> bool:
-    expected_type = _RETRYABLE_SERVER_ERRORS.get(code) if isinstance(code, int) else None
-    if expected_type is None:
+    expected_types = _RETRYABLE_SERVER_ERRORS.get(code) if isinstance(code, int) else None
+    if expected_types is None:
         return False
     error_type = data.get("error_type")
     error = data.get("error")
-    return ("error_type" not in data or error_type == expected_type) and (
+    return ("error_type" not in data or error_type in expected_types) and (
         "error" not in data or isinstance(error, str)
     )
 
@@ -228,12 +228,15 @@ class SonioxRealtimeSTTBackend(STTBackend):
         if not api_key:
             return False
 
-
         async def _check() -> bool:
             try:
-                async with network_clients.external_websocket_connect(endpoint, ping_interval=None, open_timeout=5) as ws:
+                async with network_clients.external_websocket_connect(
+                    endpoint,
+                    additional_headers={"Authorization": f"Bearer {api_key}"},
+                    ping_interval=None,
+                    open_timeout=5,
+                ) as ws:
                     config = {
-                        "api_key": api_key,
                         "model": "stt-rt-v5",
                         "audio_format": "pcm_s16le",
                         "sample_rate": 16000,
@@ -248,11 +251,11 @@ class SonioxRealtimeSTTBackend(STTBackend):
                     if isinstance(message, bytes):
                         message = message.decode("utf-8", errors="ignore")
                     data = json.loads(message)
-                    if "error" in data or "error_code" in data:
-                        raise Exception(data.get("error") or data.get("error_code"))
+                    if "error" in data or "error_code" in data or "error_type" in data:
+                        raise RuntimeError("Soniox request failed")
                     return True
-            except Exception as exc:
-                raise Exception("Connection failed") from exc
+            except Exception:
+                raise Exception("Connection failed") from None
 
         return await _check()
 
@@ -309,7 +312,6 @@ class _SonioxSession(STTBackendSession):
         import websockets
 
         config: dict[str, Any] = {
-            "api_key": self.api_key,
             "model": self.model,
             "audio_format": "pcm_s16le",
             "sample_rate": self.sample_rate_hz,
@@ -326,7 +328,12 @@ class _SonioxSession(STTBackendSession):
             config["context"] = {"terms": self.context_terms}
 
         try:
-            self._ws = await network_clients.external_websocket_connect(self.endpoint, ping_interval=None, open_timeout=self.connect_timeout_s)
+            self._ws = await network_clients.external_websocket_connect(
+                self.endpoint,
+                additional_headers={"Authorization": f"Bearer {self.api_key}"},
+                ping_interval=None,
+                open_timeout=self.connect_timeout_s,
+            )
         except websockets.exceptions.InvalidStatus as exc:
             status = _safe_code(exc.response.status_code, maximum=999999)
             if status in _RETRYABLE_SERVER_ERRORS:
