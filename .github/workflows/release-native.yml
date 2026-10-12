@@ -35,7 +35,7 @@ env:
   NATIVE_BUILD_ROOT: C:\d177\native-integration\release\build
   NATIVE_OUTPUT_ROOT: C:\d177\native-integration\release\dist
   SIGNING_ROOT: C:\d177\native-integration\release\signing
-  SIGNING_EVIDENCE: C:\d177\native-integration\release\build\evidence\signpath
+  SIGNING_EVIDENCE: C:\d177\native-integration\release\signing-evidence
 
 jobs:
   verify-version:

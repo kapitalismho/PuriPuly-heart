@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import shutil
 import struct
 import subprocess
-from pathlib import Path
+import sys
+import tempfile
+from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
 
 import pytest
@@ -525,3 +528,96 @@ def test_draft_delivery_connects_only_validated_asset_bytes(candidate, mutation)
         assert result["asset_id"] == 987
         assert result["source_sha"] == SHA
         assert result["sha256"] == digest["sha256"]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Native build initialization requires Windows")
+def test_signing_context_survives_native_build_initialization(monkeypatch):
+    import yaml
+
+    powershell = shutil.which("pwsh")
+    if powershell is None:
+        pytest.skip("PowerShell 7 is unavailable")
+    repo = Path(__file__).resolve().parents[2]
+    workflow = yaml.load(
+        (repo / ".github" / "workflows" / "release-native.yml").read_text(encoding="utf-8"),
+        Loader=yaml.BaseLoader,
+    )
+    environment = workflow["env"]
+    release_root = PureWindowsPath(environment["NATIVE_BUILD_ROOT"]).parent
+    scratch = Path("C:/d177/native-integration")
+    scratch.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("SIGNPATH_API_TOKEN", "local-lifecycle-fixture-not-a-real-token")
+    monkeypatch.setenv("SIGNPATH_EXPECTED_PUBLISHER", CONTEXT["publisher"])
+    monkeypatch.setenv("SIGNPATH_EXPECTED_ROOT_SHA256", CONTEXT["root_sha256"])
+    with tempfile.TemporaryDirectory(prefix="issue225-lifecycle-", dir=scratch) as directory:
+        release = Path(directory)
+        build = release.joinpath(
+            *PureWindowsPath(environment["NATIVE_BUILD_ROOT"]).relative_to(release_root).parts
+        )
+        evidence = release.joinpath(
+            *PureWindowsPath(environment["SIGNING_EVIDENCE"]).relative_to(release_root).parts
+        )
+        context = signing.verify_context(
+            VERSION, KEYWORDS["tag"], SHA, CONTEXT["ref"], CONTEXT["workflow_ref"], SHA, True
+        )
+        signing.write_provenance_file(evidence / "context.json", context)
+        transient = build / "evidence" / "reset-sentinel.json"
+        signing.write_provenance_file(transient, {"transient": True})
+        inputs = release / "empty-inputs"
+        inputs.mkdir()
+        archive = inputs / "empty-python-embed.zip"
+        archive.touch()
+        reset = subprocess.run(
+            [
+                powershell,
+                "-NoProfile",
+                "-File",
+                str(repo / "scripts" / "ci" / "build-native-experimental.ps1"),
+                "-ToolPython",
+                sys.executable,
+                "-PinnedInputRoot",
+                str(inputs),
+                "-PythonEmbedArchive",
+                str(archive),
+                "-SoxrBuildEnvironment",
+                str(inputs),
+                "-BuildRoot",
+                str(build),
+                "-OutputDir",
+                str(release / "dist"),
+            ],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=30,
+            check=False,
+        )
+        assert reset.returncode != 0
+        assert (build / "input-index").is_dir()
+        assert not transient.exists()
+        record = request("components")
+        record["metadata"]["signingPolicySlug"] = "test-signing"
+        signing.write_provenance_file(evidence / "components-request.json", record)
+        assert (
+            signing.main(
+                [
+                    "validate-request",
+                    "--phase",
+                    "components",
+                    "--evidence",
+                    str(evidence),
+                    "--version",
+                    VERSION,
+                    "--repository",
+                    "owner/repo",
+                    "--source-sha",
+                    SHA,
+                    "--run-id",
+                    KEYWORDS["run_id"],
+                    "--run-attempt",
+                    KEYWORDS["run_attempt"],
+                ]
+            )
+            == 0
+        )
+        assert signing.read_record(evidence / "context.json") == context
