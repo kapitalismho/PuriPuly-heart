@@ -353,6 +353,27 @@ class _SonioxSession(STTBackendSession):
         try:
             await self._ws.send(configuration)
         except Exception as exc:
+            if isinstance(exc, websockets.exceptions.ConnectionClosed):
+                while True:
+                    try:
+                        message = await self._ws.recv()
+                    except websockets.exceptions.ConnectionClosed:
+                        break
+                    if isinstance(message, bytes):
+                        message = message.decode("utf-8", errors="ignore")
+                    try:
+                        data = json.loads(message)
+                    except json.JSONDecodeError, UnicodeDecodeError:
+                        continue
+                    if not isinstance(data, dict) or not any(
+                        key in data for key in ("error", "error_code", "error_type")
+                    ):
+                        continue
+                    self._handle_message(message)
+                    code = _safe_code(data.get("error_code"), maximum=999999)
+                    if not _retryable_server_error(data, code):
+                        raise PermanentSTTScopedSessionError("soniox_request_failed") from None
+                    raise RuntimeError("soniox_request_failed") from None
             if not _retryable_transport_failure("soniox_write_failed", exc, self._ws):
                 raise PermanentSTTScopedSessionError("soniox_connection_rejected") from exc
             raise

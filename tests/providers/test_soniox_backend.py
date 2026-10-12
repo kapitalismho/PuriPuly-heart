@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from websockets.asyncio.client import ClientConnection
 from websockets.asyncio.server import serve
 from websockets.exceptions import InvalidStatus, ProtocolError
 
@@ -227,6 +228,47 @@ async def test_soniox_open_config_send_distinguishes_protocol_from_transport(
     error_type = PermanentSTTScopedSessionError if permanent else ConnectionResetError
     with pytest.raises(error_type):
         await backend.open_session()
+
+
+@pytest.mark.asyncio
+async def test_soniox_startup_send_cancellation_closes_post_upgrade_rejected_transport(
+    monkeypatch,
+) -> None:
+    sending = asyncio.Event()
+    server_closed = asyncio.Event()
+    clients = []
+    original_send = ClientConnection.send
+
+    async def blocked_send(connection, payload, **kwargs):
+        clients.append(connection)
+        sending.set()
+        await connection.wait_closed()
+        return await original_send(connection, payload, **kwargs)
+
+    monkeypatch.setattr(ClientConnection, "send", blocked_send)
+
+    async def handler(connection):
+        await connection.send(json.dumps({"error_code": 401, "error_type": "unauthenticated"}))
+        await connection.wait_closed()
+        server_closed.set()
+
+    async with serve(handler, "127.0.0.1", 0, ping_interval=None) as server:
+        host, port = server.sockets[0].getsockname()[:2]
+        backend = SonioxRealtimeSTTBackend(
+            api_key="local-cancel-key", language_hints=["en"], endpoint=f"ws://{host}:{port}"
+        )
+        opening = asyncio.create_task(backend.open_session())
+        try:
+            await asyncio.wait_for(sending.wait(), timeout=1)
+            opening.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(opening, timeout=1)
+            await asyncio.wait_for(server_closed.wait(), timeout=1)
+            assert len(clients) == 1
+            assert clients[0].close_code == 1000
+        finally:
+            opening.cancel()
+            await asyncio.gather(opening, return_exceptions=True)
 
 
 def test_soniox_backend_defaults_to_realtime_v5_model() -> None:

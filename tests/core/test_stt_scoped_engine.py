@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import numpy as np
 import pytest
+from websockets.asyncio.client import ClientConnection
 from websockets.asyncio.server import serve
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
@@ -1897,6 +1898,124 @@ async def test_soniox_local_server_cancelled_recovery_never_activates_late_conne
             opening_release.set()
             if pending is not None:
                 await asyncio.gather(pending, return_exceptions=True)
+            await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize(
+    ("error", "retryable"),
+    [
+        ({"error_code": 401, "error_type": "unauthenticated"}, False),
+        ({"error_code": 400, "error_type": "invalid_request"}, False),
+        ({"error_code": 403, "error_type": "permission_denied"}, False),
+        ({"error_code": 429, "error_type": "limit_exceeded"}, True),
+        ({"error_code": 429, "error_type": "max_concurrent_connections_reached"}, True),
+        ({"error_code": 429, "error": "legacy"}, True),
+        ({"error_code": 429, "error_type": "unknown"}, False),
+        ({"error_code": 429, "error_type": "unauthenticated"}, False),
+        ({"error_code": 429, "error_type": None}, False),
+        ({"error_code": 401, "error_type": "max_concurrent_connections_reached"}, False),
+        ({}, True),
+    ],
+    ids=[
+        "early401",
+        "early400",
+        "early403",
+        "limit",
+        "concurrency-limit",
+        "legacy-limit",
+        "unknown-type",
+        "contradictory-type",
+        "null-type",
+        "mismatched-code",
+        "closure-only",
+    ],
+)
+async def test_soniox_error_before_configuration_send_prioritizes_structured_failure(
+    channel: str, error: dict[str, object], retryable: bool, monkeypatch, caplog
+) -> None:
+    requests = []
+    clients = []
+    configurations = []
+    failures = []
+    delays = []
+    emitted = []
+    marker = "early-start-private-key"
+    original_send = ClientConnection.send
+
+    async def send_after_server_close(connection, payload, **kwargs):
+        clients.append(connection)
+        await asyncio.wait_for(connection.wait_closed(), timeout=1)
+        return await original_send(connection, payload, **kwargs)
+
+    monkeypatch.setattr(ClientConnection, "send", send_after_server_close)
+
+    async def handler(connection):
+        requests.append(
+            connection.request.headers.get("Authorization") == f"Bearer {marker}"
+            and "Sec-WebSocket-Protocol" not in connection.request.headers
+        )
+        await connection.send(json.dumps({"tokens": []}))
+        if error:
+            await connection.send(json.dumps({**error, "error_message": marker}))
+        await connection.close(code=1000)
+        async for message in connection:
+            configurations.append(message)
+
+    async def sleep(delay):
+        delays.append(delay)
+
+    async with serve(handler, "127.0.0.1", 0, ping_interval=None) as server:
+        host, port = server.sockets[0].getsockname()[:2]
+        backend = SonioxRealtimeSTTBackend(
+            api_key=marker, language_hints=["en"], endpoint=f"ws://{host}:{port}"
+        )
+
+        async def factory(_settings, epoch):
+            assert all(client.close_code == 1000 for client in clients)
+            return await backend.open_session(
+                projection=STTSessionProjection(mode="scoped", provider_epoch_id=epoch)
+            )
+
+        engine = ScopedRecognitionEngine(
+            session_factory=factory,
+            channel=cast(Any, channel),
+            event_sink=emitted.append,
+            terminal_failure_sink=failures.append,
+            watchdog_resolver=lambda _settings: watchdogs(
+                connect_retry_base_s=0.8, connect_retry_max_s=1.6
+            ),
+            sleep=sleep,
+        )
+        ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("soniox"))
+        try:
+            with caplog.at_level(logging.INFO):
+                for index in range(3):
+                    start, _chunk, end = segment_events(
+                        ledger, start_sample=7500 + index * 20, now=75.0 + index
+                    )
+                    await engine.handle_owned_vad_event(start)
+                    await engine.handle_owned_vad_event(end)
+                attempts = 3 if retryable else 1
+                assert requests == [True] * attempts
+                assert len(clients) == attempts
+                assert configurations == []
+                assert len(failures) == 1
+                if error and not retryable:
+                    assert str(failures[0]) == "soniox_request_failed"
+                assert delays == ([0.8, 1.6] if retryable else [])
+                assert engine._session is None
+                assert not engine.cleanup_debt
+                assert not engine._factory_tasks
+                assert all(client.close_code == 1000 for client in clients)
+                assert marker not in caplog.text
+                assert all(marker not in str(failure) for failure in failures)
+                assert (
+                    len([event for event in emitted if isinstance(event, STTProviderTurnTerminal)])
+                    == 3
+                )
+        finally:
             await engine.close()
 
 
