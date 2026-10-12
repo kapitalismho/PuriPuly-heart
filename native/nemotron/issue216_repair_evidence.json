@@ -1,7 +1,7 @@
 {
   "schema": "issue216-repair-evidence-1",
   "original_review_range": "896725642f50874906f5fba0d643554105b0d5fe..0ba21054d058ffbee63d65a4d9057f225fce5628",
-  "status": "Accepted findings independently repair-verified at the pinned repaired candidate; terminal Goal audit pending.",
+  "status": "Accepted findings independently repair-verified at the pinned repaired candidate; fresh terminal Goal audit accepted evidence candidate af299bf6a2cbe5eff3a7ffda18ae6e0be1f0eac4 with no remaining completion gap.",
   "checkpoint_reviews": {
     "whole": {"mode": "FULL_REVIEW followed by bounded REPAIR_VERIFY", "initial_coverage": "All 32 baseline-to-initial-candidate changed files and affected source-admission/lifecycle interactions.", "result": "repair_verified", "closure": ["W-F1", "W-F2", "W-F3", "W-F4", "Scribe unlocatable-CWT disposition", "D-P1", "direct shared-interface regressions"], "basis": "Pinned committed repair inspection plus applicable exercised evidence; unaffected original coverage retained. No fresh full review required."},
     "soniox": {"mode": "Focused FULL_REVIEW followed by bounded REPAIR_VERIFY", "result": "repair_verified", "closure": ["S-F1", "S-F2", "S-F3", "S-F4"], "basis": "Committed retirement authority, residual ledger, source-idle and SELF ordering paths; new regression assertions and seven localhost production-source-owner scenarios. Cancellation/epoch/settings/capture fences retained."},
