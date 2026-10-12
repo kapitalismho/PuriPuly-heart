@@ -845,6 +845,17 @@ class LocalASRProviderRuntimeOwner:
                 targets.append(retained)
         return tuple(targets)
 
+    async def observe_speaker_evidence(
+        self, channel: ProviderRuntimeChannel, evidence: tuple[object, ...]
+    ) -> None:
+        if self._closed:
+            return
+        async with self._operation():
+            for provider in self._source_fact_targets(self._handles[channel]):
+                observe = getattr(provider, "observe_speaker_evidence", None)
+                if callable(observe):
+                    await observe(evidence)
+
     async def handle_owned_vad_event(
         self,
         channel: ProviderRuntimeChannel,

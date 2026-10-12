@@ -32,6 +32,7 @@ class LocalDecodeJob:
     samples_f32: np.ndarray
     audio_ms: float
     speech_end_at: float
+    decode: Callable[[np.ndarray], Awaitable[str]] | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +76,7 @@ class LocalDecodeCoordinator:
     on_backlog_warning: Callable[[LocalDecodeBacklog], object] | None = None
     on_expired: Callable[[LocalDecodeExpired], Awaitable[None]] | None = None
     preserve_queued_after_failure: Callable[[LocalDecodeJob], bool] | None = None
+    continue_after_failure: Callable[[LocalDecodeJob], bool] | None = None
     start_after: asyncio.Event | None = None
     backlog_warn_size: int = DEFAULT_LOCAL_DECODE_BACKLOG_WARN_SIZE
     pending_ttl_s: float | None = None
@@ -132,6 +134,7 @@ class LocalDecodeCoordinator:
         *,
         speech_end_at: float | None = None,
         copy_samples: bool = True,
+        decode: Callable[[np.ndarray], Awaitable[str]] | None = None,
     ) -> LocalDecodeJob | None:
         if not self.accepting:
             return None
@@ -143,6 +146,7 @@ class LocalDecodeCoordinator:
             samples_f32=samples,
             audio_ms=audio_ms,
             speech_end_at=self.queue_clock() if speech_end_at is None else speech_end_at,
+            decode=decode,
         )
         self._next_sequence += 1
         self._queue.append(job)
@@ -262,7 +266,7 @@ class LocalDecodeCoordinator:
                         inference_ms = 0.0
                     else:
                         decode_started_at = self.clock()
-                        text = await self.decode(job.samples_f32)
+                        text = await (job.decode or self.decode)(job.samples_f32)
                         inference_ms = (self.clock() - decode_started_at) * 1000.0
                         decode_finished = True
                     await self.on_completion(
@@ -282,9 +286,15 @@ class LocalDecodeCoordinator:
                         else inference_ms
                     )
                     preserve_queued = bool(
-                        self._queue
-                        and self.preserve_queued_after_failure is not None
-                        and self.preserve_queued_after_failure(job)
+                        (
+                            self.continue_after_failure is not None
+                            and self.continue_after_failure(job)
+                        )
+                        or (
+                            self._queue
+                            and self.preserve_queued_after_failure is not None
+                            and self.preserve_queued_after_failure(job)
+                        )
                     )
                     discarded_jobs = () if preserve_queued else tuple(self._queue)
                     failure = LocalDecodeFailure(

@@ -144,6 +144,12 @@ class _LocalGpuSTTSession(STTBackendSession):
     _tasks: set[asyncio.Task[None]] = field(init=False, default_factory=set, repr=False)
     _closed: bool = field(init=False, default=False, repr=False)
     _stopping: bool = field(init=False, default=False, repr=False)
+    _request_options: dict[STTProviderTurnIdentity, tuple[str | None, str]] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    _isolated_failures: set[STTProviderTurnIdentity] = field(
+        init=False, default_factory=set, repr=False
+    )
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(
@@ -165,11 +171,19 @@ class _LocalGpuSTTSession(STTBackendSession):
         if samples.size:
             self._buffer.append(samples.copy())
 
+    def snapshot_decode_options(self) -> tuple[str | None, str]:
+        return self.backend.language_hint, self.backend.source_mode
+
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if self._closed or self._stopping:
             raise RuntimeError("local GPU STT session is unavailable")
         self._pcm_buffer.clear()
         self._event_projection.begin(request)
+        self._request_options[request.identity] = (
+            request.native_options or self.snapshot_decode_options()
+        )
+        if request.isolate_failure:
+            self._isolated_failures.add(request.identity)
         self._buffer.clear()
 
     async def send_turn_audio(
@@ -207,7 +221,12 @@ class _LocalGpuSTTSession(STTBackendSession):
             self._terminalize_scoped(identity, outcome="empty")
             return
         task = asyncio.create_task(
-            self._transcribe(pcm, self.backend.speech_end_clock(), identity),
+            self._transcribe(
+                pcm,
+                self.backend.speech_end_clock(),
+                identity,
+                self._request_options.pop(identity),
+            ),
             name=f"gpu-asr-{self.backend.channel}-scoped",
         )
         self._tasks.add(task)
@@ -241,6 +260,9 @@ class _LocalGpuSTTSession(STTBackendSession):
     ) -> None:
         if not self._event_projection.can_terminal(identity):
             return
+        retire = retire and identity not in self._isolated_failures
+        self._isolated_failures.discard(identity)
+        self._request_options.pop(identity, None)
         self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
@@ -280,7 +302,11 @@ class _LocalGpuSTTSession(STTBackendSession):
             self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
             return
         task = asyncio.create_task(
-            self._transcribe(samples, self.backend.speech_end_clock()),
+            self._transcribe(
+                samples,
+                self.backend.speech_end_clock(),
+                options=(self.backend.language_hint, self.backend.source_mode),
+            ),
             name=f"gpu-asr-{self.backend.channel}",
         )
         self._tasks.add(task)
@@ -291,14 +317,19 @@ class _LocalGpuSTTSession(STTBackendSession):
         samples: np.ndarray | bytes,
         speech_end_at: float,
         scoped_identity: STTProviderTurnIdentity | None = None,
+        options: tuple[str | None, str] | None = None,
     ) -> None:
+        language_hint, source_mode = options or (
+            self.backend.language_hint,
+            self.backend.source_mode,
+        )
         try:
             if scoped_identity is None:
                 result = await self.backend.runtime.submit(
                     self.backend.channel,
                     samples,
                     speech_end_at=speech_end_at,
-                    language_hint=self.backend.language_hint,
+                    language_hint=language_hint,
                 )
             else:
                 submit_task = asyncio.create_task(
@@ -306,7 +337,7 @@ class _LocalGpuSTTSession(STTBackendSession):
                         self.backend.channel,
                         samples,
                         speech_end_at=speech_end_at,
-                        language_hint=self.backend.language_hint,
+                        language_hint=language_hint,
                     ),
                     name=f"gpu-asr-submit-{self.backend.channel}",
                 )
@@ -370,7 +401,7 @@ class _LocalGpuSTTSession(STTBackendSession):
         final_language_runs = (
             (FinalLanguageRun(text=text, language=detected_language),)
             if self.backend.channel == "peer"
-            and self.backend.source_mode == "auto"
+            and source_mode == "auto"
             and text
             and detected_language
             else ()

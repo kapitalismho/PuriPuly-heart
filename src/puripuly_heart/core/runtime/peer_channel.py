@@ -189,6 +189,8 @@ class PeerSpeakerInputObserver(Protocol):
 
     def end_capture(self, capture_session_id: str, reason: str) -> None: ...
 
+    def drain_evidence(self, max_items: int) -> tuple[object, ...]: ...
+
 
 @dataclass(slots=True)
 class _CaptureGeneration:
@@ -243,16 +245,27 @@ class _GenerationGuardedVadSink:
         self._stream_drop_pending = False
         self.failure_diagnostics: ErrorDiagnostics | None = None
         self._started_segment_ids: set[UUID] = set()
+        self._speaker_task: asyncio.Task[None] | None = None
 
     async def handle_owned_vad_event(self, event: object) -> None:
         await self._submit(event)
 
     async def handle_stream_input(self, event: CaptureStreamInput) -> None:
+        if not self.runtime.is_current_generation(self.capture_generation.value):
+            return
         if self.runtime._speaker_observer is not None:
             try:
                 self.runtime._speaker_observer.observe_input(
                     self.capture_generation.capture_session_id, event
                 )
+                if (
+                    self._speaker_task is None
+                    and callable(getattr(self.runtime._speaker_observer, "drain_evidence", None))
+                    and callable(getattr(self.sink, "observe_speaker_evidence", None))
+                ):
+                    self._speaker_task = asyncio.create_task(
+                        self._drain_speaker_evidence(), name="peer-speaker-evidence"
+                    )
             except Exception:
                 logger.exception("peer speaker input unavailable")
         if not self.runtime.is_current_generation(self.capture_generation.value):
@@ -305,6 +318,26 @@ class _GenerationGuardedVadSink:
             return
         await self._submit(owned)
 
+    async def _drain_speaker_evidence(self) -> None:
+        while not self._closing and self.runtime.is_current_generation(
+            self.capture_generation.value
+        ):
+            evidence = self.runtime._speaker_observer.drain_evidence(128)
+            evidence = tuple(
+                item
+                for item in evidence
+                if item.capture_session_id == self.capture_generation.capture_session_id
+            )
+            if evidence:
+                await self.sink.observe_speaker_evidence(evidence)
+            await asyncio.sleep(0.05)
+
+    async def _cancel_speaker_evidence(self) -> None:
+        task, self._speaker_task = self._speaker_task, None
+        if task is not None:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
     async def observe_source_activity(
         self,
         *,
@@ -328,6 +361,7 @@ class _GenerationGuardedVadSink:
             await observe(pending=pending)
 
     async def finish(self) -> None:
+        await self._cancel_speaker_evidence()
         worker = self._worker
         if worker is None:
             return
@@ -337,6 +371,7 @@ class _GenerationGuardedVadSink:
         await self._cancel_expiry()
 
     async def abort(self) -> None:
+        await self._cancel_speaker_evidence()
         self._closing = True
         failures: list[Exception] = []
         worker = self._worker
@@ -949,7 +984,9 @@ class PeerCaptureSessionOwner:
                 if snapshot.identity == identity.segment:
                     settings = snapshot.settings
                     if identity.settings_scope and identity.settings_scope != (
-                        settings.provider_id, settings.provider_signature, settings.runtime_signature
+                        settings.provider_id,
+                        settings.provider_signature,
+                        settings.runtime_signature,
                     ):
                         return None
                     return snapshot

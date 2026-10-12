@@ -682,6 +682,7 @@ class PeerAudioSegmentLedger:
             opened_at_monotonic_s=segment.opened_at_monotonic_s,
             sealed_at_monotonic_s=segment.sealed_at_monotonic_s,
             seal_reason=segment.seal_reason,
+            display_group_id=segment.identity.segment_id,
         )
 
 

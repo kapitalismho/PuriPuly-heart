@@ -1,0 +1,2763 @@
+{
+  "schema": "issue215-baseline-causal-comparison-1",
+  "evidence": {
+    "baseline": {
+      "path": "native/nemotron/issue215_evidence.zip:issue215_baseline.json",
+      "sha256": "88ce35eb824f32cbee71ac93772bb1c0e1cd4ecf14b659c47bc09521c250583b"
+    },
+    "candidate": {
+      "path": "native/nemotron/issue215_evidence.zip:issue215_new_supported_window.json",
+      "sha256": "61c9caeadaf654ada62ee366f3709ed9f8c422ac4d4ac4e64c516ba3779dfeba"
+    }
+  },
+  "scope": "Production Silero VAD/listen delivery -> real scoped CPU ASR -> normal contribution ledger -> real SourceChild lifecycle/context admission; new path additionally real SpeakerRuntime FP16 Vulkan. No translation execution/renderer claims.",
+  "trimming": "OFF",
+  "profile": "0.64",
+  "selected_runtime": {
+    "schema_version": 1,
+    "abi": "puripuly-nemotron-1",
+    "source": {
+      "repository": "NVIDIA/NeMo-Speech.cpp",
+      "revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+    },
+    "dependencies": {
+      "llama.cpp": "bd4f514db14d87fded667787a7a963bfbaa98e89",
+      "vcpkg": "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+    },
+    "archives": {
+      "nemo": {
+        "repository": "NVIDIA/NeMo-Speech.cpp",
+        "revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+        "url": "https://codeload.github.com/NVIDIA/NeMo-Speech.cpp/zip/b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+        "sha256": "069d7042685996011d5f1878a06737195421b142f91859a561610b6971ae8b8a"
+      },
+      "llama.cpp": {
+        "repository": "ggml-org/llama.cpp",
+        "revision": "bd4f514db14d87fded667787a7a963bfbaa98e89",
+        "url": "https://codeload.github.com/ggml-org/llama.cpp/zip/bd4f514db14d87fded667787a7a963bfbaa98e89",
+        "sha256": "d74b36880a15ad7e6889dc1bb1db7489e929e4110cc613b9716cfc31bc33bbe7"
+      },
+      "vcpkg": {
+        "repository": "microsoft/vcpkg",
+        "revision": "9e593bb18ea69cc5095e012465dcd675a822ed0d",
+        "url": "https://codeload.github.com/microsoft/vcpkg/zip/9e593bb18ea69cc5095e012465dcd675a822ed0d",
+        "sha256": "92ea07cd3ad4b3bbe65e6e7088b4074eddab371d7bb70107c6e7ceefcb5d5c3e"
+      }
+    },
+    "patches": {
+      "native/nemotron/patches.json": "e81a179f2a71b76b8869a4a2710983c23f219717b344cf5c37af86574f90b748"
+    },
+    "policy": {
+      "backend": "Vulkan",
+      "neural_cpu_fallback": false,
+      "precision": "F16",
+      "schedule_guard": true,
+      "physical_gpu_only": true
+    },
+    "build": {
+      "generator": "Ninja",
+      "configuration": "Release",
+      "nemo_ggml_patch_set": false,
+      "ggml_physical_device_classification_patch": true,
+      "cmake_cache_sha256": "a5cebcc4a00fb750b285894b67fc2c1c3ddfb29498e7a943df3cedfdd9fbf7cf",
+      "neural_schedule": "selected Vulkan GPU checked before cached/direct and scheduler compute; CPU frontend permitted",
+      "accumulation": "backend-selected Vulkan shader accumulation; F16 weights, F32 auxiliary weights/activations; no all-F16 claim"
+    },
+    "files": {
+      "bin/concrt140.dll": "2405355f0a58067b258f8df33c327e3a3d716eaac5a3a5aebb757842d85bd376",
+      "bin/ggml-base.dll": "5dc9ef70f2583eae97659145b03421c7531265671d808c372b621771d6ab6f1c",
+      "bin/ggml-cpu.dll": "03f16942bc4c4092a1738627c9d099cd4c6d50220e5cdae12f38626ef734df57",
+      "bin/ggml-vulkan.dll": "044345dfec12ac0c4a863bfaf0ace67c818af07f1eb75082ecdcdb608f7b8d24",
+      "bin/ggml.dll": "38c9b7e2d9724418986ce124fa43f49d22e3880c83c86a12ae03824690d15e21",
+      "bin/msvcp140.dll": "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9",
+      "bin/msvcp140_1.dll": "bfad5aef4c63a669e3c140655cdfdf395b6c979b400a447bd5dcb65ed8826c3d",
+      "bin/msvcp140_2.dll": "3ea06f0ee098b4823cb79599df3780e7f23cce52c19aac31d2a0d47efe33a5e9",
+      "bin/msvcp140_atomic_wait.dll": "640b2aefced484d0368eea5bdd06addd0658a3a70a49256e560d6923b404a479",
+      "bin/msvcp140_codecvt_ids.dll": "f2069a52880ec885ee7f0511186100eb7fada0411a2b4948fafea7735b878a18",
+      "bin/nemo_speech_asr.dll": "934cadbbae518b0982a667ee2d534d4cf9bcf0841e3a53946e18b6478b92d734",
+      "bin/nemo_speech_asr_c.dll": "158f330a9b8ce664f4388238d0a1cf7cf871520eb3d209aeeb392ddc0b80bf8e",
+      "bin/vcruntime140.dll": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066",
+      "bin/vcruntime140_1.dll": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f",
+      "include/nemo_speech/asr.h": "12f3e017391ae19daabe59d2d50541f0aabb010228d075426b4a9834337422fa",
+      "include/nemo_speech/diar.h": "83dfd5e16859c2c7c6da740826aced4253b26cec3087630941770e41057f66a2",
+      "lib/cmake/NeMoSpeech/NeMoSpeechConfig.cmake": "2c636e6dd73e6df561386e6dff4ce6e51126bb9af7268f6815bf70e51121c25a",
+      "lib/cmake/NeMoSpeech/NeMoSpeechConfigVersion.cmake": "47f41ec43987a0d4fe23653504d4427dc1753b6a83167ba7dacf62e45487b6a4",
+      "lib/nemo_speech_asr_c.lib": "abcadb6022483dcd95d0927465a9c1b1846b78075a008ad70d9e3ec7ce7c07d5",
+      "share/doc/nemo-speech/CONTRIBUTING.md": "dab40307a65b606e687f7731273817794293c16e8d67ba7d836e83a96478c367",
+      "share/doc/nemo-speech/docs/api.md": "eb23ac5107ffbd2fb797eefcb2ce6deb50c4560e526d08d3b39d7b0bc07fdef1",
+      "share/doc/nemo-speech/docs/asr/configuration.md": "c4be8d65c0a4abcdf064d4124a767ae9626cdf5c3b476b124dd22651d02f9c73",
+      "share/doc/nemo-speech/docs/asr/customization.md": "3849d88f25926a1196737b11420027ee1f451abbc9b7307f799190036b4c622d",
+      "share/doc/nemo-speech/docs/asr/models.md": "dd89dde01f1b77a095750f4fadcf4762b971103e7026f52ef88096e19f9fe769",
+      "share/doc/nemo-speech/docs/build.md": "1adaeccf203a4561be08fa0bd3effb46f6bc1fae07b4d6020449a9b1dde75c74",
+      "share/doc/nemo-speech/docs/cli.md": "bbf0c8b54a67261e3f6dddadbbd7bcbbf915c9a157d068ca75cf189a3927614b",
+      "share/doc/nemo-speech/docs/clients.md": "c4977349b3fed97eee0700543ef77e58d3ea2c07b1b89ba8510adb2e3476cd6c",
+      "share/doc/nemo-speech/docs/development/asr-batching.md": "351e7cc131aa055a032aa2cb74b261320fab47793ace608b757abdce84b500a7",
+      "share/doc/nemo-speech/docs/development/cublas-shim.md": "126b2e92e74451cb999932474ddabab44e9d1064607dbafd7e36b36cb6ae4679",
+      "share/doc/nemo-speech/docs/development/diagnostics.md": "e82ced430db61edd107af84d2ac096bb6ddfa1c1d48c2a8a284469592cf7e97a",
+      "share/doc/nemo-speech/docs/development/README.md": "91b7eeb45247c5ccb86c728e100926f690bce39a13d7c2fe185ddf03eecc8847",
+      "share/doc/nemo-speech/docs/development/releasing.md": "c4445d64f55519613c0e698b24c1a7f94ea10c5ba301cc8f483015f6b725370b",
+      "share/doc/nemo-speech/docs/development/windows-build.md": "4b7f3efa6f8d3242edcef47a658d381c1d7800cd94d50e44738f60d3a075c278",
+      "share/doc/nemo-speech/docs/install.md": "bec102a2ac4f4566db8f9be6d1c5143cd5345c6a199e018b3083ab48594afc64",
+      "share/doc/nemo-speech/docs/model-conversion.md": "063a4651ac62559390241520d54d4ac47e9e952708205ce290304c7012d95f68",
+      "share/doc/nemo-speech/docs/nmt/configuration.md": "fc32f28f71114b049382d850d8c91bdb4d2a7a8cd17e96e05cb8b17f61ecf875",
+      "share/doc/nemo-speech/docs/nmt/models.md": "a0f5874b51448351ad36e2a572db16b8647e0b58a19043411e9303ac224a2451",
+      "share/doc/nemo-speech/docs/README.md": "0bd53c4c04a1a6670d440a626b04e19ce3354006807882e9d5f8e36d37b4b936",
+      "share/doc/nemo-speech/docs/s2s/clients.md": "a8c19f0b745b6ad6bdbfb3c9fee588f260d88b1f3036376a35cba507b5069ed9",
+      "share/doc/nemo-speech/docs/s2s/configuration.md": "2178cb877efd78a344d646a479e117babb332e86ea68d116840a5ab6ee48e7ca",
+      "share/doc/nemo-speech/docs/s2s/docker.md": "f430241ae0296304bac4fc20d6df04f7c8194021c282f06f486c8e7b36e2c750",
+      "share/doc/nemo-speech/docs/s2s/models.md": "4e4a8089fd8f0b4c9d7fe7d07af5466dbe98b9e2531065374c20662a1f7d65a7",
+      "share/doc/nemo-speech/docs/s2s/README.md": "b07a3b137188bc1a29ee21b071c78f01adc452bf22b7cb7307f6cc8290cd503e",
+      "share/doc/nemo-speech/docs/sdk.md": "290466ffb5ca4064abaeecfab4d0b351ce6b983d434057a67782a834622c6def",
+      "share/doc/nemo-speech/docs/server.md": "01b99ed2681cf2227ef525cbb5f22605411ee046bfc15f7a9fb40649a15fea19",
+      "share/doc/nemo-speech/docs/troubleshooting.md": "50cc4f3c85e397c78e5ab77065f0d9ed44058de62d634fee6aab2ca532927063",
+      "share/doc/nemo-speech/docs/tts/configuration.md": "5d60b9e3dc3b51b23622653b8a3463758c79e4386b1f5229b0d97ca3adf07532",
+      "share/doc/nemo-speech/docs/tts/models.md": "125e5ab5020661a20ba97d1cab4f55c92e08f7a10d86f4c0ad5dc6131ca60938",
+      "share/doc/nemo-speech/README.md": "54f85f532a1bfe23324ced98b4ad0da675d8e98b4f3d4552644f74be23b1d6b2",
+      "share/licenses/nemo-speech/LICENSE": "eaaca34b26b27c7be5a5099a0b9ddf9913f2db0aa96f6d5854435f2916d6fdc3",
+      "share/licenses/nemo-speech/NOTICE": "d5ea773d67035e676503579ecf7d5836a124649d7fe99d59ec3c50cd101e1a80",
+      "share/licenses/nemo-speech/third_party/abseil/copyright": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747",
+      "share/licenses/nemo-speech/third_party/ggml/LICENSE": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
+      "share/licenses/nemo-speech/third_party/protobuf/copyright": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d",
+      "share/licenses/nemo-speech/third_party/sentencepiece/copyright": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "share/licenses/nemo-speech/third_party/utf8-range/copyright": "02de69b64fc36d9e938f418e52723e42f0b2b226d58a9cb3c8dcbdf7059f5074",
+      "share/licenses/nemo-speech/THIRD_PARTY_NOTICES.md": "fd8fcc0c71abde95b1b742a74c70aa27d2b4f2811fc19f64378b6845d8f3254a",
+      "share/nemo-speech/config/asr.example.yaml": "c406506f22ef5baa008138c28817dd18445407e404bfb507630469d203798716",
+      "share/nemo-speech/config/diar.example.yaml": "ac0e5d93af9fb37c9a03ab0039acd5af0790c36a2b12cc8d181212a1fbd01b5b",
+      "share/nemo-speech/config/nmt.example.yaml": "313214fe93f9f9f57897823d2d3fe20e7a9986fc18b1df37063985389874d46f",
+      "share/nemo-speech/config/README.md": "981118a586fa2cdaab5bed0f0775292002821007ee1da5740a8a77877db50c89",
+      "share/nemo-speech/config/server.example.yaml": "afe8b2575c036156322a93aaf2f328f925e6685e3cddc9604c0fca37a9406d0c",
+      "share/nemo-speech/config/tts.example.yaml": "a1ccdd6886f25d635aaffd4501c3b9626f7c7b264f280ca72273bb3b14bb651a",
+      "share/nemo-speech/config/voicechat.yaml": "9013c7a390fc3f8c68c6833400a55aadd91543e01a49db32e64a81a1b32ef17b",
+      "share/nemo-speech/model-index.json": "4d5d88c93b006b33b2e02e5c214e97e6c28e96f8673b0d744ccfa1e8f4a255b7"
+    }
+  },
+  "artifact": {
+    "sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+    "version": "v3",
+    "num_speakers": 8,
+    "sample_rate": 16000,
+    "file_type": 1,
+    "tensor_formats": {
+      "F32": 231,
+      "F16": 125
+    },
+    "size_bytes": 201832928,
+    "tensor_count": 356
+  },
+  "execution_source_sha256": {
+    "native/nemotron/issue215_smoke.py": "301262c6910d9d0c37bbab0fcbd8c2eb0cdca6bb1d256a4cca698e06718964d1",
+    "src/puripuly_heart/core/stt/scoped_engine.py": "ccc17b1ae2a0956deac798c327437a60475b913bec8bd58152da5b6e6bc64e25",
+    "src/puripuly_heart/core/stt/batch_speaker.py": "1de562aaec3996de0c2d0890b3376fb823fdf84daa054fbb641c5e9101ceb364",
+    "src/puripuly_heart/core/stt/backend.py": "b47dc04be2735e995277b6e448012cbe03a52d19d745f591fc00728cace35ab8",
+    "src/puripuly_heart/core/stt/recognition_units.py": "f91e5be5e17781458e69c8a7506040ea7969d9b2001afb701e04cf718398eb1d",
+    "src/puripuly_heart/domain/recognition.py": "53f2f426aa49546767f4caa5e9a86b66ebe44f5f14fe7f51a06179e91fed5bb5",
+    "src/puripuly_heart/core/speaker/runtime.py": "76cfd82763feac96d9274c8f318ac76da585dea9b2352781a90cfc8d52bbd750",
+    "src/puripuly_heart/core/speaker/contracts.py": "d29459925d34ec39daae2ee56858d49aa1fec4fb903ed46943ae0b9401cac9de",
+    "src/puripuly_heart/app/adapters/nemotron/backend.py": "44d1d33e0df135775c3869eeee54561099bc34e191970c8a80db1b524ebbd417",
+    "src/puripuly_heart/core/audio/ownership.py": "f921ca1d80bdc63be120675a0421b250f5f18869b0d62d1afcae262072c95cf9",
+    "src/puripuly_heart/providers/stt/local_qwen_sherpa.py": "e3b1e7475f0075141ef2e2756b327cf4b7f1f90d5f54e690756905d5fa7fad6c",
+    "src/puripuly_heart/providers/stt/local_parakeet_sherpa.py": "14d8c609c64dc3da81358ccd270778817a294c22893bca39b6869c1999803a97",
+    "src/puripuly_heart/core/audio/listen_delivery.py": "30209456945e9596380d661b9c0e1e0d5d7e192d57368fa980f8be11de93c951",
+    "src/puripuly_heart/core/runtime/audio_vad_loop.py": "a402ae297bfa6bcbf84e7ca67ecdf414f7443307ce6dd9c69600aef1cca2375b",
+    "src/puripuly_heart/core/orchestrator/translation_turn.py": "67e7d1e0ed3fcc0314a68894983de70ba62308ade113c8d6061fc26705dae103",
+    "src/puripuly_heart/core/orchestrator/translation_request.py": "00564c4b69342d5e8d2eca6afbc795ce97359d2eca1c067f27e88a9d8aae78a3"
+  },
+  "gpu_asr": {
+    "status": "blocked",
+    "install": {
+      "explicit_opt_in": true,
+      "status": "missing",
+      "model_id": "qwen3-asr-1.7b-q6-k-transcribe-vulkan",
+      "state": {
+        "status": "missing",
+        "installed_manifest": null,
+        "error_message": null
+      }
+    },
+    "selected_path": "<USER_HOME>\\AppData\\Local\\puripuly-heart\\models\\qwen3-asr-1.7b-q6-k-transcribe-vulkan\\Qwen3-ASR-1.7B-Q6_K.gguf",
+    "override": "none supplied; production composition uses local_gpu_model_path()",
+    "inference": "not_run"
+  },
+  "cases": [
+    {
+      "case": "ordinary_onset",
+      "same_input_pcm": true,
+      "same_asr_options": true,
+      "same_capture_vad_range_schedule": true,
+      "baseline": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "He washed the detritus from his hair.",
+        "source_count": 1,
+        "submissions": [
+          {
+            "native_request_id": "df16464e1335416a84103290fb43337b",
+            "native_pcm16_sha256": null,
+            "reason": "delivery_pause",
+            "source_boundary_sample": null,
+            "source_boundary_seconds": null,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 44940.1102714,
+            "submitted_cursor_sample": 67072,
+            "new_content_ranges": [
+              [
+                7,
+                21504,
+                67072
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                21504,
+                67072
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                13504,
+                21504
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 44940.1099862,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 44940.2503944,
+                "admitted_at_monotonic_s": 44940.2506968,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "He washed the detritus from his hair.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "He washed the detritus from his hair.",
+                  "speaker_id": null,
+                  "session_scope": "",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  null
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": null,
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": null,
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": null,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": null,
+            "native_text_matches_admitted_source": null,
+            "native_payload_matches_declared_source": null
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 45568,
+          "owned_new_samples": 45568,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "not_run",
+          "actual_early_source_before_enclosing_seal": "not_run",
+          "early_source_count": 0,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "failed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "not_run",
+          "native_payload_matches_declared_source": "not_run",
+          "synthetic_native_context_input_valid": "not_run",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "not_run"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [],
+        "seal_reasons": [
+          "delivery_pause"
+        ],
+        "speaker_final": null,
+        "nonfinal_or_empty_results": []
+      },
+      "new": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "He washed the detritus from his hair.",
+        "source_count": 1,
+        "submissions": [
+          {
+            "native_request_id": "1be1e66d95a54847b467c1c7c854cdcc",
+            "native_pcm16_sha256": "de88342af10e5bebe7377c79099ca53454ff10ef024d2b7d6970fdd057b8af9f",
+            "reason": "delivery_pause",
+            "source_boundary_sample": 67072,
+            "source_boundary_seconds": 4.192,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 50440.210403,
+            "submitted_cursor_sample": 67072,
+            "new_content_ranges": [
+              [
+                7,
+                21504,
+                67072
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                21504,
+                67072
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                13504,
+                21504
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 50440.2060567,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 50440.35924,
+                "admitted_at_monotonic_s": 50440.359541,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "He washed the detritus from his hair.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "He washed the detritus from his hair.",
+                  "speaker_id": null,
+                  "session_scope": "1",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  {
+                    "state": "unavailable",
+                    "key": null,
+                    "source": "nemotron",
+                    "speaker_scope_id": "1"
+                  }
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": "40340234-c756-4c10-b3ae-9028524d63a8",
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": "40340234-c756-4c10-b3ae-9028524d63a8",
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": {
+              "available_at_monotonic_s": 50440.3585498,
+              "outcome": "final",
+              "text": "He washed the detritus from his hair.",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 45568,
+          "owned_new_samples": 45568,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "not_run",
+          "actual_early_source_before_enclosing_seal": "not_run",
+          "early_source_count": 0,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "passed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "passed",
+          "native_payload_matches_declared_source": "passed",
+          "synthetic_native_context_input_valid": "passed",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "passed"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [],
+        "seal_reasons": [
+          "delivery_pause"
+        ],
+        "speaker_final": {
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "issue215:ordinary_onset",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 18,
+          "onset_samples": 8000,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 98048,
+          "max_copy_samples": 512,
+          "owned_tasks": 1,
+          "processed_through_sample": 61440,
+          "immutable_through_sample": 61440,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 2048,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        "nonfinal_or_empty_results": []
+      }
+    },
+    {
+      "case": "six_second_rollover",
+      "same_input_pcm": true,
+      "same_asr_options": true,
+      "same_capture_vad_range_schedule": true,
+      "baseline": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "The UN also hopes to finalize a fund to help countries affected by global warming to cope with the",
+        "source_count": 1,
+        "submissions": [
+          {
+            "native_request_id": "ea21255d9cce48678fb79c95a6224ed4",
+            "native_pcm16_sha256": null,
+            "reason": "delivery_deadline",
+            "source_boundary_sample": null,
+            "source_boundary_seconds": null,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 44950.6242409,
+            "submitted_cursor_sample": 116736,
+            "new_content_ranges": [
+              [
+                7,
+                20992,
+                116736
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                20992,
+                116736
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                12992,
+                20992
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 44950.6239786,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 44950.8822209,
+                "admitted_at_monotonic_s": 44950.882543,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "The UN also hopes to finalize a fund to help countries affected by global warming to cope with the",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "The UN also hopes to finalize a fund to help countries affected by global warming to cope with the",
+                  "speaker_id": null,
+                  "session_scope": "",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  null
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": null,
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": null,
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": null,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": null,
+            "native_text_matches_admitted_source": null,
+            "native_payload_matches_declared_source": null
+          },
+          {
+            "native_request_id": "6c910e62ed1f404fae9e9bcbf056b53e",
+            "native_pcm16_sha256": null,
+            "reason": "delivery_pause",
+            "source_boundary_sample": null,
+            "source_boundary_seconds": null,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 44951.8496394,
+            "submitted_cursor_sample": 136704,
+            "new_content_ranges": [
+              [
+                7,
+                116736,
+                136704
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                116736,
+                136704
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                111936,
+                116736
+              ]
+            ],
+            "context_samples": 4800,
+            "enclosing_seal_monotonic_s": 44951.8493696,
+            "final_source": [],
+            "declared_display_group_id": null,
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": null,
+            "synthetic_context_metadata_preserved": null,
+            "native_result": null,
+            "native_text_matches_admitted_source": null,
+            "native_payload_matches_declared_source": null
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 115712,
+          "owned_new_samples": 115712,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "not_run",
+          "actual_early_source_before_enclosing_seal": "not_run",
+          "early_source_count": 0,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "failed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "not_run",
+          "native_payload_matches_declared_source": "not_run",
+          "synthetic_native_context_input_valid": "not_run",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "not_run"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [
+          4800
+        ],
+        "seal_reasons": [
+          "delivery_deadline",
+          "delivery_pause"
+        ],
+        "speaker_final": null,
+        "nonfinal_or_empty_results": [
+          {
+            "outcome": "empty",
+            "text": "",
+            "failure_reason": null
+          }
+        ]
+      },
+      "new": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "The UN also hopes to finalize a fund to help countries affected by global warming to cope with the",
+        "source_count": 1,
+        "submissions": [
+          {
+            "native_request_id": "557e029bb1f449ea8e33993350254b5c",
+            "native_pcm16_sha256": "cfc2bd2ca9002743bf8eb9cdc1fd93d23a7b186a23030e94704b5f2733c1fb9f",
+            "reason": "delivery_deadline",
+            "source_boundary_sample": 116736,
+            "source_boundary_seconds": 7.296,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 50450.4647962,
+            "submitted_cursor_sample": 116736,
+            "new_content_ranges": [
+              [
+                7,
+                20992,
+                116736
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                20992,
+                116736
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                12992,
+                20992
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 50450.4499152,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 50450.7125527,
+                "admitted_at_monotonic_s": 50450.7128191,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "The UN also hopes to finalize a fund to help countries affected by global warming to cope with the",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "The UN also hopes to finalize a fund to help countries affected by global warming to cope with the",
+                  "speaker_id": null,
+                  "session_scope": "3",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  {
+                    "state": "unavailable",
+                    "key": null,
+                    "source": "nemotron",
+                    "speaker_scope_id": "3"
+                  }
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": "eed46036-83fe-408f-a8c2-7814ccd64bc5",
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": "eed46036-83fe-408f-a8c2-7814ccd64bc5",
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": {
+              "available_at_monotonic_s": 50450.7114841,
+              "outcome": "final",
+              "text": "The UN also hopes to finalize a fund to help countries affected by global warming to cope with the",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          },
+          {
+            "native_request_id": "38b25b3ea85341f180383d101b6c6d04",
+            "native_pcm16_sha256": "5d224a95d7ffa188142c93e835e6db2b68856b3c6eb56abcc9163bde671f4a34",
+            "reason": "delivery_pause",
+            "source_boundary_sample": 136704,
+            "source_boundary_seconds": 8.544,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 50451.6908196,
+            "submitted_cursor_sample": 136704,
+            "new_content_ranges": [
+              [
+                7,
+                116736,
+                136704
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                116736,
+                136704
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                111936,
+                116736
+              ]
+            ],
+            "context_samples": 4800,
+            "enclosing_seal_monotonic_s": 50451.6891414,
+            "final_source": [],
+            "declared_display_group_id": "5091008b-b24a-430a-928a-364f75ad9446",
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": null,
+            "native_result": {
+              "available_at_monotonic_s": 50451.7601524,
+              "outcome": "empty",
+              "text": "",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 115712,
+          "owned_new_samples": 115712,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "not_run",
+          "actual_early_source_before_enclosing_seal": "not_run",
+          "early_source_count": 0,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "passed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "passed",
+          "native_payload_matches_declared_source": "passed",
+          "synthetic_native_context_input_valid": "passed",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "passed"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [
+          4800
+        ],
+        "seal_reasons": [
+          "delivery_deadline",
+          "delivery_pause"
+        ],
+        "speaker_final": {
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 3,
+          "capture_session_id": "issue215:six_second_rollover",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 18,
+          "onset_samples": 8000,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 169024,
+          "max_copy_samples": 512,
+          "owned_tasks": 1,
+          "processed_through_sample": 130560,
+          "immutable_through_sample": 130560,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 2048,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        "nonfinal_or_empty_results": [
+          {
+            "outcome": "empty",
+            "text": "",
+            "failure_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "case": "clean_A_B",
+      "same_input_pcm": true,
+      "same_asr_options": true,
+      "same_capture_vad_range_schedule": true,
+      "baseline": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "He washed the Detroitist from his hair.",
+        "source_count": 1,
+        "submissions": [
+          {
+            "native_request_id": "717ed94841ec481ba71dd54511375e3f",
+            "native_pcm16_sha256": null,
+            "reason": "delivery_pause",
+            "source_boundary_sample": null,
+            "source_boundary_seconds": null,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 44960.0706925,
+            "submitted_cursor_sample": 77312,
+            "new_content_ranges": [
+              [
+                7,
+                9728,
+                77312
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                9728,
+                77312
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                1728,
+                9728
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 44960.0705177,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 44960.2604522,
+                "admitted_at_monotonic_s": 44960.2607055,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "He washed the Detroitist from his hair.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "He washed the Detroitist from his hair.",
+                  "speaker_id": null,
+                  "session_scope": "",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  null
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": null,
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": null,
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": null,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": null,
+            "native_text_matches_admitted_source": null,
+            "native_payload_matches_declared_source": null
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 67584,
+          "owned_new_samples": 67584,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "not_run",
+          "actual_early_source_before_enclosing_seal": "not_run",
+          "early_source_count": 0,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "failed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "not_run",
+          "native_payload_matches_declared_source": "not_run",
+          "synthetic_native_context_input_valid": "not_run",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "not_run"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [],
+        "seal_reasons": [
+          "delivery_pause"
+        ],
+        "speaker_final": null,
+        "nonfinal_or_empty_results": []
+      },
+      "new": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "He washed the detritus from his hair. Gentlemen of the press.",
+        "source_count": 2,
+        "submissions": [
+          {
+            "native_request_id": "67d1f4252e664168951789881add83e1",
+            "native_pcm16_sha256": "db78f0567568988e95dd14dc83f8c6da6a6b45e805a1da09600574f34f55807a",
+            "reason": "speaker",
+            "source_boundary_sample": 49728,
+            "source_boundary_seconds": 3.108,
+            "evidence_ready_monotonic_s": 50458.1178184,
+            "submission_monotonic_s": 50458.1368551,
+            "submitted_cursor_sample": 49728,
+            "new_content_ranges": [
+              [
+                7,
+                9728,
+                49728
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                9728,
+                49728
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                1728,
+                9728
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 50459.2938161,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 50458.2831315,
+                "admitted_at_monotonic_s": 50458.2833383,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "He washed the detritus from his hair.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "He washed the detritus from his hair.",
+                  "speaker_id": null,
+                  "session_scope": "5",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "uncertain"
+                },
+                "origin_attribution": [
+                  {
+                    "state": "uncertain",
+                    "key": null,
+                    "source": "nemotron",
+                    "speaker_scope_id": "5"
+                  }
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": "bd9291fa-662b-4904-b00a-924c4d848f49",
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": "bd9291fa-662b-4904-b00a-924c4d848f49",
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": {
+              "available_at_monotonic_s": 50458.2825144,
+              "outcome": "final",
+              "text": "He washed the detritus from his hair.",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          },
+          {
+            "native_request_id": "fc63d428bc014989bb76e1ac5c744189",
+            "native_pcm16_sha256": "86e8d1808415613bda9ded5e5929ff2167963ecb2c920a10bfa0a06a9b460b85",
+            "reason": "delivery_pause",
+            "source_boundary_sample": 77312,
+            "source_boundary_seconds": 4.832,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 50459.295891,
+            "submitted_cursor_sample": 77312,
+            "new_content_ranges": [
+              [
+                7,
+                49728,
+                77312
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                49728,
+                77312
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [],
+            "context_samples": 0,
+            "enclosing_seal_monotonic_s": 50459.2938161,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 50459.4330271,
+                "admitted_at_monotonic_s": 50459.433267,
+                "order": [
+                  1,
+                  2,
+                  0
+                ],
+                "raw_text": "Gentlemen of the press.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "Gentlemen of the press.",
+                  "speaker_id": null,
+                  "session_scope": "5",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  {
+                    "state": "unavailable",
+                    "key": null,
+                    "source": "nemotron",
+                    "speaker_scope_id": "5"
+                  }
+                ],
+                "synthetic_right_context_samples": [
+                  32000
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  16000
+                ],
+                "display_group_id": "bd9291fa-662b-4904-b00a-924c4d848f49",
+                "prior_context_texts": [
+                  "He washed the detritus from his hair."
+                ]
+              }
+            ],
+            "declared_display_group_id": "bd9291fa-662b-4904-b00a-924c4d848f49",
+            "synthetic_right_context_samples": 32000,
+            "synthetic_context_sample_rate_hz": 16000,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": {
+              "available_at_monotonic_s": 50459.4320279,
+              "outcome": "final",
+              "text": "Gentlemen of the press.",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 67584,
+          "owned_new_samples": 67584,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "passed",
+          "actual_early_source_before_enclosing_seal": "passed",
+          "early_source_count": 1,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "passed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "passed",
+          "native_payload_matches_declared_source": "passed",
+          "synthetic_native_context_input_valid": "passed",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "passed"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [],
+        "seal_reasons": [
+          "delivery_pause"
+        ],
+        "speaker_final": {
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 5,
+          "capture_session_id": "issue215:clean_A_B",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 17,
+          "onset_samples": 8000,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 98112,
+          "max_copy_samples": 512,
+          "owned_tasks": 1,
+          "processed_through_sample": 84480,
+          "immutable_through_sample": 84480,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 2048,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        "nonfinal_or_empty_results": []
+      }
+    },
+    {
+      "case": "short_A_B_A",
+      "same_input_pcm": true,
+      "same_asr_options": true,
+      "same_capture_vad_range_schedule": true,
+      "baseline": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "He washed the Detritus from his hair. No. He washed the Detroit from his hair.",
+        "source_count": 1,
+        "submissions": [
+          {
+            "native_request_id": "273716c3e6b94a499d50c36c3d9c2a4b",
+            "native_pcm16_sha256": null,
+            "reason": "delivery_pause",
+            "source_boundary_sample": null,
+            "source_boundary_seconds": null,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 44969.1194042,
+            "submitted_cursor_sample": 92160,
+            "new_content_ranges": [
+              [
+                7,
+                9728,
+                92160
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                9728,
+                92160
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                1728,
+                9728
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 44969.1192256,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 44969.3280022,
+                "admitted_at_monotonic_s": 44969.3282045,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "He washed the Detritus from his hair. No. He washed the Detroit from his hair.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "He washed the Detritus from his hair. No. He washed the Detroit from his hair.",
+                  "speaker_id": null,
+                  "session_scope": "",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  null
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": null,
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": null,
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": null,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": null,
+            "native_text_matches_admitted_source": null,
+            "native_payload_matches_declared_source": null
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 82432,
+          "owned_new_samples": 82432,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "not_run",
+          "actual_early_source_before_enclosing_seal": "not_run",
+          "early_source_count": 0,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "failed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "not_run",
+          "native_payload_matches_declared_source": "not_run",
+          "synthetic_native_context_input_valid": "not_run",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "not_run"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [],
+        "seal_reasons": [
+          "delivery_pause"
+        ],
+        "speaker_final": null,
+        "nonfinal_or_empty_results": []
+      },
+      "new": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "He washed the detritus from his hair. No. He washed the detractors from his hair.",
+        "source_count": 3,
+        "submissions": [
+          {
+            "native_request_id": "73e8dfc22cd6462b8de5ed3fa645f985",
+            "native_pcm16_sha256": "69794bfecfc2cc08ad2df7686c0882cc062e1a577431a43f1469e3051ecd8c03",
+            "reason": "speaker",
+            "source_boundary_sample": 47808,
+            "source_boundary_seconds": 2.988,
+            "evidence_ready_monotonic_s": 50465.713581,
+            "submission_monotonic_s": 50465.7225988,
+            "submitted_cursor_sample": 47808,
+            "new_content_ranges": [
+              [
+                7,
+                9728,
+                47808
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                9728,
+                47808
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                1728,
+                9728
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 50467.8054659,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 50465.8354669,
+                "admitted_at_monotonic_s": 50465.8356723,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "He washed the detritus from his hair.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "He washed the detritus from his hair.",
+                  "speaker_id": null,
+                  "session_scope": "7",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "uncertain"
+                },
+                "origin_attribution": [
+                  {
+                    "state": "uncertain",
+                    "key": null,
+                    "source": "nemotron",
+                    "speaker_scope_id": "7"
+                  }
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": "c39034f7-bb67-461e-895f-cc4a5cb791ca",
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": "c39034f7-bb67-461e-895f-cc4a5cb791ca",
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": {
+              "available_at_monotonic_s": 50465.8347152,
+              "outcome": "final",
+              "text": "He washed the detritus from his hair.",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          },
+          {
+            "native_request_id": "8238d8039edb4fce913887d5890eeb37",
+            "native_pcm16_sha256": "2326cbfd51cc22cee8b86fbc0e7229cf2e46eb0b5eea6a04e4871a80b62f142d",
+            "reason": "speaker",
+            "source_boundary_sample": 54528,
+            "source_boundary_seconds": 3.408,
+            "evidence_ready_monotonic_s": 50465.7138488,
+            "submission_monotonic_s": 50465.723927,
+            "submitted_cursor_sample": 54528,
+            "new_content_ranges": [
+              [
+                7,
+                47808,
+                54528
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                47808,
+                54528
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [],
+            "context_samples": 0,
+            "enclosing_seal_monotonic_s": 50467.8054659,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 50465.941243,
+                "admitted_at_monotonic_s": 50465.9414489,
+                "order": [
+                  1,
+                  2,
+                  0
+                ],
+                "raw_text": "No.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "No.",
+                  "speaker_id": null,
+                  "session_scope": "7",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "uncertain"
+                },
+                "origin_attribution": [
+                  {
+                    "state": "uncertain",
+                    "key": null,
+                    "source": "nemotron",
+                    "speaker_scope_id": "7"
+                  }
+                ],
+                "synthetic_right_context_samples": [
+                  32000
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  16000
+                ],
+                "display_group_id": "c39034f7-bb67-461e-895f-cc4a5cb791ca",
+                "prior_context_texts": [
+                  "He washed the detritus from his hair."
+                ]
+              }
+            ],
+            "declared_display_group_id": "c39034f7-bb67-461e-895f-cc4a5cb791ca",
+            "synthetic_right_context_samples": 32000,
+            "synthetic_context_sample_rate_hz": 16000,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": {
+              "available_at_monotonic_s": 50465.9401989,
+              "outcome": "final",
+              "text": "No.",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          },
+          {
+            "native_request_id": "b6428d5f77a94ef5ba82275d4997e9c7",
+            "native_pcm16_sha256": "170a77c9000be53cfb7b72d7e615d4a6e9dc73cfbab8b33b53d3421f46999d94",
+            "reason": "delivery_pause",
+            "source_boundary_sample": 92160,
+            "source_boundary_seconds": 5.76,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 50467.8085546,
+            "submitted_cursor_sample": 92160,
+            "new_content_ranges": [
+              [
+                7,
+                54528,
+                92160
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                54528,
+                92160
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [],
+            "context_samples": 0,
+            "enclosing_seal_monotonic_s": 50467.8054659,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 50467.9605335,
+                "admitted_at_monotonic_s": 50467.9607529,
+                "order": [
+                  1,
+                  3,
+                  0
+                ],
+                "raw_text": "He washed the detractors from his hair.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "He washed the detractors from his hair.",
+                  "speaker_id": null,
+                  "session_scope": "7",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  {
+                    "state": "unavailable",
+                    "key": null,
+                    "source": "nemotron",
+                    "speaker_scope_id": "7"
+                  }
+                ],
+                "synthetic_right_context_samples": [
+                  32000
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  16000
+                ],
+                "display_group_id": "c39034f7-bb67-461e-895f-cc4a5cb791ca",
+                "prior_context_texts": [
+                  "He washed the detritus from his hair.",
+                  "No."
+                ]
+              }
+            ],
+            "declared_display_group_id": "c39034f7-bb67-461e-895f-cc4a5cb791ca",
+            "synthetic_right_context_samples": 32000,
+            "synthetic_context_sample_rate_hz": 16000,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": {
+              "available_at_monotonic_s": 50467.9595986,
+              "outcome": "final",
+              "text": "He washed the detractors from his hair.",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 82432,
+          "owned_new_samples": 82432,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "passed",
+          "actual_early_source_before_enclosing_seal": "passed",
+          "early_source_count": 2,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "passed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "passed",
+          "native_payload_matches_declared_source": "passed",
+          "synthetic_native_context_input_valid": "passed",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "passed"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [],
+        "seal_reasons": [
+          "delivery_pause"
+        ],
+        "speaker_final": {
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 7,
+          "capture_session_id": "issue215:short_A_B_A",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 18,
+          "onset_samples": 8000,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 118464,
+          "max_copy_samples": 512,
+          "owned_tasks": 1,
+          "processed_through_sample": 99840,
+          "immutable_through_sample": 99840,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 2048,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        "nonfinal_or_empty_results": []
+      }
+    },
+    {
+      "case": "distinct_repeated_A_B_A",
+      "same_input_pcm": true,
+      "same_asr_options": true,
+      "same_capture_vad_range_schedule": true,
+      "baseline": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "He washed the Detroitus from his hair. Gentlemen of the press. He washed the Detroit from his hair.",
+        "source_count": 1,
+        "submissions": [
+          {
+            "native_request_id": "ccc727379d454ef5bd7cfde1a3da8748",
+            "native_pcm16_sha256": null,
+            "reason": "delivery_deadline",
+            "source_boundary_sample": null,
+            "source_boundary_seconds": null,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 44979.0816454,
+            "submitted_cursor_sample": 105472,
+            "new_content_ranges": [
+              [
+                7,
+                9728,
+                105472
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                9728,
+                105472
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                1728,
+                9728
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 44979.0814106,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 44979.3159114,
+                "admitted_at_monotonic_s": 44979.316111,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "He washed the Detroitus from his hair. Gentlemen of the press. He washed the Detroit from his hair.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "He washed the Detroitus from his hair. Gentlemen of the press. He washed the Detroit from his hair.",
+                  "speaker_id": null,
+                  "session_scope": "",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  null
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": null,
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": null,
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": null,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": null,
+            "native_text_matches_admitted_source": null,
+            "native_payload_matches_declared_source": null
+          },
+          {
+            "native_request_id": "7eb2b717e02a4ce8b4043ffc3ddb8d87",
+            "native_pcm16_sha256": null,
+            "reason": "delivery_pause",
+            "source_boundary_sample": null,
+            "source_boundary_seconds": null,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 44980.0212077,
+            "submitted_cursor_sample": 120832,
+            "new_content_ranges": [
+              [
+                7,
+                105472,
+                120832
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                105472,
+                120832
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                100672,
+                105472
+              ]
+            ],
+            "context_samples": 4800,
+            "enclosing_seal_monotonic_s": 44980.0209199,
+            "final_source": [],
+            "declared_display_group_id": null,
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": null,
+            "synthetic_context_metadata_preserved": null,
+            "native_result": null,
+            "native_text_matches_admitted_source": null,
+            "native_payload_matches_declared_source": null
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 111104,
+          "owned_new_samples": 111104,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "not_run",
+          "actual_early_source_before_enclosing_seal": "not_run",
+          "early_source_count": 0,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "failed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "not_run",
+          "native_payload_matches_declared_source": "not_run",
+          "synthetic_native_context_input_valid": "not_run",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "not_run"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [
+          4800
+        ],
+        "seal_reasons": [
+          "delivery_deadline",
+          "delivery_pause"
+        ],
+        "speaker_final": null,
+        "nonfinal_or_empty_results": [
+          {
+            "outcome": "empty",
+            "text": "",
+            "failure_reason": null
+          }
+        ]
+      },
+      "new": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "He washed the detritus from his hair. Gentlemen of the press. He washed the detrifus from his hand.",
+        "source_count": 3,
+        "submissions": [
+          {
+            "native_request_id": "93d47d7e930d4bd29a6a95423be94507",
+            "native_pcm16_sha256": "db78f0567568988e95dd14dc83f8c6da6a6b45e805a1da09600574f34f55807a",
+            "reason": "speaker",
+            "source_boundary_sample": 49728,
+            "source_boundary_seconds": 3.108,
+            "evidence_ready_monotonic_s": 50474.4893399,
+            "submission_monotonic_s": 50474.4981174,
+            "submitted_cursor_sample": 49728,
+            "new_content_ranges": [
+              [
+                7,
+                9728,
+                49728
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                9728,
+                49728
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                1728,
+                9728
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 50477.4284951,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 50474.6167776,
+                "admitted_at_monotonic_s": 50474.6169877,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "He washed the detritus from his hair.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "He washed the detritus from his hair.",
+                  "speaker_id": null,
+                  "session_scope": "9",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "uncertain"
+                },
+                "origin_attribution": [
+                  {
+                    "state": "uncertain",
+                    "key": null,
+                    "source": "nemotron",
+                    "speaker_scope_id": "9"
+                  }
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": "2943c664-526f-42cc-ba95-47a4039de3e6",
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": "2943c664-526f-42cc-ba95-47a4039de3e6",
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": {
+              "available_at_monotonic_s": 50474.6162318,
+              "outcome": "final",
+              "text": "He washed the detritus from his hair.",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          },
+          {
+            "native_request_id": "b3129d6e53494688bc0cff72b36f36d8",
+            "native_pcm16_sha256": "683bb9c29835d843378288c6594400656ce5daa68498f36f1b4c52c5f057de28",
+            "reason": "speaker",
+            "source_boundary_sample": 75808,
+            "source_boundary_seconds": 4.738,
+            "evidence_ready_monotonic_s": 50475.925079,
+            "submission_monotonic_s": 50475.9406852,
+            "submitted_cursor_sample": 75808,
+            "new_content_ranges": [
+              [
+                7,
+                49728,
+                75808
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                49728,
+                75808
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [],
+            "context_samples": 0,
+            "enclosing_seal_monotonic_s": 50477.4284951,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 50476.0713672,
+                "admitted_at_monotonic_s": 50476.0715735,
+                "order": [
+                  1,
+                  2,
+                  0
+                ],
+                "raw_text": "Gentlemen of the press.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "Gentlemen of the press.",
+                  "speaker_id": null,
+                  "session_scope": "9",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "uncertain"
+                },
+                "origin_attribution": [
+                  {
+                    "state": "uncertain",
+                    "key": null,
+                    "source": "nemotron",
+                    "speaker_scope_id": "9"
+                  }
+                ],
+                "synthetic_right_context_samples": [
+                  32000
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  16000
+                ],
+                "display_group_id": "2943c664-526f-42cc-ba95-47a4039de3e6",
+                "prior_context_texts": [
+                  "He washed the detritus from his hair."
+                ]
+              }
+            ],
+            "declared_display_group_id": "2943c664-526f-42cc-ba95-47a4039de3e6",
+            "synthetic_right_context_samples": 32000,
+            "synthetic_context_sample_rate_hz": 16000,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": {
+              "available_at_monotonic_s": 50476.0706166,
+              "outcome": "final",
+              "text": "Gentlemen of the press.",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          },
+          {
+            "native_request_id": "aac4f6976283401391c742311b0a80df",
+            "native_pcm16_sha256": "b9d744b06222781f9aeaf5604833b90128463026acfb60920f69a0dda2e2d50b",
+            "reason": "delivery_deadline",
+            "source_boundary_sample": 105472,
+            "source_boundary_seconds": 6.592,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 50477.4310118,
+            "submitted_cursor_sample": 105472,
+            "new_content_ranges": [
+              [
+                7,
+                75808,
+                105472
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                75808,
+                105472
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [],
+            "context_samples": 0,
+            "enclosing_seal_monotonic_s": 50477.4284951,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 50477.5725256,
+                "admitted_at_monotonic_s": 50477.5727289,
+                "order": [
+                  1,
+                  3,
+                  0
+                ],
+                "raw_text": "He washed the detrifus from his hand.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "He washed the detrifus from his hand.",
+                  "speaker_id": null,
+                  "session_scope": "9",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  {
+                    "state": "unavailable",
+                    "key": null,
+                    "source": "nemotron",
+                    "speaker_scope_id": "9"
+                  }
+                ],
+                "synthetic_right_context_samples": [
+                  32000
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  16000
+                ],
+                "display_group_id": "2943c664-526f-42cc-ba95-47a4039de3e6",
+                "prior_context_texts": [
+                  "He washed the detritus from his hair.",
+                  "Gentlemen of the press."
+                ]
+              }
+            ],
+            "declared_display_group_id": "2943c664-526f-42cc-ba95-47a4039de3e6",
+            "synthetic_right_context_samples": 32000,
+            "synthetic_context_sample_rate_hz": 16000,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": {
+              "available_at_monotonic_s": 50477.5715341,
+              "outcome": "final",
+              "text": "He washed the detrifus from his hand.",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          },
+          {
+            "native_request_id": "85f56c2a6da6443cb9272fcd57f4e38e",
+            "native_pcm16_sha256": "f2aef23a6dfe8f58c63aba5ac0d567574a26479d39b923bae22172aab4eddf3b",
+            "reason": "delivery_pause",
+            "source_boundary_sample": 120832,
+            "source_boundary_seconds": 7.552,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 50478.3784793,
+            "submitted_cursor_sample": 120832,
+            "new_content_ranges": [
+              [
+                7,
+                105472,
+                120832
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                105472,
+                120832
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                100672,
+                105472
+              ]
+            ],
+            "context_samples": 4800,
+            "enclosing_seal_monotonic_s": 50478.3771792,
+            "final_source": [],
+            "declared_display_group_id": "2a02cda5-8112-4254-9063-255da551cd42",
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": null,
+            "native_result": {
+              "available_at_monotonic_s": 50478.4361222,
+              "outcome": "empty",
+              "text": "",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 111104,
+          "owned_new_samples": 111104,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "passed",
+          "actual_early_source_before_enclosing_seal": "passed",
+          "early_source_count": 2,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "passed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "passed",
+          "native_payload_matches_declared_source": "passed",
+          "synthetic_native_context_input_valid": "passed",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "passed"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [
+          4800
+        ],
+        "seal_reasons": [
+          "delivery_deadline",
+          "delivery_pause"
+        ],
+        "speaker_final": {
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 9,
+          "capture_session_id": "issue215:distinct_repeated_A_B_A",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 18,
+          "onset_samples": 8000,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 140288,
+          "max_copy_samples": 512,
+          "owned_tasks": 1,
+          "processed_through_sample": 122880,
+          "immutable_through_sample": 122880,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 2048,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        "nonfinal_or_empty_results": [
+          {
+            "outcome": "empty",
+            "text": "",
+            "failure_reason": null
+          }
+        ]
+      }
+    },
+    {
+      "case": "linguistic_correction",
+      "same_input_pcm": true,
+      "same_asr_options": true,
+      "same_capture_vad_range_schedule": true,
+      "baseline": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "No, no. Three.",
+        "source_count": 1,
+        "submissions": [
+          {
+            "native_request_id": "362d48d2f1ef4c54bac9fc5a81ca9ca0",
+            "native_pcm16_sha256": null,
+            "reason": "delivery_pause",
+            "source_boundary_sample": null,
+            "source_boundary_seconds": null,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 44985.5959395,
+            "submitted_cursor_sample": 41984,
+            "new_content_ranges": [
+              [
+                7,
+                8704,
+                41984
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                8704,
+                41984
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                704,
+                8704
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 44985.5957419,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 44985.7088304,
+                "admitted_at_monotonic_s": 44985.709037,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "No, no. Three.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "No, no. Three.",
+                  "speaker_id": null,
+                  "session_scope": "",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  null
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": null,
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": null,
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": null,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": null,
+            "native_text_matches_admitted_source": null,
+            "native_payload_matches_declared_source": null
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 33280,
+          "owned_new_samples": 33280,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "not_run",
+          "actual_early_source_before_enclosing_seal": "not_run",
+          "early_source_count": 0,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "failed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "not_run",
+          "native_payload_matches_declared_source": "not_run",
+          "synthetic_native_context_input_valid": "not_run",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "not_run"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [],
+        "seal_reasons": [
+          "delivery_pause"
+        ],
+        "speaker_final": null,
+        "nonfinal_or_empty_results": []
+      },
+      "new": {
+        "execution_status": "passed",
+        "error": null,
+        "source_contract_errors": [],
+        "transcript": "No, no. Three.",
+        "source_count": 1,
+        "submissions": [
+          {
+            "native_request_id": "af2e3a3824e44e8b927a385b443beb52",
+            "native_pcm16_sha256": "d9ab6bbd6773ccb692cedde8e974de8d47e9460637c5396566fe0a04d30670a4",
+            "reason": "delivery_pause",
+            "source_boundary_sample": 41984,
+            "source_boundary_seconds": 2.624,
+            "evidence_ready_monotonic_s": null,
+            "submission_monotonic_s": 50483.5962546,
+            "submitted_cursor_sample": 41984,
+            "new_content_ranges": [
+              [
+                7,
+                8704,
+                41984
+              ]
+            ],
+            "actual_delivered_new_ranges": [
+              [
+                7,
+                8704,
+                41984
+              ]
+            ],
+            "sealed_new_ranges_equal_actual_payloads": true,
+            "declared_context_ranges": [
+              [
+                7,
+                704,
+                8704
+              ]
+            ],
+            "context_samples": 8000,
+            "enclosing_seal_monotonic_s": 50483.5936523,
+            "final_source": [
+              {
+                "available_at_monotonic_s": 50483.698247,
+                "admitted_at_monotonic_s": 50483.6985097,
+                "order": [
+                  1,
+                  1,
+                  0
+                ],
+                "raw_text": "No, no. Three.",
+                "effective_equals_raw": true,
+                "speaker": {
+                  "text": "No, no. Three.",
+                  "speaker_id": null,
+                  "session_scope": "11",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "unavailable"
+                },
+                "origin_attribution": [
+                  {
+                    "state": "unavailable",
+                    "key": null,
+                    "source": "nemotron",
+                    "speaker_scope_id": "11"
+                  }
+                ],
+                "synthetic_right_context_samples": [
+                  0
+                ],
+                "synthetic_context_sample_rate_hz": [
+                  null
+                ],
+                "display_group_id": "b9abe5af-2ba1-470f-b97e-a43fad1033a6",
+                "prior_context_texts": []
+              }
+            ],
+            "declared_display_group_id": "b9abe5af-2ba1-470f-b97e-a43fad1033a6",
+            "synthetic_right_context_samples": 0,
+            "synthetic_context_sample_rate_hz": null,
+            "synthetic_native_input_valid": true,
+            "synthetic_context_metadata_preserved": true,
+            "native_result": {
+              "available_at_monotonic_s": 50483.6973387,
+              "outcome": "final",
+              "text": "No, no. Three.",
+              "failure_reason": null
+            },
+            "native_text_matches_admitted_source": true,
+            "native_payload_matches_declared_source": true
+          }
+        ],
+        "checks": {
+          "submitted_new_content_exactly_once": "passed",
+          "sealed_new_ranges_equal_actual_payloads": "passed",
+          "submitted_new_samples": 33280,
+          "owned_new_samples": 33280,
+          "duplicated_new_samples": 0,
+          "missing_owned_samples": 0,
+          "extra_new_samples": 0,
+          "speaker_cut_causal_evidence": "not_run",
+          "actual_early_source_before_enclosing_seal": "not_run",
+          "early_source_count": 0,
+          "once_only_context_entries": "passed",
+          "raw_effective_trimming_off": "passed",
+          "verified_display_group_preserved": "passed",
+          "finalized_text_admitted_exactly_once": "passed",
+          "native_finalized_text_admitted_exactly_once": "passed",
+          "native_payload_matches_declared_source": "passed",
+          "synthetic_native_context_input_valid": "passed",
+          "synthetic_context_metadata_preserved_to_source_child": "passed",
+          "original_capture_received_once": "passed"
+        },
+        "genuine_onset_context_samples": [
+          8000
+        ],
+        "hard_rollover_context_samples": [],
+        "seal_reasons": [
+          "delivery_pause"
+        ],
+        "speaker_final": {
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 11,
+          "capture_session_id": "issue215:linguistic_correction",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 17,
+          "onset_samples": 8000,
+          "evidence_items": 0,
+          "evidence_map_pieces": 0,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 52992,
+          "max_copy_samples": 512,
+          "owned_tasks": 1,
+          "processed_through_sample": 46080,
+          "immutable_through_sample": 46080,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 2048,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        "nonfinal_or_empty_results": []
+      }
+    }
+  ]
+}

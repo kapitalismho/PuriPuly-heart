@@ -379,6 +379,10 @@ class PeerTranslationChannelOwner:
         self._require_ingress()
         await self.local_asr_runtime.observe_pending_source_work("peer", pending=pending)
 
+    async def observe_speaker_evidence(self, evidence: tuple[object, ...]) -> None:
+        self._require_ingress()
+        await self.local_asr_runtime.observe_speaker_evidence("peer", evidence)
+
     async def handle_stream_input(self, owned: OwnedStreamInput) -> None:
         self._require_ingress()
         await self.local_asr_runtime.handle_stream_input("peer", owned)

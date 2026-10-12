@@ -587,6 +587,7 @@ class SpeakerRuntime:
             self._emit(source_map=mapped, update=update, frame=frame)
         self._processed = update.processed_through_sample
         self._immutable = update.immutable_through_sample
+        self._emit(update=update)
         while self._maps and self._maps[0].compact_end_sample <= self._immutable:
             self._maps.popleft()
         if self._maps and self._maps[0].compact_start_sample < self._immutable:

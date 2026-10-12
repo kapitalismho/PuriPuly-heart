@@ -2530,6 +2530,7 @@ async def test_canonical_delivery_boundaries_survive_production_write_timeout_an
     overlay = RecordingOverlay()
     translation = compose_translation_test_harness(
         stt=None,
+        peer_stt=recognition,
         llm=None,
         osc=RecordingOscQueue(),
         overlay_sink=overlay,
@@ -2545,6 +2546,7 @@ async def test_canonical_delivery_boundaries_survive_production_write_timeout_an
 
     try:
         await translation.start()
+        recognition.bind_event_sink(callbacks.peer_event_handler)
         await owner.apply_intent(
             make_config(),
             enabled=True,

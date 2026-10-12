@@ -343,6 +343,10 @@ class LocalASRProviderRuntimePort(Protocol):
         pending: bool,
     ) -> None: ...
 
+    async def observe_speaker_evidence(
+        self, channel: ProviderRuntimeChannel, evidence: tuple[object, ...]
+    ) -> None: ...
+
     async def handle_owned_vad_event(
         self,
         channel: ProviderRuntimeChannel,

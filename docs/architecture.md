@@ -262,6 +262,19 @@ Implementation: `core/storage/secrets.py`, `app/adapters/sync_secret_store.py`, 
 
 Implementation: `core/stt/backend.py`, `core/stt/scoped_engine.py`, `core/stt/session_projection.py`. Behavior: `tests/core/test_stt_scoped_engine.py`.
 
+### Causal local batch recognition
+
+`CausalBatchSession` owns retained, unsubmitted Peer audio and the submission cursor for local Qwen, both Parakeet routes, CPU Auto's resolved delegate and local GPU ASR. Custom offline, cloud routes and Self retain their existing policies.
+
+- Causally available speaker evidence can select a disjoint unsubmitted prefix while the successor keeps receiving audio. Boundary position, evidence-ready time, submission time and submitted cursor remain distinct. Duplicate, stale or revised evidence cannot reclaim submitted content.
+- Slice results release in source order through the existing contribution ledger and one enclosing terminal. Failed slices do not replay successful content or discard successful successors. There is no whole-parent re-decode or second untimed speaker splitter.
+- Natural completion and the enclosing safety deadline remain capture-owned. Bounded pending-slice pressure suppresses optional cuts rather than waiting indefinitely for diarization. Genuine onset recovery, hard-rollover context and disjoint local speaker cuts remain separate paths.
+- Frozen `STTSourceAudio` and `RecognitionTextOrigin` preserve each slice's actual source/context ranges, enclosing display group and conservative whole-input attribution. Attribution considers all supplied speech, including replayed context; overlap or unsupported purity remains mixed/unknown without deleting short speech.
+- Queued CPU work freezes its actual backend/model and native options. GPU work freezes submission-time language hints and source mode. Reconfiguration cannot mutate queued native options; existing cancellation and rebind authority still apply.
+- Parakeet V3 successor requests after an internal prefix use a route-local zero-only native right window, including Auto's V3 delegate. Its frozen sample count/rate is separate from captured source/context ranges. It creates no source time, onset, wait or Nemotron input. First/unpartitioned requests and new natural/hard-rollover parents retain legacy input. Other local models do not inherit this adjustment.
+
+Implementation and policy bounds: `core/stt/batch_speaker.py`, `providers/stt/local_decode.py`. Behavior: `tests/core/test_causal_batch_speaker.py`. Actual Vulkan Nemotron plus CPU Parakeet baseline/comparison, native-window provenance and remaining lexical/hardcut limitations: [`native/nemotron/issue215_report.json`](../native/nemotron/issue215_report.json). This evidence does not qualify missing GPU-ASR models, every language, speaker-identity accuracy or the later profile/resource selection.
+
 ### Local speaker evidence
 
 `SpeakerRuntime` owns Peer speaker evidence independently of the selected ASR. The initial adapter runs Nemotron-3-Diarization in an isolated private child process with resident model weights, explicit Vulkan device selection, and no CPU neural-inference fallback.
@@ -273,7 +286,7 @@ Implementation: `core/stt/backend.py`, `core/stt/scoped_engine.py`, `core/stt/se
 - Source children, ASR finalization, hard-rollover context and server endpoints do not reset valid speaker state. Orderly source EOF drains already-owned bounded tails; replacement, loss, manual reset and stop fence stale work. Epoch allocation is process-wide, so disabling/re-enabling the feature or replacing its device/profile cannot reuse an old runtime's speaker identity namespace.
 - Speaker failure or disable affects only speaker resources. Native Soniox speaker decisions are not a fallback; unavailable attribution remains gray while recognition and translation continue.
 
-The native adapter implements the backend-neutral contract in `core/speaker/contracts.py`. Behavior: `tests/core/speaker/test_runtime.py`. Speaker-boundary application to ASR and caption grouping are separate integration outcomes.
+The native adapter implements the backend-neutral contract in `core/speaker/contracts.py`. A bounded, physical-capture-fenced evidence drain connects Peer capture to local recognition independently of incoming VAD events. The batch consumer uses the actual eight-channel probabilities and immutable frontiers; confidence rules are conservative heuristics, not identity guarantees. Behavior: `tests/core/speaker/test_runtime.py`, `tests/core/test_causal_batch_speaker.py`. Streaming integration and caption aggregation remain separate outcomes.
 
 Native build and model provenance: `scripts/ci/build-nemotron-runtime.ps1`, `data/models/nemotron-runtime.sources.json`, and `data/models/nemotron-3-diarization-f16-vulkan.manifest.json`. Reproducible qualification commands, tensor/accumulation observations and measured limits are recorded in [`native/nemotron/verification.json`](../native/nemotron/verification.json). The initial qualification uses a pinned Bonenk F16 artifact on Windows Vulkan with local CPU-ASR co-residency; it does not select a production profile or qualify GPU-ASR/VRChat contention.
 
@@ -292,7 +305,7 @@ Native build and model provenance: `scripts/ci/build-nemotron-runtime.ps1`, `dat
   - The frozen version-1 `SourceChild` in `core/orchestrator/translation_turn.py` is the shared source-unit contract, not another turn owner. Target-language jobs and retries are attempts of that source.
   - Source composition is fixed before translation. Identity/revision, authoritative order, raw text/language, exact text-origin coverage, capture/provider/activation identities, source/context audio ranges, speaker attribution state and settings remain attached through request preparation and publication. `RecognitionTextOrigin` in `domain/recognition.py` owns the provenance schema.
   - Supplied recognition origins must cover the entire transcript before language/speaker slicing. A missing segment cannot become an apparently valid origin-free child; truly origin-free manual/legacy inputs retain their existing path.
-  - Display grouping scope is independently supplied provenance, never inferred from a translation parent. A-B-A remains three source/context units regardless of later card aggregation. Prefix normalization is disabled: `SourceChild.effective_text` is its raw text.
+  - Display grouping scope is independently supplied provenance, never inferred from a translation parent. The Peer capture ledger supplies the enclosing segment identity; internal recognition slices retain it, while natural/hardcut successors start a new scope. A-B-A remains three source/context units regardless of later card aggregation. Prefix normalization is disabled: `SourceChild.effective_text` is its raw text.
   - `TranslationRequestOwner` snapshots prior eligible history for a source's target requests, records that source once, then permits execution. Later sources can use earlier source text before translation completes; a source never includes itself in history. Language/channel/time-window eligibility and configured history caps remain unchanged.
   - Simple one-result routes retain static translation parents. Streaming prefixes use independently admitted existing parents while enclosing audio remains open. Failed predecessors resolve explicitly without discarding successful successors; bounded execution, retry/watchdog/source-only policies and destination isolation remain with existing owners.
 - **Manual admission**

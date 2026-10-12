@@ -25,6 +25,11 @@ class PeerCaptureVadSinkAdapter:
             raise RuntimeError("Peer VAD sink requires the Peer translation owner")
         await runtime.handle_stream_input(event)
 
+    async def observe_speaker_evidence(self, evidence: tuple[object, ...]) -> None:
+        runtime = self.runtime_provider()
+        if runtime is not None:
+            await runtime.observe_speaker_evidence(evidence)
+
     async def observe_source_activity(
         self,
         *,

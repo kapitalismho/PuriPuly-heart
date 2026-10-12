@@ -1,0 +1,34 @@
+{
+  "schema": "issue215-native-reference-applicability-1",
+  "reference_v3": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/master/scripts/nemo/parakeet-tdt-0.6b-v3/test_onnx.py",
+  "observed_v3_alias": "../parakeet-tdt-0.6b-v2/test_onnx.py",
+  "reference_v2": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/master/scripts/nemo/parakeet-tdt-0.6b-v2/test_onnx.py",
+  "observed_convention": "tail_padding=np.zeros(sample_rate*2); audio=np.concatenate([audio,tail_padding]); then compute_features, per_feature normalization and TDT decode. Reference uses128 mel bins.",
+  "actual_installed_sherpa_version": "1.13.4",
+  "pinned_native_sources": [
+    {"url": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.4/sherpa-onnx/csrc/offline-recognizer-transducer-nemo-impl.h", "github_blob_sha1": "b400c48fa53b75711a395342c494a5e712aa64bf", "observed": "PostInit overrides feature_dim from model metadata and sets nemo_normalize_type. CreateStream constructs a fresh OfflineStream. DecodeStreams extracts frames then encoder/TDT decoder; no automatic2s raw zero tail here."},
+    {"url": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.4/sherpa-onnx/csrc/offline-stream.cc", "github_blob_sha1": "196b571a58928bb307028ca514c5d3028db87077", "observed": "AcceptWaveform passes supplied waveform to fbank and InputFinished; GetFrames calls NemoNormalizeFeatures. No automatic2s raw zero tail in those paths."}
+  ],
+  "actual_encoder_metadata_observation": {
+    "command": ".venv/Scripts/python.exe -B -c \"import json,pathlib,onnxruntime as o; p=pathlib.Path.home()/'AppData/Local/puripuly-heart/models/parakeet-tdt-0.6b-v3-int8-sherpa/encoder.int8.onnx'; s=o.InferenceSession(str(p),providers=['CPUExecutionProvider']); print(json.dumps({'metadata':s.get_modelmeta().custom_metadata_map,'inputs':[(x.name,x.shape,x.type) for x in s.get_inputs()]},indent=2))\"",
+    "wall_seconds": 2.83,
+    "encoder_sha256": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+    "model_author": "NeMo",
+    "url": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3",
+    "model_type": "EncDecRNNTBPEModel",
+    "comment": "Only the transducer branch is exported",
+    "metadata_version": "2",
+    "feat_dim": 128,
+    "normalize_type": "per_feature",
+    "subsampling_factor": 8,
+    "vocab_size": 8192,
+    "pred_rnn_layers": 2,
+    "pred_hidden": 640,
+    "audio_signal_input": ["dynamic_batch", 128, "dynamic_time"],
+    "input_type": "tensor(float)"
+  },
+  "applicability": "V3 explicitly shares the V2 native reference; selected actual artifact identifies v3 and matches128/per_feature/TDT characteristics. Metadata version2 is not evidence of loading the v2 acoustic model. Wrapper requests feature_dim80, but pinned NeMo PostInit overrides it with actual model128; prior reports describe configured80, not an observed native80 tensor. No unresolved v2/v3/model-feature mismatch found.",
+  "differences": "Probe uses the installed sherpa compiled OfflineRecognizer CPU/greedy path and int8 model, not a reimplementation of the standalone Python ONNX/Torch decoder. Therefore upstream2s is a documented convention to compare, not a universal mandatory value or bitwise equivalence claim.",
+  "bounded_comparisons": {"160ms": "Empirical prior negative, insufficient to rule out documented native convention", "2000ms": "Separately authorized one fixed convention comparison, evidence issue215_native_right_flush_2000ms.json; no parameter sweep"},
+  "result": "2s recovers nonempty returning-A text in both exact previously empty packets; lexical/hardcut errors remain. Rollovers still empty, short-No/correction guards unchanged. Explicit production metadata implementation and final six-case smoke required before acceptance."
+}

@@ -7,6 +7,7 @@ from uuid import UUID
 if TYPE_CHECKING:
     from puripuly_heart.core.audio.format import AudioCaptureSpan
     from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot
+    from puripuly_heart.domain.models import SpeakerAttribution
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +118,9 @@ class RecognitionTextOrigin:
     ownership: Literal["request", "stream", "unresolved"] = "stream"
     audio_settings: AudioSegmentSettingsSnapshot | None = None
     source_available_at_monotonic_s: float | None = None
+    speaker_attribution: SpeakerAttribution | None = None
+    synthetic_right_context_samples: int = 0
+    synthetic_context_sample_rate_hz: int | None = None
 
     def __post_init__(self) -> None:
         if self.text_start < 0 or self.text_end < self.text_start:
@@ -131,8 +135,22 @@ class RecognitionTextOrigin:
             start, end = self.contribution_range
             if start < 0 or end - start != self.text_end - self.text_start:
                 raise ValueError("source contribution range does not conserve text")
-        if any(span.capture_epoch != self.identity.stream.capture_epoch for span in self.source_ranges):
+        if any(
+            span.capture_epoch != self.identity.stream.capture_epoch for span in self.source_ranges
+        ):
             raise ValueError("source ranges belong to another capture epoch")
+        if (
+            self.synthetic_right_context_samples < 0
+            or (
+                bool(self.synthetic_right_context_samples)
+                != (self.synthetic_context_sample_rate_hz is not None)
+            )
+            or (
+                self.synthetic_context_sample_rate_hz is not None
+                and self.synthetic_context_sample_rate_hz <= 0
+            )
+        ):
+            raise ValueError("invalid synthetic native context")
 
 
 def validate_recognition_origins(
@@ -159,10 +177,13 @@ def slice_recognition_origins(
             text_end=min(origin.text_end, end) - start,
             contribution_range=(
                 (
-                    origin.contribution_range[0] + max(origin.text_start, start) - origin.text_start,
+                    origin.contribution_range[0]
+                    + max(origin.text_start, start)
+                    - origin.text_start,
                     origin.contribution_range[0] + min(origin.text_end, end) - origin.text_start,
                 )
-                if origin.contribution_range is not None else None
+                if origin.contribution_range is not None
+                else None
             ),
         )
         for origin in origins

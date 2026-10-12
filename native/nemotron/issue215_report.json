@@ -1,0 +1,216 @@
+{
+  "schema": "issue215-practical-validation-report-2",
+  "validation_execution": "passed",
+  "practical_R8_gate": "passed",
+  "acceptance_authority": "Director explicitly accepted the practical R8 gate with residual lexical/hardcut substitution risk. Entire returning contribution restored, correct three-unit order, no new troublesome repetition. Trimming remains OFF; acoustic investigation stopped.",
+  "integration_acceptance": "not_granted_by_this_worker",
+  "scope": "Real SpeakerRuntime/Nemotron Vulkan plus supported CPU Parakeet through production Silero VAD/listen delivery, CausalBatchSession, ScopedRecognitionEngine, contribution ledger, actual SourceChild lifecycle and context admission. Approved public file playback paced in real time, not OS/ambient capture. Translation execution and renderer are not qualified; request preparation uses a source-only non-executing availability port. No oracle boundaries or speaker hints.",
+  "authoritative_evidence": {
+    "baseline": {"path": "issue215_evidence.zip:issue215_baseline.json", "sha256": "88ce35eb824f32cbee71ac93772bb1c0e1cd4ecf14b659c47bc09521c250583b"},
+    "final_changed_path": {"path": "issue215_evidence.zip:issue215_new_supported_window.json", "sha256": "61c9caeadaf654ada62ee366f3709ed9f8c422ac4d4ac4e64c516ba3779dfeba"},
+    "comparison": "issue215_comparison_supported_window.json",
+    "final_smoke_wall_seconds": 52.48,
+    "final_smoke_exit_code": 0,
+    "product_hashes": {
+      "core/stt/batch_speaker.py": "1de562aaec3996de0c2d0890b3376fb823fdf84daa054fbb641c5e9101ceb364",
+      "core/stt/scoped_engine.py": "ccc17b1ae2a0956deac798c327437a60475b913bec8bd58152da5b6e6bc64e25",
+      "core/stt/backend.py": "b47dc04be2735e995277b6e448012cbe03a52d19d745f591fc00728cace35ab8",
+      "core/stt/recognition_units.py": "f91e5be5e17781458e69c8a7506040ea7969d9b2001afb701e04cf718398eb1d",
+      "domain/recognition.py": "53f2f426aa49546767f4caa5e9a86b66ebe44f5f14fe7f51a06179e91fed5bb5",
+      "core/speaker/runtime.py": "76cfd82763feac96d9274c8f318ac76da585dea9b2352781a90cfc8d52bbd750",
+      "app/adapters/nemotron/backend.py": "44d1d33e0df135775c3869eeee54561099bc34e191970c8a80db1b524ebbd417",
+      "providers/stt/local_parakeet_sherpa.py": "14d8c609c64dc3da81358ccd270778817a294c22893bca39b6869c1999803a97",
+      "core/orchestrator/translation_turn.py": "67e7d1e0ed3fcc0314a68894983de70ba62308ade113c8d6061fc26705dae103",
+      "core/orchestrator/translation_request.py": "00564c4b69342d5e8d2eca6afbc795ce97359d2eca1c067f27e88a9d8aae78a3"
+    },
+    "smoke_driver_sha256": "301262c6910d9d0c37bbab0fcbd8c2eb0cdca6bb1d256a4cca698e06718964d1",
+    "remaining_execution_hashes": "Raw evidence and comparison retain historical execution-source hashes; product content pins remain authoritative. No raw evidence hashes were rewritten.",
+    "post_run_driver_lint": {
+      "status": "passed",
+      "command": ".venv/Scripts/python.exe -m ruff check native/nemotron/issue215_smoke.py native/nemotron/issue215_native_isolation.py native/nemotron/issue215_summarize.py",
+      "result": "All checks passed;0.14 seconds.",
+      "applicability": "After the accepted real smoke, only driver import ordering/formatting and full=lambda replacement by equivalent local def changed. No input/config/selection/native/source semantics or product files changed. Historical driver hashes intentionally remain the execution record; no unnecessary GPU rerun."
+    }
+  },
+  "raw_evidence_archive": {
+    "path": "issue215_evidence.zip",
+    "format": "ZIP_DEFLATED via repository-standard Python zipfile; basename members, original bytes unmodified",
+    "sha256": "1d82ad2ceb384518b5c3dacaa2685d1566d28e5b0623173ddcf19744d862d64a",
+    "bytes": 2042513,
+    "original_member_bytes": 27358434,
+    "normalization": "All9 members retain original CRLF bytes. Hashes address archive member bytes, not line-ending-normalized Git JSON blobs or reader-rendered text. ZIP binary bytes survive text checkout normalization; extract with zipfile binary I/O.",
+    "members": [
+      {"member": "issue215_baseline.json", "bytes": 1278956, "sha256": "88ce35eb824f32cbee71ac93772bb1c0e1cd4ecf14b659c47bc09521c250583b"},
+      {"member": "issue215_native_full_waveform.json", "bytes": 4941, "sha256": "fde5e9141398d79e58e072bbcb329bc50ffffd48e6a456cab0610a9eb7733292"},
+      {"member": "issue215_native_isolation_capture.json", "bytes": 2657, "sha256": "edda0322c6bd429bdfe7269ef65a8282f4f4006ce5bc3316c10df15806849495"},
+      {"member": "issue215_native_isolation_tail_first.json", "bytes": 3493, "sha256": "1413023ae0abd55cbb79e11ed8f99756b97c3e63dfbbc10fc6f37a12de89d520"},
+      {"member": "issue215_native_pcm_diagnostic.json", "bytes": 4415318, "sha256": "71d3edcd6fecf06d6b644493aba61fef319e5127f7f70d4239c4ba00c57c73f0"},
+      {"member": "issue215_native_right_flush_160ms.json", "bytes": 10740, "sha256": "08ebfa98d03b4d4ed3b1008529bc3bd6eb1bdad6376063b93b0ff4721986cb6d"},
+      {"member": "issue215_native_right_flush_2000ms.json", "bytes": 10941, "sha256": "84b52175ed34f4f377d639fb57fbbb29021e4162a03168c5f3e8d90304ceadb0"},
+      {"member": "issue215_new_repaired.json", "bytes": 10666335, "sha256": "a580b19f15a4c66969a5bed031317136be7d0596e08431e1ae52a63bafbc6e9e"},
+      {"member": "issue215_new_supported_window.json", "bytes": 10965053, "sha256": "61c9caeadaf654ada62ee366f3709ed9f8c422ac4d4ac4e64c516ba3779dfeba"}
+    ],
+    "compression_validation": {"status": "passed", "checks": ["ZIP CRC all9", "archive members byte-identical to original loose files all9", "stdlib CLI extraction SHA256 equality all9", "report baseline/final and both comparison baseline/candidate hashes match members", "all native diagnostic trace/guard hashes match members"]},
+    "pack_command_executed_before_loose_cleanup": ".venv/Scripts/python.exe -B -m zipfile -c native/nemotron/issue215_evidence.zip native/nemotron/issue215_baseline.json native/nemotron/issue215_native_full_waveform.json native/nemotron/issue215_native_isolation_capture.json native/nemotron/issue215_native_isolation_tail_first.json native/nemotron/issue215_native_pcm_diagnostic.json native/nemotron/issue215_native_right_flush_160ms.json native/nemotron/issue215_native_right_flush_2000ms.json native/nemotron/issue215_new_repaired.json native/nemotron/issue215_new_supported_window.json",
+    "extraction_command": ".venv/Scripts/python.exe -B -m zipfile -e native/nemotron/issue215_evidence.zip build/issue215-evidence",
+    "verification_command": ".venv/Scripts/python.exe -B -c \"import hashlib,json,zipfile; from pathlib import Path; r=json.loads(Path('native/nemotron/issue215_report.json').read_text(encoding='utf-8'))['raw_evidence_archive']; p=Path('native/nemotron')/r['path']; assert hashlib.sha256(p.read_bytes()).hexdigest()==r['sha256']; z=zipfile.ZipFile(p); assert z.testzip() is None; assert set(z.namelist())=={m['member'] for m in r['members']}; assert all(len(z.read(m['member']))==m['bytes'] and hashlib.sha256(z.read(m['member'])).hexdigest()==m['sha256'] for m in r['members']); print('Archive CRC, member sizes and SHA256: passed')\"",
+    "layout": "Readable report, both comparisons, applicability and attempts remain loose. All9 original raw JSON files removed after binary validation. Three focused drivers retained; no new docs or product changes. Archived original trace/guard path strings deliberately remain historical, not rewritten."
+  },
+  "selected_runtime": {
+    "gpu": "AMD Radeon RX 7900 XTX, Vulkan device0; AMD proprietary26.8.1(LLPC), driverVersion2.0.395, device API1.4.349",
+    "nemotron": "Approved Bonenk F16 GGUF; 8 slots,16kHz,125 F16 +231 F32 tensors. Vulkan neural inference, no CPU neural fallback. F32 auxiliaries/activations remain; not all-F16 scalar arithmetic.",
+    "model_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+    "runtime_manifest_sha256": "4615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9",
+    "runtime_revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+    "profile": "0.64",
+    "geometry": "6/2/0/264/264/222",
+    "asr": "local_parakeet_v3/parakeet-tdt-0.6b-v3-int8-sherpa, CPU2threads, configured feature_dim80, greedy_search, nemo_transducer, source en, language_hint null, hotwords[]",
+    "actual_encoder_metadata": "128 features/per_feature/subsampling8/TDT; installed native NeMo frontend overrides configured80 from model metadata. No unresolved v2/v3 feature mismatch.",
+    "asr_manifest_sha256": "82b63f3fb4ab1c08821dbad59bc5683e7d1cde57e7291754c8f211f833ffee61",
+    "component_hashes": "Exact encoder/decoder/joiner/tokens and runtime component hashes in raw evidence; native diagnostics independently rehash ASR assets.",
+    "dependencies": {"python": "3.14.7", "numpy": "2.5.1", "onnxruntime": "1.28.0", "sherpa_onnx": "1.13.4"},
+    "vad": "Silero CPU16kHz/512samples, threshold0.3, continuation approximately0.2, onset debounce3, hangover19; actual production six-second deadline, not forced fixture cuts",
+    "environment": {"HF_HUB_OFFLINE": "1", "GGML_VK_DISABLE_GRAPH_OPTIMIZE": "1", "NEMO_SPEECH_SCHEDULE_CAPTURE": "1"},
+    "trimming": "OFF"
+  },
+  "checks": {
+    "real_fp16_vulkan_speaker_and_real_supported_CPU_ASR": "passed",
+    "actual_early_shared_SourceChild_not_boundary_only": "passed",
+    "same_audio_options_capture_VAD_schedule_all6": "passed",
+    "actual_payload_owned_source_submitted_exactly_once_all6": "passed",
+    "native_source_PCM_equals_original_capture_all6": "passed",
+    "zero_only_synthetic_context_valid_and_origin_metadata_preserved_all6": "passed",
+    "nonempty_native_final_text_admitted_once_all6": "passed",
+    "source_order_context_once_and_display_group_all6": "passed",
+    "genuine_500ms_onset_and_real_300ms_hardroll_context": "passed",
+    "original_capture_once_no_ASR_replay_or_synthetic_input_to_Nemotron": "passed",
+    "returning_A_whole_contribution_correct_three_unit_order": "passed",
+    "short_No_and_linguistic_No_no_Three_preserved": "passed",
+    "new_troublesome_text_repetition": "not_observed",
+    "GPU_ready_no_overload_or_evidence_eviction_all6": "passed",
+    "exact_reference_word_accuracy": "failed",
+    "identified_speaker_accuracy_or_renderer_color_accuracy": "not_run",
+    "live_queued_settings_duplicate_stale_stop_races": "not_run",
+    "other_live_CPU_routes_and_Auto": "not_run",
+    "GPU_ASR_model_readiness": "blocked",
+    "broad_quality_language_profile_study_218": "not_run"
+  },
+  "synthetic_native_context_contract": {
+    "observed_successor_requests": 5,
+    "samples_each": 32000,
+    "sample_rate_hz": 16000,
+    "payload": "Exactly64000 zero bytes, context_only true, source_ranges empty; final native payload after real owned source. No source replay/new ownership, extra capture time or real-time wait.",
+    "frozen_fields": ["STTProviderTurnRequest.synthetic_right_context_samples", "STTProviderTurnRequest.synthetic_context_sample_rate_hz", "STTSourceAudio.synthetic_right_context_samples", "STTSourceAudio.synthetic_context_sample_rate_hz", "RecognitionTextOrigin.synthetic_right_context_samples", "RecognitionTextOrigin.synthetic_context_sample_rate_hz"],
+    "source_child_observation": "Every corresponding actual final SourceChild origin retains32000/16000; exact-payload hash, zero length/content and metadata audits pass. First/unpartitioned and new hard-roll parent retain0/null; source context remains separate500ms/300ms where applicable.",
+    "native_packet_proof": "Raw trace retains each actual request/options, native packet SHA256, per-payload SHA256/role, original capture ranges and native events. Generated zero payload validation is separate from original PCM equality and owned-source accounting."
+  },
+  "causal_clean_AB_example": {
+    "capture_epoch": 7,
+    "source_boundary_sample": 49728,
+    "source_boundary_seconds": 3.108,
+    "playback_started_monotonic_s": 50454.4479918,
+    "evidence_ready_monotonic_s": 50458.1178184,
+    "native_seal_invocation_monotonic_s": 50458.1368551,
+    "owner_submitted_at_monotonic_s": 50458.1372095,
+    "submitted_cursor_sample": 49728,
+    "owned_A_range": [9728,49728],
+    "genuine_onset_context": [1728,9728],
+    "actual_A_source_available_monotonic_s": 50458.2831315,
+    "actual_A_context_admitted_monotonic_s": 50458.2833383,
+    "enclosing_natural_seal_monotonic_s": 50459.2938161,
+    "actual_A_source_lead_seconds": 1.0106846,
+    "successor_B_owned_range": [49728,77312],
+    "B_source_context_samples": 0,
+    "B_synthetic_native_context": [32000,16000],
+    "source_texts": ["He washed the detritus from his hair.", "Gentlemen of the press."],
+    "orders": [[1,1,0],[1,2,0]],
+    "display_group_both": "bd9291fa-662b-4904-b00a-924c4d848f49",
+    "B_prior_context": ["He washed the detritus from his hair."],
+    "attribution": ["uncertain", "unavailable"],
+    "limit": "Gray attribution is honest; no identity or renderer-color accuracy claim. Five actual early sources total across cleanAB(1), shortABA(2), repeatedABA(2)."
+  },
+  "practical_cases": [
+    {"case": "ordinary_onset", "status": "passed", "observation": "Same complete He washed the detritus from his hair. as baseline;500ms onset context."},
+    {"case": "six_second_rollover", "status": "passed", "observation": "Real six-second timer and300ms continuation; both baseline/new omit terminal impacts and return empty continuation. Observed baseline limitation, not issue215 regression."},
+    {"case": "clean_A_B", "status": "passed", "observation": "Baseline omits B; new emits actual early A and later Gentlemen of the press. EarlyA has no observed B words."},
+    {"case": "short_A_B_A", "status": "passed", "baseline": "He washed the Detritus from his hair. No. He washed the Detroit from his hair.", "changed": "He washed the detritus from his hair. No. He washed the detractors from his hair.", "observation": "Three units/order preserved, short negation and entire returning phrase restored; noun variant remains."},
+    {"case": "distinct_repeated_A_B_A", "status": "passed", "baseline": "He washed the Detroitus from his hair. Gentlemen of the press. He washed the Detroit from his hair.", "changed": "He washed the detritus from his hair. Gentlemen of the press. He washed the detrifus from his hand.", "observation": "Three units/order preserved, real hardcut and entire returning phrase restored. NOTICEABLE residual hair->hand edge substitution and noun variant; explicitly accepted bounded R8 risk, not perfect word accuracy. Both hardroll continuations empty. Repeated acoustic assembly, not linguistic correction."},
+    {"case": "linguistic_correction", "status": "passed", "baseline_and_changed": "No, no. Three.", "observation": "Authorized original SAPI Zira No. then No,three. synthetic linguistic correction. Not natural conversation; deliberately replay-contaminated old-No-prefixed fixture unused."}
+  ],
+  "decisive_retained_reasoning": {
+    "disjoint_native_empty": "issue215_evidence.zip:issue215_native_pcm_diagnostic.json: original disjoint returning-A terminals EMPTY although each delivered PCM payload matches declared original capture. Source path did not suppress nonempty native text.",
+    "fresh_native_order_control": ["issue215_evidence.zip:issue215_native_isolation_tail_first.json", "issue215_evidence.zip:issue215_native_isolation_capture.json"],
+    "failed_coalescence": ["issue215_evidence.zip:issue215_new_repaired.json", "issue215_comparison_repaired.json"],
+    "full_waveform_counterevidence": "issue215_evidence.zip:issue215_native_full_waveform.json: full40093-sample A decodes alone and after B in separate fresh stream; contiguous fullB+A still loses A. Measured waveform support is not word timestamps; no alignment invented.",
+    "160ms_comparison": "issue215_evidence.zip:issue215_native_right_flush_160ms.json: empirical2560 zeros ineffective. This never rules out upstream2s convention.",
+    "2s_comparison": "issue215_evidence.zip:issue215_native_right_flush_2000ms.json: separately authorized32000 zeros recover both returning packets; No/correction unchanged, hardroll tails remain empty. Diagnostic led to explicit frozen production metadata, then final all6 actual smoke.",
+    "source_applicability": "issue215_native_applicability.json: V3 reference aliases V2 whose convention uses2s zeros; actual V3 model128/per_feature matches, pinned sherpa1.13.4 compiled frontend overrides feature80 and does not auto-add2s. Int8 compiled wrapper is not bitwise-identical to Python reference; convention is not universal mandatory requirement.",
+    "history_and_cleanup": "issue215_attempts.json retains executed failures and commands. Six redundant earlier raw/summary outputs removed; decisive failures and three reproducible focused drivers retained. No parameter sweep, oracle boundary, easier route substitution or duplicate filter."
+  },
+  "inputs_and_privacy": {
+    "public": "Approved CommonVoice17 English A/B(CC0) and FLEURS English7.920s(CC-BY-4.0). Source provenance/revisions/attribution/hashes in raw reports, original hashes hard-pinned in driver.",
+    "synthetic": "Authorized issue212 original SAPI Microsoft Zira fixtures, original local-results-real.json provenance and hashes verified.",
+    "assembly": "Documented public waveform crops with160ms support margins, assembly map report-only and never supplied to selector.",
+    "restrictions_observed": "No downloads, paid APIs, uploads, private/ambient capture, repository audio rehosting or VRChat interruption. User paths sanitized."
+  },
+  "gaps": {
+    "GPU_ASR": {"status": "blocked", "reason": "Configured qwen3-asr-1.7b-q6-k-transcribe-vulkan/Qwen3-ASR-1.7B-Q6_K.gguf missing under user-models root; production readiness/path and overrides rechecked, no alternate supplied. Worker executable exists; absent model not loaded. GPU Nemotron+CPU ASR route is valid and exercised."},
+    "other_CPU_and_Auto": {"status": "not_run", "reason": "Qwen/Parakeet-ja installed but not real-inferred here. Auto/queued-option/race fixtures belong to Director/product owner; no route substitution used."},
+    "identity_rendering_profile": {"status": "not_run", "reason": "No identity/color accuracy certification; broad quality/language/profile/resource study remains issue218."}
+  },
+  "reproduction": [
+    ".venv/Scripts/python.exe -B -m zipfile -e native/nemotron/issue215_evidence.zip build/issue215-evidence",
+    ".venv/Scripts/python.exe -B native/nemotron/issue215_summarize.py --baseline build/issue215-evidence/issue215_baseline.json --candidate build/issue215-evidence/issue215_new_supported_window.json --output build/issue215-comparison-reproduced.json",
+    ".venv/Scripts/python.exe -B native/nemotron/issue215_smoke.py --mode baseline --output build/issue215_baseline_rerun.json",
+    ".venv/Scripts/python.exe -B native/nemotron/issue215_smoke.py --mode new --output build/issue215_new_rerun.json",
+    ".venv/Scripts/python.exe -B native/nemotron/issue215_summarize.py --baseline build/issue215_baseline_rerun.json --candidate build/issue215_new_rerun.json --output build/issue215_comparison_rerun.json",
+    ".venv/Scripts/python.exe -B native/nemotron/issue215_native_isolation.py --trace build/issue215-evidence/issue215_native_pcm_diagnostic.json --order full_waveform --output build/issue215_full_waveform_rerun.json",
+    ".venv/Scripts/python.exe -B native/nemotron/issue215_native_isolation.py --trace build/issue215-evidence/issue215_native_pcm_diagnostic.json --guards build/issue215-evidence/issue215_new_repaired.json --order right_flush --right-flush-ms 160 --output build/issue215_right_flush_160ms_rerun.json",
+    ".venv/Scripts/python.exe -B native/nemotron/issue215_native_isolation.py --trace build/issue215-evidence/issue215_native_pcm_diagnostic.json --guards build/issue215-evidence/issue215_new_repaired.json --order right_flush --right-flush-ms 2000 --output build/issue215_right_flush_2000ms_rerun.json"
+  ],
+  "final_verification_index": {
+    "observer": "Director; this worker did not rerun product tests or lint",
+    "broad_suite": {
+      "status": "failed",
+      "command": "uv run pytest tests/core tests/providers tests/app tests/architecture -q -o addopts=",
+      "passed": 5338,
+      "skipped": 6,
+      "failed": 3,
+      "wall_seconds": 522.01,
+      "evidence": "artifact://81",
+      "classification": "All3 failures are pre-existing unchanged debt, not issue215 regressions; broader suite remains FAILED.",
+      "failures": [
+        {"test": "tests/app/test_release_dependency_guards.py::test_installer_script_embeds_local_stt_manifest_assets_for_inno_download", "cause": "Existing installer test enumerates all model manifests as ASR except transcribe.cpp-vulkan, so demands existing Nemotron nemo-speech-vulkan model ID in installer.iss. Pre-existing installer/manifest-test contract mismatch; intended repair is out of scope."},
+        {"test": "tests/architecture/test_dependency_boundaries.py::test_dependency_violations_are_empty", "cause": "Existing speaker_application imports app.adapters.nemotron; unchanged app-services-use-ports static rule forbids adapters. Nested imports included by ast.walk."},
+        {"test": "tests/architecture/test_dependency_boundaries.py::test_a10_composition_managed_secrets_wiring_reduces_dependency_debt_to_0", "cause": "Same existing forbidden dependency and static predicate as previous test, not a separate new defect."}
+      ]
+    },
+    "baseline_classification": {
+      "status": "passed",
+      "evidence": "agent://route-policy; read-only baseline classification, no test rerun",
+      "baseline": "8cf4c929",
+      "candidate": "06c51af5",
+      "method": "Relevant Git blobs identical at both checkpoints; deterministic source-reading/static-scanning failing predicates unchanged. No isolation-invalidating issue215 interaction found.",
+      "identical_blobs": [
+        {"path": "installer.iss", "git_blob": "5f1b6e03f9cb9bb698970c35edad55c70652d35d"},
+        {"path": "src/puripuly_heart/data/models/nemotron-3-diarization-f16-vulkan.manifest.json", "git_blob": "f87bd21b2913b25d4e621f096e97be99c1f4ad85"},
+        {"path": "tests/app/test_release_dependency_guards.py", "git_blob": "7cd4168f0bd2142cbcea9a0d45e8439a7b70da7f"},
+        {"path": "src/puripuly_heart/app/services/speaker_application.py", "git_blob": "c577f0a43b6332fe78672c54e1f98e74cc1969bb"},
+        {"path": "tests/architecture/test_dependency_boundaries.py", "git_blob": "79c5c7854d7a5a9132ce3a6b6dae9a9bdb863cfa"},
+        {"path": "src/puripuly_heart/app/adapters/nemotron/__init__.py", "git_blob": "d42f988aa9eb7bddc657544a0a2e32e02aa358a9"}
+      ]
+    },
+    "focused_product_tests": {"status": "passed", "files": 17, "passed": 594, "wall_seconds": 43.68, "evidence": "Director-observed product-owner frozen-result report"},
+    "changed_product_test_lint": {"status": "passed", "files": 23, "evidence": "Director-observed product-owner frozen-result report"},
+    "decision": "Classification evidence sufficient; no rerun, product repair, suite-pass claim or scope expansion. Unchanged baseline debt remains out of scope."
+  },
+  "handoff": "Validation-only worker changed no product src/tests, maintained docs or Git state. No product builds/tests/linters run by this worker. Director owns final deterministic range/source/lifecycle/queued-option and explicit synthetic-context fixtures after all owners land; report does not grant integration approval. No further acoustic investigation required for accepted bounded R8 gate.",
+  "references": [
+    "https://github.com/kapitalismho/PuriPuly-heart/issues/215",
+    "https://github.com/kapitalismho/PuriPuly-heart/issues/211",
+    "https://github.com/kapitalismho/PuriPuly-heart/issues/212#issuecomment-6113292176",
+    "https://github.com/k2-fsa/sherpa-onnx/blob/master/scripts/nemo/parakeet-tdt-0.6b-v3/test_onnx.py",
+    "https://github.com/k2-fsa/sherpa-onnx/blob/master/scripts/nemo/parakeet-tdt-0.6b-v2/test_onnx.py",
+    "https://github.com/k2-fsa/sherpa-onnx/blob/v1.13.4/sherpa-onnx/csrc/offline-recognizer-transducer-nemo-impl.h"
+  ]
+}

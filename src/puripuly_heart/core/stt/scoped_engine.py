@@ -327,6 +327,7 @@ class ScopedRecognitionEngine:
     _retained_high_water_bytes: int = field(init=False, default=0, repr=False)
     _authority_generation: int = field(init=False, default=0, repr=False)
     _stream_recovery: _StreamRecovery | None = field(init=False, default=None, repr=False)
+    _pending_speaker_evidence: deque = field(init=False, default_factory=deque, repr=False)
 
     def __post_init__(self) -> None:
         self._input_lock = asyncio.Lock()
@@ -703,6 +704,24 @@ class ScopedRecognitionEngine:
                 )
         return False
 
+    async def observe_speaker_evidence(self, evidence: tuple[object, ...]) -> None:
+        async with self._input_lock:
+            if self._closed:
+                return
+            if self.channel != "peer" or (
+                self.accepted_settings_scope is not None
+                and self.accepted_settings_scope[0] not in self.exclusive_provider_ids
+            ):
+                return
+            observe = getattr(self._session, "observe_speaker_evidence", None)
+            if callable(observe):
+                await observe(evidence)
+            else:
+                self._pending_speaker_evidence.extend(evidence)
+                pieces = sum(len(item.source_map) for item in self._pending_speaker_evidence)
+                while len(self._pending_speaker_evidence) > 2048 or pieces > 8192:
+                    pieces -= len(self._pending_speaker_evidence.popleft().source_map)
+
     async def handle_owned_vad_event(self, owned: object) -> None:
         if not isinstance(owned, OwnedVadEvent):
             raise TypeError("scoped recognition requires OwnedVadEvent")
@@ -840,6 +859,7 @@ class ScopedRecognitionEngine:
             if self._connection_retry_at_s is not None:
                 self._episode_failures = 0
                 self._connection_retry_at_s = None
+        self._pending_speaker_evidence.clear()
         self._stream_recovery = None
         self._recognition_authorities.clear()
         self._estimated_speech_scope = None
@@ -1036,8 +1056,10 @@ class ScopedRecognitionEngine:
         if session is not None and self._provider_epoch_id is not None and not independent:
             self._register_recognition_stream(
                 RecognitionStreamIdentity(
-                    self.channel, identity.segment.activation_generation,
-                    identity.segment.capture_epoch, identity.provider_epoch_id,
+                    self.channel,
+                    identity.segment.activation_generation,
+                    identity.segment.capture_epoch,
+                    identity.provider_epoch_id,
                     identity.settings_scope,
                 ),
                 settings,
@@ -1066,6 +1088,7 @@ class ScopedRecognitionEngine:
                     identity=identity,
                     settings=settings,
                     channel=self.channel,
+                    display_group_id=owned.segment.display_group_id,
                 )
             ),
         ):
@@ -1102,6 +1125,11 @@ class ScopedRecognitionEngine:
                 event.chunk_capture,
                 context_only=False,
             )
+        observe = getattr(session, "observe_speaker_evidence", None)
+        if callable(observe) and self._pending_speaker_evidence:
+            pending = tuple(self._pending_speaker_evidence)
+            self._pending_speaker_evidence.clear()
+            await observe(pending)
 
     async def _handle_chunk(self, owned: OwnedVadEvent, event: SpeechChunk) -> None:
         turn = self._matching_turn(owned)

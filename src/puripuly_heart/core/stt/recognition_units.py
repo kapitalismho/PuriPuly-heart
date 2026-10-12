@@ -30,10 +30,10 @@ class RecognitionConsumptionLedger:
         identity = terminal.unit.identity
         stream = identity.stream
         if stream not in self._receipt_sequences and (
-            stream.activation_generation <= self._retired_activation[stream.channel] or (
-                stream.capture_epoch <= self._retired_capture.get(
-                    (stream.channel, stream.activation_generation), -1
-                )
+            stream.activation_generation <= self._retired_activation[stream.channel]
+            or (
+                stream.capture_epoch
+                <= self._retired_capture.get((stream.channel, stream.activation_generation), -1)
             )
         ):
             return False
@@ -54,7 +54,8 @@ class RecognitionConsumptionLedger:
                     generation, self._retired_activation[channel]
                 )
                 self._retired_capture = {
-                    scope: capture for scope, capture in self._retired_capture.items()
+                    scope: capture
+                    for scope, capture in self._retired_capture.items()
                     if scope[0] != channel or scope[1] > self._retired_activation[channel]
                 }
         return terminal.outcome in {"final", "empty"}
@@ -94,34 +95,62 @@ def contribution_transcript(
         raise ValueError("contribution source request identity mismatch")
     identity = event.identity
     text = "".join(piece.text for piece in pieces)
-    unit_id = uuid5(snapshot.identity.segment_id, "|".join(
-        f"{identity.provider_epoch_id}:{identity.provider_turn_id}:"
-        f"{piece.contribution_id}:{piece.text_start}:{piece.text_end}" for piece in pieces
-    ))
+    unit_id = uuid5(
+        snapshot.identity.segment_id,
+        "|".join(
+            f"{identity.provider_epoch_id}:{identity.provider_turn_id}:"
+            f"{piece.contribution_id}:{piece.text_start}:{piece.text_end}"
+            for piece in pieces
+        ),
+    )
     if isinstance(event, STTProviderTurnTerminal) and not event.included_contributions:
         unit_id = snapshot.identity.segment_id
     stream = RecognitionStreamIdentity(
-        channel, identity.segment.activation_generation, identity.segment.capture_epoch,
-        identity.provider_epoch_id, identity.settings_scope,
+        channel,
+        identity.segment.activation_generation,
+        identity.segment.capture_epoch,
+        identity.provider_epoch_id,
+        identity.settings_scope,
     )
     unit_identity = RecognitionUnitIdentity(stream, unit_id, publication_order)
     origins = []
     offset = 0
     for piece in pieces:
-        origins.append(RecognitionTextOrigin(
-            unit_identity, offset, offset + len(piece.text),
-            request_id=identity.provider_turn_id,
-            contribution_id=piece.contribution_id,
-            contribution_range=(piece.text_start, piece.text_end),
-            source_ranges=snapshot.content_ranges,
-            context_ranges=snapshot.context_ranges,
-            display_group_id=snapshot.display_group_id,
-            source_binding="request_owned",
-            order_basis="capture_order",
-            ownership="request",
-            audio_settings=snapshot.settings,
-            source_available_at_monotonic_s=created_at,
-        ))
+        audio = next(
+            (item for item in event.source_audio if item.contribution_id == piece.contribution_id),
+            None,
+        )
+        if event.source_audio and audio is None:
+            raise ValueError("batch contribution has unresolved audio ownership")
+        origins.append(
+            RecognitionTextOrigin(
+                unit_identity,
+                offset,
+                offset + len(piece.text),
+                request_id=identity.provider_turn_id,
+                contribution_id=piece.contribution_id,
+                contribution_range=(piece.text_start, piece.text_end),
+                source_ranges=audio.source_ranges if audio is not None else snapshot.content_ranges,
+                context_ranges=audio.context_ranges
+                if audio is not None
+                else snapshot.context_ranges,
+                display_group_id=audio.display_group_id
+                if audio is not None
+                else snapshot.display_group_id,
+                source_binding="request_owned",
+                order_basis="capture_order",
+                ownership="request",
+                audio_settings=snapshot.settings,
+                source_available_at_monotonic_s=created_at,
+                speaker_attribution=audio.speaker_attribution if audio is not None else None,
+                synthetic_right_context_samples=(
+                    audio.synthetic_right_context_samples if audio is not None else 0
+                ),
+                synthetic_context_sample_rate_hz=(
+                    audio.synthetic_context_sample_rate_hz if audio is not None else None
+                ),
+            )
+        )
         offset += len(piece.text)
 
     def sliced_runs(runs):
@@ -132,12 +161,16 @@ def contribution_transcript(
                 end = cursor + len(run.text)
                 left, right = max(cursor, piece.text_start), min(end, piece.text_end)
                 if left < right:
-                    result.append(replace(run, text=run.text[left - cursor:right - cursor]))
+                    result.append(replace(run, text=run.text[left - cursor : right - cursor]))
                 cursor = end
         return tuple(result)
 
     return Transcript(
-        unit_id, text, True, created_at=created_at, channel=channel,
+        unit_id,
+        text,
+        True,
+        created_at=created_at,
+        channel=channel,
         final_language_runs=sliced_runs(event.final_language_runs),
         final_speaker_runs=sliced_runs(event.final_speaker_runs),
         publication_generation=stream.activation_generation if channel == "peer" else None,

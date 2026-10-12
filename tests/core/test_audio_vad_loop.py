@@ -249,6 +249,10 @@ async def test_listen_continuous_audio_rolls_at_six_seconds_with_context_only_ta
         "source_eof",
     ]
     assert [snapshot.genuine_onset for snapshot in snapshots] == [True, False, False]
+    assert [snapshot.display_group_id for snapshot in snapshots] == [
+        snapshot.identity.segment_id for snapshot in snapshots
+    ]
+    assert len({snapshot.display_group_id for snapshot in snapshots}) == 3
     assert [snapshot.prefix_context_sample_count for snapshot in snapshots] == [0, 4800, 4800]
     starts = [owned.event for owned in owned_events if isinstance(owned.event, SpeechStart)]
     assert [start.pre_roll.size for start in starts] == [0, 4800, 4800]

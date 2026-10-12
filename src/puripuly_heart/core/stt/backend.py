@@ -4,6 +4,7 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import AsyncIterator, Literal, Protocol, TypeVar, runtime_checkable
+from uuid import UUID
 
 import numpy as np
 
@@ -16,7 +17,7 @@ from puripuly_heart.core.audio.ownership import (
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
-from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
+from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun, SpeakerAttribution
 from puripuly_heart.domain.recognition import (
     NativeTranscriptionEvidence,
     RecognitionStreamIdentity,
@@ -62,6 +63,52 @@ class STTProviderTurnRequest:
     identity: STTProviderTurnIdentity
     settings: AudioSegmentSettingsSnapshot
     channel: Literal["self", "peer"] = "peer"
+    display_group_id: UUID | None = None
+    isolate_failure: bool = False
+    native_options: object | None = None
+    synthetic_right_context_samples: int = 0
+    synthetic_context_sample_rate_hz: int | None = None
+
+    def __post_init__(self) -> None:
+        if (
+            self.synthetic_right_context_samples < 0
+            or (
+                bool(self.synthetic_right_context_samples)
+                != (self.synthetic_context_sample_rate_hz is not None)
+            )
+            or (
+                self.synthetic_context_sample_rate_hz is not None
+                and self.synthetic_context_sample_rate_hz <= 0
+            )
+        ):
+            raise ValueError("invalid synthetic native context")
+
+
+@dataclass(frozen=True, slots=True)
+class STTSourceAudio:
+    contribution_id: str
+    source_ranges: tuple[AudioCaptureSpan, ...]
+    context_ranges: tuple[AudioCaptureSpan, ...] = ()
+    display_group_id: UUID | None = None
+    speaker_attribution: SpeakerAttribution | None = None
+    synthetic_right_context_samples: int = 0
+    synthetic_context_sample_rate_hz: int | None = None
+
+    def __post_init__(self) -> None:
+        if not self.contribution_id:
+            raise ValueError("batch audio requires a contribution identity")
+        if (
+            self.synthetic_right_context_samples < 0
+            or (
+                bool(self.synthetic_right_context_samples)
+                != (self.synthetic_context_sample_rate_hz is not None)
+            )
+            or (
+                self.synthetic_context_sample_rate_hz is not None
+                and self.synthetic_context_sample_rate_hz <= 0
+            )
+        ):
+            raise ValueError("invalid synthetic native context")
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,7 +144,9 @@ class STTSourceRelease:
 
     def __post_init__(self) -> None:
         if (
-            not self.release_id or self.text_start < 0 or self.text_end < self.text_start
+            not self.release_id
+            or self.text_start < 0
+            or self.text_end < self.text_start
             or self.reason not in {"end", "manual", "drain", "boundary"}
         ):
             raise ValueError("invalid source release")
@@ -118,6 +167,7 @@ class STTProviderTurnUpdate:
     is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
     source_release: STTSourceRelease | None = None
     included_contributions: tuple[STTTextContribution, ...] = ()
+    source_audio: tuple[STTSourceAudio, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +187,7 @@ class STTProviderTurnTerminal:
     failure_diagnostics: ErrorDiagnostics | None = None
     recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
     is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
+    source_audio: tuple[STTSourceAudio, ...] = ()
 
 
 _ProviderEvent = TypeVar("_ProviderEvent")
@@ -162,6 +213,7 @@ def scoped_event_for_delivery(
         epoch_disposition="retire",
         included_contributions=(),
         recognition_origins=(),
+        source_audio=(),
         is_current=None,
     )
 
@@ -197,9 +249,7 @@ class STTContributionConsumptionLedger:
             raise ValueError("ledger capacities must be positive")
         self._identity_capacity = identity_capacity
         self._contribution_capacity = contribution_capacity
-        self._consumed: dict[
-            tuple[STTProviderTurnIdentity, str], list[tuple[int, int]]
-        ] = {}
+        self._consumed: dict[tuple[STTProviderTurnIdentity, str], list[tuple[int, int]]] = {}
         self._contribution_ranges: dict[tuple[STTProviderTurnIdentity, str], tuple[int, int]] = {}
         self._consumed_terminal_tails: set[STTProviderTurnIdentity] = set()
         self._known_identities: set[STTProviderTurnIdentity] = set()
@@ -215,7 +265,9 @@ class STTContributionConsumptionLedger:
     def consumed_contribution_ids(self) -> frozenset[str]:
         return frozenset(contribution_id for _identity, contribution_id in self._consumed)
 
-    def record_boundary(self, identity: STTProviderTurnIdentity, boundary: STTAudioBoundary) -> None:
+    def record_boundary(
+        self, identity: STTProviderTurnIdentity, boundary: STTAudioBoundary
+    ) -> None:
         if boundary.capture_epoch != identity.segment.capture_epoch:
             raise ValueError("audio boundary belongs to another capture epoch")
         if not self._remember_identity(identity):
@@ -301,8 +353,9 @@ class STTContributionConsumptionLedger:
                     if item.text_start < previous_end or item.text_end > len(event.text):
                         raise ValueError("source release contribution ranges are invalid")
                     previous_end = item.text_end
-                    left, right = max(item.text_start, release.text_start), min(
-                        item.text_end, release.text_end
+                    left, right = (
+                        max(item.text_start, release.text_start),
+                        min(item.text_end, release.text_end),
                     )
                     if left < right:
                         if left != cursor:
@@ -312,8 +365,10 @@ class STTContributionConsumptionLedger:
                     raise ValueError("source release leaves unresolved ownership")
         else:
             contributions = event.included_contributions
-            if event.text and not contributions and any(
-                identity == event.identity for identity, _ in self._consumed
+            if (
+                event.text
+                and not contributions
+                and any(identity == event.identity for identity, _ in self._consumed)
             ):
                 raise ValueError("terminal source association is missing")
             if len({item.contribution_id for item in contributions}) != len(contributions):
@@ -327,16 +382,21 @@ class STTContributionConsumptionLedger:
             cursor = 0
             for contribution in contributions:
                 if contribution.text_start > cursor:
-                    assembled.append(STTTextContribution(
-                        f"terminal:{cursor}:{contribution.text_start}",
-                        cursor, contribution.text_start,
-                    ))
+                    assembled.append(
+                        STTTextContribution(
+                            f"terminal:{cursor}:{contribution.text_start}",
+                            cursor,
+                            contribution.text_start,
+                        )
+                    )
                 assembled.append(contribution)
                 cursor = contribution.text_end
             if cursor < len(event.text):
-                assembled.append(STTTextContribution(
-                    f"terminal:{cursor}:{len(event.text)}", cursor, len(event.text)
-                ))
+                assembled.append(
+                    STTTextContribution(
+                        f"terminal:{cursor}:{len(event.text)}", cursor, len(event.text)
+                    )
+                )
             contributions = tuple(assembled)
         selection_start, selection_end = text_range or (
             (release.text_start, release.text_end) if release is not None else (0, len(event.text))
@@ -345,8 +405,28 @@ class STTContributionConsumptionLedger:
             selection_start < release.text_start or selection_end > release.text_end
         ):
             raise ValueError("selected source range exceeds release")
-        if selection_start < 0 or selection_end > len(event.text) or selection_end < selection_start:
+        if (
+            selection_start < 0
+            or selection_end > len(event.text)
+            or selection_end < selection_start
+        ):
             raise ValueError("invalid selected source range")
+        if event.source_audio:
+            audio_ids = {item.contribution_id for item in event.source_audio}
+            if len(audio_ids) != len(event.source_audio):
+                raise ValueError("batch audio ownership identities repeat")
+            if any(
+                span.capture_epoch != event.identity.segment.capture_epoch
+                for item in event.source_audio
+                for span in (*item.source_ranges, *item.context_ranges)
+            ):
+                raise ValueError("batch audio belongs to another capture epoch")
+            if any(
+                item.contribution_id not in audio_ids
+                for item in contributions
+                if item.text_start < selection_end and item.text_end > selection_start
+            ):
+                raise ValueError("batch contribution has unresolved audio ownership")
         prefix_end = self._admitted_prefixes.get(event.identity, 0)
         if release is not None and selection_start > prefix_end:
             raise ValueError("source release skips earlier unconsumed text")
@@ -375,9 +455,15 @@ class STTContributionConsumptionLedger:
                             next_ranges.append((used_end, right))
                 remaining = next_ranges
             for left, right in remaining:
-                pieces.append(STTConsumedContribution(
-                    event.identity, contribution.contribution_id, left, right, event.text[left:right]
-                ))
+                pieces.append(
+                    STTConsumedContribution(
+                        event.identity,
+                        contribution.contribution_id,
+                        left,
+                        right,
+                        event.text[left:right],
+                    )
+                )
             staged.append((key, remaining))
         if release is not None:
             for piece in pieces:
@@ -435,7 +521,8 @@ class STTContributionConsumptionLedger:
         is_obsolete: Callable[[STTProviderTurnIdentity], bool],
     ) -> bool:
         identities = {
-            identity for identity in self._known_identities
+            identity
+            for identity in self._known_identities
             if identity.provider_epoch_id == provider_epoch_id and is_obsolete(identity)
         }
         if not identities:
@@ -448,11 +535,13 @@ class STTContributionConsumptionLedger:
             key: span for key, span in self._contribution_ranges.items() if key[0] not in identities
         }
         self._releases = {
-            identity: releases for identity, releases in self._releases.items()
+            identity: releases
+            for identity, releases in self._releases.items()
             if identity not in identities
         }
         self._admitted_prefixes = {
-            identity: prefix_end for identity, prefix_end in self._admitted_prefixes.items()
+            identity: prefix_end
+            for identity, prefix_end in self._admitted_prefixes.items()
             if identity not in identities
         }
         return True
@@ -473,9 +562,14 @@ class STTContributionConsumptionLedger:
             segment.segment_order <= self._retired_floor.get(scope, -1)
         ):
             return False
-        expired = next(
-            (item for item in self._identity_order if item in self._consumed_terminal_tails), None
-        ) if len(self._identity_order) >= self._identity_capacity else None
+        expired = (
+            next(
+                (item for item in self._identity_order if item in self._consumed_terminal_tails),
+                None,
+            )
+            if len(self._identity_order) >= self._identity_capacity
+            else None
+        )
         if len(self._identity_order) >= self._identity_capacity and expired is None:
             raise ValueError("unfinished source identity capacity exceeded")
         self._known_identities.add(identity)
@@ -491,7 +585,8 @@ class STTContributionConsumptionLedger:
                 generation = min(scope[0] for scope in self._retired_floor)
                 self._generation_floor = max(self._generation_floor, generation)
                 self._retired_floor = {
-                    scope: order for scope, order in self._retired_floor.items()
+                    scope: order
+                    for scope, order in self._retired_floor.items()
                     if scope[0] > self._generation_floor
                 }
             self._known_identities.discard(expired)
@@ -500,7 +595,9 @@ class STTContributionConsumptionLedger:
             self._admitted_prefixes.pop(expired, None)
             self._sealed.discard(expired)
             self._releases.pop(expired, None)
-            self._consumed = {key: ranges for key, ranges in self._consumed.items() if key[0] != expired}
+            self._consumed = {
+                key: ranges for key, ranges in self._consumed.items() if key[0] != expired
+            }
             self._contribution_ranges = {
                 key: span for key, span in self._contribution_ranges.items() if key[0] != expired
             }

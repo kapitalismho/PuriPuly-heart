@@ -1,0 +1,148 @@
+{
+  "schema": "issue215-smoke-attempts-1",
+  "historical_artifact_note": "Commands below preserve executed history, not current certification. Redundant earlier raw/summary files were removed after the accepted final freeze; decisive strict native-PCM failure, failed coalescence, full-waveform isolation,160ms failure and2s effectiveness remain reproducible.",
+  "removed_redundant_artifacts": ["issue215_new.json", "issue215_comparison.json", "issue215_new_final.json", "issue215_comparison_final.json", "issue215_native_diagnostic.json", "issue215_native_pcm_comparison.json"],
+  "raw_evidence_location": "issue215_evidence.zip contains all9 retained original raw JSON files as basename members. Historical commands/path strings below are preserved; extract with .venv/Scripts/python.exe -B -m zipfile -e native/nemotron/issue215_evidence.zip build/issue215-evidence and use extracted build/issue215-evidence paths for native trace/guard inputs. Archive hashes, extraction/reproduction/verification commands and member inventory are in issue215_report.json.",
+  "attempts": [
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_smoke.py --mode new --output native/nemotron/issue215_new.json",
+      "wall_seconds": 10.7,
+      "exit_code": 1,
+      "status": "failed",
+      "classification": "validation harness serialization failure, not product inference failure",
+      "error": "TypeError: Object of type builtin_function_or_method is not JSON serializable; trace request.native_options.decode_clock",
+      "retained_case_results": false,
+      "repair": "Serialize callable native-option metadata by module and qualified name. No product or input changes."
+    }
+    ,{
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_smoke.py --mode new --output native/nemotron/issue215_new.json",
+      "wall_seconds": 13.34,
+      "exit_code": 1,
+      "status": "failed",
+      "classification": "validation harness serialization failure, not product inference failure",
+      "error": "TypeError: Object of type OfflineRecognizer is not JSON serializable; trace request.native_options._recognizer",
+      "retained_case_results": false,
+      "repair": "Omit private dataclass implementation fields from metadata serialization; retain all public actual native options. No product or input changes."
+    }
+    ,{
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_smoke.py --mode new --output native/nemotron/issue215_new.json",
+      "wall_seconds": 59.04,
+      "exit_code": 0,
+      "execution_status": "passed",
+      "causal_source_acceptance": "failed",
+      "evidence": ["issue215_new.json", "issue215_comparison.json"],
+      "classification": "real-model diagnostic run before final product repair freeze",
+      "observations": [
+        "All six exact input/config/capture-VAD range schedules matched baseline; transcripts were identical.",
+        "All 3408 actual raw probability frames had empty active_slots; selector produced no speaker cuts or early source units.",
+        "All final SourceChild speaker attribution was unavailable; display_group_id null.",
+        "Nemotron GPU ready with no overload, CPU ASR executed successfully; raw model probabilities were nonblank.",
+        "Product owner accepted raw probability projection and enclosing group producer gaps and continued repairs."
+      ],
+      "reported_to": ["Main", "batch-implementation"],
+      "applicability": "Diagnostic evidence only; not a final repaired-candidate acceptance run."
+    }
+    ,{
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_smoke.py --mode new --output native/nemotron/issue215_new_final.json",
+      "wall_seconds": 53.91,
+      "exit_code": 0,
+      "execution_status": "passed",
+      "practical_acceptance": "failed",
+      "evidence": ["issue215_new_final.json", "issue215_comparison_final.json"],
+      "classification": "complete six-case real smoke at first explicit product freeze",
+      "observations": [
+        "Actual early shared SourceChild output observed in clean A-B, short A-B-A, and distinct repeated A-B-A.",
+        "Exact audio, ASR options, and original capture/VAD source range schedules matched baseline in all six cases.",
+        "Original capture, submitted new content, once-only text/context, display groups, 500 ms onset/300 ms hardcut context passed.",
+        "Returning A disappeared entirely in both A-B-A examples despite once-only submission; material regression versus baseline.",
+        "No trimming or harness boundary override. Shared attribution remained uncertain/unavailable, not proven speaker identities."
+      ],
+      "reported_to": ["Main", "batch-implementation"],
+      "applicability": "Failed freeze retained; product freeze withdrawn for repair, not accepted final evidence."
+    }
+    ,{
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_smoke.py --mode new --cases short_A_B_A,distinct_repeated_A_B_A --output native/nemotron/issue215_native_diagnostic.json",
+      "wall_seconds": 20.86,
+      "exit_code": 0,
+      "diagnosis": "Returning-A native terminals were empty; wrapper did not suppress nonempty native text.",
+      "applicability": "Transparent native event diagnostic at same product source hash as failed freeze."
+    }
+    ,{
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_smoke.py --mode new --cases short_A_B_A,distinct_repeated_A_B_A --output native/nemotron/issue215_native_pcm_diagnostic.json",
+      "wall_seconds": 21.88,
+      "exit_code": 0,
+      "diagnosis": "Every delivered payload exactly matched declared original source PCM using production normalization. Native tails still empty.",
+      "evidence": ["issue215_native_pcm_diagnostic.json", "issue215_native_pcm_comparison.json"]
+    }
+    ,{
+      "commands": [
+        ".venv/Scripts/python.exe -B native/nemotron/issue215_native_isolation.py --trace native/nemotron/issue215_native_pcm_diagnostic.json --order tail_first --output native/nemotron/issue215_native_isolation_tail_first.json",
+        ".venv/Scripts/python.exe -B native/nemotron/issue215_native_isolation.py --trace native/nemotron/issue215_native_pcm_diagnostic.json --order capture --output native/nemotron/issue215_native_isolation_capture.json"
+      ],
+      "combined_wall_seconds": 11.81,
+      "exit_code": 0,
+      "diagnosis": "Same actual tail packet empty even as first invocation on fresh CPU recognizer, and after real prefix invocations. Prefix packets decode correctly.",
+      "applicability": "CPU-only native acoustic isolation; NOT causal acceptance, no extra context or whole-parent decode."
+    }
+    ,{
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_smoke.py --mode new --output native/nemotron/issue215_new_repaired.json",
+      "wall_seconds": 54.73,
+      "exit_code": 0,
+      "execution_status": "passed",
+      "practical_acceptance": "failed",
+      "product_batch_sha256": "82fc9aeb5050e96b75315005b7c18b040e45dafe6830cbbdec18015217bf1a49",
+      "evidence": ["issue215_new_repaired.json", "issue215_comparison_repaired.json"],
+      "diagnosis": "Parakeet V3 returning-speaker coalescence conserves PCM and produces honest mixed attribution, but returning A still absent from native text in both A-B-A cases.",
+      "observations": [
+        "Clean A-B real early shared A source available 1.0081742 s before enclosing natural seal, B preserved.",
+        "All six exact audio/options/capture-VAD schedules remain equal to baseline.",
+        "Native PCM matches original source; ownership/text/context/display groups pass; trimming OFF.",
+        "Short coalesced No+A native text only No.; repeated coalesced B+A native text only Gentlemen of the press."
+      ],
+      "reported_to": ["Main", "batch-implementation"],
+      "applicability": "Failed repaired freeze retained, not accepted final evidence."
+    }
+    ,{
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_native_isolation.py --trace native/nemotron/issue215_native_pcm_diagnostic.json --order full_waveform --output native/nemotron/issue215_native_full_waveform.json",
+      "wall_seconds": 6.63,
+      "exit_code": 0,
+      "diagnosis": "Full uncut returning-A crop decodes complete A alone and after B in a separate fresh stream. Contiguous full B+A loses A in both scenarios, even without endpoint clipping.",
+      "applicability": "Director-requested CPU acoustic counterevidence, no padding/sweep. Measured support is NOT word timestamps; not causal acceptance."
+    }
+    ,{
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_native_isolation.py --trace native/nemotron/issue215_native_pcm_diagnostic.json --guards native/nemotron/issue215_new_repaired.json --order right_flush --output native/nemotron/issue215_native_right_flush_160ms.json",
+      "wall_seconds": 11.83,
+      "exit_code": 0,
+      "diagnostic_effectiveness": "failed",
+      "diagnosis": "Approved ONE fixed160ms zero-only native right suffix leaves isolated short/repeated A and both actual rollover continuations EMPTY. Short-No and linguistic correction controls unchanged.",
+      "applicability": "CPU-only empirical160ms diagnostic; no source replay/ownership/time change, wait, Nemotron feed, or product padding.160ms is not the upstream convention; this failure does not rule out an official native-window solution."
+    }
+    ,{
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_native_isolation.py --trace native/nemotron/issue215_native_pcm_diagnostic.json --guards native/nemotron/issue215_new_repaired.json --order right_flush --right-flush-ms 2000 --output native/nemotron/issue215_native_right_flush_2000ms.json",
+      "wall_seconds": 11.57,
+      "exit_code": 0,
+      "diagnostic_effectiveness": "passed",
+      "diagnosis": "Separately authorized ONE documented2s zero native suffix recovers both previously empty returning-A packets. Short: He washed the detractors from his hair. Repeated predeadline: He washed the detrifus from his hand. Lexical/hardcut quality remains; both rollover continuations empty and No/correction guards unchanged.",
+      "applicability": "Native diagnostic only, not production acceptance. V3 alias to V2 reference verified; actual128/per_feature/TDT model metadata and compiled1.13.4 frontend source inspected. Explicit production metadata implementation and final frozen6case live smoke required.",
+      "evidence": ["issue215_native_right_flush_2000ms.json", "issue215_native_applicability.json"]
+    }
+    ,{
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_smoke.py --mode new --output native/nemotron/issue215_new_supported_window.json",
+      "wall_seconds": 52.48,
+      "exit_code": 0,
+      "execution_status": "passed",
+      "practical_acceptance": "passed",
+      "acceptance_authority": "Director explicitly accepted bounded practical R8 gate with residual lexical/hardcut substitution risk; no identity/color accuracy claim.",
+      "product_batch_sha256": "1de562aaec3996de0c2d0890b3376fb823fdf84daa054fbb641c5e9101ceb364",
+      "evidence": ["issue215_new_supported_window.json", "issue215_comparison_supported_window.json", "issue215_report.json"],
+      "observations": [
+        "All six exact input/options/original capture-VAD schedules equal baseline. Five actual early SourceChild publications across three transfer cases.",
+        "Entire returning contribution restored in correct A-B-A three-unit order. Short No and linguistic No,no.Three preserved; no new troublesome repetition.",
+        "All source ownership, actual native PCM, source admission, context, group and original capture-once checks passed; ready Vulkan GPU with zero overload/eviction all6.",
+        "Five successor native requests contain exactly32000 zero samples at16kHz, empty source ranges and frozen matching SourceChild origin metadata; never fed to Nemotron.",
+        "Lexical variants and repeated predeadline hair->hand substitution remain explicitly disclosed. Both baseline and new path have empty hardcut continuations."
+      ],
+      "applicability": "Final real-model candidate at explicit product freeze. Trimming OFF; no oracle boundaries or further acoustic investigation. Does not grant overall issue/integration acceptance or profile qualification."
+    }
+  ]
+}

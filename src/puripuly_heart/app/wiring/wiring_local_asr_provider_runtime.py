@@ -42,6 +42,7 @@ from puripuly_heart.core.stt.backend import (
     STTScopedTurnSession,
     STTSessionProjection,
 )
+from puripuly_heart.core.stt.batch_speaker import CausalBatchSession
 from puripuly_heart.core.stt.custom import validate_peer_custom_stt_configuration
 from puripuly_heart.core.stt.notifications import FinalTranscriptSuppressedNotification
 from puripuly_heart.core.stt.scoped_engine import (
@@ -178,6 +179,8 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                 getattr(session, "inner", session),
                 STTScopedTurnSession,
             ):
+                if config.channel == "peer" and str(config.provider) in _LOCAL_PROVIDER_IDS:
+                    return CausalBatchSession(session, clock=self.clock.now)
                 return session
             try:
                 await session.close()

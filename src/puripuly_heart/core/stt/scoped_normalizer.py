@@ -57,6 +57,7 @@ class STTScopedTurnNormalizer:
         self._provenance: list[STTNativeProvenance] = []
         self._contributions: list[STTTextContribution] = []
         self._terminal: STTProviderTurnTerminal | None = None
+        self._source_audio = ()
 
     @property
     def stable_text(self) -> str:
@@ -79,6 +80,7 @@ class STTScopedTurnNormalizer:
         native_event_id = update.provenance.native_event_id
         if native_event_id is not None and native_event_id in self._native_event_ids:
             return None
+        self._source_audio = update.source_audio or self._source_audio
         if update.sequence <= self._last_sequence:
             raise STTNormalizationError("provider_update_sequence_disorder")
         self._last_sequence = update.sequence
@@ -156,6 +158,7 @@ class STTScopedTurnNormalizer:
             provenance=update.provenance,
             contribution=contribution,
             recognition_origins=self._recognition_origins,
+            source_audio=update.source_audio,
             source_release=update.source_release,
             included_contributions=(
                 tuple(self._contributions) if update.source_release is not None else ()
@@ -172,6 +175,7 @@ class STTScopedTurnNormalizer:
             self._stable_runs, self._stable_speaker_runs,
             source_release=release, included_contributions=tuple(self._contributions),
             recognition_origins=self._recognition_origins,
+            source_audio=self._source_audio,
         )
 
     def apply_terminal(self, terminal: STTProviderTurnTerminal) -> STTProviderTurnTerminal:
@@ -184,6 +188,7 @@ class STTScopedTurnNormalizer:
             self._remember_provenance(item)
         if terminal.recognition_origins:
             self._recognition_origins = terminal.recognition_origins
+        self._source_audio = terminal.source_audio or self._source_audio
         raw_text = terminal.text if terminal.text else self._stable_text
         runs = terminal.final_language_runs if terminal.text else self._stable_runs
         speaker_runs = terminal.final_speaker_runs if terminal.text else self._stable_speaker_runs
@@ -265,6 +270,7 @@ class STTScopedTurnNormalizer:
             included_contributions=contributions if text else (),
             failure_diagnostics=terminal.failure_diagnostics,
             recognition_origins=self._recognition_origins,
+            source_audio=self._source_audio,
         )
         return self._terminal
 

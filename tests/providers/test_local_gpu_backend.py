@@ -920,3 +920,73 @@ async def test_failed_same_channel_preparation_cannot_release_live_owner(
         await candidate.close()
         await current.close()
         await runtime.close()
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+async def test_gpu_queued_request_freezes_native_language_and_result_source_mode(tmp_path, wrapped):
+    from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+    from puripuly_heart.core.stt.batch_speaker import CausalBatchSession
+
+    runtime = FakeSharedGpuRuntime()
+    backend = LocalGpuSTTBackend(
+        runtime,
+        "peer",
+        tmp_path / "model.gguf",
+        "gpu-model",
+        "vk:0",
+        source_mode="auto",
+        language_hint="English",
+    )
+    inner = await backend.open_session(projection=SCOPED_PROJECTION)
+    session = CausalBatchSession(inner) if wrapped else inner
+    first, second = _scoped_request(1), _scoped_request(2)
+    try:
+        await session.begin_turn(first)
+        await session.send_turn_audio(
+            first.identity,
+            b"\x01\x00" * 160,
+            payload_sequence=1,
+            source_ranges=(),
+            context_only=False,
+        )
+        await session.seal_turn(
+            first.identity,
+            sealed_content_ranges=(),
+            seal_reason="silence",
+            observed_trailing_silence_ms=0,
+        )
+        await backend.reconfigure_session_options(
+            LocalASRSessionOptions("ja", source_mode="manual", language_hint="Japanese")
+        )
+        await session.begin_turn(second)
+        await session.send_turn_audio(
+            second.identity,
+            b"\x01\x00" * 160,
+            payload_sequence=1,
+            source_ranges=(),
+            context_only=False,
+        )
+        await session.seal_turn(
+            second.identity,
+            sealed_content_ranges=(),
+            seal_reason="silence",
+            observed_trailing_silence_ms=0,
+        )
+        terminals = []
+        async with asyncio.timeout(2):
+            async for event in session.turn_events():
+                if isinstance(event, STTProviderTurnTerminal):
+                    terminals.append(event)
+                    if len(terminals) == 2:
+                        break
+        assert [submission[3] for submission in runtime.submissions] == ["English", "Japanese"]
+        assert terminals[0].final_language_runs[0].language == "en"
+        assert (
+            not terminals[1].final_language_runs
+            if not wrapped
+            else (terminals[1].final_language_runs[0].language == "")
+        )
+        assert terminals[0].identity != terminals[1].identity
+    finally:
+        await session.close()
+        await backend.close()

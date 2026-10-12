@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import importlib
 import logging
 import time
@@ -338,6 +339,12 @@ class _LocalQwenSherpaSession(STTBackendSession):
     _scoped_watchdogs: dict[int, asyncio.Task[None]] = field(
         init=False, default_factory=dict, repr=False
     )
+    _request_backends: dict[STTProviderTurnIdentity, LocalQwenSherpaSTTBackend] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    _isolated_failures: set[STTProviderTurnIdentity] = field(
+        init=False, default_factory=set, repr=False
+    )
 
     def __post_init__(self) -> None:
         self._buffer_f32 = []
@@ -355,6 +362,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
             on_failure=self._handle_decode_failure,
             on_expired=self._handle_decode_expired,
             preserve_queued_after_failure=self._preserve_queued_after_failure,
+            continue_after_failure=self._continue_after_failure,
             on_backlog_warning=self._log_decode_backlog_warning,
             start_after=self.decode_start_after,
             pending_ttl_s=self.backend.pending_ttl_s,
@@ -385,10 +393,18 @@ class _LocalQwenSherpaSession(STTBackendSession):
             return
         self._buffer_f32.append(samples.copy())
 
+    def snapshot_decode_options(self) -> LocalQwenSherpaSTTBackend:
+        return copy.copy(self.backend)
+
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if self._closed or self._stopping or not self._decode_coordinator.accepting:
             raise RuntimeError("local STT session is unavailable")
         self._event_projection.begin(request)
+        self._request_backends[request.identity] = (
+            request.native_options or self.snapshot_decode_options()
+        )
+        if request.isolate_failure:
+            self._isolated_failures.add(request.identity)
         self._buffer_f32.clear()
 
     async def send_turn_audio(
@@ -421,7 +437,10 @@ class _LocalQwenSherpaSession(STTBackendSession):
             else np.empty((0,), dtype=np.float32)
         )
         self._buffer_f32.clear()
-        job = self._decode_coordinator.enqueue_job(samples_f32, copy_samples=False)
+        frozen_backend = self._request_backends.pop(identity)
+        job = self._decode_coordinator.enqueue_job(
+            samples_f32, copy_samples=False, decode=frozen_backend.decode_f32
+        )
         if job is None:
             self._terminalize_scoped(
                 identity,
@@ -493,7 +512,11 @@ class _LocalQwenSherpaSession(STTBackendSession):
         authority = "authoritative" if outcome in ("final", "empty") else "none"
         if outcome == "degraded":
             authority = "degraded"
-        should_retire = retire or outcome in ("failed", "cancelled")
+        should_retire = (
+            retire or outcome in ("failed", "cancelled")
+        ) and identity not in self._isolated_failures
+        self._isolated_failures.discard(identity)
+        self._request_backends.pop(identity, None)
         self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
@@ -536,7 +559,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
             else np.empty((0,), dtype=np.float32)
         )
         self._buffer_f32.clear()
-        self._decode_coordinator.enqueue(samples_f32)
+        self._decode_coordinator.enqueue_job(samples_f32, decode=copy.copy(self.backend).decode_f32)
 
     async def _decode_samples(self, samples_f32: np.ndarray) -> str:
         return await self.backend.decode_f32(samples_f32)
@@ -573,6 +596,10 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 self._terminalize_scoped(identity, outcome="final", text=text)
             else:
                 self._terminalize_scoped(identity, outcome="empty")
+
+    def _continue_after_failure(self, job: LocalDecodeJob) -> bool:
+        identity = self._scoped_job_identities.get(job.sequence)
+        return identity in self._isolated_failures
 
     def _preserve_queued_after_failure(self, job: LocalDecodeJob) -> bool:
         return (
@@ -685,6 +712,8 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 watchdog.cancel()
             self._scoped_watchdogs.clear()
             self._retired_scoped_job_sequences.clear()
+            self._request_backends.clear()
+            self._isolated_failures.clear()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         self._events_started = True
