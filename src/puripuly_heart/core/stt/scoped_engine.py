@@ -1089,6 +1089,7 @@ class ScopedRecognitionEngine:
                     settings=settings,
                     channel=self.channel,
                     display_group_id=owned.segment.display_group_id,
+                    optional_cutoff_at_monotonic_s=owned.optional_cutoff_at_monotonic_s,
                 )
             ),
         ):

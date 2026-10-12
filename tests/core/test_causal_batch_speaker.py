@@ -146,7 +146,7 @@ async def terminal_events(session, count=1):
 )
 async def test_actual_adapters_early_disjoint_short_a_b_a_and_shared_origins(backend_type):
     backend, recognizer, session = await opened(backend_type)
-    req = request()
+    req = replace(request(), optional_cutoff_at_monotonic_s=5.7)
     try:
         await session.begin_turn(req)
         await payload(session, req, 0, 1600, 1)
@@ -936,6 +936,143 @@ async def test_late_observation_selects_retained_prefix_and_records_distinct_cau
         ] == [(0, 38400), (38400, 48000)]
     finally:
         await session.close()
+        await backend.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "backend_type", [LocalQwenSherpaSTTBackend, LocalParakeetV3SherpaSTTBackend]
+)
+@pytest.mark.parametrize("observed_at", [5.0, 5.99])
+async def test_imminent_safety_coalesces_optional_cut_without_losing_short_successor(
+    backend_type, observed_at, caplog
+):
+    backend, recognizer, session = await opened(backend_type)
+    session.clock = lambda: observed_at
+    req = replace(request(), optional_cutoff_at_monotonic_s=5.7)
+    pcm = np.full(96000, 321, dtype=np.int16)
+    pcm[94400:] = -1234
+    try:
+        await session.begin_turn(req)
+        with caplog.at_level("INFO", logger="puripuly_heart.core.stt.batch_speaker"):
+            await session.send_turn_audio(
+                req.identity,
+                pcm[:95900].tobytes(),
+                payload_sequence=1,
+                source_ranges=(span(0, 95900),),
+                context_only=False,
+            )
+            await session.observe_speaker_evidence(
+                (evidence(0, 94400, (0,), ready=5.99), evidence(94400, 95900, (1,), ready=5.99))
+            )
+        assert not recognizer.calls
+        assert any("coalesced=safety" in record.getMessage() for record in caplog.records)
+        await session.send_turn_audio(
+            req.identity,
+            pcm[95900:].tobytes(),
+            payload_sequence=2,
+            source_ranges=(span(95900, 96000),),
+            context_only=False,
+        )
+        await session.observe_speaker_evidence((evidence(95900, 96000, (1,), ready=6.0),))
+        await seal(session, req, "hardcut")
+        events = await asyncio.wait_for(terminal_events(session), 1)
+        assert len(recognizer.calls) == 1
+        np.testing.assert_array_equal(recognizer.calls[0].samples, pcm.astype(np.float32) / 32768)
+        assert len(events) == 1
+        (audio,) = events[0].source_audio
+        assert audio.source_ranges == (span(0, 95900), span(95900, 96000))
+        assert audio.context_ranges == ()
+        assert audio.display_group_id == req.display_group_id
+        assert audio.speaker_attribution.state == "mixed"
+        assert audio.synthetic_right_context_samples == 0
+        assert audio.synthetic_context_sample_rate_hz is None
+    finally:
+        await session.close()
+        await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_actual_listen_safety_policy_reaches_owner_without_restarting_deadline():
+    from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
+    from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
+    from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
+    from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
+    from tests.core.test_source_context_contract import until
+
+    now = 0.0
+    segment_id = uuid4()
+    backend = LocalQwenSherpaSTTBackend(Path("/fixture"), language_hint="English")
+    recognizer = Recognizer()
+    backend._recognizer = recognizer
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=request().settings)
+    received, opened_requests = [], []
+
+    async def factory(settings, epoch):
+        inner = await backend.open_session(projection=STTSessionProjection("scoped", epoch))
+        session = CausalBatchSession(inner, clock=lambda: now)
+        begin = session.begin_turn
+
+        async def record_begin(req):
+            opened_requests.append(req)
+            await begin(req)
+
+        session.begin_turn = record_begin
+        return session
+
+    engine = ScopedRecognitionEngine(
+        factory, event_sink=received.append, monotonic_clock=lambda: now
+    )
+    delivery = ListenDeliveryController(
+        vad=SimpleNamespace(
+            seal_active_for_rollover=lambda reason: SpeechEnd(segment_id, reason=reason)
+        ),
+        ledger=ledger,
+        emit=engine.handle_owned_vad_event,
+        monotonic_clock=lambda: now,
+    )
+    try:
+        await delivery.handle_vad_event(
+            SpeechStart(
+                segment_id,
+                np.empty(0, dtype=np.float32),
+                np.full(95900, 0.25, dtype=np.float32),
+                chunk_capture=(span(0, 95900),),
+            )
+        )
+        assert opened_requests[0].optional_cutoff_at_monotonic_s == 5.7
+        now = 5.99
+        await engine.observe_speaker_evidence(
+            (evidence(0, 94400, (0,), ready=now), evidence(94400, 95900, (1,), ready=now))
+        )
+        assert not recognizer.calls
+        await delivery.handle_vad_event(
+            SpeechChunk(
+                segment_id,
+                np.full(100, -0.25, dtype=np.float32),
+                chunk_capture=(span(95900, 96000),),
+            )
+        )
+        now = 6.0
+        await delivery.observe_acoustic_chunk(speech_observed=True, capture=(span(95900, 96000),))
+        await until(lambda: len(received) == 1)
+        assert isinstance(received[0], STTProviderTurnTerminal)
+        assert ledger.snapshots[0].seal_reason == "delivery_deadline"
+        assert ledger.snapshots[0].content_sample_count == 96000
+        assert delivery.current_segment_id is None
+        assert len(opened_requests) == 1
+        assert len(recognizer.calls) == 1
+        assert recognizer.calls[0].samples.size == 96000
+        np.testing.assert_array_equal(
+            recognizer.calls[0].samples[-1600:], [0.25] * 1500 + [-0.25] * 100
+        )
+        (audio,) = received[0].source_audio
+        assert audio.source_ranges == (span(0, 95900), span(95900, 96000))
+        assert audio.display_group_id == segment_id
+        assert audio.speaker_attribution.state == "mixed"
+    finally:
+        await delivery.close()
+        await engine.close()
         await backend.close()
 
 

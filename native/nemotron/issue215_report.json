@@ -204,6 +204,37 @@
     "changed_product_test_lint": {"status": "passed", "files": 23, "evidence": "Director-observed product-owner frozen-result report"},
     "decision": "Classification evidence sufficient; no rerun, product repair, suite-pass claim or scope expansion. Unchanged baseline debt remains out of scope."
   },
+  "checkpoint_F1_repair": {
+    "reviewed_candidate": "db1cacc2d5a90c9aff56da6f57dc9a58f95eddb7",
+    "finding": "Accepted independent review F1: optional speaker cuts immediately before the enclosing hardcut caused an avoidable extra short native request.",
+    "policy": "ListenDeliveryController forwards an immutable optional cutoff from the existing enclosing opening time, six-second limit and 300ms rollover window. CausalBatchSession suppresses optional cuts once either its clock or retained original capture frontier reaches it. All owned PCM proceeds through ordinary closure; no new wait, deadline restart, speech-duration floor, acoustic processing or option change.",
+    "product_batch_sha256": "a340187779a297902f4739a1a71c87141cdf8d68af813de7d1275a724e4aa81f",
+    "focused_tests": {"passed": 599, "files": 17, "wall_seconds": 43.66, "scope": "Original focused suite plus five near-safety handoff/coalescing cases"},
+    "timer_tests": {"command": "uv run pytest tests/core/test_smart_turn_delivery.py -q -o addopts=", "passed": 71, "wall_seconds": 1.11},
+    "repair_lint": "All seven changed product/test surfaces passed Ruff.",
+    "scripted_runtime_smoke": {
+      "status": "passed",
+      "scope": "Actual capture loop, Peer VAD, delivery controller and scoped CPU adapter with scripted recognizer/evidence; not a real-model run",
+      "near_hardcut_observation_s": 5.99,
+      "speaker_boundary_sample": 94400,
+      "native_request_samples": [96256, 10944],
+      "owned_samples": [96256, 6144],
+      "captured_context_samples": [0, 4800],
+      "original_samples_once": 102400,
+      "seal_reasons": ["delivery_deadline", "source_eof"],
+      "attribution": "mixed",
+      "result": "Only mandatory enclosing-group requests remain; no optional near-edge request or short-successor loss."
+    },
+    "retained_real6_applicability": {
+      "source": "issue215_evidence.zip:issue215_new_supported_window.json",
+      "method": "Compare all five original native optional starts against genuine enclosing openings. Original playback yields each frame only after its source end, bounding retained source-frontier age by native-start wall age; the gate runs before that native start.",
+      "safety_margin_lower_bounds_s": [2.9203248, 2.9277701, 2.9255863, 2.9209751, 1.4780368],
+      "new_gate_window_s": 0.3,
+      "minimum_slack_s": 1.1780368,
+      "result": "All prior optional schedules remain allowed. Original acoustic, range and option results remain applicable through this bounded delta.",
+      "limit": "Raw hashes pin the original candidate. No fresh model inference was run after F1; newly coalesced near-boundary behavior has scripted verification only."
+    }
+  },
   "handoff": "Validation-only worker changed no product src/tests, maintained docs or Git state. No product builds/tests/linters run by this worker. Director owns final deterministic range/source/lifecycle/queued-option and explicit synthetic-context fixtures after all owners land; report does not grant integration approval. No further acoustic investigation required for accepted bounded R8 gate.",
   "references": [
     "https://github.com/kapitalismho/PuriPuly-heart/issues/215",

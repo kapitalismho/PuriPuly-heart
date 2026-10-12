@@ -256,6 +256,11 @@ async def test_listen_continuous_audio_rolls_at_six_seconds_with_context_only_ta
     assert [snapshot.prefix_context_sample_count for snapshot in snapshots] == [0, 4800, 4800]
     starts = [owned.event for owned in owned_events if isinstance(owned.event, SpeechStart)]
     assert [start.pre_roll.size for start in starts] == [0, 4800, 4800]
+    owned_starts = [owned for owned in owned_events if isinstance(owned.event, SpeechStart)]
+    assert all(
+        abs(owned.optional_cutoff_at_monotonic_s - owned.segment.opened_at_monotonic_s - 5.7) < 1e-9
+        for owned in owned_starts
+    )
     assert sum(snapshot.content_sample_count for snapshot in snapshots) == frame_count * 512
     content_ranges = [
         capture_range for snapshot in snapshots for capture_range in snapshot.content_ranges

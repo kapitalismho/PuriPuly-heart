@@ -5,6 +5,7 @@ import contextlib
 import logging
 import math
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from typing import Literal
 from uuid import UUID
 
@@ -116,6 +117,12 @@ class ListenDeliveryController:
             if owned.segment.settings.delivery_profile_effective == "on":
                 self._smart_turn_owner.request_prepare()
             self._arm_timers(event.utterance_id, self._opened_at_s)
+            owned = replace(
+                owned,
+                optional_cutoff_at_monotonic_s=(
+                    self._opened_at_s + self.HARD_LIMIT_S - self.HARD_CUT_OVERLAP_MS / 1000
+                ),
+            )
         elif isinstance(event, SpeechChunk) and event.utterance_id == self._segment_id:
             self._append_context(event.chunk)
         elif isinstance(event, SpeechEnd) and event.utterance_id == self._segment_id:
@@ -263,7 +270,9 @@ class ListenDeliveryController:
             else (
                 "segment_changed"
                 if identity.segment_id != self._segment_id
-                else "pause_changed" if identity.pause_id != self._pause_id else None
+                else "pause_changed"
+                if identity.pause_id != self._pause_id
+                else None
             )
         )
         if reason is not None:

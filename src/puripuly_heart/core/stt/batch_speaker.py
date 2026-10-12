@@ -215,6 +215,26 @@ class CausalBatchSession:
     async def _cut_available(self, parent):
         if parent.optional_cuts_disabled:
             return
+        cutoff = parent.request.optional_cutoff_at_monotonic_s
+        if cutoff is not None:
+            frontier = max(
+                (
+                    span.source_end_monotonic_s
+                    for _, ranges, _ in parent.payloads
+                    for span in ranges
+                ),
+                default=self.clock(),
+            )
+            observed_at = max(self.clock(), frontier)
+            if observed_at >= cutoff:
+                parent.optional_cuts_disabled = True
+                logger.info(
+                    "[BatchSpeaker] request=%s coalesced=safety optional_cutoff=%s observed_at=%s",
+                    parent.request.identity.provider_turn_id,
+                    cutoff,
+                    observed_at,
+                )
+                return
         if sum(len(item.children) for item in self._parents) >= self.MAX_PENDING_SLICES:
             parent.optional_cuts_disabled = True
             return

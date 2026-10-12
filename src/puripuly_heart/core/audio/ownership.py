@@ -185,6 +185,7 @@ class OwnedVadEvent:
     event: object
     segment: AudioSegmentSnapshot
     retention: AudioRetentionBinding | None = None
+    optional_cutoff_at_monotonic_s: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

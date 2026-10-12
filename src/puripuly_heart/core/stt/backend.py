@@ -68,6 +68,7 @@ class STTProviderTurnRequest:
     native_options: object | None = None
     synthetic_right_context_samples: int = 0
     synthetic_context_sample_rate_hz: int | None = None
+    optional_cutoff_at_monotonic_s: float | None = None
 
     def __post_init__(self) -> None:
         if (
