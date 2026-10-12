@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from puripuly_heart.core.stt.backend import (
     STTNativeProvenance,
@@ -71,6 +71,10 @@ class STTScopedTurnNormalizer:
     def terminal(self) -> STTProviderTurnTerminal | None:
         return self._terminal
 
+    @property
+    def contributions(self) -> tuple[STTTextContribution, ...]:
+        return tuple(self._contributions)
+
     def apply_update(self, update: STTProviderTurnUpdate) -> STTProviderTurnUpdate | None:
         self._require_identity(update.identity)
         if update.source_release is not None and update.stability != "stable":
@@ -80,7 +84,10 @@ class STTScopedTurnNormalizer:
         native_event_id = update.provenance.native_event_id
         if native_event_id is not None and native_event_id in self._native_event_ids:
             return None
-        self._source_audio = update.source_audio or self._source_audio
+        if update.source_audio:
+            audio = {item.contribution_id: item for item in self._source_audio}
+            audio.update((item.contribution_id, item) for item in update.source_audio)
+            self._source_audio = tuple(audio.values())
         if update.sequence <= self._last_sequence:
             raise STTNormalizationError("provider_update_sequence_disorder")
         self._last_sequence = update.sequence
@@ -124,12 +131,34 @@ class STTScopedTurnNormalizer:
             runs = self._stable_runs
             speaker_runs = self._stable_speaker_runs
             if len(text) > previous_length:
-                contribution = STTTextContribution(
+                contribution = update.contribution or STTTextContribution(
                     contribution_id=f"{self.identity.provider_turn_id}:{update.sequence}",
                     text_start=previous_length,
                     text_end=len(text),
                 )
+                if contribution.text_start != previous_length or contribution.text_end != len(text):
+                    raise STTNormalizationError("provider_contribution_range_invalid")
+                if any(
+                    item.contribution_id == contribution.contribution_id
+                    for item in self._contributions
+                ):
+                    raise STTNormalizationError("provider_contribution_identity_reused")
                 self._contributions.append(contribution)
+            if update.included_contributions:
+                cursor = 0
+                ids = set()
+                for item in update.included_contributions:
+                    if (
+                        item.text_start != cursor
+                        or item.text_end > len(text)
+                        or item.contribution_id in ids
+                    ):
+                        raise STTNormalizationError("provider_contribution_range_invalid")
+                    cursor = item.text_end
+                    ids.add(item.contribution_id)
+                if cursor != len(text):
+                    raise STTNormalizationError("provider_contribution_range_invalid")
+                self._contributions = list(update.included_contributions)
         else:
             (
                 self._provisional_text,
@@ -158,7 +187,7 @@ class STTScopedTurnNormalizer:
             provenance=update.provenance,
             contribution=contribution,
             recognition_origins=self._recognition_origins,
-            source_audio=update.source_audio,
+            source_audio=self._source_audio,
             source_release=update.source_release,
             included_contributions=(
                 tuple(self._contributions) if update.source_release is not None else ()
@@ -171,9 +200,15 @@ class STTScopedTurnNormalizer:
         if release.text_end > len(self._stable_text):
             raise STTNormalizationError("provider_source_release_range_invalid")
         return STTProviderTurnUpdate(
-            self.identity, self._last_sequence, "stable", "replace", self._stable_text,
-            self._stable_runs, self._stable_speaker_runs,
-            source_release=release, included_contributions=tuple(self._contributions),
+            self.identity,
+            self._last_sequence,
+            "stable",
+            "replace",
+            self._stable_text,
+            self._stable_runs,
+            self._stable_speaker_runs,
+            source_release=release,
+            included_contributions=tuple(self._contributions),
             recognition_origins=self._recognition_origins,
             source_audio=self._source_audio,
         )
@@ -205,7 +240,8 @@ class STTScopedTurnNormalizer:
             identities = set()
             for item in terminal.included_contributions:
                 if (
-                    item.contribution_id in identities or item.text_start < cursor
+                    item.contribution_id in identities
+                    or item.text_start < cursor
                     or item.text_end > len(text)
                 ):
                     raise STTNormalizationError("provider_terminal_contribution_invalid")
@@ -354,42 +390,16 @@ class STTScopedTurnNormalizer:
         text: str,
         runs: tuple[FinalLanguageRun, ...],
     ) -> tuple[str, tuple[FinalLanguageRun, ...]]:
-        normalized = text if self._preserve_text else text.strip()
-        if not normalized:
+        if not text:
             return "", ()
         if not runs:
-            return normalized, ()
+            return text, ()
         if "".join(item.text for item in runs) != text:
-            return normalized, self._fallback_language_run(
-                normalized, "language_run_conservation_fallback"
-            )
-        trimmed = list(runs)
-        left = 0 if self._preserve_text else len(text) - len(text.lstrip())
-        right = 0 if self._preserve_text else len(text) - len(text.rstrip())
-        while left and trimmed:
-            item = trimmed[0]
-            amount = min(left, len(item.text))
-            item = FinalLanguageRun(item.text[amount:], item.language)
-            left -= amount
-            if item.text:
-                trimmed[0] = item
-            else:
-                trimmed.pop(0)
-        while right and trimmed:
-            item = trimmed[-1]
-            amount = min(right, len(item.text))
-            item = FinalLanguageRun(item.text[: len(item.text) - amount], item.language)
-            right -= amount
-            if item.text:
-                trimmed[-1] = item
-            else:
-                trimmed.pop()
-        if any(item.language and not item.language.strip() for item in trimmed):
-            return normalized, self._fallback_language_run(
-                normalized, "invalid_language_run_fallback"
-            )
-        merged: list[FinalLanguageRun] = []
-        for item in trimmed:
+            return text, self._fallback_language_run(text, "language_run_conservation_fallback")
+        if any(item.language and not item.language.strip() for item in runs):
+            return text, self._fallback_language_run(text, "invalid_language_run_fallback")
+        merged = []
+        for item in runs:
             if not item.text:
                 continue
             if merged and merged[-1].language == item.language:
@@ -397,14 +407,9 @@ class STTScopedTurnNormalizer:
                 merged[-1] = FinalLanguageRun(previous.text + item.text, item.language)
             else:
                 merged.append(item)
-        if (
-            len(merged) > self.MAX_LANGUAGE_RUNS
-            or "".join(item.text for item in merged) != normalized
-        ):
-            return normalized, self._fallback_language_run(
-                normalized, "language_run_limit_fallback"
-            )
-        return normalized, tuple(merged)
+        if len(merged) > self.MAX_LANGUAGE_RUNS:
+            return text, self._fallback_language_run(text, "language_run_limit_fallback")
+        return text, tuple(merged)
 
     def _normalize_speaker_runs(
         self,
@@ -417,31 +422,11 @@ class STTScopedTurnNormalizer:
             return runs
         if "".join(item.text for item in runs) != text:
             self._diagnose("speaker_run_conservation_fallback")
-            return (FinalSpeakerRun(text.strip(), None, "", attribution_state="malformed"),)
+            return (FinalSpeakerRun(text, None, "", attribution_state="malformed"),)
         if len(runs) > self.MAX_SPEAKER_RUNS:
             self._diagnose("speaker_run_limit_fallback")
-            return (FinalSpeakerRun(text.strip(), None, "", attribution_state="malformed"),)
-        left = len(text) - len(text.lstrip())
-        right = len(text) - len(text.rstrip())
-        trimmed = list(runs)
-        while left and trimmed:
-            item = trimmed[0]
-            amount = min(left, len(item.text))
-            item = replace(item, text=item.text[amount:])
-            left -= amount
-            if item.text:
-                trimmed[0] = item
-            else:
-                trimmed.pop(0)
-        while right and trimmed:
-            item = trimmed[-1]
-            amount = min(right, len(item.text))
-            item = replace(item, text=item.text[: len(item.text) - amount])
-            right -= amount
-            if item.text:
-                trimmed[-1] = item
-            else:
-                trimmed.pop()
+            return (FinalSpeakerRun(text, None, "", attribution_state="malformed"),)
+        trimmed = runs
         merged: list[FinalSpeakerRun] = []
         for item in trimmed:
             if not item.text:
@@ -466,7 +451,7 @@ class STTScopedTurnNormalizer:
                 )
             else:
                 merged.append(item)
-        normalized = text.strip()
+        normalized = text
         if "".join(item.text for item in merged) != normalized:
             self._diagnose("invalid_speaker_run_fallback")
             return (FinalSpeakerRun(normalized, None, "", attribution_state="malformed"),)
@@ -519,6 +504,11 @@ class STTScopedTurnNormalizer:
             if run.speaker_id is not None:
                 size += len(run.speaker_id.encode("utf-8"))
         for provenance in self._provenance:
+            size += 128 + len(provenance.text_timing) * 128 + len(provenance.audio_clocks) * 64
+            size += sum(
+                len(key.encode("utf-8")) + len(value.encode("utf-8"))
+                for key, value in provenance.native_model_metadata
+            )
             size += sum(
                 len(value.encode("utf-8"))
                 for value in (
@@ -540,14 +530,7 @@ class STTScopedTurnNormalizer:
             raise STTNormalizationError("provider_result_too_large")
 
     def _remember_provenance(self, provenance: STTNativeProvenance) -> None:
-        if (
-            provenance.native_event_id is None
-            and provenance.native_request_id is None
-            and provenance.native_item_id is None
-            and provenance.native_task_id is None
-            and provenance.barrier is None
-            and provenance.from_finalize is None
-        ):
+        if provenance == STTNativeProvenance():
             return
         if provenance not in self._provenance:
             self._provenance.append(provenance)

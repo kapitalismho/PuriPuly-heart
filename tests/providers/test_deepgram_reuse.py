@@ -629,3 +629,214 @@ async def test_installed_sdk_valid_callbacks_preserve_empty_and_cancellation_sem
         assert ended.failure_diagnostics is None
     finally:
         await session.close()
+def _timed_result(text: str, start: float, duration: float = 0.5, *, speaker: int = 1):
+    result = _result(text)
+    result.start = start
+    result.duration = duration
+    result.channel_index = [0, 1]
+    result.metadata.model_info = types.SimpleNamespace(
+        name="general-nova-3", version="2025-04-17.21547", arch="nova"
+    )
+    result.metadata.model_uuid = "qualified-model"
+    result.channel.alternatives[0].words = [
+        types.SimpleNamespace(
+            word=text.strip(),
+            punctuated_word=text.strip(),
+            start=start,
+            end=None,
+            speaker=speaker,
+        )
+    ]
+    return result
+
+
+@pytest.mark.asyncio
+async def test_final_segments_release_exact_prefix_and_keep_distinct_equal_terminal_tail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from puripuly_heart.core.stt.backend import STTContributionConsumptionLedger
+    from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
+
+    async def write(_session, _payload):
+        return None
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
+    session = _session()
+    request = _request(1)
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        request.identity, b"\0" * 64000, payload_sequence=1, source_ranges=(), context_only=False
+    )
+    session._build_transcript_event(_result("provisional", is_final=False, speech_final=True))
+    assert session._event_projection.scoped_event_depth == 0
+    first_result = _timed_result("  No. ", 0.1, speaker=3)
+    session._build_transcript_event(first_result)
+    session._build_transcript_event(first_result)
+    first = await _next(session)
+    assert first.text == "  No. "
+    assert first.source_release.text_end == len(first.text)
+    assert first.provenance.transcription.words == (("No.", "0.1", None),)
+    assert first.provenance.transcription.speaker_label is None
+    assert dict(first.provenance.native_model_metadata) == {
+        "name": "general-nova-3",
+        "version": "2025-04-17.21547",
+        "arch": "nova",
+        "model_uuid": "qualified-model",
+    }
+    assert first.provenance.audio_clocks[0].origin_sent_sample == 0
+    assert first.provenance.sent_until_sample == 32000
+    await _seal(session, request)
+    tail_result = _timed_result("  No. ", 1.1, speaker=99)
+    tail_result.from_finalize = True
+    session._build_transcript_event(tail_result)
+    tail = await _next(session)
+    terminal = await _next(session)
+    assert first.contribution.contribution_id != tail.contribution.contribution_id
+    assert tail.provenance.control_sent_sample == 32000
+    assert tail.provenance.control_kind == "Finalize"
+    assert terminal.text == "  No.   No. "
+    normalizer = STTScopedTurnNormalizer(request.identity)
+    consumption = STTContributionConsumptionLedger()
+    normalized_first = normalizer.apply_update(first)
+    assert consumption.consume(normalized_first) == "  No. "
+    normalizer.apply_update(tail)
+    assert consumption.consume(normalizer.apply_terminal(terminal)) == "  No. "
+    assert session._scoped_drain_task is None
+
+
+@pytest.mark.asyncio
+async def test_native_clock_discontinuity_preserves_text_without_guessed_correction() -> None:
+    session = _session()
+    request = _request(1)
+    await session.begin_turn(request)
+    session._build_transcript_event(_timed_result("first", 2.0))
+    session._build_transcript_event(_timed_result("尾", 0.2))
+    first, reset = await _next(session), await _next(session)
+    assert first.provenance.audio_clocks[0].qualified
+    assert reset.text == "尾"
+    assert not reset.provenance.audio_clocks[0].qualified
+    assert reset.provenance.text_timing[0].raw_start == 0.2
+    assert reset.provenance.text_timing[0].text_start == len("first")
+    session._scoped_transport_end(False, "test_finished")
+
+
+@pytest.mark.asyncio
+async def test_missing_empty_finalize_ack_never_authorizes_success_or_successor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    writes = []
+
+    async def write(_session, payload):
+        writes.append(payload)
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
+    session = _session(drain_timeout_s=0.001)
+    request = _request(1)
+    await session.begin_turn(request)
+    await _seal(session, request)
+    terminal = await _next(session)
+    assert terminal.outcome == "failed"
+    assert terminal.text_authority == "none"
+    assert terminal.failure_reason == "deepgram_finalize_ack_missing"
+    assert writes == [_FINALIZE, _CLOSE_STREAM]
+    with pytest.raises(RuntimeError, match="closed"):
+        await session.begin_turn(_request(2))
+    session._build_transcript_event(_timed_result("late", 0.1))
+    ended = await _next(session)
+    assert isinstance(ended, STTProviderEpochEnded)
+
+
+@pytest.mark.asyncio
+async def test_failed_pcm_write_does_not_advance_actual_submitted_cursor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def write(_session, _payload):
+        raise OSError("failed actual write")
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
+    session = _session()
+    request = _request(1)
+    await session.begin_turn(request)
+    with pytest.raises(OSError, match="actual write"):
+        await session.send_turn_audio(
+            request.identity, b"\0" * 32, payload_sequence=1, source_ranges=(), context_only=False
+        )
+    assert session._sent_samples == 0
+    session._scoped_transport_end(False, "test_finished")
+
+
+@pytest.mark.asyncio
+async def test_stop_or_writer_end_is_not_an_empty_finalize_ack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def write(_session, _payload):
+        return None
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
+    session = _session()
+    request = _request(1)
+    await session.begin_turn(request)
+    await _seal(session, request)
+    await session.stop()
+    session._scoped_transport_end(True, "deepgram_writer_ended")
+    terminal = await _next(session)
+    assert terminal.outcome == "failed"
+    assert terminal.text_authority == "none"
+    assert terminal.epoch_disposition == "retire"
+
+
+@pytest.mark.asyncio
+async def test_lawful_close_stream_drains_late_final_source_without_results_ack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    writes = []
+
+    async def write(_session, payload):
+        writes.append(payload)
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
+    session = _session(drain_timeout_s=0.05)
+    request = _request(1)
+    await session.begin_turn(request)
+    await _seal(session, request)
+    while not session._scoped_close_written:
+        await asyncio.sleep(0)
+    session._build_transcript_event(_timed_result(" tail ", 0.1))
+    session._scoped_transport_end(True, "deepgram_connection_closed")
+    update, terminal = await _next(session), await _next(session)
+    assert update.text == terminal.text == " tail "
+    assert (terminal.outcome, terminal.text_authority, terminal.epoch_disposition) == (
+        "final",
+        "authoritative",
+        "retire",
+    )
+    assert writes == [_FINALIZE, _CLOSE_STREAM]
+    assert any(item.control_kind == "CloseStream" for item in terminal.provenance)
+    assert session._scoped_drain_task is None
+
+
+@pytest.mark.asyncio
+async def test_native_word_languages_are_retained_without_native_speaker_authority() -> None:
+    session = _session()
+    request = _request(1)
+    await session.begin_turn(request)
+    result = _timed_result(" Hi  好! ", 0.1)
+    result.channel.alternatives[0].languages = ["en", "zh"]
+    result.channel.alternatives[0].words = [
+        types.SimpleNamespace(
+            word="Hi", punctuated_word="Hi", start=0.1, end=0.3, language="en", speaker=0
+        ),
+        types.SimpleNamespace(
+            word="好", punctuated_word="好!", start=0.4, end=0.6, language="zh", speaker=99
+        ),
+    ]
+    session._build_transcript_event(result)
+    update = await _next(session)
+    assert [(run.text, run.language) for run in update.final_language_runs] == [
+        (" Hi", "en"),
+        ("  好! ", "zh"),
+    ]
+    assert "".join(run.text for run in update.final_language_runs) == update.text
+    assert update.final_speaker_runs == ()
+    assert update.provenance.transcription.language_code is None
+    session._scoped_transport_end(False, "test_finished")

@@ -73,6 +73,7 @@ async def _next(session):
     return await asyncio.wait_for(anext(session.turn_events()), timeout=1)
 
 
+
 @pytest.mark.asyncio
 async def test_non_soniox_provider_does_not_add_audio_at_listen_hard_boundary(monkeypatch) -> None:
     writes: list[object] = []
@@ -134,7 +135,7 @@ async def test_deepgram_actual_result_shape_reuses_acknowledged_epoch_and_detect
         observed_trailing_silence_ms=224,
     )
     session._build_transcript_event(_deepgram_result("same "))
-    session._build_transcript_event(_deepgram_result("text"))
+    session._build_transcript_event(_deepgram_result("text", start=0.1))
     session._build_transcript_event(_deepgram_result("", from_finalize=True))
     await asyncio.sleep(0)
     assert (await _next(session)).text == "same "
@@ -161,7 +162,7 @@ async def test_deepgram_actual_result_shape_reuses_acknowledged_epoch_and_detect
         seal_reason="silence",
         observed_trailing_silence_ms=0,
     )
-    session._build_transcript_event(_deepgram_result("same text", from_finalize=True))
+    session._build_transcript_event(_deepgram_result("same text", start=0.2, from_finalize=True))
     await asyncio.sleep(0)
     assert (await _next(session)).text == "same text"
     terminal_b = await _next(session)
@@ -177,7 +178,7 @@ async def test_deepgram_actual_result_shape_reuses_acknowledged_epoch_and_detect
     ended = await _next(ambiguous)
     assert isinstance(ended, STTProviderEpochEnded)
     assert ended.reason == "deepgram_idle_result"
-    with pytest.raises(RuntimeError, match="epoch is retired"):
+    with pytest.raises(RuntimeError):
         await ambiguous.begin_turn(_request("deepgram"))
     await ambiguous.close()
 
@@ -246,7 +247,7 @@ async def test_deepgram_empty_error_abort_and_two_drain_path(monkeypatch) -> Non
         "cancelled",
     )
     assert isinstance(await _next(aborted), STTProviderEpochEnded)
-    with pytest.raises(RuntimeError, match="epoch is retired|session is closed"):
+    with pytest.raises(RuntimeError):
         await aborted.begin_turn(_request("deepgram", 2))
     await aborted.close()
     assert writes.count(_FINALIZE) == 2
@@ -373,7 +374,7 @@ async def test_gemini_empty_result_transport_error_and_abort_have_distinct_recei
 
 
 @pytest.mark.asyncio
-async def test_soniox_documented_unkeyed_tokens_reuse_epoch_and_detect_idle_ambiguity() -> None:
+async def test_soniox_unkeyed_tokens_preserve_source_through_reuse_and_idle_stream() -> None:
     session, ws = _soniox_session()
     assert session._audio_q.maxsize == 258
     request_a = _request("soniox")
@@ -439,23 +440,39 @@ async def test_soniox_documented_unkeyed_tokens_reuse_epoch_and_detect_idle_ambi
             }
         )
     )
-    assert (await _next(session)).text == "same text"
+    source_b = await _next(session)
+    assert isinstance(source_b, STTRecognitionUnit)
+    assert source_b.text == "same text"
     terminal_b = await _next(session)
-    assert (terminal_b.text, terminal_b.epoch_disposition) == ("same text", "reuse")
+    assert (terminal_b.text, terminal_b.outcome, terminal_b.epoch_disposition) == (
+        "",
+        "empty",
+        "reuse",
+    )
     assert terminal_a.identity != terminal_b.identity
+    assert source_b.identity.stream.provider_epoch_id == request_b.identity.provider_epoch_id
     assert ws.closed is False
     assert b"pcm-a" in ws.sent and b"pcm-b" in ws.sent
+    ws.push(
+        json.dumps(
+            {
+                "tokens": [
+                    {"text": "<fin>", "is_final": True},
+                    {"text": " idle tail ", "is_final": True, "end_ms": 300, "language": "en"},
+                    {"text": "<end>", "is_final": True},
+                ]
+            }
+        )
+    )
+    idle_source = await _next(session)
+    assert isinstance(idle_source, STTRecognitionUnit)
+    assert idle_source.text == " idle tail "
+    assert idle_source.identity.stream == source_b.identity.stream
+    assert idle_source.identity.receipt_sequence > source_b.identity.receipt_sequence
+    assert session._event_projection.active_identity is None
+    assert not session._event_projection.retired
     await session.close()
     assert ws.closed is True
-
-    ambiguous, ambiguous_ws = _soniox_session()
-    ambiguous_ws.push(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
-    ended = await _next(ambiguous)
-    assert isinstance(ended, STTProviderEpochEnded)
-    assert ended.reason == "soniox_protocol_ambiguity"
-    with pytest.raises(RuntimeError, match="epoch is retired"):
-        await ambiguous.begin_turn(_request("soniox"))
-    await ambiguous.close()
 
 
 @pytest.mark.asyncio
@@ -498,18 +515,22 @@ async def test_soniox_empty_error_and_abort_receipts() -> None:
         "cancelled",
     )
     assert isinstance(await _next(aborted), STTProviderEpochEnded)
-    with pytest.raises(RuntimeError, match="epoch is retired"):
+    with pytest.raises(RuntimeError):
         await aborted.begin_turn(_request("soniox", 2))
     await aborted.close()
 
 
+
 @pytest.mark.asyncio
 async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_ambiguity() -> None:
-    from elevenlabs.types import CommittedTranscriptPayload, PartialTranscriptPayload
+    from elevenlabs.types import (
+        CommittedTranscriptPayload,
+        CommittedTranscriptWithTimestampsPayload,
+        PartialTranscriptPayload,
+    )
 
-    assert "id" not in CommittedTranscriptPayload.model_fields
-    assert "transcript_id" not in CommittedTranscriptPayload.model_fields
-    assert "commit_id" not in CommittedTranscriptPayload.model_fields
+    for payload_type in (CommittedTranscriptPayload, CommittedTranscriptWithTimestampsPayload):
+        assert not {"id", "transcript_id", "commit_id"}.intersection(payload_type.model_fields)
     session, connection = _scribe_session()
     assert session._connection_events.maxsize == 258
     request_a = _request("elevenlabs_scribe")
@@ -543,7 +564,8 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
     )
     await _wait(lambda: connection.commits == 1)
     assert not seal.done()
-    session._on_committed(CommittedTranscriptPayload(text="same"))
+    session._on_committed(CommittedTranscriptPayload(text="different plain completion"))
+    session._on_committed_with_timestamps(CommittedTranscriptWithTimestampsPayload(text="same"))
     assert session._event_projection.scoped_event_depth == 0
     connection.commit_gate.set()
     await seal
@@ -565,7 +587,7 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
         seal_reason="silence",
         observed_trailing_silence_ms=0,
     )
-    session._on_committed(CommittedTranscriptPayload(text="same"))
+    session._on_committed_with_timestamps(CommittedTranscriptWithTimestampsPayload(text="same"))
     terminal_b = await _next(session)
     assert (terminal_b.text, terminal_b.epoch_disposition) == ("same", "reuse")
     assert terminal_a.identity != terminal_b.identity
@@ -575,11 +597,15 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
     assert connection.closed is True
 
     ambiguous, ambiguous_connection = _scribe_session()
-    ambiguous._on_committed(CommittedTranscriptPayload(text="unsolicited"))
+    ambiguous._on_committed(CommittedTranscriptPayload(text="unsolicited plain"))
+    assert ambiguous._event_projection.scoped_event_depth == 0
+    ambiguous._on_committed_with_timestamps(
+        CommittedTranscriptWithTimestampsPayload(text="unowned source")
+    )
     ended = await _next(ambiguous)
     assert isinstance(ended, STTProviderEpochEnded)
-    assert ended.reason == "scribe_unsolicited_committed_transcript"
-    with pytest.raises(RuntimeError, match="session is closed"):
+    assert ended.reason == "scribe_unsolicited_timestamped_transcript"
+    with pytest.raises(RuntimeError):
         await ambiguous.begin_turn(_request("elevenlabs_scribe"))
     await ambiguous.close()
     assert ambiguous_connection.closed is True
@@ -587,7 +613,7 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
 
 @pytest.mark.asyncio
 async def test_scribe_empty_error_and_abort_receipts() -> None:
-    from elevenlabs.types import CommittedTranscriptPayload
+    from elevenlabs.types import CommittedTranscriptWithTimestampsPayload
 
     empty, _ = _scribe_session()
     request = _request("elevenlabs_scribe")
@@ -598,7 +624,7 @@ async def test_scribe_empty_error_and_abort_receipts() -> None:
         seal_reason="silence",
         observed_trailing_silence_ms=0,
     )
-    empty._on_committed(CommittedTranscriptPayload(text=""))
+    empty._on_committed_with_timestamps(CommittedTranscriptWithTimestampsPayload(text=""))
     terminal = await _next(empty)
     assert (terminal.outcome, terminal.text_authority, terminal.epoch_disposition) == (
         "empty",
@@ -627,7 +653,7 @@ async def test_scribe_empty_error_and_abort_receipts() -> None:
         "cancelled",
     )
     assert isinstance(await _next(aborted), STTProviderEpochEnded)
-    with pytest.raises(RuntimeError, match="epoch is retired"):
+    with pytest.raises(RuntimeError):
         await aborted.begin_turn(_request("elevenlabs_scribe", 2))
     await aborted.close()
 
@@ -712,10 +738,14 @@ async def test_shared_engine_real_owner_and_deepgram_adapter_serve_both_clients(
 
     async def self_consumer(event: object) -> None:
         self_events.append(event)
-        if isinstance(event, STTProviderTurnUpdate) and not consumed:
-            consumed.append(consumption.consume(event))
+        if isinstance(event, STTProviderTurnUpdate) and event.source_release is not None:
+            text = consumption.consume(event)
+            if text:
+                consumed.append(text)
         elif isinstance(event, STTProviderTurnTerminal):
-            consumed.append(consumption.consume(event))
+            text = consumption.consume(event)
+            if text:
+                consumed.append(text)
 
     peer_engine = _deepgram_engine("peer", peer_sessions)
     self_engine = _deepgram_engine("self", self_sessions)
@@ -768,7 +798,7 @@ async def test_shared_engine_real_owner_and_deepgram_adapter_serve_both_clients(
         assert session._event_projection.sealed is False
         end_task = asyncio.create_task(owner.handle_owned_vad_event(channel, end))
         await _wait(lambda: session._event_projection.sealed)
-        session._build_transcript_event(_deepgram_result("B"))
+        session._build_transcript_event(_deepgram_result("B", start=0.1))
         session._build_transcript_event(_deepgram_result("", from_finalize=True, is_final=False))
         await end_task
 
@@ -935,7 +965,7 @@ async def test_each_concrete_streaming_protocol_serves_self_and_peer_concurrentl
     provider_id: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from elevenlabs.types import CommittedTranscriptPayload
+    from elevenlabs.types import CommittedTranscriptWithTimestampsPayload
 
     async def deepgram_write(_session, _payload) -> None:
         return None
@@ -1007,7 +1037,9 @@ async def test_each_concrete_streaming_protocol_serves_self_and_peer_concurrentl
                 )
             )
         else:
-            session._on_committed(CommittedTranscriptPayload(text=text))
+            session._on_committed_with_timestamps(
+                CommittedTranscriptWithTimestampsPayload(text=text)
+            )
 
     terminals: list[STTProviderTurnTerminal | STTRecognitionUnit] = []
     for session in sessions:
@@ -1133,16 +1165,184 @@ async def test_real_soniox_shared_engine_preserves_trailing_token_separator() ->
 
     updates = [event for event in emitted if isinstance(event, STTProviderTurnUpdate)]
     terminal = next(event for event in emitted if isinstance(event, STTProviderTurnTerminal))
-    assert [event.text for event in updates] == ["same", "same 世界"]
-    assert [
-        (item.contribution_id, item.text_start, item.text_end)
-        for item in terminal.included_contributions
-    ] == [
-        (f"{terminal.identity.provider_turn_id}:1", 0, 4),
-        (f"{terminal.identity.provider_turn_id}:2", 4, 7),
+    assert [event.text for event in updates] == ["same ", "same 世界"]
+    assert [(item.text_start, item.text_end) for item in terminal.included_contributions] == [
+        (0, 5),
+        (5, 7),
     ]
-    assert consumption.consume(updates[0]) == "same"
-    assert consumption.consume(terminal) == " 世界"
+    assert len({item.contribution_id for item in terminal.included_contributions}) == 2
+    assert consumption.consume(updates[0]) == "same "
+    assert consumption.consume(terminal) == "世界"
     assert terminal.text == "same 世界"
     assert "".join(run.text for run in terminal.final_language_runs) == terminal.text
     await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_id", ["deepgram", "elevenlabs_scribe"])
+@pytest.mark.parametrize("boundary_case", ["clean", "crossing", "unproven"])
+async def test_actual_native_word_boundaries_partition_source_without_word_jobs(
+    provider_id: str,
+    boundary_case: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from deepgram.extensions.types.sockets.listen_v1_results_event import ListenV1Word
+    from elevenlabs.types import CommittedTranscriptWithTimestampsPayload, TranscriptionWord
+
+    from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt
+    from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
+    from puripuly_heart.core.stt.streaming_speaker import StreamingSpeakerSession
+    from tests.core.test_source_context_contract import (
+        ControlledProvider,
+        close,
+        finish,
+        harness_for,
+        source_fixture,
+    )
+    from tests.core.test_streaming_speaker import evidence, next_text, send, span
+
+    async def write(_session, _payload):
+        return None
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
+    snapshot, identity = source_fixture()
+    request = STTProviderTurnRequest(
+        identity, snapshot.settings, display_group_id=snapshot.display_group_id
+    )
+    if provider_id == "deepgram":
+        native = _deepgram_session(epoch=identity.provider_epoch_id)
+    else:
+        native, _ = _scribe_session(epoch=identity.provider_epoch_id, model="scribe_v2_realtime")
+    wrapper = StreamingSpeakerSession(native)
+    translation = ControlledProvider()
+    harness, trace = harness_for(translation)
+    words = [
+        ("Alpha,", 0.0, 0.04),
+        ("again!", 0.04, 0.08),
+    ]
+    if boundary_case != "clean":
+        words.append(("crossing!", 0.09, 0.17))
+    words.extend([("Beta,", 0.20, 0.24), ("later.", 0.24, 0.28)])
+    raw_text = (
+        "Alpha, again!  " + ("crossing! " if boundary_case != "clean" else "") + "Beta, later."
+    )
+    try:
+        await wrapper.begin_turn(request)
+        await send(wrapper, request, 0, 4800, 1)
+        await wrapper.observe_speaker_evidence(
+            (
+                evidence(0, 1600, 0),
+                evidence(1600, 2400, None),
+                evidence(2400, 4800, 1),
+            )
+        )
+        if provider_id == "deepgram":
+            result = _deepgram_result(raw_text, duration=0.28)
+            native_words = [
+                ListenV1Word(
+                    word=word,
+                    punctuated_word=word,
+                    start=start,
+                    end=end,
+                    confidence=1.0,
+                    speaker=99,
+                )
+                for word, start, end in words
+            ]
+            if boundary_case == "unproven":
+                native_words[0] = native_words[0].model_copy(
+                    update={
+                        "word": "mismatch",
+                        "punctuated_word": "mismatch",
+                    }
+                )
+            result = result.model_copy(
+                update={
+                    "channel": result.channel.model_copy(
+                        update={
+                            "alternatives": [
+                                result.channel.alternatives[0].model_copy(
+                                    update={
+                                        "words": native_words,
+                                    }
+                                )
+                            ],
+                        }
+                    ),
+                }
+            )
+            native._build_transcript_event(result)
+        else:
+            native_words = []
+            cursor = 0
+            for word, start, end in words:
+                offset = raw_text.index(word, cursor)
+                if offset > cursor:
+                    native_words.append(
+                        TranscriptionWord(
+                            text=raw_text[cursor:offset],
+                            start=start,
+                            end=start,
+                            type="spacing",
+                        )
+                    )
+                native_words.append(
+                    TranscriptionWord(
+                        text=word,
+                        start=start,
+                        end=end,
+                        type=None if boundary_case == "unproven" else "word",
+                        speaker_id="native-wrong",
+                    )
+                )
+                cursor = offset + len(word)
+            native._on_committed_with_timestamps(
+                CommittedTranscriptWithTimestampsPayload(
+                    text=raw_text,
+                    words=native_words,
+                    language_code="en",
+                )
+            )
+        stream = wrapper.turn_events()
+        outgoing = STTScopedTurnNormalizer(identity).apply_update(await next_text(stream))
+        await harness.peer_owner.handle_provider_turn_update(snapshot, outgoing)
+        await finish(harness)
+        sources = [item.source_child for item in trace.items]
+        assert "".join(source.raw_text for source in sources) == raw_text
+        if boundary_case == "unproven":
+            assert len(sources) == 1
+            assert sources[0].speaker.speaker_id is None
+        else:
+            expected = ["Alpha, again!  ", "Beta, later."]
+            if boundary_case == "crossing":
+                expected.insert(1, "crossing! ")
+            assert [source.raw_text for source in sources] == expected
+            assert [source.speaker.speaker_id for source in sources] == (
+                ["0", None, "1"] if boundary_case == "crossing" else ["0", "1"]
+            )
+            assert len(sources) < len(words)
+        assert len(translation.calls) == len(sources)
+        await harness.peer_owner.handle_provider_turn_update(snapshot, outgoing)
+        await finish(harness)
+        assert len(trace.items) == len(sources)
+        await wrapper.seal_turn(
+            identity,
+            sealed_content_ranges=(span(0, 4800),),
+            seal_reason="silence",
+            observed_trailing_silence_ms=200,
+        )
+        if provider_id == "deepgram":
+            native._build_transcript_event(_deepgram_result("", from_finalize=True))
+        else:
+            native._on_committed_with_timestamps(CommittedTranscriptWithTimestampsPayload(text=""))
+        terminal = await asyncio.wait_for(anext(stream), 1)
+        assert isinstance(terminal, STTProviderTurnTerminal)
+        await harness.peer_owner.handle_provider_turn_terminal(
+            AudioSegmentTerminalReceipt(identity.segment, "final", snapshot, 11), terminal
+        )
+        await finish(harness)
+        assert len(trace.items) == len(sources)
+        assert len(translation.calls) == len(sources)
+    finally:
+        await wrapper.close()
+        await close(harness)

@@ -930,3 +930,45 @@ async def test_production_cancelled_same_channel_candidate_preserves_live_prepar
         )
         await owner.close()
     assert client.close_calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "channel,provider_id,wrapper_name",
+    [
+        ("peer", "deepgram", "StreamingSpeakerSession"),
+        ("peer", "local_qwen", "CausalBatchSession"),
+        ("self", "deepgram", "Provider"),
+    ],
+)
+async def test_peer_speaker_composition_preserves_batch_and_self_paths(
+    monkeypatch, channel, provider_id, wrapper_name
+):
+    from tests.core.test_streaming_speaker import Provider
+
+    inner = Provider()
+    backend = SimpleNamespace(open_session=lambda **kwargs: asyncio.sleep(0, result=inner))
+    monkeypatch.setattr(
+        runtime_wiring, "create_stt_backend_from_resolved_config", lambda *args, **kwargs: backend
+    )
+    factory = SharedSTTProviderFactory(
+        secrets=object(),
+        clock=FakeClock(),
+        reset_deadline_s=300.0,
+        gpu_model_path=Path("gpu.gguf"),
+    )
+    engine = await factory.create(
+        ProviderRuntimeBuildRequest(
+            config=_resolved_config(channel, provider_id),
+            provider_signature=(provider_id,),
+            runtime_signature=(channel,),
+            recognition_projection="scoped",
+        ),
+        gpu_runtime=object(),
+    )
+    session = await engine.session_factory(None, "epoch")
+    try:
+        assert type(session).__name__ == wrapper_name
+    finally:
+        await session.close()
+        await engine.close()

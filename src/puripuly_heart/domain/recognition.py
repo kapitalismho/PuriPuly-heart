@@ -7,6 +7,7 @@ from uuid import UUID
 if TYPE_CHECKING:
     from puripuly_heart.core.audio.format import AudioCaptureSpan
     from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot
+    from puripuly_heart.core.stt.backend import STTNativeProvenance
     from puripuly_heart.domain.models import SpeakerAttribution
 
 
@@ -121,6 +122,7 @@ class RecognitionTextOrigin:
     speaker_attribution: SpeakerAttribution | None = None
     synthetic_right_context_samples: int = 0
     synthetic_context_sample_rate_hz: int | None = None
+    native_provenance: tuple[STTNativeProvenance, ...] = ()
 
     def __post_init__(self) -> None:
         if self.text_start < 0 or self.text_end < self.text_start:

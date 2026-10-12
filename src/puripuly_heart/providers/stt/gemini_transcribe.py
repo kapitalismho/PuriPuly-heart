@@ -27,6 +27,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnRequest,
     STTRecognitionUnit,
     STTSessionProjection,
+    STTSourceCapabilities,
 )
 from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
@@ -321,6 +322,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
     max_session_age_s: ClassVar[float] = GEMINI_TRANSCRIBE_MAX_SESSION_AGE_S
 
     _event_projection: STTSessionEventProjection = field(init=False, repr=False)
+    _capabilities: STTSourceCapabilities = field(init=False, repr=False)
     _send_queue: asyncio.Queue[_EndStream | _AudioWrite] = field(init=False, repr=False)
     _live_context: Any = field(init=False, default=None, repr=False)
     _live_session: Any = field(init=False, default=None, repr=False)
@@ -351,6 +353,9 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
+        self._capabilities = STTSourceCapabilities(
+            backend_id="gemini_transcribe", model_id=self.model, policy="unknown"
+        )
         self._send_queue = asyncio.Queue(maxsize=258)
 
     async def start(self) -> None:
@@ -647,6 +652,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                     identity=RecognitionUnitIdentity(self._stream, uuid4(), self._receipt_sequence),
                     text=text,
                     provenance=STTNativeProvenance(
+                        capabilities=self._capabilities,
                         transcription=NativeTranscriptionEvidence(
                             finished=getattr(final, "finished", None),
                             language_code=getattr(final, "language_code", None),
@@ -667,7 +673,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                                 )
                                 for word in (getattr(final, "words", None) or ())
                             ),
-                        )
+                        ),
                     ),
                 )
                 if not self._event_projection.put_recognition(unit):

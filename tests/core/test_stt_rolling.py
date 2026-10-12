@@ -12,11 +12,15 @@ from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
     STTBackendTranscriptEvent,
+    STTContributionConsumptionLedger,
+    STTNativeProvenance,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
+    STTProviderTurnTerminal,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
     STTSessionProjection,
+    STTSourceCapabilities,
 )
 from puripuly_heart.core.stt.rolling import (
     RollingProviderDefinition,
@@ -788,7 +792,15 @@ async def test_rolling_gemini_preserves_independent_stream_units_across_local_tu
     else:
         await session.begin_turn(STTProviderTurnRequest(first, settings, channel="peer"))
         await session.begin_turn(STTProviderTurnRequest(second, settings, channel="peer"))
-    original = STTRecognitionUnit(RecognitionUnitIdentity(stream, uuid4(), 1), "first")
+    native_origin = STTNativeProvenance(
+        native_event_id="native-unit",
+        capabilities=STTSourceCapabilities(
+            "gemini_transcribe", "gemini-3.5-transcribe-live", "unknown"
+        ),
+    )
+    original = STTRecognitionUnit(
+        RecognitionUnitIdentity(stream, uuid4(), 1), "first", provenance=native_origin
+    )
     later = STTRecognitionUnit(RecognitionUnitIdentity(stream, uuid4(), 1), "second")
     stale = STTRecognitionUnit(
         RecognitionUnitIdentity(replace(stream, provider_epoch_id="retired"), uuid4(), 2),
@@ -808,6 +820,9 @@ async def test_rolling_gemini_preserves_independent_stream_units_across_local_tu
     assert session.accepts_stream_input and session.independent_recognition_units
     assert inner.audio == [(b"\x00\x01", ())]
     assert inner.fences == ["source_eof"]
+    assert events[0].provenance == events[1].unit.provenance == native_origin
+    assert events[2].provenance.capabilities is None
+    assert events[3].unit.provenance.capabilities is None
     assert [
         item.identity.receipt_sequence for item in events if isinstance(item, STTRecognitionUnit)
     ] == [1, 2]
@@ -822,3 +837,51 @@ async def test_rolling_gemini_preserves_independent_stream_units_across_local_tu
         "second",
     ]
     await session.close()
+
+
+@pytest.mark.asyncio
+async def test_rolling_late_degraded_origin_survives_switch_and_terminal_consumption() -> None:
+    identity = STTProviderTurnIdentity(
+        AudioSegmentIdentity(3, 1, uuid4(), 7),
+        "original-epoch",
+        "original-request",
+        ("original-settings",),
+    )
+    provenance = STTNativeProvenance(
+        native_event_id="late-native-event",
+        native_request_id="original-native-request",
+        capabilities=STTSourceCapabilities(
+            "gemini_transcribe", "gemini-3.5-transcribe-live", "unknown"
+        ),
+    )
+    terminal = STTProviderTurnTerminal(
+        identity=identity,
+        outcome="final",
+        text=" no。 no。 ",
+        text_authority="degraded",
+        provenance=(provenance,),
+    )
+
+    class LateSession(_ScopedScriptedSession):
+        async def turn_events(self):
+            yield terminal
+            yield terminal
+
+    old_definition, _ = _definition(STTProviderName.GEMINI_TRANSCRIBE, LateSession())
+    next_definition, _ = _definition(STTProviderName.DEEPGRAM, _ScopedScriptedSession())
+    backend = _make(old_definition, next_definition)
+    old_session = await backend.open_session()
+    backend._handle_session_error(old_definition, RuntimeError("daily quota exceeded"))
+    successor = await backend.open_session()
+    assert successor.provider_name is STTProviderName.DEEPGRAM
+    ledger = STTContributionConsumptionLedger()
+    emitted = []
+    async for event in old_session.turn_events():
+        assert event.identity == identity
+        assert event.provenance == (provenance,)
+        assert event.text_authority == "degraded"
+        emitted.append(ledger.consume(event))
+    assert emitted == [" no。 no。 ", ""]
+    assert ledger.lifecycle(identity)[1]
+    await old_session.close()
+    await successor.close()

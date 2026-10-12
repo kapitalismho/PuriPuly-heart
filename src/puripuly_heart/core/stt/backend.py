@@ -113,6 +113,44 @@ class STTSourceAudio:
 
 
 @dataclass(frozen=True, slots=True)
+class STTSourceCapabilities:
+    backend_id: str
+    model_id: str | None = None
+    policy: Literal["timed", "whole_span", "unknown"] = "unknown"
+    optional_progress: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class STTAudioClock:
+    clock_id: str
+    sample_rate_hz: int
+    origin_sent_sample: int | None = None
+    qualified: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.clock_id or self.sample_rate_hz <= 0:
+            raise ValueError("invalid source clock")
+
+
+@dataclass(frozen=True, slots=True)
+class STTTextTiming:
+    contribution_id: str
+    text_start: int
+    text_end: int
+    semantics: Literal["word_interval", "subword_interval", "token_point", "result_span"]
+    raw_start: float | None = None
+    raw_end: float | None = None
+    unit: Literal["s", "ms"] = "s"
+    clock_id: str | None = None
+    complete_boundary: bool = False
+    estimated: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.contribution_id or self.text_start < 0 or self.text_end < self.text_start:
+            raise ValueError("invalid text timing range")
+
+
+@dataclass(frozen=True, slots=True)
 class STTNativeProvenance:
     native_event_id: str | None = None
     native_request_id: str | None = None
@@ -121,6 +159,15 @@ class STTNativeProvenance:
     barrier: str | None = None
     from_finalize: bool | None = None
     transcription: NativeTranscriptionEvidence | None = None
+    capabilities: STTSourceCapabilities | None = None
+    text_timing: tuple[STTTextTiming, ...] = ()
+    audio_clocks: tuple[STTAudioClock, ...] = ()
+    native_audio_progress: tuple[tuple[str, float], ...] = ()
+    sent_until_sample: int | None = None
+    control_id: str | None = None
+    control_kind: str | None = None
+    control_sent_sample: int | None = None
+    native_model_metadata: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,10 +274,30 @@ class STTAudioBoundary:
     observed_at_monotonic_s: float
     reason: Literal["speaker", "natural", "hardcut"]
     speaker_epoch: str | None = None
+    transition_start_sample: int | None = None
+    transition_end_sample: int | None = None
 
     def __post_init__(self) -> None:
         if not self.boundary_id or self.capture_epoch < 0 or self.normalized_sample < 0:
             raise ValueError("invalid audio boundary")
+        if (self.transition_start_sample is None) != (self.transition_end_sample is None):
+            raise ValueError("audio transition requires both interval endpoints")
+        if self.transition_start_sample is not None and (
+            self.transition_start_sample < 0
+            or self.transition_start_sample > self.transition_end_sample
+            or self.normalized_sample != self.transition_end_sample
+        ):
+            raise ValueError("invalid audio transition interval")
+
+
+@dataclass(frozen=True, slots=True)
+class STTProviderAudioBoundary:
+    identity: STTProviderTurnIdentity
+    boundary: STTAudioBoundary
+
+    def __post_init__(self) -> None:
+        if self.identity.segment.capture_epoch != self.boundary.capture_epoch:
+            raise ValueError("audio boundary belongs to another capture epoch")
 
 
 @dataclass(frozen=True, slots=True)
@@ -658,6 +725,7 @@ STTProviderTurnEvent = (
     | STTProviderEpochEnded
     | STTProviderInputTerminal
     | STTRecognitionUnit
+    | STTProviderAudioBoundary
     | STTRecognitionUnitTerminal
 )
 

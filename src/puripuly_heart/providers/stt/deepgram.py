@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Sequence
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
@@ -18,6 +18,7 @@ from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
+    STTAudioClock,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
@@ -27,12 +28,43 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTSessionProjection,
+    STTSourceCapabilities,
+    STTSourceRelease,
+    STTTextContribution,
+    STTTextTiming,
 )
 from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
+from puripuly_heart.domain.models import FinalLanguageRun
+from puripuly_heart.domain.recognition import NativeTranscriptionEvidence
 
 logger = logging.getLogger(__name__)
 _DEEPGRAM_KEYTERM_MODEL = "nova-3"
+
+
+def _native_language_runs(
+    text: str, words: Sequence[Any], language: str | None
+) -> tuple[FinalLanguageRun, ...]:
+    runs = []
+    cursor = 0
+    for word in words:
+        word_text = getattr(word, "punctuated_word", None) or getattr(word, "word", None)
+        word_language = getattr(word, "language", None) or language
+        if not isinstance(word_text, str) or not word_text or not word_language:
+            return (FinalLanguageRun(text, language),) if text and language else ()
+        offset = text.find(word_text, cursor)
+        if offset < 0 or text[cursor:offset].strip():
+            return (FinalLanguageRun(text, language),) if text and language else ()
+        end = offset + len(word_text)
+        runs.append(FinalLanguageRun(text[cursor:end], str(word_language)))
+        cursor = end
+    if cursor < len(text):
+        if runs and not text[cursor:].strip():
+            previous = runs[-1]
+            runs[-1] = FinalLanguageRun(previous.text + text[cursor:], previous.language)
+        else:
+            return (FinalLanguageRun(text, language),) if text and language else ()
+    return tuple(runs)
 
 
 @dataclass(slots=True)
@@ -136,9 +168,25 @@ class _DeepgramSDKSession(STTBackendSession):
     _scoped_provenance: list[STTNativeProvenance] = field(
         init=False, default_factory=list, repr=False
     )
+    _scoped_language_runs: list[FinalLanguageRun] = field(
+        init=False, default_factory=list, repr=False
+    )
     _scoped_close_sent: bool = field(init=False, default=False, repr=False)
     _scoped_drain_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _drain_tasks: set[asyncio.Task[None]] = field(init=False, default_factory=set, repr=False)
+    _scoped_contributions: list[STTTextContribution] = field(
+        init=False, default_factory=list, repr=False
+    )
+    _final_segment_ids: dict[tuple[object, ...], None] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    _sent_samples: int = field(init=False, default=0, repr=False)
+    _finalize_control_id: str | None = field(init=False, default=None, repr=False)
+    _scoped_close_written: bool = field(init=False, default=False, repr=False)
+    _finalize_sent_sample: int | None = field(init=False, default=None, repr=False)
+    _scoped_text_length: int = field(init=False, default=0, repr=False)
+    _last_final_start: float | None = field(init=False, default=None, repr=False)
+    _clock_discontinuous: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
@@ -170,26 +218,138 @@ class _DeepgramSDKSession(STTBackendSession):
             raw_transcript = ""
         else:
             return None
-        transcript = raw_transcript.strip()
+        transcript = raw_transcript
         request_id = getattr(metadata, "request_id", None)
+        model_info = getattr(metadata, "model_info", None)
+        effective_model = getattr(model_info, "name", None) or self.model
+        words = (getattr(alternative, "words", None) or ()) if alternatives else ()
+        languages = getattr(alternative, "languages", None) if alternatives else None
+        language = str(languages[0]) if languages and len(languages) == 1 else None
+        language_runs = _native_language_runs(raw_transcript, words, language)
+        model_metadata = tuple(
+            (key, str(value))
+            for key, value in (
+                ("name", getattr(model_info, "name", None)),
+                ("version", getattr(model_info, "version", None)),
+                ("arch", getattr(model_info, "arch", None)),
+                ("model_uuid", getattr(metadata, "model_uuid", None)),
+            )
+            if value is not None
+        )
+        qualified = self.model == "nova-3" and effective_model in {"nova-3", "general-nova-3"}
+        start = getattr(result, "start", None)
+        duration = getattr(result, "duration", None)
+        segment_key = None
+        if isinstance(start, (int, float)) and isinstance(duration, (int, float)):
+            segment_key = (
+                request_id,
+                tuple(getattr(result, "channel_index", ()) or ()),
+                start,
+                duration,
+            )
+            if is_final and raw_transcript and segment_key not in self._final_segment_ids:
+                if self._last_final_start is not None and start < self._last_final_start:
+                    self._clock_discontinuous = True
+                self._last_final_start = start
+        qualified = qualified and not self._clock_discontinuous
+        clock_id = f"deepgram:{self.projection.provider_epoch_id or request_id or 'connection'}"
         provenance = STTNativeProvenance(
             native_request_id=str(request_id) if request_id is not None else None,
-            barrier="finalize_ack" if from_finalize else None,
+            barrier="finalize_ack" if from_finalize else ("is_final" if is_final else None),
             from_finalize=from_finalize,
+            capabilities=STTSourceCapabilities(
+                backend_id="deepgram",
+                model_id=str(effective_model),
+                policy="timed" if qualified else "unknown",
+            ),
+            audio_clocks=(STTAudioClock(clock_id, self.sample_rate_hz, 0, qualified),),
+            sent_until_sample=self._sent_samples,
+            control_id=self._finalize_control_id if from_finalize else None,
+            control_kind="Finalize" if from_finalize else None,
+            control_sent_sample=self._finalize_sent_sample if from_finalize else None,
+            transcription=NativeTranscriptionEvidence(
+                finished=bool(speech_final),
+                language_code=language,
+                words=tuple(
+                    (
+                        getattr(word, "punctuated_word", None) or getattr(word, "word", None),
+                        str(word.start) if getattr(word, "start", None) is not None else None,
+                        str(word.end) if getattr(word, "end", None) is not None else None,
+                    )
+                    for word in words
+                ),
+            ),
+            native_model_metadata=model_metadata,
         )
         if self._event_projection.is_scoped:
+            if is_final and raw_transcript and segment_key is not None:
+                if segment_key in self._final_segment_ids:
+                    raw_transcript = ""
+                else:
+                    self._final_segment_ids[segment_key] = None
+                    if len(self._final_segment_ids) > 256:
+                        del self._final_segment_ids[next(iter(self._final_segment_ids))]
+            identity = self._event_projection.active_identity
+            if identity is not None and is_final and raw_transcript:
+                text_start = self._scoped_text_length
+                contribution_id = (
+                    f"{identity.provider_turn_id}:segment:{len(self._scoped_contributions) + 1}"
+                )
+                timings = []
+                if isinstance(start, (int, float)) and isinstance(duration, (int, float)):
+                    timings.append(
+                        STTTextTiming(
+                            contribution_id,
+                            text_start,
+                            text_start + len(raw_transcript),
+                            "result_span",
+                            start,
+                            start + duration,
+                            clock_id=clock_id,
+                            complete_boundary=True,
+                            estimated=True,
+                        )
+                    )
+                cursor = 0
+                for word in words:
+                    word_text = getattr(word, "punctuated_word", None) or getattr(
+                        word, "word", None
+                    )
+                    if not isinstance(word_text, str) or not word_text:
+                        continue
+                    offset = raw_transcript.find(word_text, cursor)
+                    if offset < 0 or raw_transcript[cursor:offset].strip():
+                        continue
+                    cursor = offset + len(word_text)
+                    timings.append(
+                        STTTextTiming(
+                            contribution_id,
+                            text_start + offset,
+                            text_start + cursor,
+                            "word_interval",
+                            getattr(word, "start", None),
+                            getattr(word, "end", None),
+                            clock_id=clock_id,
+                            complete_boundary=True,
+                            estimated=True,
+                        )
+                    )
+                provenance = replace(provenance, text_timing=tuple(timings))
             self._handle_scoped_result(
-                self._event_projection.active_identity,
+                identity,
                 raw_transcript,
                 bool(is_final),
                 from_finalize,
                 provenance,
+                language_runs,
             )
-        if self._event_projection.is_scoped or not (is_final or speech_final or from_finalize):
+        if self._event_projection.is_scoped or not (is_final or from_finalize):
             return None
         if not transcript:
             return STTBackendTranscriptEvent(text="", is_final=True)
-        return STTBackendTranscriptEvent(text=transcript, is_final=True)
+        return STTBackendTranscriptEvent(
+            text=transcript, is_final=True, final_language_runs=language_runs
+        )
 
     def _handle_scoped_result(
         self,
@@ -198,6 +358,7 @@ class _DeepgramSDKSession(STTBackendSession):
         is_final: bool,
         from_finalize: bool,
         provenance: STTNativeProvenance,
+        language_runs: tuple[FinalLanguageRun, ...] = (),
     ) -> None:
         if identity is None:
             if is_final or from_finalize:
@@ -211,6 +372,16 @@ class _DeepgramSDKSession(STTBackendSession):
         if is_final and text:
             self._scoped_fragments.append(text)
             self._scoped_provenance.append(provenance)
+            self._scoped_language_runs.extend(language_runs or (FinalLanguageRun(text, ""),))
+            text_start = self._scoped_text_length
+            self._scoped_text_length += len(text)
+            contribution_id = (
+                provenance.text_timing[0].contribution_id
+                if provenance.text_timing
+                else f"{identity.provider_turn_id}:segment:{len(self._scoped_contributions) + 1}"
+            )
+            contribution = STTTextContribution(contribution_id, text_start, text_start + len(text))
+            self._scoped_contributions.append(contribution)
             sequence = self._event_projection.next_update_sequence(identity)
             if sequence is not None:
                 self._event_projection.put_update(
@@ -220,7 +391,12 @@ class _DeepgramSDKSession(STTBackendSession):
                         stability="stable",
                         assembly="append",
                         text=text,
+                        final_language_runs=language_runs,
                         provenance=provenance,
+                        contribution=contribution,
+                        source_release=STTSourceRelease(
+                            f"{contribution_id}:final", 0, contribution.text_end, "end"
+                        ),
                     )
                 )
         if from_finalize:
@@ -279,15 +455,20 @@ class _DeepgramSDKSession(STTBackendSession):
                 identity=identity,
                 outcome=outcome,
                 text=text,
+                final_language_runs=tuple(self._scoped_language_runs),
                 text_authority=authority,
                 failure_reason=degraded_reason,
                 epoch_disposition=epoch_disposition,
                 provenance=tuple(self._scoped_provenance),
                 failure_diagnostics=failure_diagnostics,
+                included_contributions=tuple(self._scoped_contributions),
             )
         )
         self._scoped_fragments.clear()
         self._scoped_provenance.clear()
+        self._scoped_contributions.clear()
+        self._scoped_text_length = 0
+        self._scoped_language_runs.clear()
 
     def _scoped_transport_end(
         self, orderly: bool, reason: str, exception: BaseException | None = None
@@ -311,7 +492,12 @@ class _DeepgramSDKSession(STTBackendSession):
         identity = self._event_projection.active_identity
         provider_turn_id = identity.provider_turn_id if identity is not None else None
         if identity is not None:
-            if orderly and self._scoped_close_sent and self._event_projection.sealed:
+            if (
+                orderly
+                and self._scoped_close_written
+                and self._event_projection.sealed
+                and reason == "deepgram_connection_closed"
+            ):
                 self._terminalize_scoped(
                     epoch_disposition="retire",
                     empty_is_success=True,
@@ -466,7 +652,7 @@ class _DeepgramSDKSession(STTBackendSession):
             self._stopped = True
             self._startup_done.set()
             self._put_event(None)
-            self._scoped_transport_end(self._scoped_close_sent, "deepgram_writer_ended")
+            self._scoped_transport_end(False, "deepgram_writer_ended")
 
     async def _listen_loop(self, connection: Any) -> None:
         try:
@@ -588,6 +774,11 @@ class _DeepgramSDKSession(STTBackendSession):
         self._event_projection.begin(request)
         self._scoped_fragments.clear()
         self._scoped_provenance.clear()
+        self._scoped_contributions.clear()
+        self._scoped_text_length = 0
+        self._scoped_language_runs.clear()
+        self._finalize_control_id = None
+        self._finalize_sent_sample = None
 
     async def send_turn_audio(
         self,
@@ -600,6 +791,7 @@ class _DeepgramSDKSession(STTBackendSession):
     ) -> None:
         self._event_projection.validate_payload(identity, payload_sequence)
         await self._write_payload(pcm16le)
+        self._sent_samples += len(pcm16le) // 2
         self._event_projection.payload_written(identity, payload_sequence)
 
     async def seal_turn(
@@ -612,6 +804,8 @@ class _DeepgramSDKSession(STTBackendSession):
     ) -> None:
         self._event_projection.seal(identity)
         _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
+        self._finalize_control_id = f"{identity.provider_turn_id}:finalize"
+        self._finalize_sent_sample = self._sent_samples
         await self._write_payload(_FINALIZE)
         if self._event_projection.is_current(identity):
             task = asyncio.create_task(self._missing_finalize_ack(identity), name="deepgram-drain")
@@ -626,6 +820,18 @@ class _DeepgramSDKSession(STTBackendSession):
                 return
             self._scoped_close_sent = True
             await self._write_payload(_CLOSE_STREAM)
+            self._scoped_close_written = True
+            if not self._event_projection.is_current(identity):
+                return
+            self._scoped_provenance.append(
+                STTNativeProvenance(
+                    barrier="close_stream",
+                    control_id=f"{identity.provider_turn_id}:close",
+                    control_kind="CloseStream",
+                    control_sent_sample=self._sent_samples,
+                    sent_until_sample=self._sent_samples,
+                )
+            )
             await asyncio.sleep(self.drain_timeout_s)
         except asyncio.CancelledError:
             return
@@ -669,6 +875,9 @@ class _DeepgramSDKSession(STTBackendSession):
         )
         self._scoped_fragments.clear()
         self._scoped_provenance.clear()
+        self._scoped_contributions.clear()
+        self._scoped_text_length = 0
+        self._scoped_language_runs.clear()
         self._scoped_close_sent = True
         if not self._stopped:
             await self._write_payload(_CLOSE_STREAM)
@@ -711,7 +920,6 @@ class _DeepgramSDKSession(STTBackendSession):
         if self._stopped:
             return
         self._stopped = True
-        self._scoped_close_sent = True
         try:
             self._audio_q.put_nowait(_STOP)
         except asyncio.QueueFull:

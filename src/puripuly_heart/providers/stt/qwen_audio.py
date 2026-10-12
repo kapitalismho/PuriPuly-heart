@@ -11,6 +11,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Literal
 
+from puripuly_heart.config.alibaba_connection import workspace_api_host_region
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.diagnostics import emit_failure
@@ -18,6 +19,7 @@ from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
     RecoverableSTTSessionError,
+    STTAudioClock,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
@@ -27,6 +29,10 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTSessionProjection,
+    STTSourceCapabilities,
+    STTSourceRelease,
+    STTTextContribution,
+    STTTextTiming,
 )
 from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
@@ -307,6 +313,7 @@ class _QwenAudioSession(STTBackendSession):
         slot.task = task
         self._next_slot = 1 - self._next_slot
         return task
+
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if request.channel != self.backend.channel:

@@ -905,7 +905,7 @@ async def test_soniox_empty_final_boundary_clears_previous_segment_before_next_f
 
 
 @pytest.mark.asyncio
-async def test_soniox_whitespace_final_boundary_emits_empty_final_ack() -> None:
+async def test_soniox_whitespace_final_boundary_preserves_raw_source() -> None:
     session = _make_session()
 
     await session.on_speech_end(trailing_silence_ms=0)
@@ -924,7 +924,7 @@ async def test_soniox_whitespace_final_boundary_emits_empty_final_ack() -> None:
     )
 
     event = session._event_projection._legacy_events.get_nowait()
-    assert event.text == ""
+    assert event.text == "   "
     assert event.is_final is True
 
 
@@ -1521,7 +1521,7 @@ async def test_soniox_protocol_rejection_logs_safe_detail_once(
 
 
 @pytest.mark.asyncio
-async def test_soniox_idle_fin_is_epoch_fault_not_previous_turn(caplog) -> None:
+async def test_soniox_duplicate_idle_fin_has_no_source_or_epoch_fault(caplog) -> None:
     session = _make_session(
         projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
     )
@@ -1531,17 +1531,14 @@ async def test_soniox_idle_fin_is_epoch_fault_not_previous_turn(caplog) -> None:
         await session.begin_turn(request)
         session._event_projection.seal(request.identity)
         session._pending_finalize_requests = 1
+        session._written_manual_target = request.identity
         session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
         session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
         session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
     events = _soniox_events(caplog)
-    assert [event["event"] for event in events] == ["turn_end", "session_fault"]
+    assert [event["event"] for event in events] == ["turn_end"]
     assert events[0]["trigger"] == "fin"
-    assert events[1]["turn"] == "none"
-    assert events[1]["utterance_id"] == "none"
-    assert events[1]["epoch"] == "epoch-1"
-    assert events[1]["protocol_detail"] == "fin_without_turn"
-    assert events[1]["fin_received"] == "true"
+    assert session._event_projection.retired is False
 
 
 @pytest.mark.asyncio
@@ -1630,19 +1627,20 @@ async def test_soniox_delayed_finalize_write_never_claims_next_turn(caplog) -> N
         while session._audio_q.empty():
             await asyncio.sleep(0)
         session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
-        seal.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await seal
-        await session.begin_turn(second)
+        assert session._event_projection.active_identity == first.identity
+        assert session._pending_finalize_requests == 1
+        with pytest.raises(RuntimeError, match="unresolved turn"):
+            await session.begin_turn(second)
         writer = asyncio.create_task(session._send_loop())
-        while not session._audio_q.empty():
-            await asyncio.sleep(0)
+        await seal
+        session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
+        await session.begin_turn(second)
         await session.stop()
         await writer
     first_log, second_log = _soniox_events(caplog)
     assert first_log["turn"] == "turn-1"
     assert first_log["finalize_requested"] == "true"
-    assert first_log["finalize_written"] == "false"
+    assert first_log["finalize_written"] == "true"
     assert second_log["turn"] == "turn-2"
     assert second_log["trigger"] == "local_stop"
     assert second_log["finalize_requested"] == "false"

@@ -51,6 +51,7 @@ from puripuly_heart.core.stt.scoped_engine import (
     STTRetentionProfile,
 )
 from puripuly_heart.core.stt.scoped_normalizer import STTNormalizationDiagnostic
+from puripuly_heart.core.stt.streaming_speaker import StreamingSpeakerSession
 from puripuly_heart.providers.stt.gemini_transcribe import (
     GEMINI_TRANSCRIBE_MAX_SESSION_AGE_S,
 )
@@ -181,6 +182,8 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
             ):
                 if config.channel == "peer" and str(config.provider) in _LOCAL_PROVIDER_IDS:
                     return CausalBatchSession(session, clock=self.clock.now)
+                if config.channel == "peer":
+                    return StreamingSpeakerSession(session, clock=self.clock.now)
                 return session
             try:
                 await session.close()

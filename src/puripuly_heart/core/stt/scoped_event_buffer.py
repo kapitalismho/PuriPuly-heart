@@ -5,6 +5,7 @@ from collections import deque
 from collections.abc import AsyncIterator
 
 from puripuly_heart.core.stt.backend import (
+    STTProviderAudioBoundary,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
     STTProviderTurnEvent,
@@ -51,6 +52,8 @@ class STTProviderEventBuffer:
         size = _recognition_bytes(event)
         if size + self._recognition_bytes > self.MAX_RECOGNITION_BYTES:
             self._fail_epoch(epoch_id)
+            return False
+        if isinstance(event, STTProviderAudioBoundary) and len(self._events) >= self._max_events:
             return False
         if _is_provisional_snapshot(event):
             self._remove_matching_provisional_snapshots(event)
@@ -149,7 +152,8 @@ class STTProviderEventBuffer:
             queued
             for queued in self._events
             if not (
-                _event_epoch_id(queued) == epoch_id and isinstance(queued, STTProviderTurnUpdate)
+                _event_epoch_id(queued) == epoch_id
+                and isinstance(queued, (STTProviderTurnUpdate, STTProviderAudioBoundary))
             )
         )
         if len(retained) >= self._max_events + 1:

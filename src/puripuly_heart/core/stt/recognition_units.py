@@ -77,7 +77,13 @@ def recognition_transcript(
         ),
         source_order=publication_order,
         recognition_origins=(
-            RecognitionTextOrigin(unit.identity, 0, len(unit.text), unit.provenance.transcription),
+            RecognitionTextOrigin(
+                unit.identity,
+                0,
+                len(unit.text),
+                unit.provenance.transcription,
+                native_provenance=(unit.provenance,),
+            ),
         ),
     )
 
@@ -131,12 +137,12 @@ def contribution_transcript(
                 contribution_id=piece.contribution_id,
                 contribution_range=(piece.text_start, piece.text_end),
                 source_ranges=audio.source_ranges if audio is not None else snapshot.content_ranges,
-                context_ranges=audio.context_ranges
-                if audio is not None
-                else snapshot.context_ranges,
-                display_group_id=audio.display_group_id
-                if audio is not None
-                else snapshot.display_group_id,
+                context_ranges=(
+                    audio.context_ranges if audio is not None else snapshot.context_ranges
+                ),
+                display_group_id=(
+                    audio.display_group_id if audio is not None else snapshot.display_group_id
+                ),
                 source_binding="request_owned",
                 order_basis="capture_order",
                 ownership="request",
@@ -148,6 +154,11 @@ def contribution_transcript(
                 ),
                 synthetic_context_sample_rate_hz=(
                     audio.synthetic_context_sample_rate_hz if audio is not None else None
+                ),
+                native_provenance=(
+                    (event.provenance,)
+                    if isinstance(event, STTProviderTurnUpdate)
+                    else event.provenance
                 ),
             )
         )

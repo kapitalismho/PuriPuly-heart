@@ -22,6 +22,7 @@ from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
 from puripuly_heart.core.stt.backend import (
+    STTProviderAudioBoundary,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
     STTProviderTurnIdentity,
@@ -246,6 +247,12 @@ class TranslationChannelOwnerCallbacks:
         )
 
     async def peer_event_handler(self, event: object) -> None:
+        if isinstance(event, STTProviderAudioBoundary):
+            async with self._recognition_locks["peer"]:
+                snapshot = self._require_peer_capture().provider_source_snapshot(event.identity)
+                if snapshot is not None and self._peer_provider_identity_is_current(event.identity):
+                    self._require_peer().note_audio_boundary(event.identity, event.boundary)
+            return
         if isinstance(event, STTProviderInputTerminal):
             if event.channel != "peer":
                 raise ValueError("Peer input terminal belongs to another channel")
@@ -278,13 +285,20 @@ class TranslationChannelOwnerCallbacks:
                 if not self._peer_provider_identity_is_current(event.identity):
                     peer.retire_provider_turn(event.identity)
                     event = replace(
-                        event, outcome="cancelled", text="", text_authority="none",
-                        final_language_runs=(), final_speaker_runs=(), included_contributions=(),
+                        event,
+                        outcome="cancelled",
+                        text="",
+                        text_authority="none",
+                        final_language_runs=(),
+                        final_speaker_runs=(),
+                        included_contributions=(),
                     )
                 admissions = self._require_peer_capture().admit_provider_terminal(event)
-                if not admissions and self._require_peer_capture().provider_source_snapshot(
-                    event.identity
-                ) is None:
+                if (
+                    not admissions
+                    and self._require_peer_capture().provider_source_snapshot(event.identity)
+                    is None
+                ):
                     peer.retire_provider_turn(event.identity)
                 for receipt, terminal in admissions:
                     await peer.handle_provider_turn_terminal(receipt, terminal)
@@ -294,8 +308,11 @@ class TranslationChannelOwnerCallbacks:
 
     def _peer_provider_identity_is_current(self, identity: STTProviderTurnIdentity) -> bool:
         stream = RecognitionStreamIdentity(
-            "peer", identity.segment.activation_generation, identity.segment.capture_epoch,
-            identity.provider_epoch_id, identity.settings_scope,
+            "peer",
+            identity.segment.activation_generation,
+            identity.segment.capture_epoch,
+            identity.provider_epoch_id,
+            identity.settings_scope,
         )
         return self._require_peer().local_asr_runtime.is_current_recognition_stream("peer", stream)
 
@@ -307,13 +324,16 @@ class TranslationChannelOwnerCallbacks:
         )
 
     async def retired_event_handler(self, event: object) -> None:
-        if isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal) and self._peer_capture is not None:
+        if (
+            isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal)
+            and self._peer_capture is not None
+        ):
             if self._peer_capture.owns_provider_turn(event.identity):
                 await self.peer_event_handler(event)
                 return
-            if isinstance(event, STTProviderTurnTerminal) and self._require_peer().retire_provider_turn(
-                event.identity
-            ):
+            if isinstance(
+                event, STTProviderTurnTerminal
+            ) and self._require_peer().retire_provider_turn(event.identity):
                 return
         if isinstance(event, STTProviderInputTerminal):
             if event.channel == "self":

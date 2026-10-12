@@ -15,6 +15,7 @@ from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_f
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
+    STTAudioClock,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
@@ -24,9 +25,14 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTSessionProjection,
+    STTSourceCapabilities,
+    STTSourceRelease,
+    STTTextContribution,
+    STTTextTiming,
 )
 from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
+from puripuly_heart.domain.recognition import NativeTranscriptionEvidence
 
 logger = logging.getLogger(__name__)
 
@@ -327,6 +333,22 @@ class _ElevenLabsScribeSession(STTBackendSession):
     _pending_committed: tuple[STTProviderTurnIdentity, str, STTNativeProvenance] | None = field(
         init=False, default=None, repr=False
     )
+    _pending_plain: tuple[STTProviderTurnIdentity | None, str, STTNativeProvenance] | None = field(
+        init=False, default=None, repr=False
+    )
+    _plain_fallback_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _plain_fallback_timeout_s: float = field(init=False, default=1.5, repr=False)
+    _scoped_fragments: list[str] = field(init=False, default_factory=list, repr=False)
+    _scoped_contributions: list[STTTextContribution] = field(
+        init=False, default_factory=list, repr=False
+    )
+    _scoped_text_length: int = field(init=False, default=0, repr=False)
+    _sent_samples: int = field(init=False, default=0, repr=False)
+    _commit_sent_sample: int | None = field(init=False, default=None, repr=False)
+    _seen_cwt: dict[tuple[object, ...], None] = field(init=False, default_factory=dict, repr=False)
+    _completed_commits: int = field(init=False, default=0, repr=False)
+    _last_cwt_start: float | None = field(init=False, default=None, repr=False)
+    _clock_discontinuous: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
@@ -347,6 +369,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
             commit_strategy=CommitStrategy.MANUAL,
             language_code=self.language_code,
             keyterms=list(self.keyterms) if self.keyterms else None,
+            include_timestamps=True,
         )
         if self.scribe_connect_factory is not None:
             connection = await asyncio.wait_for(
@@ -365,6 +388,9 @@ class _ElevenLabsScribeSession(STTBackendSession):
         self._connection.on(RealtimeEvents.FINAL_TRANSCRIPT, self._on_partial)
         self._connection.on(RealtimeEvents.FINAL_TRANSCRIPT_WITH_TIMESTAMPS, self._on_partial)
         self._connection.on(RealtimeEvents.COMMITTED_TRANSCRIPT, self._on_committed)
+        self._connection.on(
+            RealtimeEvents.COMMITTED_TRANSCRIPT_WITH_TIMESTAMPS, self._on_committed_with_timestamps
+        )
         self._connection.on(RealtimeEvents.QUOTA_EXCEEDED, self._on_error_event)
         self._connection.on(RealtimeEvents.AUTH_ERROR, self._on_error_event)
         self._connection.on(RealtimeEvents.RATE_LIMITED, self._on_error_event)
@@ -417,28 +443,154 @@ class _ElevenLabsScribeSession(STTBackendSession):
         )
 
     def _on_committed(self, data: Any) -> None:
+        if self._stopped:
+            return
         try:
             text = self._committed_text(data)
         except TypeError, ValueError:
             self._protocol_failure("scribe_committed_transcript_missing_text")
             return
         if self._event_projection.is_legacy:
-            self._enqueue_connection_event(STTBackendTranscriptEvent(text=text, is_final=True))
+            self._pending_plain = (None, text, self._event_provenance(data))
+            self._schedule_plain_fallback()
             return
         identity = self._event_projection.active_identity
         if identity is None:
-            self._protocol_failure("scribe_unsolicited_committed_transcript")
             return
         if self._commit_identity != identity or not self._event_projection.sealed:
             return
         provenance = self._event_provenance(data, barrier="committed_transcript")
-        if self._commit_write_in_flight:
-            if self._pending_committed is not None:
-                self._protocol_failure("scribe_duplicate_committed_transcript")
-                return
-            self._pending_committed = (identity, text, provenance)
+        if self._pending_plain is None:
+            self._pending_plain = (identity, text, provenance)
+        if not self._commit_write_in_flight:
+            self._schedule_plain_fallback()
+
+    def _on_committed_with_timestamps(self, data: Any) -> None:
+        if self._stopped:
             return
-        self._finish_committed(identity, text, provenance)
+        try:
+            text = self._committed_text(data)
+        except TypeError, ValueError:
+            self._protocol_failure("scribe_timestamped_transcript_missing_text")
+            return
+        words = self._event_value(data, "words") or ()
+        key = tuple(
+            (self._event_value(word, "start"), self._event_value(word, "end")) for word in words
+        )
+        if (
+            self.model == ELEVENLABS_SCRIBE_STT_MODEL
+            and key
+            and any(start is not None or end is not None for start, end in key)
+        ):
+            if key in self._seen_cwt:
+                return
+            self._seen_cwt[key] = None
+            if len(self._seen_cwt) > 256:
+                del self._seen_cwt[next(iter(self._seen_cwt))]
+        starts = [start for start, _end in key if isinstance(start, (int, float))]
+        if starts:
+            start = min(starts)
+            if self._last_cwt_start is not None and start < self._last_cwt_start:
+                self._clock_discontinuous = True
+            self._last_cwt_start = start
+        if self._event_projection.is_legacy:
+            self._cancel_plain_fallback()
+            self._pending_plain = None
+            self._enqueue_connection_event(STTBackendTranscriptEvent(text=text, is_final=True))
+            self._completed_commits += 1
+            return
+        identity = self._event_projection.active_identity
+        if identity is None:
+            self._protocol_failure("scribe_unsolicited_timestamped_transcript")
+            return
+        provenance = self._event_provenance(data, barrier="committed_transcript_with_timestamps")
+        if self._event_projection.sealed and self._commit_identity == identity:
+            if self._commit_write_in_flight:
+                if self._pending_committed is None:
+                    self._pending_committed = (identity, text, provenance)
+                return
+            self._finish_committed(identity, text, provenance)
+            return
+        self._append_committed_source(identity, text, provenance, release=True)
+        self._completed_commits += 1
+
+    def _schedule_plain_fallback(self) -> None:
+        if self._plain_fallback_task is None:
+            self._plain_fallback_task = asyncio.create_task(self._plain_fallback())
+
+    def _cancel_plain_fallback(self) -> None:
+        task = self._plain_fallback_task
+        self._plain_fallback_task = None
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+
+    async def _plain_fallback(self) -> None:
+        try:
+            await asyncio.sleep(self._plain_fallback_timeout_s)
+            pending = self._pending_plain
+            if pending is None or self._stopped:
+                return
+            identity, text, provenance = pending
+            if self._event_projection.is_legacy:
+                self._pending_plain = None
+                if self._completed_commits:
+                    self._enqueue_connection_event(RuntimeError("scribe_plain_owner_unresolved"))
+                else:
+                    self._enqueue_connection_event(
+                        STTBackendTranscriptEvent(text=text, is_final=True)
+                    )
+                self._end_connection_stream()
+            elif identity is not None:
+                if self._completed_commits:
+                    self._scoped_transport_failure("scribe_plain_owner_unresolved", orderly=False)
+                    self._end_connection_stream()
+                else:
+                    self._finish_committed(identity, text, provenance, fallback=True)
+        except asyncio.CancelledError:
+            return
+        finally:
+            if self._plain_fallback_task is asyncio.current_task():
+                self._plain_fallback_task = None
+
+    def _append_committed_source(
+        self,
+        identity: STTProviderTurnIdentity,
+        text: str,
+        provenance: STTNativeProvenance,
+        *,
+        release: bool,
+    ) -> None:
+        self._scoped_provenance.append(provenance)
+        if not text:
+            return
+        contribution_id = (
+            provenance.text_timing[0].contribution_id
+            if provenance.text_timing
+            else f"{identity.provider_turn_id}:commit:{len(self._scoped_contributions) + 1}"
+        )
+        contribution = STTTextContribution(
+            contribution_id, self._scoped_text_length, self._scoped_text_length + len(text)
+        )
+        self._scoped_fragments.append(text)
+        self._scoped_contributions.append(contribution)
+        self._scoped_text_length += len(text)
+        if release:
+            sequence = self._event_projection.next_update_sequence(identity)
+            if sequence is not None:
+                self._event_projection.put_update(
+                    STTProviderTurnUpdate(
+                        identity=identity,
+                        sequence=sequence,
+                        stability="stable",
+                        assembly="append",
+                        text=text,
+                        provenance=provenance,
+                        contribution=contribution,
+                        source_release=STTSourceRelease(
+                            f"{contribution_id}:end", 0, self._scoped_text_length, "end"
+                        ),
+                    )
+                )
 
     @staticmethod
     def _committed_text(data: Any) -> str:
@@ -459,6 +611,8 @@ class _ElevenLabsScribeSession(STTBackendSession):
         identity: STTProviderTurnIdentity,
         text: str,
         provenance: STTNativeProvenance,
+        *,
+        fallback: bool = False,
     ) -> None:
         if (
             self._stopped
@@ -468,18 +622,34 @@ class _ElevenLabsScribeSession(STTBackendSession):
             or not self._event_projection.sealed
         ):
             return
-        self._scoped_provenance.append(provenance)
+        self._cancel_plain_fallback()
+        self._append_committed_source(identity, text, provenance, release=False)
+        text = "".join(self._scoped_fragments)
         accepted = self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
-                outcome="final" if text else "empty",
+                outcome=(
+                    ("degraded" if text else "empty")
+                    if fallback
+                    else ("final" if text else "empty")
+                ),
                 text=text,
-                text_authority="authoritative",
-                epoch_disposition="reuse",
+                text_authority="degraded" if fallback else "authoritative",
+                failure_reason="scribe_timestamped_transcript_missing" if fallback else None,
+                epoch_disposition="retire" if fallback else "reuse",
                 provenance=tuple(self._scoped_provenance),
+                included_contributions=tuple(self._scoped_contributions),
             )
         )
         self._clear_scoped_turn()
+        self._completed_commits += 1
+        if fallback:
+            self._event_projection.end_epoch(
+                orderly=True,
+                reason="scribe_plain_fallback",
+                provider_turn_id=identity.provider_turn_id,
+            )
+            self._end_connection_stream()
         if not accepted:
             self._event_projection.end_epoch(
                 orderly=False,
@@ -524,13 +694,95 @@ class _ElevenLabsScribeSession(STTBackendSession):
         self._enqueue_connection_event(_CLOSED)
 
     @staticmethod
-    def _event_provenance(
-        data: Any,
-        *,
-        barrier: str | None = None,
-    ) -> STTNativeProvenance:
-        _ = data
-        return STTNativeProvenance(barrier=barrier)
+    def _event_value(data: Any, name: str) -> Any:
+        return data.get(name) if isinstance(data, dict) else getattr(data, name, None)
+
+    def _event_provenance(self, data: Any, *, barrier: str | None = None) -> STTNativeProvenance:
+        identity = self._event_projection.active_identity
+        contribution_id = (
+            f"{identity.provider_turn_id}:commit:{len(self._scoped_contributions) + 1}"
+            if identity is not None
+            else "scribe:legacy"
+        )
+        clock_id = f"scribe:{self.projection.provider_epoch_id or 'connection'}"
+        qualified = self.model == ELEVENLABS_SCRIBE_STT_MODEL and not self._clock_discontinuous
+        text = self._event_text(data)
+        words = self._event_value(data, "words") or ()
+        timings = []
+        cursor = 0
+        for word in words:
+            word_text = self._event_value(word, "text")
+            if not isinstance(word_text, str) or not text.startswith(word_text, cursor):
+                break
+            end = cursor + len(word_text)
+            whole_word = (
+                barrier == "committed_transcript_with_timestamps"
+                and self._event_value(word, "type") == "word"
+                and bool(word_text)
+            )
+            timings.append(
+                STTTextTiming(
+                    contribution_id,
+                    self._scoped_text_length + cursor,
+                    self._scoped_text_length + end,
+                    (
+                        "word_interval"
+                        if self._event_value(word, "type") == "word"
+                        else "subword_interval"
+                    ),
+                    self._event_value(word, "start"),
+                    self._event_value(word, "end"),
+                    clock_id=clock_id,
+                    complete_boundary=whole_word,
+                    estimated=True,
+                )
+            )
+            cursor = end
+        if cursor == len(text) and timings:
+            timings.append(
+                STTTextTiming(
+                    contribution_id,
+                    self._scoped_text_length,
+                    self._scoped_text_length + len(text),
+                    "result_span",
+                    timings[0].raw_start,
+                    timings[-1].raw_end,
+                    clock_id=clock_id,
+                    complete_boundary=True,
+                    estimated=True,
+                )
+            )
+        return STTNativeProvenance(
+            barrier=barrier,
+            capabilities=STTSourceCapabilities(
+                "elevenlabs_scribe", self.model, "timed" if qualified else "unknown"
+            ),
+            audio_clocks=(STTAudioClock(clock_id, self.sample_rate_hz, 0, qualified),),
+            text_timing=tuple(timings),
+            sent_until_sample=self._sent_samples,
+            control_id=f"{identity.provider_turn_id}:commit" if self._commit_identity else None,
+            control_kind="commit" if self._commit_identity else None,
+            control_sent_sample=self._commit_sent_sample,
+            transcription=NativeTranscriptionEvidence(
+                language_code=self._event_value(data, "language_code"),
+                words=tuple(
+                    (
+                        self._event_value(word, "text"),
+                        (
+                            str(self._event_value(word, "start"))
+                            if self._event_value(word, "start") is not None
+                            else None
+                        ),
+                        (
+                            str(self._event_value(word, "end"))
+                            if self._event_value(word, "end") is not None
+                            else None
+                        ),
+                    )
+                    for word in words
+                ),
+            ),
+        )
 
     def _enqueue_connection_event(self, event: object) -> None:
         if self._event_projection.is_scoped and event is not _CLOSED:
@@ -549,6 +801,12 @@ class _ElevenLabsScribeSession(STTBackendSession):
         self._commit_identity = None
         self._commit_write_in_flight = False
         self._pending_committed = None
+        self._pending_plain = None
+        self._cancel_plain_fallback()
+        self._scoped_fragments.clear()
+        self._scoped_contributions.clear()
+        self._scoped_text_length = 0
+        self._commit_sent_sample = None
 
     def _scoped_transport_failure(
         self, reason: str, *, orderly: bool, exception: BaseException | None = None
@@ -642,6 +900,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
             raise RuntimeError("Scribe session is closed")
         try:
             await connection.send({"audio_base_64": base64.b64encode(pcm16le).decode("ascii")})
+            self._sent_samples += len(pcm16le) // 2
         except Exception as exc:
             self._scoped_transport_failure("scribe_write_failed", orderly=False, exception=exc)
             self._end_connection_stream()
@@ -671,6 +930,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
         self._event_projection.seal(identity)
         self._commit_identity = identity
         self._commit_write_in_flight = True
+        self._commit_sent_sample = self._sent_samples
         try:
             await connection.commit()
         except Exception as exc:
@@ -691,6 +951,8 @@ class _ElevenLabsScribeSession(STTBackendSession):
             pending_identity, text, provenance = pending
             if pending_identity == identity:
                 self._finish_committed(identity, text, provenance)
+        elif self._pending_plain is not None:
+            self._schedule_plain_fallback()
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         self._event_projection.require_open(identity)
@@ -751,6 +1013,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
         self._enqueue_connection_event(_CLOSED)
 
     async def close(self) -> None:
+        self._cancel_plain_fallback()
         await self.stop()
         tasks = tuple(task for task in (self._queue_task, self._keepalive_task) if task is not None)
         self._queue_task = None

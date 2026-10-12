@@ -29,6 +29,7 @@ from puripuly_heart.core.network_diagnostics import (
 from puripuly_heart.core.stt.backend import (
     PermanentSTTScopedSessionError,
     STTIndependentRecognitionSession,
+    STTProviderAudioBoundary,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
     STTProviderTurnEvent,
@@ -1098,7 +1099,7 @@ class ScopedRecognitionEngine:
         turn.independent_recognition = isinstance(session, STTIndependentRecognitionSession) and (
             session.independent_recognition_units
         )
-        if turn.independent_recognition:
+        if turn.independent_recognition or getattr(session, "allows_stream_owned_units", False):
             stream = RecognitionStreamIdentity(
                 self.channel,
                 identity.segment.activation_generation,
@@ -1699,6 +1700,11 @@ class ScopedRecognitionEngine:
                     epoch_id != self._provider_epoch_id
                     and epoch_id not in self._retiring_provider_epoch_ids
                 ):
+                    continue
+                if isinstance(event, STTProviderAudioBoundary):
+                    turn = self._turns.get(event.identity)
+                    if turn is not None and turn.identity == event.identity:
+                        await self._emit(event)
                     continue
                 if isinstance(event, STTRecognitionUnit):
                     if (

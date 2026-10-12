@@ -142,8 +142,8 @@ async def test_committed_transcript_is_authoritative_final() -> None:
     try:
         _emit(
             session,
-            "committed_transcript",
-            {"message_type": "committed_transcript", "text": "hello"},
+            "committed_transcript_with_timestamps",
+            {"message_type": "committed_transcript_with_timestamps", "text": "hello"},
         )
         events = await asyncio.wait_for(events_task, timeout=1)
         assert [event.text for event in events] == ["hello"]

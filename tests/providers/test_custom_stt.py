@@ -168,13 +168,17 @@ async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_fr
     release = asyncio.Event()
 
     async def success(url: str, **kwargs: Any) -> _FakeResponse:
-        _ = url, kwargs
+        assert kwargs["data"]["model"] == "request-model"
         started.set()
         await release.wait()
-        return _FakeResponse(200, {"text": "same same"})
+        return _FakeResponse(200, {"text": " same  same。 "})
 
-    backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(success))
+    backend = _backend(
+        extra={"model": "request-model"},
+        http_client_factory=lambda **_: _FakeAsyncClient(success),
+    )
     session = await backend.open_session(projection=SCOPED_PROJECTION)
+    backend.model = "replacement-model"
     request = _scoped_request(channel=channel)
     await session.begin_turn(request)
     await session.send_turn_audio(
@@ -195,7 +199,12 @@ async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_fr
     terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
     assert isinstance(terminal, STTProviderTurnTerminal)
     assert terminal.outcome == "final"
-    assert terminal.text == "same same"
+    assert terminal.text == " same  same。 "
+    assert terminal.identity == request.identity
+    assert terminal.provenance[0].native_request_id == request.identity.provider_turn_id
+    assert terminal.provenance[0].capabilities.backend_id == "custom:openai_transcription"
+    assert terminal.provenance[0].capabilities.model_id == "request-model"
+    assert terminal.provenance[0].capabilities.policy == "whole_span"
     await session.close()
 
     async def failure(url: str, **kwargs: Any) -> _FakeResponse:
@@ -234,6 +243,7 @@ async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_fr
     )
     terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
     assert terminal.outcome == "empty"
+    assert terminal.text == " "
     assert terminal.text_authority == "authoritative"
     await session.close()
 
@@ -372,6 +382,10 @@ async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_fin
     assert terminal.outcome == "final"
     assert terminal.text == "same same"
     assert terminal.provenance[0].native_item_id == "item-1"
+    assert terminal.identity == request.identity
+    assert terminal.provenance[0].capabilities.backend_id == "custom:openai_realtime"
+    assert terminal.provenance[0].capabilities.model_id == "whisper-1"
+    assert terminal.provenance[0].capabilities.policy == "unknown"
 
     second = _scoped_request(2)
     await session.begin_turn(second)
@@ -580,6 +594,7 @@ async def test_realtime_scoped_terminal_matrix(
     assert terminal.outcome == expected
     assert terminal.epoch_disposition == "retire"
     if expected == "empty":
+        assert terminal.text == " "
         with pytest.raises(RuntimeError, match="epoch is retired"):
             await session.begin_turn(_scoped_request(2))
     await session.close()
@@ -679,7 +694,7 @@ async def test_offline_empty_result_still_finalizes() -> None:
     await session.close()
 
     assert event.is_final is True
-    assert event.text == ""
+    assert event.text == "   "
 
 
 @pytest.mark.asyncio

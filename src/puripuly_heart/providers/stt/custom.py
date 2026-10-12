@@ -7,7 +7,7 @@ import json
 import logging
 from collections import deque
 from collections.abc import AsyncIterator, Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import httpx
@@ -26,6 +26,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTSessionProjection,
+    STTSourceCapabilities,
 )
 from puripuly_heart.core.stt.custom import (
     CUSTOM_STT_CAPABILITY_LANGUAGE_HINT,
@@ -169,6 +170,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
     projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
 
     _event_projection: STTSessionEventProjection = field(init=False, repr=False)
+    _capabilities: STTSourceCapabilities = field(init=False, repr=False)
     _buffer: bytearray = field(init=False, repr=False)
     _transcribe_lock: asyncio.Lock = field(init=False, repr=False)
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
@@ -179,6 +181,17 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
+        effective_model = self.extra.get("model", self.model)
+        self._capabilities = STTSourceCapabilities(
+            backend_id="custom:openai_transcription",
+            model_id=(
+                effective_model
+                if isinstance(effective_model, str)
+                else json.dumps(effective_model, ensure_ascii=False)
+            )
+            or None,
+            policy="whole_span",
+        )
         self._buffer = bytearray()
         self._transcribe_lock = asyncio.Lock()
         self._scoped_buffer = bytearray()
@@ -272,7 +285,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
             return
         self._terminalize_scoped(
             identity,
-            outcome="final" if text else "empty",
+            outcome="final" if text.strip() else "empty",
             text=text,
         )
 
@@ -329,6 +342,12 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                 failure_reason=failure_reason,
                 epoch_disposition="retire" if retire else "reuse",
                 failure_diagnostics=diagnostics,
+                provenance=(
+                    STTNativeProvenance(
+                        native_request_id=identity.provider_turn_id,
+                        capabilities=self._capabilities,
+                    ),
+                ),
             )
         )
         if retire:
@@ -449,8 +468,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                 "Custom STT compatibility mismatch",
                 category=CUSTOM_STT_VALIDATION_COMPATIBILITY_MISMATCH,
             )
-        normalized = text.strip()
-        return normalized
+        return text
 
 
 @dataclass(slots=True)
@@ -465,6 +483,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
     projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
 
     _event_projection: STTSessionEventProjection = field(init=False, repr=False)
+    _capabilities: STTSourceCapabilities = field(init=False, repr=False)
     _ws: Any = field(init=False, default=None, repr=False)
     _recv_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
@@ -486,6 +505,17 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
+        effective_model = self.extra.get("model", self.model)
+        self._capabilities = STTSourceCapabilities(
+            backend_id="custom:openai_realtime",
+            model_id=(
+                effective_model
+                if isinstance(effective_model, str)
+                else json.dumps(effective_model, ensure_ascii=False)
+            )
+            or None,
+            policy="unknown",
+        )
         self._held_audio = bytearray()
         self._final_ready = asyncio.Event()
         self._final_ready.set()
@@ -693,8 +723,8 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 text_authority="authoritative" if outcome in ("final", "empty") else "none",
                 failure_reason=failure_reason,
                 epoch_disposition="retire" if retire else "reuse",
-                provenance=(provenance,),
                 failure_diagnostics=diagnostics,
+                provenance=(replace(provenance, capabilities=self._capabilities),),
             )
         )
         self._scoped_native_item_id = None
@@ -881,7 +911,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                         and native_item_id is not None
                         and native_item_id == self._scoped_native_item_id
                     ):
-                        delta = str(event.get("delta") or event.get("text") or "").strip()
+                        delta = str(event.get("delta") or event.get("text") or "")
                         if delta:
                             sequence = self._event_projection.next_update_sequence(identity)
                             if sequence is not None:
@@ -896,6 +926,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                                             native_event_id=native_event_id,
                                             native_item_id=native_item_id,
                                             barrier=event_type,
+                                            capabilities=self._capabilities,
                                         ),
                                     )
                                 )
@@ -942,7 +973,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                         )
                     continue
                 text = extract_transcript_text(event) or ""
-                normalized_text = text.strip()
+                normalized_text = text
                 if identity is not None and self._event_projection.sealed:
                     if native_item_id is not None:
                         if self._scoped_native_item_id is None:
@@ -966,7 +997,11 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                     retire = failed or native_item_id is None
                     self._terminalize_scoped(
                         identity,
-                        outcome="failed" if failed else ("final" if normalized_text else "empty"),
+                        outcome=(
+                            "failed"
+                            if failed
+                            else ("final" if normalized_text.strip() else "empty")
+                        ),
                         text="" if failed else normalized_text,
                         failure_reason="native_transcription_failed" if failed else None,
                         retire=retire,

@@ -4,6 +4,7 @@ import asyncio
 import logging
 from copy import copy
 from dataclasses import replace
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -969,5 +970,42 @@ async def test_repeated_receive_iterators_allow_late_native_final() -> None:
         live.push(_message(final="late", include_final=True))
         assert (await _next(session)).text == "late"
         assert live.receive_calls >= 2
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_independent_equal_native_units_preserve_unknown_origin_without_fence() -> None:
+    session, live = await _session()
+    stream = RecognitionStreamIdentity("peer", 1, 1, "epoch", ("original-settings",))
+    native = SimpleNamespace(
+        text=" はい。  はい。 ",
+        finished=False,
+        language_code="ja",
+        speaker_label="contradictory-native-speaker",
+        words=[SimpleNamespace(word="はい。", start_offset="0s", end_offset="0.25s")],
+    )
+    try:
+        await session.begin_stream(stream)
+        await session.send_stream_audio(b"aabb", source_ranges=_span(0, 2))
+        message = SimpleNamespace(server_content=SimpleNamespace(input_transcription=native))
+        live.push(message)
+        live.push(message)
+        first, second = await _next(session), await _next(session)
+        assert first.identity != second.identity
+        assert first.identity.stream == second.identity.stream == stream
+        assert first.text == second.text == native.text
+        for unit in (first, second):
+            assert unit.final_speaker_runs == ()
+            assert unit.provenance.capabilities.backend_id == "gemini_transcribe"
+            assert unit.provenance.capabilities.model_id == "gemini-3.5-transcribe-live"
+            assert unit.provenance.capabilities.policy == "unknown"
+            assert unit.provenance.transcription.finished is False
+            assert unit.provenance.transcription.language_code == "ja"
+            assert unit.provenance.transcription.words == (("はい。", "0s", "0.25s"),)
+            assert unit.provenance.text_timing == ()
+            assert unit.provenance.audio_clocks == ()
+        assert len(live.sent) == 1
+        assert "audio" in live.sent[0]
     finally:
         await session.close()

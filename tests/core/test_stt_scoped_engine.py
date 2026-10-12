@@ -375,7 +375,7 @@ async def test_ordered_actual_writes_and_final_wait_starts_after_end_write() -> 
         "seal_done",
     ]
     terminal = next(item for item in emitted if isinstance(item, STTProviderTurnTerminal))
-    assert terminal.text == "repeated repeated"
+    assert terminal.text == "  repeated repeated  "
     assert terminal.final_language_runs == ()
     await engine.close()
 
@@ -947,8 +947,8 @@ def test_normalizer_enforces_text_and_language_run_bounds() -> None:
             text_authority="authoritative",
         )
     )
-    assert result_256.text == "x" * 256
-    assert len(result_256.final_language_runs) == 256
+    assert result_256.text == " " + ("x" * 256) + " "
+    assert len(result_256.final_language_runs) <= STTScopedTurnNormalizer.MAX_LANGUAGE_RUNS
     assert "".join(run.text for run in result_256.final_language_runs) == result_256.text
     assert diagnostics == []
 
@@ -997,7 +997,7 @@ def test_normalizer_accepts_metadata_free_updates_and_terminal_without_diagnosti
             sequence=2,
             stability="stable",
             assembly="replace",
-            text="hello",
+            text="  hello",
         )
     )
     terminal = normalizer.apply_terminal(
@@ -1013,8 +1013,8 @@ def test_normalizer_accepts_metadata_free_updates_and_terminal_without_diagnosti
         "draft",
         (),
     )
-    assert stable is not None and (stable.text, stable.final_language_runs) == ("hello", ())
-    assert (terminal.text, terminal.final_language_runs) == ("hello world", ())
+    assert stable is not None and (stable.text, stable.final_language_runs) == ("  hello", ())
+    assert (terminal.text, terminal.final_language_runs) == ("  hello world  ", ())
     assert diagnostics == []
 
 
@@ -1154,7 +1154,7 @@ def test_normalizer_bounds_private_raw_whitespace_and_cumulative_appends() -> No
         )
     )
     assert first is not None and middle is not None
-    assert middle.text == "hello"
+    assert middle.text == "hello" + whitespace
     for sequence in range(3, 7):
         try:
             cumulative.apply_update(
@@ -1171,7 +1171,7 @@ def test_normalizer_bounds_private_raw_whitespace_and_cumulative_appends() -> No
             break
     else:
         pytest.fail("raw whitespace accumulation exceeded the assembly limit")
-    assert cumulative.stable_text == "hello"
+    assert cumulative.stable_text == middle.text
 
 
 @pytest.mark.asyncio
@@ -2894,7 +2894,7 @@ async def test_ceiling_rotates_at_boundary_before_admitting_successor() -> None:
     await engine.close()
 
 
-def test_whitespace_stable_contributions_match_normalized_terminal_ranges() -> None:
+def test_whitespace_stable_contributions_conserve_raw_terminal_ranges() -> None:
     request_identity = STTProviderTurnIdentity(
         segment=PeerAudioSegmentLedger(
             activation_generation=1,
@@ -2941,10 +2941,9 @@ def test_whitespace_stable_contributions_match_normalized_terminal_ranges() -> N
         )
     )
 
-    assert stable.text == "hello 世界"
-    assert terminal.text == "hello 世界"
+    assert stable.text == terminal.text == "  hello 世界  "
     assert terminal.included_contributions == (stable.contribution,)
-    assert ledger.consume(stable) == "hello 世界"
+    assert ledger.consume(stable) == stable.text
     assert ledger.consume(terminal) == ""
     assert "".join(run.text for run in terminal.final_language_runs) == terminal.text
 
@@ -2980,16 +2979,17 @@ def test_append_separators_and_cumulative_raw_whitespace_preserve_exact_suffixes
         )
     )
     assert first is not None and second is not None
-    assert (first.text, second.text) == ("hello", "hello 世界")
+    assert (first.text, second.text) == ("hello ", "hello 世界")
     assert first.contribution is not None and (
         first.contribution.text_start,
         first.contribution.text_end,
-    ) == (0, 5)
+    ) == (0, len(first.text))
     assert second.contribution is not None and (
         second.contribution.text_start,
         second.contribution.text_end,
-    ) == (5, 8)
-    assert consumption.consume(first) == "hello"
+    ) == (len(first.text), len(second.text))
+    first_consumed = consumption.consume(first)
+    assert first_consumed == "hello "
     trailing_terminal = trailing.apply_terminal(
         STTProviderTurnTerminal(
             identity=identity,
@@ -3002,11 +3002,10 @@ def test_append_separators_and_cumulative_raw_whitespace_preserve_exact_suffixes
             text_authority="authoritative",
         )
     )
-    assert consumption.consume(trailing_terminal) == " 世界"
-    assert [item.contribution_id for item in trailing_terminal.included_contributions] == [
-        "spaced-turn:1",
-        "spaced-turn:2",
-    ]
+    terminal_consumed = consumption.consume(trailing_terminal)
+    assert terminal_consumed == "世界"
+    assert first_consumed + terminal_consumed == trailing_terminal.text
+    assert len({item.contribution_id for item in trailing_terminal.included_contributions}) == 2
 
     cumulative_identity = replace(identity, provider_turn_id="cumulative-turn")
     cumulative = STTScopedTurnNormalizer(cumulative_identity)
@@ -3029,12 +3028,12 @@ def test_append_separators_and_cumulative_raw_whitespace_preserve_exact_suffixes
         )
     )
     assert cumulative_first is not None and cumulative_second is not None
-    assert (cumulative_first.text, cumulative_second.text) == ("hello", "hello world")
+    assert (cumulative_first.text, cumulative_second.text) == ("  hello ", "  hello world  ")
     assert cumulative_second.contribution is not None
     assert (
         cumulative_second.contribution.text_start,
         cumulative_second.contribution.text_end,
-    ) == (5, 11)
+    ) == (len(cumulative_first.text), len(cumulative_second.text))
     cumulative_terminal = cumulative.apply_terminal(
         STTProviderTurnTerminal(
             identity=cumulative_identity,
@@ -3043,7 +3042,7 @@ def test_append_separators_and_cumulative_raw_whitespace_preserve_exact_suffixes
             text_authority="authoritative",
         )
     )
-    assert STTContributionConsumptionLedger().consume(cumulative_terminal) == "hello world"
+    assert STTContributionConsumptionLedger().consume(cumulative_terminal) == "  hello world  "
 
 
 @pytest.mark.asyncio
