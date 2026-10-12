@@ -3750,6 +3750,7 @@ async def test_queued_capture_discontinuity_retires_stream_after_successor_arriv
     runtime = SimpleNamespace(
         segment_ledger=ledger,
         _current_stream_capture_epoch=None,
+        _speaker_observer=None,
         is_current_generation=lambda generation: generation == 3,
     )
     retired_sources: list[AudioSegmentTerminalReceipt] = []

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 from puripuly_heart.core.audio.ownership import (
+    AudioSegmentSnapshot,
     AudioSegmentTerminalReceipt,
     OwnedStreamInput,
     OwnedVadEvent,
@@ -51,8 +52,18 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnRequest,
 )
 from puripuly_heart.core.speaker_identity import PeerSpeakerIdentityAllocator
-from puripuly_heart.core.stt.backend import STTProviderTurnTerminal, STTRecognitionUnit
-from puripuly_heart.core.stt.recognition_units import recognition_transcript
+from puripuly_heart.core.stt.backend import (
+    STTAudioBoundary,
+    STTContributionConsumptionLedger,
+    STTProviderTurnIdentity,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
+    STTRecognitionUnit,
+)
+from puripuly_heart.core.stt.recognition_units import (
+    contribution_transcript,
+    recognition_transcript,
+)
 from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import (
     STTErrorEvent,
@@ -89,6 +100,9 @@ class PeerTranslationChannelOwner:
     )
     _publication_order_by_generation: dict[int, int] = field(default_factory=dict)
     _retired_local_vad_ids: OrderedDict[UUID, None] = field(default_factory=OrderedDict)
+    _stt_consumption: STTContributionConsumptionLedger = field(
+        default_factory=STTContributionConsumptionLedger
+    )
     _accepting_events: bool = field(init=False, default=True)
 
     def __post_init__(self) -> None:
@@ -346,26 +360,6 @@ class PeerTranslationChannelOwner:
         self._retired_local_vad_ids.clear()
         self._clear_latency_state(channel="peer")
 
-    def _remember_context_entry(
-        self,
-        text: str,
-        timestamp: float,
-        *,
-        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
-        runtime: ChannelRuntime | None = None,
-        source_language: str | None = None,
-    ) -> None:
-        runtime = runtime or self.runtime
-        if runtime.channel != "peer":
-            raise ValueError("Peer translation owner received a non-Peer runtime")
-        self.translation_requests.remember_context(
-            text,
-            timestamp,
-            channel=runtime.channel,
-            config_snapshot=config_snapshot,
-            source_language=source_language,
-        )
-
     async def observe_source_activity(
         self,
         *,
@@ -467,6 +461,27 @@ class PeerTranslationChannelOwner:
             STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
         )
 
+    def note_audio_boundary(
+        self, identity: STTProviderTurnIdentity, boundary: STTAudioBoundary
+    ) -> None:
+        self._require_ingress()
+        self._stt_consumption.record_boundary(identity, boundary)
+
+    async def handle_provider_turn_update(
+        self, snapshot: AudioSegmentSnapshot, update: STTProviderTurnUpdate
+    ) -> STTFinalEvent | None:
+        self._require_ingress()
+        pieces = self._stt_consumption.consume_parts(update)
+        if not pieces:
+            return None
+        order = self._allocate_publication_order(snapshot.identity.activation_generation)
+        transcript = contribution_transcript(
+            snapshot, update, pieces, created_at=self.clock.now(), publication_order=order
+        )
+        event = STTFinalEvent(transcript.utterance_id, transcript)
+        await self.handle_stt_event(event)
+        return event
+
     async def handle_provider_turn_terminal(
         self,
         receipt: AudioSegmentTerminalReceipt,
@@ -475,7 +490,10 @@ class PeerTranslationChannelOwner:
         self._require_ingress()
         if receipt.identity != terminal.identity.segment:
             raise ValueError("provider terminal receipt identity mismatch")
+        if receipt.segment.sealed_at_monotonic_s is not None:
+            self._stt_consumption.seal_audio(terminal.identity)
         if terminal.outcome not in {"final", "degraded"} or not terminal.text:
+            self._stt_consumption.retire(terminal.identity)
             self.diagnostics.emit(
                 RuntimeDiagnostic(
                     message=(
@@ -495,23 +513,17 @@ class PeerTranslationChannelOwner:
                 )
             )
             return None
-        transcript = Transcript(
-            utterance_id=receipt.identity.segment_id,
-            text=terminal.text,
-            is_final=True,
-            created_at=self.clock.now(),
-            channel="peer",
-            final_language_runs=terminal.final_language_runs,
-            final_speaker_runs=terminal.final_speaker_runs,
-            recognition_origins=terminal.recognition_origins,
-            publication_generation=receipt.identity.activation_generation,
-            source_order=self._allocate_publication_order(
-                receipt.identity.activation_generation,
-                source_order=receipt.identity.segment_order,
+        pieces = self._stt_consumption.consume_parts(terminal)
+        if not pieces:
+            return None
+        transcript = contribution_transcript(
+            receipt.segment, terminal, pieces, created_at=self.clock.now(),
+            publication_order=self._allocate_publication_order(
+                receipt.identity.activation_generation, source_order=receipt.identity.segment_order
             ),
         )
         event = STTFinalEvent(
-            utterance_id=receipt.identity.segment_id,
+            utterance_id=transcript.utterance_id,
             transcript=transcript,
         )
         await self.handle_stt_event(event)
@@ -670,14 +682,6 @@ class PeerTranslationChannelOwner:
         )
         if child.precomputed_translation is not None:
             prepared = self._prepared_requests.get(child.utterance_id)
-            if prepared is None:
-                self._remember_context_entry(
-                    child.transcript.text,
-                    self.clock.now(),
-                    config_snapshot=config_snapshot,
-                    runtime=runtime,
-                    source_language=child.precomputed_translation.source_language,
-                )
             return TranslationTurnProcessResult(
                 "translated",
                 TranslationOutputSubmission(
@@ -699,6 +703,7 @@ class PeerTranslationChannelOwner:
                     source_order=child.transcript.source_order,
                     turn_kind=child.turn_kind,
                     parent_output_count=child.parent_output_count,
+                    source_child=child.source_child,
                     context_texts=None if prepared is None else prepared.context_texts,
                 ),
             )
@@ -734,6 +739,8 @@ class PeerTranslationChannelOwner:
             source_order=child.transcript.source_order,
             turn_kind=child.turn_kind,
             parent_output_count=child.parent_output_count,
+            source_child=child.source_child,
+            precomputed=child.precomputed_translation is not None,
         )
 
     async def on_child_started(

@@ -1033,6 +1033,15 @@ class ScopedRecognitionEngine:
         self._turns[identity] = turn
         self._turn_order.append(identity)
         self._turn_resolved.clear()
+        if session is not None and self._provider_epoch_id is not None and not independent:
+            self._register_recognition_stream(
+                RecognitionStreamIdentity(
+                    self.channel, identity.segment.activation_generation,
+                    identity.segment.capture_epoch, identity.provider_epoch_id,
+                    identity.settings_scope,
+                ),
+                settings,
+            )
         if open_failure is not None or session is None or self._provider_epoch_id is None:
             turn.readiness_failure_counted = settings.provider_id == "qwen_audio"
             self._set_turn_failure(

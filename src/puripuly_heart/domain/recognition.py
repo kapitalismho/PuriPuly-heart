@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from puripuly_heart.core.audio.format import AudioCaptureSpan
+    from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,8 +106,33 @@ class RecognitionTextOrigin:
     text_start: int
     text_end: int
     native: NativeTranscriptionEvidence | None = None
-    source_binding: Literal["stream_scoped", "local_segment"] = "stream_scoped"
-    order_basis: Literal["provider_receipt", "source_order"] = "provider_receipt"
+    source_binding: Literal["stream_scoped", "local_segment", "request_owned"] = "stream_scoped"
+    order_basis: Literal["provider_receipt", "source_order", "capture_order"] = "provider_receipt"
+    request_id: str | None = None
+    contribution_id: str | None = None
+    contribution_range: tuple[int, int] | None = None
+    source_ranges: tuple[AudioCaptureSpan, ...] = ()
+    context_ranges: tuple[AudioCaptureSpan, ...] = ()
+    display_group_id: UUID | None = None
+    ownership: Literal["request", "stream", "unresolved"] = "stream"
+    audio_settings: AudioSegmentSettingsSnapshot | None = None
+    source_available_at_monotonic_s: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.text_start < 0 or self.text_end < self.text_start:
+            raise ValueError("invalid source origin text range")
+        if self.identity.receipt_sequence < 1:
+            raise ValueError("source origin requires authoritative receipt order")
+        if self.ownership == "unresolved":
+            raise ValueError("unresolved source ownership cannot be admitted")
+        if self.ownership == "request" and not self.request_id:
+            raise ValueError("request ownership requires a request identity")
+        if self.contribution_range is not None:
+            start, end = self.contribution_range
+            if start < 0 or end - start != self.text_end - self.text_start:
+                raise ValueError("source contribution range does not conserve text")
+        if any(span.capture_epoch != self.identity.stream.capture_epoch for span in self.source_ranges):
+            raise ValueError("source ranges belong to another capture epoch")
 
 
 def slice_recognition_origins(
@@ -114,6 +143,13 @@ def slice_recognition_origins(
             origin,
             text_start=max(origin.text_start, start) - start,
             text_end=min(origin.text_end, end) - start,
+            contribution_range=(
+                (
+                    origin.contribution_range[0] + max(origin.text_start, start) - origin.text_start,
+                    origin.contribution_range[0] + min(origin.text_end, end) - origin.text_start,
+                )
+                if origin.contribution_range is not None else None
+            ),
         )
         for origin in origins
         if origin.text_start < end and origin.text_end > start

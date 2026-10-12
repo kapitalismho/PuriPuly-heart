@@ -19,6 +19,7 @@ from puripuly_heart.core.audio.ownership import (
     AudioRetentionBinding,
     AudioRetentionBudget,
     AudioSegmentSettingsSnapshot,
+    AudioSegmentSnapshot,
     AudioSegmentTerminalReceipt,
     CaptureStreamInput,
     OwnedStreamInput,
@@ -65,7 +66,11 @@ from puripuly_heart.core.runtime.local_asr_transition import (
     LocalASRTransitionRequest,
     PreparedLocalASRTransition,
 )
-from puripuly_heart.core.stt.backend import STTProviderInputTerminal, STTProviderTurnTerminal
+from puripuly_heart.core.stt.backend import (
+    STTProviderInputTerminal,
+    STTProviderTurnIdentity,
+    STTProviderTurnTerminal,
+)
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 
@@ -926,6 +931,29 @@ class PeerCaptureSessionOwner:
             raise RuntimeError("peer publication generation observer is already bound")
         self._publication_generation_activated = activated
         self._publication_generation_retired = retired
+
+    def owns_provider_turn(self, identity: STTProviderTurnIdentity) -> bool:
+        return any(
+            any(snapshot.identity == identity.segment for snapshot in ledger.snapshots)
+            or any(receipt.identity == identity.segment for receipt in ledger.terminal_receipts)
+            for ledger in self._segment_ledgers
+        )
+
+    def provider_source_snapshot(
+        self, identity: STTProviderTurnIdentity
+    ) -> AudioSegmentSnapshot | None:
+        if identity.segment.activation_generation not in self._publication_generations:
+            return None
+        for ledger in reversed(self._segment_ledgers):
+            for snapshot in ledger.snapshots:
+                if snapshot.identity == identity.segment:
+                    settings = snapshot.settings
+                    if identity.settings_scope and identity.settings_scope != (
+                        settings.provider_id, settings.provider_signature, settings.runtime_signature
+                    ):
+                        return None
+                    return snapshot
+        return None
 
     def admit_provider_terminal(
         self,

@@ -166,12 +166,31 @@ class STTScopedTurnNormalizer:
         raw_text = terminal.text if terminal.text else self._stable_text
         runs = terminal.final_language_runs if terminal.text else self._stable_runs
         speaker_runs = terminal.final_speaker_runs if terminal.text else self._stable_speaker_runs
-        if terminal.text and not speaker_runs and terminal.text == self._stable_text:
-            speaker_runs = self._stable_speaker_runs
         normalized_speaker_runs = self._normalize_speaker_runs(raw_text, speaker_runs)
         text, runs = self._normalize_text_and_runs(raw_text, runs)
         speaker_runs = self._normalize_speaker_runs(text, normalized_speaker_runs)
-        if text and self._stable_text and not text.startswith(self._stable_text):
+        contributions = terminal.included_contributions or tuple(self._contributions)
+        if terminal.included_contributions:
+            declared = {
+                (item.contribution_id, item.text_start, item.text_end)
+                for item in terminal.included_contributions
+            }
+            cursor = 0
+            identities = set()
+            for item in terminal.included_contributions:
+                if (
+                    item.contribution_id in identities or item.text_start < cursor
+                    or item.text_end > len(text)
+                ):
+                    raise STTNormalizationError("provider_terminal_contribution_invalid")
+                identities.add(item.contribution_id)
+                cursor = item.text_end
+            if any(
+                (item.contribution_id, item.text_start, item.text_end) not in declared
+                for item in self._contributions
+            ):
+                raise STTNormalizationError("provider_terminal_contribution_missing")
+        elif text and self._stable_text and not text.startswith(self._stable_text):
             raise STTNormalizationError("provider_stable_prefix_inconsistent")
         outcome = terminal.outcome
         authority = terminal.text_authority
@@ -222,7 +241,7 @@ class STTScopedTurnNormalizer:
             failure_retryable=terminal.failure_retryable,
             recovery_pending=terminal.recovery_pending,
             provenance=tuple(self._provenance),
-            included_contributions=tuple(self._contributions),
+            included_contributions=contributions if text else (),
             failure_diagnostics=terminal.failure_diagnostics,
             recognition_origins=self._recognition_origins,
         )

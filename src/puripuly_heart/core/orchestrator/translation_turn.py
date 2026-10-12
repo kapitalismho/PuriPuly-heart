@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Mapping
@@ -31,7 +30,7 @@ from puripuly_heart.domain.models import (
     Transcript,
     Translation,
 )
-from puripuly_heart.domain.recognition import slice_recognition_origins
+from puripuly_heart.domain.recognition import RecognitionTextOrigin, slice_recognition_origins
 
 if TYPE_CHECKING:
     from puripuly_heart.core.orchestrator.translation_request import PreparedTranslationRequest
@@ -241,6 +240,41 @@ class TranslationTurnRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class SourceChild:
+    source_id: UUID
+    revision: str
+    channel: ChannelId
+    order: tuple[int, int, int]
+    raw_text: str
+    language: str | None
+    text_range: tuple[int, int]
+    origins: tuple[RecognitionTextOrigin, ...]
+    speaker: FinalSpeakerRun | None
+    settings: TranslationRuntimeConfigSnapshot
+    display_group_id: UUID | None = None
+    version: int = 1
+
+    def __post_init__(self) -> None:
+        if self.version != 1 or not self.revision:
+            raise ValueError("unsupported source contract or missing revision")
+        start, end = self.text_range
+        if start < 0 or end - start != len(self.raw_text):
+            raise ValueError("source text range does not conserve raw text")
+        if self.origins:
+            cursor = 0
+            for origin in self.origins:
+                if origin.text_start != cursor or origin.text_end > len(self.raw_text):
+                    raise ValueError("source provenance does not conserve text")
+                cursor = origin.text_end
+            if cursor != len(self.raw_text):
+                raise ValueError("source provenance leaves unresolved text")
+
+    @property
+    def effective_text(self) -> str:
+        return self.raw_text
+
+
+@dataclass(frozen=True, slots=True)
 class TranslationTurnChild:
     parent_utterance_id: UUID
     utterance_id: UUID
@@ -259,6 +293,7 @@ class TranslationTurnChild:
     precomputed_failure: TerminalTranslationFailure | None = field(
         default=None, repr=False, compare=False
     )
+    source_child: SourceChild | None = None
     parent_output_count: int = 1
     operation_id: str | None = None
     request_id: str | None = None
@@ -302,6 +337,7 @@ class TranslationOutputSubmission:
     operation_id: str | None = None
     request_id: str | None = None
     failure_diagnostics: ErrorDiagnostics | None = None
+    source_child: SourceChild | None = None
 
     def __post_init__(self) -> None:
         if self.outcome == "translated" and self.translation is None:
@@ -368,6 +404,7 @@ class _TranslationTurnParent:
     semantic_completed_child_ids: set[UUID] = field(default_factory=set)
     semantic_done_event: asyncio.Event = field(default_factory=asyncio.Event)
     closed_event: asyncio.Event = field(default_factory=asyncio.Event)
+    publication_predecessor: _TranslationTurnParent | None = None
     closed: bool = False
     failure_diagnostics: ErrorDiagnostics | None = None
     source_closed: bool = True
@@ -1023,11 +1060,12 @@ class TranslationTurnLifecycleOwner:
                         await self._terminalize_parent_remaining(parent, "cancelled")
                     elif not parent.closed:
                         predecessor = self._channel_tails.get(parent.channel)
-                        if predecessor is not None and predecessor.closed:
-                            predecessor = None
+                        while predecessor is not None and predecessor.closed:
+                            predecessor = predecessor.publication_predecessor
                         if any(child.turn_kind == "manual" for child in parent.children):
                             predecessor = None
                         self._channel_tails[parent.channel] = parent
+                        parent.publication_predecessor = predecessor
             overflow = self._peer_waiting_parents()[: -self.peer_waiting_capacity]
             for waiting_parent in overflow:
                 await self._retire_waiting_parent(
@@ -1261,6 +1299,45 @@ class TranslationTurnLifecycleOwner:
             "self",
         }
         children: list[TranslationTurnChild] = []
+        sources: dict[int, SourceChild] = {}
+        revision = request.transcript.source_text_revision or str(request.transcript.utterance_id)
+        for run_index, segment in enumerate(segments):
+            origins = slice_recognition_origins(
+                request.transcript.recognition_origins,
+                segment.source_text_start,
+                segment.source_text_end,
+            )
+            groups = {origin.display_group_id for origin in origins}
+            sources[run_index] = SourceChild(
+                source_id=uuid5(request.transcript.utterance_id, f"source:{run_index}"),
+                revision=revision,
+                channel=request.transcript.channel,
+                order=(
+                    request.transcript.publication_generation
+                    if request.transcript.publication_generation is not None
+                    else turn_generation,
+                    request.transcript.source_order
+                    if request.transcript.source_order is not None
+                    else turn_order,
+                    run_index,
+                ),
+                raw_text=segment.text,
+                language=segment.language or None,
+                text_range=(segment.source_text_start, segment.source_text_end),
+                origins=origins,
+                speaker=FinalSpeakerRun(
+                    segment.text,
+                    segment.speaker_id,
+                    segment.speaker_session_scope,
+                    source_start_ms=segment.source_start_ms,
+                    source_end_ms=segment.source_end_ms,
+                    overlaps_previous=segment.overlaps_previous,
+                    source=segment.speaker_source,
+                    attribution_state=segment.attribution_state,
+                ) if request.turn_kind == "peer" else None,
+                settings=request.config_snapshot,
+                display_group_id=next(iter(groups)) if len(groups) == 1 else None,
+            )
         for sequence, (run_index, target_index, segment, target_language) in enumerate(child_specs):
             child_id = _translation_turn_child_id(
                 request.transcript.utterance_id,
@@ -1306,17 +1383,9 @@ class TranslationTurnLifecycleOwner:
                         publication_generation=request.transcript.publication_generation,
                         source_order=request.transcript.source_order,
                         source_text_range=(segment.source_text_start, segment.source_text_end),
-                        source_text_revision=(
-                            request.transcript.source_text_revision
-                            or hashlib.sha256(request.transcript.text.encode("utf-8")).hexdigest()[
-                                :16
-                            ]
-                        ),
-                        recognition_origins=slice_recognition_origins(
-                            request.transcript.recognition_origins,
-                            segment.source_text_start,
-                            segment.source_text_end,
-                        ),
+                        source_text_revision=sources[run_index].revision,
+                        recognition_origins=sources[run_index].origins,
+                        source_child=sources[run_index],
                     ),
                     detected_language=segment.language or None,
                     target_language=target_language,
@@ -1336,6 +1405,7 @@ class TranslationTurnLifecycleOwner:
                     precomputed_failure=(
                         request.precomputed_failure if target_index == 0 else None
                     ),
+                    source_child=sources[run_index],
                     parent_output_count=len(child_specs),
                     config_snapshot=request.config_snapshot,
                     operation_id=request.operation_id,
@@ -1500,6 +1570,15 @@ class TranslationTurnLifecycleOwner:
         await self.on_child_started(child, child_task)
         return await self._execute_child(child, predecessor)
 
+    @staticmethod
+    async def _wait_for_publication_predecessors(
+        predecessor: _TranslationTurnParent,
+    ) -> None:
+        current: _TranslationTurnParent | None = predecessor
+        while current is not None:
+            await current.closed_event.wait()
+            current = current.publication_predecessor
+
     async def _run_peer_children(
         self,
         parent: _TranslationTurnParent,
@@ -1518,11 +1597,11 @@ class TranslationTurnLifecycleOwner:
         predecessor_wait = (
             start_lifecycle_task(
                 self._scope,
-                predecessor.closed_event.wait(),
+                self._wait_for_publication_predecessors(predecessor),
                 name=f"peer-predecessor:{parent.parent_utterance_id}",
                 eager_start=True,
             )
-            if predecessor is not None and not predecessor.closed_event.is_set()
+            if predecessor is not None
             else None
         )
 
@@ -1547,7 +1626,7 @@ class TranslationTurnLifecycleOwner:
             while publish_index < len(children):
                 if self._parent_cancellation_requested(parent):
                     raise asyncio.CancelledError
-                if predecessor is None or predecessor.closed_event.is_set():
+                if predecessor_wait is None or predecessor_wait.done():
                     while publish_index < len(children):
                         child = children[publish_index]
                         result = finished.pop(child.utterance_id, None)
@@ -1675,6 +1754,24 @@ class TranslationTurnLifecycleOwner:
     ) -> TranslationTurnProcessResult:
         if self.is_child_cancellation_requested(child):
             raise asyncio.CancelledError
+        if result.output is not None and child.source_child is not None:
+            output = result.output
+            translation = output.translation
+            if translation is not None and (
+                translation.source_child is not child.source_child
+                or translation.source_text != child.source_child.effective_text
+            ):
+                translation = replace(
+                    translation,
+                    source_child=child.source_child,
+                    source_text=child.source_child.effective_text,
+                    source_text_hash=None,
+                    source_text_len=len(child.source_child.effective_text),
+                )
+            if output.source_child is not child.source_child or translation is not output.translation:
+                result = replace(
+                    result, output=replace(output, source_child=child.source_child, translation=translation)
+                )
         if result.output is not None and self.output is not None:
             try:
                 await self.output.submit_translation_output(result.output)
@@ -1922,6 +2019,7 @@ class TranslationTurnLifecycleOwner:
                                 parent_output_count=child.parent_output_count,
                                 operation_id=child.operation_id,
                                 request_id=child.request_id,
+                                source_child=child.source_child,
                             )
                         )
                     except Exception:
@@ -2048,8 +2146,15 @@ class TranslationTurnLifecycleOwner:
             expiry_task.cancel()
         parent.closed = True
         self._parents.pop(parent.parent_utterance_id, None)
+        predecessor = parent.publication_predecessor
+        while predecessor is not None and predecessor.closed:
+            predecessor = predecessor.publication_predecessor
+        parent.publication_predecessor = predecessor
         if self._channel_tails.get(parent.channel) is parent:
-            self._channel_tails.pop(parent.channel, None)
+            if predecessor is None:
+                self._channel_tails.pop(parent.channel, None)
+            else:
+                self._channel_tails[parent.channel] = predecessor
         self._cancelling_parent_ids.discard(parent.parent_utterance_id)
         self._closed_parent_ids[parent.parent_utterance_id] = (
             parent.channel,
@@ -2076,6 +2181,7 @@ class TranslationTurnLifecycleOwner:
 
 __all__ = [
     "TerminalTranslationFailure",
+    "SourceChild",
     "TranslationContextPolicy",
     "TranslationOutputSubmission",
     "TranslationOutputSubmissionPort",

@@ -3,10 +3,13 @@ from __future__ import annotations
 import hashlib
 import time
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID, uuid4
 
 from puripuly_heart.domain.recognition import RecognitionTextOrigin
+
+if TYPE_CHECKING:
+    from puripuly_heart.core.orchestrator.translation_turn import SourceChild
 
 ChannelId = Literal["self", "peer"]
 SpeakerAttributionState = Literal[
@@ -115,6 +118,7 @@ class Transcript:
     source_text_range: tuple[int, int] | None = None
     source_text_revision: str | None = None
     recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
+    source_child: SourceChild | None = None
 
     def __post_init__(self) -> None:
         _validate_channel(self.channel)
@@ -153,6 +157,7 @@ class Translation:
     source_text_len: int | None
     logical_turn_key: str | None
     speaker_assignment: SpeakerAssignment | None
+    source_child: SourceChild | None
 
     def __init__(
         self,
@@ -172,6 +177,7 @@ class Translation:
         source_text_len: int | None = None,
         logical_turn_key: str | None = None,
         speaker_assignment: SpeakerAssignment | None = None,
+        source_child: SourceChild | None = None,
     ) -> None:
         if text is not None and translated_text is not None and text != translated_text:
             raise ValueError("text and translated_text must match when both are set")
@@ -218,6 +224,7 @@ class Translation:
         if speaker_assignment is not None and channel != "peer":
             raise ValueError("speaker attribution is only valid for Peer translations")
         object.__setattr__(self, "speaker_assignment", speaker_assignment)
+        object.__setattr__(self, "source_child", source_child)
 
     @property
     def text(self) -> str:

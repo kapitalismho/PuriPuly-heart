@@ -160,8 +160,7 @@ class TestContextFiltering:
         assert len(valid) == 1
         assert valid[0].text == "ok"
 
-    def test_context_filters_short_entries(self):
-        """Entries shorter than 2 characters should be excluded."""
+    def test_context_preserves_short_entries(self):
         clock = FakeClock(initial_time=10.0)
         harness = compose_translation_test_harness(
             stt=None,
@@ -178,8 +177,7 @@ class TestContextFiltering:
 
         valid = harness.get_valid_context()
 
-        assert len(valid) == 1
-        assert valid[0].text == "ok"
+        assert [entry.text for entry in valid] == ["a", "ok"]
 
     def test_context_cleared_on_clear_context(self):
         """clear_context() should empty the history."""

@@ -67,6 +67,7 @@ class AudioSegmentSnapshot:
     opened_at_monotonic_s: float
     sealed_at_monotonic_s: float | None
     seal_reason: str | None
+    display_group_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)

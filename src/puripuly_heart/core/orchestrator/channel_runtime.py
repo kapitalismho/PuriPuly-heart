@@ -24,6 +24,8 @@ class ContextEntry:
     timestamp: float
     channel: ChannelId = "self"
     origin: str = ""
+    target_languages: tuple[str, ...] = ()
+    source_id: UUID | None = None
 
     def __post_init__(self) -> None:
         _validate_channel(self.channel)
@@ -108,9 +110,11 @@ class ChannelRuntime:
         target_language: str = "",
         max_entries: int | None = None,
         origin: str | None = None,
+        target_languages: tuple[str, ...] = (),
+        source_id: UUID | None = None,
     ) -> None:
-        text_clean = text.strip()
-        if len(text_clean) < 2:
+        text_clean = text if source_id is not None else text.strip()
+        if not text_clean.strip():
             return
 
         self.translation_history.append(
@@ -121,6 +125,8 @@ class ChannelRuntime:
                 timestamp=timestamp,
                 channel=self.channel,
                 origin=origin or self.channel,
+                target_languages=target_languages,
+                source_id=source_id,
             )
         )
         if max_entries is not None and max_entries > 0:
@@ -144,8 +150,12 @@ class ChannelRuntime:
             for entry in history
             if (now - entry.timestamp) < time_window_s
             and (not entry.source_language or entry.source_language == source_language)
-            and (not entry.target_language or entry.target_language == target_language)
-            and len(entry.text) >= 2
+            and (
+                target_language in entry.target_languages
+                if entry.target_languages
+                else not entry.target_language or entry.target_language == target_language
+            )
+            and bool(entry.text)
         ]
 
     async def clear_self_speech_state(self) -> None:

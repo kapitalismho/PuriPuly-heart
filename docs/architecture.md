@@ -237,10 +237,13 @@ Implementation: `core/storage/secrets.py`, `app/adapters/sync_secret_store.py`, 
 
 - **Provider contracts**
   - Provider adapters translate native events into shared STT contracts.
-  - Local audio completion and transcript delivery are distinct.
+  - Local audio completion, finalized text availability, recognition resolution and translation/publication completion are distinct.
   - Capture scope and provider lifetime authorize recognition results.
   - Provider recovery stays inside the recognition boundary.
   - Direct Qwen Audio owns two logical recognition slots per Self/Peer channel, targeting two reusable connections while tracking bounded replacement overlap and retiring transports through confirmed cleanup; source order, bounded unsent audio, and each channel's endpoint/publication policies remain independent.
+  - Scoped streaming adapters share the bounded `STTContributionConsumptionLedger` for immutable contribution prefixes and terminal-tail reconciliation. Delivery identity and contribution ranges, not text equality, determine what remains unconsumed. Empty markers admit no source; malformed ownership cannot become a successful unknown-speaker result.
+  - `STTAudioBoundary` records capture position and observation time independently of transcript readiness. A server endpoint is not an audio boundary and does not reset source timers, pre-roll, display scope or speaker state.
+  - Stop/replacement fence retired updates, while sealing audio does not cancel already admitted translation work.
 - **Failure identity**
   - Typed turn/input/epoch results and provider-mutation results retain the original safe cause before reduction to a terminal reason.
   - Capture generation, provider generation/epoch, and turn identity remain distinct.
@@ -254,7 +257,7 @@ Implementation: `core/storage/secrets.py`, `app/adapters/sync_secret_store.py`, 
   - Python owns the worker connection and lifecycle.
   - Rust owns device discovery, model activation, and transcription.
 
-Implementation: `core/stt/scoped_engine.py`, `core/stt/session_projection.py`. Behavior: `tests/core/test_stt_scoped_engine.py`.
+Implementation: `core/stt/backend.py`, `core/stt/scoped_engine.py`, `core/stt/session_projection.py`. Behavior: `tests/core/test_stt_scoped_engine.py`.
 
 ### Local speaker evidence
 
@@ -282,6 +285,12 @@ Native build and model provenance: `scripts/ci/build-nemotron-runtime.ps1`, `dat
 - **Channel ordering**
   - Self and Peer have separate channel admission while sharing provider capacity.
   - Peer execution may be concurrent. Context preparation and publication preserve admitted order.
+- **Canonical source units**
+  - The frozen version-1 `SourceChild` in `core/orchestrator/translation_turn.py` is the shared source-unit contract, not another turn owner. Target-language jobs and retries are attempts of that source.
+  - Source composition is fixed before translation. Identity/revision, authoritative order, raw text/language, exact text-origin coverage, capture/provider/activation identities, source/context audio ranges, speaker attribution state and settings remain attached through request preparation and publication. `RecognitionTextOrigin` in `domain/recognition.py` owns the provenance schema.
+  - Display grouping scope is independently supplied provenance, never inferred from a translation parent. A-B-A remains three source/context units regardless of later card aggregation. Prefix normalization is disabled: `SourceChild.effective_text` is its raw text.
+  - `TranslationRequestOwner` snapshots prior eligible history for a source's target requests, records that source once, then permits execution. Later sources can use earlier source text before translation completes; a source never includes itself in history. Language/channel/time-window eligibility and configured history caps remain unchanged.
+  - Simple one-result routes retain static translation parents. Streaming prefixes use independently admitted existing parents while enclosing audio remains open. Failed predecessors resolve explicitly without discarding successful successors; bounded execution, retry/watchdog/source-only policies and destination isolation remain with existing owners.
 - **Manual admission**
   - Admission returns existing parent/child turn identities.
   - The originating operation/request identity is carried explicitly through asynchronous work.

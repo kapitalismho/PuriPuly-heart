@@ -276,7 +276,7 @@ def peer_requests(fixture: OwnerFixture) -> tuple[TranslationProcessRequest, ...
 
 
 @pytest.mark.asyncio
-async def test_peer_segments_use_individual_requests_with_whole_parent_context() -> None:
+async def test_peer_segments_use_individual_requests_with_prior_only_context() -> None:
     translations = {"one ": "一", "둘째 ": "二", "three": "三"}
     requests_seen: list[dict[str, object]] = []
 
@@ -313,10 +313,11 @@ async def test_peer_segments_use_individual_requests_with_whole_parent_context()
         ("둘째 ", "二"),
         ("three", "三"),
     ]
+    assert [prepared[request.utterance_id].context_texts for request in requests] == [
+        (), (), ("one",)
+    ]
     for body in requests_seen:
-        context = body["messages"][1]["content"]
-        assert all(text in context for text in translations)
-        assert "speaker=" not in context
+        assert "speaker=" not in body["messages"][1]["content"]
 
 
 @pytest.mark.asyncio

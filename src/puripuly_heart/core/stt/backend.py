@@ -149,86 +149,244 @@ def scoped_event_for_delivery(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class STTAudioBoundary:
+    boundary_id: str
+    capture_epoch: int
+    normalized_sample: int
+    observed_at_monotonic_s: float
+    reason: Literal["speaker", "natural", "hardcut"]
+    speaker_epoch: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.boundary_id or self.capture_epoch < 0 or self.normalized_sample < 0:
+            raise ValueError("invalid audio boundary")
+
+
+@dataclass(frozen=True, slots=True)
+class STTConsumedContribution:
+    identity: STTProviderTurnIdentity
+    contribution_id: str
+    text_start: int
+    text_end: int
+    text: str
+
+
 class STTContributionConsumptionLedger:
-    def __init__(self, *, identity_capacity: int = 4096) -> None:
-        if identity_capacity < 1:
-            raise ValueError("identity_capacity must be positive")
+    def __init__(
+        self, *, identity_capacity: int = 4096, contribution_capacity: int = 16384
+    ) -> None:
+        if identity_capacity < 1 or contribution_capacity < 1:
+            raise ValueError("ledger capacities must be positive")
         self._identity_capacity = identity_capacity
-        self._consumed: set[tuple[STTProviderTurnIdentity, str]] = set()
+        self._contribution_capacity = contribution_capacity
+        self._consumed: dict[
+            tuple[STTProviderTurnIdentity, str], list[tuple[int, int]]
+        ] = {}
+        self._contribution_ranges: dict[tuple[STTProviderTurnIdentity, str], tuple[int, int]] = {}
         self._consumed_terminal_tails: set[STTProviderTurnIdentity] = set()
         self._known_identities: set[STTProviderTurnIdentity] = set()
         self._identity_order: deque[STTProviderTurnIdentity] = deque()
+        self._retired_floor: dict[tuple[int, int], int] = {}
+        self._generation_floor = -1
+        self._boundaries: dict[STTProviderTurnIdentity, dict[str, STTAudioBoundary]] = {}
+        self._sealed: set[STTProviderTurnIdentity] = set()
 
     @property
     def consumed_contribution_ids(self) -> frozenset[str]:
         return frozenset(contribution_id for _identity, contribution_id in self._consumed)
 
-    def consume(
-        self,
-        event: STTProviderTurnUpdate | STTProviderTurnTerminal,
-    ) -> str:
-        text, _origins = self.consume_with_origins(event)
-        return text
+    def record_boundary(self, identity: STTProviderTurnIdentity, boundary: STTAudioBoundary) -> None:
+        if boundary.capture_epoch != identity.segment.capture_epoch:
+            raise ValueError("audio boundary belongs to another capture epoch")
+        if not self._remember_identity(identity):
+            return
+        boundaries = self._boundaries.setdefault(identity, {})
+        previous = boundaries.get(boundary.boundary_id)
+        if previous is not None and previous != boundary:
+            raise ValueError("audio boundary identity changed")
+        if previous is None and len(boundaries) >= 256:
+            raise ValueError("audio boundary capacity exceeded")
+        boundaries[boundary.boundary_id] = boundary
+
+    def boundaries(self, identity: STTProviderTurnIdentity) -> tuple[STTAudioBoundary, ...]:
+        return tuple(self._boundaries.get(identity, {}).values())
+
+    def seal_audio(self, identity: STTProviderTurnIdentity) -> None:
+        if self._remember_identity(identity):
+            self._sealed.add(identity)
+
+    def lifecycle(self, identity: STTProviderTurnIdentity) -> tuple[bool, bool]:
+        return identity in self._sealed, identity in self._consumed_terminal_tails
+
+    def consume(self, event: STTProviderTurnUpdate | STTProviderTurnTerminal) -> str:
+        return "".join(piece.text for piece in self.consume_parts(event))
 
     def consume_with_origins(
         self,
         event: STTProviderTurnUpdate | STTProviderTurnTerminal,
     ) -> tuple[str, tuple[RecognitionTextOrigin, ...]]:
-        self._remember_identity(event.identity)
-        ranges: list[tuple[int, int]] = []
-        if isinstance(event, STTProviderTurnUpdate):
-            contributions = (event.contribution,) if event.contribution is not None else ()
-            if event.stability != "stable":
-                return "", ()
-            include_terminal_only = False
-        else:
-            contributions = event.included_contributions
-            include_terminal_only = event.identity not in self._consumed_terminal_tails
-            if not contributions and any(
-                identity == event.identity for identity, _item in self._consumed
-            ):
-                return "", ()
-        cursor = 0
-        for contribution in contributions:
-            if contribution.text_start < cursor or contribution.text_end > len(event.text):
-                raise ValueError("invalid assembled contribution range")
-            if include_terminal_only and cursor < contribution.text_start:
-                ranges.append((cursor, contribution.text_start))
-            key = (event.identity, contribution.contribution_id)
-            if key not in self._consumed:
-                self._consumed.add(key)
-                ranges.append((contribution.text_start, contribution.text_end))
-            cursor = contribution.text_end
-        if include_terminal_only:
-            ranges.append((cursor, len(event.text)))
-            self._consumed_terminal_tails.add(event.identity)
         text = ""
         origins: tuple[RecognitionTextOrigin, ...] = ()
-        for start, end in ranges:
+        for piece in self.consume_parts(event):
             offset = len(text)
-            text += event.text[start:end]
+            text += piece.text
             origins += tuple(
                 replace(
                     origin, text_start=origin.text_start + offset, text_end=origin.text_end + offset
                 )
-                for origin in slice_recognition_origins(event.recognition_origins, start, end)
+                for origin in slice_recognition_origins(
+                    event.recognition_origins, piece.text_start, piece.text_end
+                )
             )
         return text, origins
 
-    def retire(self, identity: STTProviderTurnIdentity) -> None:
-        self._remember_identity(identity)
-        self._consumed_terminal_tails.add(identity)
+    def consume_parts(
+        self,
+        event: STTProviderTurnUpdate | STTProviderTurnTerminal,
+        *,
+        text_range: tuple[int, int] | None = None,
+    ) -> tuple[STTConsumedContribution, ...]:
+        if not self._remember_identity(event.identity):
+            return ()
+        if event.identity in self._consumed_terminal_tails:
+            return ()
+        if isinstance(event, STTProviderTurnUpdate):
+            if event.stability != "stable" or event.contribution is None:
+                return ()
+            contributions = (event.contribution,)
+        else:
+            contributions = event.included_contributions
+            if event.text and not contributions and any(
+                identity == event.identity for identity, _ in self._consumed
+            ):
+                raise ValueError("terminal source association is missing")
+            if len({item.contribution_id for item in contributions}) != len(contributions):
+                raise ValueError("terminal contribution identities repeat")
+            cursor = 0
+            for contribution in contributions:
+                if contribution.text_start < cursor or contribution.text_end > len(event.text):
+                    raise ValueError("terminal contribution ranges are invalid")
+                cursor = contribution.text_end
+            assembled: list[STTTextContribution] = []
+            cursor = 0
+            for contribution in contributions:
+                if contribution.text_start > cursor:
+                    assembled.append(STTTextContribution(
+                        f"terminal:{cursor}:{contribution.text_start}",
+                        cursor, contribution.text_start,
+                    ))
+                assembled.append(contribution)
+                cursor = contribution.text_end
+            if cursor < len(event.text):
+                assembled.append(STTTextContribution(
+                    f"terminal:{cursor}:{len(event.text)}", cursor, len(event.text)
+                ))
+            contributions = tuple(assembled)
+        selection_start, selection_end = text_range or (0, len(event.text))
+        if selection_start < 0 or selection_end > len(event.text) or selection_end < selection_start:
+            raise ValueError("invalid selected source range")
+        pieces: list[STTConsumedContribution] = []
+        staged: list[tuple[tuple[STTProviderTurnIdentity, str], list[tuple[int, int]]]] = []
+        for contribution in contributions:
+            declared = (contribution.text_start, contribution.text_end)
+            known = self._contribution_ranges.get((event.identity, contribution.contribution_id))
+            if known is not None and known != declared:
+                raise ValueError("contribution ownership range changed")
+            if contribution.text_end > len(event.text):
+                raise ValueError("contribution range exceeds assembled text")
+            key = (event.identity, contribution.contribution_id)
+            start = max(selection_start, contribution.text_start)
+            end = min(selection_end, contribution.text_end)
+            remaining = [(start, end)] if start < end else []
+            for used_start, used_end in self._consumed.get(key, ()):
+                next_ranges = []
+                for left, right in remaining:
+                    if used_end <= left or used_start >= right:
+                        next_ranges.append((left, right))
+                    else:
+                        if left < used_start:
+                            next_ranges.append((left, used_start))
+                        if used_end < right:
+                            next_ranges.append((used_end, right))
+                remaining = next_ranges
+            for left, right in remaining:
+                pieces.append(STTConsumedContribution(
+                    event.identity, contribution.contribution_id, left, right, event.text[left:right]
+                ))
+            staged.append((key, remaining))
+        new_keys = {key for key, ranges in staged if ranges and key not in self._consumed}
+        if len(self._consumed) + len(new_keys) > self._contribution_capacity:
+            raise ValueError("source contribution capacity exceeded")
+        commits = []
+        for contribution, (key, ranges) in zip(contributions, staged):
+            if ranges:
+                combined = sorted((*self._consumed.get(key, ()), *ranges))
+                merged: list[tuple[int, int]] = []
+                for left, right in combined:
+                    if merged and left <= merged[-1][1]:
+                        merged[-1] = (merged[-1][0], max(right, merged[-1][1]))
+                    else:
+                        merged.append((left, right))
+                if len(merged) > 256:
+                    raise ValueError("source split capacity exceeded")
+                commits.append((key, merged, (contribution.text_start, contribution.text_end)))
+        for key, merged, declared in commits:
+            self._consumed[key] = merged
+            self._contribution_ranges[key] = declared
+        if isinstance(event, STTProviderTurnTerminal) and text_range is None:
+            self.retire(event.identity)
+        return tuple(pieces)
 
-    def _remember_identity(self, identity: STTProviderTurnIdentity) -> None:
+    def retire(self, identity: STTProviderTurnIdentity) -> None:
+        if self._remember_identity(identity):
+            self._consumed_terminal_tails.add(identity)
+            self._consumed = {
+                key: ranges for key, ranges in self._consumed.items() if key[0] != identity
+            }
+            self._contribution_ranges = {
+                key: span for key, span in self._contribution_ranges.items() if key[0] != identity
+            }
+
+    def _remember_identity(self, identity: STTProviderTurnIdentity) -> bool:
         if identity in self._known_identities:
-            return
+            return True
+        segment = identity.segment
+        scope = (segment.activation_generation, segment.capture_epoch)
+        if segment.activation_generation <= self._generation_floor or (
+            segment.segment_order <= self._retired_floor.get(scope, -1)
+        ):
+            return False
+        expired = next(
+            (item for item in self._identity_order if item in self._consumed_terminal_tails), None
+        ) if len(self._identity_order) >= self._identity_capacity else None
+        if len(self._identity_order) >= self._identity_capacity and expired is None:
+            raise ValueError("unfinished source identity capacity exceeded")
         self._known_identities.add(identity)
         self._identity_order.append(identity)
-        while len(self._identity_order) > self._identity_capacity:
-            expired = self._identity_order.popleft()
+        if expired is not None:
+            self._identity_order.remove(expired)
+            old = expired.segment
+            old_scope = (old.activation_generation, old.capture_epoch)
+            self._retired_floor[old_scope] = max(
+                old.segment_order, self._retired_floor.get(old_scope, -1)
+            )
+            if len(self._retired_floor) > self._identity_capacity:
+                generation = min(scope[0] for scope in self._retired_floor)
+                self._generation_floor = max(self._generation_floor, generation)
+                self._retired_floor = {
+                    scope: order for scope, order in self._retired_floor.items()
+                    if scope[0] > self._generation_floor
+                }
             self._known_identities.discard(expired)
             self._consumed_terminal_tails.discard(expired)
-            self._consumed = {item for item in self._consumed if item[0] != expired}
+            self._boundaries.pop(expired, None)
+            self._sealed.discard(expired)
+            self._consumed = {key: ranges for key, ranges in self._consumed.items() if key[0] != expired}
+            self._contribution_ranges = {
+                key: span for key, span in self._contribution_ranges.items() if key[0] != expired
+            }
+        return True
 
 
 @dataclass(frozen=True, slots=True)

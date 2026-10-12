@@ -858,16 +858,6 @@ class SelfTranslationChannelOwner:
                     prepared, provider_generation=self.translation_requests.provider_generation
                 )
         if child.precomputed_translation is not None:
-            if prepared is None:
-                self.translation_requests.remember_context(
-                    child.transcript.text,
-                    self.clock.now(),
-                    channel="self",
-                    config_snapshot=child.config_snapshot,
-                    source_language=child.precomputed_translation.source_language,
-                    target_language=target_language,
-                    origin=child.turn_kind,
-                )
             return TranslationTurnProcessResult(
                 "translated",
                 TranslationOutputSubmission(
@@ -887,9 +877,11 @@ class SelfTranslationChannelOwner:
                     turn_order=child.turn_order,
                     turn_kind=child.turn_kind,
                     parent_output_count=child.parent_output_count,
+                    source_child=child.source_child,
                     context_texts=None if prepared is None else prepared.context_texts,
                 ),
             )
+
         result = await self.translation_requests.process(
             request,
             cancellation_requested=cancellation_requested,
@@ -1193,6 +1185,8 @@ class SelfTranslationChannelOwner:
             terminal_failure=child.precomputed_failure,
             operation_id=child.operation_id,
             request_id=child.request_id,
+            source_child=child.source_child,
+            precomputed=child.precomputed_translation is not None,
         )
 
     def _send_stt_connected_notification(self) -> None:

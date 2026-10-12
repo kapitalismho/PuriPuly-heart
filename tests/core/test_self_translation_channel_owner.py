@@ -1129,6 +1129,7 @@ async def test_scoped_readiness_restores_session_state_disclosure_and_failure_st
         text_authority="degraded",
         failure_reason="provider_final_timeout",
         epoch_disposition="retire",
+        included_contributions=(STTTextContribution("usable", 0, 6),),
     )
     await callbacks.self_event_handler(terminal)
 
