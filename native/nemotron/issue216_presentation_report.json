@@ -1,0 +1,153 @@
+{
+  "schema": "issue216-actual-presentation-observation-1",
+  "outcome": "actual_desktop_renderer_observed",
+  "scope": "Validation-only, sanitized recorded REAL source groups. No product/docs/tests/Git/settings/audio/model/paid-API changes and no VRChat/SteamVR interaction.",
+  "successful_command": ".venv/Scripts/python.exe -B native/nemotron/issue216_presentation.py --source native/nemotron/issue216_final.json --baseline native/nemotron/issue216_baseline.json --output native/nemotron/issue216_presentation_images4 --dwell-ms 650",
+  "successful_command_exit_code": 0,
+  "run_evidence": "native/nemotron/issue216_presentation_images4/result.json",
+  "renderer": "DesktopOverlayRenderer",
+  "window": "FletDesktopRendererWindow (default real Flet desktop view, not mock renderer)",
+  "publication_seam": "Recorded SourceChild raw text, source identity/order/range/revision, and FinalSpeakerRun fields -> existing child Transcript pattern -> PeerSpeakerIdentityAllocator -> OverlayEventAdapter.transcript_final/utterance_closed -> OverlayPresenter.emit_peer_when_admissible -> LocalAuthenticatedRawIngress -> actual default DesktopOverlayRenderer/FletDesktopRendererWindow.",
+  "publication_limits": [
+    "SourceChild settings/origins were not rehydrated; this does not repeat source partition/ownership/model/provider validation.",
+    "No translation event or translation call was made. Existing source-only presenter mapping promotes original text into the primary slot; its internal caption-plan role is named peer_translation even though these pixels contain only recorded source text.",
+    "Baseline and candidate each use a fresh presenter/allocator with the existing default two-row selection, one-second replacement pacing, and TTL. No #217 aggregation or TTL changes. The renderer remains the same owned instance; revision remapping only preserves monotonic ingress revisions across the isolated comparison.",
+    "Recorded display_group_id is retained as evidence; it is not a new display grouping implementation."
+  ],
+  "capture_safety": {
+    "method": "Actual screen pixels using Win32 BitBlt, bounded before reading to the owned renderer client rectangle over an opaque owned checkerboard.",
+    "crop_xyxy": [32, 32, 1376, 368],
+    "dimensions": [1344, 336],
+    "full_desktop_capture": false,
+    "foreign_window_capture": false,
+    "guard": "Before each pixel read, verifies renderer/backdrop HWND ownership, full opaque owned-backdrop coverage, overlay above backdrop, and no intersecting visible foreign HWND above backdrop. Only own windows are reasserted topmost, without activation or move/hide operations on foreign windows.",
+    "ingress": "Authenticated 127.0.0.1 ephemeral WebSocket, authentication token not retained.",
+    "composition": "Direct task-local diagnostic startup. Ordinary main/application composition and user settings are never invoked. Renderer is persistence-free."
+  },
+  "observation_method": "All seven PNG files were decoded and actually viewed with functions.read(image/png). Renderer commit acknowledgements and exact color pixel counts are corroboration only, not substituted for image observation.",
+  "observed_frames": [
+    {
+      "label": "baseline_plain",
+      "image": "native/nemotron/issue216_presentation_images4/baseline_plain.png",
+      "visible": "A single broad gray card wrapping over two text lines: Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from his",
+      "colors": ["gray #B4B4B4"],
+      "exact_color_pixels": {"gray": 14221, "gold": 0, "cyan": 0},
+      "observation": "No visual A/B distinction within the mixed-speaker text. Original missing space at press.He remains."
+    },
+    {
+      "label": "baseline_terminal",
+      "image": "native/nemotron/issue216_presentation_images4/baseline_terminal.png",
+      "visible": "The same broad gray card above a second gray from his hair. card.",
+      "colors": ["gray #B4B4B4"],
+      "exact_color_pixels": {"gray": 16241, "gold": 0, "cyan": 0},
+      "observation": "Terminal continuation is a separate row but still not visually attributed."
+    },
+    {
+      "label": "fixed_A",
+      "image": "native/nemotron/issue216_presentation_images4/fixed_A.png",
+      "visible": "Washed the detritus from his",
+      "colors": ["gold #FFD700"],
+      "exact_color_pixels": {"gray": 0, "gold": 4681, "cyan": 0},
+      "recorded_attribution": "identified Nemotron speaker 0, scope 1, palette 0",
+      "observation": "One coherent identified A span, not multiple isolated token cards. Renderer strips trailing display whitespace only."
+    },
+    {
+      "label": "fixed_gray_crossing",
+      "image": "native/nemotron/issue216_presentation_images4/fixed_gray_crossing.png",
+      "visible": "Gold Washed the detritus from his above gray hair.",
+      "colors": ["gold #FFD700", "gray #B4B4B4"],
+      "exact_color_pixels": {"gray": 701, "gold": 4681, "cyan": 0},
+      "recorded_attribution": "hair. is uncertain Nemotron scope 1, no speaker ID",
+      "observation": "The crossing word is actually gray on its own row. It is not falsely recolored as A or B. This isolated crossing word remains a semantic/presentation limitation, not proof that every visible group is sentence-sized."
+    },
+    {
+      "label": "fixed_B",
+      "image": "native/nemotron/issue216_presentation_images4/fixed_B.png",
+      "visible": "Gray hair. above cyan Gentlemen of the press.",
+      "colors": ["gray #B4B4B4", "cyan #40DBFF"],
+      "exact_color_pixels": {"gray": 701, "gold": 0, "cyan": 3754},
+      "recorded_attribution": "identified Nemotron speaker 1, scope 1, palette 1",
+      "observation": "B is a full coherent phrase visually distinguished from A; existing two-row policy has displaced the earlier A row."
+    },
+    {
+      "label": "fixed_mixed_return_A",
+      "image": "native/nemotron/issue216_presentation_images4/fixed_mixed_return_A.png",
+      "visible": "Cyan Gentlemen of the press. above gray He the He He the detritus",
+      "colors": ["cyan #40DBFF", "gray #B4B4B4"],
+      "exact_color_pixels": {"gray": 4008, "gold": 0, "cyan": 3754},
+      "recorded_attribution": "whole returning-source run is unavailable, no speaker ID",
+      "observation": "Original garbled/repeated He text is preserved as one gray group, not upgraded to identified A or split into token-island jobs. The label describes the scenario's returning A, not a confident attribution of this run."
+    },
+    {
+      "label": "fixed_terminal_A",
+      "image": "native/nemotron/issue216_presentation_images4/fixed_terminal_A.png",
+      "visible": "Gray He the He He the detritus above gold detritus from his hair.",
+      "colors": ["gray #B4B4B4", "gold #FFD700"],
+      "exact_color_pixels": {"gray": 4008, "gold": 3364, "cyan": 0},
+      "recorded_attribution": "identified Nemotron speaker 0, scope 1, palette 0",
+      "observation": "Terminal identified A returns to the same gold as initial identified A. Previous ambiguous text remains gray."
+    }
+  ],
+  "comparison": {
+    "supported": "On the actual owned desktop renderer, identified A and B have visibly distinct stable gold/cyan colors while uncertain crossing and unavailable returning-source text remain gray. The candidate does not display one job/card per recognized token: A and B coherent spans and the whole ambiguous returning run appear as groups.",
+    "retained_ambiguity": "hair. is still an isolated gray crossing-word row. The ASR corruption He the He He the detritus remains. A/B labels do not establish real speaker/model accuracy or lexical/semantic correctness.",
+    "not_supported": "No claim of elimination of all displayed confusion, overall ASR/translation/profile quality, HMD/photon output, profile robustness, live application timing, or #217 aggregation quality. No usability participants or VR rendering were tested."
+  },
+  "attempts": [
+    {
+      "command": ".venv\\Scripts\\python.exe -B native\\nemotron\\issue216_presentation.py --source native\\nemotron\\issue216_final.json --baseline native\\nemotron\\issue216_baseline.json --output native\\nemotron\\issue216_presentation_images --dwell-ms 650",
+      "exit_code": 127,
+      "result": "Shell consumed unquoted Windows backslashes; executable not launched. Switched exact command to forward-slash paths."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue216_presentation.py --source native/nemotron/issue216_final.json --baseline native/nemotron/issue216_baseline.json --output native/nemotron/issue216_presentation_images --dwell-ms 650",
+      "exit_code": 1,
+      "result": "Task-local driver relative input path normalization failed before GUI startup. Resolved input paths in driver."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue216_presentation.py --source native/nemotron/issue216_final.json --baseline native/nemotron/issue216_baseline.json --output native/nemotron/issue216_presentation_images --dwell-ms 650",
+      "exit_code": 1,
+      "evidence": "native/nemotron/issue216_presentation_images/result.json",
+      "result": "Owned checkerboard matching used Windows venv launcher PID, not actual child window PID. No capture. Owned process stopped; later exact spawned-driver command-line inspection found no remaining backdrop process. Replaced identity assumption with child-reported actual PID and graceful stdin shutdown."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue216_presentation.py --source native/nemotron/issue216_final.json --baseline native/nemotron/issue216_baseline.json --output native/nemotron/issue216_presentation_images2 --dwell-ms 650",
+      "exit_code": 1,
+      "evidence": "native/nemotron/issue216_presentation_images2/result.json",
+      "result": "Actual renderer started and committed source, but strict foreign-window intersection guard rejected capture at origin. Zero images; both own GUI processes stopped."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue216_presentation.py --source native/nemotron/issue216_final.json --baseline native/nemotron/issue216_baseline.json --output native/nemotron/issue216_presentation_images3 --dwell-ms 650",
+      "exit_code": 1,
+      "evidence": "native/nemotron/issue216_presentation_images3/result.json",
+      "result": "Reasserting only own topmost HWNDs retained strict guard rejection: a foreign visible 1x1 rectangle at [0,0,1,1] intersected the origin crop. Zero images. Moved only owned fixture/renderer to [32,32] rather than bypassing guard or touching foreign window; both own processes stopped."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue216_presentation.py --source native/nemotron/issue216_final.json --baseline native/nemotron/issue216_baseline.json --output native/nemotron/issue216_presentation_images4 --dwell-ms 650",
+      "exit_code": 0,
+      "result": "Seven safe actual client-crop PNGs captured, then all seven decoded/viewed using functions.read."
+    }
+  ],
+  "cleanup": {
+    "successful_run_ingress_closed": true,
+    "successful_run_renderer_shutdown": true,
+    "successful_run_renderer_exit_code": 0,
+    "successful_run_owned_backdrop_stopped": true,
+    "only_spawned_processes_stopped": true,
+    "maintained_surfaces_modified": false
+  },
+  "changed_surfaces": [
+    "native/nemotron/issue216_presentation.py",
+    "native/nemotron/issue216_presentation_report.json",
+    "native/nemotron/issue216_presentation_images/result.json",
+    "native/nemotron/issue216_presentation_images2/result.json",
+    "native/nemotron/issue216_presentation_images3/result.json",
+    "native/nemotron/issue216_presentation_images4/result.json",
+    "native/nemotron/issue216_presentation_images4/*.png"
+  ],
+  "remaining_gaps": [
+    "Actual renderer-only source presentation is now exercised; full live application translated presentation and HMD output remain intentionally unexercised.",
+    "Crossing-word gray and original semantic corruption remain visible and are not suppressed or relabeled."
+  ],
+  "director_decision_needed": null
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "issue216-existing-public-narration-prerequisite-1",
+  "network_calls": 0,
+  "model_calls": 0,
+  "inspection": "Existing approved corpus manifest plus original cached CommonVoice dev transcript/audio tar; decoded complete matching originals in memory with ffmpeg. No new download, private audio, speaker reidentification, word crop or upload.",
+  "existing_current_A_originals": [
+    {"sample": "common_voice_en_11289258.mp3", "archive_member": "en_dev_0/common_voice_en_11289258.mp3", "full_source_text": "He washed the detritus from his hair.", "sha256": "19865499680804b33e8ac1f3a7b96fa8762e31be6a143c9e711bba72984272ad", "full_samples_16khz": 56064, "seconds": 3.504},
+    {"sample": "common_voice_en_11289259.mp3", "archive_member": "en_dev_0/common_voice_en_11289259.mp3", "full_source_text": "The clock was slightly askew.", "sha256": "6daefae6cb9d7ba0764d6e4b7df423210967ab846783674adbf150a4e0ae9516", "full_samples_16khz": 44160, "seconds": 2.76}
+  ],
+  "current_A_longer_narration": "Unavailable in the original cached dev metadata/audio for the same anonymous recording contributor. Corpus longerA derivatives are concat3x, prefixed/mid silence or truncated versions, not a longer original narration. Do not brute-force those repetitions or substitute an unrelated voice silently.",
+  "alternative_requires_director_approval": {
+    "scenario_A": "Use the already approved FLEURS narration as a new anonymousA; warm up with SAME complete source, natural pause, then same complete source continues beforeB",
+    "source": "clips/fleurs/en_us/1009709090964908274.wav",
+    "sha256": "e5664ae10a6273fbe0009068e512f4c416cccbeff19d3d2d11e5fb8d72d03fb7",
+    "full_source_text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the impacts.",
+    "full_samples_16khz": 126720,
+    "seconds": 7.92,
+    "license": "CC-BY-4.0",
+    "dataset_revision": "70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+    "existing_actual_native_evidence": {"archive": "native/nemotron/issue215_evidence.zip", "member": "issue215_new_supported_window.json", "case": "six_second_rollover", "profile": "0.64", "closed_probability_records": 816, "active_slot_union": [0], "clear_slot_union": [0], "clear_probability_records": 655, "uncertain_probability_records": 4, "continuous_clear_source_range": [20832, 125472], "continuous_clear_source_seconds": [1.302, 7.842], "uncertainty": "Three startup records source19552–20032 plus one trailing record125792–125952; no second-speaker conflict. Entire batch source was unavailable, so these interior facts are not a previous whole-source rich certification."},
+    "proposed_sequence": "500ms initial silence + full7.920s narrationA warmup +1500ms natural pause + SAME full7.920s narrationA + full3.456s existing CommonVoiceB +1250ms trailing silence",
+    "original_input_seconds": 22.546,
+    "physical_policy": "Unchanged actual product Deepgram flags, existing natural/six-second safety and applicable300/500ms recovery. TrimmingOFF, no per-speaker reconnect or oracle source/text cut.",
+    "hypothesis": "Establish modelA before resumed continuous narration and avoid the previous interior440ms lowactivity hole. One probe only if approved; no threshold adjustment or guaranteed outcome.",
+    "caveat": "If finalizedA source precedesB onset, record its availability and later model-observed transfer/continuation. Do not claim boundary-triggered release. All-gray early remains non-success. Existing real model evidence supports selecting an input, not future cloud/attribution claims."
+  },
+  "state": "Historical prerequisite suggestion only. Director did NOT approve FLEURS/newinput/tuning; no such live/model call occurred. Superseded by fixed-policy/performance-repaired ORIGINAL repeatedABA case. No current authorization implied.",
+  "budget_unspent_when_written": {"connections": 6, "audio_seconds": 140.708}
+}

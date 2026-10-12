@@ -1,0 +1,831 @@
+{
+  "schema": "issue216-precise-first-final-uncertainty-1",
+  "cloud_calls": 0,
+  "model_calls": 0,
+  "classification_source_execution_sha256": "0094652a10f52f07b775c00928a354c6f89c32c713c8ddc1b5ab2178e41c547d",
+  "same_actual_classification_code": true,
+  "first_native_text": "He washed the detritus from his hair. He washed",
+  "cutoff_actual_normalized_source_event_at": 84467.9385656,
+  "observed_whole_source_state": "uncertain",
+  "classifications": [
+    {
+      "semantics": "result_span",
+      "text_range": [
+        0,
+        47
+      ],
+      "raw_time": [
+        0.0,
+        3.465
+      ],
+      "source_envelope": [
+        1728,
+        57168
+      ],
+      "captured_replayed_classification": "uncertain",
+      "active_slots_union": [
+        0
+      ],
+      "uncertain_frames": [
+        {
+          "source_range": [
+            9088,
+            9216
+          ],
+          "ready_at": 84463.4198854,
+          "probabilities": [
+            0.49529844522476196,
+            0.0012061154702678323,
+            0.0004272061341907829,
+            0.00038664741441607475,
+            0.0005580739234574139,
+            0.00022533400624524802,
+            4.810158134205267e-05,
+            7.274690688063856e-06
+          ],
+          "top_probability": 0.49529844522476196,
+          "second_probability": 0.0012061154702678323,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            9216,
+            9248
+          ],
+          "ready_at": 84463.4198854,
+          "probabilities": [
+            0.49529844522476196,
+            0.0012061154702678323,
+            0.0004272061341907829,
+            0.00038664741441607475,
+            0.0005580739234574139,
+            0.00022533400624524802,
+            4.810158134205267e-05,
+            7.274690688063856e-06
+          ],
+          "top_probability": 0.49529844522476196,
+          "second_probability": 0.0012061154702678323,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            42688,
+            42848
+          ],
+          "ready_at": 84465.8024551,
+          "probabilities": [
+            0.44091153144836426,
+            0.0005266008665785193,
+            0.00019322427397128195,
+            0.00011351874127285555,
+            0.00012469675857573748,
+            2.4104687327053398e-05,
+            1.0440382993692765e-06,
+            4.666750186288482e-08
+          ],
+          "top_probability": 0.44091153144836426,
+          "second_probability": 0.0005266008665785193,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            42848,
+            43008
+          ],
+          "ready_at": 84465.8024602,
+          "probabilities": [
+            0.35847416520118713,
+            0.00044544049887917936,
+            0.00015982247714418918,
+            9.183788642985746e-05,
+            9.494073310634121e-05,
+            1.7581964129931293e-05,
+            6.16237741724035e-07,
+            2.3287094919055562e-08
+          ],
+          "top_probability": 0.35847416520118713,
+          "second_probability": 0.00044544049887917936,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            43008,
+            43168
+          ],
+          "ready_at": 84465.8024657,
+          "probabilities": [
+            0.2905385494232178,
+            0.00038941839011386037,
+            0.00013441435294225812,
+            7.517381891375408e-05,
+            7.40621835575439e-05,
+            1.3919959201302845e-05,
+            4.056450393363775e-07,
+            1.3116934205470443e-08
+          ],
+          "top_probability": 0.2905385494232178,
+          "second_probability": 0.00038941839011386037,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            43168,
+            43328
+          ],
+          "ready_at": 84465.8024708,
+          "probabilities": [
+            0.22407978773117065,
+            0.0003279949596617371,
+            0.00011512357013998553,
+            6.225420656846836e-05,
+            6.323133129626513e-05,
+            1.1455164894869085e-05,
+            2.963485883356043e-07,
+            8.133319795433636e-09
+          ],
+          "top_probability": 0.22407978773117065,
+          "second_probability": 0.0003279949596617371,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            47808,
+            47968
+          ],
+          "ready_at": 84466.2765463,
+          "probabilities": [
+            0.25505590438842773,
+            0.00020383259106893092,
+            6.295033381320536e-05,
+            2.9314252969925292e-05,
+            1.9528817574610002e-05,
+            1.379033733428514e-06,
+            1.0763948843361959e-08,
+            1.366193269625171e-10
+          ],
+          "top_probability": 0.25505590438842773,
+          "second_probability": 0.00020383259106893092,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            47968,
+            48128
+          ],
+          "ready_at": 84466.2765554,
+          "probabilities": [
+            0.26544177532196045,
+            0.0002067800669465214,
+            6.295503408182412e-05,
+            2.968474291265011e-05,
+            1.9739811250474304e-05,
+            1.5422374417539686e-06,
+            1.396701598821437e-08,
+            1.9167831211142072e-10
+          ],
+          "top_probability": 0.26544177532196045,
+          "second_probability": 0.0002067800669465214,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            48128,
+            48288
+          ],
+          "ready_at": 84466.2765618,
+          "probabilities": [
+            0.27991536259651184,
+            0.00022184074623510242,
+            6.442429730668664e-05,
+            3.091420148848556e-05,
+            2.0255545678082854e-05,
+            1.6710170029909932e-06,
+            1.6787856438327253e-08,
+            2.4918306307242233e-10
+          ],
+          "top_probability": 0.27991536259651184,
+          "second_probability": 0.00022184074623510242,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            48288,
+            48448
+          ],
+          "ready_at": 84466.2765674,
+          "probabilities": [
+            0.306805282831192,
+            0.00024685225798748434,
+            6.99493321008049e-05,
+            3.38398567691911e-05,
+            2.1914007447776385e-05,
+            1.8729087969404645e-06,
+            2.130548892864681e-08,
+            3.467372777787858e-10
+          ],
+          "top_probability": 0.306805282831192,
+          "second_probability": 0.00024685225798748434,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            48448,
+            48608
+          ],
+          "ready_at": 84466.2765727,
+          "probabilities": [
+            0.3480830490589142,
+            0.00027969959774054587,
+            7.872923015384004e-05,
+            3.963923882110976e-05,
+            2.626367859193124e-05,
+            2.389724613749422e-06,
+            3.147386706814359e-08,
+            5.849881135056023e-10
+          ],
+          "top_probability": 0.3480830490589142,
+          "second_probability": 0.00027969959774054587,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            48608,
+            48640
+          ],
+          "ready_at": 84466.2765819,
+          "probabilities": [
+            0.42922478914260864,
+            0.0003562318452168256,
+            9.530136594548821e-05,
+            4.823999552172609e-05,
+            3.4153137676185e-05,
+            3.169067440467188e-06,
+            4.869005110208491e-08,
+            1.0115061011006787e-09
+          ],
+          "top_probability": 0.42922478914260864,
+          "second_probability": 0.0003562318452168256,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            48640,
+            48768
+          ],
+          "ready_at": 84466.2765819,
+          "probabilities": [
+            0.42922478914260864,
+            0.0003562318452168256,
+            9.530136594548821e-05,
+            4.823999552172609e-05,
+            3.4153137676185e-05,
+            3.169067440467188e-06,
+            4.869005110208491e-08,
+            1.0115061011006787e-09
+          ],
+          "top_probability": 0.42922478914260864,
+          "second_probability": 0.0003562318452168256,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        }
+      ],
+      "missing_coverage": false,
+      "epochs": [
+        1
+      ],
+      "text": "He washed the detritus from his hair. He washed"
+    },
+    {
+      "semantics": "word_interval",
+      "text_range": [
+        0,
+        2
+      ],
+      "raw_time": [
+        0.32,
+        0.64
+      ],
+      "source_envelope": [
+        6848,
+        11968
+      ],
+      "captured_replayed_classification": "uncertain",
+      "active_slots_union": [
+        0
+      ],
+      "uncertain_frames": [
+        {
+          "source_range": [
+            9088,
+            9216
+          ],
+          "ready_at": 84463.4198854,
+          "probabilities": [
+            0.49529844522476196,
+            0.0012061154702678323,
+            0.0004272061341907829,
+            0.00038664741441607475,
+            0.0005580739234574139,
+            0.00022533400624524802,
+            4.810158134205267e-05,
+            7.274690688063856e-06
+          ],
+          "top_probability": 0.49529844522476196,
+          "second_probability": 0.0012061154702678323,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            9216,
+            9248
+          ],
+          "ready_at": 84463.4198854,
+          "probabilities": [
+            0.49529844522476196,
+            0.0012061154702678323,
+            0.0004272061341907829,
+            0.00038664741441607475,
+            0.0005580739234574139,
+            0.00022533400624524802,
+            4.810158134205267e-05,
+            7.274690688063856e-06
+          ],
+          "top_probability": 0.49529844522476196,
+          "second_probability": 0.0012061154702678323,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        }
+      ],
+      "missing_coverage": false,
+      "epochs": [
+        1
+      ],
+      "text": "He"
+    },
+    {
+      "semantics": "word_interval",
+      "text_range": [
+        3,
+        9
+      ],
+      "raw_time": [
+        0.64,
+        1.04
+      ],
+      "source_envelope": [
+        11968,
+        18368
+      ],
+      "captured_replayed_classification": "identified",
+      "active_slots_union": [
+        0
+      ],
+      "uncertain_frames": [],
+      "missing_coverage": false,
+      "epochs": [
+        1
+      ],
+      "text": "washed"
+    },
+    {
+      "semantics": "word_interval",
+      "text_range": [
+        10,
+        13
+      ],
+      "raw_time": [
+        1.04,
+        1.28
+      ],
+      "source_envelope": [
+        18368,
+        22208
+      ],
+      "captured_replayed_classification": "identified",
+      "active_slots_union": [
+        0
+      ],
+      "uncertain_frames": [],
+      "missing_coverage": false,
+      "epochs": [
+        1
+      ],
+      "text": "the"
+    },
+    {
+      "semantics": "word_interval",
+      "text_range": [
+        14,
+        22
+      ],
+      "raw_time": [
+        1.28,
+        1.8399999
+      ],
+      "source_envelope": [
+        22208,
+        31168
+      ],
+      "captured_replayed_classification": "identified",
+      "active_slots_union": [
+        0
+      ],
+      "uncertain_frames": [],
+      "missing_coverage": false,
+      "epochs": [
+        1
+      ],
+      "text": "detritus"
+    },
+    {
+      "semantics": "word_interval",
+      "text_range": [
+        23,
+        27
+      ],
+      "raw_time": [
+        1.8399999,
+        2.08
+      ],
+      "source_envelope": [
+        31167,
+        35008
+      ],
+      "captured_replayed_classification": "identified",
+      "active_slots_union": [
+        0
+      ],
+      "uncertain_frames": [],
+      "missing_coverage": false,
+      "epochs": [
+        1
+      ],
+      "text": "from"
+    },
+    {
+      "semantics": "word_interval",
+      "text_range": [
+        28,
+        31
+      ],
+      "raw_time": [
+        2.08,
+        2.32
+      ],
+      "source_envelope": [
+        35008,
+        38848
+      ],
+      "captured_replayed_classification": "identified",
+      "active_slots_union": [
+        0
+      ],
+      "uncertain_frames": [],
+      "missing_coverage": false,
+      "epochs": [
+        1
+      ],
+      "text": "his"
+    },
+    {
+      "semantics": "word_interval",
+      "text_range": [
+        32,
+        37
+      ],
+      "raw_time": [
+        2.32,
+        2.8799999
+      ],
+      "source_envelope": [
+        38848,
+        47808
+      ],
+      "captured_replayed_classification": "uncertain",
+      "active_slots_union": [
+        0
+      ],
+      "uncertain_frames": [
+        {
+          "source_range": [
+            42688,
+            42848
+          ],
+          "ready_at": 84465.8024551,
+          "probabilities": [
+            0.44091153144836426,
+            0.0005266008665785193,
+            0.00019322427397128195,
+            0.00011351874127285555,
+            0.00012469675857573748,
+            2.4104687327053398e-05,
+            1.0440382993692765e-06,
+            4.666750186288482e-08
+          ],
+          "top_probability": 0.44091153144836426,
+          "second_probability": 0.0005266008665785193,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            42848,
+            43008
+          ],
+          "ready_at": 84465.8024602,
+          "probabilities": [
+            0.35847416520118713,
+            0.00044544049887917936,
+            0.00015982247714418918,
+            9.183788642985746e-05,
+            9.494073310634121e-05,
+            1.7581964129931293e-05,
+            6.16237741724035e-07,
+            2.3287094919055562e-08
+          ],
+          "top_probability": 0.35847416520118713,
+          "second_probability": 0.00044544049887917936,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            43008,
+            43168
+          ],
+          "ready_at": 84465.8024657,
+          "probabilities": [
+            0.2905385494232178,
+            0.00038941839011386037,
+            0.00013441435294225812,
+            7.517381891375408e-05,
+            7.40621835575439e-05,
+            1.3919959201302845e-05,
+            4.056450393363775e-07,
+            1.3116934205470443e-08
+          ],
+          "top_probability": 0.2905385494232178,
+          "second_probability": 0.00038941839011386037,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            43168,
+            43328
+          ],
+          "ready_at": 84465.8024708,
+          "probabilities": [
+            0.22407978773117065,
+            0.0003279949596617371,
+            0.00011512357013998553,
+            6.225420656846836e-05,
+            6.323133129626513e-05,
+            1.1455164894869085e-05,
+            2.963485883356043e-07,
+            8.133319795433636e-09
+          ],
+          "top_probability": 0.22407978773117065,
+          "second_probability": 0.0003279949596617371,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        }
+      ],
+      "missing_coverage": false,
+      "epochs": [
+        1
+      ],
+      "text": "hair."
+    },
+    {
+      "semantics": "word_interval",
+      "text_range": [
+        38,
+        40
+      ],
+      "raw_time": [
+        2.8799999,
+        3.12
+      ],
+      "source_envelope": [
+        47807,
+        51648
+      ],
+      "captured_replayed_classification": "uncertain",
+      "active_slots_union": [
+        0
+      ],
+      "uncertain_frames": [
+        {
+          "source_range": [
+            47808,
+            47968
+          ],
+          "ready_at": 84466.2765463,
+          "probabilities": [
+            0.25505590438842773,
+            0.00020383259106893092,
+            6.295033381320536e-05,
+            2.9314252969925292e-05,
+            1.9528817574610002e-05,
+            1.379033733428514e-06,
+            1.0763948843361959e-08,
+            1.366193269625171e-10
+          ],
+          "top_probability": 0.25505590438842773,
+          "second_probability": 0.00020383259106893092,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            47968,
+            48128
+          ],
+          "ready_at": 84466.2765554,
+          "probabilities": [
+            0.26544177532196045,
+            0.0002067800669465214,
+            6.295503408182412e-05,
+            2.968474291265011e-05,
+            1.9739811250474304e-05,
+            1.5422374417539686e-06,
+            1.396701598821437e-08,
+            1.9167831211142072e-10
+          ],
+          "top_probability": 0.26544177532196045,
+          "second_probability": 0.0002067800669465214,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            48128,
+            48288
+          ],
+          "ready_at": 84466.2765618,
+          "probabilities": [
+            0.27991536259651184,
+            0.00022184074623510242,
+            6.442429730668664e-05,
+            3.091420148848556e-05,
+            2.0255545678082854e-05,
+            1.6710170029909932e-06,
+            1.6787856438327253e-08,
+            2.4918306307242233e-10
+          ],
+          "top_probability": 0.27991536259651184,
+          "second_probability": 0.00022184074623510242,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            48288,
+            48448
+          ],
+          "ready_at": 84466.2765674,
+          "probabilities": [
+            0.306805282831192,
+            0.00024685225798748434,
+            6.99493321008049e-05,
+            3.38398567691911e-05,
+            2.1914007447776385e-05,
+            1.8729087969404645e-06,
+            2.130548892864681e-08,
+            3.467372777787858e-10
+          ],
+          "top_probability": 0.306805282831192,
+          "second_probability": 0.00024685225798748434,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            48448,
+            48608
+          ],
+          "ready_at": 84466.2765727,
+          "probabilities": [
+            0.3480830490589142,
+            0.00027969959774054587,
+            7.872923015384004e-05,
+            3.963923882110976e-05,
+            2.626367859193124e-05,
+            2.389724613749422e-06,
+            3.147386706814359e-08,
+            5.849881135056023e-10
+          ],
+          "top_probability": 0.3480830490589142,
+          "second_probability": 0.00027969959774054587,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            48608,
+            48640
+          ],
+          "ready_at": 84466.2765819,
+          "probabilities": [
+            0.42922478914260864,
+            0.0003562318452168256,
+            9.530136594548821e-05,
+            4.823999552172609e-05,
+            3.4153137676185e-05,
+            3.169067440467188e-06,
+            4.869005110208491e-08,
+            1.0115061011006787e-09
+          ],
+          "top_probability": 0.42922478914260864,
+          "second_probability": 0.0003562318452168256,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        },
+        {
+          "source_range": [
+            48640,
+            48768
+          ],
+          "ready_at": 84466.2765819,
+          "probabilities": [
+            0.42922478914260864,
+            0.0003562318452168256,
+            9.530136594548821e-05,
+            4.823999552172609e-05,
+            3.4153137676185e-05,
+            3.169067440467188e-06,
+            4.869005110208491e-08,
+            1.0115061011006787e-09
+          ],
+          "top_probability": 0.42922478914260864,
+          "second_probability": 0.0003562318452168256,
+          "active_slots": [],
+          "reason": "no_active_slot_and_top_probability>=0.2"
+        }
+      ],
+      "missing_coverage": false,
+      "epochs": [
+        1
+      ],
+      "text": "He"
+    },
+    {
+      "semantics": "word_interval",
+      "text_range": [
+        41,
+        47
+      ],
+      "raw_time": [
+        3.12,
+        3.36
+      ],
+      "source_envelope": [
+        51648,
+        55488
+      ],
+      "captured_replayed_classification": "identified",
+      "active_slots_union": [
+        0
+      ],
+      "uncertain_frames": [],
+      "missing_coverage": false,
+      "epochs": [
+        1
+      ],
+      "text": "washed"
+    }
+  ],
+  "word_states": [
+    "uncertain",
+    "identified",
+    "identified",
+    "identified",
+    "identified",
+    "identified",
+    "uncertain",
+    "uncertain",
+    "identified"
+  ],
+  "actual_audio_boundaries_available_at_first_source": [],
+  "exact_code_rules": {
+    "frame": "slots=p>=0.5; uncertain = ranked[1]>=0.35 OR (no slots AND ranked[0]>=0.2)",
+    "timeline": "mixed if multiple slots/epochs; else unavailable if missing/no slot; else uncertain if any contributing frame.uncertain; else identified",
+    "complete_group": "Use result-span classification immediately only if identified or mixed. Otherwise classify exact words; any unavailable -> unavailable, otherwise any nonidentified state -> uncertain; no token-level source children. streaming_speaker.py::_Timeline.observe/attribute and StreamingSpeakerSession._group_speaker"
+  },
+  "boundary_vs_uncertainty": "No model boundary existed when first complete source was admitted; its gray state cannot be attributed to later A-to-B transition protection.",
+  "decision": "Fact-only diagnosis, no threshold changes/force-pass/speaker fallback/post-publication recoloring. Director owns next disposition."
+}

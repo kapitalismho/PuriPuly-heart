@@ -1,0 +1,1425 @@
+{
+  "schema": "issue216-retained-evidence-summary-2",
+  "source_reports": [
+    "native\\nemotron\\issue216_baseline.json",
+    "native\\nemotron\\issue216_new_repaired.json"
+  ],
+  "execution_source_hashes_same": false,
+  "product_execution_hashes_same": true,
+  "actual_execution_hashes": {
+    "native/nemotron/issue216_smoke.py": "cf7c1d1a9e6bfdb52c0080f8b53e443fb9f31cb1fefe28a6e0c45dba43610b8b",
+    "src/puripuly_heart/providers/stt/deepgram.py": "38d5a31668ed4f3fa81414d8f60adddc2aea5b22989abc5f1dc7108cb159ea7f",
+    "src/puripuly_heart/core/stt/backend.py": "da3bc8920833bda6f16383416a8d6cd0e17bcae03b3fb17f881ea05f1527c2c6",
+    "src/puripuly_heart/core/stt/scoped_normalizer.py": "200ad8d2b6c27e058d50a3d6c2f14af161a3fc3f4e6b46af93e0f688302fc2a1",
+    "src/puripuly_heart/core/stt/scoped_engine.py": "724de65f6e589686b8160985beed062a1e623a83a24f74cb72ba790fc85c54c8",
+    "src/puripuly_heart/core/stt/streaming_speaker.py": "97df650837c5151cf9e7c9a3ed8e1609aafbb3c371b797c15b66da808921adc8",
+    "src/puripuly_heart/core/speaker/runtime.py": "76cfd82763feac96d9274c8f318ac76da585dea9b2352781a90cfc8d52bbd750",
+    "src/puripuly_heart/core/orchestrator/translation_turn.py": "67e7d1e0ed3fcc0314a68894983de70ba62308ade113c8d6061fc26705dae103",
+    "src/puripuly_heart/core/orchestrator/translation_request.py": "00564c4b69342d5e8d2eca6afbc795ce97359d2eca1c067f27e88a9d8aae78a3",
+    "native/nemotron/issue215_smoke.py": "753a840e32696ea88d36316f493d5bb9d1025396cb3f5053cb69e050e45ede9f",
+    "src/puripuly_heart/providers/stt/sdk_network.py": "ed6138215e35c8555aba50f6a59974d6ba2ded23f232b680dc4ea42ffa236980",
+    "src/puripuly_heart/core/stt/recognition_units.py": "b39d7ab2bc9c7b39883bf8575cee7f205a8e719988661d5b97eb29b1a711b0db",
+    "src/puripuly_heart/core/audio/ownership.py": "a3c22e417cf471a0f8b6d2aa9bc39726c43f5ed1f01fa3e99ad59d4131dbd39c",
+    "src/puripuly_heart/core/audio/listen_delivery.py": "454ada11bb464c8f55c50f0e913267bfe446cf9aa0976e9527144dc5e43297c2",
+    "src/puripuly_heart/core/runtime/audio_vad_loop.py": "a402ae297bfa6bcbf84e7ca67ecdf414f7443307ce6dd9c69600aef1cca2375b",
+    "src/puripuly_heart/core/vad/gating.py": "41f9e48ba1111bcb0664257f0b6722a51309a57e305eefdf65ecdc9caaf5f0d6",
+    "src/puripuly_heart/app/adapters/nemotron/backend.py": "44d1d33e0df135775c3869eeee54561099bc34e191970c8a80db1b524ebbd417"
+  },
+  "baseline_contrast": "Same integrated Deepgram adapter/settings/input and application physical cut schedule. Baseline has no StreamingSpeakerSession/Nemotron and suppresses all update-driven source admission, preserving complete adapter text for ordinary terminal admission. New permits production complete-final source release plus real mapped Nemotron attribution. Disabling evidence alone would still early-admit gray and is not this baseline.",
+  "trimming": "OFF",
+  "cases": {
+    "clean_A_B": {
+      "identical_original_pcm": true,
+      "baseline": {
+        "execution_status": "passed",
+        "error": null,
+        "errors": [],
+        "playback_started_at": 82625.632453,
+        "sources": [
+          {
+            "admitted_at": 82630.6800857,
+            "text": "Gentlemen of the press.",
+            "order": [
+              1,
+              1,
+              0
+            ],
+            "speaker": {
+              "text": "Gentlemen of the press.",
+              "speaker_id": null,
+              "session_scope": "",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "",
+              "attribution_state": "unavailable"
+            },
+            "display_group_id": "2f1039a4-33d2-4402-bbaf-7d248441cd12",
+            "contribution_origins": [
+              {
+                "contribution_id": "a1797cfce88b40e4a71d46b0c057d50e:segment:1",
+                "contribution_range": [
+                  0,
+                  23
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [],
+            "lead_before_first_enclosing_end_seconds": -0.20330150000518188
+          }
+        ],
+        "admitted_text_in_source_order": "Gentlemen of the press.",
+        "native_final_segments_and_source_boundaries": [
+          {
+            "observed_at": 82630.6792131,
+            "text": "Gentlemen of the press.",
+            "contribution": {
+              "contribution_id": "a1797cfce88b40e4a71d46b0c057d50e:segment:1",
+              "text_start": 0,
+              "text_end": 23
+            },
+            "clocks": [
+              {
+                "clock_id": "deepgram:20388c8dae7746bcb24d6cae30cab009",
+                "sample_rate_hz": 16000,
+                "origin_sent_sample": 0,
+                "qualified": true
+              }
+            ],
+            "complete_timings": [
+              {
+                "contribution_id": "a1797cfce88b40e4a71d46b0c057d50e:segment:1",
+                "text_start": 0,
+                "text_end": 23,
+                "semantics": "result_span",
+                "raw_start": 0.0,
+                "raw_end": 4.692,
+                "unit": "s",
+                "clock_id": "deepgram:20388c8dae7746bcb24d6cae30cab009",
+                "complete_boundary": true,
+                "estimated": true
+              }
+            ],
+            "resulting_children": [
+              {
+                "text": "Gentlemen of the press.",
+                "admitted_at": 82630.6800857,
+                "speaker": {
+                  "text": "Gentlemen of the press.",
+                  "speaker_id": null,
+                  "session_scope": "",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "",
+                  "attribution_state": "unavailable"
+                },
+                "origin_ranges": [
+                  [
+                    0,
+                    23
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "audio_boundaries_recorded": [],
+        "enclosing_ends": [
+          {
+            "at": 82630.4767842,
+            "reason": "delivery_pause",
+            "source_end_sample": 77312
+          }
+        ],
+        "controls_written": [
+          {
+            "event": "control_written",
+            "at": 82630.4772096,
+            "control": "Finalize",
+            "sent_until": 75584
+          }
+        ],
+        "physical_submissions": [
+          {
+            "at": 82630.4769246,
+            "reason": "delivery_pause",
+            "pcm16_sha256": "53444ed2f4198ad3e400edfbbddce946818a1e7b980d0acabd7147fceefb2adc",
+            "samples": 75584,
+            "context_samples": 8000,
+            "declared_source_bytes_match": true
+          }
+        ],
+        "original_capture_received_once": true,
+        "source_orders_sorted": true,
+        "overlapping_admitted_contribution_ranges": [],
+        "trimming_OFF_raw_equals_effective": true,
+        "actual_audio_samples_written": 75584,
+        "retention_high_water_samples": 8000,
+        "retention_final": {
+          "at": 82631.5908293,
+          "value": {
+            "retained_samples": 0,
+            "retained_bytes": 0,
+            "high_water_samples": 8000,
+            "high_water_bytes": 16000
+          }
+        },
+        "capture_delivery_max_lag_seconds": 0.18399510000017472,
+        "speaker_final": null,
+        "actual_speaker_evidence_count": 0,
+        "acceptance_scope": "Execution/summary is not automatic rich-source acceptance. Complete native grouping, actual source attribution, causal evidence/availability and successor progress must all support that separate claim; assembly annotations never supply speaker evidence."
+      },
+      "candidate": {
+        "execution_status": "passed",
+        "error": null,
+        "errors": [],
+        "playback_started_at": 82910.2006769,
+        "sources": [
+          {
+            "admitted_at": 82915.2649163,
+            "text": "Gentlemen ",
+            "order": [
+              1,
+              1,
+              0
+            ],
+            "speaker": {
+              "text": "Gentlemen ",
+              "speaker_id": null,
+              "session_scope": "1",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "nemotron",
+              "attribution_state": "uncertain"
+            },
+            "display_group_id": "1d29c1dd-8189-47dd-a896-2254004b5e75",
+            "contribution_origins": [
+              {
+                "contribution_id": "a7e625f93224471487dc7b5d6e091e9f:segment:1",
+                "contribution_range": [
+                  0,
+                  10
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [],
+            "lead_before_first_enclosing_end_seconds": -0.2131478000083007
+          },
+          {
+            "admitted_at": 82915.2655928,
+            "text": "of the press.",
+            "order": [
+              1,
+              1,
+              1
+            ],
+            "speaker": {
+              "text": "of the press.",
+              "speaker_id": "1",
+              "session_scope": "1",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "nemotron",
+              "attribution_state": "identified"
+            },
+            "display_group_id": "1d29c1dd-8189-47dd-a896-2254004b5e75",
+            "contribution_origins": [
+              {
+                "contribution_id": "a7e625f93224471487dc7b5d6e091e9f:segment:1",
+                "contribution_range": [
+                  10,
+                  23
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [
+              "Gentlemen "
+            ],
+            "lead_before_first_enclosing_end_seconds": -0.21382430000812747
+          }
+        ],
+        "admitted_text_in_source_order": "Gentlemen of the press.",
+        "native_final_segments_and_source_boundaries": [
+          {
+            "observed_at": 82915.2175646,
+            "text": "Gentlemen of the press.",
+            "contribution": {
+              "contribution_id": "a7e625f93224471487dc7b5d6e091e9f:segment:1",
+              "text_start": 0,
+              "text_end": 23
+            },
+            "clocks": [
+              {
+                "clock_id": "deepgram:324b376cf24c4bc2845ca73a2df3125a",
+                "sample_rate_hz": 16000,
+                "origin_sent_sample": 0,
+                "qualified": true
+              }
+            ],
+            "complete_timings": [
+              {
+                "contribution_id": "a7e625f93224471487dc7b5d6e091e9f:segment:1",
+                "text_start": 0,
+                "text_end": 23,
+                "semantics": "result_span",
+                "raw_start": 0.0,
+                "raw_end": 4.724,
+                "unit": "s",
+                "clock_id": "deepgram:324b376cf24c4bc2845ca73a2df3125a",
+                "complete_boundary": true,
+                "estimated": true
+              }
+            ],
+            "resulting_children": [
+              {
+                "text": "Gentlemen ",
+                "admitted_at": 82915.2649163,
+                "speaker": {
+                  "text": "Gentlemen ",
+                  "speaker_id": null,
+                  "session_scope": "1",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "uncertain"
+                },
+                "origin_ranges": [
+                  [
+                    0,
+                    10
+                  ]
+                ]
+              },
+              {
+                "text": "of the press.",
+                "admitted_at": 82915.2655928,
+                "speaker": {
+                  "text": "of the press.",
+                  "speaker_id": "1",
+                  "session_scope": "1",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "identified"
+                },
+                "origin_ranges": [
+                  [
+                    10,
+                    23
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "audio_boundaries_recorded": [],
+        "enclosing_ends": [
+          {
+            "at": 82915.0517685,
+            "reason": "delivery_pause",
+            "source_end_sample": 77312
+          }
+        ],
+        "controls_written": [
+          {
+            "event": "control_written",
+            "at": 82915.0523641,
+            "control": "Finalize",
+            "sent_until": 75584
+          }
+        ],
+        "physical_submissions": [
+          {
+            "at": 82915.0520221,
+            "reason": "delivery_pause",
+            "pcm16_sha256": "53444ed2f4198ad3e400edfbbddce946818a1e7b980d0acabd7147fceefb2adc",
+            "samples": 75584,
+            "context_samples": 8000,
+            "declared_source_bytes_match": true
+          }
+        ],
+        "original_capture_received_once": true,
+        "source_orders_sorted": true,
+        "overlapping_admitted_contribution_ranges": [],
+        "trimming_OFF_raw_equals_effective": true,
+        "actual_audio_samples_written": 75584,
+        "retention_high_water_samples": 8000,
+        "retention_final": {
+          "at": 82916.1565592,
+          "value": {
+            "retained_samples": 0,
+            "retained_bytes": 0,
+            "high_water_samples": 8000,
+            "high_water_bytes": 16000
+          }
+        },
+        "capture_delivery_max_lag_seconds": 0.20247519999975339,
+        "speaker_final": {
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 1,
+          "capture_session_id": "issue216:clean_A_B",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 17,
+          "onset_samples": 8000,
+          "evidence_items": 2,
+          "evidence_map_pieces": 2,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 98112,
+          "max_copy_samples": 512,
+          "owned_tasks": 1,
+          "processed_through_sample": 84480,
+          "immutable_through_sample": 84480,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 2048,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        "actual_speaker_evidence_count": 708,
+        "acceptance_scope": "Execution/summary is not automatic rich-source acceptance. Complete native grouping, actual source attribution, causal evidence/availability and successor progress must all support that separate claim; assembly annotations never supply speaker evidence."
+      }
+    },
+    "distinct_repeated_A_B_A": {
+      "identical_original_pcm": true,
+      "baseline": {
+        "execution_status": "passed",
+        "error": null,
+        "errors": [],
+        "playback_started_at": 82632.3797015,
+        "sources": [
+          {
+            "admitted_at": 82639.1611582,
+            "text": "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from his",
+            "order": [
+              1,
+              1,
+              0
+            ],
+            "speaker": {
+              "text": "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from his",
+              "speaker_id": null,
+              "session_scope": "",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "",
+              "attribution_state": "unavailable"
+            },
+            "display_group_id": "7f157dae-e9f4-4df1-8474-17e9b26019cc",
+            "contribution_origins": [
+              {
+                "contribution_id": "9643dbe1b10648a89c7a9630c81541a2:segment:1",
+                "contribution_range": [
+                  0,
+                  58
+                ],
+                "ownership": "request"
+              },
+              {
+                "contribution_id": "9643dbe1b10648a89c7a9630c81541a2:segment:2",
+                "contribution_range": [
+                  58,
+                  89
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [],
+            "lead_before_first_enclosing_end_seconds": -0.16812250000657514
+          },
+          {
+            "admitted_at": 82640.1196799,
+            "text": "from his hair.",
+            "order": [
+              1,
+              2,
+              0
+            ],
+            "speaker": {
+              "text": "from his hair.",
+              "speaker_id": null,
+              "session_scope": "",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "",
+              "attribution_state": "unavailable"
+            },
+            "display_group_id": "2586b5d0-0cfc-413f-8848-0e38379d7cf2",
+            "contribution_origins": [
+              {
+                "contribution_id": "2950657f0f4f4e7489173c8387945175:segment:1",
+                "contribution_range": [
+                  0,
+                  14
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [
+              "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from his"
+            ],
+            "lead_before_first_enclosing_end_seconds": -1.126644200005103
+          }
+        ],
+        "admitted_text_in_source_order": "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from hisfrom his hair.",
+        "native_final_segments_and_source_boundaries": [
+          {
+            "observed_at": 82637.684243,
+            "text": "Washed the detritus from his hair. Gentlemen of the press.",
+            "contribution": {
+              "contribution_id": "9643dbe1b10648a89c7a9630c81541a2:segment:1",
+              "text_start": 0,
+              "text_end": 58
+            },
+            "clocks": [
+              {
+                "clock_id": "deepgram:0c30eeb5929a41bc929a8bced7a0f4fe",
+                "sample_rate_hz": 16000,
+                "origin_sent_sample": 0,
+                "qualified": true
+              }
+            ],
+            "complete_timings": [
+              {
+                "contribution_id": "9643dbe1b10648a89c7a9630c81541a2:segment:1",
+                "text_start": 0,
+                "text_end": 58,
+                "semantics": "result_span",
+                "raw_start": 0.0,
+                "raw_end": 4.515,
+                "unit": "s",
+                "clock_id": "deepgram:0c30eeb5929a41bc929a8bced7a0f4fe",
+                "complete_boundary": true,
+                "estimated": true
+              }
+            ],
+            "resulting_children": [
+              {
+                "text": "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from his",
+                "admitted_at": 82639.1611582,
+                "speaker": {
+                  "text": "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from his",
+                  "speaker_id": null,
+                  "session_scope": "",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "",
+                  "attribution_state": "unavailable"
+                },
+                "origin_ranges": [
+                  [
+                    0,
+                    58
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "observed_at": 82639.1601423,
+            "text": "He washed the detritus from his",
+            "contribution": {
+              "contribution_id": "9643dbe1b10648a89c7a9630c81541a2:segment:2",
+              "text_start": 58,
+              "text_end": 89
+            },
+            "clocks": [
+              {
+                "clock_id": "deepgram:0c30eeb5929a41bc929a8bced7a0f4fe",
+                "sample_rate_hz": 16000,
+                "origin_sent_sample": 0,
+                "qualified": true
+              }
+            ],
+            "complete_timings": [
+              {
+                "contribution_id": "9643dbe1b10648a89c7a9630c81541a2:segment:2",
+                "text_start": 58,
+                "text_end": 89,
+                "semantics": "result_span",
+                "raw_start": 4.515,
+                "raw_end": 6.4840003,
+                "unit": "s",
+                "clock_id": "deepgram:0c30eeb5929a41bc929a8bced7a0f4fe",
+                "complete_boundary": true,
+                "estimated": true
+              }
+            ],
+            "resulting_children": [
+              {
+                "text": "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from his",
+                "admitted_at": 82639.1611582,
+                "speaker": {
+                  "text": "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from his",
+                  "speaker_id": null,
+                  "session_scope": "",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "",
+                  "attribution_state": "unavailable"
+                },
+                "origin_ranges": [
+                  [
+                    58,
+                    89
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "observed_at": 82640.1191263,
+            "text": "from his hair.",
+            "contribution": {
+              "contribution_id": "2950657f0f4f4e7489173c8387945175:segment:1",
+              "text_start": 0,
+              "text_end": 14
+            },
+            "clocks": [
+              {
+                "clock_id": "deepgram:0c30eeb5929a41bc929a8bced7a0f4fe",
+                "sample_rate_hz": 16000,
+                "origin_sent_sample": 0,
+                "qualified": true
+              }
+            ],
+            "complete_timings": [
+              {
+                "contribution_id": "2950657f0f4f4e7489173c8387945175:segment:1",
+                "text_start": 0,
+                "text_end": 14,
+                "semantics": "result_span",
+                "raw_start": 6.484,
+                "raw_end": 7.7439998,
+                "unit": "s",
+                "clock_id": "deepgram:0c30eeb5929a41bc929a8bced7a0f4fe",
+                "complete_boundary": true,
+                "estimated": true
+              }
+            ],
+            "resulting_children": [
+              {
+                "text": "from his hair.",
+                "admitted_at": 82640.1196799,
+                "speaker": {
+                  "text": "from his hair.",
+                  "speaker_id": null,
+                  "session_scope": "",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "",
+                  "attribution_state": "unavailable"
+                },
+                "origin_ranges": [
+                  [
+                    0,
+                    14
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "audio_boundaries_recorded": [],
+        "enclosing_ends": [
+          {
+            "at": 82638.9930357,
+            "reason": "delivery_deadline",
+            "source_end_sample": 105472
+          },
+          {
+            "at": 82639.9424702,
+            "reason": "delivery_pause",
+            "source_end_sample": 120832
+          }
+        ],
+        "controls_written": [
+          {
+            "event": "control_written",
+            "at": 82638.99357,
+            "control": "Finalize",
+            "sent_until": 103744
+          },
+          {
+            "event": "control_written",
+            "at": 82639.9427782,
+            "control": "Finalize",
+            "sent_until": 123904
+          }
+        ],
+        "physical_submissions": [
+          {
+            "at": 82638.9932462,
+            "reason": "delivery_deadline",
+            "pcm16_sha256": "d8bfd15e589806ee6125fdd620e9892f841299ee8ea8b0290d9a20dd26a0ac94",
+            "samples": 103744,
+            "context_samples": 8000,
+            "declared_source_bytes_match": true
+          },
+          {
+            "at": 82639.9425824,
+            "reason": "delivery_pause",
+            "pcm16_sha256": "f2aef23a6dfe8f58c63aba5ac0d567574a26479d39b923bae22172aab4eddf3b",
+            "samples": 20160,
+            "context_samples": 4800,
+            "declared_source_bytes_match": true
+          }
+        ],
+        "original_capture_received_once": true,
+        "source_orders_sorted": true,
+        "overlapping_admitted_contribution_ranges": [],
+        "trimming_OFF_raw_equals_effective": true,
+        "actual_audio_samples_written": 123904,
+        "retention_high_water_samples": 8000,
+        "retention_final": {
+          "at": 82640.8411548,
+          "value": {
+            "retained_samples": 0,
+            "retained_bytes": 0,
+            "high_water_samples": 8000,
+            "high_water_bytes": 16000
+          }
+        },
+        "capture_delivery_max_lag_seconds": 0.15628719999222085,
+        "speaker_final": null,
+        "actual_speaker_evidence_count": 0,
+        "acceptance_scope": "Execution/summary is not automatic rich-source acceptance. Complete native grouping, actual source attribution, causal evidence/availability and successor progress must all support that separate claim; assembly annotations never supply speaker evidence."
+      },
+      "candidate": {
+        "execution_status": "passed",
+        "error": null,
+        "errors": [],
+        "playback_started_at": 82918.9013718,
+        "sources": [
+          {
+            "admitted_at": 82924.2203228,
+            "text": "Washed the detritus from his ",
+            "order": [
+              1,
+              1,
+              0
+            ],
+            "speaker": {
+              "text": "Washed the detritus from his ",
+              "speaker_id": "0",
+              "session_scope": "3",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "nemotron",
+              "attribution_state": "identified"
+            },
+            "display_group_id": "461f07d5-9c33-4d66-ab82-52645060ea51",
+            "contribution_origins": [
+              {
+                "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:1",
+                "contribution_range": [
+                  0,
+                  29
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [],
+            "lead_before_first_enclosing_end_seconds": 1.2974826999998186
+          },
+          {
+            "admitted_at": 82924.2210964,
+            "text": "hair. ",
+            "order": [
+              1,
+              1,
+              1
+            ],
+            "speaker": {
+              "text": "hair. ",
+              "speaker_id": null,
+              "session_scope": "3",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "nemotron",
+              "attribution_state": "uncertain"
+            },
+            "display_group_id": "461f07d5-9c33-4d66-ab82-52645060ea51",
+            "contribution_origins": [
+              {
+                "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:1",
+                "contribution_range": [
+                  29,
+                  35
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [
+              "Washed the detritus from his "
+            ],
+            "lead_before_first_enclosing_end_seconds": 1.2967091000027722
+          },
+          {
+            "admitted_at": 82924.2217091,
+            "text": "Gentlemen of the press.",
+            "order": [
+              1,
+              1,
+              2
+            ],
+            "speaker": {
+              "text": "Gentlemen of the press.",
+              "speaker_id": "1",
+              "session_scope": "3",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "nemotron",
+              "attribution_state": "identified"
+            },
+            "display_group_id": "461f07d5-9c33-4d66-ab82-52645060ea51",
+            "contribution_origins": [
+              {
+                "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:1",
+                "contribution_range": [
+                  35,
+                  58
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [
+              "Washed the detritus from his ",
+              "hair. "
+            ],
+            "lead_before_first_enclosing_end_seconds": 1.296096399993985
+          },
+          {
+            "admitted_at": 82925.8705882,
+            "text": "He ",
+            "order": [
+              1,
+              2,
+              0
+            ],
+            "speaker": {
+              "text": "He ",
+              "speaker_id": null,
+              "session_scope": "3",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "nemotron",
+              "attribution_state": "uncertain"
+            },
+            "display_group_id": "461f07d5-9c33-4d66-ab82-52645060ea51",
+            "contribution_origins": [
+              {
+                "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:2",
+                "contribution_range": [
+                  58,
+                  61
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [
+              "Washed the detritus from his ",
+              "hair. ",
+              "Gentlemen of the press."
+            ],
+            "lead_before_first_enclosing_end_seconds": -0.3527827000070829
+          },
+          {
+            "admitted_at": 82925.8714737,
+            "text": "washed the detritus from ",
+            "order": [
+              1,
+              2,
+              1
+            ],
+            "speaker": {
+              "text": "washed the detritus from ",
+              "speaker_id": "0",
+              "session_scope": "3",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "nemotron",
+              "attribution_state": "identified"
+            },
+            "display_group_id": "461f07d5-9c33-4d66-ab82-52645060ea51",
+            "contribution_origins": [
+              {
+                "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:2",
+                "contribution_range": [
+                  61,
+                  86
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [
+              "Washed the detritus from his ",
+              "hair. ",
+              "Gentlemen of the press.",
+              "He "
+            ],
+            "lead_before_first_enclosing_end_seconds": -0.3536681999976281
+          },
+          {
+            "admitted_at": 82925.8723032,
+            "text": "his",
+            "order": [
+              1,
+              2,
+              2
+            ],
+            "speaker": {
+              "text": "his",
+              "speaker_id": null,
+              "session_scope": "3",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "nemotron",
+              "attribution_state": "unavailable"
+            },
+            "display_group_id": "461f07d5-9c33-4d66-ab82-52645060ea51",
+            "contribution_origins": [
+              {
+                "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:2",
+                "contribution_range": [
+                  86,
+                  89
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [
+              "Washed the detritus from his ",
+              "hair. ",
+              "Gentlemen of the press.",
+              "He ",
+              "washed the detritus from "
+            ],
+            "lead_before_first_enclosing_end_seconds": -0.35449769999831915
+          },
+          {
+            "admitted_at": 82926.6678998,
+            "text": "from his hair.",
+            "order": [
+              1,
+              3,
+              0
+            ],
+            "speaker": {
+              "text": "from his hair.",
+              "speaker_id": "0",
+              "session_scope": "3",
+              "source_start_ms": null,
+              "source_end_ms": null,
+              "overlaps_previous": false,
+              "source": "nemotron",
+              "attribution_state": "identified"
+            },
+            "display_group_id": "1b842557-9f39-4645-947e-748805e2dd1f",
+            "contribution_origins": [
+              {
+                "contribution_id": "310bb704bcba4f5b8022db2f1b78018d:segment:1",
+                "contribution_range": [
+                  0,
+                  14
+                ],
+                "ownership": "request"
+              }
+            ],
+            "prior_context_texts": [
+              "hair. ",
+              "Gentlemen of the press.",
+              "He ",
+              "washed the detritus from ",
+              "his"
+            ],
+            "lead_before_first_enclosing_end_seconds": -1.1500942999991821
+          }
+        ],
+        "admitted_text_in_source_order": "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from hisfrom his hair.",
+        "native_final_segments_and_source_boundaries": [
+          {
+            "observed_at": 82924.1898461,
+            "text": "Washed the detritus from his hair. Gentlemen of the press.",
+            "contribution": {
+              "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:1",
+              "text_start": 0,
+              "text_end": 58
+            },
+            "clocks": [
+              {
+                "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+                "sample_rate_hz": 16000,
+                "origin_sent_sample": 0,
+                "qualified": true
+              }
+            ],
+            "complete_timings": [
+              {
+                "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:1",
+                "text_start": 0,
+                "text_end": 58,
+                "semantics": "result_span",
+                "raw_start": 0.0,
+                "raw_end": 4.515,
+                "unit": "s",
+                "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+                "complete_boundary": true,
+                "estimated": true
+              }
+            ],
+            "resulting_children": [
+              {
+                "text": "Washed the detritus from his ",
+                "admitted_at": 82924.2203228,
+                "speaker": {
+                  "text": "Washed the detritus from his ",
+                  "speaker_id": "0",
+                  "session_scope": "3",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "identified"
+                },
+                "origin_ranges": [
+                  [
+                    0,
+                    29
+                  ]
+                ]
+              },
+              {
+                "text": "hair. ",
+                "admitted_at": 82924.2210964,
+                "speaker": {
+                  "text": "hair. ",
+                  "speaker_id": null,
+                  "session_scope": "3",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "uncertain"
+                },
+                "origin_ranges": [
+                  [
+                    29,
+                    35
+                  ]
+                ]
+              },
+              {
+                "text": "Gentlemen of the press.",
+                "admitted_at": 82924.2217091,
+                "speaker": {
+                  "text": "Gentlemen of the press.",
+                  "speaker_id": "1",
+                  "session_scope": "3",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "identified"
+                },
+                "origin_ranges": [
+                  [
+                    35,
+                    58
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "observed_at": 82925.7523413,
+            "text": "He washed the detritus from his",
+            "contribution": {
+              "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:2",
+              "text_start": 58,
+              "text_end": 89
+            },
+            "clocks": [
+              {
+                "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+                "sample_rate_hz": 16000,
+                "origin_sent_sample": 0,
+                "qualified": true
+              }
+            ],
+            "complete_timings": [
+              {
+                "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:2",
+                "text_start": 58,
+                "text_end": 89,
+                "semantics": "result_span",
+                "raw_start": 4.515,
+                "raw_end": 6.4840003,
+                "unit": "s",
+                "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+                "complete_boundary": true,
+                "estimated": true
+              }
+            ],
+            "resulting_children": [
+              {
+                "text": "He ",
+                "admitted_at": 82925.8705882,
+                "speaker": {
+                  "text": "He ",
+                  "speaker_id": null,
+                  "session_scope": "3",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "uncertain"
+                },
+                "origin_ranges": [
+                  [
+                    58,
+                    61
+                  ]
+                ]
+              },
+              {
+                "text": "washed the detritus from ",
+                "admitted_at": 82925.8714737,
+                "speaker": {
+                  "text": "washed the detritus from ",
+                  "speaker_id": "0",
+                  "session_scope": "3",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "identified"
+                },
+                "origin_ranges": [
+                  [
+                    61,
+                    86
+                  ]
+                ]
+              },
+              {
+                "text": "his",
+                "admitted_at": 82925.8723032,
+                "speaker": {
+                  "text": "his",
+                  "speaker_id": null,
+                  "session_scope": "3",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "unavailable"
+                },
+                "origin_ranges": [
+                  [
+                    86,
+                    89
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "observed_at": 82926.6447986,
+            "text": "from his hair.",
+            "contribution": {
+              "contribution_id": "310bb704bcba4f5b8022db2f1b78018d:segment:1",
+              "text_start": 0,
+              "text_end": 14
+            },
+            "clocks": [
+              {
+                "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+                "sample_rate_hz": 16000,
+                "origin_sent_sample": 0,
+                "qualified": true
+              }
+            ],
+            "complete_timings": [
+              {
+                "contribution_id": "310bb704bcba4f5b8022db2f1b78018d:segment:1",
+                "text_start": 0,
+                "text_end": 14,
+                "semantics": "result_span",
+                "raw_start": 6.484,
+                "raw_end": 7.7439998,
+                "unit": "s",
+                "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+                "complete_boundary": true,
+                "estimated": true
+              }
+            ],
+            "resulting_children": [
+              {
+                "text": "from his hair.",
+                "admitted_at": 82926.6678998,
+                "speaker": {
+                  "text": "from his hair.",
+                  "speaker_id": "0",
+                  "session_scope": "3",
+                  "source_start_ms": null,
+                  "source_end_ms": null,
+                  "overlaps_previous": false,
+                  "source": "nemotron",
+                  "attribution_state": "identified"
+                },
+                "origin_ranges": [
+                  [
+                    0,
+                    14
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "audio_boundaries_recorded": [],
+        "enclosing_ends": [
+          {
+            "at": 82925.5178055,
+            "reason": "delivery_deadline",
+            "source_end_sample": 105472
+          },
+          {
+            "at": 82926.4662636,
+            "reason": "delivery_pause",
+            "source_end_sample": 120832
+          }
+        ],
+        "controls_written": [
+          {
+            "event": "control_written",
+            "at": 82925.5183994,
+            "control": "Finalize",
+            "sent_until": 103744
+          },
+          {
+            "event": "control_written",
+            "at": 82926.466632,
+            "control": "Finalize",
+            "sent_until": 123904
+          }
+        ],
+        "physical_submissions": [
+          {
+            "at": 82925.5181403,
+            "reason": "delivery_deadline",
+            "pcm16_sha256": "d8bfd15e589806ee6125fdd620e9892f841299ee8ea8b0290d9a20dd26a0ac94",
+            "samples": 103744,
+            "context_samples": 8000,
+            "declared_source_bytes_match": true
+          },
+          {
+            "at": 82926.4663936,
+            "reason": "delivery_pause",
+            "pcm16_sha256": "f2aef23a6dfe8f58c63aba5ac0d567574a26479d39b923bae22172aab4eddf3b",
+            "samples": 20160,
+            "context_samples": 4800,
+            "declared_source_bytes_match": true
+          }
+        ],
+        "original_capture_received_once": true,
+        "source_orders_sorted": true,
+        "overlapping_admitted_contribution_ranges": [],
+        "trimming_OFF_raw_equals_effective": true,
+        "actual_audio_samples_written": 123904,
+        "retention_high_water_samples": 8000,
+        "retention_final": {
+          "at": 82927.3569437,
+          "value": {
+            "retained_samples": 0,
+            "retained_bytes": 0,
+            "high_water_samples": 8000,
+            "high_water_bytes": 16000
+          }
+        },
+        "capture_delivery_max_lag_seconds": 0.326722299985704,
+        "speaker_final": {
+          "state": "ready",
+          "ready": true,
+          "speaker_epoch": 3,
+          "capture_session_id": "issue216:distinct_repeated_A_B_A",
+          "paused": true,
+          "pending_samples": 0,
+          "pending_items": 0,
+          "retained_map_pieces": 18,
+          "onset_samples": 8000,
+          "evidence_items": 3,
+          "evidence_map_pieces": 3,
+          "evidence_evictions": 0,
+          "overloads": 0,
+          "stale_events": 0,
+          "copied_samples": 140288,
+          "max_copy_samples": 512,
+          "owned_tasks": 1,
+          "processed_through_sample": 122880,
+          "immutable_through_sample": 122880,
+          "limits": {
+            "max_input_samples": 16000,
+            "max_pending_samples": 64000,
+            "max_pending_items": 128,
+            "max_map_pieces": 2048,
+            "max_frames_per_update": 1024,
+            "max_evidence_items": 2048,
+            "max_evidence_map_pieces": 8192,
+            "max_capture_sessions": 1024,
+            "max_backend_lag_samples": 64000,
+            "max_tail_padding_samples": 32000
+          },
+          "diagnostics": [
+            [
+              "backend",
+              "Vulkan"
+            ],
+            [
+              "device_ordinal",
+              "0"
+            ],
+            [
+              "profile",
+              "0.64"
+            ],
+            [
+              "geometry",
+              "6/2/0/264/264/222"
+            ],
+            [
+              "artifact_sha256",
+              "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+            ],
+            [
+              "tensor_formats",
+              "{\"F16\": 125, \"F32\": 231}"
+            ],
+            [
+              "source_revision",
+              "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+            ],
+            [
+              "neural_cpu_fallback",
+              "forbidden"
+            ],
+            [
+              "probability_frontier",
+              "immutable emitted probabilities, not identity certainty"
+            ],
+            [
+              "processed_cursor",
+              "consumed mel hop prefix; excludes submitted lookahead"
+            ],
+            [
+              "accumulation",
+              "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+            ]
+          ],
+          "error": null
+        },
+        "actual_speaker_evidence_count": 1032,
+        "acceptance_scope": "Execution/summary is not automatic rich-source acceptance. Complete native grouping, actual source attribution, causal evidence/availability and successor progress must all support that separate claim; assembly annotations never supply speaker evidence."
+      }
+    }
+  },
+  "budget_after": {
+    "schema": "issue216-cloud-budget-1",
+    "authorization": {
+      "maximum_connections": 12,
+      "maximum_audio_samples_16khz": 2880000,
+      "maximum_audio_seconds": 180,
+      "automatic_retries": 0,
+      "private_uploads": false,
+      "allowed_providers": [
+        "deepgram",
+        "soniox",
+        "elevenlabs_scribe",
+        "qwen_audio"
+      ]
+    },
+    "connections_reserved": 5,
+    "audio_samples_reserved": 474560
+  },
+  "visual_caption_observation": "not_run; source attribution payload is not rendered caption/HMD evidence",
+  "translation_calls": 0,
+  "profile_selection": "not_run; explicit development0.64 only"
+}

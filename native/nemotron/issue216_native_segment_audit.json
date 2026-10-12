@@ -1,0 +1,4911 @@
+{
+  "schema": "issue216-captured-boundary-audit-1",
+  "cloud_calls": 0,
+  "model_calls": 0,
+  "product_execution_hashes_equal": {
+    "src\\puripuly_heart\\providers\\stt\\deepgram.py": true,
+    "src\\puripuly_heart\\core\\stt\\backend.py": true,
+    "src\\puripuly_heart\\core\\stt\\scoped_normalizer.py": true,
+    "src\\puripuly_heart\\core\\stt\\scoped_engine.py": true,
+    "src\\puripuly_heart\\core\\stt\\streaming_speaker.py": true,
+    "src\\puripuly_heart\\core\\speaker\\runtime.py": true,
+    "src\\puripuly_heart\\core\\orchestrator\\translation_turn.py": true,
+    "src\\puripuly_heart\\core\\orchestrator\\translation_request.py": true,
+    "src\\puripuly_heart\\providers\\stt\\sdk_network.py": true,
+    "src\\puripuly_heart\\core\\stt\\recognition_units.py": true,
+    "src\\puripuly_heart\\core\\audio\\ownership.py": true,
+    "src\\puripuly_heart\\core\\audio\\listen_delivery.py": true,
+    "src\\puripuly_heart\\core\\runtime\\audio_vad_loop.py": true,
+    "src\\puripuly_heart\\core\\vad\\gating.py": true,
+    "src\\puripuly_heart\\app\\adapters\\nemotron\\backend.py": true
+  },
+  "harness_hash_changed_reason": "Bounded deque/cleanup/authorization-metadata persistence repair after lost-evidence attempt; baseline pipeline/settings/source bytes unaffected",
+  "cases": {
+    "clean_A_B": {
+      "identical_actual_pcm_context_source_maps_and_control_reasons": true,
+      "baseline_pcm_schedule": [
+        {
+          "reason": "delivery_pause",
+          "pcm16_sha256": "53444ed2f4198ad3e400edfbbddce946818a1e7b980d0acabd7147fceefb2adc",
+          "payloads": [
+            {
+              "samples": 8000,
+              "pcm16_sha256": "292245afdc6f1134f416bb16e3bf9ccf3974d6ec3f0777b5816f5f13af46a582",
+              "role": "source_context",
+              "source_ranges": [
+                [
+                  7,
+                  1728,
+                  2048
+                ],
+                [
+                  7,
+                  2048,
+                  2560
+                ],
+                [
+                  7,
+                  2560,
+                  3072
+                ],
+                [
+                  7,
+                  3072,
+                  3584
+                ],
+                [
+                  7,
+                  3584,
+                  4096
+                ],
+                [
+                  7,
+                  4096,
+                  4608
+                ],
+                [
+                  7,
+                  4608,
+                  5120
+                ],
+                [
+                  7,
+                  5120,
+                  5632
+                ],
+                [
+                  7,
+                  5632,
+                  6144
+                ],
+                [
+                  7,
+                  6144,
+                  6656
+                ],
+                [
+                  7,
+                  6656,
+                  7168
+                ],
+                [
+                  7,
+                  7168,
+                  7680
+                ],
+                [
+                  7,
+                  7680,
+                  8192
+                ],
+                [
+                  7,
+                  8192,
+                  8704
+                ],
+                [
+                  7,
+                  8704,
+                  9216
+                ],
+                [
+                  7,
+                  9216,
+                  9728
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "81f9b0c45de606c27a8443bd8e4e7b9e223d54aeba06010fa9043425ad57d579",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  9728,
+                  10240
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "db9cf6537f49b8462cd962edbac211857dc2cf833af466d6a803b4e2c73ea336",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  10240,
+                  10752
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "225826f40e8131704fcc8c130b46de832ca12331d5050c3db261a06331b04850",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  10752,
+                  11264
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d063c9b68b44cafb4feea7a4e13c1994c97dc0736bbfebe97e10ffb2a3bcb95d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  11264,
+                  11776
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6ce021f4aa2df16429fe5e437f94e270555a6ad7a2c6126ca698e431fe5edd6f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  11776,
+                  12288
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "fbbeef0f9a3bc6ea6c95e7fe8d22a84cd83b13061a0b6c6bf6bf4d9b0af59b1f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  12288,
+                  12800
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "80e586b29fbb9752c53a167ce783b70ef3760f59ca5df97df9b5672501a60cd7",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  12800,
+                  13312
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "2fd5f39a5227b7706746122c5b6f9b7d949d7ec29e9f29b78179f0979f14a174",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  13312,
+                  13824
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "4ae171a00f72fd7ffa13d2b95a390e2932a4f6c0bf4d94c04aa61109dfac4242",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  13824,
+                  14336
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "73fdd34f8cfc38b6e19d8de5b9a58d2680b82ab7b9f60606bae76433ad302039",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  14336,
+                  14848
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f3df15e8fd94bc63b61cc13059a95223515abfc4b455b6b759eb9c368dbdfc69",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  14848,
+                  15360
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "44f68c0961c637066555d1d6887889634f5ebcdb4d2be8b3d848fe00b4f7ac52",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  15360,
+                  15872
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "43f92844b29de7a66f01f1f5065aca40f34669564187ab76dae8fb78a57a6e80",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  15872,
+                  16384
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "473be2c184273e413126bd4997942348fc87267a74479e54341754a9b3d2b800",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  16384,
+                  16896
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "efb6dab30d0dc95fa50c769a19ffcc83f613bc64650ad1f116f6858aa87dd7f8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  16896,
+                  17408
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "121b990e9dceb4e7eb9099624bfd808cf812f016c1043e89755698749aeb9ba5",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  17408,
+                  17920
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3ce20ade8e2e7032198bfb8240b61daab0353b3a271706e05e553839a15e84bc",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  17920,
+                  18432
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "13c3447440df0f94b6a021e2deedcb36d8dc2434777002bb89d125f1f29bc07d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  18432,
+                  18944
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "90032211668dc6fb73410700454b22382a9e7b4ca8af09505a415c24ccbf1ffe",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  18944,
+                  19456
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "221b300bcb699d22ba37998ae2e311e34cbedccb71ac17970014a8539d1d170a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  19456,
+                  19968
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5dbc11710ae8732b9672e8708e7b3979f889a8a8013fd767755ccf4870f67227",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  19968,
+                  20480
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "90f5df6802bd820bda8ba804323665ebbc780490805837a66bb612da3bb97fad",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  20480,
+                  20992
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "7ca46f109b41b75be3bb38403b78a952871d4554a66de562ace6aae4b3942331",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  20992,
+                  21504
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b09f90828cf4855d77b5d0c95a75b8e4900b03d6b6544f423bb9e7e0c13abb7f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  21504,
+                  22016
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f28d765276e0f56fd7f218d51d8169d850f3d57f94ec4680e11ee440006bed79",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  22016,
+                  22528
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "ee46da3df3d03b27e68848794541e12e72ce3442c5e5755e57b927b00baac7d5",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  22528,
+                  23040
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "ac37adf5c9d34c49453d1bee877df98dcd7684d5eed8eb45c0201e0ee617be16",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  23040,
+                  23552
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "82c8c4d03d0eb9b5f72aaa66275f915a80abce4f1d1006575ad715a9c2a0867c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  23552,
+                  24064
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "fafcb663b2d7fff1b703c4c86b70a402987661ce62c73d8d0fd355483e03f482",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  24064,
+                  24576
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "99b66d0785aa48aa3212efdc406ea48702ba91da4f577ed52b466897b7f88466",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  24576,
+                  25088
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f7fcefcd9c31e95dc46f33e9245e4c314e6380424bc9cc34743a6ecb8380a9d2",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  25088,
+                  25600
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "397ac3ff47c138cf551171152a8462cef4e4ad19bc32e872a98c8d930cf561c4",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  25600,
+                  26112
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "aa779721712381c742356c659b28bc4124220265d663205f7272f702ee97b986",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  26112,
+                  26624
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "7afd0c8444bef5877510afcc509fd4d1b8ea16d910839875b046e7ebce649594",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  26624,
+                  27136
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b15bf5c77c2a545aaa3f13b66efd5406519eac9da1fe4322be5591605cd43ee0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  27136,
+                  27648
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "1671571cb2fbe25479a665b17597d47582e1f9388667e6f6ffa1b13b90c2f9ca",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  27648,
+                  28160
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "a32f02fe95182e039664b2cfbf6d703797efa3403ee7344cfb8a4d22cffe0490",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  28160,
+                  28672
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "9a4340b1773a777fe611f1487468733087db7d3e050746e0d5e8e4457b54f1d9",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  28672,
+                  29184
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e8acc0a3760225aea752954fcec6aaff46b45593fbe56922e180d054cd9473d7",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  29184,
+                  29696
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e146894938d0adf7bb9d1d4a002e56b499b6eebe1e59807732cfd9bb280d02be",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  29696,
+                  30208
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d0dccaa63559d9b726fcaaff569eea76cdbed2715c5894121f73fdafd33ad4e4",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  30208,
+                  30720
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "0b5416c618cb4b35616462d3e7c346f914a1a7bf48e175c00a102ee617ab31ca",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  30720,
+                  31232
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "175772606009db7d8213204f57cf0b004464ae3b3fa118de373c4123338f16bb",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  31232,
+                  31744
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3a8d268563f9be86a456ed672ec2f1ec6b378a8c029eb973282d92aea026fb91",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  31744,
+                  32256
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "638e20ca1236f7ed349774d595fbe7a5cc2bd1c4ff5065e511e48366baf12ef3",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  32256,
+                  32768
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "fffa5f0a2d2a066ffbc6f6c48b197f65b27d4561742d190ea5455ec99e61c36a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  32768,
+                  33280
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f77c7cecb556660c9374e8f49966f50da0a8f2afec1d225b716d0cce3f7b6ab7",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  33280,
+                  33792
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "2ae9a9331b9e6455bcc82d3ce03a3bc786a7c552c8bb55b7c53d557a3d706dde",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  33792,
+                  34304
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3ef8e3aaeaa46106155eba5ea64349b71dbaca8fb8eff56c93f999b093008a07",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  34304,
+                  34816
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d608333c33bfc91e2b63d05e8f12a9db8ac26cd77289f8d5e04068f86c333a34",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  34816,
+                  35328
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "85a0d067fe188e044e1a669875e2d74dd377264866781f5c30d1ae7fe5ab6101",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  35328,
+                  35840
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "1c40eb4824f58511de1918b9492bb1c3bb4b9acaf2645d4a857917ed81f6e6c2",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  35840,
+                  36352
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "0dc8d1834c1f20f89e392073403f52b6594e2120321ff2bba1060cbd0f88ac21",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  36352,
+                  36864
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e6e57cbf915ba5d7a33c6c19b915fcb969e9c2a135e7090f0cf9d5fe62453ae8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  36864,
+                  37376
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "9bad8c5f64bfaee3375ee32452255563e0c0160ccb09897217e373a4535f4df1",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  37376,
+                  37888
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e74cac0a71b1de2704bfcc96bbc837d385ef14891fa48f5677fabcfbd7f4a2fc",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  37888,
+                  38400
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "87d7e13684ca1d1103a8a1a94f04a22c4350ed2f51560d75e0896cac542e4b5b",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  38400,
+                  38912
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d27e8c5c6ae1fe4c28a8ad81d4724f26d1b47c3b51794ab11a3182b585259031",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  38912,
+                  39424
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "44b6bed2a8aa833eda8b3259ab092366bd0836dfe0149f0f4ee980230c239df0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  39424,
+                  39936
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "80df1271d7ca7b419e1b429c24f35942018744680518ba714f38f69d76474b8d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  39936,
+                  40448
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f38c9692a92e25f9206e606f47381ba460a86863e77751bf9b7c8aeb109c81b2",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  40448,
+                  40960
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3ff14051f231ce847334f55ef39122d24da18013c8805ca3f9a18d072c7b3217",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  40960,
+                  41472
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "fb269df1132b1ca3eb3ac20a786eac748485042f893739fc7cc3eca69bfc965e",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  41472,
+                  41984
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "826c70e1f5f523db15f00ca2e46245b76fe06dde628b80ec35c55ce5bab9394c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  41984,
+                  42496
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "df38dbd1707880a4d27d961b4567fdd00984a891693d87798b73ee1ebc380099",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  42496,
+                  43008
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6edf79dd7ff1b7608548f996fb552d929225fefe33f5db0f70d5564aa0b3b63f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  43008,
+                  43520
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "a39c9ddbbdccadceeabb960fabecd611c793992106421c5990030828a8ab368a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  43520,
+                  44032
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "92fa139cc6b891e9909a68436fd293bd821275cc116bfd86b2a0eaffdb86aee9",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  44032,
+                  44544
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "43c176bf3c46b44ff138615897398e12707ae40bf8925a4f918323acff15a73c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  44544,
+                  45056
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "71c51c267f09a87802c97dce7b9337c9e2508207fb622b8cda8f55ffc1b5abc4",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  45056,
+                  45568
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "dbc277214f0287e3534521af8812ad9c8641236c83d95e81400ddd0d384bbcd8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  45568,
+                  46080
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "997268520e64fa7dbacc5d1b5b0b81d20066c6db755b33857ddb5eb957781130",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  46080,
+                  46592
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "68a19aeb4e358966322b498d7177500d8f8f5acbdd9b3dacc7ee1f8b15a33149",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  46592,
+                  47104
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "4957bbcc8040b0229d90f470f4215b4c605c679fa0ca750505a605daa53f7d63",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  47104,
+                  47616
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f905acdaf6103f533bcc9c5d83e114af182f89a4f84f6b974fa9f3e0d76c3772",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  47616,
+                  48128
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6f3910cad2db156e5b7d6b4a59624fc49bff041ebf3657267897a88901ccacc4",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  48128,
+                  48640
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d1d055ac0e7ef623bcd6bf3cfd80f05094c8f843e8a8b6c35e0320a97b996697",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  48640,
+                  49152
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "39d4aaf25879614ddb73b088c02e7c413479b1f07a9da7163b363d16edf0db56",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  49152,
+                  49664
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "7908287aecc867a62e4a599d69e2297256753a2afa83ffed649cf79cb57ea204",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  49664,
+                  50176
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "12fa5f6ede76f8f431eb5cd30fc997fec01edd937c5519a8990361fd0fb0e7b6",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  50176,
+                  50688
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "02eefdd7c814a0994bc655b80dfc3e124900379565d1cde34433b10d660a122c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  50688,
+                  51200
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "81e5a6de65e1cc6db0059576740500f3e9579eb7ab865499c2dbf8ec53251e1f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  51200,
+                  51712
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "db7c3fb0de6624313542d37f80fbb99660660a90acfc3a537117c0c686a26f0a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  51712,
+                  52224
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b732293540837aa8f33049af69d29d292e3f80ec03d46238940317035bd5864d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  52224,
+                  52736
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "eca573780110c7e207bf2e821ecc6aa9bcc15ec2d5fa3b9baacc1eca022d5ff1",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  52736,
+                  53248
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d265d53ead5358ab21f00ec2b9c6497c6de08254b49b1bbe5ca1af55ddbdbae8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  53248,
+                  53760
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "2da2c1a906007d83d288ad78654b460f53965ce31a9dbe375c09d16653bc1127",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  53760,
+                  54272
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "54c558aa038101dc7cb6df817fe6b0004b831b157e0e59132cf5e007751d5459",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  54272,
+                  54784
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "4ece9fed6b6af16d70d860e6900d125bea1142251f1877c5048af8d19818c9d4",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  54784,
+                  55296
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e4798d7ea02c4f50b7b9eb64dcd529c7963b9ca54eb416007ec5b8d9b493dbb0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  55296,
+                  55808
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "8bc4e77c588b00fd7a0e9436c8025a60a837b622f161b1db1d4f71b92751ce75",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  55808,
+                  56320
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "80f23b42d207d1002d29cb385c6a62ab42888d31ff11e972ba0c178854ae7604",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  56320,
+                  56832
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b7d86e1836ede023728581394957499aeb8935157f829491c70fb706c7ea91da",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  56832,
+                  57344
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5d6a5db21bf52534c234ddfe18e1f7718324e4a78f8b032dc78af726267e06e6",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  57344,
+                  57856
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "37f4d4d03d564f02102eb5044795a7dbda1029808d1bd455ae0aec3da7b045b6",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  57856,
+                  58368
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5350d6bc2854b9f73bbf9bae935fa8229cb2cfc2e6faad5cdd6b472ca3fd3044",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  58368,
+                  58880
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "0bc6606b742413a2c2be385545542011478c94432e8d40dde6938b2e88135426",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  58880,
+                  59392
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "ae8a703debe0ca3d9bc305c9cccde912ca8412ead7c15fe6eeac50bb57f18fa0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  59392,
+                  59904
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "80477c29d852abe9a08f6be9a02678ae90bafb5d3a664c1540f27d53621dbf89",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  59904,
+                  60416
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f55c413c1f760e197f9df72e1c8a88e14c70eb149dac43d72bcdf2c62ce60acf",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  60416,
+                  60928
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "897c6e8c8e3dc807476b1d0cc4f7201bba810b5873b5b32325aca7fcdba9ed6d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  60928,
+                  61440
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "163aa458bf18d0c2e1612a6c0744e49631000012dc30b0b2a913f227baefd4b7",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  61440,
+                  61952
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6ab822693fb287f53195e07c75047d01ce3a2943074c4e1db97c526b758017d0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  61952,
+                  62464
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b57ac98f244c9bdececedca0c238bdbef93ec24f2db797294f49814a759e9975",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  62464,
+                  62976
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f4ec4ab360905ab54c8ad454c951c74d30bb1e1ca89a61a290bbb91e911db206",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  62976,
+                  63488
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b762acca8ae88bc293be86350ba1440fac685da5e6ff73f6098d0e7bfd70ca93",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  63488,
+                  64000
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "df1437b1e3a945fbfc415a5503578b71192d6aa8e10ef992e4808ee8c5e3c51f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  64000,
+                  64512
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "ac9eff6851170cf3ab0c99356f0d18aff73663c5c2ac5f2d0101929de3a503e0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  64512,
+                  65024
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "36f4fe863408fa24db930659d817d590fdef19328bb6d53e84c234488c87997d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  65024,
+                  65536
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "a93a83ae8da3d301a92002a1f35b18774b78bf8700a0154a06b910435c1c4d4e",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  65536,
+                  66048
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "442885cd03c999e9becf5041aa85e83708a411d2ad734a4d3ba23bfa72ac9483",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  66048,
+                  66560
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "02c712aa62cf055a0089df0db2b45748d5bac9bb363f9bb5ee87b0569b101743",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  66560,
+                  67072
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "863e2cd283334a9f376cdf6d0e46abbbb86271cb07cfd8e9b7a263cfea6bf55f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  67072,
+                  67584
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6edc6a2fe87e989cf29968c8d4563f362cf01f6105b8663e3d977148e8ae736c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  67584,
+                  68096
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6cb830ee695c059953f78673bcf781ff171abbc27af3bc244d7b67e6840a145b",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  68096,
+                  68608
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "a49e5cf6a62bb4a1490c829bdf2d7d448ed5ddd78d3371223fb8a3606d03e364",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  68608,
+                  69120
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5c98b8ef56707590878c4fceb63aeadb598ad2847ea99e38ed1b7cdbcb043d4b",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  69120,
+                  69632
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6b8c34e5c677d3c00850bb247f39bf96ad1d330ef8ba911188111aa3077cd4c2",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  69632,
+                  70144
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5734625fc0cebe40917e5ac76f6affd2324ebcf0c7dfeac556f21d66b7e15974",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  70144,
+                  70656
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "ef1f8501299ef96ffb4a2e54372ec338678b422962a0b623b55012b05a0c2305",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  70656,
+                  71168
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3d9f3c808f97a413d440b5d9c850a5ea7d701d06dcf399a5ed563dae93fec0b1",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  71168,
+                  71680
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e9c79f574b8a3c08893463bb7447b3ed7505def204ca5c22faffc14b35a52a0f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  71680,
+                  72192
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "fcd3efe851e2668604709c5b05ae295d86468451d133556cc29daf6209e6156a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  72192,
+                  72704
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e87c45dbbf368bf25b46d596986d9e1d3d7e8d942ba9454174a1b33d3358f611",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  72704,
+                  73216
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f56e762a731f545b0244b964eafb32e289651ef131c9012c061d446e9978affa",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  73216,
+                  73728
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f4ffec388677961961a60b6ff8f17090af0aa31c3a6e136807e76522d0bcf945",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  73728,
+                  74240
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "8dc4f89478f404af5597009ce0b644b7252ef8d32b6793924a0ab15fca8039f0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  74240,
+                  74752
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "65c3106ff3d36c556463cefe2c779fed30754e3bf92ecb4fdfd873873f40bdf2",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  74752,
+                  75264
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  75264,
+                  75776
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  75776,
+                  76288
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  76288,
+                  76800
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  76800,
+                  77312
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "native_final_segments_and_resulting_sources": [
+        {
+          "native_final_observed_at": 82915.2175646,
+          "raw_text": "Gentlemen of the press.",
+          "contribution": {
+            "contribution_id": "a7e625f93224471487dc7b5d6e091e9f:segment:1",
+            "text_start": 0,
+            "text_end": 23
+          },
+          "native_complete_boundary_timings": [
+            {
+              "contribution_id": "a7e625f93224471487dc7b5d6e091e9f:segment:1",
+              "text_start": 0,
+              "text_end": 23,
+              "semantics": "result_span",
+              "raw_start": 0.0,
+              "raw_end": 4.724,
+              "unit": "s",
+              "clock_id": "deepgram:324b376cf24c4bc2845ca73a2df3125a",
+              "complete_boundary": true,
+              "estimated": true
+            }
+          ],
+          "audio_clocks": [
+            {
+              "clock_id": "deepgram:324b376cf24c4bc2845ca73a2df3125a",
+              "sample_rate_hz": 16000,
+              "origin_sent_sample": 0,
+              "qualified": true
+            }
+          ],
+          "source_children": [
+            {
+              "text": "Gentlemen ",
+              "admitted_at": 82915.2649163,
+              "contribution_ranges": [
+                [
+                  0,
+                  10
+                ]
+              ],
+              "speaker": {
+                "text": "Gentlemen ",
+                "speaker_id": null,
+                "session_scope": "1",
+                "source_start_ms": null,
+                "source_end_ms": null,
+                "overlaps_previous": false,
+                "source": "nemotron",
+                "attribution_state": "uncertain"
+              },
+              "order": [
+                1,
+                1,
+                0
+              ]
+            },
+            {
+              "text": "of the press.",
+              "admitted_at": 82915.2655928,
+              "contribution_ranges": [
+                [
+                  10,
+                  23
+                ]
+              ],
+              "speaker": {
+                "text": "of the press.",
+                "speaker_id": "1",
+                "session_scope": "1",
+                "source_start_ms": null,
+                "source_end_ms": null,
+                "overlaps_previous": false,
+                "source": "nemotron",
+                "attribution_state": "identified"
+              },
+              "order": [
+                1,
+                1,
+                1
+              ]
+            }
+          ],
+          "exact_native_text_conserved": true
+        }
+      ],
+      "discrete_audio_boundary_events": 0,
+      "first_enclosing_seal": 82915.0517685
+    },
+    "distinct_repeated_A_B_A": {
+      "identical_actual_pcm_context_source_maps_and_control_reasons": true,
+      "baseline_pcm_schedule": [
+        {
+          "reason": "delivery_deadline",
+          "pcm16_sha256": "d8bfd15e589806ee6125fdd620e9892f841299ee8ea8b0290d9a20dd26a0ac94",
+          "payloads": [
+            {
+              "samples": 8000,
+              "pcm16_sha256": "292245afdc6f1134f416bb16e3bf9ccf3974d6ec3f0777b5816f5f13af46a582",
+              "role": "source_context",
+              "source_ranges": [
+                [
+                  7,
+                  1728,
+                  2048
+                ],
+                [
+                  7,
+                  2048,
+                  2560
+                ],
+                [
+                  7,
+                  2560,
+                  3072
+                ],
+                [
+                  7,
+                  3072,
+                  3584
+                ],
+                [
+                  7,
+                  3584,
+                  4096
+                ],
+                [
+                  7,
+                  4096,
+                  4608
+                ],
+                [
+                  7,
+                  4608,
+                  5120
+                ],
+                [
+                  7,
+                  5120,
+                  5632
+                ],
+                [
+                  7,
+                  5632,
+                  6144
+                ],
+                [
+                  7,
+                  6144,
+                  6656
+                ],
+                [
+                  7,
+                  6656,
+                  7168
+                ],
+                [
+                  7,
+                  7168,
+                  7680
+                ],
+                [
+                  7,
+                  7680,
+                  8192
+                ],
+                [
+                  7,
+                  8192,
+                  8704
+                ],
+                [
+                  7,
+                  8704,
+                  9216
+                ],
+                [
+                  7,
+                  9216,
+                  9728
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "81f9b0c45de606c27a8443bd8e4e7b9e223d54aeba06010fa9043425ad57d579",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  9728,
+                  10240
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "db9cf6537f49b8462cd962edbac211857dc2cf833af466d6a803b4e2c73ea336",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  10240,
+                  10752
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "225826f40e8131704fcc8c130b46de832ca12331d5050c3db261a06331b04850",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  10752,
+                  11264
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d063c9b68b44cafb4feea7a4e13c1994c97dc0736bbfebe97e10ffb2a3bcb95d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  11264,
+                  11776
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6ce021f4aa2df16429fe5e437f94e270555a6ad7a2c6126ca698e431fe5edd6f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  11776,
+                  12288
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "fbbeef0f9a3bc6ea6c95e7fe8d22a84cd83b13061a0b6c6bf6bf4d9b0af59b1f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  12288,
+                  12800
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "80e586b29fbb9752c53a167ce783b70ef3760f59ca5df97df9b5672501a60cd7",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  12800,
+                  13312
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "2fd5f39a5227b7706746122c5b6f9b7d949d7ec29e9f29b78179f0979f14a174",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  13312,
+                  13824
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "4ae171a00f72fd7ffa13d2b95a390e2932a4f6c0bf4d94c04aa61109dfac4242",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  13824,
+                  14336
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "73fdd34f8cfc38b6e19d8de5b9a58d2680b82ab7b9f60606bae76433ad302039",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  14336,
+                  14848
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f3df15e8fd94bc63b61cc13059a95223515abfc4b455b6b759eb9c368dbdfc69",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  14848,
+                  15360
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "44f68c0961c637066555d1d6887889634f5ebcdb4d2be8b3d848fe00b4f7ac52",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  15360,
+                  15872
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "43f92844b29de7a66f01f1f5065aca40f34669564187ab76dae8fb78a57a6e80",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  15872,
+                  16384
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "473be2c184273e413126bd4997942348fc87267a74479e54341754a9b3d2b800",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  16384,
+                  16896
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "efb6dab30d0dc95fa50c769a19ffcc83f613bc64650ad1f116f6858aa87dd7f8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  16896,
+                  17408
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "121b990e9dceb4e7eb9099624bfd808cf812f016c1043e89755698749aeb9ba5",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  17408,
+                  17920
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3ce20ade8e2e7032198bfb8240b61daab0353b3a271706e05e553839a15e84bc",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  17920,
+                  18432
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "13c3447440df0f94b6a021e2deedcb36d8dc2434777002bb89d125f1f29bc07d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  18432,
+                  18944
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "90032211668dc6fb73410700454b22382a9e7b4ca8af09505a415c24ccbf1ffe",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  18944,
+                  19456
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "221b300bcb699d22ba37998ae2e311e34cbedccb71ac17970014a8539d1d170a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  19456,
+                  19968
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5dbc11710ae8732b9672e8708e7b3979f889a8a8013fd767755ccf4870f67227",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  19968,
+                  20480
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "90f5df6802bd820bda8ba804323665ebbc780490805837a66bb612da3bb97fad",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  20480,
+                  20992
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "7ca46f109b41b75be3bb38403b78a952871d4554a66de562ace6aae4b3942331",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  20992,
+                  21504
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b09f90828cf4855d77b5d0c95a75b8e4900b03d6b6544f423bb9e7e0c13abb7f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  21504,
+                  22016
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f28d765276e0f56fd7f218d51d8169d850f3d57f94ec4680e11ee440006bed79",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  22016,
+                  22528
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "ee46da3df3d03b27e68848794541e12e72ce3442c5e5755e57b927b00baac7d5",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  22528,
+                  23040
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "ac37adf5c9d34c49453d1bee877df98dcd7684d5eed8eb45c0201e0ee617be16",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  23040,
+                  23552
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "82c8c4d03d0eb9b5f72aaa66275f915a80abce4f1d1006575ad715a9c2a0867c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  23552,
+                  24064
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "fafcb663b2d7fff1b703c4c86b70a402987661ce62c73d8d0fd355483e03f482",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  24064,
+                  24576
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "99b66d0785aa48aa3212efdc406ea48702ba91da4f577ed52b466897b7f88466",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  24576,
+                  25088
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f7fcefcd9c31e95dc46f33e9245e4c314e6380424bc9cc34743a6ecb8380a9d2",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  25088,
+                  25600
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "397ac3ff47c138cf551171152a8462cef4e4ad19bc32e872a98c8d930cf561c4",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  25600,
+                  26112
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "aa779721712381c742356c659b28bc4124220265d663205f7272f702ee97b986",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  26112,
+                  26624
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "7afd0c8444bef5877510afcc509fd4d1b8ea16d910839875b046e7ebce649594",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  26624,
+                  27136
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b15bf5c77c2a545aaa3f13b66efd5406519eac9da1fe4322be5591605cd43ee0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  27136,
+                  27648
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "1671571cb2fbe25479a665b17597d47582e1f9388667e6f6ffa1b13b90c2f9ca",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  27648,
+                  28160
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "a32f02fe95182e039664b2cfbf6d703797efa3403ee7344cfb8a4d22cffe0490",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  28160,
+                  28672
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "9a4340b1773a777fe611f1487468733087db7d3e050746e0d5e8e4457b54f1d9",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  28672,
+                  29184
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e8acc0a3760225aea752954fcec6aaff46b45593fbe56922e180d054cd9473d7",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  29184,
+                  29696
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e146894938d0adf7bb9d1d4a002e56b499b6eebe1e59807732cfd9bb280d02be",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  29696,
+                  30208
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d0dccaa63559d9b726fcaaff569eea76cdbed2715c5894121f73fdafd33ad4e4",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  30208,
+                  30720
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "0b5416c618cb4b35616462d3e7c346f914a1a7bf48e175c00a102ee617ab31ca",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  30720,
+                  31232
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "175772606009db7d8213204f57cf0b004464ae3b3fa118de373c4123338f16bb",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  31232,
+                  31744
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3a8d268563f9be86a456ed672ec2f1ec6b378a8c029eb973282d92aea026fb91",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  31744,
+                  32256
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "638e20ca1236f7ed349774d595fbe7a5cc2bd1c4ff5065e511e48366baf12ef3",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  32256,
+                  32768
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "fffa5f0a2d2a066ffbc6f6c48b197f65b27d4561742d190ea5455ec99e61c36a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  32768,
+                  33280
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f77c7cecb556660c9374e8f49966f50da0a8f2afec1d225b716d0cce3f7b6ab7",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  33280,
+                  33792
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "2ae9a9331b9e6455bcc82d3ce03a3bc786a7c552c8bb55b7c53d557a3d706dde",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  33792,
+                  34304
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3ef8e3aaeaa46106155eba5ea64349b71dbaca8fb8eff56c93f999b093008a07",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  34304,
+                  34816
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d608333c33bfc91e2b63d05e8f12a9db8ac26cd77289f8d5e04068f86c333a34",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  34816,
+                  35328
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "85a0d067fe188e044e1a669875e2d74dd377264866781f5c30d1ae7fe5ab6101",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  35328,
+                  35840
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "1c40eb4824f58511de1918b9492bb1c3bb4b9acaf2645d4a857917ed81f6e6c2",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  35840,
+                  36352
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "0dc8d1834c1f20f89e392073403f52b6594e2120321ff2bba1060cbd0f88ac21",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  36352,
+                  36864
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e6e57cbf915ba5d7a33c6c19b915fcb969e9c2a135e7090f0cf9d5fe62453ae8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  36864,
+                  37376
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "9bad8c5f64bfaee3375ee32452255563e0c0160ccb09897217e373a4535f4df1",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  37376,
+                  37888
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e74cac0a71b1de2704bfcc96bbc837d385ef14891fa48f5677fabcfbd7f4a2fc",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  37888,
+                  38400
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "87d7e13684ca1d1103a8a1a94f04a22c4350ed2f51560d75e0896cac542e4b5b",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  38400,
+                  38912
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d27e8c5c6ae1fe4c28a8ad81d4724f26d1b47c3b51794ab11a3182b585259031",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  38912,
+                  39424
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "44b6bed2a8aa833eda8b3259ab092366bd0836dfe0149f0f4ee980230c239df0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  39424,
+                  39936
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "80df1271d7ca7b419e1b429c24f35942018744680518ba714f38f69d76474b8d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  39936,
+                  40448
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f38c9692a92e25f9206e606f47381ba460a86863e77751bf9b7c8aeb109c81b2",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  40448,
+                  40960
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3ff14051f231ce847334f55ef39122d24da18013c8805ca3f9a18d072c7b3217",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  40960,
+                  41472
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "fb269df1132b1ca3eb3ac20a786eac748485042f893739fc7cc3eca69bfc965e",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  41472,
+                  41984
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "826c70e1f5f523db15f00ca2e46245b76fe06dde628b80ec35c55ce5bab9394c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  41984,
+                  42496
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "df38dbd1707880a4d27d961b4567fdd00984a891693d87798b73ee1ebc380099",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  42496,
+                  43008
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6edf79dd7ff1b7608548f996fb552d929225fefe33f5db0f70d5564aa0b3b63f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  43008,
+                  43520
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "a39c9ddbbdccadceeabb960fabecd611c793992106421c5990030828a8ab368a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  43520,
+                  44032
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "92fa139cc6b891e9909a68436fd293bd821275cc116bfd86b2a0eaffdb86aee9",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  44032,
+                  44544
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "43c176bf3c46b44ff138615897398e12707ae40bf8925a4f918323acff15a73c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  44544,
+                  45056
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "71c51c267f09a87802c97dce7b9337c9e2508207fb622b8cda8f55ffc1b5abc4",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  45056,
+                  45568
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "dbc277214f0287e3534521af8812ad9c8641236c83d95e81400ddd0d384bbcd8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  45568,
+                  46080
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "997268520e64fa7dbacc5d1b5b0b81d20066c6db755b33857ddb5eb957781130",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  46080,
+                  46592
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "68a19aeb4e358966322b498d7177500d8f8f5acbdd9b3dacc7ee1f8b15a33149",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  46592,
+                  47104
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "4957bbcc8040b0229d90f470f4215b4c605c679fa0ca750505a605daa53f7d63",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  47104,
+                  47616
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f905acdaf6103f533bcc9c5d83e114af182f89a4f84f6b974fa9f3e0d76c3772",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  47616,
+                  48128
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6f3910cad2db156e5b7d6b4a59624fc49bff041ebf3657267897a88901ccacc4",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  48128,
+                  48640
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d1d055ac0e7ef623bcd6bf3cfd80f05094c8f843e8a8b6c35e0320a97b996697",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  48640,
+                  49152
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "39d4aaf25879614ddb73b088c02e7c413479b1f07a9da7163b363d16edf0db56",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  49152,
+                  49664
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "7908287aecc867a62e4a599d69e2297256753a2afa83ffed649cf79cb57ea204",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  49664,
+                  50176
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "12fa5f6ede76f8f431eb5cd30fc997fec01edd937c5519a8990361fd0fb0e7b6",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  50176,
+                  50688
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "02eefdd7c814a0994bc655b80dfc3e124900379565d1cde34433b10d660a122c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  50688,
+                  51200
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "81e5a6de65e1cc6db0059576740500f3e9579eb7ab865499c2dbf8ec53251e1f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  51200,
+                  51712
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "db7c3fb0de6624313542d37f80fbb99660660a90acfc3a537117c0c686a26f0a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  51712,
+                  52224
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b732293540837aa8f33049af69d29d292e3f80ec03d46238940317035bd5864d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  52224,
+                  52736
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "eca573780110c7e207bf2e821ecc6aa9bcc15ec2d5fa3b9baacc1eca022d5ff1",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  52736,
+                  53248
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "d265d53ead5358ab21f00ec2b9c6497c6de08254b49b1bbe5ca1af55ddbdbae8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  53248,
+                  53760
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "2da2c1a906007d83d288ad78654b460f53965ce31a9dbe375c09d16653bc1127",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  53760,
+                  54272
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "54c558aa038101dc7cb6df817fe6b0004b831b157e0e59132cf5e007751d5459",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  54272,
+                  54784
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "4ece9fed6b6af16d70d860e6900d125bea1142251f1877c5048af8d19818c9d4",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  54784,
+                  55296
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e4798d7ea02c4f50b7b9eb64dcd529c7963b9ca54eb416007ec5b8d9b493dbb0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  55296,
+                  55808
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "8bc4e77c588b00fd7a0e9436c8025a60a837b622f161b1db1d4f71b92751ce75",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  55808,
+                  56320
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "80f23b42d207d1002d29cb385c6a62ab42888d31ff11e972ba0c178854ae7604",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  56320,
+                  56832
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b7d86e1836ede023728581394957499aeb8935157f829491c70fb706c7ea91da",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  56832,
+                  57344
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5d6a5db21bf52534c234ddfe18e1f7718324e4a78f8b032dc78af726267e06e6",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  57344,
+                  57856
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "37f4d4d03d564f02102eb5044795a7dbda1029808d1bd455ae0aec3da7b045b6",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  57856,
+                  58368
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5350d6bc2854b9f73bbf9bae935fa8229cb2cfc2e6faad5cdd6b472ca3fd3044",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  58368,
+                  58880
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "0bc6606b742413a2c2be385545542011478c94432e8d40dde6938b2e88135426",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  58880,
+                  59392
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "ae8a703debe0ca3d9bc305c9cccde912ca8412ead7c15fe6eeac50bb57f18fa0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  59392,
+                  59904
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "80477c29d852abe9a08f6be9a02678ae90bafb5d3a664c1540f27d53621dbf89",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  59904,
+                  60416
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f55c413c1f760e197f9df72e1c8a88e14c70eb149dac43d72bcdf2c62ce60acf",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  60416,
+                  60928
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "897c6e8c8e3dc807476b1d0cc4f7201bba810b5873b5b32325aca7fcdba9ed6d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  60928,
+                  61440
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "163aa458bf18d0c2e1612a6c0744e49631000012dc30b0b2a913f227baefd4b7",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  61440,
+                  61952
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6ab822693fb287f53195e07c75047d01ce3a2943074c4e1db97c526b758017d0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  61952,
+                  62464
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b57ac98f244c9bdececedca0c238bdbef93ec24f2db797294f49814a759e9975",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  62464,
+                  62976
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f4ec4ab360905ab54c8ad454c951c74d30bb1e1ca89a61a290bbb91e911db206",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  62976,
+                  63488
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b762acca8ae88bc293be86350ba1440fac685da5e6ff73f6098d0e7bfd70ca93",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  63488,
+                  64000
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "df1437b1e3a945fbfc415a5503578b71192d6aa8e10ef992e4808ee8c5e3c51f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  64000,
+                  64512
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "ac9eff6851170cf3ab0c99356f0d18aff73663c5c2ac5f2d0101929de3a503e0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  64512,
+                  65024
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "36f4fe863408fa24db930659d817d590fdef19328bb6d53e84c234488c87997d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  65024,
+                  65536
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "a93a83ae8da3d301a92002a1f35b18774b78bf8700a0154a06b910435c1c4d4e",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  65536,
+                  66048
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "442885cd03c999e9becf5041aa85e83708a411d2ad734a4d3ba23bfa72ac9483",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  66048,
+                  66560
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "02c712aa62cf055a0089df0db2b45748d5bac9bb363f9bb5ee87b0569b101743",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  66560,
+                  67072
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "863e2cd283334a9f376cdf6d0e46abbbb86271cb07cfd8e9b7a263cfea6bf55f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  67072,
+                  67584
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6edc6a2fe87e989cf29968c8d4563f362cf01f6105b8663e3d977148e8ae736c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  67584,
+                  68096
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6cb830ee695c059953f78673bcf781ff171abbc27af3bc244d7b67e6840a145b",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  68096,
+                  68608
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "a49e5cf6a62bb4a1490c829bdf2d7d448ed5ddd78d3371223fb8a3606d03e364",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  68608,
+                  69120
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5c98b8ef56707590878c4fceb63aeadb598ad2847ea99e38ed1b7cdbcb043d4b",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  69120,
+                  69632
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6b8c34e5c677d3c00850bb247f39bf96ad1d330ef8ba911188111aa3077cd4c2",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  69632,
+                  70144
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5734625fc0cebe40917e5ac76f6affd2324ebcf0c7dfeac556f21d66b7e15974",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  70144,
+                  70656
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "ef1f8501299ef96ffb4a2e54372ec338678b422962a0b623b55012b05a0c2305",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  70656,
+                  71168
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3d9f3c808f97a413d440b5d9c850a5ea7d701d06dcf399a5ed563dae93fec0b1",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  71168,
+                  71680
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e9c79f574b8a3c08893463bb7447b3ed7505def204ca5c22faffc14b35a52a0f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  71680,
+                  72192
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "fcd3efe851e2668604709c5b05ae295d86468451d133556cc29daf6209e6156a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  72192,
+                  72704
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e87c45dbbf368bf25b46d596986d9e1d3d7e8d942ba9454174a1b33d3358f611",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  72704,
+                  73216
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f56e762a731f545b0244b964eafb32e289651ef131c9012c061d446e9978affa",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  73216,
+                  73728
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f4ffec388677961961a60b6ff8f17090af0aa31c3a6e136807e76522d0bcf945",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  73728,
+                  74240
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "8dc4f89478f404af5597009ce0b644b7252ef8d32b6793924a0ab15fca8039f0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  74240,
+                  74752
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "a3d24fe3a2a53ffa5cf7d5250dfb4c2797fbeec8888430e32061e76ab6616b49",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  74752,
+                  75264
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "1bb018d6c01c577ec2c46d8e16a5d053668b7b2c4d6009eeb6f3b5308d0c2515",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  75264,
+                  75776
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "155e36cbabc98ebfcf48402ae40c5e679119291d10ecc6855f7587a0e2f3ed83",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  75776,
+                  76288
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "83e138454d374d84de1322705be2f74d953bb7c2380aaf19969ca5e326171e21",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  76288,
+                  76800
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "69de233f8711b9da9b27cc8554fc05d5434c300281fa84a63c5f8c68012e9bcc",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  76800,
+                  77312
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "30b2c36eff24cb04ea90edc74d0104d2c581ccc5c982c4cab7d5745772a137cf",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  77312,
+                  77824
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "c22949fc8daa32b9fae3630a9326dda4d979afb57003fb60accfbce76ed6533b",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  77824,
+                  78336
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "77e001a3b91fd689cd1db978b8345f1c758d930a76b4f897a893a524611ea9d0",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  78336,
+                  78848
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "7926d41fc70e914929df19af0df3fac8b4412af9b75b97ba93f1f697e05f6d9d",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  78848,
+                  79360
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "91a6c70325b601b70370fe97e5ae7fcb8a9f4dc727fde02dd2765533ea32378b",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  79360,
+                  79872
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "1e10d75ea8999e14adbaabd077187dc59a4104fc4291b0bf8fcab6905040eb72",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  79872,
+                  80384
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "c52c4b7ed6bdbeb51de6f6b9f6345505901cab706d1b8a2caab8e845592313ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  80384,
+                  80896
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "73d15148fd2380a0b3f1b5646ef5044b900a32babe4403b89a4e08013201b1cc",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  80896,
+                  81408
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "63385d2bf88a618425b9a31863ad67d34d10c47e645424e9a36a467f5c3dee56",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  81408,
+                  81920
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6cc7d6e783dbc4e7ae48700bd16afeb7975d128125a71399b07cdd79e6454b83",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  81920,
+                  82432
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "cf4098d180738992e866e4ab08579219a016fa4947882b6ae61f6a1b609ebbf5",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  82432,
+                  82944
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "414c803a8a4b7f447546f87b688b541c33505ccfe4917e3083bd4dc8c6bc8740",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  82944,
+                  83456
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f1bb17737709fdeb6dbf5e8d22cf5d0d6fa5e871083959a81ccea33ce870599f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  83456,
+                  83968
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3e478563e41291b0ee08c8a68e7c6eaa499e47a2458bd769f7e5d6e79521a596",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  83968,
+                  84480
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "17683069443c6d025c063609188901e9791c59dec70b73398656c0b73a88fab6",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  84480,
+                  84992
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "2801bb7074d8604d38a7fa9d2e2119a4ae5386bf40769b37f6316dfe75f74aab",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  84992,
+                  85504
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "993047f4d17d33485d4a3c240fce7bf5b4ea6084fa3d7cde6500b7ed97cbd67b",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  85504,
+                  86016
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "0e5b9fb50800b244e5d61094d324f821dad15a1b054c2979d4f73b12d2205c99",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  86016,
+                  86528
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6efecb42c476eccb798527f8a29c0c69eacc7361bf0479d8e141e02471bfc99c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  86528,
+                  87040
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "9967115cf7409ff6994ec41233ccd20c3b4820e161a4c73e1683b160f4d59717",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  87040,
+                  87552
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "4428e3d07d061774bb64b0c4a298dfa917f9f58be857ea11d9f69f8d53911b83",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  87552,
+                  88064
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "0d130eefdb254e799707677a5e76637422747cae1bb832a5aee823a627c7c349",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  88064,
+                  88576
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "7cec7d982693e3dc8ed6b63cb63e8667191bdc56d4e6dd90505d764543d46b1c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  88576,
+                  89088
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "641242ef30d81051d1528d1995ca982ddb671f65e64224dd0212bee79285b1a6",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  89088,
+                  89600
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "dab82e08840c206b21cb3e668718d7b866c3b7d80e2e1c12ef7a4da6c41a419a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  89600,
+                  90112
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f0d5f7423cfac0529f549999c1285c3fcae5f475ce276936abf294d9e264a35a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  90112,
+                  90624
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "6525c7e4d61d2c9005fe97af698e2df0c360cdc8fdabd97fd165401c4b723eab",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  90624,
+                  91136
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f0a7bea29a5e47a07c9724b29ed12f12175cbf91d8e887a496eb0f9d5298a937",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  91136,
+                  91648
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f0953bdd4252dea16ef4dd13b7f6175460f4d659e741b8138eff4d1f5f863f94",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  91648,
+                  92160
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "552e253824be7316b1739da2c347c615f90dda1032a8c6dea4db4ab4df6c53cb",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  92160,
+                  92672
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "facdd9109772634c91fbabcdc7728295ca96279ff3d17a74589530970627bd22",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  92672,
+                  93184
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "1b3aad45bdaadbb899f3e949da0fa57fe53f86bc341c5a57c8c540d69262f3d8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  93184,
+                  93696
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "1882f8fc6e0fd0158cb55f8df421f53475c1295ab9c95dda7abeae8c267e0a6b",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  93696,
+                  94208
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3409bb7c94ef3e5ddc56e2918585ac3baa8c7ed8bf8693d72290f2edd7842d50",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  94208,
+                  94720
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f6a8df7ccf6b6e64757c68d143bab33c08d827e7c162ad5273edc37d0d6b5ff1",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  94720,
+                  95232
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "8ff2a515448d063ee797c5628d10decba06148b31a79c1f6e40ba25385b547ab",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  95232,
+                  95744
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "53991067d9a634a370338f9402444243abe9df4b8270c6c3f7aee9b1335f4206",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  95744,
+                  96256
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "c0caa5ab85fbde107ac264fda289569ed5a0b177740ca5f9a00cf1199e11373e",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  96256,
+                  96768
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "1eb987225cbbbc2b69703857d7248964b752d45b64a91923b06c616e2c85336e",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  96768,
+                  97280
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "17c1329686947394f93dff6057e74062337fe1520f436d99511ae93fba09d7b4",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  97280,
+                  97792
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "7abf4778d353e24216db8345139c0d9a98953d5cb6fef2c778c3bdb5a1d6b7f3",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  97792,
+                  98304
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "52a36c50a2e719ca8b80e4ae3d2b7e91c489a46fb0b16358c41322c43349c943",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  98304,
+                  98816
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "4410c657bad7cb09763311068f97e4d20858ea028aba74df5eb2e4747342ba1c",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  98816,
+                  99328
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b863bb9d02498ef0ace2c0a582d5d332bb417b71595199b3d3a2e79a40be8d07",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  99328,
+                  99840
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "a6f5c2673350f3bbb6d757a80daa16c5118fdba8009b7f197560678844797abf",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  99840,
+                  100352
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "3d40b61e866517adbf2fa7031ce75c6b026f03723497164f9151e63090859e02",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  100352,
+                  100864
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "2fcb30a5ca2f2c4ccf2a52f2431b5dec59dc1ae262a9382fb3a7edffe00cb710",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  100864,
+                  101376
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "06227df7e41b9fff7f590755466f590731150887553f54e3d18843b55c63fc00",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  101376,
+                  101888
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f24cdd1b6452448caaad7178c9e21e8a2dcef61ce018f24af6779cf0163d4d10",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  101888,
+                  102400
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "f8dc7f51c8ce03c54c97d68bdb3e7cb9c52a82d0d46b7a985567fed8ba153b42",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  102400,
+                  102912
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "14b0e7aa1856bfeded15e93758dc5fef8bcb8856f9202a41df12d16f39a33d1b",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  102912,
+                  103424
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "634db283405576341e6910f3c73e8f1d265124ed89293b85681e768572528a55",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  103424,
+                  103936
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "556319841ebae0c3248c8614e53c52e83bf56fbdfc5043503e66bdee65cf1105",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  103936,
+                  104448
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5335935b8214789051e4423a3cd8fc286ae51b440b0675c5001d214c6ad781ca",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  104448,
+                  104960
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "2f07e3a83f8f09bde427f37a670312d4c153b712d4194a344b656b3fe853f0df",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  104960,
+                  105472
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "reason": "delivery_pause",
+          "pcm16_sha256": "f2aef23a6dfe8f58c63aba5ac0d567574a26479d39b923bae22172aab4eddf3b",
+          "payloads": [
+            {
+              "samples": 4800,
+              "pcm16_sha256": "325e30b7af23eac36bf35e52e2e2814cf55f0f59147cb85b6425b6c3f7e2a2b6",
+              "role": "source_context",
+              "source_ranges": [
+                [
+                  7,
+                  100672,
+                  100864
+                ],
+                [
+                  7,
+                  100864,
+                  101376
+                ],
+                [
+                  7,
+                  101376,
+                  101888
+                ],
+                [
+                  7,
+                  101888,
+                  102400
+                ],
+                [
+                  7,
+                  102400,
+                  102912
+                ],
+                [
+                  7,
+                  102912,
+                  103424
+                ],
+                [
+                  7,
+                  103424,
+                  103936
+                ],
+                [
+                  7,
+                  103936,
+                  104448
+                ],
+                [
+                  7,
+                  104448,
+                  104960
+                ],
+                [
+                  7,
+                  104960,
+                  105472
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "1855465f8ecaef349753ddfcd73356399927c7b41bd87fd825412d8323337c95",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  105472,
+                  105984
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "637f6d3976aa4627d5eac8310e81508207ea017ed9a6085581f2fd881b18fde8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  105984,
+                  106496
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "71e8f0b030c783877c1e782b98a81e2c620ac3af5b927c3d74d1d55a8086d327",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  106496,
+                  107008
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b11feb61ad86a0517f42000846d5af71bfbcad284f0cac38acef57f5f54aef0a",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  107008,
+                  107520
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "bf66f56644ed22c8bcdda9a6dc5133548a4196f2da485df417c19f43daa737f8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  107520,
+                  108032
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "ba02b77f74f24142c33fd5b92eb199be970fa20ea49afbda7a310a0aad2275a6",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  108032,
+                  108544
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "dd6664995203bb576f73a122ff8382a99882738e4528e8cfd54b5ef7c6e04b73",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  108544,
+                  109056
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "b6a4349c4e6a023a6656d9535dfc9bfb995cd9ce67b9d638919fae6082bf6644",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  109056,
+                  109568
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "c1da46529f54cf942a80a79397d9ccd256f85223210b1d07a3c8ef510e83effa",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  109568,
+                  110080
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "cd6ebee8b785cdc90d278a48a488e15b53f90d21a4d60d523cc1b864d9841ade",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  110080,
+                  110592
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "855f6124b1b8d953de82f8e01c761675e43e1862ff821e816d9352d6eeed0964",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  110592,
+                  111104
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "18c1714470d8450ac49fc2c0afc1a5460b883c960ecd20081c8c4047c30e6d74",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  111104,
+                  111616
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5596cc1f8052e08e17cd326a860b63728b140df62ed0c308a96880489f4da7cc",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  111616,
+                  112128
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "37f36275463f6a0aec3d0034579ebb770413b2816a715a1b587df3aba292c9d8",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  112128,
+                  112640
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "1a89cbebd66214770feca24354511a8736a630216ec0ca424a7efff40fcec2df",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  112640,
+                  113152
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "20efea3218ae246508bceb7d5e62ee7237a5c1e81c9f5102b47016f01df5316f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  113152,
+                  113664
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "e529a4305877d58fdf3ef59c1dfdf6d1f5d7004abb2a9cffc37e84bbb0f06f45",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  113664,
+                  114176
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "40535b101bb8cb429c947571df0ee532348674e0d0035df74e1760218a0cf79f",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  114176,
+                  114688
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "615571016b56ea601e45b7bf8252b4bac1e59f797629fdbafd6db0bbe4e839d1",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  114688,
+                  115200
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "a0ab73fda6a283e9ac3f6700d0874e628853614d679cdca51e6c26cce4874fef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  115200,
+                  115712
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  115712,
+                  116224
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  116224,
+                  116736
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  116736,
+                  117248
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  117248,
+                  117760
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  117760,
+                  118272
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  118272,
+                  118784
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  118784,
+                  119296
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  119296,
+                  119808
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  119808,
+                  120320
+                ]
+              ]
+            },
+            {
+              "samples": 512,
+              "pcm16_sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+              "role": "new_content",
+              "source_ranges": [
+                [
+                  7,
+                  120320,
+                  120832
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "native_final_segments_and_resulting_sources": [
+        {
+          "native_final_observed_at": 82924.1898461,
+          "raw_text": "Washed the detritus from his hair. Gentlemen of the press.",
+          "contribution": {
+            "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:1",
+            "text_start": 0,
+            "text_end": 58
+          },
+          "native_complete_boundary_timings": [
+            {
+              "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:1",
+              "text_start": 0,
+              "text_end": 58,
+              "semantics": "result_span",
+              "raw_start": 0.0,
+              "raw_end": 4.515,
+              "unit": "s",
+              "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+              "complete_boundary": true,
+              "estimated": true
+            }
+          ],
+          "audio_clocks": [
+            {
+              "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+              "sample_rate_hz": 16000,
+              "origin_sent_sample": 0,
+              "qualified": true
+            }
+          ],
+          "source_children": [
+            {
+              "text": "Washed the detritus from his ",
+              "admitted_at": 82924.2203228,
+              "contribution_ranges": [
+                [
+                  0,
+                  29
+                ]
+              ],
+              "speaker": {
+                "text": "Washed the detritus from his ",
+                "speaker_id": "0",
+                "session_scope": "3",
+                "source_start_ms": null,
+                "source_end_ms": null,
+                "overlaps_previous": false,
+                "source": "nemotron",
+                "attribution_state": "identified"
+              },
+              "order": [
+                1,
+                1,
+                0
+              ]
+            },
+            {
+              "text": "hair. ",
+              "admitted_at": 82924.2210964,
+              "contribution_ranges": [
+                [
+                  29,
+                  35
+                ]
+              ],
+              "speaker": {
+                "text": "hair. ",
+                "speaker_id": null,
+                "session_scope": "3",
+                "source_start_ms": null,
+                "source_end_ms": null,
+                "overlaps_previous": false,
+                "source": "nemotron",
+                "attribution_state": "uncertain"
+              },
+              "order": [
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "text": "Gentlemen of the press.",
+              "admitted_at": 82924.2217091,
+              "contribution_ranges": [
+                [
+                  35,
+                  58
+                ]
+              ],
+              "speaker": {
+                "text": "Gentlemen of the press.",
+                "speaker_id": "1",
+                "session_scope": "3",
+                "source_start_ms": null,
+                "source_end_ms": null,
+                "overlaps_previous": false,
+                "source": "nemotron",
+                "attribution_state": "identified"
+              },
+              "order": [
+                1,
+                1,
+                2
+              ]
+            }
+          ],
+          "exact_native_text_conserved": true
+        },
+        {
+          "native_final_observed_at": 82925.7523413,
+          "raw_text": "He washed the detritus from his",
+          "contribution": {
+            "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:2",
+            "text_start": 58,
+            "text_end": 89
+          },
+          "native_complete_boundary_timings": [
+            {
+              "contribution_id": "ab1b483931624d1f9711ddbc2246d3b5:segment:2",
+              "text_start": 58,
+              "text_end": 89,
+              "semantics": "result_span",
+              "raw_start": 4.515,
+              "raw_end": 6.4840003,
+              "unit": "s",
+              "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+              "complete_boundary": true,
+              "estimated": true
+            }
+          ],
+          "audio_clocks": [
+            {
+              "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+              "sample_rate_hz": 16000,
+              "origin_sent_sample": 0,
+              "qualified": true
+            }
+          ],
+          "source_children": [
+            {
+              "text": "He ",
+              "admitted_at": 82925.8705882,
+              "contribution_ranges": [
+                [
+                  58,
+                  61
+                ]
+              ],
+              "speaker": {
+                "text": "He ",
+                "speaker_id": null,
+                "session_scope": "3",
+                "source_start_ms": null,
+                "source_end_ms": null,
+                "overlaps_previous": false,
+                "source": "nemotron",
+                "attribution_state": "uncertain"
+              },
+              "order": [
+                1,
+                2,
+                0
+              ]
+            },
+            {
+              "text": "washed the detritus from ",
+              "admitted_at": 82925.8714737,
+              "contribution_ranges": [
+                [
+                  61,
+                  86
+                ]
+              ],
+              "speaker": {
+                "text": "washed the detritus from ",
+                "speaker_id": "0",
+                "session_scope": "3",
+                "source_start_ms": null,
+                "source_end_ms": null,
+                "overlaps_previous": false,
+                "source": "nemotron",
+                "attribution_state": "identified"
+              },
+              "order": [
+                1,
+                2,
+                1
+              ]
+            },
+            {
+              "text": "his",
+              "admitted_at": 82925.8723032,
+              "contribution_ranges": [
+                [
+                  86,
+                  89
+                ]
+              ],
+              "speaker": {
+                "text": "his",
+                "speaker_id": null,
+                "session_scope": "3",
+                "source_start_ms": null,
+                "source_end_ms": null,
+                "overlaps_previous": false,
+                "source": "nemotron",
+                "attribution_state": "unavailable"
+              },
+              "order": [
+                1,
+                2,
+                2
+              ]
+            }
+          ],
+          "exact_native_text_conserved": true
+        },
+        {
+          "native_final_observed_at": 82926.6447986,
+          "raw_text": "from his hair.",
+          "contribution": {
+            "contribution_id": "310bb704bcba4f5b8022db2f1b78018d:segment:1",
+            "text_start": 0,
+            "text_end": 14
+          },
+          "native_complete_boundary_timings": [
+            {
+              "contribution_id": "310bb704bcba4f5b8022db2f1b78018d:segment:1",
+              "text_start": 0,
+              "text_end": 14,
+              "semantics": "result_span",
+              "raw_start": 6.484,
+              "raw_end": 7.7439998,
+              "unit": "s",
+              "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+              "complete_boundary": true,
+              "estimated": true
+            }
+          ],
+          "audio_clocks": [
+            {
+              "clock_id": "deepgram:8553fc70b44e4c23a4e376f8564fb57d",
+              "sample_rate_hz": 16000,
+              "origin_sent_sample": 0,
+              "qualified": true
+            }
+          ],
+          "source_children": [
+            {
+              "text": "from his hair.",
+              "admitted_at": 82926.6678998,
+              "contribution_ranges": [
+                [
+                  0,
+                  14
+                ]
+              ],
+              "speaker": {
+                "text": "from his hair.",
+                "speaker_id": "0",
+                "session_scope": "3",
+                "source_start_ms": null,
+                "source_end_ms": null,
+                "overlaps_previous": false,
+                "source": "nemotron",
+                "attribution_state": "identified"
+              },
+              "order": [
+                1,
+                3,
+                0
+              ]
+            }
+          ],
+          "exact_native_text_conserved": true
+        }
+      ],
+      "discrete_audio_boundary_events": 0,
+      "first_enclosing_seal": 82925.5178055
+    }
+  },
+  "earliest_complete_phrase_audit": {
+    "case": "distinct_repeated_A_B_A",
+    "native_complete_segment": "Washed the detritus from his hair. Gentlemen of the press.",
+    "native_available_at": 82924.1898461,
+    "native_available_after_playback_seconds": 5.288474299988593,
+    "complete_punctuated_A_phrase_in_native_text": "Washed the detritus from his hair.",
+    "A_phrase_text_range": [
+      0,
+      34
+    ],
+    "native_result_visible_span": {
+      "sent_range": [
+        0,
+        72240
+      ],
+      "mapped_source_envelope": [
+        1728,
+        73968
+      ],
+      "active_slots_union": [
+        0,
+        1
+      ],
+      "complete_closed_frame_coverage": true,
+      "uncertain_frame_count": 10,
+      "frame_observation_ready_latest": 82924.0225995,
+      "observed_policy_attribution": "mixed",
+      "note": "Offline summary of captured probabilities under run's declared thresholds, not new inference or product enablement"
+    },
+    "complete_A_phrase_word_envelope": {
+      "sent_range": [
+        10240,
+        46080
+      ],
+      "mapped_source_envelope": [
+        11968,
+        47808
+      ],
+      "active_slots_union": [
+        0
+      ],
+      "complete_closed_frame_coverage": true,
+      "uncertain_frame_count": 6,
+      "frame_observation_ready_latest": 82922.0969441,
+      "observed_policy_attribution": "uncertain",
+      "note": "Offline summary of captured probabilities under run's declared thresholds, not new inference or product enablement"
+    },
+    "uncertain_trailing_hair_word": {
+      "sent_range": [
+        37120,
+        46080
+      ],
+      "mapped_source_envelope": [
+        38848,
+        47808
+      ],
+      "active_slots_union": [
+        0
+      ],
+      "complete_closed_frame_coverage": true,
+      "uncertain_frame_count": 6,
+      "frame_observation_ready_latest": 82922.0969441,
+      "observed_policy_attribution": "uncertain",
+      "note": "Offline summary of captured probabilities under run's declared thresholds, not new inference or product enablement"
+    },
+    "first_A_source_admitted_at": 82924.2203228,
+    "first_enclosing_hardcut_at": 82925.5178055,
+    "early_fragment_lead_seconds": 1.2974826999998186,
+    "acceptance": "Not a complete identified preceding-speaker phrase or an audio-transition example: zero discrete model boundary events, uncertain trailing hair word was split into its own source. Repair source composition before acceptance."
+  }
+}

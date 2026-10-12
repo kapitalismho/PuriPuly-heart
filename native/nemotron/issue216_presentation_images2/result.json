@@ -1,0 +1,258 @@
+{
+  "schema": "issue216-actual-desktop-presentation-1",
+  "publication_note": "Public derivative: only the private absolute worktree prefix in command and traceback was replaced by <worktree>. Original bytes remain local at the same path in unpublished commit af299bf6a2cbe5eff3a7ffda18ae6e0be1f0eac4, retained by backup/listen-before-dev-sync-c237d660. Outcomes, failures, source hashes and observations are unchanged.",
+  "command": [
+    "<worktree>\\.venv\\Scripts\\python.exe",
+    "-B",
+    "native/nemotron/issue216_presentation.py",
+    "--source",
+    "native/nemotron/issue216_final.json",
+    "--baseline",
+    "native/nemotron/issue216_baseline.json",
+    "--output",
+    "native/nemotron/issue216_presentation_images2",
+    "--dwell-ms",
+    "650"
+  ],
+  "driver_sha256": "eb00f1b4c15d974b1eefcb880cf8eef2ffc44953f47cb5c11946737bb644e949",
+  "source_report": {
+    "path": "native/nemotron/issue216_final.json",
+    "sha256": "60a0abf0cf3fe18422aeadec810f2bddedf9f050a1c4a4b4f00526fcf66bad44"
+  },
+  "baseline_report": {
+    "path": "native/nemotron/issue216_baseline.json",
+    "sha256": "966738db723f21d9313146d16c3ddd47ed980a9e1b83e0ba9a54f8e52408aba5"
+  },
+  "safety": {
+    "ordinary_app_composition": false,
+    "settings_read_write": false,
+    "audio_capture": false,
+    "cloud_model_calls": false,
+    "VR_interaction": false,
+    "only_spawned_processes_stopped": true,
+    "whole_desktop_capture": false
+  },
+  "seam": "Recorded SourceChild fields -> Transcript (existing translation_turn child pattern) -> PeerSpeakerIdentityAllocator -> OverlayEventAdapter.transcript_final/utterance_closed -> OverlayPresenter.emit_peer_when_admissible -> LocalAuthenticatedRawIngress -> default DesktopOverlayRenderer/FletDesktopRendererWindow",
+  "limits": [
+    "Renderer-only Windows desktop pixels, not HMD/photon evidence",
+    "No translation execution or fabricated translated text",
+    "Source semantic/ASR ambiguity remains; acknowledgements alone prove no quality",
+    "Serialized origins/settings retained in source report, not rehydrated; no source partition/ownership revalidation",
+    "Existing default two rows, pacing, TTL unchanged; display_group_id recorded, no #217 aggregation",
+    "Replayed sanitized source groups, not original live-time end-to-end GUI timing"
+  ],
+  "frames": [],
+  "renderer_events": [
+    {
+      "schema_version": 1,
+      "record_type": "renderer_event",
+      "event_type": "receipt",
+      "renderer_revision": 1,
+      "actual_disposition": "committed",
+      "render_commit_acknowledged": false,
+      "slot_count": 1,
+      "line_count": 1,
+      "surface_visible": true,
+      "interaction_mode": "locked",
+      "window_width": 1344,
+      "window_height": 336
+    },
+    {
+      "schema_version": 1,
+      "record_type": "renderer_event",
+      "event_type": "render_start",
+      "renderer_revision": 1,
+      "actual_disposition": "committed",
+      "render_commit_acknowledged": false,
+      "slot_count": 1,
+      "line_count": 1,
+      "surface_visible": true,
+      "interaction_mode": "locked",
+      "window_width": 1344,
+      "window_height": 336
+    },
+    {
+      "schema_version": 1,
+      "record_type": "renderer_event",
+      "event_type": "render_commit",
+      "renderer_revision": 1,
+      "actual_disposition": "committed",
+      "render_commit_acknowledged": false,
+      "slot_count": 1,
+      "line_count": 1,
+      "surface_visible": true,
+      "interaction_mode": "locked",
+      "window_width": 1344,
+      "window_height": 336
+    },
+    {
+      "schema_version": 1,
+      "record_type": "renderer_event",
+      "event_type": "render_commit_acknowledgement",
+      "renderer_revision": 1,
+      "actual_disposition": "committed",
+      "render_commit_acknowledged": true,
+      "slot_count": 1,
+      "line_count": 1,
+      "surface_visible": true,
+      "interaction_mode": "locked",
+      "window_width": 1344,
+      "window_height": 336
+    },
+    {
+      "schema_version": 1,
+      "record_type": "renderer_event",
+      "event_type": "receipt",
+      "renderer_revision": 2,
+      "actual_disposition": "committed",
+      "render_commit_acknowledged": false,
+      "slot_count": 0,
+      "line_count": 0,
+      "surface_visible": false,
+      "interaction_mode": "locked",
+      "window_width": 1344,
+      "window_height": 336
+    },
+    {
+      "schema_version": 1,
+      "record_type": "renderer_event",
+      "event_type": "render_start",
+      "renderer_revision": 2,
+      "actual_disposition": "committed",
+      "render_commit_acknowledged": false,
+      "slot_count": 0,
+      "line_count": 0,
+      "surface_visible": false,
+      "interaction_mode": "locked",
+      "window_width": 1344,
+      "window_height": 336
+    },
+    {
+      "schema_version": 1,
+      "record_type": "renderer_event",
+      "event_type": "render_commit",
+      "renderer_revision": 2,
+      "actual_disposition": "committed",
+      "render_commit_acknowledged": false,
+      "slot_count": 0,
+      "line_count": 0,
+      "surface_visible": false,
+      "interaction_mode": "locked",
+      "window_width": 1344,
+      "window_height": 336
+    },
+    {
+      "schema_version": 1,
+      "record_type": "renderer_event",
+      "event_type": "render_commit_acknowledgement",
+      "renderer_revision": 2,
+      "actual_disposition": "committed",
+      "render_commit_acknowledged": true,
+      "slot_count": 0,
+      "line_count": 0,
+      "surface_visible": false,
+      "interaction_mode": "locked",
+      "window_width": 1344,
+      "window_height": 336
+    }
+  ],
+  "cleanup": {
+    "ingress_closed": true,
+    "renderer_shutdown": true,
+    "renderer_exit_code": 0,
+    "owned_backdrop_stopped": true
+  },
+  "presentation_source_sha256": {
+    "src/puripuly_heart/ui/desktop_overlay.py": "33dfc8b049b06035632f79e8689577a2291337c5c470d0e82a9ddc3cd7d4bd4a",
+    "src/puripuly_heart/ui/desktop_overlay_repro.py": "ce6027d465189a369c5da2bb773241107277cab66c0554672607bc0231e6534c",
+    "src/puripuly_heart/ui/desktop_overlay_surface/renderer.py": "259525e0d2b37432854d2f86aa200cbc60d3042a47dcbf2722298e982a06b2db",
+    "src/puripuly_heart/ui/desktop_overlay_surface/contract.py": "156b0842994155017d45a00ad87b2d460bce4b88ca751bd1810ada9649cfdc56",
+    "src/puripuly_heart/core/overlay/presenter.py": "a72a469d37aae70755cd5496e07f1f9afc4658875bae05707fc36abd69e853ee",
+    "src/puripuly_heart/core/overlay/state.py": "ac9cb7aa9c3b8524dd8d8e1789b3d3e78c23fc7c2ea84a3431a7458dbbfa53b6",
+    "src/puripuly_heart/core/overlay/sink.py": "de02cf1778c662d5c341e1ac12ae1ab045f3e9ff69abf78a2e16bf96c4b00666",
+    "src/puripuly_heart/core/speaker_identity.py": "a30c30d61ea3e9dbdc11b1992a0674eca6e7b9128d89a0428f64f0ae9ee2b0e3"
+  },
+  "backdrop_identity": {
+    "launcher_pid": 61408,
+    "window_process_pid": 15632,
+    "title": "issue216-owned-checkerboard-9fce0d1f64674d35"
+  },
+  "ingress": {
+    "host": "127.0.0.1",
+    "ephemeral_port": 58872,
+    "authenticated": true,
+    "token_retained": false
+  },
+  "actual_renderer": "DesktopOverlayRenderer",
+  "actual_window": "FletDesktopRendererWindow",
+  "owned_processes": {
+    "driver": 36816,
+    "renderer": 60644,
+    "backdrop": 15632
+  },
+  "baseline_source_groups": [
+    {
+      "admitted_at": 82639.1611582,
+      "source": {
+        "source_id": "da95adbe-d278-56d6-ad39-00758c9dd848",
+        "revision": "9643dbe1b10648a89c7a9630c81541a2:1",
+        "channel": "peer",
+        "order": [
+          1,
+          1,
+          0
+        ],
+        "raw_text": "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from his",
+        "language": null,
+        "text_range": [
+          0,
+          89
+        ],
+        "speaker": {
+          "text": "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from his",
+          "speaker_id": null,
+          "session_scope": "",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "",
+          "attribution_state": "unavailable"
+        },
+        "display_group_id": "7f157dae-e9f4-4df1-8474-17e9b26019cc"
+      }
+    },
+    {
+      "admitted_at": 82640.1196799,
+      "source": {
+        "source_id": "c7282e06-2ff9-5dd3-a947-8e219ad006f7",
+        "revision": "2950657f0f4f4e7489173c8387945175:2",
+        "channel": "peer",
+        "order": [
+          1,
+          2,
+          0
+        ],
+        "raw_text": "from his hair.",
+        "language": null,
+        "text_range": [
+          0,
+          14
+        ],
+        "speaker": {
+          "text": "from his hair.",
+          "speaker_id": null,
+          "session_scope": "",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "",
+          "attribution_state": "unavailable"
+        },
+        "display_group_id": "2586b5d0-0cfc-413f-8848-0e38379d7cf2"
+      }
+    }
+  ],
+  "outcome": "failed",
+  "error": "visible foreign HWND intersects owned crop above backdrop; no pixels captured",
+  "traceback": "Traceback (most recent call last):\n  File \"<worktree>\\native\\nemotron\\issue216_presentation.py\", line 365, in run\n    captured = capture.capture(overlay_pid, backdrop_pid, title, image_path)\n  File \"<worktree>\\native\\nemotron\\issue216_presentation.py\", line 165, in capture\n    raise RuntimeError(\"visible foreign HWND intersects owned crop above backdrop; no pixels captured\")\nRuntimeError: visible foreign HWND intersects owned crop above backdrop; no pixels captured\n"
+}

@@ -1,0 +1,129 @@
+{
+  "schema": "issue216-final-code-snapshot-1",
+  "archive": "native/nemotron/issue216_final_code_snapshot.zip",
+  "archive_sha256": "1e84e76239c705002ec1f65a27a5f39df26a4e8d114a075dbef4ed7a021cb9f4",
+  "source_live_report": "native/nemotron/issue216_final_repaired.json",
+  "members": {
+    "native/nemotron/issue216_smoke.py": {
+      "actual_live_execution_sha256": "23a68fbcaa906049001b1528bd4ad715e552f61ec52629c21dd1bb86eda002e5",
+      "snapshot_current_sha256": "23a68fbcaa906049001b1528bd4ad715e552f61ec52629c21dd1bb86eda002e5",
+      "byte_identical_to_live": true,
+      "bytes": 22861
+    },
+    "src/puripuly_heart/providers/stt/deepgram.py": {
+      "actual_live_execution_sha256": "fa506abeca1a83ca1480a1572f3e257ea3ebdc96d6ee44255e9a9e19e8689436",
+      "snapshot_current_sha256": "fa506abeca1a83ca1480a1572f3e257ea3ebdc96d6ee44255e9a9e19e8689436",
+      "byte_identical_to_live": true,
+      "bytes": 38349
+    },
+    "src/puripuly_heart/core/stt/backend.py": {
+      "actual_live_execution_sha256": "de956a41be2caa5463f3f69c7782edfbadbdf1c89172e0bae00e96f5aae56e9d",
+      "snapshot_current_sha256": "de956a41be2caa5463f3f69c7782edfbadbdf1c89172e0bae00e96f5aae56e9d",
+      "byte_identical_to_live": true,
+      "bytes": 29769
+    },
+    "src/puripuly_heart/core/stt/scoped_normalizer.py": {
+      "actual_live_execution_sha256": "79f440fb19a68f7ca6b31677b3a2f15fb2538475a8b6e206d84bcc63f363cc5b",
+      "snapshot_current_sha256": "79f440fb19a68f7ca6b31677b3a2f15fb2538475a8b6e206d84bcc63f363cc5b",
+      "byte_identical_to_live": true,
+      "bytes": 22672
+    },
+    "src/puripuly_heart/core/stt/scoped_engine.py": {
+      "actual_live_execution_sha256": "e85e1bb464de7ce7ad30e6195f58119ff181d6fcbc8e19f3560fbc99759c5030",
+      "snapshot_current_sha256": "a7a2ba32cbf60e536736c88cce53a114594cad3d059a195f9d8734b500590fe1",
+      "byte_identical_to_live": false,
+      "bytes": 99591
+    },
+    "src/puripuly_heart/core/stt/streaming_speaker.py": {
+      "actual_live_execution_sha256": "b17ad1a75f4e29cb37d260459098add3d79da40d78cbf61ae40c2888899b9470",
+      "snapshot_current_sha256": "b17ad1a75f4e29cb37d260459098add3d79da40d78cbf61ae40c2888899b9470",
+      "byte_identical_to_live": true,
+      "bytes": 33771
+    },
+    "src/puripuly_heart/core/speaker/runtime.py": {
+      "actual_live_execution_sha256": "76cfd82763feac96d9274c8f318ac76da585dea9b2352781a90cfc8d52bbd750",
+      "snapshot_current_sha256": "76cfd82763feac96d9274c8f318ac76da585dea9b2352781a90cfc8d52bbd750",
+      "byte_identical_to_live": true,
+      "bytes": 28273
+    },
+    "src/puripuly_heart/core/orchestrator/translation_turn.py": {
+      "actual_live_execution_sha256": "67e7d1e0ed3fcc0314a68894983de70ba62308ade113c8d6061fc26705dae103",
+      "snapshot_current_sha256": "67e7d1e0ed3fcc0314a68894983de70ba62308ade113c8d6061fc26705dae103",
+      "byte_identical_to_live": true,
+      "bytes": 66529
+    },
+    "src/puripuly_heart/core/orchestrator/translation_request.py": {
+      "actual_live_execution_sha256": "00564c4b69342d5e8d2eca6afbc795ce97359d2eca1c067f27e88a9d8aae78a3",
+      "snapshot_current_sha256": "00564c4b69342d5e8d2eca6afbc795ce97359d2eca1c067f27e88a9d8aae78a3",
+      "byte_identical_to_live": true,
+      "bytes": 40022
+    },
+    "native/nemotron/issue215_smoke.py": {
+      "actual_live_execution_sha256": "753a840e32696ea88d36316f493d5bb9d1025396cb3f5053cb69e050e45ede9f",
+      "snapshot_current_sha256": "753a840e32696ea88d36316f493d5bb9d1025396cb3f5053cb69e050e45ede9f",
+      "byte_identical_to_live": true,
+      "bytes": 24930
+    },
+    "src/puripuly_heart/providers/stt/sdk_network.py": {
+      "actual_live_execution_sha256": "ed6138215e35c8555aba50f6a59974d6ba2ded23f232b680dc4ea42ffa236980",
+      "snapshot_current_sha256": "ed6138215e35c8555aba50f6a59974d6ba2ded23f232b680dc4ea42ffa236980",
+      "byte_identical_to_live": true,
+      "bytes": 3984
+    },
+    "src/puripuly_heart/core/stt/recognition_units.py": {
+      "actual_live_execution_sha256": "91f38a44b4f3968dd99764654cf76ef93369f1a47a43ca34d94948e5f9c4ab7f",
+      "snapshot_current_sha256": "91f38a44b4f3968dd99764654cf76ef93369f1a47a43ca34d94948e5f9c4ab7f",
+      "byte_identical_to_live": true,
+      "bytes": 7312
+    },
+    "src/puripuly_heart/core/audio/ownership.py": {
+      "actual_live_execution_sha256": "a3c22e417cf471a0f8b6d2aa9bc39726c43f5ed1f01fa3e99ad59d4131dbd39c",
+      "snapshot_current_sha256": "a3c22e417cf471a0f8b6d2aa9bc39726c43f5ed1f01fa3e99ad59d4131dbd39c",
+      "byte_identical_to_live": true,
+      "bytes": 27062
+    },
+    "src/puripuly_heart/core/audio/listen_delivery.py": {
+      "actual_live_execution_sha256": "454ada11bb464c8f55c50f0e913267bfe446cf9aa0976e9527144dc5e43297c2",
+      "snapshot_current_sha256": "454ada11bb464c8f55c50f0e913267bfe446cf9aa0976e9527144dc5e43297c2",
+      "byte_identical_to_live": true,
+      "bytes": 18501
+    },
+    "src/puripuly_heart/core/runtime/audio_vad_loop.py": {
+      "actual_live_execution_sha256": "a402ae297bfa6bcbf84e7ca67ecdf414f7443307ce6dd9c69600aef1cca2375b",
+      "snapshot_current_sha256": "a402ae297bfa6bcbf84e7ca67ecdf414f7443307ce6dd9c69600aef1cca2375b",
+      "byte_identical_to_live": true,
+      "bytes": 25978
+    },
+    "src/puripuly_heart/core/vad/gating.py": {
+      "actual_live_execution_sha256": "41f9e48ba1111bcb0664257f0b6722a51309a57e305eefdf65ecdc9caaf5f0d6",
+      "snapshot_current_sha256": "41f9e48ba1111bcb0664257f0b6722a51309a57e305eefdf65ecdc9caaf5f0d6",
+      "byte_identical_to_live": true,
+      "bytes": 20289
+    },
+    "src/puripuly_heart/app/adapters/nemotron/backend.py": {
+      "actual_live_execution_sha256": "44d1d33e0df135775c3869eeee54561099bc34e191970c8a80db1b524ebbd417",
+      "snapshot_current_sha256": "44d1d33e0df135775c3869eeee54561099bc34e191970c8a80db1b524ebbd417",
+      "byte_identical_to_live": true,
+      "bytes": 11605
+    }
+  },
+  "formatting_applicability": {
+    "owner": "Director",
+    "command": "uv run black (owned repair files; default SAFE mode, no --fast), followed by ruff check",
+    "timing": "After ALL live calls stopped and live-complete notice",
+    "basis": "Director reports Black checked AST equivalence and ruff passed; no functional edits since live. This worker did not rerun those checks.",
+    "affected_member": "src/puripuly_heart/core/stt/scoped_engine.py",
+    "exact_preformat_bytes_retained": false,
+    "exact_preformat_sha256": "e85e1bb464de7ce7ad30e6195f58119ff181d6fcbc8e19f3560fbc99759c5030",
+    "formatted_sha256": "a7a2ba32cbf60e536736c88cce53a114594cad3d059a195f9d8734b500590fe1",
+    "byte_identical": false,
+    "remaining_16_members_byte_identical_to_live": true,
+    "claim": "Current formatted source snapshot explicitly differs from historical live engine bytes; semantic-equivalence applicability rests on reported safe formatter check, not fabricated identical bytes or a paid rerun."
+  },
+  "snapshot_kind": "EXECUTED working-source with explicitly qualified post-live SAFE formatter change; NOT owned-commit full-byte identity",
+  "director_owned_product_commit": "3c1ba9a4349ee5ba4e5a981c91033954bd9cb73a",
+  "preserved_user_overlay": "Executed/current working source includes concurrent USER215 synthetic-right-tail removals in shared backend/domain/recognition_units/helper, deliberately EXCLUDED from Director-owned product commit. Helper archive and execution hashes preserve this truth; do not assert archive blobs all equal owned commit.",
+  "applicability_basis": "Streaming cloud path does not use local Parakeet synthetic-tail behavior. Director reports isolated committed-export175tests including source/stream/protocol/lifecycle/causal prove compatibility with retained baseline fields. Worker did not rerun that check. No new cloud/model call or exact-byte equivalence claim.",
+  "model_calls": 0,
+  "cloud_calls": 0
+}

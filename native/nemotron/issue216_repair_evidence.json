@@ -1,0 +1,65 @@
+{
+  "schema": "issue216-repair-evidence-1",
+  "original_review_range": "896725642f50874906f5fba0d643554105b0d5fe..0ba21054d058ffbee63d65a4d9057f225fce5628",
+  "status": "Accepted findings independently repair-verified at the pinned repaired candidate; terminal Goal audit pending.",
+  "checkpoint_reviews": {
+    "whole": {"mode": "FULL_REVIEW followed by bounded REPAIR_VERIFY", "initial_coverage": "All 32 baseline-to-initial-candidate changed files and affected source-admission/lifecycle interactions.", "result": "repair_verified", "closure": ["W-F1", "W-F2", "W-F3", "W-F4", "Scribe unlocatable-CWT disposition", "D-P1", "direct shared-interface regressions"], "basis": "Pinned committed repair inspection plus applicable exercised evidence; unaffected original coverage retained. No fresh full review required."},
+    "soniox": {"mode": "Focused FULL_REVIEW followed by bounded REPAIR_VERIFY", "result": "repair_verified", "closure": ["S-F1", "S-F2", "S-F3", "S-F4"], "basis": "Committed retirement authority, residual ledger, source-idle and SELF ordering paths; new regression assertions and seven localhost production-source-owner scenarios. Cancellation/epoch/settings/capture fences retained."},
+    "remaining_adjudicated_findings": [],
+    "limits": "Reviewers did not rerun valid suites or live calls. Deterministic protocol evidence is not hosted-server qualification. Repair verification does not itself establish Goal closure."
+  },
+  "repaired_candidate": "3c1ba9a4349ee5ba4e5a981c91033954bd9cb73a",
+  "owned_candidate_verification": {"method": "Export the staged repaired candidate without the concurrent user overlay; run streaming, source-context, causal-batch, Soniox lifecycle and provider protocol suites using project Python and exported src.", "result": "175 passed, 2 existing SDK warnings in 15.76s; exit 0; task-created export removed."},
+  "post_live_formatting": "Director ran default-safe Black and Ruff on owned repair paths after all live calls stopped. Formatting-only scoped_engine.py byte changes are distinguished from the historical live hash; Black's default AST-equivalence check passed, Ruff passed. No semantic product edits followed the live run.",
+  "adjudicated_findings": [
+    {"id": "S-F1", "contract": "Lawful Soniox retiring-epoch source drain", "repair": "Bounded stream authority survives lawful idle/maximum-lifetime retirement; stop/reset and incompatible settings/capture revoke authority.", "evidence": "tests/core/test_soniox_source_lifecycle.py; real localhost WebSocket SELF and wrapped Peer source histories both retain first source then drained tail."},
+    {"id": "S-F2", "contract": "Immutable final-token residual on nonorderly failure", "repair": "Existing Soniox source ledger emits only unreleased final tokens before clearing failure state; provisional text and already released text are excluded.", "evidence": "tests/core/test_soniox_source_lifecycle.py; tests/providers/test_soniox_reuse.py; localhost receive/provider/write failure scenarios preserve raw tail exactly once."},
+    {"id": "S-F3/W-F3", "contract": "Soniox output must not refresh source-idle activity", "repair": "Native-text activity accounting belongs only to the existing independent-input protocol, not request/VAD-owned Soniox input.", "evidence": "SELF and wrapped Peer timeout scenarios; existing Gemini independent-input lifecycle remains unchanged."},
+    {"id": "S-F4", "contract": "SELF predecessor precedes later stream source in context", "repair": "Settle earlier scoped low-latency merge before admitting later connection-owned source.", "evidence": "Single-response and delayed-tail source/context ordering, reset cancellation and stale-unit regression cases; real localhost SELF smoke."},
+    {"id": "W-F1", "contract": "No silent timestamp-collision source loss or guessed receipt identity", "repair": "Known in-process receipt replay is distinct from conflicting coordinates. Unresolved source fails/retires explicitly, retaining rejected raw in bounded unresolved_source_text provenance and only proved ordered prefix as normal source.", "evidence": "Deepgram/Scribe adapter-to-wrapper-to-context cases preserve First./Second., do not translate Correction., retain Correction. in terminal provenance, and recover on a fresh epoch."},
+    {"id": "W-F2", "contract": "Qwen source order and clock validity are separate", "repair": "Documented increasing numeric sentence IDs preserve source order after clock regression, with sticky unqualified timing until a new task. Contradictory chronology without independent order fails/retires with explicit rejected raw.", "evidence": "Qwen source/context cases retain First., Second., Later.; only First. remains identified. New-task readiness restores qualification.", "authority": "https://docs.modelstudio.console.alibabacloud.com/en/model-studio/qwen-audio-asr-streaming-server-events"},
+    {"id": "W-F4", "contract": "Failed transport writes cannot advance submitted-audio maps", "repair": "Qwen re-raises failed writes after existing lifecycle failure handling.", "evidence": "Actual adapter plus wrapper and failing transport: failure raised, native_sent=0, wrapper_sent=0, map_pieces=0, failed terminal, no failed-input replay."},
+    {"id": "Scribe metadata ownership qualification", "contract": "Unlocatable metadata cannot adopt an arbitrary successor", "repair": "First unambiguous missing-timing CWT remains normal gray source; later newly parsed unlocatable CWT without commit identity fails/retires with rejected raw preserved. Qualified CWT keeps connection reuse.", "limit": "Conservative unsupported-metadata guard, not an observation that the live server emits delayed null-timing duplicates."},
+    {"id": "D-P1", "contract": "Already consumed text must not repeatedly block input with attribution computation", "repair": "Early exit from release calculation when the latest stable text is fully consumed; independent AUDIO-boundary observation, new/partial source and terminal decoration remain unchanged.", "evidence": "Append/replace consumer regressions cover later AUDIO transition, partial mapping/evidence retry, unchanged first SourceChild, successor admission and terminal tail."}
+  ],
+  "test_runs": [
+    {"command": "uv run pytest tests/core/test_soniox_source_lifecycle.py tests/core/test_stt_scoped_engine.py tests/core/test_source_context_contract.py tests/core/test_self_translation_low_latency.py tests/core/test_stt_session_projection.py tests/core/runtime/test_self_capture_session.py tests/core/runtime/test_peer_capture_session.py tests/providers/test_soniox_reuse.py tests/providers/test_soniox_backend.py tests/app/test_soniox_product_authority.py -q -o addopts= -ra", "result": "629 passed in 47.52s"},
+    {"command": ".venv/Scripts/python.exe -B -m pytest tests/providers/test_deepgram_backend.py tests/providers/test_deepgram_session.py tests/providers/test_deepgram_reuse.py tests/providers/test_elevenlabs_scribe_backend.py tests/providers/test_elevenlabs_scribe_reuse.py tests/providers/test_qwen_audio.py tests/providers/test_protocol_a_scoped_sessions.py -o addopts= -q", "result": "197 passed, 3 existing dependency warnings in 34.36s"},
+    {"command": ".venv/Scripts/python.exe -m pytest tests/core/test_streaming_speaker.py", "result": "33 passed in 1.09s"}
+  ],
+  "operational_smoke": [
+    "Seven real localhost WebSocket Soniox adapter-to-engine-to-production-callback/source-owner scenarios exited 0; no external provider calls. Throwaway script removed.",
+    "Separate production Deepgram/Scribe SDK-shaped native-event and Qwen failing-transport process exited 0; rejected raw remains explicit, ordered prefix survives, failed PCM advances no maps. These are not hosted-server qualification.",
+    "Production wrapper replay reconstructed actual approved public waveform and verified assembly float32 SHA256 47484dedc6a7e69a33495b6fffb115ffdfcce59fedf55c59d41af5c79a97ac67 plus all 148 submitted PCM16 payload hashes. Exact 16 evidence callbacks and next audio payload preserve queued events, released cursor 58 and source endpoints. No model/provider calls or persisted scripts."
+  ],
+  "independent_hotpath_measurement": {
+    "source": "issue216_final.json, first finalized 58-character result, 10 lexical words, 162 maps, 607 initial stable frames, released cursor 58",
+    "method": "Separate read-only researchers used the same captured-metadata reconstruction before/after the repair. Original process died; replacement recovered helper from history, did not rerun baseline. PCM in this paired measurement was zero-filled with exact captured sizes/maps, not actual-waveform submission.",
+    "callbacks": 16,
+    "before_ms": {"median": 39.546, "max": 57.966, "total": 665.405, "next_payload": 45.387},
+    "after_ms": {"median": 0.08825, "max": 2.5006, "total": 3.9962, "next_payload": 0.0941},
+    "outcome": "Same source cursor/endpoints and event depth; frames progress to 667. No additional source release. Existing AUDIO boundaries retained; this exact window has no new boundary, so later-boundary emission is covered by the behavioral regression instead.",
+    "limit": "Single local samples, not a statistical benchmark or proof that this was the only source of live lag. Independent actual-waveform worker replay also preserved outputs and measured 4.0506ms total callbacks."
+  },
+  "controlled_live_after": {
+    "evidence": "native/nemotron/issue216_final_repaired.json",
+    "input": "Same original distinct_repeated_A_B_A public input, unchanged model, classifier, control configuration and pre-roll policy",
+    "first_identified_predecessor": "Washed the detritus from his ",
+    "admitted_at": 93184.6756632,
+    "boundary_ready_at": 93183.0197053,
+    "enclosing_end_at": 93185.9341431,
+    "release_before_end_seconds": 1.2584799,
+    "max_capture_delivery_lag_seconds": 0.3582276,
+    "previous_partition_run_lag_seconds": 1.2452653,
+    "earlier_matched_run_lag_seconds": 0.3267223,
+    "actual_control_cursors": [103744, 123904],
+    "successor_pcm_samples": 20160,
+    "successor_new_samples": 15360,
+    "successor_context_samples": 4800,
+    "outcome": "Five legal source groups conserve three native finals; original capture once, pending zero, no overload. Raw text again matches the earlier same-case run, including first-He omission and acoustic from-his repetition; no text normalization/filter was used.",
+    "limit": "No universal ASR accuracy, latency SLA, production-profile, translation-model or HMD qualification claim."
+  },
+  "paid_budget": {"connections_used": 8, "samples_at_16khz": 876480, "audio_seconds": 54.780, "authorized_connections": 12, "authorized_audio_seconds": 180, "state": "All cloud/model calls stopped"},
+  "presentation_evidence": "native/nemotron/issue216_presentation_report.json: actual desktop renderer screenshots show A gold, B cyan, crossing/unmapped source gray and terminal A gold. Uses the earlier actual source trace; later repair does not alter renderer or style allocation. Not HMD validation.",
+  "concurrent_user_changes": "Independent issue215 synthetic-right-tail revert remains excluded from issue216 commits. No push, PR, issue closure, release or worktree cleanup."
+}

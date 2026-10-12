@@ -1,0 +1,69 @@
+{
+  "schema": "issue216-verification-index-1",
+  "status": "Implementation and actual runtime/presentation verification complete; independent repaired-checkpoint and terminal completion audits pending.",
+  "authority": [
+    "https://github.com/kapitalismho/PuriPuly-heart/issues/216",
+    "https://github.com/kapitalismho/PuriPuly-heart/issues/211",
+    "https://github.com/kapitalismho/PuriPuly-heart/issues/212#issuecomment-6113292176",
+    "https://github.com/kapitalismho/PuriPuly-heart/issues/212#issuecomment-6114014900",
+    "https://github.com/kapitalismho/PuriPuly-heart/issues/214"
+  ],
+  "checkpoint": {
+    "baseline": "896725642f50874906f5fba0d643554105b0d5fe",
+    "initial_candidate": "0ba21054d058ffbee63d65a4d9057f225fce5628",
+    "repaired_candidate": "3c1ba9a4349ee5ba4e5a981c91033954bd9cb73a",
+    "upstream": "User-approved origin/dev merge includes eac4fb465665f15edcaa7d794f467411185ca947 Soniox Bearer authentication.",
+    "concurrent_user_work": "The independent issue215 Parakeet synthetic-right-tail revert was preserved in the working tree, not staged or committed as issue216. Shared-file staging retained baseline synthetic fields while adding only issue216 provenance and boundary changes. A clean index export was tested separately.",
+    "excluded_user_paths": [
+      "native/nemotron/issue215_report.json",
+      "native/nemotron/issue215_smoke.py",
+      "native/nemotron/issue215_summarize.py",
+      "src/puripuly_heart/core/stt/batch_speaker.py",
+      "tests/core/test_causal_batch_speaker.py",
+      "User synthetic-field removal hunks in core/stt/backend.py, core/stt/recognition_units.py and domain/recognition.py",
+      "User local-batch revert paragraphs in docs/architecture.md"
+    ]
+  },
+  "repair_evidence": "native/nemotron/issue216_repair_evidence.json",
+  "final_live_evidence": "native/nemotron/issue216_final_repaired.json",
+  "requirement_coverage": [
+    {"requirement": "R1 native finality, raw text, identity, clocks and capture coverage", "coverage": "Provider-native provenance, qualified clock origins and exact contribution offsets are retained through normalizer and SourceChild slicing. Unknown clocks remain unknown.", "evidence": ["tests/core/test_streaming_speaker.py", "tests/core/test_source_context_contract.py", "tests/providers/test_protocol_a_scoped_sessions.py", "native/nemotron/issue216_final.json"]},
+    {"requirement": "R2 independent audio boundary and ordered residual prefix", "coverage": "Audio-boundary events precede transcript readiness; transition intervals distinguish uncertainty from the safe established successor position. Existing ledger consumes source subranges and terminal residuals once.", "evidence": ["tests/core/test_streaming_speaker.py", "tests/core/test_stt_scoped_engine.py", "native/nemotron/issue216_final.json"]},
+    {"requirement": "R3 complete text boundaries without token jobs or text reconstruction", "coverage": "Deepgram complete native words and exact typed Scribe words can form audio-boundary-owned groups. Crossing material remains gray. Qwen character items and Soniox subwords are not falsely promoted to words. Native result enclosure cannot shadow qualified word prefixes.", "evidence": ["tests/providers/test_protocol_a_scoped_sessions.py", "tests/providers/test_qwen_audio.py", "tests/core/fixtures/issue216_streaming_fragmentation.json", "native/nemotron/issue216_final.json"]},
+    {"requirement": "R4 lawful controls and coalesced completion", "coverage": "No new optional physical speaker cuts are advertised. Existing finals and natural/hardcut/drain paths are selected. Soniox serial manual operation and endpoint marker handling remain distinct; Deepgram empty Finalize is not assumed acknowledged; Scribe has one irreversible known-owner admission winner.", "evidence": ["tests/providers/test_soniox_backend.py", "tests/providers/test_soniox_reuse.py", "tests/providers/test_deepgram_reuse.py", "tests/providers/test_elevenlabs_scribe_reuse.py", "tests/providers/test_qwen_audio.py"]},
+    {"requirement": "R5 actual sent cursors, lifecycle and bounded successor progress", "coverage": "Sent PCM, source maps, boundary evidence and actual controls remain separate. No retroactive cloud cut or per-speaker reconnect is introduced. Actual final run drains successor and terminal source; measured scheduling lag is explicitly retained, not an SLA claim.", "evidence": ["tests/core/test_stt_scoped_engine.py", "tests/providers/test_protocol_a_scoped_sessions.py", "native/nemotron/issue216_final.json"]},
+    {"requirement": "R6 actual-boundary pre-roll and original capture once", "coverage": "Onset and actual hard-rollover context remain capture-owned; source releases add no replay or timer reset. Cloud synthetic sends create unmapped input gaps. Actual original capture and provider context mappings are retained.", "evidence": ["tests/core/test_streaming_speaker.py", "native/nemotron/issue216_comparison.json", "native/nemotron/issue216_final.json"]},
+    {"requirement": "R7 conservative whole visible-span attribution", "coverage": "Untimed attribution considers content and replay context. Mixed or unsupported correspondence stays explicit; Gemini Hybrid and Custom realtime do not gain timing from receipt proximity or an active local request.", "evidence": ["tests/core/test_streaming_speaker.py", "tests/providers/test_custom_stt.py", "tests/providers/test_gemini_transcribe_reuse.py"]},
+    {"requirement": "R8 Nemotron-only speaker authority and availability", "coverage": "Contradictory native speaker values leave consumed groups and attribution unchanged. Missing/unavailable evidence preserves normal text without native or CPU diarizer fallback.", "evidence": ["tests/core/test_streaming_speaker.py", "tests/app/test_soniox_product_authority.py", "native/nemotron/issue216_final.json"]},
+    {"requirement": "R9 actual-route capability and origin preservation", "coverage": "Effective native backend/model/task facts survive scoped and independent results, degraded paths and Rolling switches. CPU Auto remains the existing local-batch strategy.", "evidence": ["tests/core/test_stt_rolling.py", "tests/providers/test_custom_stt.py", "tests/providers/test_gemini_transcribe_reuse.py", "tests/providers/test_qwen_audio.py", "tests/app/test_wiring_local_asr_provider_runtime.py"]}
+  ],
+  "execution_index": [
+    {"kind": "Final shared regression suite", "command": "uv run pytest tests/core/test_streaming_speaker.py tests/core/test_source_context_contract.py tests/core/test_stt_scoped_engine.py tests/core/test_stt_session_projection.py tests/core/runtime/test_local_asr_provider_runtime.py tests/app/test_wiring_local_asr_provider_runtime.py -q -o addopts= -ra", "result": "317 passed in 30.28s"},
+    {"kind": "Complete-word adapter and protocol regressions", "command": ".venv/Scripts/python.exe -m pytest tests/providers/test_protocol_a_scoped_sessions.py tests/providers/test_deepgram_reuse.py tests/providers/test_elevenlabs_scribe_reuse.py tests/providers/test_qwen_audio.py -o addopts=-s -q", "result": "127 passed in 10.69s; subsequent partition-specific seven cases passed after adjacent gray-group coalescing"},
+    {"kind": "Soniox adapter regressions", "command": "uv run pytest tests/providers/test_soniox_backend.py tests/providers/test_soniox_reuse.py -o addopts= -q", "result": "171 passed in 3.66s; 22 scoped engine cancellation/recovery selectors also passed"},
+    {"kind": "Conservative routes", "command": "uv run pytest tests/providers/test_custom_stt.py tests/providers/test_gemini_transcribe_reuse.py tests/providers/test_gemini_transcribe_backend.py tests/providers/test_gemini_transcribe_lifecycle.py tests/core/test_stt_rolling.py -q", "result": "Passed; later affected Custom and Rolling selectors passed. No live-server correspondence claim."},
+    {"kind": "Owned-only committed candidate without user overlay", "command": "Export staged index to a temporary directory; project Python with PYTHONPATH=<export>/src runs test_streaming_speaker.py, test_source_context_contract.py, test_causal_batch_speaker.py and test_protocol_a_scoped_sessions.py", "result": "142 passed, two SDK warnings in 8.81s; task-created export removed"},
+    {"kind": "Broad integration discovery run", "command": "uv run pytest tests/core tests/providers tests/app tests/architecture -o addopts= -q", "result": "5454 passed, 11 failed, six skipped in 538.60s BEFORE final partition repair. Eight stale protocol fixtures were subsequently migrated and passed. Three untouched baseline guard failures remain explicit below; this is not a claim of a clean full suite."},
+    {"kind": "Operational local smoke", "result": "Standalone production Soniox loopback OFF/ON, real Deepgram/Scribe SDK and Qwen loopbacks, Gemini/Custom source-consumer execution, integrated provider-to-SourceChild smoke and chronological retained-wire/Vulkan source-partition replay were executed outside pytest. Throwaway scripts removed; no provider-model claims inferred from fake transports."},
+    {"kind": "Actual GPU and cloud smoke", "evidence": "native/nemotron/issue216_final.json", "result": "Same original repeated A-B-A input after compliance repair: real Deepgram native final and Vulkan Nemotron transition support a useful identified predecessor word group 1.2339872s before enclosing end, gray crossing material, identified successor and conserved terminal tail. No threshold, model, input substitution or optional control was introduced."}
+  ],
+  "preexisting_failures": {
+    "evidence": "The broad run observed these failures; git diff from baseline for installer.iss, speaker_application.py and the affected guard tests was empty. They were not rerun merely to confirm.",
+    "tests": [
+      "tests/app/test_release_dependency_guards.py::test_installer_script_embeds_local_stt_manifest_assets_for_inno_download",
+      "tests/architecture/test_dependency_boundaries.py::test_dependency_violations_are_empty",
+      "tests/architecture/test_dependency_boundaries.py::test_a10_composition_managed_secrets_wiring_reduces_dependency_debt_to_0"
+    ],
+    "scope": "Pre-existing Nemotron installer manifest assertion and speaker_application importing a concrete adapter; not repaired or suppressed by issue216. No clean full-suite claim."
+  },
+  "route_local_limits": [
+    "Soniox automatic endpointing stays OFF by default. Prior authorized OFF/ON comparison is reused; raw post-manual lexical clocks remain unqualified. Serialized FIFO ACK cannot identify arbitrary delayed duplicates across different operations without a native operation ID.",
+    "Qwen positive timing qualification covers measured Beijing workspace only. Other regional paths continue conservative source; character/subword entries do not establish word cuts.",
+    "Scribe missing/reordered native metadata races are deterministic coverage, not newly observed live guarantees. Ambiguous plain fallback cannot be admitted as a successor.",
+    "Gemini and Custom realtime lack demonstrated capture correspondence. Custom offline preserves request enclosure without certifying an arbitrary server's internal word timing.",
+    "Actual cloud/model smoke uses development Nemotron 0.64 profile on RX7900XTX, not production profile selection, all-language accuracy or VR resource qualification.",
+    "The earlier partition run exposed 1.2452653s maximum capture-delivery lag and worse raw returning ASR text. Removing measured consumed-prefix recomputation reduced the same-input final run to 0.3582276s, restored its actual control cursor and earlier raw native text. Existing first-word omission/acoustic repetition remains explicit; this is not a universal accuracy or latency claim.",
+    "Actual desktop presentation is verified by issue216_presentation_report.json and the seven issue216_presentation_images4 screenshots. These use the earlier actual trace; subsequent lifecycle/clock and consumed-prefix repairs do not change renderer/style allocation. HMD and production profile selection remain outside this evidence."
+  ],
+  "remote_operations": "Issue216 Project status was changed from Backlog to existing In progress and read back. No push, PR creation, issue closure, release, deployment or worktree cleanup."
+}

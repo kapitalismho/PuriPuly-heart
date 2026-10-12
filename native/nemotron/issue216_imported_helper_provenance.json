@@ -1,0 +1,29 @@
+{
+  "schema": "issue216-imported-helper-provenance-1",
+  "archive": "native/nemotron/issue216_imported_helper_snapshot.zip",
+  "archive_sha256": "8451eb05f17efed1f6259613261290f1099094cbc4041018046b1a4594052320",
+  "helpers": {
+    "native/nemotron/issue215_smoke.py": {
+      "current_sha256": "753a840e32696ea88d36316f493d5bb9d1025396cb3f5053cb69e050e45ede9f",
+      "snapshot_member": "native/nemotron/issue215_smoke.py",
+      "snapshot_bytes": 24930,
+      "baseline_execution_sha256": "753a840e32696ea88d36316f493d5bb9d1025396cb3f5053cb69e050e45ede9f",
+      "candidate_execution_sha256": "753a840e32696ea88d36316f493d5bb9d1025396cb3f5053cb69e050e45ede9f",
+      "current_equals_both_execution_pins": true,
+      "note": "Current user-reverted helper matched both actually executed paths; snapshot capture makes no maintained-file mutation"
+    },
+    "native/nemotron/probe.py": {
+      "current_sha256": "31504fafb69845542efb140f1f11ebcde30b8fc8a19fabbcde1ce1fc06053b04",
+      "snapshot_member": "native/nemotron/probe.py",
+      "snapshot_bytes": 10938,
+      "baseline_execution_sha256": null,
+      "candidate_execution_sha256": null,
+      "current_equals_both_execution_pins": null,
+      "note": "Current audio helper snapshot only; earlier execution helper hash not recorded"
+    }
+  },
+  "concurrent_user_change": "Director confirmed issue215 user revert removed Parakeet2s synthetic tail; preserved untouched. Streaming case never calls local-batch case_run or CausalBatchSession.",
+  "read_only_source_capture": true,
+  "cloud_calls": 0,
+  "model_calls": 0
+}

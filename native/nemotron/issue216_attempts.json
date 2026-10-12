@@ -1,0 +1,87 @@
+{
+  "schema": "issue216-attempt-register-2",
+  "automatic_retries": 0,
+  "privacy": "Existing approved public/synthetic assets only; live scenarios used public read-speech. No private/ambient audio, downloads or product/settings/Git mutation.",
+  "attempts": [
+    {
+      "ordinal": 1,
+      "mode": "baseline",
+      "status": "failed_before_model_or_network",
+      "failure": "AttributeError: DeepgramRealtimeSTTBackend has no close; harness copied CPU-backend cleanup assumption",
+      "cloud_connections": 0,
+      "cloud_audio_samples_reserved": 0,
+      "model_calls": 0,
+      "repair": "Omit nonexistent backend_close callback; ScopedRecognitionEngine retains real provider session cleanup ownership"
+    },
+    {
+      "ordinal": 2,
+      "mode": "baseline",
+      "cases": ["clean_A_B", "distinct_repeated_A_B_A"],
+      "status": "execution_passed_with_recorded_ASR_quality_deficiencies",
+      "cloud_connections": 2,
+      "cloud_audio_samples_reserved": 199488,
+      "cloud_audio_seconds_reserved": 12.468,
+      "artifact": "native/nemotron/issue216_baseline.json",
+      "quality": "Clean AB raw server text omitted all A; repeated ABA omitted first He and repeated from-his across hardcut context. These are baseline observations, not software-admission loss."
+    },
+    {
+      "ordinal": 3,
+      "mode": "new",
+      "case": "clean_A_B",
+      "status": "failed_harness_serialization_after_actual_execution",
+      "failure": "TypeError: deque is not JSON serializable; wrapper audio_boundaries deque escaped existing serial helper",
+      "cloud_connections": 1,
+      "cloud_audio_samples_reserved": 75584,
+      "cloud_audio_seconds_reserved": 4.724,
+      "evidence_gap": "In-memory raw candidate trace lost when both catch/finally save failed. No causal/model/provider outcome inferred; budget ledger retained.",
+      "repair": "Handle deque/dataclass recursively, snapshot boundary deque as tuple, move persistence after all cleanup with independent error handling; offline full-state/current-provenance roundtrip passed before fresh call",
+      "authorization": "Director explicitly authorized bounded manually repaired candidate execution"
+    },
+    {
+      "ordinal": 4,
+      "mode": "new",
+      "cases": ["clean_A_B", "distinct_repeated_A_B_A"],
+      "status": "execution_passed; source-composition_acceptance_failed",
+      "cloud_connections": 2,
+      "cloud_audio_samples_reserved": 199488,
+      "cloud_audio_seconds_reserved": 12.468,
+      "artifact": "native/nemotron/issue216_new_repaired.json",
+      "finding": "Source fragmentation7versus2 and no discrete audio boundary made positive complete rich preceding-A gate unmet. Product repair assigned to shared owner, not this validation worker."
+    },
+    {
+      "ordinal": 5,
+      "mode": "new_after_shared_source_composition_repair",
+      "case": "long_A_long_B (A,A,B,B)",
+      "status": "execution_passed; complete-grouping_passed; rich_early_A_acceptance_NOT_SATISFIED",
+      "cloud_connections": 1,
+      "cloud_audio_samples_reserved": 154112,
+      "cloud_audio_seconds_reserved": 9.632,
+      "artifact": "native/nemotron/issue216_transfer.json",
+      "finding": "Three native finals produced three whole children and actual later A-to-B audio transition; first useful whole A native final released before B onset but remains uncertain/gray. Exact-code captured replay found13 low-activity uncertain frame/map pieces and no competing speaker or coverage loss. Calls stopped; no endless probes."
+    },
+    {
+      "ordinal": 6,
+      "mode": "final_fixed_policy_original_case",
+      "case": "distinct_repeated_A_B_A",
+      "status": "execution_passed; useful_supported_early_word_group_criterion_accepted; material_perf_and_raw_ASR_quality_deficiency",
+      "cloud_connections": 1,
+      "cloud_audio_samples_reserved": 123904,
+      "cloud_audio_seconds_reserved": 7.744,
+      "artifact": "native/nemotron/issue216_final.json",
+      "finding": "Useful identifiedA word group1.2339872s before enclosing end, gray real crossingword, five legal source units. Peaklag1.2452653s and firstcut91456samples; returningA raw server text He-the-He-He corrupted. Preserved as negative performance/quality comparison, not a universal F2pass."
+    },
+    {
+      "ordinal": 7,
+      "mode": "final_performance_repaired_original_case",
+      "case": "distinct_repeated_A_B_A",
+      "status": "execution_passed; useful_supported_early_word_group_maintained; samecase_lag_and_raw_quality_recovered_in_finite_probe",
+      "cloud_connections": 1,
+      "cloud_audio_samples_reserved": 123904,
+      "cloud_audio_seconds_reserved": 7.744,
+      "artifact": "native/nemotron/issue216_final_repaired.json",
+      "finding": "Useful identifiedA word group1.2584799s before enclosing end; same5legal groups. Peaklag0.3582276s, firstcutrestored103744, raw finals again match earlier retained low-lag samecase. No thresholds/model/profile/input/controlconfig changed, no new input/FLEURS, no blanket causal or universal zero-repeat/quality claim. All calls stopped."
+    }
+  ],
+  "totals": {"cloud_connections": 8, "cloud_audio_samples_reserved": 876480, "cloud_audio_seconds_reserved": 54.78, "remaining_connections": 4, "remaining_audio_seconds": 125.22, "automatic_retries": 0},
+  "accounting": "Conservative attempted PCM input reservations, including failed candidate; not billed duration or charge estimates. Successful repaired attempts are not automatic retries; each was explicit manual Director-authorized continuation after disclosed harness/product repair."
+}

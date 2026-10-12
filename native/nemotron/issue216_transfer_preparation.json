@@ -1,0 +1,95 @@
+{
+  "schema": "issue216-approved-AABB-preparation-1",
+  "approval": "Director approved one unchanged-product A,A,B,B scenario after shared repair barrier; no paired baseline paid call",
+  "status": "prepared_waiting_for_repair_replay_and_execute_release",
+  "network_calls": 0,
+  "model_calls": 0,
+  "inputs": {
+    "A": {
+      "dataset": "common_voice",
+      "dataset_revision": "8262c16bf297c87a9cd88c51997c4758ed7a8ba2",
+      "dataset_version": "cv-corpus-17.0-2024-03-15",
+      "duration_ms": 3504,
+      "license": "CC0-1.0",
+      "locale": "en",
+      "relative_audio_path": "clips/common-voice-17.0/en/common_voice_en_11289258.mp3",
+      "sample_id": "common_voice_en_11289258.mp3",
+      "source_audio_sha256": "19865499680804b33e8ac1f3a7b96fa8762e31be6a143c9e711bba72984272ad",
+      "source_text": "He washed the detritus from his hair.",
+      "split": "dev",
+      "verified_sha256": "19865499680804b33e8ac1f3a7b96fa8762e31be6a143c9e711bba72984272ad"
+    },
+    "B": {
+      "dataset": "common_voice",
+      "dataset_revision": "8262c16bf297c87a9cd88c51997c4758ed7a8ba2",
+      "dataset_version": "cv-corpus-17.0-2024-03-15",
+      "duration_ms": 3456,
+      "license": "CC0-1.0",
+      "locale": "en",
+      "relative_audio_path": "clips/common-voice-17.0/en/common_voice_en_12274.mp3",
+      "sample_id": "common_voice_en_12274.mp3",
+      "source_audio_sha256": "cccded3f9d5a5bb4c28110b8273e217cc44d5d9e9de95eb70fd19208dce9b4f5",
+      "source_text": "Gentlemen of the Press!",
+      "split": "dev",
+      "verified_sha256": "cccded3f9d5a5bb4c28110b8273e217cc44d5d9e9de95eb70fd19208dce9b4f5"
+    }
+  },
+  "assembly": [
+    {
+      "input": "A",
+      "input_sample_range": [
+        11457,
+        51550
+      ],
+      "scenario_sample_range": [
+        8000,
+        48093
+      ]
+    },
+    {
+      "input": "A",
+      "input_sample_range": [
+        11457,
+        51550
+      ],
+      "scenario_sample_range": [
+        48093,
+        88186
+      ]
+    },
+    {
+      "input": "B",
+      "input_sample_range": [
+        17517,
+        44556
+      ],
+      "scenario_sample_range": [
+        88186,
+        115225
+      ]
+    },
+    {
+      "input": "B",
+      "input_sample_range": [
+        17517,
+        44556
+      ],
+      "scenario_sample_range": [
+        115225,
+        142264
+      ]
+    }
+  ],
+  "samples": 162264,
+  "seconds": 10.1415,
+  "pcm_float32_sha256": "67933636f58ade30d26d00edcaffe95961b01e7edee40985078e58a00926eda3",
+  "initial_silence_samples": 8000,
+  "trailing_silence_samples": 20000,
+  "genuine_repetitions": "Two complete previously used A utterances then two complete previously used B utterances; no new sub-utterance/word crop",
+  "B_input_first_sample": 88186,
+  "B_input_first_seconds": 5.511625,
+  "control_policy": "Actual production Silero/listen natural completion + six-second deadline and300ms continuation; no optional controls, no endpoint/interim option change, trimmingOFF",
+  "decision": "Test whether larger verified same-A enclosure yields a useful complete native finalized A source before enclosing/surrounding end while successorB remains supported/bounded",
+  "causality_limit": "A source ready/released before B onset is not boundary-triggered release. Later actual A-to-B evidence and continuation must be recorded. Input composition boundary is not model evidence.",
+  "command_after_new_barrier": ".venv/Scripts/python.exe -B native/nemotron/issue216_smoke.py --mode new --cases long_A_long_B --output native/nemotron/issue216_transfer.json"
+}

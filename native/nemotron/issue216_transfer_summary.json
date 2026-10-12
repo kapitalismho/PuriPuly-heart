@@ -1,0 +1,664 @@
+{
+  "schema": "issue216-repaired-transfer-summary-1",
+  "execution_status": "passed",
+  "rich_causal_acceptance": "NOT_SATISFIED",
+  "reason": "Whole early A native final remains uncertain under selected real Nemotron evidence policy. Later A-to-B audio evidence and identified B source are real, but do not retroactively identify admitted gray A or make its pre-B release boundary-caused.",
+  "input_matches_approved_float32_hash": true,
+  "candidate_code_unchanged_during_execution": true,
+  "current_imported_helper_sha256": "753a840e32696ea88d36316f493d5bb9d1025396cb3f5053cb69e050e45ede9f",
+  "raw_native_final_segments_and_source_boundaries": [
+    {
+      "native_observed_at": 84467.9136917,
+      "native_text": "He washed the detritus from his hair. He washed",
+      "contribution": {
+        "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:1",
+        "text_start": 0,
+        "text_end": 47
+      },
+      "timings": [
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:1",
+          "text_start": 0,
+          "text_end": 47,
+          "semantics": "result_span",
+          "raw_start": 0.0,
+          "raw_end": 3.465,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": true,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:1",
+          "text_start": 0,
+          "text_end": 2,
+          "semantics": "word_interval",
+          "raw_start": 0.32,
+          "raw_end": 0.64,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:1",
+          "text_start": 3,
+          "text_end": 9,
+          "semantics": "word_interval",
+          "raw_start": 0.64,
+          "raw_end": 1.04,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:1",
+          "text_start": 10,
+          "text_end": 13,
+          "semantics": "word_interval",
+          "raw_start": 1.04,
+          "raw_end": 1.28,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:1",
+          "text_start": 14,
+          "text_end": 22,
+          "semantics": "word_interval",
+          "raw_start": 1.28,
+          "raw_end": 1.8399999,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:1",
+          "text_start": 23,
+          "text_end": 27,
+          "semantics": "word_interval",
+          "raw_start": 1.8399999,
+          "raw_end": 2.08,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:1",
+          "text_start": 28,
+          "text_end": 31,
+          "semantics": "word_interval",
+          "raw_start": 2.08,
+          "raw_end": 2.32,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:1",
+          "text_start": 32,
+          "text_end": 37,
+          "semantics": "word_interval",
+          "raw_start": 2.32,
+          "raw_end": 2.8799999,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:1",
+          "text_start": 38,
+          "text_end": 40,
+          "semantics": "word_interval",
+          "raw_start": 2.8799999,
+          "raw_end": 3.12,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:1",
+          "text_start": 41,
+          "text_end": 47,
+          "semantics": "word_interval",
+          "raw_start": 3.12,
+          "raw_end": 3.36,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        }
+      ],
+      "clocks": [
+        {
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "sample_rate_hz": 16000,
+          "origin_sent_sample": 0,
+          "qualified": true
+        }
+      ],
+      "children": [
+        {
+          "text": "He washed the detritus from his hair. He washed",
+          "admitted_at": 84467.9393547,
+          "state": "uncertain",
+          "speaker_id": null,
+          "contribution_ranges": [
+            [
+              0,
+              47
+            ]
+          ]
+        }
+      ],
+      "exact_text_conserved": true
+    },
+    {
+      "native_observed_at": 84469.4081291,
+      "native_text": "the detritus from his hair. Gentlemen of the",
+      "contribution": {
+        "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:2",
+        "text_start": 47,
+        "text_end": 91
+      },
+      "timings": [
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:2",
+          "text_start": 47,
+          "text_end": 91,
+          "semantics": "result_span",
+          "raw_start": 3.465,
+          "raw_end": 6.4840003,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": true,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:2",
+          "text_start": 47,
+          "text_end": 50,
+          "semantics": "word_interval",
+          "raw_start": 3.465,
+          "raw_end": 3.7849998,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:2",
+          "text_start": 51,
+          "text_end": 59,
+          "semantics": "word_interval",
+          "raw_start": 3.7849998,
+          "raw_end": 4.4249997,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:2",
+          "text_start": 60,
+          "text_end": 64,
+          "semantics": "word_interval",
+          "raw_start": 4.4249997,
+          "raw_end": 4.585,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:2",
+          "text_start": 65,
+          "text_end": 68,
+          "semantics": "word_interval",
+          "raw_start": 4.585,
+          "raw_end": 4.825,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:2",
+          "text_start": 69,
+          "text_end": 74,
+          "semantics": "word_interval",
+          "raw_start": 4.825,
+          "raw_end": 5.305,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:2",
+          "text_start": 75,
+          "text_end": 84,
+          "semantics": "word_interval",
+          "raw_start": 5.3849998,
+          "raw_end": 5.9449997,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:2",
+          "text_start": 85,
+          "text_end": 87,
+          "semantics": "word_interval",
+          "raw_start": 5.9449997,
+          "raw_end": 6.265,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "65aa7446061b4f77b45a187d4930089d:segment:2",
+          "text_start": 88,
+          "text_end": 91,
+          "semantics": "word_interval",
+          "raw_start": 6.265,
+          "raw_end": 6.425,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        }
+      ],
+      "clocks": [
+        {
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "sample_rate_hz": 16000,
+          "origin_sent_sample": 0,
+          "qualified": true
+        }
+      ],
+      "children": [
+        {
+          "text": "the detritus from his hair. Gentlemen of the",
+          "admitted_at": 84469.5223713,
+          "state": "unavailable",
+          "speaker_id": null,
+          "contribution_ranges": [
+            [
+              47,
+              91
+            ]
+          ]
+        }
+      ],
+      "exact_text_conserved": true
+    },
+    {
+      "native_observed_at": 84472.2823942,
+      "native_text": "of the press. Gentlemen of the press.",
+      "contribution": {
+        "contribution_id": "198f47f7610a45b3a58069b001e99ddc:segment:1",
+        "text_start": 0,
+        "text_end": 37
+      },
+      "timings": [
+        {
+          "contribution_id": "198f47f7610a45b3a58069b001e99ddc:segment:1",
+          "text_start": 0,
+          "text_end": 37,
+          "semantics": "result_span",
+          "raw_start": 6.484,
+          "raw_end": 9.6319998,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": true,
+          "estimated": true
+        },
+        {
+          "contribution_id": "198f47f7610a45b3a58069b001e99ddc:segment:1",
+          "text_start": 0,
+          "text_end": 2,
+          "semantics": "word_interval",
+          "raw_start": 6.484,
+          "raw_end": 6.724,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "198f47f7610a45b3a58069b001e99ddc:segment:1",
+          "text_start": 3,
+          "text_end": 6,
+          "semantics": "word_interval",
+          "raw_start": 6.724,
+          "raw_end": 6.8040004,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "198f47f7610a45b3a58069b001e99ddc:segment:1",
+          "text_start": 7,
+          "text_end": 13,
+          "semantics": "word_interval",
+          "raw_start": 6.8040004,
+          "raw_end": 7.4440002,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "198f47f7610a45b3a58069b001e99ddc:segment:1",
+          "text_start": 14,
+          "text_end": 23,
+          "semantics": "word_interval",
+          "raw_start": 7.604,
+          "raw_end": 8.1640005,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "198f47f7610a45b3a58069b001e99ddc:segment:1",
+          "text_start": 24,
+          "text_end": 26,
+          "semantics": "word_interval",
+          "raw_start": 8.1640005,
+          "raw_end": 8.324,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "198f47f7610a45b3a58069b001e99ddc:segment:1",
+          "text_start": 27,
+          "text_end": 30,
+          "semantics": "word_interval",
+          "raw_start": 8.324,
+          "raw_end": 8.564,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        },
+        {
+          "contribution_id": "198f47f7610a45b3a58069b001e99ddc:segment:1",
+          "text_start": 31,
+          "text_end": 37,
+          "semantics": "word_interval",
+          "raw_start": 8.564,
+          "raw_end": 8.804,
+          "unit": "s",
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "complete_boundary": false,
+          "estimated": true
+        }
+      ],
+      "clocks": [
+        {
+          "clock_id": "deepgram:31d5e7837c2746a6891710d12902033e",
+          "sample_rate_hz": 16000,
+          "origin_sent_sample": 0,
+          "qualified": true
+        }
+      ],
+      "children": [
+        {
+          "text": "of the press. Gentlemen of the press.",
+          "admitted_at": 84472.3540672,
+          "state": "identified",
+          "speaker_id": "1",
+          "contribution_ranges": [
+            [
+              0,
+              37
+            ]
+          ]
+        }
+      ],
+      "exact_text_conserved": true
+    }
+  ],
+  "first_source_finality": {
+    "wire_available_at": 84467.9133846,
+    "native_adapter_available_at": 84467.9136917,
+    "admitted_at": 84467.9393547,
+    "wire_after_playback_seconds": 5.304348600009689,
+    "admitted_after_playback_seconds": 5.330318700012867,
+    "B_first_input_at": 84468.120661,
+    "admitted_before_B_input_seconds": 0.18130629998631775,
+    "admitted_before_enclosing_hardcut_seconds": 1.2845390999864321,
+    "native_result_span_sent_samples": [
+      0,
+      55440
+    ],
+    "known_native_result_source_envelope": [
+      1728,
+      57168
+    ],
+    "captured_closed_frame_active_slots_union": [
+      0
+    ],
+    "captured_uncertain_probability_frame_records": 11,
+    "count_unit_note": "Original probability records, not source-map pieces. Exact-code uncertainty audit identifies13 mapped pieces from these11 records, including frames split at capture-map boundaries.",
+    "latest_supporting_closed_frame_ready_at": 84466.7675772,
+    "observed_source_attribution": {
+      "text": "He washed the detritus from his hair. He washed",
+      "speaker_id": null,
+      "session_scope": "1",
+      "source_start_ms": null,
+      "source_end_ms": null,
+      "overlaps_previous": false,
+      "source": "nemotron",
+      "attribution_state": "uncertain"
+    },
+    "source_identity_causality": "No later recolor/replay; pre-B source remains gray. Only selected-policy uncertainty prevents positive identified-A claim; no missing model/device/provider access is asserted."
+  },
+  "actual_model_audio_boundaries": [
+    {
+      "common_recorded_at": 84468.6944787,
+      "boundary_id": "nemotron:1:7:90048",
+      "capture_epoch": 7,
+      "normalized_sample": 90048,
+      "observed_at_monotonic_s": 84468.6787851,
+      "reason": "speaker",
+      "speaker_epoch": "1",
+      "transition_start_sample": 82208,
+      "transition_end_sample": 90048
+    }
+  ],
+  "controls_written": [
+    {
+      "event": "control_written",
+      "at": 84469.2243786,
+      "control": "Finalize",
+      "sent_until": 103744
+    },
+    {
+      "event": "control_written",
+      "at": 84472.0618516,
+      "control": "Finalize",
+      "sent_until": 154112
+    }
+  ],
+  "physical_submissions": [
+    {
+      "at": 84469.2240974,
+      "reason": "delivery_deadline",
+      "pcm16_sha256": "b391d02af2f61d2ab47e61297704df4bc707b51c3ec073427f35572ceaca0c6b",
+      "payload_samples": 103744,
+      "source_context_samples": 8000,
+      "all_payloads_match_original_declared_source": true
+    },
+    {
+      "at": 84472.0615921,
+      "reason": "delivery_pause",
+      "pcm16_sha256": "74f01075848e8678364dbb9e3146f14f899bb13ecd764fec08a5484ddaa94629",
+      "payload_samples": 50368,
+      "source_context_samples": 4800,
+      "all_payloads_match_original_declared_source": true
+    }
+  ],
+  "repaired_grouping": {
+    "native_final_count": 3,
+    "source_child_count": 3,
+    "one_whole_child_per_native_final": true,
+    "all_native_text_conserved": true,
+    "effective_equals_raw": true
+  },
+  "successor": {
+    "B_terminal_text": "of the press. Gentlemen of the press.",
+    "B_attribution": {
+      "text": "of the press. Gentlemen of the press.",
+      "speaker_id": "1",
+      "session_scope": "1",
+      "source_start_ms": null,
+      "source_end_ms": null,
+      "overlaps_previous": false,
+      "source": "nemotron",
+      "attribution_state": "identified"
+    },
+    "B_admitted_at": 84472.3540672,
+    "retention_final": {
+      "at": 84472.7604951,
+      "value": {
+        "retained_samples": 0,
+        "retained_bytes": 0,
+        "high_water_samples": 8000,
+        "high_water_bytes": 16000
+      }
+    },
+    "capture_delivery_max_lag_seconds": 0.27421770001819823,
+    "speaker_final": {
+      "state": "ready",
+      "ready": true,
+      "speaker_epoch": 1,
+      "capture_session_id": "issue216:long_A_long_B",
+      "paused": true,
+      "pending_samples": 0,
+      "pending_items": 0,
+      "retained_map_pieces": 17,
+      "onset_samples": 8000,
+      "evidence_items": 2,
+      "evidence_map_pieces": 2,
+      "evidence_evictions": 0,
+      "overloads": 0,
+      "stale_events": 0,
+      "copied_samples": 165184,
+      "max_copy_samples": 512,
+      "owned_tasks": 1,
+      "processed_through_sample": 153600,
+      "immutable_through_sample": 153600,
+      "limits": {
+        "max_input_samples": 16000,
+        "max_pending_samples": 64000,
+        "max_pending_items": 128,
+        "max_map_pieces": 2048,
+        "max_frames_per_update": 1024,
+        "max_evidence_items": 2048,
+        "max_evidence_map_pieces": 8192,
+        "max_capture_sessions": 1024,
+        "max_backend_lag_samples": 64000,
+        "max_tail_padding_samples": 32000
+      },
+      "diagnostics": [
+        [
+          "backend",
+          "Vulkan"
+        ],
+        [
+          "device_ordinal",
+          "0"
+        ],
+        [
+          "profile",
+          "0.64"
+        ],
+        [
+          "geometry",
+          "6/2/0/264/264/222"
+        ],
+        [
+          "artifact_sha256",
+          "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+        ],
+        [
+          "tensor_formats",
+          "{\"F16\": 125, \"F32\": 231}"
+        ],
+        [
+          "source_revision",
+          "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+        ],
+        [
+          "neural_cpu_fallback",
+          "forbidden"
+        ],
+        [
+          "probability_frontier",
+          "immutable emitted probabilities, not identity certainty"
+        ],
+        [
+          "processed_cursor",
+          "consumed mel hop prefix; excludes submitted lookahead"
+        ],
+        [
+          "accumulation",
+          "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+        ]
+      ],
+      "error": null
+    },
+    "original_capture_received_once": true
+  },
+  "quality": "Both genuine A repetitions and B repetitions were received. First He now preserved in this larger-context input, not claimed as matched baseline feature improvement. Raw physical rollover repeated of-the between separate native contributions; trimming remainsOFF. No token/gray fragments after repair; mixed second complete source remains gray. No colored-caption or translation-semantic qualification.",
+  "budget_after": {
+    "schema": "issue216-cloud-budget-1",
+    "authorization": {
+      "maximum_connections": 12,
+      "maximum_audio_samples_16khz": 2880000,
+      "maximum_audio_seconds": 180,
+      "automatic_retries": 0,
+      "private_uploads": false,
+      "allowed_providers": [
+        "deepgram",
+        "soniox",
+        "elevenlabs_scribe",
+        "qwen_audio"
+      ]
+    },
+    "connections_reserved": 6,
+    "audio_samples_reserved": 628672
+  },
+  "actual_total_audio_seconds_reserved": 39.292,
+  "remaining_authorization": {
+    "connections": 6,
+    "audio_seconds": 140.708
+  },
+  "automatic_retries": 0,
+  "private_uploads": false,
+  "checks_not_run": [
+    "matched new-input paid baseline (Director intentionally waived)",
+    "actual GUI/native caption surface",
+    "translation execution",
+    "HMD/VR resource qualification",
+    "production profile selection",
+    "long source-idle/max-lifetime scenarios"
+  ],
+  "followup": "No further live probes authorized by this report. Director must disposition required positive preceding-speaker source gate or repair/qualify evidence policy with retained captures; no forced-pass threshold, fallback identity, guessed clocks or post-publication recoloring."
+}
