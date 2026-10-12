@@ -180,9 +180,7 @@ class GoogleGenaiGeminiClient:
 
             if self._http_options is None:
                 self._http_options = network_clients.genai_http_options()
-            self._client = genai.Client(
-                api_key=self.api_key, http_options=self._http_options
-            )
+            self._client = genai.Client(api_key=self.api_key, http_options=self._http_options)
         return self._client
 
     def _build_request(

@@ -18,7 +18,9 @@ class TLSSelection:
     backend: str
 
 
-def select_tls(*, requests: bool = False, environment: Mapping[str, str] | None = None) -> TLSSelection:
+def select_tls(
+    *, requests: bool = False, environment: Mapping[str, str] | None = None
+) -> TLSSelection:
     environment = os.environ if environment is None else environment
     choices = (
         (("REQUESTS_CA_BUNDLE", "requests_bundle"), ("CURL_CA_BUNDLE", "curl_bundle"))
@@ -134,7 +136,9 @@ class ProxyPolicy:
         return ProxyRoute(None, "direct")
 
 
-def annotate_connection_error(exc: Exception, *, url: str, tls: TLSSelection, route: ProxyRoute) -> None:
+def annotate_connection_error(
+    exc: Exception, *, url: str, tls: TLSSelection, route: ProxyRoute
+) -> None:
     scheme = urlsplit(url).scheme.lower()
     secure = scheme in ("https", "wss") or bool(route.url and urlsplit(route.url).scheme == "https")
     exc.connection_diagnostics = {

@@ -46,22 +46,43 @@ def test_typed_causes_classify_authentication_translation_and_stt_consistently(
     wrapper = RuntimeError("neutral")
     wrapper.__cause__ = failure
     assert classify_transport_error(wrapper) == kind
-    assert OpenRouterAuthenticationError.from_exception(wrapper, stage="key_verification").reason == kind
-    assert provider_failure_report(wrapper, provider="openrouter", operation="translate").diagnostics.category == category
-    assert stt_failure_report(wrapper, provider="soniox", operation="open_session", channel="self").diagnostics.category == category
+    assert (
+        OpenRouterAuthenticationError.from_exception(wrapper, stage="key_verification").reason
+        == kind
+    )
+    assert (
+        provider_failure_report(
+            wrapper, provider="openrouter", operation="translate"
+        ).diagnostics.category
+        == category
+    )
+    assert (
+        stt_failure_report(
+            wrapper, provider="soniox", operation="open_session", channel="self"
+        ).diagnostics.category
+        == category
+    )
 
 
 def test_allowlisted_metadata_and_numeric_os_fields_only() -> None:
     failure = OSError(10061, SECRET)
     failure.winerror = 10061
     failure.connection_diagnostics = {
-        "transport": "wss", "tls_source": "windows", "tls_backend": "native",
-        "proxy_source": "system", "proxy_url": SECRET, "ca_path": SECRET,
+        "transport": "wss",
+        "tls_source": "windows",
+        "tls_backend": "native",
+        "proxy_source": "system",
+        "proxy_url": SECRET,
+        "ca_path": SECRET,
     }
     fields = safe_transport_fields(failure)
     assert fields == {
-        "transport": "wss", "tls_source": "windows", "tls_backend": "native",
-        "proxy_source": "system", "os_errno": 10061, "winerror": 10061,
+        "transport": "wss",
+        "tls_source": "windows",
+        "tls_backend": "native",
+        "proxy_source": "system",
+        "os_errno": 10061,
+        "winerror": 10061,
     }
 
 
@@ -69,8 +90,14 @@ def test_allowlisted_metadata_and_numeric_os_fields_only() -> None:
 def test_hostile_metadata_and_numeric_attributes_are_not_serialized(value: object) -> None:
     failure = certificate_failure(20)
     failure.verify_code = value
-    failure.connection_diagnostics = {key: value for key in ("transport", "tls_source", "tls_backend", "proxy_source")}
-    failure.diagnostic_transport_fields = {"tls_verify_code": value, "winerror": value, "raw_exception": SECRET}
+    failure.connection_diagnostics = {
+        key: value for key in ("transport", "tls_source", "tls_backend", "proxy_source")
+    }
+    failure.diagnostic_transport_fields = {
+        "tls_verify_code": value,
+        "winerror": value,
+        "raw_exception": SECRET,
+    }
     fields = safe_transport_fields(failure)
     assert set(fields.values()) == {"unknown"}
     assert SECRET not in repr(fields)
@@ -128,8 +155,10 @@ def test_requests_retry_reason_and_ssl_argument_preserve_verification_code(code:
     retry = urllib3_errors.MaxRetryError(None, SECRET, reason=ssl_wrapper)
     failure = requests_errors.SSLError(retry)
     failure.connection_diagnostics = {
-        "transport": "https", "tls_source": "explicit_file",
-        "proxy_source": "direct", "tls_backend": "openssl",
+        "transport": "https",
+        "tls_source": "explicit_file",
+        "proxy_source": "direct",
+        "tls_backend": "openssl",
     }
     assert failure.__cause__ is failure.__context__ is None
     report = provider_failure_report(failure, provider="dashscope", operation="recognize")

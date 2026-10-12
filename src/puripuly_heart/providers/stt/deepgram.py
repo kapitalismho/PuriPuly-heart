@@ -308,7 +308,9 @@ class _DeepgramSDKSession(STTBackendSession):
                 await asyncio.wait_for(self._startup_done.wait(), self.connect_timeout_s)
             except TimeoutError as cause:
                 exc = RuntimeError("Deepgram SDK connection timeout")
-                logger.warning("[STT] Deepgram connection timeout after %.1fs", self.connect_timeout_s)
+                logger.warning(
+                    "[STT] Deepgram connection timeout after %.1fs", self.connect_timeout_s
+                )
                 self._report_error(exc)
                 raise exc from cause
             if self._startup_error is not None:
@@ -350,6 +352,7 @@ class _DeepgramSDKSession(STTBackendSession):
                     **connect_kwargs,
                 ) as connection,
             ):
+
                 def on_message(result: Any) -> None:
                     try:
                         event = self._build_transcript_event(result)
@@ -418,9 +421,7 @@ class _DeepgramSDKSession(STTBackendSession):
             self._stopped = True
             self._startup_done.set()
             self._put_event(None)
-            self._scoped_transport_end(
-                self._scoped_close_sent, "deepgram_writer_ended"
-            )
+            self._scoped_transport_end(self._scoped_close_sent, "deepgram_writer_ended")
 
     async def _listen_loop(self, connection: Any) -> None:
         try:

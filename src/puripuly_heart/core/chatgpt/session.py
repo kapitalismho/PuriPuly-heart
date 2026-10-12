@@ -53,7 +53,9 @@ class ChatGptSessionStatus:
 @dataclass(slots=True)
 class ChatGptSession:
     secret_store: Callable[[], SecretStore]
-    http_factory: Callable[[], httpx.AsyncClient] = lambda: network_clients.external_async_client(timeout=20.0)
+    http_factory: Callable[[], httpx.AsyncClient] = lambda: network_clients.external_async_client(
+        timeout=20.0
+    )
     clock: Callable[[], float] = time.time
     refresh_margin_s: float = _REFRESH_MARGIN_S
     _tokens: ChatGptTokenSet | None = field(init=False, default=None, repr=False)

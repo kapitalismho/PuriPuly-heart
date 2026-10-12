@@ -197,7 +197,6 @@ async def test_apply_switches_regions_and_can_explicitly_return_to_shared() -> N
     assert len(applied) == 2
 
 
-
 @pytest.mark.asyncio
 async def test_runtime_plan_replaces_only_affected_qwen_clients() -> None:
     initial = AppSettingsVNext()

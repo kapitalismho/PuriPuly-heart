@@ -90,11 +90,14 @@ async def test_deepgram_backend_verify_api_key_handles_empty_and_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen = []
+
     def respond(request):
         seen.append(request)
         return httpx.Response(200)
+
     monkeypatch.setattr(
-        network_clients, "external_client",
+        network_clients,
+        "external_client",
         lambda **kwargs: httpx.Client(transport=httpx.MockTransport(respond)),
     )
 
@@ -109,8 +112,11 @@ async def test_deepgram_backend_verify_api_key_raises_on_http_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        network_clients, "external_client",
-        lambda **kwargs: httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(401))),
+        network_clients,
+        "external_client",
+        lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(lambda request: httpx.Response(401))
+        ),
     )
 
     with pytest.raises(httpx.HTTPStatusError) as caught:
@@ -130,7 +136,9 @@ def local_sdk_client(monkeypatch: pytest.MonkeyPatch, url: str) -> None:
 
 @pytest.mark.asyncio
 async def test_scoped_deepgram_real_tls_failure_reaches_safe_report_without_startup_timeout(
-    certificates, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    certificates,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
     created_http_clients,
 ) -> None:
     root, _, contexts = certificates
@@ -143,7 +151,9 @@ async def test_scoped_deepgram_real_tls_failure_reaches_safe_report_without_star
     async with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
         local_sdk_client(monkeypatch, f"wss://127.0.0.1:{server.sockets[0].getsockname()[1]}")
         backend = DeepgramRealtimeSTTBackend(
-            api_key="synthetic-private-key", language="en", connect_timeout_s=10,
+            api_key="synthetic-private-key",
+            language="en",
+            connect_timeout_s=10,
         )
         started = time.monotonic()
         with pytest.raises(ssl.SSLCertVerificationError) as caught:
@@ -153,7 +163,10 @@ async def test_scoped_deepgram_real_tls_failure_reaches_safe_report_without_star
             )
         assert time.monotonic() - started < 3
         report = stt_failure_report(
-            caught.value, provider="deepgram", operation="open_session", channel="self",
+            caught.value,
+            provider="deepgram",
+            operation="open_session",
+            channel="self",
         )
         assert report.diagnostics.category == "network"
         assert report.diagnostics.fields["tls_verify_code"] == 64
@@ -174,12 +187,19 @@ async def test_scoped_deepgram_real_tls_failure_reaches_safe_report_without_star
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("model", "keyterms", "expected_keyterms"),
-    [("nova-3", ["first", "second"], ["first", "second"]), ("nova-3", [], None),
-     ("nova-2", ["unsupported"], None)],
+    [
+        ("nova-3", ["first", "second"], ["first", "second"]),
+        ("nova-3", [], None),
+        ("nova-2", ["unsupported"], None),
+    ],
 )
 async def test_scoped_deepgram_real_sdk_audio_control_result_reuse_and_closure(
-    certificates, monkeypatch: pytest.MonkeyPatch, created_http_clients,
-    model, keyterms, expected_keyterms,
+    certificates,
+    monkeypatch: pytest.MonkeyPatch,
+    created_http_clients,
+    model,
+    keyterms,
+    expected_keyterms,
 ) -> None:
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
@@ -215,7 +235,10 @@ async def test_scoped_deepgram_real_sdk_audio_control_result_reuse_and_closure(
     async with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
         local_sdk_client(monkeypatch, f"wss://localhost:{server.sockets[0].getsockname()[1]}")
         backend = DeepgramRealtimeSTTBackend(
-            api_key="synthetic-key", language="en", model=model, keyterms=keyterms,
+            api_key="synthetic-key",
+            language="en",
+            model=model,
+            keyterms=keyterms,
             drain_timeout_s=0.1,
         )
         session = await asyncio.wait_for(
@@ -228,8 +251,11 @@ async def test_scoped_deepgram_real_sdk_audio_control_result_reuse_and_closure(
                 request = _request(order)
                 await session.begin_turn(request)
                 await session.send_turn_audio(
-                    request.identity, bytes([order, 0]), payload_sequence=1,
-                    source_ranges=(), context_only=False,
+                    request.identity,
+                    bytes([order, 0]),
+                    payload_sequence=1,
+                    source_ranges=(),
+                    context_only=False,
                 )
                 await _seal(session, request)
                 if order == 1:
@@ -247,7 +273,12 @@ async def test_scoped_deepgram_real_sdk_audio_control_result_reuse_and_closure(
         finally:
             await asyncio.wait_for(session.close(), 1)
         assert [item for item in received if item != "KeepAlive"] == [
-            b"\x01\0", "Finalize", b"\x02\0", "Finalize", "Finalize", "CloseStream",
+            b"\x01\0",
+            "Finalize",
+            b"\x02\0",
+            "Finalize",
+            "Finalize",
+            "CloseStream",
         ]
         assert len(requests) == 1
         path, headers = requests[0]
@@ -261,8 +292,11 @@ async def test_scoped_deepgram_real_sdk_audio_control_result_reuse_and_closure(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("status", [300, 301, 302, 303, 307, 308, 401])
 async def test_deepgram_rejects_redirect_or_auth_before_second_contact_and_closes(
-    certificates, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
-    created_http_clients, status,
+    certificates,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    created_http_clients,
+    status,
 ) -> None:
     from deepgram.core.api_error import ApiError
 
@@ -289,7 +323,11 @@ async def test_deepgram_rejects_redirect_or_auth_before_second_contact_and_close
             return response
 
         async with serve(
-            handler, "::1", 0, ssl=contexts["valid"], process_request=reject,
+            handler,
+            "::1",
+            0,
+            ssl=contexts["valid"],
+            process_request=reject,
         ) as server:
             url = f"wss://localhost:{server.sockets[0].getsockname()[1]}"
             local_sdk_client(monkeypatch, url)
@@ -300,13 +338,17 @@ async def test_deepgram_rejects_redirect_or_auth_before_second_contact_and_close
             assert isinstance(caught.value.__cause__, InvalidStatus)
             assert caught.value.body == (
                 "Websocket initialized with invalid credentials."
-                if status == 401 else "Unexpected error when initializing websocket connection."
+                if status == 401
+                else "Unexpected error when initializing websocket connection."
             )
             assert len(origins) == 1
             await asyncio.wait_for(origins[0].wait_closed(), 1)
             assert not destination_contacts
             report = stt_failure_report(
-                caught.value, provider="deepgram", operation="open_session", channel="self",
+                caught.value,
+                provider="deepgram",
+                operation="open_session",
+                channel="self",
             )
             assert report.diagnostics.fields["transport"] == "wss"
             rendered = format_error_report_for_log(report, sink="persisted_logs")
@@ -342,10 +384,14 @@ async def test_scoped_deepgram_missing_open_preserves_timeout_or_cancellation_an
 
     monkeypatch.setattr("puripuly_heart.providers.stt.sdk_network.deepgram_listen_connect", connect)
     monkeypatch.setattr(
-        network_clients, "external_async_client", lambda **kwargs: httpx.AsyncClient(trust_env=False)
+        network_clients,
+        "external_async_client",
+        lambda **kwargs: httpx.AsyncClient(trust_env=False),
     )
     backend = DeepgramRealtimeSTTBackend(
-        api_key="synthetic-key", language="en", connect_timeout_s=10 if cancel else 0.1,
+        api_key="synthetic-key",
+        language="en",
+        connect_timeout_s=10 if cancel else 0.1,
     )
     task = asyncio.create_task(
         backend.open_session(projection=STTSessionProjection("scoped", "missing-open"))
@@ -359,7 +405,10 @@ async def test_scoped_deepgram_missing_open_preserves_timeout_or_cancellation_an
         with pytest.raises(RuntimeError, match="connection timeout") as caught:
             await task
         report = stt_failure_report(
-            caught.value, provider="deepgram", operation="open_session", channel="self",
+            caught.value,
+            provider="deepgram",
+            operation="open_session",
+            channel="self",
         )
         assert report.diagnostics.category == "timeout"
         assert report.diagnostics.fields["tls_backend"] == "unknown"
@@ -369,7 +418,9 @@ async def test_scoped_deepgram_missing_open_preserves_timeout_or_cancellation_an
 
 @pytest.mark.asyncio
 async def test_scoped_deepgram_pending_tls_cancellation_keeps_event_loop_responsive(
-    certificates, monkeypatch: pytest.MonkeyPatch, created_http_clients,
+    certificates,
+    monkeypatch: pytest.MonkeyPatch,
+    created_http_clients,
 ) -> None:
     root, _, _ = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
@@ -405,7 +456,9 @@ async def test_scoped_deepgram_pending_tls_cancellation_keeps_event_loop_respons
         try:
             local_sdk_client(monkeypatch, f"wss://127.0.0.1:{listener.getsockname()[1]}")
             backend = DeepgramRealtimeSTTBackend(
-                api_key="synthetic-key", language="en", connect_timeout_s=10,
+                api_key="synthetic-key",
+                language="en",
+                connect_timeout_s=10,
             )
             opening = asyncio.create_task(
                 backend.open_session(projection=STTSessionProjection("scoped", "pending-tls"))
@@ -452,7 +505,9 @@ async def test_scoped_deepgram_pending_tls_cancellation_keeps_event_loop_respons
 
 @pytest.mark.asyncio
 async def test_deepgram_real_tls_duplex_legacy_results_finalize_and_stop(
-    certificates, monkeypatch: pytest.MonkeyPatch, created_http_clients,
+    certificates,
+    monkeypatch: pytest.MonkeyPatch,
+    created_http_clients,
 ):
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
@@ -472,7 +527,9 @@ async def test_deepgram_real_tls_duplex_legacy_results_finalize_and_stop(
                     control = json.loads(message)["type"]
                     received.append(control)
                     if control == "Finalize":
-                        await socket.send(_deepgram_result("", from_finalize=True).model_dump_json())
+                        await socket.send(
+                            _deepgram_result("", from_finalize=True).model_dump_json()
+                        )
         finally:
             closed.set()
 
@@ -523,7 +580,7 @@ async def unanswered_deepgram_peer(context):
         protocol = ServerProtocol()
         try:
             protocol.receive_data(await reader.readuntil(b"\r\n\r\n"))
-            request, = protocol.events_received()
+            (request,) = protocol.events_received()
             protocol.send_response(protocol.accept(request))
             for data in protocol.data_to_send():
                 writer.write(data)
@@ -573,8 +630,11 @@ async def unanswered_deepgram_peer(context):
 @pytest.mark.parametrize("writer_blocked", [False, True], ids=["closing", "blocked-writer"])
 @pytest.mark.parametrize("cancel", [False, True], ids=["deadline", "caller-cancel"])
 async def test_deepgram_unanswered_close_terminates_real_transport_within_owner_budget(
-    certificates, monkeypatch: pytest.MonkeyPatch, created_http_clients,
-    writer_blocked, cancel,
+    certificates,
+    monkeypatch: pytest.MonkeyPatch,
+    created_http_clients,
+    writer_blocked,
+    cancel,
 ):
     from deepgram.listen.v1.socket_client import AsyncV1SocketClient
 
@@ -590,7 +650,10 @@ async def test_deepgram_unanswered_close_terminates_real_transport_within_owner_
 
     monkeypatch.setattr(network_clients, "external_websocket_connect", connect)
     async with unanswered_deepgram_peer(contexts["valid"]) as (
-        port, close_received, disconnected, media,
+        port,
+        close_received,
+        disconnected,
+        media,
     ):
         local_sdk_client(monkeypatch, f"wss://localhost:{port}")
         session = await asyncio.wait_for(
@@ -642,23 +705,28 @@ async def test_deepgram_unanswered_close_terminates_real_transport_within_owner_
             assert all(client.is_closed for client in created_http_clients)
             assert session._run_task is None
             assert all(
-                task.done() for task in
-                (session._send_task, session._recv_task, session._keepalive_task)
+                task.done()
+                for task in (session._send_task, session._recv_task, session._keepalive_task)
             )
             if writes:
-                results = await asyncio.wait_for(
-                    asyncio.gather(*writes, return_exceptions=True), 1
-                )
+                results = await asyncio.wait_for(asyncio.gather(*writes, return_exceptions=True), 1)
                 assert all(isinstance(result, RuntimeError) for result in results)
                 assert media.empty()
-            print(json.dumps({
-                "mode": "blocked-writer" if writer_blocked else "closing",
-                "cancelled": cancel, "elapsed_s": elapsed,
-                "peer_disconnected": disconnected.is_set(),
-                "protocol": protocol.state.name,
-                "websocket_keepalive_done": protocol.keepalive_task.done(),
-                "http_clients_closed": all(client.is_closed for client in created_http_clients),
-            }))
+            print(
+                json.dumps(
+                    {
+                        "mode": "blocked-writer" if writer_blocked else "closing",
+                        "cancelled": cancel,
+                        "elapsed_s": elapsed,
+                        "peer_disconnected": disconnected.is_set(),
+                        "protocol": protocol.state.name,
+                        "websocket_keepalive_done": protocol.keepalive_task.done(),
+                        "http_clients_closed": all(
+                            client.is_closed for client in created_http_clients
+                        ),
+                    }
+                )
+            )
         finally:
             if closing is not None and not closing.done():
                 closing.cancel()

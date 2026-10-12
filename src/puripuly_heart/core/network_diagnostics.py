@@ -13,12 +13,24 @@ from urllib3 import exceptions as urllib3_errors
 from puripuly_heart.core.messages import DiagnosticFieldValue
 
 TransportErrorKind: TypeAlias = Literal["tls", "proxy", "timeout", "network"]
-TRANSPORT_ENUM_FIELDS: Final = MappingProxyType({
-    "transport": frozenset({"http", "https", "ws", "wss", "unknown"}),
-    "tls_source": frozenset({"windows", "explicit_file", "explicit_directory", "requests_bundle", "curl_bundle", "none", "unknown"}),
-    "proxy_source": frozenset({"env", "system", "direct", "bypass", "explicit", "unknown"}),
-    "tls_backend": frozenset({"native", "openssl", "none", "unknown"}),
-})
+TRANSPORT_ENUM_FIELDS: Final = MappingProxyType(
+    {
+        "transport": frozenset({"http", "https", "ws", "wss", "unknown"}),
+        "tls_source": frozenset(
+            {
+                "windows",
+                "explicit_file",
+                "explicit_directory",
+                "requests_bundle",
+                "curl_bundle",
+                "none",
+                "unknown",
+            }
+        ),
+        "proxy_source": frozenset({"env", "system", "direct", "bypass", "explicit", "unknown"}),
+        "tls_backend": frozenset({"native", "openssl", "none", "unknown"}),
+    }
+)
 TRANSPORT_NUMERIC_FIELDS: Final = ("tls_verify_code", "os_errno", "winerror")
 TRANSPORT_FIELD_KEYS: Final = (*TRANSPORT_ENUM_FIELDS, *TRANSPORT_NUMERIC_FIELDS)
 
@@ -64,15 +76,27 @@ def classify_transport_error(exc: BaseException) -> TransportErrorKind | None:
     for item in transport_exception_chain(exc):
         if isinstance(item, (ssl.SSLError, requests_errors.SSLError, urllib3_errors.SSLError)):
             return "tls"
-        if isinstance(item, (httpx.ProxyError, requests_errors.ProxyError, urllib3_errors.ProxyError)):
+        if isinstance(
+            item, (httpx.ProxyError, requests_errors.ProxyError, urllib3_errors.ProxyError)
+        ):
             fallback = "proxy"
         elif isinstance(item, urllib3_errors.NewConnectionError):
             if fallback is None:
                 fallback = "network"
-        elif isinstance(item, (TimeoutError, httpx.TimeoutException, requests_errors.Timeout, urllib3_errors.TimeoutError)):
+        elif isinstance(
+            item,
+            (
+                TimeoutError,
+                httpx.TimeoutException,
+                requests_errors.Timeout,
+                urllib3_errors.TimeoutError,
+            ),
+        ):
             if fallback != "proxy":
                 fallback = "timeout"
-        elif isinstance(item, (httpx.TransportError, ConnectionError, OSError, urllib3_errors.ProtocolError)):
+        elif isinstance(
+            item, (httpx.TransportError, ConnectionError, OSError, urllib3_errors.ProtocolError)
+        ):
             if fallback is None:
                 fallback = "network"
     return fallback
@@ -92,7 +116,11 @@ def safe_transport_fields(exc: BaseException) -> dict[str, DiagnosticFieldValue]
             for key in TRANSPORT_FIELD_KEYS:
                 value = _mapping_value(normalized, key)
                 if key in TRANSPORT_ENUM_FIELDS:
-                    if type(value) is str and value in TRANSPORT_ENUM_FIELDS[key] and fields[key] == "unknown":
+                    if (
+                        type(value) is str
+                        and value in TRANSPORT_ENUM_FIELDS[key]
+                        and fields[key] == "unknown"
+                    ):
                         fields[key] = value
                 elif type(value) is int:
                     fields.setdefault(key, value)

@@ -83,14 +83,18 @@ def _worker_environment(*, disable_xet: bool) -> dict[str, str]:
     environment = os.environ.copy()
     tls = select_tls(environment=environment)
     policy = _worker_policy(environment)
-    environment[_WORKER_PROXY_POLICY_ENV] = json.dumps({
-        "environment": policy.environment,
-        "system": policy.system,
-        "system_bypass": policy.system_bypass,
-    })
+    environment[_WORKER_PROXY_POLICY_ENV] = json.dumps(
+        {
+            "environment": policy.environment,
+            "system": policy.system,
+            "system_bypass": policy.system_bypass,
+        }
+    )
     proxy_urls = [
-        policy.environment.get(scheme) or policy.environment.get("all")
-        or policy.system.get(scheme) or policy.system.get("all")
+        policy.environment.get(scheme)
+        or policy.environment.get("all")
+        or policy.system.get(scheme)
+        or policy.system.get("all")
         for scheme in ("http", "https")
     ]
     uses_system = any(
@@ -104,7 +108,8 @@ def _worker_environment(*, disable_xet: bool) -> dict[str, str]:
         or bool(any(proxy_urls) and not all(proxy_urls))
         or any(
             urlsplit(value).scheme not in ("http", "https", "socks5", "socks5h")
-            for value in proxy_urls if value
+            for value in proxy_urls
+            if value
         )
     )
     if disable_xet or tls.source in ("explicit_file", "explicit_directory") or incompatible_proxy:
@@ -200,7 +205,12 @@ class HuggingFaceXetDownloadAdapter:
                     cause_type=type(exc).__name__,
                     os_error_code=_os_error_code(exc),
                 ) from exc
-            http_only = environment.get("HF_HUB_DISABLE_XET", "").upper() in {"1", "ON", "YES", "TRUE"}
+            http_only = environment.get("HF_HUB_DISABLE_XET", "").upper() in {
+                "1",
+                "ON",
+                "YES",
+                "TRUE",
+            }
             request.local_dir.mkdir(parents=True, exist_ok=True)
             try:
                 return await self._download_attempt(
@@ -408,7 +418,8 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
     global _WORKER_EVENT_PATH
     previous_xet_cache = os.environ.get("HF_XET_CACHE")
     previous_network_environment = {
-        name: value for name, value in os.environ.items()
+        name: value
+        for name, value in os.environ.items()
         if name.lower().endswith("_proxy")
         or name in ("HF_HUB_DISABLE_XET", _WORKER_PROXY_POLICY_ENV)
     }
@@ -431,13 +442,15 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
 
         from puripuly_heart.core.network_clients import external_client
 
-        set_client_factory(partial(
-            external_client,
-            policy=_worker_policy(environment),
-            follow_redirects=True,
-            timeout=None,
-            event_hooks={"request": [hf_request_event_hook]},
-        ))
+        set_client_factory(
+            partial(
+                external_client,
+                policy=_worker_policy(environment),
+                follow_redirects=True,
+                timeout=None,
+                event_hooks={"request": [hf_request_event_hook]},
+            )
+        )
 
         failure_code = "download_failed"
         downloaded_path = Path(
@@ -460,7 +473,8 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
             "error_type": type(exc).__name__,
             "message": (
                 "Hugging Face download network configuration failed"
-                if failure_code == "network_configuration_failed" else str(exc)
+                if failure_code == "network_configuration_failed"
+                else str(exc)
             ),
         }
         status_code = _http_status_code(exc)
@@ -474,7 +488,8 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
     finally:
         for name in tuple(os.environ):
             if name.lower().endswith("_proxy") or name in (
-                "HF_HUB_DISABLE_XET", _WORKER_PROXY_POLICY_ENV
+                "HF_HUB_DISABLE_XET",
+                _WORKER_PROXY_POLICY_ENV,
             ):
                 os.environ.pop(name)
         os.environ.update(previous_network_environment)

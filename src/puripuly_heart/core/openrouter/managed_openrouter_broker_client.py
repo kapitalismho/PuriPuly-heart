@@ -521,9 +521,11 @@ class HttpManagedOpenRouterBrokerClient:
         async with self._client_lock:
             if self._client is None:
                 normalized_base_url = self.base_url.strip().rstrip("/")
-                self._client = network_clients.external_async_client(base_url=normalized_base_url,
-                timeout=self.timeout,
-                transport=self.transport,)
+                self._client = network_clients.external_async_client(
+                    base_url=normalized_base_url,
+                    timeout=self.timeout,
+                    transport=self.transport,
+                )
             return self._client
 
 

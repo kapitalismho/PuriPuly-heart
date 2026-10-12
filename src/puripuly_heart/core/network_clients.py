@@ -31,9 +31,12 @@ class _HTTPTransport(httpx.BaseTransport):
                     proxy = (
                         httpx.Proxy(
                             route.url,
-                            ssl_context=self.tls.context if route.url.startswith("https:") else None,
+                            ssl_context=(
+                                self.tls.context if route.url.startswith("https:") else None
+                            ),
                         )
-                        if route.url else None
+                        if route.url
+                        else None
                     )
                     transport = httpx.HTTPTransport(
                         verify=self.tls.context, proxy=proxy, trust_env=False, **self.kwargs
@@ -66,7 +69,8 @@ class _AsyncHTTPTransport(httpx.AsyncBaseTransport):
                         route.url,
                         ssl_context=self.tls.context if route.url.startswith("https:") else None,
                     )
-                    if route.url else None
+                    if route.url
+                    else None
                 )
                 transport = httpx.AsyncHTTPTransport(
                     verify=self.tls.context, proxy=proxy, trust_env=False, **self.kwargs

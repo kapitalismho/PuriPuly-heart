@@ -134,7 +134,9 @@ def _download(contract: ArchiveContract, destination: Path) -> None:
     try:
         with (
             external_client(follow_redirects=True, timeout=None) as client,
-            client.stream("GET", contract.url, headers={"User-Agent": "PuriPulyHeart-build"}) as response,
+            client.stream(
+                "GET", contract.url, headers={"User-Agent": "PuriPulyHeart-build"}
+            ) as response,
             partial.open("wb") as output,
         ):
             response.raise_for_status()

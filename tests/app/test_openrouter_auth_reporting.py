@@ -52,7 +52,11 @@ def install_response(monkeypatch: pytest.MonkeyPatch, response: httpx.Response) 
         network_clients,
         "external_async_client",
         lambda **kwargs: real_client(
-            **{**kwargs, "transport": httpx.MockTransport(lambda _request: response), "trust_env": False}
+            **{
+                **kwargs,
+                "transport": httpx.MockTransport(lambda _request: response),
+                "trust_env": False,
+            }
         ),
     )
 
@@ -467,8 +471,10 @@ async def test_tls_codes_survive_real_auth_normalization_and_persisted_log_owner
             failure = httpx.ConnectError(UNSAFE)
             failure.__cause__ = cause
             failure.connection_diagnostics = {
-                "transport": "https", "tls_source": "windows",
-                "proxy_source": "direct", "tls_backend": "native",
+                "transport": "https",
+                "tls_source": "windows",
+                "proxy_source": "direct",
+                "tls_backend": "native",
                 "proxy_url": UNSAFE,
             }
 
