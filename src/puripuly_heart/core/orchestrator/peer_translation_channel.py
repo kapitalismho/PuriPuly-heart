@@ -124,6 +124,7 @@ class PeerTranslationChannelOwner:
 
     async def close(self) -> None:
         self._accepting_events = False
+        self._stt_consumption.retire_all()
         await self.translation_turns.cancel_pending(channel="peer")
         await self.runtime.reset_runtime_state()
         self._prepared_requests.clear()
@@ -354,6 +355,7 @@ class PeerTranslationChannelOwner:
     async def reset_provider_channel(self, channel: ChannelId) -> None:
         if channel != "peer":
             raise ValueError("Peer translation owner cannot reset a non-Peer channel")
+        self._stt_consumption.retire_all()
         await self.translation_turns.cancel_pending(channel="peer")
         await self.runtime.reset_runtime_state()
         self._clear_peer_logical_turn_state()
@@ -461,6 +463,12 @@ class PeerTranslationChannelOwner:
             STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
         )
 
+    def retire_provider_turn(self, identity: STTProviderTurnIdentity) -> bool:
+        return self._stt_consumption.retire_known(identity)
+
+    def retire_provider_epoch(self, provider_epoch_id: str) -> bool:
+        return self._stt_consumption.retire_epoch(provider_epoch_id)
+
     def note_audio_boundary(
         self, identity: STTProviderTurnIdentity, boundary: STTAudioBoundary
     ) -> None:
@@ -471,6 +479,10 @@ class PeerTranslationChannelOwner:
         self, snapshot: AudioSegmentSnapshot, update: STTProviderTurnUpdate
     ) -> STTFinalEvent | None:
         self._require_ingress()
+        if update.source_release is None:
+            return None
+        if snapshot.identity != update.identity.segment:
+            raise ValueError("contribution source request identity mismatch")
         pieces = self._stt_consumption.consume_parts(update)
         if not pieces:
             return None
@@ -532,6 +544,7 @@ class PeerTranslationChannelOwner:
     async def clear_language_runtime_state(self, *, channel: ChannelId) -> None:
         if channel != "peer":
             raise ValueError("Peer translation owner cannot clear a non-Peer channel")
+        self._stt_consumption.retire_all()
         await self.translation_turns.cancel_pending(channel="peer")
         await self.runtime.clear_live_translation_state()
         self._clear_peer_logical_turn_state()

@@ -135,6 +135,20 @@ class RecognitionTextOrigin:
             raise ValueError("source ranges belong to another capture epoch")
 
 
+def validate_recognition_origins(
+    origins: tuple[RecognitionTextOrigin, ...], text_length: int
+) -> None:
+    if not origins:
+        return
+    cursor = 0
+    for origin in origins:
+        if origin.text_start != cursor or origin.text_end > text_length:
+            raise ValueError("source provenance does not conserve text")
+        cursor = origin.text_end
+    if cursor != text_length:
+        raise ValueError("source provenance leaves unresolved text")
+
+
 def slice_recognition_origins(
     origins: tuple[RecognitionTextOrigin, ...], start: int, end: int
 ) -> tuple[RecognitionTextOrigin, ...]:

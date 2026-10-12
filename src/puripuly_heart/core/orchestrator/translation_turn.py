@@ -30,7 +30,11 @@ from puripuly_heart.domain.models import (
     Transcript,
     Translation,
 )
-from puripuly_heart.domain.recognition import RecognitionTextOrigin, slice_recognition_origins
+from puripuly_heart.domain.recognition import (
+    RecognitionTextOrigin,
+    slice_recognition_origins,
+    validate_recognition_origins,
+)
 
 if TYPE_CHECKING:
     from puripuly_heart.core.orchestrator.translation_request import PreparedTranslationRequest
@@ -260,14 +264,7 @@ class SourceChild:
         start, end = self.text_range
         if start < 0 or end - start != len(self.raw_text):
             raise ValueError("source text range does not conserve raw text")
-        if self.origins:
-            cursor = 0
-            for origin in self.origins:
-                if origin.text_start != cursor or origin.text_end > len(self.raw_text):
-                    raise ValueError("source provenance does not conserve text")
-                cursor = origin.text_end
-            if cursor != len(self.raw_text):
-                raise ValueError("source provenance leaves unresolved text")
+        validate_recognition_origins(self.origins, len(self.raw_text))
 
     @property
     def effective_text(self) -> str:
@@ -1283,6 +1280,9 @@ class TranslationTurnLifecycleOwner:
         turn_generation: int,
         turn_order: int,
     ) -> tuple[TranslationTurnChild, ...]:
+        validate_recognition_origins(
+            request.transcript.recognition_origins, len(request.transcript.text)
+        )
         segments = _final_transcript_segments(
             request.transcript,
             split_speakers=request.turn_kind == "peer",

@@ -267,16 +267,22 @@ class TranslationChannelOwnerCallbacks:
                     await self._require_peer().handle_provider_turn_update(snapshot, event)
             return
         if isinstance(event, STTProviderEpochEnded):
+            self._require_peer().retire_provider_epoch(event.provider_epoch_id)
             return
         if isinstance(event, STTProviderTurnTerminal):
             async with self._recognition_locks["peer"]:
+                peer = self._require_peer()
                 if not self._peer_provider_source_is_current(event):
+                    peer.retire_provider_turn(event.identity)
                     event = replace(
                         event, outcome="cancelled", text="", text_authority="none",
                         final_language_runs=(), final_speaker_runs=(), included_contributions=(),
                     )
                 admissions = self._require_peer_capture().admit_provider_terminal(event)
-                peer = self._require_peer()
+                if not admissions and self._require_peer_capture().provider_source_snapshot(
+                    event.identity
+                ) is None:
+                    peer.retire_provider_turn(event.identity)
                 for receipt, terminal in admissions:
                     await peer.handle_provider_turn_terminal(receipt, terminal)
             return
@@ -298,6 +304,10 @@ class TranslationChannelOwnerCallbacks:
             if self._peer_capture.owns_provider_turn(event.identity):
                 await self.peer_event_handler(event)
                 return
+            if isinstance(event, STTProviderTurnTerminal) and self._require_peer().retire_provider_turn(
+                event.identity
+            ):
+                return
         if isinstance(event, STTProviderInputTerminal):
             if event.channel == "self":
                 if self._self_capture is not None:
@@ -318,6 +328,8 @@ class TranslationChannelOwnerCallbacks:
             await self._admit_recognition_unit(event, channel=event.unit.identity.stream.channel)
             return
         if isinstance(event, STTProviderEpochEnded):
+            if self._peer is not None and self._peer.retire_provider_epoch(event.provider_epoch_id):
+                return
             await self._after_self_epoch_ended(event)
             return
         self._stt_sessions.record(event)

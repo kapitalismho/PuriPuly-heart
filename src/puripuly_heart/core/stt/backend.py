@@ -89,6 +89,21 @@ class STTTextContribution:
 
 
 @dataclass(frozen=True, slots=True)
+class STTSourceRelease:
+    release_id: str
+    text_start: int
+    text_end: int
+    reason: Literal["end", "manual", "drain", "boundary"]
+
+    def __post_init__(self) -> None:
+        if (
+            not self.release_id or self.text_start < 0 or self.text_end < self.text_start
+            or self.reason not in {"end", "manual", "drain", "boundary"}
+        ):
+            raise ValueError("invalid source release")
+
+
+@dataclass(frozen=True, slots=True)
 class STTProviderTurnUpdate:
     identity: STTProviderTurnIdentity
     sequence: int
@@ -101,6 +116,8 @@ class STTProviderTurnUpdate:
     contribution: STTTextContribution | None = None
     recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
     is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
+    source_release: STTSourceRelease | None = None
+    included_contributions: tuple[STTTextContribution, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,6 +208,7 @@ class STTContributionConsumptionLedger:
         self._generation_floor = -1
         self._boundaries: dict[STTProviderTurnIdentity, dict[str, STTAudioBoundary]] = {}
         self._sealed: set[STTProviderTurnIdentity] = set()
+        self._releases: dict[STTProviderTurnIdentity, dict[str, STTSourceRelease]] = {}
 
     @property
     def consumed_contribution_ids(self) -> frozenset[str]:
@@ -247,14 +265,50 @@ class STTContributionConsumptionLedger:
         *,
         text_range: tuple[int, int] | None = None,
     ) -> tuple[STTConsumedContribution, ...]:
+        release = event.source_release if isinstance(event, STTProviderTurnUpdate) else None
+        if release is not None and (
+            not event.identity.provider_epoch_id or not event.identity.provider_turn_id
+        ):
+            raise ValueError("source release requires provider request ownership")
         if not self._remember_identity(event.identity):
             return ()
         if event.identity in self._consumed_terminal_tails:
             return ()
         if isinstance(event, STTProviderTurnUpdate):
-            if event.stability != "stable" or event.contribution is None:
+            if event.stability != "stable":
+                if release is not None:
+                    raise ValueError("source release requires stable text")
                 return ()
-            contributions = (event.contribution,)
+            contributions = event.included_contributions or (
+                (event.contribution,) if event.contribution is not None else ()
+            )
+            if release is None and not contributions:
+                return ()
+            if release is not None:
+                if release.text_end > len(event.text):
+                    raise ValueError("source release exceeds assembled text")
+                releases = self._releases.get(event.identity, {})
+                previous = releases.get(release.release_id)
+                if previous is not None and previous != release:
+                    raise ValueError("source release identity changed")
+                if previous is None and len(releases) >= 256:
+                    raise ValueError("source release capacity exceeded")
+                if len({item.contribution_id for item in contributions}) != len(contributions):
+                    raise ValueError("source release contribution identities repeat")
+                cursor, previous_end = release.text_start, 0
+                for item in contributions:
+                    if item.text_start < previous_end or item.text_end > len(event.text):
+                        raise ValueError("source release contribution ranges are invalid")
+                    previous_end = item.text_end
+                    left, right = max(item.text_start, release.text_start), min(
+                        item.text_end, release.text_end
+                    )
+                    if left < right:
+                        if left != cursor:
+                            raise ValueError("source release leaves unresolved ownership")
+                        cursor = right
+                if cursor != release.text_end:
+                    raise ValueError("source release leaves unresolved ownership")
         else:
             contributions = event.included_contributions
             if event.text and not contributions and any(
@@ -283,7 +337,13 @@ class STTContributionConsumptionLedger:
                     f"terminal:{cursor}:{len(event.text)}", cursor, len(event.text)
                 ))
             contributions = tuple(assembled)
-        selection_start, selection_end = text_range or (0, len(event.text))
+        selection_start, selection_end = text_range or (
+            (release.text_start, release.text_end) if release is not None else (0, len(event.text))
+        )
+        if release is not None and (
+            selection_start < release.text_start or selection_end > release.text_end
+        ):
+            raise ValueError("selected source range exceeds release")
         if selection_start < 0 or selection_end > len(event.text) or selection_end < selection_start:
             raise ValueError("invalid selected source range")
         pieces: list[STTConsumedContribution] = []
@@ -334,6 +394,8 @@ class STTContributionConsumptionLedger:
         for key, merged, declared in commits:
             self._consumed[key] = merged
             self._contribution_ranges[key] = declared
+        if release is not None:
+            self._releases.setdefault(event.identity, {})[release.release_id] = release
         if isinstance(event, STTProviderTurnTerminal) and text_range is None:
             self.retire(event.identity)
         return tuple(pieces)
@@ -341,12 +403,45 @@ class STTContributionConsumptionLedger:
     def retire(self, identity: STTProviderTurnIdentity) -> None:
         if self._remember_identity(identity):
             self._consumed_terminal_tails.add(identity)
+            self._releases.pop(identity, None)
             self._consumed = {
                 key: ranges for key, ranges in self._consumed.items() if key[0] != identity
             }
             self._contribution_ranges = {
                 key: span for key, span in self._contribution_ranges.items() if key[0] != identity
             }
+
+    def retire_known(self, identity: STTProviderTurnIdentity) -> bool:
+        if identity not in self._known_identities:
+            return False
+        self.retire(identity)
+        return True
+
+    def retire_epoch(self, provider_epoch_id: str) -> bool:
+        identities = {
+            identity for identity in self._known_identities
+            if identity.provider_epoch_id == provider_epoch_id
+        }
+        if not identities:
+            return False
+        self._consumed_terminal_tails.update(identities)
+        self._consumed = {
+            key: ranges for key, ranges in self._consumed.items() if key[0] not in identities
+        }
+        self._contribution_ranges = {
+            key: span for key, span in self._contribution_ranges.items() if key[0] not in identities
+        }
+        self._releases = {
+            identity: releases for identity, releases in self._releases.items()
+            if identity not in identities
+        }
+        return True
+
+    def retire_all(self) -> None:
+        self._consumed_terminal_tails.update(self._known_identities)
+        self._consumed.clear()
+        self._contribution_ranges.clear()
+        self._releases.clear()
 
     def _remember_identity(self, identity: STTProviderTurnIdentity) -> bool:
         if identity in self._known_identities:
@@ -382,6 +477,7 @@ class STTContributionConsumptionLedger:
             self._consumed_terminal_tails.discard(expired)
             self._boundaries.pop(expired, None)
             self._sealed.discard(expired)
+            self._releases.pop(expired, None)
             self._consumed = {key: ranges for key, ranges in self._consumed.items() if key[0] != expired}
             self._contribution_ranges = {
                 key: span for key, span in self._contribution_ranges.items() if key[0] != expired

@@ -8,6 +8,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTSourceRelease,
     STTTextContribution,
 )
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
@@ -71,6 +72,8 @@ class STTScopedTurnNormalizer:
 
     def apply_update(self, update: STTProviderTurnUpdate) -> STTProviderTurnUpdate | None:
         self._require_identity(update.identity)
+        if update.source_release is not None and update.stability != "stable":
+            raise STTNormalizationError("provider_source_release_requires_stable_text")
         if self._terminal is not None:
             return None
         native_event_id = update.provenance.native_event_id
@@ -140,6 +143,8 @@ class STTScopedTurnNormalizer:
             runs = self._provisional_runs
             speaker_runs = self._provisional_speaker_runs
         self._ensure_bounded()
+        if update.source_release is not None and update.source_release.text_end > len(text):
+            raise STTNormalizationError("provider_source_release_range_invalid")
         return STTProviderTurnUpdate(
             identity=update.identity,
             sequence=update.sequence,
@@ -150,6 +155,22 @@ class STTScopedTurnNormalizer:
             final_speaker_runs=speaker_runs,
             provenance=update.provenance,
             contribution=contribution,
+            recognition_origins=self._recognition_origins,
+            source_release=update.source_release,
+            included_contributions=(
+                tuple(self._contributions) if update.source_release is not None else ()
+            ),
+        )
+
+    def release_source(self, release: STTSourceRelease) -> STTProviderTurnUpdate | None:
+        if self._terminal is not None:
+            return None
+        if release.text_end > len(self._stable_text):
+            raise STTNormalizationError("provider_source_release_range_invalid")
+        return STTProviderTurnUpdate(
+            self.identity, self._last_sequence, "stable", "replace", self._stable_text,
+            self._stable_runs, self._stable_speaker_runs,
+            source_release=release, included_contributions=tuple(self._contributions),
             recognition_origins=self._recognition_origins,
         )
 
