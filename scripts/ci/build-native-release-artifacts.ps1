@@ -28,7 +28,13 @@ param(
     [string]$InstallerOutputDir = "installer_output\native",
 
     [Parameter()]
-    [switch]$SkipNativeBuild
+    [switch]$SkipNativeBuild,
+
+    [Parameter()]
+    [switch]$PrepareSigningComponents,
+
+    [Parameter()]
+    [string]$SigningRoot = "C:\d177\native-integration\release\signing"
 )
 
 $ErrorActionPreference = "Stop"
@@ -205,19 +211,31 @@ try {
         "--native-manifest", (Join-Path $OutputDir "native-artifact-manifest.json"),
         "--output", $cleanupInclude
     )
-    New-Item -ItemType Directory -Path $InstallerOutputDir -Force | Out-Null
-    Invoke-Checked -FilePath $iscc -ArgumentList @(
-        "/DNativeExperimental=1",
-        "/DMyPackagedAppDir=$OutputDir",
-        "/DMyStagedOverlayDir=$OutputDir",
-        "/DNativeCleanupInclude=$cleanupInclude",
-        "/O$InstallerOutputDir",
-        (Join-Path $repoRoot "installer.iss")
-    )
-    Invoke-Checked -FilePath $ToolPython -ArgumentList @("-c", $metadataCheck, $appVersion, $installerPath)
-    $hash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    Write-Host "Native installer: $installerPath"
-    Write-Host "SHA256: $hash"
+    if ($PrepareSigningComponents) {
+        Invoke-Checked -FilePath $ToolPython -ArgumentList @(
+            "-m", "puripuly_heart.release_evidence.signing_release", "prepare",
+            "--version", $appVersion,
+            "--payload", $OutputDir,
+            "--root", (Resolve-RepoPath $SigningRoot),
+            "--compiler", $iscc,
+            "--script", (Join-Path $repoRoot "installer.iss"),
+            "--cleanup-include", $cleanupInclude
+        )
+    } else {
+        New-Item -ItemType Directory -Path $InstallerOutputDir -Force | Out-Null
+        Invoke-Checked -FilePath $iscc -ArgumentList @(
+            "/DNativeExperimental=1",
+            "/DMyPackagedAppDir=$OutputDir",
+            "/DMyStagedOverlayDir=$OutputDir",
+            "/DNativeCleanupInclude=$cleanupInclude",
+            "/O$InstallerOutputDir",
+            (Join-Path $repoRoot "installer.iss")
+        )
+        Invoke-Checked -FilePath $ToolPython -ArgumentList @("-c", $metadataCheck, $appVersion, $installerPath)
+        $hash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        Write-Host "Native installer: $installerPath"
+        Write-Host "SHA256: $hash"
+    }
     Write-Host "Build evidence: $evidenceRoot"
 } finally {
     Pop-Location

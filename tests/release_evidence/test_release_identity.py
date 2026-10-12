@@ -157,50 +157,6 @@ def test_native_release_surface_and_provenance_round_trip(tmp_path) -> None:
     identity.verify_assets_against_provenance(reloaded, [installer])
 
 
-@pytest.mark.parametrize("mutation", ["bytes", "version", "tag", "unrecorded"])
-def test_publish_rejects_detached_inline_provenance(tmp_path, mutation) -> None:
-    installer = tmp_path / INSTALLER_EXE
-    installer.write_bytes(b"native-installer")
-    body = tmp_path / "body.md"
-    body.write_text(f"Download `{INSTALLER_EXE}` below.", encoding="utf-8")
-    provenance = identity.build_provenance(
-        version=VERSION,
-        tag=TAG,
-        source_sha=SOURCE_SHA,
-        build_origin="local",
-        artifacts=_artifact_entries([installer]),
-    )
-    if mutation == "bytes":
-        installer.write_bytes(b"NATIVE-INSTALLER")
-    elif mutation == "version":
-        provenance["version"] = "2.8.2"
-    elif mutation == "tag":
-        provenance["tag"] = "v2.8.2"
-    else:
-        provenance["artifacts"][0]["filename"] = "other.exe"
-
-    with pytest.raises(RuntimeError):
-        identity.main(
-            [
-                "verify-publish",
-                "--version",
-                VERSION,
-                "--tag",
-                TAG,
-                "--title",
-                TAG,
-                "--installer-exe",
-                INSTALLER_EXE,
-                "--body",
-                str(body),
-                "--asset",
-                str(installer),
-                "--provenance-json",
-                json.dumps(provenance),
-            ]
-        )
-
-
 @pytest.mark.parametrize("tag", ["native-v2.8.0", "v2.8.1", "2.8.0", "V2.8.0"])
 def test_release_identity_rejects_nonstandard_and_version_mismatched_tags(tag) -> None:
     with pytest.raises(RuntimeError, match="tag mismatch"):

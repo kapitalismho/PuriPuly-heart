@@ -31,7 +31,7 @@
   #error MyAppDataDirName must be one safe LocalApplicationData child directory name without traversal, roots, or separators.
 #endif
 #define MyAppDataRoot "{localappdata}\" + MyAppDataDirName
-#define MyAppVersion "2.8.2"
+#define MyAppVersion "2.8.3"
 #define MyAppPublisher "salee"
 #define MyAppURL "https://github.com/kapitalismho/PuriPuly-heart"
 #ifndef MyAppExeName
@@ -110,6 +110,10 @@ PrivilegesRequiredOverridesAllowed=dialog
 ; Auto-upgrade: remember previous install location
 UsePreviousAppDir=yes
 UsePreviousGroup=yes
+#ifdef SigningUninstallerDir
+SignedUninstaller=yes
+SignedUninstallerDir={#SigningUninstallerDir}
+#endif
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

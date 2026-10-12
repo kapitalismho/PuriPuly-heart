@@ -1,7 +1,7 @@
 # Code signing policy
 
-PuriPuly is applying to the SignPath Foundation open-source code-signing program.
-Current official releases are unsigned until the application and signing integration are complete.
+SignPath has accepted the project. The native release workflow implements two manually approved signing requests, but production signing is not active: the release certificate remains `CSR PENDING` and `release-signing` is invalid.
+Historical published releases remain unsigned. Repository implementation and local validation do not establish production acceptance.
 
 Free code signing provided by SignPath.io, certificate by SignPath Foundation.
 
@@ -25,7 +25,7 @@ Approved responsibilities:
 
 One person holds all three roles; no second approver is required. Signing waits if the Approver is unavailable. Repository review rules still apply.
 
-GitHub and SignPath access must use MFA. SignPath setup and MFA verification are pending.
+GitHub and SignPath access involved in production signing must use MFA. Production cutover requires maintainer verification; the workflow does not infer or certify account MFA state.
 
 ## Signing scope
 
@@ -52,11 +52,53 @@ Retain GitHub-hosted, tag-triggered builds and manually published draft releases
 5. Validate the installer and installed signing targets. Attach only the validated signed installer to a draft release.
 6. Publish only by explicit maintainer action.
 
-Changing this two-request sequence requires maintainer approval. Uninstaller generation and reuse were tested locally; Foundation integration and real signing remain unverified.
+The repository stages the three explicit project executables and generated uninstaller as `uninstaller.exe`, validates the signed results, rebuilds from those exact bytes, and requests signing of the installer. Local real-PE/Inno probes verified signing-boundary handoff and installed uninstaller reuse with an independently pinned local probe authority; these probes do not establish real SignPath or production acceptance.
 
 Missing artifacts, signing rejection or failure, or invalid signatures, publisher, metadata, or provenance must block the signed release. Never substitute unsigned files. Verify the certificate chain, applicable timestamp, expected publisher, product metadata, and installed inner artifacts.
 
 Link the tag, source SHA, workflow run, submitted artifacts, signing requests, validated outputs, and release asset names. Signing approval is not publication approval.
+
+## Test probe and production cutover
+
+Use organization `41a8602a-e07d-4d35-876f-8876d5acb31d`, project `PuriPuly-heart`, and the existing `SIGNPATH_API_TOKEN` repository secret. Never copy its value into logs, evidence, issues, or release text.
+
+The `components` artifact configuration must select only the three named project executables and `uninstaller.exe` at the root of the uploaded artifact ZIP. The `installer` configuration must select only `PuriPulyHeart-Setup-<version>.exe` at that ZIP root. Both configurations must enforce product name `PuriPuly <3` and the `version` parameter. Verify the actual portal configurations before the first run; a nested ZIP or wildcard executable selection is not the approved contract.
+
+Dispatch **Native Release** from the selected immutable `vMAJOR.MINOR.PATCH` tag, enter that same `tag`, and set `test_signing=true` for the first end-to-end probe. Both requests use `test-signing`; both require manual approval and all artifact, signature, metadata, provenance and installed-file checks. Successful test runs produce clearly named `test-signed-candidate-<run>-<attempt>` and `test-signing-evidence-<run>-<attempt>` Actions artifacts, never a GitHub draft release.
+
+Configure these repository variables from independently approved public certificate material:
+
+| Variable | Required value |
+| --- | --- |
+| `SIGNPATH_TEST_PUBLISHER` | Exact approved test signer certificate Subject. |
+| `SIGNPATH_TEST_ROOT_SHA256` | SHA-256 of the approved test authority DER certificate. |
+| `SIGNPATH_TEST_ROOT_CERTIFICATE_BASE64` | Approved test authority DER encoded as base64. |
+| `SIGNPATH_RELEASE_PUBLISHER` | Exact approved SignPath Foundation signer certificate Subject. |
+| `SIGNPATH_RELEASE_ROOT_SHA256` | SHA-256 of its independently verified Windows trust-root DER certificate. |
+| `SIGNPATH_RELEASE_ORIGIN` | Exact observed SignPath `branchName`, optionally containing literal `{tag}`; no wildcards. |
+| `SIGNPATH_PRODUCTION_READY` | Exact `true`, set only after certificate, policy, origin restriction and MFA review. |
+
+Test certificates are not publicly trusted production certificates. The approved test authority is installed only in the isolated test runner; an independently approved self-signed test leaf may be its own authority. Never trust a certificate merely because it came back with a signed artifact, and never use local probe certificates as the project's approved authority.
+
+Derive values from independently exported public certificates with PowerShell:
+
+```powershell
+$signer = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new((Resolve-Path './approved-signer.cer').Path)
+$authority = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new((Resolve-Path './approved-authority.cer').Path)
+$signer.Subject
+[Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($authority.RawData)).ToLowerInvariant()
+[Convert]::ToBase64String($authority.RawData)
+```
+
+For an approved self-signed test leaf, both paths may refer to the same certificate. Do not export or upload a private key.
+
+Both requests use `signpath/github-action-submit-signing-request@v3` with the exact `artifact-id` returned by their preceding `actions/upload-artifact` step. Durable Actions evidence records GitHub tag/ref, source SHA, workflow run and attempt, artifact IDs, actual SignPath request IDs and API-reported origin, hashes and validation results. Production evidence additionally links the delivered draft asset ID, URL and digest. GitHub-side tag/ref data must not be presented as SignPath-reported origin.
+
+After the first successful test run, review the literal `origin.repositoryData.branchName` and build URL returned for both requests. Set `SIGNPATH_RELEASE_ORIGIN` to that exact tag representation (for example, `{tag}` or `refs/tags/{tag}` only if observed), and narrow the production policy's allowed-origin rule accordingly. The existing `**` rule is not the intended production state.
+
+Before setting `SIGNPATH_PRODUCTION_READY=true`, the maintainer must verify a valid production certificate and `release-signing` policy, the narrow origin restriction, approved Foundation publisher/root values, and MFA for the involved accounts. This explicit gate does not replace signature or origin validation. A complete production-signed candidate and clean Windows install/uninstall verification remain required before production cutover can be called complete.
+
+Missing configuration, rejected or withheld approval, timeout, malformed response or validation failure blocks the release. Only validated production-signed installers may enter a draft; publication remains a separate explicit maintainer action.
 
 ## Privacy
 
@@ -66,14 +108,14 @@ Usage statistics default to ON, with agreement preselected. Declining turns stat
 
 Statistics OFF does not disable update checks, model downloads, authentication, or selected external services. See the Privacy Policy for these flows.
 
-Existing published installers predate this implementation. Foundation assessment remains pending.
+Existing published installers predate this implementation. Foundation acceptance does not establish production signing readiness.
 
 ## Foundation attribution
 
-After Foundation acceptance, include:
+Foundation acceptance attribution:
 
 > Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org)
 
 ## Unsigned artifacts
 
-Existing releases may be unsigned. Local builds and CI artifacts are not validated signed releases; this policy introduces no official nightly distribution. After cutover, signing failure must block the official installer release.
+Historical releases are unsigned. Local unsigned builds and test-signed Actions candidates are not production-signed releases; this policy introduces no official nightly distribution. The official draft-release path rejects unsigned and test-signed candidates and never substitutes an unsigned installer after signing failure.

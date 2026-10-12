@@ -545,112 +545,15 @@ def verify_soxr_packaging(
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
-    build_parser = subparsers.add_parser("verify-build")
-    build_parser.add_argument("--version", required=True)
-    build_parser.add_argument("--tag", required=True)
-    build_parser.add_argument("--source-sha", required=True)
-    build_parser.add_argument("--build-origin", default=LOCAL_ORIGIN)
-    build_parser.add_argument("--repository", default="")
-    build_parser.add_argument("--server-url", default="")
-    build_parser.add_argument("--run-id", default="")
-    build_parser.add_argument("--run-attempt", default="")
-    build_parser.add_argument("--main-exe", type=Path, required=True)
-    build_parser.add_argument("--gpu-worker-exe", type=Path, required=True)
-    build_parser.add_argument("--overlay-exe", type=Path, required=True)
-    build_parser.add_argument("--installer", type=Path, required=True)
-    build_parser.add_argument("--soxr-bundle", type=Path, default=None)
-    build_parser.add_argument("--provenance-out", type=Path, required=True)
     render_parser = subparsers.add_parser("render-body")
     render_parser.add_argument("--template", type=Path, required=True)
     render_parser.add_argument("--installer-exe", required=True)
     render_parser.add_argument("--output", type=Path, required=True)
-    publish_parser = subparsers.add_parser("verify-publish")
-    publish_parser.add_argument("--version", required=True)
-    publish_parser.add_argument("--tag", required=True)
-    publish_parser.add_argument("--title", required=True)
-    publish_parser.add_argument("--installer-exe", required=True)
-    publish_parser.add_argument("--body", type=Path, required=True)
-    publish_parser.add_argument("--asset", dest="assets", type=Path, action="append", required=True)
-    publish_parser.add_argument("--provenance-json", required=True)
     licenses_parser = subparsers.add_parser("verify-packaged-licenses")
     licenses_parser.add_argument("--package-dir", type=Path, required=True)
     licenses_parser.add_argument("--repo-root", type=Path, default=None)
     licenses_parser.add_argument("--soxr-manifest", type=Path, default=None)
     return parser
-
-
-def _run_verify_build(arguments: argparse.Namespace) -> dict[str, object]:
-    expected_version = arguments.version.strip()
-    check_tag_matches_version(arguments.tag, expected_version)
-    expected_installer = installer_filename(expected_version)
-    if Path(arguments.installer).name != expected_installer:
-        raise RuntimeError(
-            f"installer filename mismatch: expected {expected_installer!r}, "
-            f"found {Path(arguments.installer).name!r}"
-        )
-    if (
-        arguments.soxr_bundle is not None
-        and Path(arguments.soxr_bundle).name != SOXR_BUNDLE_FILENAME
-    ):
-        raise RuntimeError(
-            f"compliance bundle filename mismatch: expected {SOXR_BUNDLE_FILENAME!r}, "
-            f"found {Path(arguments.soxr_bundle).name!r}"
-        )
-    main_metadata = verify_pe_product_metadata(
-        arguments.main_exe, expected_version=expected_version
-    )
-    gpu_metadata = verify_pe_product_metadata(
-        arguments.gpu_worker_exe, expected_version=expected_version
-    )
-    overlay_metadata = verify_pe_product_metadata(
-        arguments.overlay_exe, expected_version=expected_version
-    )
-    installer_metadata = verify_pe_product_metadata(
-        arguments.installer, expected_version=expected_version
-    )
-    candidates: list[tuple[str, Path, dict[str, str]]] = [
-        ("main-executable", Path(arguments.main_exe), main_metadata),
-        ("gpu-worker-executable", Path(arguments.gpu_worker_exe), gpu_metadata),
-        ("overlay-executable", Path(arguments.overlay_exe), overlay_metadata),
-        ("installer", Path(arguments.installer), installer_metadata),
-    ]
-    artifacts: list[dict[str, object]] = []
-    for role, path, metadata in candidates:
-        identity = file_identity(path)
-        artifacts.append(
-            {
-                "role": role,
-                "filename": path.resolve().name,
-                "size": identity["size"],
-                "sha256": identity["sha256"],
-                "product_name": metadata.get("ProductName", "").strip(),
-                "product_version": metadata.get("ProductVersion", "").strip(),
-                "file_description": metadata.get("FileDescription", "").strip(),
-            }
-        )
-    if arguments.soxr_bundle is not None:
-        bundle_identity = file_identity(Path(arguments.soxr_bundle))
-        artifacts.append(
-            {
-                "role": "compliance-bundle",
-                "filename": Path(arguments.soxr_bundle).resolve().name,
-                "size": bundle_identity["size"],
-                "sha256": bundle_identity["sha256"],
-            }
-        )
-    provenance = build_provenance(
-        version=expected_version,
-        tag=arguments.tag,
-        source_sha=arguments.source_sha,
-        build_origin=arguments.build_origin,
-        repository=arguments.repository,
-        server_url=arguments.server_url,
-        run_id=arguments.run_id,
-        run_attempt=arguments.run_attempt,
-        artifacts=artifacts,
-    )
-    write_provenance_file(Path(arguments.provenance_out), provenance)
-    return provenance
 
 
 def _run_render_body(arguments: argparse.Namespace) -> dict[str, object]:
@@ -667,34 +570,6 @@ def _run_render_body(arguments: argparse.Namespace) -> dict[str, object]:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(body, encoding="utf-8")
     return {"installer_exe": installer_exe, "body_path": str(output)}
-
-
-def _run_verify_publish(arguments: argparse.Namespace) -> dict[str, object]:
-    body_text = Path(arguments.body).read_text(encoding="utf-8")
-    asset_paths = [Path(item) for item in arguments.assets]
-    expected_installer = verify_release_surface(
-        version=arguments.version,
-        tag=arguments.tag,
-        title=arguments.title,
-        installer_exe=arguments.installer_exe,
-        body_text=body_text,
-        asset_names=[path.name for path in asset_paths],
-    )
-    summary: dict[str, object] = {
-        "version": arguments.version.strip(),
-        "tag": arguments.tag.strip(),
-        "installer_exe": expected_installer,
-        "assets": sorted(path.name for path in asset_paths),
-    }
-    provenance = json.loads(arguments.provenance_json)
-    if str(provenance.get("version", "")).strip() != arguments.version.strip():
-        raise RuntimeError("provenance version disagrees with the release version")
-    if str(provenance.get("tag", "")).strip() != arguments.tag.strip():
-        raise RuntimeError("provenance tag disagrees with the release tag")
-    verify_assets_against_provenance(provenance, asset_paths)
-    summary["source_sha"] = provenance.get("source_sha")
-    summary["build_origin"] = provenance.get("build_origin")
-    return summary
 
 
 def _run_verify_packaged_licenses(arguments: argparse.Namespace) -> dict[str, object]:
@@ -716,12 +591,8 @@ def _run_verify_packaged_licenses(arguments: argparse.Namespace) -> dict[str, ob
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _build_parser().parse_args(argv)
-    if arguments.command == "verify-build":
-        result = _run_verify_build(arguments)
-    elif arguments.command == "render-body":
+    if arguments.command == "render-body":
         result = _run_render_body(arguments)
-    elif arguments.command == "verify-publish":
-        result = _run_verify_publish(arguments)
     else:
         result = _run_verify_packaged_licenses(arguments)
     print(json.dumps(result, indent=2, sort_keys=True))

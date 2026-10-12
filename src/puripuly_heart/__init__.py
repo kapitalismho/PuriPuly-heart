@@ -1,4 +1,4 @@
 __all__ = ["__version__", "GITHUB_REPO"]
 
-__version__ = "2.8.2"
+__version__ = "2.8.3"
 GITHUB_REPO = "kapitalismho/PuriPuly-heart"

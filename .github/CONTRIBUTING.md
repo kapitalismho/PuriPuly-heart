@@ -22,13 +22,13 @@ Thanks for taking an interest in this project.
 
 ## Releases
 
-Pushing a `vMAJOR.MINOR.PATCH` tag, such as `v2.8.2`, runs the [native release workflow](workflows/release-native.yml). It builds and verifies the native Windows installer, uploads only `PuriPulyHeart-Setup-MAJOR.MINOR.PATCH.exe` as the Actions artifact, and creates a GitHub draft release containing that installer alone. The legacy release workflow has been removed; `native-v*` tags no longer trigger a release.
+Pushing a synchronized `vMAJOR.MINOR.PATCH` tag runs the [GitHub-hosted native release workflow](workflows/release-native.yml). Production execution is fail-closed until its explicit cutover prerequisites are configured. The workflow prepares four explicit component targets, submits the components and rebuilt installer through two separately manually approved SignPath v3 artifact-ID requests, validates the outer installer and installed targets, and stages only the validated production-signed installer in a draft. Publication remains a separate maintainer action. Test-signing dispatches create clearly named Actions candidates/evidence and never a draft. The legacy release workflow has been removed; `native-v*` tags no longer trigger a release.
 
 The native Windows shell disables optional CMake JNI discovery before configuring Flutter plugins. Android-only transitive dependencies must not introduce a Java runtime dependency based on the build machine's installed JDK. Native DLL dependency closure validation remains enforced.
 
 The draft-release job installs the pinned `PYTHON_VERSION` before running release helpers. These helpers use the project's Python syntax and must not run with the Ubuntu image's default interpreter.
 
-SHA-256 and provenance verification remain inside the pipeline; provenance passes between jobs through job outputs rather than downloadable JSON files. Required third-party licenses and corresponding-source bundles remain embedded in the installer. Successful reruns remove non-installer attachments from the selected release.
+SHA-256, Authenticode chain/publisher/timestamp, metadata, signed-byte handoff and provenance validation remain inside the pipeline. Durable Actions evidence links the tag, source SHA, workflow run and attempt, both uploaded artifact IDs and signing requests, validated outputs, and production draft asset ID/URL/digest. Candidate and evidence transfer between jobs uses returned artifact IDs. Required third-party licenses and corresponding-source bundles remain embedded in the installer.
 
 Before creating a tag, commit matching versions in:
 
@@ -38,12 +38,17 @@ Before creating a tag, commit matching versions in:
 - `native/overlay/Cargo.toml`
 - `native/gpu_worker/Cargo.toml`
 
-Tag the commit containing the workflow changes and version updates, then push that tag:
+Keep the root package versions in `uv.lock`, `native/overlay/Cargo.lock`, and `native/gpu_worker/Cargo.lock` synchronized too.
+
+Tag the commit containing the workflow changes and version updates. For the initial authorized test probe:
 
 ```sh
-git tag v2.8.2
-git push origin v2.8.2
+git tag v2.8.3
+git push origin v2.8.3
+gh workflow run release-native.yml --ref v2.8.3 -f tag=v2.8.3 -f test_signing=true
 ```
 
-To rerun an existing release tag manually, use **Native Release → Run workflow** and enter the same `vMAJOR.MINOR.PATCH` tag. The workflow checks out that tag and rejects mismatched versions or source commits. Rerunning does not pick up newer branch commits: commit source fixes and update an unpublished tag before retrying, or create a new version tag. Do not move a tag whose release has already been published.
+The tag push takes the production path and remains blocked until production cutover prerequisites are satisfied; the explicit dispatch above selects the test-only path. Prepare the independently approved test certificate variables and verify the SignPath artifact configurations first. Both test requests still need manual approval. See [Code signing policy](../CODE_SIGNING.md) for exact settings and the remaining production requirements.
+
+To rerun an existing tag, select that exact tag as the **Native Release → Run workflow** ref and enter the same tag input. Branch-ref dispatches and mismatched workflow/source revisions are rejected. Select `test_signing=true` for a test-only candidate. Reruns do not pick up newer branch commits: use a new synchronized immutable version tag for source fixes, and never move a published tag. Historical unsigned releases must not be represented as signed by this workflow.
 

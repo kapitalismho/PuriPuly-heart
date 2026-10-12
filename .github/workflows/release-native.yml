@@ -10,9 +10,15 @@ on:
         description: Existing release tag, for example v2.8.2
         required: true
         type: string
+      test_signing:
+        description: Test-sign both requests and validate a probe artifact without creating a draft
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: release-native-${{ inputs.tag || github.ref_name }}
@@ -28,6 +34,8 @@ env:
   NATIVE_INPUT_ROOT: C:\d177\native-integration\release\inputs
   NATIVE_BUILD_ROOT: C:\d177\native-integration\release\build
   NATIVE_OUTPUT_ROOT: C:\d177\native-integration\release\dist
+  SIGNING_ROOT: C:\d177\native-integration\release\signing
+  SIGNING_EVIDENCE: C:\d177\native-integration\release\build\evidence\signpath
 
 jobs:
   verify-version:
@@ -69,6 +77,10 @@ jobs:
           ).strip()
           if source_sha != tag_sha:
               raise SystemExit("Checkout does not match the selected native release tag")
+          if os.environ["GITHUB_REF"] != f"refs/tags/{tag}":
+              raise SystemExit("Dispatch must select the release tag as its workflow ref")
+          if os.environ["GITHUB_SHA"] != source_sha:
+              raise SystemExit("Workflow ref does not match the selected source revision")
           root = Path(".")
           versions = {"tag": version}
           for filename in (
@@ -97,11 +109,25 @@ jobs:
           PY
 
   build-installer:
-    name: Build native Windows installer
+    name: Build and validate two-stage signed Windows installer
     runs-on: windows-2022
     needs: verify-version
+    timeout-minutes: 360
+    env:
+      APP_VERSION: ${{ needs.verify-version.outputs.version }}
+      RELEASE_TAG: ${{ needs.verify-version.outputs.tag }}
+      SOURCE_SHA: ${{ needs.verify-version.outputs.source-sha }}
+      TEST_SIGNING: ${{ inputs.test_signing && 'true' || 'false' }}
+      SIGNPATH_PRODUCTION_READY: ${{ vars.SIGNPATH_PRODUCTION_READY }}
+      SIGNPATH_TEST_PUBLISHER: ${{ vars.SIGNPATH_TEST_PUBLISHER }}
+      SIGNPATH_TEST_ROOT_SHA256: ${{ vars.SIGNPATH_TEST_ROOT_SHA256 }}
+      SIGNPATH_RELEASE_PUBLISHER: ${{ vars.SIGNPATH_RELEASE_PUBLISHER }}
+      SIGNPATH_RELEASE_ROOT_SHA256: ${{ vars.SIGNPATH_RELEASE_ROOT_SHA256 }}
+      SIGNPATH_RELEASE_ORIGIN: ${{ vars.SIGNPATH_RELEASE_ORIGIN }}
+      SIGNPATH_TEST_ROOT_CERTIFICATE_BASE64: ${{ vars.SIGNPATH_TEST_ROOT_CERTIFICATE_BASE64 }}
     outputs:
-      provenance: ${{ steps.identity.outputs.provenance }}
+      candidate-id: ${{ steps.candidate.outputs.artifact-id }}
+      evidence-id: ${{ steps.evidence.outputs.artifact-id }}
     steps:
       - name: Checkout verified native source
         uses: actions/checkout@v7
@@ -115,6 +141,28 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           uv-version: ${{ env.UV_VERSION }}
           sync-args: --extra build
+      - name: Require verified signing context and cutover authority
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          if ($env:TEST_SIGNING -eq "true") {
+            $env:SIGNPATH_EXPECTED_PUBLISHER = $env:SIGNPATH_TEST_PUBLISHER
+            $env:SIGNPATH_EXPECTED_ROOT_SHA256 = $env:SIGNPATH_TEST_ROOT_SHA256
+          } else {
+            $env:SIGNPATH_EXPECTED_PUBLISHER = $env:SIGNPATH_RELEASE_PUBLISHER
+            $env:SIGNPATH_EXPECTED_ROOT_SHA256 = $env:SIGNPATH_RELEASE_ROOT_SHA256
+          }
+          "SIGNPATH_EXPECTED_PUBLISHER=$env:SIGNPATH_EXPECTED_PUBLISHER" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "SIGNPATH_EXPECTED_ROOT_SHA256=$env:SIGNPATH_EXPECTED_ROOT_SHA256" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          $probe = @()
+          if ($env:TEST_SIGNING -eq "true") { $probe = @("--test") }
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.signing_release verify-context `
+            --version $env:APP_VERSION --tag $env:RELEASE_TAG --source-sha $env:SOURCE_SHA `
+            --ref "${{ github.ref }}" --workflow-ref "${{ github.workflow_ref }}" `
+            --workflow-sha "${{ github.workflow_sha }}" --output "$env:SIGNING_EVIDENCE/context.json" @probe
+          if ($LASTEXITCODE -ne 0) { throw "Signing context rejected." }
+          ./scripts/ci/prepare-signing-trust.ps1 -TestSigning:($env:TEST_SIGNING -eq "true")
 
       - name: Cache pinned native inputs
         uses: actions/cache@v5
@@ -207,56 +255,166 @@ jobs:
             -SoxrBuildEnvironment (Join-Path $PWD ".venv") `
             -BuildRoot $env:NATIVE_BUILD_ROOT `
             -OutputDir $env:NATIVE_OUTPUT_ROOT `
-            -InstallerOutputDir "installer_output/native" `
             -InnoSetupVersion $env:INNOSETUP_VERSION `
-            -InnoSetupCompiler $env:INNOSETUP_COMPILER
+            -InnoSetupCompiler $env:INNOSETUP_COMPILER `
+            -PrepareSigningComponents `
+            -SigningRoot $env:SIGNING_ROOT
 
-      - name: Verify native release identity and write provenance
-        id: identity
-        shell: pwsh
-        env:
-          APP_VERSION: ${{ needs.verify-version.outputs.version }}
-          RELEASE_TAG: ${{ needs.verify-version.outputs.tag }}
-          SOURCE_SHA: ${{ needs.verify-version.outputs.source-sha }}
-        run: |
-          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.release_identity verify-build `
-            --version $env:APP_VERSION `
-            --tag $env:RELEASE_TAG `
-            --source-sha $env:SOURCE_SHA `
-            --build-origin github-hosted `
-            --repository "${{ github.repository }}" `
-            --server-url "${{ github.server_url }}" `
-            --run-id "${{ github.run_id }}" `
-            --run-attempt "${{ github.run_attempt }}" `
-            --main-exe "$env:NATIVE_OUTPUT_ROOT/PuriPulyHeart.exe" `
-            --gpu-worker-exe "$env:NATIVE_OUTPUT_ROOT/PuriPulyHeartGpuWorker.exe" `
-            --overlay-exe "$env:NATIVE_OUTPUT_ROOT/PuriPulyHeartOverlay.exe" `
-            --installer "installer_output/native/PuriPulyHeart-Setup-$env:APP_VERSION.exe" `
-            --soxr-bundle "$env:NATIVE_BUILD_ROOT/soxr-release-inputs/PuriPulyHeart-soxr-third-party-source-bundle.zip" `
-            --provenance-out "$env:NATIVE_BUILD_ROOT/evidence/release-provenance-$env:APP_VERSION.json"
-          $provenance = Get-Content "$env:NATIVE_BUILD_ROOT/evidence/release-provenance-$env:APP_VERSION.json" -Raw |
-            ConvertFrom-Json | ConvertTo-Json -Depth 10 -Compress
-          "provenance=$provenance" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-
-      - name: Upload native release artifacts
+      - name: Upload exact component signing targets
+        id: components
         uses: actions/upload-artifact@v7
         with:
-          name: native-release-artifacts
-          path: installer_output/native/PuriPulyHeart-Setup-${{ needs.verify-version.outputs.version }}.exe
+          name: unsigned-components-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.SIGNING_ROOT }}/components/*
           if-no-files-found: error
+          compression-level: 0
 
+      - name: Request manually approved component signing
+        id: sign-components
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: 41a8602a-e07d-4d35-876f-8876d5acb31d
+          project-slug: PuriPuly-heart
+          signing-policy-slug: ${{ inputs.test_signing && 'test-signing' || 'release-signing' }}
+          artifact-configuration-slug: components
+          github-artifact-id: ${{ steps.components.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 7200
+          output-artifact-directory: ${{ env.SIGNING_ROOT }}/signed-components
+          parameters: |
+            version: "${{ needs.verify-version.outputs.version }}"
+
+      - name: Preserve component request evidence
+        if: always()
+        shell: pwsh
+        env:
+          ARTIFACT_ID: ${{ steps.components.outputs.artifact-id }}
+          REQUEST_ID: ${{ steps.sign-components.outputs.signing-request-id }}
+          REQUEST_URL: ${{ steps.sign-components.outputs.signing-request-web-url }}
+          REQUEST_RESULT: ${{ steps.sign-components.outcome }}
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: ./scripts/ci/record-signing-request.ps1 -Phase components -OutputDir $env:SIGNING_EVIDENCE
+
+      - name: Validate components and rebuild from exact signed bytes
+        shell: pwsh
+        run: |
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.signing_release validate-request `
+            --phase components --evidence $env:SIGNING_EVIDENCE --version $env:APP_VERSION `
+            --repository "${{ github.repository }}" --source-sha $env:SOURCE_SHA `
+            --run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}"
+          if ($LASTEXITCODE -ne 0) { throw "Component signing provenance rejected." }
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.signing_release rebuild `
+            --version $env:APP_VERSION --payload $env:NATIVE_OUTPUT_ROOT --root $env:SIGNING_ROOT `
+            --compiler $env:INNOSETUP_COMPILER --script "$PWD/installer.iss" `
+            --cleanup-include "$env:NATIVE_OUTPUT_ROOT/../native-installer-cleanup.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Signed component validation or installer rebuild failed." }
+
+      - name: Upload exact rebuilt installer candidate
+        id: installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-installer-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.SIGNING_ROOT }}/installer-candidate/PuriPulyHeart-Setup-${{ env.APP_VERSION }}.exe
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Request manually approved installer signing
+        id: sign-installer
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: 41a8602a-e07d-4d35-876f-8876d5acb31d
+          project-slug: PuriPuly-heart
+          signing-policy-slug: ${{ inputs.test_signing && 'test-signing' || 'release-signing' }}
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.installer.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 7200
+          output-artifact-directory: ${{ env.SIGNING_ROOT }}/signed-installer
+          parameters: |
+            version: "${{ needs.verify-version.outputs.version }}"
+
+      - name: Preserve installer request evidence
+        if: always()
+        shell: pwsh
+        env:
+          ARTIFACT_ID: ${{ steps.installer.outputs.artifact-id }}
+          REQUEST_ID: ${{ steps.sign-installer.outputs.signing-request-id }}
+          REQUEST_URL: ${{ steps.sign-installer.outputs.signing-request-web-url }}
+          REQUEST_RESULT: ${{ steps.sign-installer.outcome }}
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: ./scripts/ci/record-signing-request.ps1 -Phase installer -OutputDir $env:SIGNING_EVIDENCE
+
+      - name: Validate outer signature and clean installed signed targets
+        shell: pwsh
+        run: |
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.signing_release validate-request `
+            --phase installer --evidence $env:SIGNING_EVIDENCE --version $env:APP_VERSION `
+            --repository "${{ github.repository }}" --source-sha $env:SOURCE_SHA `
+            --run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}"
+          if ($LASTEXITCODE -ne 0) { throw "Installer signing provenance rejected." }
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.signing_release validate-installer `
+            --root $env:SIGNING_ROOT --version $env:APP_VERSION
+          if ($LASTEXITCODE -ne 0) { throw "Signed installer validation failed." }
+          ./scripts/ci/validate-signed-install.ps1 `
+            -ToolPython "$PWD/.venv/Scripts/python.exe" -SigningRoot $env:SIGNING_ROOT `
+            -EvidenceRoot $env:SIGNING_EVIDENCE -Version $env:APP_VERSION
+
+      - name: Finalize validated signing provenance
+        shell: pwsh
+        run: |
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.signing_release finalize `
+            --root $env:SIGNING_ROOT --evidence $env:SIGNING_EVIDENCE --version $env:APP_VERSION `
+            --tag $env:RELEASE_TAG --source-sha $env:SOURCE_SHA `
+            --repository "${{ github.repository }}" --run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}"
+          if ($LASTEXITCODE -ne 0) { throw "Signing provenance validation failed." }
+
+      - name: Upload validated candidate only
+        id: candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.test_signing && 'test-signed-candidate' || 'production-signed-candidate' }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.SIGNING_ROOT }}/signed-installer/PuriPulyHeart-Setup-${{ env.APP_VERSION }}.exe
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Collect durable signing evidence
+        if: always()
+        shell: pwsh
+        env:
+          CANDIDATE_ARTIFACT_ID: ${{ steps.candidate.outputs.artifact-id }}
+        run: |
+          New-Item -ItemType Directory -Path $env:SIGNING_EVIDENCE -Force | Out-Null
+          foreach ($name in @("prepared.json", "validated-components.json", "rebuild-inputs.json", "installer-candidate.json", "validated-installer.json", "validated-installed.json", "prepare-compiler.log", "rebuild-compiler.log")) {
+            $source = Join-Path $env:SIGNING_ROOT $name
+            if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination $env:SIGNING_EVIDENCE }
+          }
+          @{ candidate_artifact_id = $env:CANDIDATE_ARTIFACT_ID; job_status = "${{ job.status }}" } |
+            ConvertTo-Json | Set-Content "$env:SIGNING_EVIDENCE/delivery.json" -Encoding utf8
+
+      - name: Upload durable signing evidence even on failure
+        id: evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.test_signing && 'test-signing-evidence' || 'production-signing-evidence' }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.SIGNING_EVIDENCE }}
+          if-no-files-found: error
   publish-release:
     name: Create native GitHub draft release
     runs-on: ubuntu-latest
+    if: ${{ !inputs.test_signing }}
     needs:
       - verify-version
       - build-installer
     permissions:
       contents: write
+      actions: read
     env:
       APP_VERSION: ${{ needs.verify-version.outputs.version }}
       RELEASE_TAG: ${{ needs.verify-version.outputs.tag }}
-      RELEASE_PROVENANCE: ${{ needs.build-installer.outputs.provenance }}
+      SOURCE_SHA: ${{ needs.verify-version.outputs.source-sha }}
     steps:
       - name: Checkout verified native source
         uses: actions/checkout@v7
@@ -272,8 +430,16 @@ jobs:
       - name: Download native release artifacts
         uses: actions/download-artifact@v8
         with:
-          name: native-release-artifacts
+          artifact-ids: ${{ needs.build-installer.outputs.candidate-id }}
           path: native-release-artifacts
+          merge-multiple: true
+
+      - name: Download signing provenance
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build-installer.outputs.evidence-id }}
+          path: signing-evidence
+          merge-multiple: true
 
       - name: Render native release body
         run: |
@@ -284,14 +450,26 @@ jobs:
 
       - name: Verify native release surface and provenance
         run: |
-          PYTHONPATH=src python3 -m puripuly_heart.release_evidence.release_identity verify-publish \
-            --version "$APP_VERSION" \
-            --tag "$RELEASE_TAG" \
-            --title "$RELEASE_TAG" \
-            --installer-exe "PuriPulyHeart-Setup-$APP_VERSION.exe" \
-            --body native-release-body.md \
+          PYTHONPATH=src python3 -m puripuly_heart.release_evidence.signing_release verify-publish \
+            --version "$APP_VERSION" --tag "$RELEASE_TAG" --source-sha "$SOURCE_SHA" \
+            --repository "${{ github.repository }}" --run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}" \
+            --body native-release-body.md --evidence signing-evidence \
             --asset "native-release-artifacts/PuriPulyHeart-Setup-$APP_VERSION.exe" \
-            --provenance-json "$RELEASE_PROVENANCE"
+            --candidate-id "${{ needs.build-installer.outputs.candidate-id }}"
+
+      - name: Reject modification of a published release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing="$(gh api "repos/${{ github.repository }}/releases/tags/$RELEASE_TAG" 2>release-lookup-error.txt)" || {
+            if ! grep -q "HTTP 404" release-lookup-error.txt; then
+              cat release-lookup-error.txt
+              exit 1
+            fi
+          }
+          if [ -n "$existing" ]; then
+            test "$(printf '%s' "$existing" | jq -r '.draft')" = true
+          fi
 
       - name: Create native draft release
         uses: softprops/action-gh-release@v3
@@ -317,3 +495,18 @@ jobs:
           done <<< "$obsolete_assets"
           actual_assets="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')"
           test "$actual_assets" = "$installer"
+
+      - name: Record draft release asset delivery
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/releases/tags/$RELEASE_TAG" > signing-evidence/draft-delivery.json
+          PYTHONPATH=src python3 -m puripuly_heart.release_evidence.signing_release verify-draft-delivery --evidence signing-evidence
+
+      - name: Preserve draft delivery evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: draft-delivery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: signing-evidence
+          if-no-files-found: error
