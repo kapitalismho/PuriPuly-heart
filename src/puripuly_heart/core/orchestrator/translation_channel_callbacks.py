@@ -24,6 +24,7 @@ from puripuly_heart.core.runtime.stt_session_projection import SttSessionStatePr
 from puripuly_heart.core.stt.backend import (
     STTProviderEpochEnded,
     STTProviderInputTerminal,
+    STTProviderTurnIdentity,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTRecognitionUnitTerminal,
@@ -263,16 +264,18 @@ class TranslationChannelOwnerCallbacks:
         if isinstance(event, STTProviderTurnUpdate):
             async with self._recognition_locks["peer"]:
                 snapshot = self._require_peer_capture().provider_source_snapshot(event.identity)
-                if snapshot is not None and self._peer_provider_source_is_current(event):
+                if snapshot is not None and self._peer_provider_identity_is_current(event.identity):
                     await self._require_peer().handle_provider_turn_update(snapshot, event)
             return
         if isinstance(event, STTProviderEpochEnded):
-            self._require_peer().retire_provider_epoch(event.provider_epoch_id)
+            self._require_peer().retire_provider_epoch(
+                event.provider_epoch_id, is_obsolete=self._peer_provider_source_is_obsolete
+            )
             return
         if isinstance(event, STTProviderTurnTerminal):
             async with self._recognition_locks["peer"]:
                 peer = self._require_peer()
-                if not self._peer_provider_source_is_current(event):
+                if not self._peer_provider_identity_is_current(event.identity):
                     peer.retire_provider_turn(event.identity)
                     event = replace(
                         event, outcome="cancelled", text="", text_authority="none",
@@ -289,15 +292,19 @@ class TranslationChannelOwnerCallbacks:
         self._stt_sessions.record(event)
         await self._require_peer().handle_stt_event(event)
 
-    def _peer_provider_source_is_current(
-        self, event: STTProviderTurnUpdate | STTProviderTurnTerminal
-    ) -> bool:
-        identity = event.identity
+    def _peer_provider_identity_is_current(self, identity: STTProviderTurnIdentity) -> bool:
         stream = RecognitionStreamIdentity(
             "peer", identity.segment.activation_generation, identity.segment.capture_epoch,
             identity.provider_epoch_id, identity.settings_scope,
         )
         return self._require_peer().local_asr_runtime.is_current_recognition_stream("peer", stream)
+
+    def _peer_provider_source_is_obsolete(self, identity: STTProviderTurnIdentity) -> bool:
+        capture = self._peer_capture
+        return capture is not None and (
+            capture.provider_source_snapshot(identity) is None
+            or not self._peer_provider_identity_is_current(identity)
+        )
 
     async def retired_event_handler(self, event: object) -> None:
         if isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal) and self._peer_capture is not None:
@@ -328,7 +335,9 @@ class TranslationChannelOwnerCallbacks:
             await self._admit_recognition_unit(event, channel=event.unit.identity.stream.channel)
             return
         if isinstance(event, STTProviderEpochEnded):
-            if self._peer is not None and self._peer.retire_provider_epoch(event.provider_epoch_id):
+            if self._peer is not None and self._peer.retire_provider_epoch(
+                event.provider_epoch_id, is_obsolete=self._peer_provider_source_is_obsolete
+            ):
                 return
             await self._after_self_epoch_ended(event)
             return

@@ -6,6 +6,7 @@ from dataclasses import replace
 from types import SimpleNamespace
 from uuid import uuid4
 
+import numpy as np
 import pytest
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
@@ -14,6 +15,7 @@ from puripuly_heart.core.audio.ownership import (
     AudioSegmentSettingsSnapshot,
     AudioSegmentSnapshot,
     AudioSegmentTerminalReceipt,
+    PeerAudioSegmentLedger,
 )
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
@@ -35,7 +37,9 @@ from puripuly_heart.core.stt.backend import (
     STTTextContribution,
 )
 from puripuly_heart.core.stt.recognition_units import contribution_transcript
+from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
 from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun, Transcript, Translation
 from puripuly_heart.domain.recognition import (
     RecognitionStreamIdentity,
@@ -43,6 +47,7 @@ from puripuly_heart.domain.recognition import (
     RecognitionUnitIdentity,
 )
 from puripuly_heart.providers.stt.soniox import _SonioxSession
+from tests.core.test_stt_scoped_engine import ControlledScopedSession, settings, span, watchdogs
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
 
@@ -921,3 +926,189 @@ async def test_explicit_release_checks_capture_owner_before_consumption():
         assert [entry.text for entry in harness.peer_runtime.translation_history] == ["AB"]
     finally:
         await close(harness)
+
+
+@pytest.mark.parametrize("selection", [None, (1, 2)])
+def test_explicit_release_rejects_skipped_prefix_atomically_then_reconciles_tail(selection):
+    _, identity = source_fixture()
+    normalizer = STTScopedTurnNormalizer(identity)
+    normalizer.apply_update(STTProviderTurnUpdate(identity, 1, "stable", "append", "AB"))
+    ledger = STTContributionConsumptionLedger()
+    later = normalizer.release_source(STTSourceRelease(
+        "ready", 1 if selection is None else 0, 2, "end"
+    ))
+    with pytest.raises(ValueError, match="skips earlier unconsumed"):
+        ledger.consume_parts(later, text_range=selection)
+    assert ledger.consumed_contribution_ids == frozenset()
+    assert ledger._releases == ledger._admitted_prefixes == {}
+    prefix = normalizer.release_source(STTSourceRelease("ready", 0, 1, "end"))
+    assert ledger.consume(prefix) == "A"
+    assert ledger._admitted_prefixes[identity] == 1
+    assert ledger.consume(prefix) == ""
+    terminal = normalizer.apply_terminal(STTProviderTurnTerminal(
+        identity, "final", "ABC", text_authority="authoritative"
+    ))
+    assert ledger.consume(terminal) == "BC"
+    assert ledger._releases == ledger._admitted_prefixes == {}
+
+
+@pytest.mark.asyncio
+async def test_rejected_out_of_order_source_release_adds_no_context_jobs_or_publications():
+    provider = ControlledProvider()
+    harness, trace = harness_for(provider)
+    snapshot, identity = source_fixture()
+    normalizer = STTScopedTurnNormalizer(identity)
+    normalizer.apply_update(STTProviderTurnUpdate(identity, 1, "stable", "append", "AB"))
+    try:
+        with pytest.raises(ValueError, match="skips earlier unconsumed"):
+            await harness.peer_owner.handle_provider_turn_update(
+                snapshot, normalizer.release_source(STTSourceRelease("later", 1, 2, "end"))
+            )
+        assert provider.calls == trace.items == harness.peer_runtime.translation_history == []
+        assert harness.peer_owner._stt_consumption.consumed_contribution_ids == frozenset()
+        assert harness.peer_owner._stt_consumption._releases == {}
+        await harness.peer_owner.handle_provider_turn_update(
+            snapshot, normalizer.release_source(STTSourceRelease("earlier", 0, 1, "end"))
+        )
+        await until(lambda: len(provider.calls) == 1)
+        await harness.peer_owner.handle_provider_turn_update(
+            snapshot, normalizer.release_source(STTSourceRelease("later", 1, 2, "end"))
+        )
+        await finish(harness)
+        assert [item.source_text for item in trace.items] == ["A", "B"]
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == ["A", "B"]
+        assert provider.calls[0][2] == ""
+        assert '"A"' in provider.calls[1][2]
+    finally:
+        await close(harness)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("orderly", [False, True])
+@pytest.mark.parametrize("retired_route", [False, True])
+async def test_actual_engine_epoch_before_local_seal_preserves_lawful_terminal_tail(
+    orderly, retired_route
+):
+    provider = ControlledProvider()
+    harness, trace = harness_for(provider)
+    harness.peer_owner._stt_consumption = STTContributionConsumptionLedger(identity_capacity=1)
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("soniox"))
+    segment_id = uuid4()
+    start = ledger.observe_vad_event(
+        SpeechStart(
+            segment_id, np.empty(0, dtype=np.float32), np.full(4, 0.1, dtype=np.float32),
+            chunk_capture=(span(1, 0, 4),),
+        ),
+        now_monotonic_s=10,
+    )
+    capture = object.__new__(PeerCaptureSessionOwner)
+    capture._publication_generations = {1}
+    capture._segment_ledgers = [ledger]
+    capture._provider_terminal_events = {}
+    capture.clock = FakeClock(10)
+    callbacks = TranslationChannelOwnerCallbacks(harness.stt_sessions)
+    callbacks.bind_peer(harness.peer_owner)
+    callbacks.bind_peer_capture(capture)
+    session = ControlledScopedSession()
+    delivered = []
+
+    async def receive(event):
+        if retired_route and isinstance(event, STTProviderEpochEnded):
+            await callbacks.retired_event_handler(event)
+        else:
+            await callbacks.peer_event_handler(event)
+        delivered.append(event)
+
+    engine = ScopedRecognitionEngine(
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        event_sink=receive, watchdog_resolver=lambda _settings: watchdogs(final_timeout_s=0.3),
+    )
+    harness.peer_owner.local_asr_runtime = SimpleNamespace(
+        is_current_recognition_stream=lambda channel, stream: engine.is_current_recognition_stream(stream)
+    )
+    try:
+        await engine.handle_owned_vad_event(start)
+        identity = session.requests[0].identity
+        session.emit(STTProviderTurnUpdate(
+            identity, 1, "stable", "append", "AB",
+            source_release=STTSourceRelease("prefix", 0, 1, "boundary"),
+        ))
+        await until(lambda: len(provider.calls) == 1)
+        await finish(harness)
+        assert [item.source_text for item in trace.items] == ["A"]
+        session.emit(STTProviderTurnTerminal(
+            identity, "degraded", "AB", text_authority="degraded",
+            epoch_disposition="retire", failure_reason="soniox_stream_finished",
+        ))
+        session.emit(STTProviderEpochEnded(
+            identity.provider_epoch_id, orderly, "soniox_stream_finished"
+        ))
+        await until(lambda: any(isinstance(event, STTProviderEpochEnded) for event in delivered))
+        assert engine._turns[identity].terminal_ready.done()
+        assert not engine._turns[identity].local_sealed
+        assert ledger.snapshots[0].state == "open"
+        assert not any(isinstance(event, STTProviderTurnTerminal) for event in delivered)
+        assert harness.peer_owner._stt_consumption.lifecycle(identity) == (False, False)
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == ["A"]
+        end = ledger.observe_vad_event(
+            SpeechEnd(segment_id, trailing_silence_ms=224, reason="silence"),
+            now_monotonic_s=11,
+        )
+        await engine.handle_owned_vad_event(end)
+        await finish(harness)
+        assert [item.source_text for item in trace.items] == ["A", "B"]
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == ["A", "B"]
+        assert provider.calls[0][2] == ""
+        assert '"A"' in provider.calls[1][2]
+        assert harness.peer_owner._stt_consumption.lifecycle(identity) == (True, True)
+        assert harness.peer_owner._stt_consumption.consumed_contribution_ids == frozenset()
+        assert harness.peer_owner._stt_consumption._releases == {}
+        assert harness.peer_owner._stt_consumption._admitted_prefixes == {}
+        next_identity = replace(
+            identity, segment=replace(identity.segment, segment_order=2, segment_id=uuid4()),
+            provider_turn_id="next",
+        )
+        assert harness.peer_owner._stt_consumption.consume(
+            STTProviderTurnTerminal(next_identity, "final", "next")
+        ) == "next"
+        assert harness.peer_owner._stt_consumption.consume(STTProviderTurnUpdate(
+            identity, 2, "stable", "replace", "AB",
+            source_release=STTSourceRelease("late", 0, 2, "end"),
+            included_contributions=(STTTextContribution(
+                f"{identity.provider_turn_id}:1", 0, 2
+            ),),
+        )) == ""
+    finally:
+        await engine.close()
+        await close(harness)
+
+
+def test_epoch_reclamation_selects_obsolete_identity_and_preserves_older_pending_tail():
+    _, pending = source_fixture(1)
+    _, obsolete = source_fixture(2)
+    ledger = STTContributionConsumptionLedger(identity_capacity=2)
+    contribution = STTTextContribution("pending-text", 0, 2)
+    pending_update = STTProviderTurnUpdate(
+        pending, 1, "stable", "replace", "AB", contribution=contribution,
+        source_release=STTSourceRelease("pending-prefix", 0, 1, "boundary"),
+    )
+    obsolete_update = STTProviderTurnUpdate(
+        obsolete, 1, "stable", "replace", "C", contribution=STTTextContribution("old", 0, 1),
+        source_release=STTSourceRelease("old-prefix", 0, 1, "boundary"),
+    )
+    assert ledger.consume(pending_update) == "A"
+    assert ledger.consume(obsolete_update) == "C"
+    assert ledger.retire_epoch(
+        pending.provider_epoch_id, is_obsolete=lambda identity: identity == obsolete
+    )
+    assert ledger.lifecycle(pending) == (False, False)
+    assert ledger.lifecycle(obsolete) == (False, True)
+    assert ledger._admitted_prefixes == {pending: 1}
+    _, next_identity = source_fixture(3)
+    assert ledger.consume(STTProviderTurnTerminal(next_identity, "final", "next")) == "next"
+    assert len(ledger._known_identities) == 2
+    assert ledger.consume(STTProviderTurnTerminal(
+        pending, "degraded", "AB", included_contributions=(contribution,)
+    )) == "B"
+    assert ledger.consume(obsolete_update) == ""
+    assert ledger._releases == ledger._admitted_prefixes == {}

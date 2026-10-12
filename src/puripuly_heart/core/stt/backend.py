@@ -209,6 +209,7 @@ class STTContributionConsumptionLedger:
         self._boundaries: dict[STTProviderTurnIdentity, dict[str, STTAudioBoundary]] = {}
         self._sealed: set[STTProviderTurnIdentity] = set()
         self._releases: dict[STTProviderTurnIdentity, dict[str, STTSourceRelease]] = {}
+        self._admitted_prefixes: dict[STTProviderTurnIdentity, int] = {}
 
     @property
     def consumed_contribution_ids(self) -> frozenset[str]:
@@ -346,6 +347,9 @@ class STTContributionConsumptionLedger:
             raise ValueError("selected source range exceeds release")
         if selection_start < 0 or selection_end > len(event.text) or selection_end < selection_start:
             raise ValueError("invalid selected source range")
+        prefix_end = self._admitted_prefixes.get(event.identity, 0)
+        if release is not None and selection_start > prefix_end:
+            raise ValueError("source release skips earlier unconsumed text")
         pieces: list[STTConsumedContribution] = []
         staged: list[tuple[tuple[STTProviderTurnIdentity, str], list[tuple[int, int]]]] = []
         for contribution in contributions:
@@ -375,6 +379,11 @@ class STTContributionConsumptionLedger:
                     event.identity, contribution.contribution_id, left, right, event.text[left:right]
                 ))
             staged.append((key, remaining))
+        if release is not None:
+            for piece in pieces:
+                if piece.text_start != prefix_end:
+                    raise ValueError("source release changes admitted prefix ownership")
+                prefix_end = piece.text_end
         new_keys = {key for key, ranges in staged if ranges and key not in self._consumed}
         if len(self._consumed) + len(new_keys) > self._contribution_capacity:
             raise ValueError("source contribution capacity exceeded")
@@ -396,6 +405,7 @@ class STTContributionConsumptionLedger:
             self._contribution_ranges[key] = declared
         if release is not None:
             self._releases.setdefault(event.identity, {})[release.release_id] = release
+            self._admitted_prefixes[event.identity] = prefix_end
         if isinstance(event, STTProviderTurnTerminal) and text_range is None:
             self.retire(event.identity)
         return tuple(pieces)
@@ -404,6 +414,7 @@ class STTContributionConsumptionLedger:
         if self._remember_identity(identity):
             self._consumed_terminal_tails.add(identity)
             self._releases.pop(identity, None)
+            self._admitted_prefixes.pop(identity, None)
             self._consumed = {
                 key: ranges for key, ranges in self._consumed.items() if key[0] != identity
             }
@@ -417,10 +428,15 @@ class STTContributionConsumptionLedger:
         self.retire(identity)
         return True
 
-    def retire_epoch(self, provider_epoch_id: str) -> bool:
+    def retire_epoch(
+        self,
+        provider_epoch_id: str,
+        *,
+        is_obsolete: Callable[[STTProviderTurnIdentity], bool],
+    ) -> bool:
         identities = {
             identity for identity in self._known_identities
-            if identity.provider_epoch_id == provider_epoch_id
+            if identity.provider_epoch_id == provider_epoch_id and is_obsolete(identity)
         }
         if not identities:
             return False
@@ -435,6 +451,10 @@ class STTContributionConsumptionLedger:
             identity: releases for identity, releases in self._releases.items()
             if identity not in identities
         }
+        self._admitted_prefixes = {
+            identity: prefix_end for identity, prefix_end in self._admitted_prefixes.items()
+            if identity not in identities
+        }
         return True
 
     def retire_all(self) -> None:
@@ -442,6 +462,7 @@ class STTContributionConsumptionLedger:
         self._consumed.clear()
         self._contribution_ranges.clear()
         self._releases.clear()
+        self._admitted_prefixes.clear()
 
     def _remember_identity(self, identity: STTProviderTurnIdentity) -> bool:
         if identity in self._known_identities:
@@ -476,6 +497,7 @@ class STTContributionConsumptionLedger:
             self._known_identities.discard(expired)
             self._consumed_terminal_tails.discard(expired)
             self._boundaries.pop(expired, None)
+            self._admitted_prefixes.pop(expired, None)
             self._sealed.discard(expired)
             self._releases.pop(expired, None)
             self._consumed = {key: ranges for key, ranges in self._consumed.items() if key[0] != expired}

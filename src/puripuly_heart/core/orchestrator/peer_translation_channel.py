@@ -466,8 +466,13 @@ class PeerTranslationChannelOwner:
     def retire_provider_turn(self, identity: STTProviderTurnIdentity) -> bool:
         return self._stt_consumption.retire_known(identity)
 
-    def retire_provider_epoch(self, provider_epoch_id: str) -> bool:
-        return self._stt_consumption.retire_epoch(provider_epoch_id)
+    def retire_provider_epoch(
+        self,
+        provider_epoch_id: str,
+        *,
+        is_obsolete: Callable[[STTProviderTurnIdentity], bool],
+    ) -> bool:
+        return self._stt_consumption.retire_epoch(provider_epoch_id, is_obsolete=is_obsolete)
 
     def note_audio_boundary(
         self, identity: STTProviderTurnIdentity, boundary: STTAudioBoundary
