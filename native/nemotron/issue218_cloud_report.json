@@ -1,0 +1,2075 @@
+{
+  "schema": "issue218-cloud-experiment-report-1",
+  "candidate": "c7e7ae0d5bfb8a5ab8637c0dbc1e40eb0f84e6f9",
+  "scope": "Fresh authorized non-VR Deepgram and exact Gemini Transcribe comparison only, on approved public inputs. This is not whole #218 completion, production-profile selection, integration approval or VR suitability evidence.",
+  "authority": {
+    "routes": [
+      "Deepgram",
+      "Gemini Transcribe"
+    ],
+    "Gemini_credential": "GOOGLE_API_KEY2 from explicit targeted .env.local parser, passed to current GeminiTranscribeSTTBackend and checked at genai.Client creation; GOOGLE_API_KEY never a fallback",
+    "Deepgram_credential": "DEEPGRAM_API_KEY explicit current backend constructor; targeted file parser with authorized established environment fallback only for Deepgram",
+    "limits": {
+      "per_provider_audio_seconds_including_replay": 300,
+      "per_provider_remote_starts": 72
+    },
+    "forbidden": [
+      "Soniox/other cloud calls",
+      "paid cloud translation",
+      "model downloads",
+      "private capture",
+      "VRChat/SteamVR launch",
+      "persisted settings changes",
+      "product implementation/repair",
+      "Git/remote mutations"
+    ],
+    "previous_local_evidence": "Immutable; no local-run evidence or acceptance/review records modified."
+  },
+  "executed_result": {
+    "valid_cases": 48,
+    "valid_translation_calls": 88,
+    "all_valid_translation_terminals": "translated",
+    "real_provider_calls_including_invalid": 60,
+    "driver_failure_attempts_preserved": 2,
+    "budget_totals": {
+      "deepgram": {
+        "remote_starts_reserved": 24,
+        "audio_samples_reserved": 1987200,
+        "audio_samples_written": 1987200,
+        "halted": false,
+        "reserved_audio_seconds": 124.2,
+        "successfully_written_audio_seconds": 124.2,
+        "max_remote_starts": 72,
+        "max_audio_seconds_including_replay": 300
+      },
+      "gemini_transcribe": {
+        "remote_starts_reserved": 36,
+        "audio_samples_reserved": 3446512,
+        "audio_samples_written": 3446512,
+        "halted": false,
+        "reserved_audio_seconds": 215.407,
+        "successfully_written_audio_seconds": 215.407,
+        "max_remote_starts": 72,
+        "max_audio_seconds_including_replay": 300
+      }
+    },
+    "no_extra_calls_for_analysis": true,
+    "monetary_charge": "unknown; no captured usage/charge events. Successful SDK PCM write is not a provider billing receipt."
+  },
+  "headline_disposition": {
+    "Deepgram_baseline": "DEFER as complete-content success: cleanAB missing A and longer cases retain existing edge/replay issues. Baseline useful context/translation comparison remains valid.",
+    "Deepgram_1.04": "DEFER, no adoption: actual early identified pixels and returning text exist, but phrase fragments cause material translation usefulness regression; gray/cyan split within one true B sentence is not rich complete success.",
+    "Deepgram_0.64": "DEFER, no adoption: same material translation splitting harm, plus only bounded additional returning-tail identification versus1.04; no profile winner.",
+    "Gemini_Transcribe_baseline": "DEFER complete-content claim pending finality/source-coverage qualification; recorded authoritative finals are conserved, but normal admitted final source lacks earlier required content. Exact service/SDK/contract cause unresolved.",
+    "Gemini_Transcribe_1.04": "DEFER rich enhancement: independent native finals remain unmapped/allgray; same baseline-common final-source coverage failure, not CPU feature-induced substitution.",
+    "Gemini_Transcribe_0.64": "DEFER on same limits; no identified source or material enhanced-release benefit established.",
+    "production_profile_selected": false,
+    "approval_boundary": "Director/maintainer review and separate product decision; worker report is experiment evidence only."
+  },
+  "comparisons": {
+    "arm_metrics": {
+      "deepgram": {
+        "baseline": {
+          "case_count": 8,
+          "source_units": 10,
+          "translation_calls": 10,
+          "attribution_states": {
+            "unavailable": 10
+          },
+          "identified_source_char_coverage_stripped": 0.0,
+          "submitted_audio_s": 41.4,
+          "complete_required_words_availability": {
+            "failed": 6,
+            "passed": 2
+          },
+          "frame_delivery_lag_peak_s": 0.2975715000065975
+        },
+        "1.04": {
+          "case_count": 8,
+          "source_units": 24,
+          "translation_calls": 24,
+          "attribution_states": {
+            "uncertain": 8,
+            "identified": 10,
+            "unavailable": 6
+          },
+          "identified_source_char_coverage_stripped": 0.4666666666666667,
+          "submitted_audio_s": 41.4,
+          "complete_required_words_availability": {
+            "failed": 6,
+            "passed": 2
+          },
+          "frame_delivery_lag_peak_s": 0.5458351999986917
+        },
+        "0.64": {
+          "case_count": 8,
+          "source_units": 24,
+          "translation_calls": 24,
+          "attribution_states": {
+            "uncertain": 8,
+            "identified": 12,
+            "unavailable": 4
+          },
+          "identified_source_char_coverage_stripped": 0.5333333333333333,
+          "submitted_audio_s": 41.4,
+          "complete_required_words_availability": {
+            "failed": 6,
+            "passed": 2
+          },
+          "frame_delivery_lag_peak_s": 0.5978261000127532
+        }
+      },
+      "gemini_transcribe": {
+        "baseline": {
+          "case_count": 8,
+          "source_units": 10,
+          "translation_calls": 10,
+          "attribution_states": {
+            "unavailable": 10
+          },
+          "identified_source_char_coverage_stripped": 0.0,
+          "submitted_audio_s": 48.75175,
+          "complete_required_words_availability": {
+            "failed": 6,
+            "passed": 2
+          },
+          "frame_delivery_lag_peak_s": 0.12052419999963604
+        },
+        "1.04": {
+          "case_count": 8,
+          "source_units": 10,
+          "translation_calls": 10,
+          "attribution_states": {
+            "unavailable": 10
+          },
+          "identified_source_char_coverage_stripped": 0.0,
+          "submitted_audio_s": 48.75175,
+          "complete_required_words_availability": {
+            "failed": 6,
+            "passed": 2
+          },
+          "frame_delivery_lag_peak_s": 0.1291899999778252
+        },
+        "0.64": {
+          "case_count": 8,
+          "source_units": 10,
+          "translation_calls": 10,
+          "attribution_states": {
+            "unavailable": 10
+          },
+          "identified_source_char_coverage_stripped": 0.0,
+          "submitted_audio_s": 48.75175,
+          "complete_required_words_availability": {
+            "failed": 6,
+            "passed": 2
+          },
+          "frame_delivery_lag_peak_s": 0.10899459998472594
+        }
+      }
+    },
+    "case_table": [
+      {
+        "route": "deepgram",
+        "case": "clean_A_B",
+        "reference": "He washed the detritus from his hair. Gentlemen of the Press!",
+        "actual_exact_source_concatenations": [
+          "Gentlemen of the press."
+        ],
+        "within_route_raw_admitted_source_identical_all_arms_repetitions": true,
+        "exact_source_WER_punctuation_tokenized": [
+          0.6363636363636364
+        ],
+        "complete_required_words_status": "failed",
+        "complete_required_words_latency_if_failed": null
+      },
+      {
+        "route": "deepgram",
+        "case": "distinct_repeated_A_B_A",
+        "reference": "He washed the detritus from his hair. Gentlemen of the Press! He washed the detritus from his hair.",
+        "actual_exact_source_concatenations": [
+          "Washed the detritus from his hair. Gentlemen of the press.He washed the detritus from hisfrom his hair."
+        ],
+        "within_route_raw_admitted_source_identical_all_arms_repetitions": true,
+        "exact_source_WER_punctuation_tokenized": [
+          0.1111111111111111
+        ],
+        "complete_required_words_status": "failed",
+        "complete_required_words_latency_if_failed": null
+      },
+      {
+        "route": "deepgram",
+        "case": "short_A_B_A",
+        "reference": "He washed the detritus from his hair. No. He washed the detritus from his hair.",
+        "actual_exact_source_concatenations": [
+          "Washed the detritus from his hair. No. He washedthe detritus from his hair."
+        ],
+        "within_route_raw_admitted_source_identical_all_arms_repetitions": true,
+        "exact_source_WER_punctuation_tokenized": [
+          0.2
+        ],
+        "complete_required_words_status": "failed",
+        "complete_required_words_latency_if_failed": null
+      },
+      {
+        "route": "deepgram",
+        "case": "linguistic_correction",
+        "reference": "No. No, three.",
+        "actual_exact_source_concatenations": [
+          "No. No. Three."
+        ],
+        "within_route_raw_admitted_source_identical_all_arms_repetitions": true,
+        "exact_source_WER_punctuation_tokenized": [
+          0.0
+        ],
+        "complete_required_words_status": "passed",
+        "complete_required_words_latency_if_failed": null
+      },
+      {
+        "route": "gemini_transcribe",
+        "case": "clean_A_B",
+        "reference": "He washed the detritus from his hair. Gentlemen of the Press!",
+        "actual_exact_source_concatenations": [
+          "Gentlemen of the press."
+        ],
+        "within_route_raw_admitted_source_identical_all_arms_repetitions": true,
+        "exact_source_WER_punctuation_tokenized": [
+          0.6363636363636364
+        ],
+        "complete_required_words_status": "failed",
+        "complete_required_words_latency_if_failed": null
+      },
+      {
+        "route": "gemini_transcribe",
+        "case": "distinct_repeated_A_B_A",
+        "reference": "He washed the detritus from his hair. Gentlemen of the Press! He washed the detritus from his hair.",
+        "actual_exact_source_concatenations": [
+          "Gentlemen of the press.from his"
+        ],
+        "within_route_raw_admitted_source_identical_all_arms_repetitions": true,
+        "exact_source_WER_punctuation_tokenized": [
+          0.6666666666666666
+        ],
+        "complete_required_words_status": "failed",
+        "complete_required_words_latency_if_failed": null
+      },
+      {
+        "route": "gemini_transcribe",
+        "case": "short_A_B_A",
+        "reference": "He washed the detritus from his hair. No. He washed the detritus from his hair.",
+        "actual_exact_source_concatenations": [
+          "He washed the detritus from his hair."
+        ],
+        "within_route_raw_admitted_source_identical_all_arms_repetitions": true,
+        "exact_source_WER_punctuation_tokenized": [
+          0.5333333333333333
+        ],
+        "complete_required_words_status": "failed",
+        "complete_required_words_latency_if_failed": null
+      },
+      {
+        "route": "gemini_transcribe",
+        "case": "linguistic_correction",
+        "reference": "No. No, three.",
+        "actual_exact_source_concatenations": [
+          "No no three."
+        ],
+        "within_route_raw_admitted_source_identical_all_arms_repetitions": true,
+        "exact_source_WER_punctuation_tokenized": [
+          0.0
+        ],
+        "complete_required_words_status": "passed",
+        "complete_required_words_latency_if_failed": null
+      }
+    ],
+    "CPU_returning_content_question": "The prior CPU Parakeet feature-induced returning A disappearance/Yeah. substitution did not recur as a new-arm-only ASR effect in these valid cloud observations. Deepgram retains returning content with baseline-common initial He omission, boundary replay and glue errors. Gemini normal-final coverage drops earlier content in baseline and both new arms; that is not evidence of the same Nemotron-induced substitution mechanism.",
+    "all_gray_question": "Deepgram is not allgray:22/48new source units identified (10/24 at1.04,12/24 at.64), with gold/cyan actual pixels. Gemini is30/30unavailable acrossallarms: current independent native finals have no source correspondence/word clocks, and native speaker values are never used. Nemotron probability dominance or whole-input purity cannot supply missing correspondence.",
+    "raw_source_conservation_is_not_semantic_success": true
+  },
+  "prominent_semantic_negative": {
+    "classification": "Feature-induced Deepgram source-fragment/translation composition harm despite identical admitted ASR concatenation. This is a new type of regression relative to CPU returning-source substitution, not an ASR text conservation pass promoted to final success.",
+    "clean_B_baseline": {
+      "source": "Gentlemen of the press.",
+      "actual_translation": "기자 여러분."
+    },
+    "clean_B_new_1.04_repetition1": [
+      {
+        "source": "Gentlemen ",
+        "speaker": "uncertain/gray",
+        "actual_translation": "신사분들"
+      },
+      {
+        "source": "of the press.",
+        "speaker": "identified1/cyan",
+        "actual_translation": "기자분들의."
+      }
+    ],
+    "ABA_A_new_1.04_repetition1": [
+      {
+        "source": "Washed the detritus from his ",
+        "speaker": "identified0/gold",
+        "actual_translation": "그의 잔해를 씻어냈어"
+      },
+      {
+        "source": "hair. ",
+        "speaker": "uncertain/gray",
+        "actual_translation": "머리."
+      }
+    ],
+    "ABA_A_baseline_repetition1": "Full initial A clause kept within compound source, translated as 그의 머리에서 이물질을 씻어냈어요. (with later B/return text in same source). New from-his/hair split changes compositional meaning and produces detached fragments.",
+    "short_ABA_new": "hair. No. He and washed and the detritus from his hair. become separate actual translation inputs; No. is retained in raw source but actual translations/composition are not certified equivalent.",
+    "translation_call_pressure": "Across8cases/arm, baseline10jobs versus24jobs per Deepgram profile; all58valid Deepgram calls execute real managed Gemma, not fixtures.",
+    "variability": "Two rotated repeats preserve same raw admitted source and same fragment structure. Translated Korean wording varies; exact per-call prompts/context/outputs remain in traces/summary. Gemini numeric cardinal/ordinal translation variation is also retained, not automatically attributed to speaker profiles."
+  },
+  "clean_B_attribution_diagnosis": {
+    "same_true_B_sentence": "All four lexical words belong to public B reference; gray Gentlemen then identified1 of the press is fragmented identity coverage, not two incompatible identified IDs.",
+    "native_intervals_are_estimated": true,
+    "Gentlemen_native_s": [
+      2.8799999,
+      3.52
+    ],
+    "actual_map_with500ms_onset_context": {
+      "capture_sample_range": [
+        47807,
+        58048
+      ],
+      "source_seconds": [
+        2.9879375,
+        3.628
+      ],
+      "A_reference_end_B_start_sample": 48093,
+      "A_tail_overlap_samples": 286,
+      "A_tail_overlap_ms": 17.875,
+      "B_overlap_samples": 9955
+    },
+    "recorded_model_transition_ranges": {
+      "1.04": [
+        42208,
+        49888
+      ],
+      "0.64": [
+        42048,
+        49888
+      ]
+    },
+    "full_span_observed_disposition": "uncertain, speaker_idNone inall4new cleanAB observations. Other words map wholly B[58048,70848), full-span identifiedslot1 with no overlapping transition range.",
+    "known_wrong_assignment": "Not demonstrated for this sentence. Gray is unknown/coverage loss, not correct identified B; cyan remainder agrees with B. Whole-word ambiguity remains explicit; no exact phonetic alignment, majority vote or scoring-reference repair.",
+    "reproduction": "cloud_summarize clean_B_sentence_word_span_attribution_explanation reconstructs only recorded delivered evidence and actual submitted PCM maps through current full-span policy, at actual admission time. This is offline explanation of actual E2E output, not a new run or substitute source mapping."
+  },
+  "Gemini_finality_mechanism": {
+    "observation_boundary": "Decoded google-genai2.21.0 LiveServerMessage immediately before product _handle_message. raw_wire_result label means sanitized SDK-native object, not raw websocket JSON bytes.",
+    "native_counts_valid24cases": {
+      "input_transcription": 30,
+      "interim_input_transcription": 178,
+      "generation_complete_true": 30,
+      "other_text_fields": 0
+    },
+    "raw_to_admitted": "30/30authoritative input_transcription fragments exactly preserved in30recognition terminals,30admitted sources,30real translation calls. Receipt sequence/unit identity only; no inferred source speaker/audio association. Full relevant ordered native/control sequence and per-fragment mapping saved in final summary.",
+    "earlier_content": "First A and other required content appears in speculative interim hypotheses; recorded final field contains B only, B+from his, one A sentence or No no three dependingcase. All final finished/language/speaker/word fields areNone/empty. No earlier authoritative input_transcription fragment discarded by current adapter/normalizer is demonstrated in recorded sequence.",
+    "contract": "Current official docs distinguish interim speculative preview from authoritative input_transcription speech segment; example commits each final fragment. Product616-655 emits each final field independently and retains optional finished provenance, does not concatenate/promote interim. #216 excludes speculative partial translation and invented source association.",
+    "confirmed": "Baseline-common end-to-end normal-final source coverage failure for3/4case types; not a feature-induced Nemotron quality effect.",
+    "unresolved": "Whether service/native final contract or SDK decoding/uncaptured wire behavior explains missing earlier words. No proven service/model omission claim and no confirmed adapter final-delta accumulation defect. Exact final-to-source conservation is only proven at recorded decoded-SDK boundary.",
+    "references": [
+      "https://ai.google.dev/gemini-api/docs/live-api/live-transcribe",
+      "src/puripuly_heart/providers/stt/gemini_transcribe.py:616-656",
+      ".venv/Lib/site-packages/google/genai/live.py:433-460,534-566",
+      ".venv/Lib/site-packages/google/genai/_live_converters.py:1412-1462",
+      "tests/providers/test_gemini_transcribe_reuse.py:972-1006",
+      "https://github.com/kapitalismho/PuriPuly-heart/issues/216"
+    ],
+    "needed_next_decision": "Route-local native finality/raw-wire qualification under separate authority, not interim promotion, threshold tuning or fake source mapping in this experiment."
+  },
+  "controls_and_reproducibility": {
+    "cases": [
+      "clean_A_B",
+      "distinct_repeated_A_B_A",
+      "short_A_B_A",
+      "linguistic_correction"
+    ],
+    "repetitions": 2,
+    "rotation": [
+      "baseline,1.04,.64",
+      "1.04,.64,baseline"
+    ],
+    "assembly": "Exact input float32 and native PCM hashes in traces; public assembly maps only scoring, never decisions. All4case hashes matched acrossarms/routes. Source input is real-time paced512frames/16kHz; per-route transmitted strategy differs legitimately (DeepgramVADscoped vs Geminioriginal independent stream), not a cross-provider latency/accuracy equal-input-wire claim.",
+    "actual_input_delivery_seconds_per_case": [
+      {"case": "clean_A_B", "captured_input": 5.94575, "Deepgram_successful_native_write": 4.724, "Gemini_successful_native_write": 5.83775},
+      {"case": "distinct_repeated_A_B_A", "captured_input": 8.4515625, "Deepgram_successful_native_write": 7.744, "Gemini_successful_native_write": 8.3435625},
+      {"case": "short_A_B_A", "captured_input": 7.121625, "Deepgram_successful_native_write": 5.652, "Gemini_successful_native_write": 7.013625},
+      {"case": "linguistic_correction", "captured_input": 3.2249375, "Deepgram_successful_native_write": 2.58, "Gemini_successful_native_write": 3.1809375}
+    ],
+    "input_delivery_scope_limit": "These numbers are identical across arms/repetitions within each provider, not a claim that every captured initial-silence sample was submitted remotely. Current scoped opening/VAD/context and Gemini stream-map deduplication determine actual wire input; separate native_begin/turn payloads and native_stream_input preserve their declared ranges. The first recorded ongoing Gemini stream callback starts at11264 (10240 for correction), with earlier owned onset/context input recorded separately by native turn payloads. No experiment padding, crop, replay filter or source association was introduced.",
+    "mandatory_boundaries_per_valid_route": {
+      "natural_delivery_pause": 24,
+      "six_second_delivery_deadline": 6
+    },
+    "baseline": "Deepgram update admission suppressed until normal terminal natural/six-second completion. Gemini independent native finals stay independent in everyarm; no fabricated enclosure or extra wait.",
+    "new": "Current StreamingSpeakerSession, actual Windows F16 Nemotron Vulkan, real source/context/order/translation owners and current Flet renderer; no optional physical diarization cuts or pre-send hold.",
+    "evidence_poll_seconds": 0.05,
+    "poll_limit": "Configured production50ms cadence, not guaranteed exact scheduler interval. Old local5ms evidence is not relabeled.",
+    "profiles": {
+      "1.04": {
+        "chunk_len": 9,
+        "right_context": 4,
+        "left_context": 0,
+        "fifo": 264,
+        "cache": 264,
+        "cache_update": 222
+      },
+      "0.64": {
+        "chunk_len": 6,
+        "right_context": 2,
+        "left_context": 0,
+        "fifo": 264,
+        "cache": 264,
+        "cache_update": 222
+      }
+    },
+    "frozen_policy": {
+      "padding_workaround": false,
+      "trimming": "OFF",
+      "threshold_tuning": false,
+      "native_speaker_authority": "none; Nemotron only",
+      "concurrency": 3,
+      "integrated_context": true,
+      "system_prompt": "Full production resolved prompt pinned in trace gemma.selection and each case translation_config, with actual preceding source context per call. No oracle assembly/scoring text enters prompts or source decisions.",
+      "warmup": "Real managed Gemma owner prepare/prefill, no paid/cloud request warmup.",
+      "prefix_disk_cache": "disabled",
+      "prompt_cache": "llama cache-prompt enabled, model resident throughout route rotation",
+      "UI": "Current two-card/TTL8/presenter/calibration; no artificial1s hold; owned checkerboard window for safe pixel readback."
+    },
+    "Deepgram_reuse_after_proxy_fix": "Unchanged paid evidence reused from executed driverd4a5e360. Added independent proxy methods returnFalse for Deepgram, and scoped-engine independent branches are flag-gated (952,1012,1135,1202); new independent-terminal consumer cannot affect Deepgram turn updates/terminals. No paid Deepgram rerun. Exact old snapshot retained for independent review; latest shared driver is not labeled rerun-tested Deepgram.",
+    "driver_failures": "Preserved separately and excluded from comparisons: initial Deepgram nonexistent backend.close (0cloud), first Gemini mismatched proxy/terminal envelope (12successful cloud starts/69.15175s)."
+  },
+  "pinned_runtime": {
+    "inputs": {
+      "A": {
+        "dataset": "common_voice",
+        "dataset_revision": "8262c16bf297c87a9cd88c51997c4758ed7a8ba2",
+        "dataset_version": "cv-corpus-17.0-2024-03-15",
+        "duration_ms": 3504,
+        "license": "CC0-1.0",
+        "locale": "en",
+        "relative_audio_path": "clips/common-voice-17.0/en/common_voice_en_11289258.mp3",
+        "sample_id": "common_voice_en_11289258.mp3",
+        "source_audio_sha256": "19865499680804b33e8ac1f3a7b96fa8762e31be6a143c9e711bba72984272ad",
+        "source_text": "He washed the detritus from his hair.",
+        "split": "dev",
+        "verified_sha256": "19865499680804b33e8ac1f3a7b96fa8762e31be6a143c9e711bba72984272ad"
+      },
+      "B": {
+        "dataset": "common_voice",
+        "dataset_revision": "8262c16bf297c87a9cd88c51997c4758ed7a8ba2",
+        "dataset_version": "cv-corpus-17.0-2024-03-15",
+        "duration_ms": 3456,
+        "license": "CC0-1.0",
+        "locale": "en",
+        "relative_audio_path": "clips/common-voice-17.0/en/common_voice_en_12274.mp3",
+        "sample_id": "common_voice_en_12274.mp3",
+        "source_audio_sha256": "cccded3f9d5a5bb4c28110b8273e217cc44d5d9e9de95eb70fd19208dce9b4f5",
+        "source_text": "Gentlemen of the Press!",
+        "split": "dev",
+        "verified_sha256": "cccded3f9d5a5bb4c28110b8273e217cc44d5d9e9de95eb70fd19208dce9b4f5"
+      },
+      "long": {
+        "dataset": "fleurs",
+        "dataset_revision": "70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+        "dataset_version": "google-fleurs-dev",
+        "duration_ms": 7920,
+        "license": "CC-BY-4.0",
+        "locale": "en_us",
+        "relative_audio_path": "clips/fleurs/en_us/1009709090964908274.wav",
+        "sample_id": "1510:1009709090964908274.wav",
+        "source_audio_sha256": "e5664ae10a6273fbe0009068e512f4c416cccbeff19d3d2d11e5fb8d72d03fb7",
+        "source_text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the impacts.",
+        "split": "dev",
+        "verified_sha256": "e5664ae10a6273fbe0009068e512f4c416cccbeff19d3d2d11e5fb8d72d03fb7"
+      },
+      "local_no_trim": {
+        "path": "issue212/audio/local_no_trim.wav",
+        "sha256": "e474e0808b047ccbc2a678a22531adc9599cd07a2a5fccea0e7be8047b777c49",
+        "pcm_sha256": "cb998cbfc4cef3e63e8daf7fd252dccc6c27b94ce95c169470e1a0b0101cd2ca",
+        "samples": 5760,
+        "seconds": 0.36,
+        "sample_rate_hz": 16000,
+        "channels": 1,
+        "sample_width_bytes": 2,
+        "mapping": {
+          "parent": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+          "parent_sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+          "sample_range": [
+            1200,
+            6960
+          ],
+          "rule": "Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold"
+        },
+        "voice": "Microsoft Zira Desktop",
+        "kind": "authorized synthetic linguistic speech, not natural conversation",
+        "source_text": "No."
+      },
+      "local_correction_trim": {
+        "path": "issue212/audio/local_correction_trim.wav",
+        "sha256": "34a41d87d8752cc290945044af90309c36d7076c0a1f236394a095a78d7eadac",
+        "pcm_sha256": "b4a3f39ebd49960ca8ceca005524ffc93500ac85f93abb1e382357ae8b672f16",
+        "samples": 17839,
+        "seconds": 1.1149375,
+        "sample_rate_hz": 16000,
+        "channels": 1,
+        "sample_width_bytes": 2,
+        "mapping": {
+          "parent": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+          "parent_sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+          "sample_range": [
+            1280,
+            19119
+          ],
+          "rule": "Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold"
+        },
+        "voice": "Microsoft Zira Desktop",
+        "kind": "authorized synthetic linguistic speech, not natural conversation",
+        "source_text": "No, three."
+      }
+    },
+    "dependencies": {
+      "deepgram-sdk": "5.3.4",
+      "google-genai": "2.21.0",
+      "websockets": "16.1.1",
+      "numpy": "2.5.1",
+      "onnxruntime": "1.28.0",
+      "httpx": "0.28.1",
+      "flet": "1.0.0"
+    },
+    "nemotron_artifact": {
+      "sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+      "version": "v3",
+      "num_speakers": 8,
+      "sample_rate": 16000,
+      "file_type": 1,
+      "tensor_formats": {
+        "F32": 231,
+        "F16": 125
+      },
+      "size_bytes": 201832928,
+      "tensor_count": 356
+    },
+    "nemotron_runtime_manifest_sha256": "4615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9",
+    "official_model_card_revision": "f667ed73aee57d40cc39428eb768b4fd87a0a29e",
+    "Gemma": {
+      "requested_backend": "gpu",
+      "readiness": {
+        "requested_backend": "gpu",
+        "effective_backend": "vulkan",
+        "source_language": "en",
+        "target_language": "ko",
+        "prefix_identity": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370"
+      },
+      "selection": {
+        "backend": "gpu",
+        "source_language": "en",
+        "target_language": "ko",
+        "system_prompt": "# Role: VRChat Social Interpreter\nInterpret <input> naturally in the configured target language, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` contains prior multilingual turns, oldest first.\n* `[self]` is the local-user channel; `[peer]` is the peer-audio channel.\n* `<scene>` is VRChat metadata. `People` counts current participants, including the local user.\n* With `People: 2`, `[peer]` turns likely come from the same partner; earlier turns may help follow the conversation, and the partner's way of speaking may suggest a fitting register.\n* `<input>` is the current turn on the configured Channel; `<context>` labels earlier turns.\n* Ground translation in `<input>`; use `<context>` to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context if:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the speaker's tone, formality, emotion, social distance, and emphasis in `<input>`.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Return ONLY the target-language translation of `<input>`.\n\n## Translation Settings\nSource: English\nTarget: Korean\nChannel: self\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[self] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[self] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n",
+        "model_id": "gemma-4-e4b-it-qat-ud-q4-k-xl",
+        "vulkan_device": "Vulkan0"
+      },
+      "messages": [
+        {
+          "at": 143326.7707904,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=19 cached_prompt_tokens=820 completion_tokens=5 prompt_ms=103.037 generation_ms=58.482 generation_tps=68.397"
+        },
+        {
+          "at": 143335.1349326,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=1 cached_prompt_tokens=838 completion_tokens=5 prompt_ms=30.491 generation_ms=55.953 generation_tps=71.489"
+        },
+        {
+          "at": 143336.6976599,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=34 cached_prompt_tokens=821 completion_tokens=3 prompt_ms=144.211 generation_ms=28.572 generation_tps=69.999"
+        },
+        {
+          "at": 143347.6146264,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=21 cached_prompt_tokens=821 completion_tokens=16 prompt_ms=104.185 generation_ms=194.635 generation_tps=77.067"
+        },
+        {
+          "at": 143354.8145235,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=13 cached_prompt_tokens=824 completion_tokens=8 prompt_ms=94.072 generation_ms=91.939 generation_tps=76.137"
+        },
+        {
+          "at": 143364.0093384,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=15 cached_prompt_tokens=824 completion_tokens=5 prompt_ms=94.888 generation_ms=51.983 generation_tps=76.948"
+        },
+        {
+          "at": 143375.4612792,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=1 cached_prompt_tokens=838 completion_tokens=5 prompt_ms=27.364 generation_ms=52.346 generation_tps=76.415"
+        },
+        {
+          "at": 143376.992848,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=34 cached_prompt_tokens=821 completion_tokens=3 prompt_ms=122.709 generation_ms=26.948 generation_tps=74.217"
+        },
+        {
+          "at": 143390.2120966,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=21 cached_prompt_tokens=821 completion_tokens=16 prompt_ms=108.986 generation_ms=197.334 generation_tps=76.013"
+        },
+        {
+          "at": 143399.4789337,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=13 cached_prompt_tokens=824 completion_tokens=7 prompt_ms=96.479 generation_ms=78.583 generation_tps=76.352"
+        },
+        {
+          "at": 143410.4895118,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=15 cached_prompt_tokens=824 completion_tokens=5 prompt_ms=96.180 generation_ms=52.471 generation_tps=76.233"
+        },
+        {
+          "at": 143422.2719992,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=1 cached_prompt_tokens=838 completion_tokens=5 prompt_ms=27.223 generation_ms=52.088 generation_tps=76.793"
+        },
+        {
+          "at": 143423.8082478,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=34 cached_prompt_tokens=821 completion_tokens=3 prompt_ms=115.918 generation_ms=29.072 generation_tps=68.795"
+        },
+        {
+          "at": 143437.3627718,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=21 cached_prompt_tokens=821 completion_tokens=16 prompt_ms=108.779 generation_ms=204.334 generation_tps=73.409"
+        },
+        {
+          "at": 143447.096365,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=13 cached_prompt_tokens=824 completion_tokens=8 prompt_ms=99.058 generation_ms=92.332 generation_tps=75.813"
+        },
+        {
+          "at": 143458.5294822,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=15 cached_prompt_tokens=824 completion_tokens=5 prompt_ms=97.213 generation_ms=52.454 generation_tps=76.257"
+        },
+        {
+          "at": 143470.576875,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=1 cached_prompt_tokens=838 completion_tokens=5 prompt_ms=28.118 generation_ms=55.113 generation_tps=72.578"
+        },
+        {
+          "at": 143472.098812,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=34 cached_prompt_tokens=821 completion_tokens=3 prompt_ms=123.358 generation_ms=26.524 generation_tps=75.403"
+        },
+        {
+          "at": 143485.9284588,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=21 cached_prompt_tokens=821 completion_tokens=16 prompt_ms=103.257 generation_ms=203.399 generation_tps=73.747"
+        },
+        {
+          "at": 143495.9477353,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=13 cached_prompt_tokens=824 completion_tokens=7 prompt_ms=95.760 generation_ms=78.259 generation_tps=76.668"
+        },
+        {
+          "at": 143507.7362251,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=15 cached_prompt_tokens=824 completion_tokens=5 prompt_ms=95.011 generation_ms=52.223 generation_tps=76.595"
+        },
+        {
+          "at": 143520.1665554,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=1 cached_prompt_tokens=838 completion_tokens=5 prompt_ms=27.951 generation_ms=52.823 generation_tps=75.725"
+        },
+        {
+          "at": 143521.7017041,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=34 cached_prompt_tokens=821 completion_tokens=3 prompt_ms=116.339 generation_ms=26.545 generation_tps=75.344"
+        },
+        {
+          "at": 143535.9387297,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=21 cached_prompt_tokens=821 completion_tokens=15 prompt_ms=110.194 generation_ms=185.195 generation_tps=75.596"
+        },
+        {
+          "at": 143546.3352477,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=13 cached_prompt_tokens=824 completion_tokens=7 prompt_ms=95.043 generation_ms=78.071 generation_tps=76.853"
+        },
+        {
+          "at": 143558.0279934,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=15 cached_prompt_tokens=824 completion_tokens=5 prompt_ms=95.583 generation_ms=52.772 generation_tps=75.798"
+        },
+        {
+          "at": 143568.8701635,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=1 cached_prompt_tokens=838 completion_tokens=5 prompt_ms=28.574 generation_ms=52.848 generation_tps=75.689"
+        },
+        {
+          "at": 143570.4292661,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=34 cached_prompt_tokens=821 completion_tokens=3 prompt_ms=117.653 generation_ms=26.429 generation_tps=75.674"
+        },
+        {
+          "at": 143582.8616962,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=21 cached_prompt_tokens=821 completion_tokens=16 prompt_ms=106.371 generation_ms=194.168 generation_tps=77.253"
+        },
+        {
+          "at": 143591.5455048,
+          "level": 20,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=13 cached_prompt_tokens=824 completion_tokens=8 prompt_ms=99.226 generation_ms=98.077 generation_tps=71.372"
+        }
+      ],
+      "runtime_commands": [
+        [
+          "<USER_HOME>\\Documents\\dev\\puripuly_heart\\build\\llama.cpp\\llama.cpp-b10423\\vulkan\\llama-server.exe",
+          "--model",
+          "<USER_HOME>\\AppData\\Local\\puripuly-heart\\models\\gemma-4-e4b-it-qat-ud-q4-k-xl\\gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "--alias",
+          "puripuly-gemma-4-e4b-q4",
+          "--load-mode",
+          "mmap",
+          "--ctx-size",
+          "4608",
+          "--parallel",
+          "3",
+          "--batch-size",
+          "512",
+          "--ubatch-size",
+          "512",
+          "--cache-type-k",
+          "f16",
+          "--cache-type-v",
+          "f16",
+          "--cache-prompt",
+          "--reasoning",
+          "off",
+          "--reasoning-budget",
+          "0",
+          "--warmup",
+          "--perf",
+          "--metrics",
+          "--no-webui",
+          "--threads-http",
+          "1",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "51692",
+          "--prio",
+          "-1",
+          "--threads",
+          "4",
+          "--threads-batch",
+          "4",
+          "--device",
+          "Vulkan0",
+          "--n-gpu-layers",
+          "99",
+          "--flash-attn",
+          "on",
+          "--verbosity",
+          "4"
+        ]
+      ],
+      "prefix_disk_cache": "disabled",
+      "warmup": "production owner prepare/prefix prefill; no additional request warmup",
+      "prompt_cache": "llama cache-prompt enabled; runtime kept resident throughout rotated arms"
+    },
+    "GPU": "Actual Gemma log identifies Vulkan0 AMD Radeon RX7900XTX24560MiB. Projected Gemma allocation2789MiB is not observed whole-workload peak VRAM.",
+    "providers": {
+      "Deepgram": {
+        "class": "DeepgramRealtimeSTTBackend",
+        "requested_model": "nova-3",
+        "returned_model": "general-nova-3",
+        "returned_version": "2025-04-17.21547",
+        "endpoint": "wss://api.deepgram.com/v1/listen",
+        "language": "en",
+        "sample_rate_hz": 16000,
+        "keyterms": [],
+        "interim_results": false,
+        "endpointing": false,
+        "vad_events": false,
+        "punctuate": true,
+        "drain_timeout_s": 1.5,
+        "captured_native_result_count": 42,
+        "usage_limit": "Captured Results model metadata retained; session-level Metadata/billing response not instrumented/captured, so returned duration/charges are unknown rather than asserted absent."
+      },
+      "Gemini_Transcribe": {
+        "class": "GeminiTranscribeSTTBackend",
+        "factory_model_constant": "gemini-3.5-transcribe-live",
+        "accepted_request_model": "gemini-3.5-transcribe-live",
+        "returned_internal_model_version": "not reported in captured responses",
+        "actual_handshake_endpoint": "wss://generativelanguage.googleapis.com//ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent",
+        "language_codes": [
+          "en-US"
+        ],
+        "response_modalities": [
+          "TEXT"
+        ],
+        "transcription_mode": "VERBATIM",
+        "automatic_activity_detection": {
+          "prefix_padding_ms": 500,
+          "silence_duration_ms": 400
+        },
+        "drain_timeout_s": 2.0,
+        "native_source_capability": "unknown/independent",
+        "usage_events_captured": 0
+      }
+    }
+  },
+  "availability_and_latency": {
+    "complete_required_words": "18failed/6passed per valid24case route; eacharm6failed/2passed. Missing required content receives null complete-turn latency, not a faster success. This bounded exact-word check excludes punctuation, is not an acceptance threshold or proof of all semantic correctness. Only numeric case required-word availability passes.",
+    "useful_vs_complete": "Deepgram identified early A prefix and B clause are actual useful-source/pixel opportunities, but A prefix omits gray hair and cleanAB A is absent. Complete/source/context semantic success remains separate.",
+    "Gemini_native_early": "B native final/ACK can precede six-second application seal even inbaseline (~1.1s); independent native source has no mapped enclosing audio claim, and this is not enhancement benefit or complete-turn success.",
+    "Deepgram_observed_pixels": [
+      {
+        "arm": "1.04",
+        "repetition": 1,
+        "source_id": "00c634c1-8bd8-594c-8006-b69ff46b468c",
+        "source_text": "Washed the detritus from his ",
+        "speaker": {
+          "text": "Washed the detritus from his ",
+          "speaker_id": "0",
+          "session_scope": "3",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "identified"
+        },
+        "translations": [
+          "그의 잔해를 씻어냈어"
+        ],
+        "renderer_dispatch_ACK_lead_to_first_six_second_enclosing_end_s": 1.0204272999835666,
+        "observed_readback_completed_lead_to_first_six_second_enclosing_end_s": 0.7698976999963634,
+        "readback": {
+          "revision": 18,
+          "dispatch_ack_at": 142348.0095444,
+          "readback_started_at": 142348.0829,
+          "requested_snapshot": {
+            "revision": 18,
+            "calibration": {
+              "anchor": "head_locked",
+              "offset_x": 0.0,
+              "offset_y": -0.45,
+              "distance": 1.1,
+              "text_scale": 1.0,
+              "background_alpha": 0.24
+            },
+            "blocks": [
+              {
+                "id": "peer:c926d215-dce0-577c-bc2b-caabadd1c006",
+                "occupant_key": "peer:c926d215-dce0-577c-bc2b-caabadd1c006",
+                "appearance_seq": 2,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "그의 잔해를 씻어냈어",
+                "secondary_text": "Washed the detritus from his",
+                "secondary_enabled": true,
+                "update_id": "4cdec457b9ba45ca946779be2e103c59",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791865979326,
+                "source_text_hash": "41fe1a75f1fef99d",
+                "source_text_len": 29,
+                "logical_turn_key": "peer:26581c99-14e6-55d2-8a5d-5c06001980c1",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 0,
+                "speaker_style": "gold"
+              }
+            ]
+          },
+          "current_revision_at_readback_start": 18,
+          "capture": {
+            "method": "Win32 BitBlt exact owned client crop over opaque owned checkerboard",
+            "overlay_hwnd": 13502810,
+            "overlay_pid": 52720,
+            "backdrop_hwnd": 25759416,
+            "backdrop_pid": 48952,
+            "crop_screen_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "backdrop_client_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "foreign_visible_rectangles_checked_without_capture": 8,
+            "foreign_intersection": false,
+            "width": 1344,
+            "height": 336,
+            "exact_color_pixel_counts": {
+              "gold": 4647,
+              "cyan": 0,
+              "gray": 0
+            },
+            "sha256": "4cf5bf2c3b1ee0ae9675e64c660d89e81fa20cb0645a62e9266e5c5bac6ca5a8",
+            "path": "native/nemotron/issue218_cloud_deepgram_run1/commit_18.png"
+          },
+          "readback_completed_at": 142348.260074,
+          "current_revision_at_readback_end": 18,
+          "correlation_limit": "Expected live snapshot/logical_turn_key recorded; exact visible text requires image observation. Readback is an upper observation bound, not pixel onset or photon latency."
+        },
+        "limit": "Matching owned software pixels observed by completed readback, not first pixel onset, GPU present fence, monitor photon or HMD latency. Useful fragment is not complete required turn or proven compositional translation success."
+      },
+      {
+        "arm": "1.04",
+        "repetition": 1,
+        "source_id": "fc647a76-b675-5068-8bac-2ac901e94d8d",
+        "source_text": "Gentlemen of the press.",
+        "speaker": {
+          "text": "Gentlemen of the press.",
+          "speaker_id": "1",
+          "session_scope": "3",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "identified"
+        },
+        "translations": [
+          "기자 여러분."
+        ],
+        "renderer_dispatch_ACK_lead_to_first_six_second_enclosing_end_s": 0.5277371999982279,
+        "observed_readback_completed_lead_to_first_six_second_enclosing_end_s": 0.2960453999985475,
+        "readback": {
+          "revision": 20,
+          "dispatch_ack_at": 142348.5022345,
+          "readback_started_at": 142348.5664356,
+          "requested_snapshot": {
+            "revision": 20,
+            "calibration": {
+              "anchor": "head_locked",
+              "offset_x": 0.0,
+              "offset_y": -0.45,
+              "distance": 1.1,
+              "text_scale": 1.0,
+              "background_alpha": 0.24
+            },
+            "blocks": [
+              {
+                "id": "peer:f6ee2510-1732-5444-82b0-7de3de8125d3",
+                "occupant_key": "peer:f6ee2510-1732-5444-82b0-7de3de8125d3",
+                "appearance_seq": 4,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "머리.",
+                "secondary_text": "hair.",
+                "secondary_enabled": true,
+                "update_id": "9b43c1c878c6433b9695a6ab6c702fbf",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791865979584,
+                "source_text_hash": "77258eec1f76721e",
+                "source_text_len": 6,
+                "logical_turn_key": "peer:f6cf8158-3521-55c5-a794-efb513d0b3e7",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 1,
+                "speaker_style": "gray"
+              },
+              {
+                "id": "peer:49b9b1dc-d030-5144-acf6-dedcd08751ed",
+                "occupant_key": "peer:49b9b1dc-d030-5144-acf6-dedcd08751ed",
+                "appearance_seq": 6,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "기자 여러분.",
+                "secondary_text": "Gentlemen of the press.",
+                "secondary_enabled": true,
+                "update_id": "6423ec8d3a244477ab57a12f50f6d2f0",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791865979818,
+                "source_text_hash": "d3f945ad98dd337d",
+                "source_text_len": 23,
+                "logical_turn_key": "peer:606e191c-a84e-522e-a60c-381ac0f2c8bb",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 2,
+                "speaker_style": "cyan"
+              }
+            ],
+            "semantic_retirement_frontiers": [
+              {
+                "scope": "peer",
+                "generation": 0,
+                "order": 0,
+                "index": 0
+              }
+            ]
+          },
+          "current_revision_at_readback_start": 20,
+          "capture": {
+            "method": "Win32 BitBlt exact owned client crop over opaque owned checkerboard",
+            "overlay_hwnd": 13502810,
+            "overlay_pid": 52720,
+            "backdrop_hwnd": 25759416,
+            "backdrop_pid": 48952,
+            "crop_screen_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "backdrop_client_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "foreign_visible_rectangles_checked_without_capture": 8,
+            "foreign_intersection": false,
+            "width": 1344,
+            "height": 336,
+            "exact_color_pixel_counts": {
+              "gold": 0,
+              "cyan": 2812,
+              "gray": 927
+            },
+            "sha256": "bddefca65030e8925b91023beb2bce4a5b98e948da08f1301e0d39e6d5446f23",
+            "path": "native/nemotron/issue218_cloud_deepgram_run1/commit_20.png"
+          },
+          "readback_completed_at": 142348.7339263,
+          "current_revision_at_readback_end": 20,
+          "correlation_limit": "Expected live snapshot/logical_turn_key recorded; exact visible text requires image observation. Readback is an upper observation bound, not pixel onset or photon latency."
+        },
+        "limit": "Matching owned software pixels observed by completed readback, not first pixel onset, GPU present fence, monitor photon or HMD latency. Useful fragment is not complete required turn or proven compositional translation success."
+      },
+      {
+        "arm": "0.64",
+        "repetition": 1,
+        "source_id": "807c40d3-e7dd-5dc5-8549-a2e8e42c2f26",
+        "source_text": "Washed the detritus from his ",
+        "speaker": {
+          "text": "Washed the detritus from his ",
+          "speaker_id": "0",
+          "session_scope": "11",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "identified"
+        },
+        "translations": [
+          "그의 잔여물들을 씻어냈어"
+        ],
+        "renderer_dispatch_ACK_lead_to_first_six_second_enclosing_end_s": 1.0000477000139654,
+        "observed_readback_completed_lead_to_first_six_second_enclosing_end_s": 0.7580392000090797,
+        "readback": {
+          "revision": 38,
+          "dispatch_ack_at": 142389.1804626,
+          "readback_started_at": 142389.2492196,
+          "requested_snapshot": {
+            "revision": 38,
+            "calibration": {
+              "anchor": "head_locked",
+              "offset_x": 0.0,
+              "offset_y": -0.45,
+              "distance": 1.1,
+              "text_scale": 1.0,
+              "background_alpha": 0.24
+            },
+            "blocks": [
+              {
+                "id": "peer:57941c91-47ac-518f-9e3e-7be4398c8601",
+                "occupant_key": "peer:57941c91-47ac-518f-9e3e-7be4398c8601",
+                "appearance_seq": 2,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "그의 잔여물들을 씻어냈어",
+                "secondary_text": "Washed the detritus from his",
+                "secondary_enabled": true,
+                "update_id": "8e457a0a5dd3498ea1d58ba0c12f7700",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791866020497,
+                "source_text_hash": "41fe1a75f1fef99d",
+                "source_text_len": 29,
+                "logical_turn_key": "peer:86af6825-3dc9-5aff-a458-1bd3480dcdfc",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 0,
+                "speaker_style": "gold"
+              }
+            ]
+          },
+          "current_revision_at_readback_start": 38,
+          "capture": {
+            "method": "Win32 BitBlt exact owned client crop over opaque owned checkerboard",
+            "overlay_hwnd": 13502810,
+            "overlay_pid": 52720,
+            "backdrop_hwnd": 25759416,
+            "backdrop_pid": 48952,
+            "crop_screen_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "backdrop_client_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "foreign_visible_rectangles_checked_without_capture": 8,
+            "foreign_intersection": false,
+            "width": 1344,
+            "height": 336,
+            "exact_color_pixel_counts": {
+              "gold": 5563,
+              "cyan": 0,
+              "gray": 0
+            },
+            "sha256": "2ee6aa8c213c5acb43f66c44f05edd6651431c871b61d9ef5d7c6884a482b935",
+            "path": "native/nemotron/issue218_cloud_deepgram_run1/commit_38.png"
+          },
+          "readback_completed_at": 142389.4224711,
+          "current_revision_at_readback_end": 38,
+          "correlation_limit": "Expected live snapshot/logical_turn_key recorded; exact visible text requires image observation. Readback is an upper observation bound, not pixel onset or photon latency."
+        },
+        "limit": "Matching owned software pixels observed by completed readback, not first pixel onset, GPU present fence, monitor photon or HMD latency. Useful fragment is not complete required turn or proven compositional translation success."
+      },
+      {
+        "arm": "0.64",
+        "repetition": 1,
+        "source_id": "8a56faac-48ab-545d-bfec-869aed779f99",
+        "source_text": "Gentlemen of the press.",
+        "speaker": {
+          "text": "Gentlemen of the press.",
+          "speaker_id": "1",
+          "session_scope": "11",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "identified"
+        },
+        "translations": [
+          "기자 여러분."
+        ],
+        "renderer_dispatch_ACK_lead_to_first_six_second_enclosing_end_s": 0.4980148000176996,
+        "observed_readback_completed_lead_to_first_six_second_enclosing_end_s": 0.2533054999948945,
+        "readback": {
+          "revision": 40,
+          "dispatch_ack_at": 142389.6824955,
+          "readback_started_at": 142389.7479156,
+          "requested_snapshot": {
+            "revision": 40,
+            "calibration": {
+              "anchor": "head_locked",
+              "offset_x": 0.0,
+              "offset_y": -0.45,
+              "distance": 1.1,
+              "text_scale": 1.0,
+              "background_alpha": 0.24
+            },
+            "blocks": [
+              {
+                "id": "peer:cd29a5be-3bbf-59ea-a1ff-3f0c684ff604",
+                "occupant_key": "peer:cd29a5be-3bbf-59ea-a1ff-3f0c684ff604",
+                "appearance_seq": 4,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "머리.",
+                "secondary_text": "hair.",
+                "secondary_enabled": true,
+                "update_id": "76699a4dd264436184f93b856c238dee",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791866020744,
+                "source_text_hash": "77258eec1f76721e",
+                "source_text_len": 6,
+                "logical_turn_key": "peer:7b432291-e635-5c75-ae13-60468ba9cbec",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 1,
+                "speaker_style": "gray"
+              },
+              {
+                "id": "peer:e2350a31-555a-5cee-8984-6d32a8e44f80",
+                "occupant_key": "peer:e2350a31-555a-5cee-8984-6d32a8e44f80",
+                "appearance_seq": 6,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "기자 여러분.",
+                "secondary_text": "Gentlemen of the press.",
+                "secondary_enabled": true,
+                "update_id": "9ee34acabb9d48c0b69f3b5df12d25be",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791866020998,
+                "source_text_hash": "d3f945ad98dd337d",
+                "source_text_len": 23,
+                "logical_turn_key": "peer:eb10bbb5-89cd-55e5-a203-3a80bd0e31d6",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 2,
+                "speaker_style": "cyan"
+              }
+            ],
+            "semantic_retirement_frontiers": [
+              {
+                "scope": "peer",
+                "generation": 0,
+                "order": 0,
+                "index": 0
+              }
+            ]
+          },
+          "current_revision_at_readback_start": 40,
+          "capture": {
+            "method": "Win32 BitBlt exact owned client crop over opaque owned checkerboard",
+            "overlay_hwnd": 13502810,
+            "overlay_pid": 52720,
+            "backdrop_hwnd": 25759416,
+            "backdrop_pid": 48952,
+            "crop_screen_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "backdrop_client_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "foreign_visible_rectangles_checked_without_capture": 8,
+            "foreign_intersection": false,
+            "width": 1344,
+            "height": 336,
+            "exact_color_pixel_counts": {
+              "gold": 0,
+              "cyan": 2812,
+              "gray": 927
+            },
+            "sha256": "bddefca65030e8925b91023beb2bce4a5b98e948da08f1301e0d39e6d5446f23",
+            "path": "native/nemotron/issue218_cloud_deepgram_run1/commit_40.png"
+          },
+          "readback_completed_at": 142389.9272048,
+          "current_revision_at_readback_end": 40,
+          "correlation_limit": "Expected live snapshot/logical_turn_key recorded; exact visible text requires image observation. Readback is an upper observation bound, not pixel onset or photon latency."
+        },
+        "limit": "Matching owned software pixels observed by completed readback, not first pixel onset, GPU present fence, monitor photon or HMD latency. Useful fragment is not complete required turn or proven compositional translation success."
+      },
+      {
+        "arm": "1.04",
+        "repetition": 2,
+        "source_id": "583eec43-3c95-5432-a341-f3639994540a",
+        "source_text": "Washed the detritus from his ",
+        "speaker": {
+          "text": "Washed the detritus from his ",
+          "speaker_id": "0",
+          "session_scope": "19",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "identified"
+        },
+        "translations": [
+          "그의 찌꺼기들을 씻어냈어요."
+        ],
+        "renderer_dispatch_ACK_lead_to_first_six_second_enclosing_end_s": 0.8954494000063278,
+        "observed_readback_completed_lead_to_first_six_second_enclosing_end_s": 0.6536113999900408,
+        "readback": {
+          "revision": 58,
+          "dispatch_ack_at": 142433.2908268,
+          "readback_started_at": 142433.3629019,
+          "requested_snapshot": {
+            "revision": 58,
+            "calibration": {
+              "anchor": "head_locked",
+              "offset_x": 0.0,
+              "offset_y": -0.45,
+              "distance": 1.1,
+              "text_scale": 1.0,
+              "background_alpha": 0.24
+            },
+            "blocks": [
+              {
+                "id": "peer:0d898ab9-92c1-5032-966b-daabe29db8ad",
+                "occupant_key": "peer:0d898ab9-92c1-5032-966b-daabe29db8ad",
+                "appearance_seq": 2,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "그의 찌꺼기들을 씻어냈어요.",
+                "secondary_text": "Washed the detritus from his",
+                "secondary_enabled": true,
+                "update_id": "f13cae67c00b4e86b7976317a15adf58",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791866064607,
+                "source_text_hash": "41fe1a75f1fef99d",
+                "source_text_len": 29,
+                "logical_turn_key": "peer:88fb11d1-73b3-5838-9e8c-bcd0594e162b",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 0,
+                "speaker_style": "gold"
+              }
+            ]
+          },
+          "current_revision_at_readback_start": 58,
+          "capture": {
+            "method": "Win32 BitBlt exact owned client crop over opaque owned checkerboard",
+            "overlay_hwnd": 13502810,
+            "overlay_pid": 52720,
+            "backdrop_hwnd": 25759416,
+            "backdrop_pid": 48952,
+            "crop_screen_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "backdrop_client_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "foreign_visible_rectangles_checked_without_capture": 8,
+            "foreign_intersection": false,
+            "width": 1344,
+            "height": 336,
+            "exact_color_pixel_counts": {
+              "gold": 5725,
+              "cyan": 0,
+              "gray": 0
+            },
+            "sha256": "07e90ba8ef1d3dbf329ec05d54f31bb2ba34a054924f02c243368b19d69e31e4",
+            "path": "native/nemotron/issue218_cloud_deepgram_run1/commit_58.png"
+          },
+          "readback_completed_at": 142433.5326648,
+          "current_revision_at_readback_end": 58,
+          "correlation_limit": "Expected live snapshot/logical_turn_key recorded; exact visible text requires image observation. Readback is an upper observation bound, not pixel onset or photon latency."
+        },
+        "limit": "Matching owned software pixels observed by completed readback, not first pixel onset, GPU present fence, monitor photon or HMD latency. Useful fragment is not complete required turn or proven compositional translation success."
+      },
+      {
+        "arm": "1.04",
+        "repetition": 2,
+        "source_id": "099546c1-7d45-5c74-b73d-7cda4030206d",
+        "source_text": "Gentlemen of the press.",
+        "speaker": {
+          "text": "Gentlemen of the press.",
+          "speaker_id": "1",
+          "session_scope": "19",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "identified"
+        },
+        "translations": [
+          "언론 여러분."
+        ],
+        "renderer_dispatch_ACK_lead_to_first_six_second_enclosing_end_s": 0.3653494000027422,
+        "observed_readback_completed_lead_to_first_six_second_enclosing_end_s": 0.12119499998516403,
+        "readback": {
+          "revision": 60,
+          "dispatch_ack_at": 142433.8209268,
+          "readback_started_at": 142433.8903785,
+          "requested_snapshot": {
+            "revision": 60,
+            "calibration": {
+              "anchor": "head_locked",
+              "offset_x": 0.0,
+              "offset_y": -0.45,
+              "distance": 1.1,
+              "text_scale": 1.0,
+              "background_alpha": 0.24
+            },
+            "blocks": [
+              {
+                "id": "peer:63335f36-17cb-5fc7-ab57-914b6a9edbe7",
+                "occupant_key": "peer:63335f36-17cb-5fc7-ab57-914b6a9edbe7",
+                "appearance_seq": 4,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "머리.",
+                "secondary_text": "hair.",
+                "secondary_enabled": true,
+                "update_id": "f752e0c39c7b4e74ae8c79e75a76e70f",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791866064854,
+                "source_text_hash": "77258eec1f76721e",
+                "source_text_len": 6,
+                "logical_turn_key": "peer:87f282db-1756-566b-88df-6a196819136e",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 1,
+                "speaker_style": "gray"
+              },
+              {
+                "id": "peer:6c3f686d-6049-5a3f-bc2c-b8a89f973e81",
+                "occupant_key": "peer:6c3f686d-6049-5a3f-bc2c-b8a89f973e81",
+                "appearance_seq": 6,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "언론 여러분.",
+                "secondary_text": "Gentlemen of the press.",
+                "secondary_enabled": true,
+                "update_id": "adf60e30ea4d49cfbf7d151931c6c9c2",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791866065123,
+                "source_text_hash": "d3f945ad98dd337d",
+                "source_text_len": 23,
+                "logical_turn_key": "peer:de56e48b-bf0c-578f-a0a0-e8e38b62d5f9",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 2,
+                "speaker_style": "cyan"
+              }
+            ],
+            "semantic_retirement_frontiers": [
+              {
+                "scope": "peer",
+                "generation": 0,
+                "order": 0,
+                "index": 0
+              }
+            ]
+          },
+          "current_revision_at_readback_start": 60,
+          "capture": {
+            "method": "Win32 BitBlt exact owned client crop over opaque owned checkerboard",
+            "overlay_hwnd": 13502810,
+            "overlay_pid": 52720,
+            "backdrop_hwnd": 25759416,
+            "backdrop_pid": 48952,
+            "crop_screen_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "backdrop_client_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "foreign_visible_rectangles_checked_without_capture": 8,
+            "foreign_intersection": false,
+            "width": 1344,
+            "height": 336,
+            "exact_color_pixel_counts": {
+              "gold": 0,
+              "cyan": 3044,
+              "gray": 927
+            },
+            "sha256": "0b0226534240dc39f1ffd1396fee47f70b8f32a197bd9bd583bfeabe37d85ea8",
+            "path": "native/nemotron/issue218_cloud_deepgram_run1/commit_60.png"
+          },
+          "readback_completed_at": 142434.0650812,
+          "current_revision_at_readback_end": 60,
+          "correlation_limit": "Expected live snapshot/logical_turn_key recorded; exact visible text requires image observation. Readback is an upper observation bound, not pixel onset or photon latency."
+        },
+        "limit": "Matching owned software pixels observed by completed readback, not first pixel onset, GPU present fence, monitor photon or HMD latency. Useful fragment is not complete required turn or proven compositional translation success."
+      },
+      {
+        "arm": "0.64",
+        "repetition": 2,
+        "source_id": "fa3cb822-2010-5ab8-8b9a-974f1742239b",
+        "source_text": "Washed the detritus from his ",
+        "speaker": {
+          "text": "Washed the detritus from his ",
+          "speaker_id": "0",
+          "session_scope": "27",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "identified"
+        },
+        "translations": [
+          "그의 잔해를 닦았어"
+        ],
+        "renderer_dispatch_ACK_lead_to_first_six_second_enclosing_end_s": 0.8873354000097606,
+        "observed_readback_completed_lead_to_first_six_second_enclosing_end_s": 0.6437321999983396,
+        "readback": {
+          "revision": 78,
+          "dispatch_ack_at": 142478.8820787,
+          "readback_started_at": 142478.9456949,
+          "requested_snapshot": {
+            "revision": 78,
+            "calibration": {
+              "anchor": "head_locked",
+              "offset_x": 0.0,
+              "offset_y": -0.45,
+              "distance": 1.1,
+              "text_scale": 1.0,
+              "background_alpha": 0.24
+            },
+            "blocks": [
+              {
+                "id": "peer:cecbab59-faa0-512a-ad01-80db8a333aa1",
+                "occupant_key": "peer:cecbab59-faa0-512a-ad01-80db8a333aa1",
+                "appearance_seq": 2,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "그의 잔해를 닦았어",
+                "secondary_text": "Washed the detritus from his",
+                "secondary_enabled": true,
+                "update_id": "fd22ebc1e2a34681863a17062427254d",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791866110199,
+                "source_text_hash": "41fe1a75f1fef99d",
+                "source_text_len": 29,
+                "logical_turn_key": "peer:aa3c7f50-d2c2-54f8-9994-7fe0991bdc42",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 0,
+                "speaker_style": "gold"
+              }
+            ]
+          },
+          "current_revision_at_readback_start": 78,
+          "capture": {
+            "method": "Win32 BitBlt exact owned client crop over opaque owned checkerboard",
+            "overlay_hwnd": 13502810,
+            "overlay_pid": 52720,
+            "backdrop_hwnd": 25759416,
+            "backdrop_pid": 48952,
+            "crop_screen_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "backdrop_client_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "foreign_visible_rectangles_checked_without_capture": 8,
+            "foreign_intersection": false,
+            "width": 1344,
+            "height": 336,
+            "exact_color_pixel_counts": {
+              "gold": 4356,
+              "cyan": 0,
+              "gray": 0
+            },
+            "sha256": "70badb535acafb6ae5820a1a535c7897fdf3e3d96134592290999dab87efaa92",
+            "path": "native/nemotron/issue218_cloud_deepgram_run1/commit_78.png"
+          },
+          "readback_completed_at": 142479.1256819,
+          "current_revision_at_readback_end": 78,
+          "correlation_limit": "Expected live snapshot/logical_turn_key recorded; exact visible text requires image observation. Readback is an upper observation bound, not pixel onset or photon latency."
+        },
+        "limit": "Matching owned software pixels observed by completed readback, not first pixel onset, GPU present fence, monitor photon or HMD latency. Useful fragment is not complete required turn or proven compositional translation success."
+      },
+      {
+        "arm": "0.64",
+        "repetition": 2,
+        "source_id": "9f097eec-2891-5153-885a-80bd8a5c896e",
+        "source_text": "Gentlemen of the press.",
+        "speaker": {
+          "text": "Gentlemen of the press.",
+          "speaker_id": "1",
+          "session_scope": "27",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "identified"
+        },
+        "translations": [
+          "언론 여러분."
+        ],
+        "renderer_dispatch_ACK_lead_to_first_six_second_enclosing_end_s": 0.39287579999654554,
+        "observed_readback_completed_lead_to_first_six_second_enclosing_end_s": 0.1525168000080157,
+        "readback": {
+          "revision": 80,
+          "dispatch_ack_at": 142479.3765383,
+          "readback_started_at": 142479.4423076,
+          "requested_snapshot": {
+            "revision": 80,
+            "calibration": {
+              "anchor": "head_locked",
+              "offset_x": 0.0,
+              "offset_y": -0.45,
+              "distance": 1.1,
+              "text_scale": 1.0,
+              "background_alpha": 0.24
+            },
+            "blocks": [
+              {
+                "id": "peer:12e40c86-0ebd-5df2-aadd-901298b3167a",
+                "occupant_key": "peer:12e40c86-0ebd-5df2-aadd-901298b3167a",
+                "appearance_seq": 4,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "머리.",
+                "secondary_text": "hair.",
+                "secondary_enabled": true,
+                "update_id": "0ec81bbceb9d460797dfc02416d40c6c",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791866110447,
+                "source_text_hash": "77258eec1f76721e",
+                "source_text_len": 6,
+                "logical_turn_key": "peer:a6fd5342-f186-5277-a16f-7918e8f4acc3",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 1,
+                "speaker_style": "gray"
+              },
+              {
+                "id": "peer:5f0a8b13-eabf-5426-86a5-f09976f9a107",
+                "occupant_key": "peer:5f0a8b13-eabf-5426-86a5-f09976f9a107",
+                "appearance_seq": 6,
+                "card_revision": 1,
+                "channel": "peer",
+                "block_variant": "finalized",
+                "primary_text": "언론 여러분.",
+                "secondary_text": "Gentlemen of the press.",
+                "secondary_enabled": true,
+                "update_id": "12aa1f4e4e7c403baea0704ab016531e",
+                "primary_language": "ko",
+                "secondary_language": "en",
+                "origin_wall_clock_ms": 1791866110689,
+                "source_text_hash": "d3f945ad98dd337d",
+                "source_text_len": 23,
+                "logical_turn_key": "peer:594769dc-0a27-53f7-b532-568f7f329dde",
+                "publication_scope": "peer",
+                "publication_generation": 0,
+                "publication_order": 0,
+                "publication_index": 2,
+                "speaker_style": "cyan"
+              }
+            ],
+            "semantic_retirement_frontiers": [
+              {
+                "scope": "peer",
+                "generation": 0,
+                "order": 0,
+                "index": 0
+              }
+            ]
+          },
+          "current_revision_at_readback_start": 80,
+          "capture": {
+            "method": "Win32 BitBlt exact owned client crop over opaque owned checkerboard",
+            "overlay_hwnd": 13502810,
+            "overlay_pid": 52720,
+            "backdrop_hwnd": 25759416,
+            "backdrop_pid": 48952,
+            "crop_screen_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "backdrop_client_xyxy": [
+              32,
+              32,
+              1376,
+              368
+            ],
+            "foreign_visible_rectangles_checked_without_capture": 8,
+            "foreign_intersection": false,
+            "width": 1344,
+            "height": 336,
+            "exact_color_pixel_counts": {
+              "gold": 0,
+              "cyan": 3044,
+              "gray": 927
+            },
+            "sha256": "0b0226534240dc39f1ffd1396fee47f70b8f32a197bd9bd583bfeabe37d85ea8",
+            "path": "native/nemotron/issue218_cloud_deepgram_run1/commit_80.png"
+          },
+          "readback_completed_at": 142479.6168973,
+          "current_revision_at_readback_end": 80,
+          "correlation_limit": "Expected live snapshot/logical_turn_key recorded; exact visible text requires image observation. Readback is an upper observation bound, not pixel onset or photon latency."
+        },
+        "limit": "Matching owned software pixels observed by completed readback, not first pixel onset, GPU present fence, monitor photon or HMD latency. Useful fragment is not complete required turn or proven compositional translation success."
+      }
+    ],
+    "ACK_vs_readback_vs_photons": "Renderer render_commit dispatch ACK is not actual pixel onset. Revision-stable timed owned readbacks and observed images now prove matching software pixels by readback completion for selected cases. No monitor/HMD photons, GPU present fence or first-draw onset measured. No absent-display claim from late blank snapshots.",
+    "readback_gap": "4/58Deepgram timed captures changedrevision while sampling; exclude these from exact source-pixel correlation.54/58stable; Gemini30/30stable."
+  },
+  "resource_and_loss_bounds": {
+    "deepgram": {
+      "sampling_seconds": 0.25,
+      "sampled_process_peaks_bytes_by_name": {
+        "python.exe": {
+          "rss": 472309760,
+          "private": 2308296704
+        },
+        "llama-server.exe": {
+          "rss": 3752681472,
+          "private": 3995340800
+        },
+        "flet.exe": {
+          "rss": 183799808,
+          "private": 226557952
+        },
+        "conhost.exe": {
+          "rss": 12083200,
+          "private": 5627904
+        }
+      },
+      "sampled_speaker_buffer_peaks": {
+        "pending_samples": 10752,
+        "pending_items": 6,
+        "retained_map_pieces": 34,
+        "evidence_items": 77,
+        "evidence_evictions": 0,
+        "overloads": 0,
+        "copied_samples": 140288,
+        "max_copy_samples": 512
+      },
+      "frame_delivery_lag_peak_s": 0.5978261000127532,
+      "all_capture_received_exactly_once": true,
+      "native_declared_PCM_mismatches": 0,
+      "speaker_end_pending_zero": true,
+      "renderer_readback_revision_stability": {
+        "True": 54,
+        "False": 4
+      },
+      "clock_limit": "Host monotonic submit/result/evidence-ready/queue/publication/ACK/readback only; no calibrated native GPU timestamps or real photon timestamps. Sampled peaks are not absolute maxima, whole-host VRAM ceiling or interference certification."
+    },
+    "gemini_transcribe": {
+      "sampling_seconds": 0.25,
+      "sampled_process_peaks_bytes_by_name": {
+        "python.exe": {
+          "rss": 465379328,
+          "private": 2308411392
+        },
+        "llama-server.exe": {
+          "rss": 3719815168,
+          "private": 3955408896
+        },
+        "flet.exe": {
+          "rss": 197054464,
+          "private": 250228736
+        },
+        "conhost.exe": {
+          "rss": 12079104,
+          "private": 5627904
+        }
+      },
+      "sampled_speaker_buffer_peaks": {
+        "pending_samples": 11264,
+        "pending_items": 3,
+        "retained_map_pieces": 34,
+        "evidence_items": 74,
+        "evidence_evictions": 0,
+        "overloads": 0,
+        "copied_samples": 140288,
+        "max_copy_samples": 512
+      },
+      "frame_delivery_lag_peak_s": 0.1291899999778252,
+      "all_capture_received_exactly_once": true,
+      "native_declared_PCM_mismatches": 0,
+      "speaker_end_pending_zero": true,
+      "renderer_readback_revision_stability": {
+        "True": 30
+      },
+      "clock_limit": "Host monotonic submit/result/evidence-ready/queue/publication/ACK/readback only; no calibrated native GPU timestamps or real photon timestamps. Sampled peaks are not absolute maxima, whole-host VRAM ceiling or interference certification."
+    }
+  },
+  "requirements_disposition": [
+    {
+      "requirement": "Actual authorized Deepgram/default and exact Gemini Transcribe KEY2 paths",
+      "status": "passed",
+      "evidence": "24valid cases each; constructor proof/model/endpoint/native/source/translation/render traces."
+    },
+    {
+      "requirement": "Matched no-early baseline,full1.04,.64,natural/six-second controls,rotated repeat",
+      "status": "passed",
+      "evidence": "8cases perarm/provider, matching input/audio budgets withinroute, six deadline cases and24natural pauses perroute."
+    },
+    {
+      "requirement": "Same actual GemmaVulkan/current source/context/order/Flet path",
+      "status": "passed",
+      "evidence": "88actual translated terminals,136renderer commits including48clears,88timed readbacks; real modelruntime logs and per-call prompts/context."
+    },
+    {
+      "requirement": "Complete required reference turn content",
+      "status": "failed",
+      "evidence": "18/24failed perroute; no complete-turn latency credited to missingcontent."
+    },
+    {
+      "requirement": "Useful translation semantic benefit/no harmful fragment regression",
+      "status": "failed",
+      "evidence": "Deepgram phrase splitting materially damages actual Korean composition despite source text equality. Gemini wording/ordinal variance retained; semantic pass not granted."
+    },
+    {
+      "requirement": "Rich speaker attribution",
+      "status": "failed",
+      "evidence": "Deepgram partial22identified new units with retained gray/transitions; cleanBgray/cyan fragment coverage. Gemini0identified current independent/unmapped route."
+    },
+    {
+      "requirement": "No feature-induced CPU-style return substitution on tested cloud routes",
+      "status": "passed",
+      "evidence": "Same exact raw source concatenation eacharm/repetition withinprovider; missing/repeated baseline common content explicitly retained. Not a complete semantic success."
+    },
+    {
+      "requirement": "Gemini service-vs-adapter finality cause",
+      "status": "unknown",
+      "evidence": "All30received authoritative final fields preserved; missingcontent onlyrecordedinterim. RawWSbytes/extra native contract unobserved; no definitive service or adapter defect attribution."
+    },
+    {
+      "requirement": "Resource/nativequeue/process/delivery bounds",
+      "status": "passed",
+      "evidence": "0.25s samples, configured bounds, no observed overload/eviction, zero pending atdrain,0PCM mismatches. Not global peak/long-duration proof."
+    },
+    {
+      "requirement": "Calibrated GPU timestamps/peak whole-hostVRAM/photon timing",
+      "status": "unknown",
+      "evidence": "Host and software readback only; Gemma projectedVRAM is not measuredpeak."
+    },
+    {
+      "requirement": "VRChat/SteamVR/HMD readability/coexistence",
+      "status": "not_run",
+      "evidence": "Explicit user-deferred; notblocker for this nonVR scoped recommendation."
+    },
+    {
+      "requirement": "Exhaustive language/speaker8/over8/long-duration/current cloud acoustic matrix",
+      "status": "not_run",
+      "evidence": "Fresh cloud assignment bounded4approved English/correction cases. Prior deterministic/source/render invariants reused, not relabeled as new acoustic coverage."
+    },
+    {
+      "requirement": "Whole#218 completion/production enablement",
+      "status": "not_run",
+      "evidence": "Not requested/granted in cloud follow-up; no productionprofile selected."
+    }
+  ],
+  "durable_evidence": {
+    "summary": "native/nemotron/issue218_cloud_summary.json",
+    "attempts": "native/nemotron/issue218_cloud_attempts.json",
+    "budget": "native/nemotron/issue218_cloud_budget.jsonl",
+    "archives": [
+      {
+        "archive_member": "native/nemotron/issue218_cloud_deepgram_raw.zip:valid/trace.json",
+        "execution_path": "native/nemotron/issue218_cloud_deepgram_run1/trace.json",
+        "utf8_lf_sha256": "cbcb49ae13ed87856579f2d1ea33779273c66991db716f426bc9f53f508c0ec7",
+        "utf8_bytes": 59670396,
+        "archived_bytes_sha256": "cbcb49ae13ed87856579f2d1ea33779273c66991db716f426bc9f53f508c0ec7",
+        "archived_size": 59670396,
+        "archive_member_crc32_hex": "cd3a74ae",
+        "line_ending": "LF"
+      },
+      {
+        "archive_member": "native/nemotron/issue218_cloud_deepgram_raw.zip:valid/driver_snapshot.py",
+        "execution_path": "native/nemotron/issue218_cloud_deepgram_run1/driver_snapshot.py",
+        "utf8_lf_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+        "utf8_bytes": 34953,
+        "archived_bytes_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+        "archived_size": 34953,
+        "archive_member_crc32_hex": "902a7d7d",
+        "line_ending": "LF"
+      },
+      {
+        "archive_member": "native/nemotron/issue218_cloud_deepgram_raw.zip:startup_driver_failure/trace.json",
+        "execution_path": "native/nemotron/issue218_cloud_deepgram/trace.json",
+        "utf8_lf_sha256": "397764faefbf93acac49c56ac344cb9f266e7a3d2f4399498010c5e24b189a4b",
+        "utf8_bytes": 46037,
+        "archived_bytes_sha256": "397764faefbf93acac49c56ac344cb9f266e7a3d2f4399498010c5e24b189a4b",
+        "archived_size": 46037,
+        "archive_member_crc32_hex": "4b5eb37e",
+        "line_ending": "LF"
+      },
+      {
+        "archive_member": "native/nemotron/issue218_cloud_deepgram_raw.zip:startup_driver_failure/driver_snapshot.py",
+        "execution_path": "native/nemotron/issue218_cloud_deepgram/driver_snapshot.py",
+        "utf8_lf_sha256": "dad23c178c346090df78718ef498734954acc5a1c6a52f53a70ac9c3e5425e31",
+        "utf8_bytes": 34224,
+        "archived_bytes_sha256": "dad23c178c346090df78718ef498734954acc5a1c6a52f53a70ac9c3e5425e31",
+        "archived_size": 34224,
+        "archive_member_crc32_hex": "df468347",
+        "line_ending": "LF"
+      },
+      {
+        "archive_member": "native/nemotron/issue218_cloud_gemini_raw.zip:valid/trace.json",
+        "execution_path": "native/nemotron/issue218_cloud_gemini_run2/trace.json",
+        "utf8_lf_sha256": "f64922e0b3a510a705c507af03362c341bcbd9653ed06568a980a5627c0e9204",
+        "utf8_bytes": 30973608,
+        "archived_bytes_sha256": "f64922e0b3a510a705c507af03362c341bcbd9653ed06568a980a5627c0e9204",
+        "archived_size": 30973608,
+        "archive_member_crc32_hex": "fde3d86c",
+        "line_ending": "LF"
+      },
+      {
+        "archive_member": "native/nemotron/issue218_cloud_gemini_raw.zip:valid/driver_snapshot.py",
+        "execution_path": "native/nemotron/issue218_cloud_gemini_run2/driver_snapshot.py",
+        "utf8_lf_sha256": "57c5dde1bd1a887b72fbd96828f91ad090b4f5207ec579fb80494c237a84aa02",
+        "utf8_bytes": 35913,
+        "archived_bytes_sha256": "57c5dde1bd1a887b72fbd96828f91ad090b4f5207ec579fb80494c237a84aa02",
+        "archived_size": 35913,
+        "archive_member_crc32_hex": "628fdc12",
+        "line_ending": "LF"
+      },
+      {
+        "archive_member": "native/nemotron/issue218_cloud_gemini_raw.zip:invalid_driver_comparison/trace.json",
+        "execution_path": "native/nemotron/issue218_cloud_gemini_run1/trace.json",
+        "utf8_lf_sha256": "598ba1ec5564e391d878e16135d3c9d40daa20b5801b7682825a5890f5ec0e7d",
+        "utf8_bytes": 14848320,
+        "archived_bytes_sha256": "598ba1ec5564e391d878e16135d3c9d40daa20b5801b7682825a5890f5ec0e7d",
+        "archived_size": 14848320,
+        "archive_member_crc32_hex": "e69f9d51",
+        "line_ending": "LF"
+      },
+      {
+        "archive_member": "native/nemotron/issue218_cloud_gemini_raw.zip:invalid_driver_comparison/driver_snapshot.py",
+        "execution_path": "native/nemotron/issue218_cloud_gemini_run1/driver_snapshot.py",
+        "utf8_lf_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+        "utf8_bytes": 34953,
+        "archived_bytes_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+        "archived_size": 34953,
+        "archive_member_crc32_hex": "902a7d7d",
+        "line_ending": "LF"
+      },
+      {
+        "archive_member": "native/nemotron/issue218_cloud_gemini_raw.zip:budget/all_routes.jsonl",
+        "execution_path": "native/nemotron/issue218_cloud_budget.jsonl",
+        "utf8_lf_sha256": "3a4b77a8b33d9fc52d9c2896485834ff73bb3b36a568718c762ee9d00b618a0f",
+        "utf8_bytes": 2338619,
+        "archived_bytes_sha256": "3a4b77a8b33d9fc52d9c2896485834ff73bb3b36a568718c762ee9d00b618a0f",
+        "archived_size": 2338619,
+        "archive_member_crc32_hex": "b7378908",
+        "line_ending": "LF"
+      }
+    ],
+    "owned_images": [
+      "native/nemotron/issue218_cloud_deepgram_run1/",
+      "native/nemotron/issue218_cloud_gemini_run2/",
+      "native/nemotron/issue218_cloud_gemini_run1/ (invalid driver attempt only)"
+    ],
+    "visually_observed_examples": [
+      "native/nemotron/issue218_cloud_deepgram_run1/commit_18.png",
+      "native/nemotron/issue218_cloud_deepgram_run1/commit_20.png",
+      "native/nemotron/issue218_cloud_deepgram_run1/commit_42.png",
+      "native/nemotron/issue218_cloud_gemini_run2/commit_4.png"
+    ],
+    "execution_and_archive_hashes": "Archived UTF8 LF sanitized trace hashes equal original saved execution trace hashes observed by offline summarizer. No post-summary trace header edits. Distinct actual driver source execution hashes/snapshots retained. Unsanitized/network raw-byte equality is not claimed.",
+    "cleanup": "Removed superseded intermediate summaries and redundant uncompressed trace/snapshot copies after exact archived-byte preservation. Successful reusable drivers, final summary/report/attempts/budget, valid and invalid raw archives and owned images remain. Previous local evidence and Director acceptance/review records untouched."
+  },
+  "commands": {
+    "executed_attempts": [
+      {
+        "id": "deepgram_startup_driver_failure",
+        "route": "deepgram",
+        "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_experiment.py --route deepgram --repetitions 2 --output native/nemotron/issue218_cloud_deepgram",
+        "wall_seconds": 8.71,
+        "exit_code": 1,
+        "comparison_validity": "INVALID_TASK_DRIVER_STARTUP",
+        "remote_starts": 0,
+        "submitted_audio_seconds": 0,
+        "mechanism": "Driver incorrectly supplied nonexistent Deepgram backend.close to scoped-engine lifecycle. Removed only task-driver backend_close option, consistent current provider session ownership. No product failure or paid request.",
+        "trace_archive": "native/nemotron/issue218_cloud_deepgram_raw.zip:startup_driver_failure/trace.json"
+      },
+      {
+        "id": "deepgram_valid",
+        "route": "deepgram",
+        "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_experiment.py --route deepgram --repetitions 2 --output native/nemotron/issue218_cloud_deepgram_run1",
+        "wall_seconds": 260.3,
+        "exit_code": 0,
+        "comparison_validity": "VALID_CURRENT_PATH",
+        "cases": 24,
+        "remote_starts": 24,
+        "submitted_audio_seconds": 124.2,
+        "driver_execution_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+        "trace_archive": "native/nemotron/issue218_cloud_deepgram_raw.zip:valid/trace.json"
+      },
+      {
+        "id": "gemini_invalid_driver_comparison",
+        "route": "gemini_transcribe",
+        "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_experiment.py --route gemini_transcribe --repetitions 2 --output native/nemotron/issue218_cloud_gemini_run1",
+        "wall_seconds": 208.87,
+        "exit_code": 0,
+        "comparison_validity": "INVALID_TASK_DRIVER_COMPARISON",
+        "cases": 12,
+        "remote_starts": 12,
+        "submitted_audio_seconds": 69.15175,
+        "driver_execution_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+        "mechanism": "Task consumer expected bare STTRecognitionUnit rather than current STTRecognitionUnitTerminal; baseline proxy also lacked explicit properties/methods required by runtime-checkable independent protocol, causing unmatched native input and terminal timeout. Raw native service accepted KEY2/model and delivered finals. No provider loss, gray outcome or quality score can be inferred from zero sources. Counted against grant.",
+        "correction": "Explicit independent proxy methods/properties and existing production RecognitionConsumptionLedger/current-stream/generation/capture fence; no invented source mapping or product mutation.",
+        "trace_archive": "native/nemotron/issue218_cloud_gemini_raw.zip:invalid_driver_comparison/trace.json"
+      },
+      {
+        "id": "gemini_valid",
+        "route": "gemini_transcribe",
+        "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_experiment.py --route gemini_transcribe --repetitions 2 --output native/nemotron/issue218_cloud_gemini_run2",
+        "wall_seconds": 285.98,
+        "exit_code": 0,
+        "comparison_validity": "VALID_CURRENT_PATH",
+        "cases": 24,
+        "remote_starts": 24,
+        "submitted_audio_seconds": 146.25525,
+        "driver_execution_sha256": "57c5dde1bd1a887b72fbd96828f91ad090b4f5207ec579fb80494c237a84aa02",
+        "trace_archive": "native/nemotron/issue218_cloud_gemini_raw.zip:valid/trace.json"
+      }
+    ],
+    "executed_offline_analysis": [
+      {
+        "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_summarize.py --trace native/nemotron/issue218_cloud_deepgram_run1/trace.json --output native/nemotron/issue218_cloud_deepgram_summary.json",
+        "exit_code": 0,
+        "status": "superseded intermediate analysis"
+      },
+      {
+        "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_summarize.py --trace native/nemotron/issue218_cloud_gemini_run2/trace.json --output native/nemotron/issue218_cloud_gemini_summary.json",
+        "exit_code": 0,
+        "status": "superseded intermediate analysis"
+      },
+      {
+        "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_summarize.py --trace native/nemotron/issue218_cloud_deepgram_run1/trace.json --trace native/nemotron/issue218_cloud_gemini_run2/trace.json --output native/nemotron/issue218_cloud_summary.json",
+        "exit_code": 0,
+        "wall_seconds": 1.13,
+        "status": "conservation/availability analysis before word-span explanation"
+      },
+      {
+        "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_summarize.py --trace native/nemotron/issue218_cloud_deepgram_run1/trace.json --trace native/nemotron/issue218_cloud_gemini_run2/trace.json --output native/nemotron/issue218_cloud_summary.json",
+        "exit_code": 0,
+        "wall_seconds": 1.56,
+        "status": "final analysis including recorded full-word attribution explanation; no model/cloud calls"
+      }
+    ],
+    "independent_review_no_paid_rerun": "Extract each raw ZIP to separate task-owned build/issue218_cloud_reproduction provider directory. Run .venv/Scripts/python.exe -B native/nemotron/issue218_cloud_summarize.py --trace <deepgram extraction>/valid/trace.json --trace <gemini extraction>/valid/trace.json --output build/issue218_cloud_reproduction/summary.json. Expected metrics/mapping identical; trace_path differs by extraction path. Archive member SHA256 values in attempts/report are authority. Screenshots remain in owned dirs.",
+    "paid_reproduction_boundary": "Original executed commands preserved; any fresh cloud reproduction requires remaining explicit budget/authority and existing persistent ledger. Do not reset grant ledger or run another credential/model fallback."
+  },
+  "unchanged_surfaces": "All product code, maintained docs/settings/reports other than assigned issue218_cloud* and prior local evidence are read-only/intentionally unchanged. Investigation adds no permanent tests or comments. No Git mutations.",
+  "remaining_prerequisites": "No blocker to scoped experiment completion. Semantic/route-adoption decisions remain DEFER. Separate authorized source-fragment/translation policy work, Gemini native finality/raw-wire qualification and later VR/HMD evaluation would be needed before broader enablement; none repaired or simulated here."
+}

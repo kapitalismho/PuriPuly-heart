@@ -1,0 +1,200 @@
+{
+  "schema": "issue218-cloud-attempts-1",
+  "candidate": "c7e7ae0d5bfb8a5ab8637c0dbc1e40eb0f84e6f9",
+  "attempts": [
+    {
+      "id": "deepgram_startup_driver_failure",
+      "route": "deepgram",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_experiment.py --route deepgram --repetitions 2 --output native/nemotron/issue218_cloud_deepgram",
+      "wall_seconds": 8.71,
+      "exit_code": 1,
+      "comparison_validity": "INVALID_TASK_DRIVER_STARTUP",
+      "remote_starts": 0,
+      "submitted_audio_seconds": 0,
+      "mechanism": "Driver incorrectly supplied nonexistent Deepgram backend.close to scoped-engine lifecycle. Removed only task-driver backend_close option, consistent current provider session ownership. No product failure or paid request.",
+      "trace_archive": "native/nemotron/issue218_cloud_deepgram_raw.zip:startup_driver_failure/trace.json"
+    },
+    {
+      "id": "deepgram_valid",
+      "route": "deepgram",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_experiment.py --route deepgram --repetitions 2 --output native/nemotron/issue218_cloud_deepgram_run1",
+      "wall_seconds": 260.3,
+      "exit_code": 0,
+      "comparison_validity": "VALID_CURRENT_PATH",
+      "cases": 24,
+      "remote_starts": 24,
+      "submitted_audio_seconds": 124.2,
+      "driver_execution_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+      "trace_archive": "native/nemotron/issue218_cloud_deepgram_raw.zip:valid/trace.json"
+    },
+    {
+      "id": "gemini_invalid_driver_comparison",
+      "route": "gemini_transcribe",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_experiment.py --route gemini_transcribe --repetitions 2 --output native/nemotron/issue218_cloud_gemini_run1",
+      "wall_seconds": 208.87,
+      "exit_code": 0,
+      "comparison_validity": "INVALID_TASK_DRIVER_COMPARISON",
+      "cases": 12,
+      "remote_starts": 12,
+      "submitted_audio_seconds": 69.15175,
+      "driver_execution_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+      "mechanism": "Task consumer expected bare STTRecognitionUnit rather than current STTRecognitionUnitTerminal; baseline proxy also lacked explicit properties/methods required by runtime-checkable independent protocol, causing unmatched native input and terminal timeout. Raw native service accepted KEY2/model and delivered finals. No provider loss, gray outcome or quality score can be inferred from zero sources. Counted against grant.",
+      "correction": "Explicit independent proxy methods/properties and existing production RecognitionConsumptionLedger/current-stream/generation/capture fence; no invented source mapping or product mutation.",
+      "trace_archive": "native/nemotron/issue218_cloud_gemini_raw.zip:invalid_driver_comparison/trace.json"
+    },
+    {
+      "id": "gemini_valid",
+      "route": "gemini_transcribe",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_experiment.py --route gemini_transcribe --repetitions 2 --output native/nemotron/issue218_cloud_gemini_run2",
+      "wall_seconds": 285.98,
+      "exit_code": 0,
+      "comparison_validity": "VALID_CURRENT_PATH",
+      "cases": 24,
+      "remote_starts": 24,
+      "submitted_audio_seconds": 146.25525,
+      "driver_execution_sha256": "57c5dde1bd1a887b72fbd96828f91ad090b4f5207ec579fb80494c237a84aa02",
+      "trace_archive": "native/nemotron/issue218_cloud_gemini_raw.zip:valid/trace.json"
+    }
+  ],
+  "offline_commands": [
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_summarize.py --trace native/nemotron/issue218_cloud_deepgram_run1/trace.json --output native/nemotron/issue218_cloud_deepgram_summary.json",
+      "exit_code": 0,
+      "status": "superseded intermediate analysis"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_summarize.py --trace native/nemotron/issue218_cloud_gemini_run2/trace.json --output native/nemotron/issue218_cloud_gemini_summary.json",
+      "exit_code": 0,
+      "status": "superseded intermediate analysis"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_summarize.py --trace native/nemotron/issue218_cloud_deepgram_run1/trace.json --trace native/nemotron/issue218_cloud_gemini_run2/trace.json --output native/nemotron/issue218_cloud_summary.json",
+      "exit_code": 0,
+      "wall_seconds": 1.13,
+      "status": "conservation/availability analysis before word-span explanation"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_cloud_summarize.py --trace native/nemotron/issue218_cloud_deepgram_run1/trace.json --trace native/nemotron/issue218_cloud_gemini_run2/trace.json --output native/nemotron/issue218_cloud_summary.json",
+      "exit_code": 0,
+      "wall_seconds": 1.56,
+      "status": "final analysis including recorded full-word attribution explanation; no model/cloud calls"
+    }
+  ],
+  "budget_totals": {
+    "deepgram": {
+      "remote_starts_reserved": 24,
+      "audio_samples_reserved": 1987200,
+      "audio_samples_written": 1987200,
+      "halted": false,
+      "reserved_audio_seconds": 124.2,
+      "successfully_written_audio_seconds": 124.2,
+      "max_remote_starts": 72,
+      "max_audio_seconds_including_replay": 300
+    },
+    "gemini_transcribe": {
+      "remote_starts_reserved": 36,
+      "audio_samples_reserved": 3446512,
+      "audio_samples_written": 3446512,
+      "halted": false,
+      "reserved_audio_seconds": 215.407,
+      "successfully_written_audio_seconds": 215.407,
+      "max_remote_starts": 72,
+      "max_audio_seconds_including_replay": 300
+    }
+  },
+  "authorization": "Fresh authorization only Deepgram and exact Gemini Transcribe KEY2; no paid translation. Limits300seconds transmitted audio including replay and72remote starts per provider. Invalid successful transmissions/start attempts remain counted. No automatic paid retries or credential fallback.",
+  "safety": "Credential values never included in commands, hashed, serialized or inherited into model/UI child environment. Names and explicit-constructor equality proof only.",
+  "archive_records": [
+    {
+      "archive_member": "native/nemotron/issue218_cloud_deepgram_raw.zip:valid/trace.json",
+      "execution_path": "native/nemotron/issue218_cloud_deepgram_run1/trace.json",
+      "utf8_lf_sha256": "cbcb49ae13ed87856579f2d1ea33779273c66991db716f426bc9f53f508c0ec7",
+      "utf8_bytes": 59670396,
+      "archived_bytes_sha256": "cbcb49ae13ed87856579f2d1ea33779273c66991db716f426bc9f53f508c0ec7",
+      "archived_size": 59670396,
+      "archive_member_crc32_hex": "cd3a74ae",
+      "line_ending": "LF"
+    },
+    {
+      "archive_member": "native/nemotron/issue218_cloud_deepgram_raw.zip:valid/driver_snapshot.py",
+      "execution_path": "native/nemotron/issue218_cloud_deepgram_run1/driver_snapshot.py",
+      "utf8_lf_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+      "utf8_bytes": 34953,
+      "archived_bytes_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+      "archived_size": 34953,
+      "archive_member_crc32_hex": "902a7d7d",
+      "line_ending": "LF"
+    },
+    {
+      "archive_member": "native/nemotron/issue218_cloud_deepgram_raw.zip:startup_driver_failure/trace.json",
+      "execution_path": "native/nemotron/issue218_cloud_deepgram/trace.json",
+      "utf8_lf_sha256": "397764faefbf93acac49c56ac344cb9f266e7a3d2f4399498010c5e24b189a4b",
+      "utf8_bytes": 46037,
+      "archived_bytes_sha256": "397764faefbf93acac49c56ac344cb9f266e7a3d2f4399498010c5e24b189a4b",
+      "archived_size": 46037,
+      "archive_member_crc32_hex": "4b5eb37e",
+      "line_ending": "LF"
+    },
+    {
+      "archive_member": "native/nemotron/issue218_cloud_deepgram_raw.zip:startup_driver_failure/driver_snapshot.py",
+      "execution_path": "native/nemotron/issue218_cloud_deepgram/driver_snapshot.py",
+      "utf8_lf_sha256": "dad23c178c346090df78718ef498734954acc5a1c6a52f53a70ac9c3e5425e31",
+      "utf8_bytes": 34224,
+      "archived_bytes_sha256": "dad23c178c346090df78718ef498734954acc5a1c6a52f53a70ac9c3e5425e31",
+      "archived_size": 34224,
+      "archive_member_crc32_hex": "df468347",
+      "line_ending": "LF"
+    },
+    {
+      "archive_member": "native/nemotron/issue218_cloud_gemini_raw.zip:valid/trace.json",
+      "execution_path": "native/nemotron/issue218_cloud_gemini_run2/trace.json",
+      "utf8_lf_sha256": "f64922e0b3a510a705c507af03362c341bcbd9653ed06568a980a5627c0e9204",
+      "utf8_bytes": 30973608,
+      "archived_bytes_sha256": "f64922e0b3a510a705c507af03362c341bcbd9653ed06568a980a5627c0e9204",
+      "archived_size": 30973608,
+      "archive_member_crc32_hex": "fde3d86c",
+      "line_ending": "LF"
+    },
+    {
+      "archive_member": "native/nemotron/issue218_cloud_gemini_raw.zip:valid/driver_snapshot.py",
+      "execution_path": "native/nemotron/issue218_cloud_gemini_run2/driver_snapshot.py",
+      "utf8_lf_sha256": "57c5dde1bd1a887b72fbd96828f91ad090b4f5207ec579fb80494c237a84aa02",
+      "utf8_bytes": 35913,
+      "archived_bytes_sha256": "57c5dde1bd1a887b72fbd96828f91ad090b4f5207ec579fb80494c237a84aa02",
+      "archived_size": 35913,
+      "archive_member_crc32_hex": "628fdc12",
+      "line_ending": "LF"
+    },
+    {
+      "archive_member": "native/nemotron/issue218_cloud_gemini_raw.zip:invalid_driver_comparison/trace.json",
+      "execution_path": "native/nemotron/issue218_cloud_gemini_run1/trace.json",
+      "utf8_lf_sha256": "598ba1ec5564e391d878e16135d3c9d40daa20b5801b7682825a5890f5ec0e7d",
+      "utf8_bytes": 14848320,
+      "archived_bytes_sha256": "598ba1ec5564e391d878e16135d3c9d40daa20b5801b7682825a5890f5ec0e7d",
+      "archived_size": 14848320,
+      "archive_member_crc32_hex": "e69f9d51",
+      "line_ending": "LF"
+    },
+    {
+      "archive_member": "native/nemotron/issue218_cloud_gemini_raw.zip:invalid_driver_comparison/driver_snapshot.py",
+      "execution_path": "native/nemotron/issue218_cloud_gemini_run1/driver_snapshot.py",
+      "utf8_lf_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+      "utf8_bytes": 34953,
+      "archived_bytes_sha256": "d4a5e360d0849660e336cd2b2e717b5bad526bdfe8f1d4842a13e9db39bcef77",
+      "archived_size": 34953,
+      "archive_member_crc32_hex": "902a7d7d",
+      "line_ending": "LF"
+    },
+    {
+      "archive_member": "native/nemotron/issue218_cloud_gemini_raw.zip:budget/all_routes.jsonl",
+      "execution_path": "native/nemotron/issue218_cloud_budget.jsonl",
+      "utf8_lf_sha256": "3a4b77a8b33d9fc52d9c2896485834ff73bb3b36a568718c762ee9d00b618a0f",
+      "utf8_bytes": 2338619,
+      "archived_bytes_sha256": "3a4b77a8b33d9fc52d9c2896485834ff73bb3b36a568718c762ee9d00b618a0f",
+      "archived_size": 2338619,
+      "archive_member_crc32_hex": "b7378908",
+      "line_ending": "LF"
+    }
+  ],
+  "sanitization": "Native message dictionaries sanitized before durable trace and again on report save: selected secret values and credential/query/account/session fields redacted; user-home prefix replaced; LF UTF8 JSON. Generic key-field sanitization also masks anonymous origin-attribution key objects, while actual source speaker_id/session_scope remain preserved. No raw websocket bytes or unsanitized in-memory trace was archived. Archived hashes are authoritative sanitized bytes; execution driver source hashes are distinct."
+}

@@ -1,0 +1,51 @@
+{
+  "schema": "issue218-cloud-followup-director-assessment-1",
+  "product_candidate": "c7e7ae0d5bfb8a5ab8637c0dbc1e40eb0f84e6f9",
+  "scope": "User requested explanation of the Parakeet/profile relationship, a simple uncertainty-rule proposal, feasibility of later attribution, and actual Deepgram/Gemini Transcribe tests. Product policy changes were not requested or performed. Fresh cloud authorization is limited to these two providers and existing permitted public inputs. Gemini must use GOOGLE_API_KEY2 from the explicitly named parent repository .env.local; no key value belongs in evidence.",
+  "repository_baseline": "Clean current branch at start. Remote dev tip75c4485a6787d504f5335d1602973f63b4d0c234 observed; no merge/push authority, experiment remains frozen at the stated candidate.",
+  "question1_profile_and_parakeet": {
+    "decision": "Correct the misleading direct-cause reading: profiles configure Nemotron, not Parakeet. CausalBatchSession uses diarizer boundaries to select ASR input, so profiles can indirectly change native text through different PCM windows.",
+    "evidence": "issue218_evidence.zip:cpu_initial/trace.json and cpu_rotated_readback/trace.json; distinct_repeated_A_B_A, two comparisons per arm.",
+    "identical": "Same original135225-sample input/hash, Parakeet model/settings. First A cut49728(3.108s) and complete PCM/context identical for both profiles; same text,0.64 submits approximately0.41s sooner. Common real hard-rollover successor identical/empty in all arms.",
+    "different": "Baseline's main decode includes A+B+returning A with onset context. New paths decode disjoint slices. Returning A is [75968,105472) for1.04 vs[75808,105472) for0.64 at16kHz, no context:10ms extra leading PCM in0.64. Each profile repeats the same own PCM hash and native result:Yeah. versus empty.",
+    "limit": "Different actual slices verified. Ten milliseconds alone causing the native result difference is NOT established; no identical-input nondeterminism or native internal cause is claimed."
+  },
+  "question2_simple_relaxation": {
+    "proposal_not_implemented": "Permit bounded low-confidence interior dropouts only when supplied source+context has complete eligible coverage, exactly one supported speaker/epoch, no competing/overlap evidence, and clear evidence of that same key on both sides within supplied input. Preserve ordinary text and current mixed/uncertain/unavailable outcomes otherwise.",
+    "complexity": "Keep this inside existing whole-input attribution, not a new classifier, majority vote or text splitter. Limit total tolerated dropout with an absolute cap and a cap relative to unique clear same-speaker support; silence or duplicate replay cannot enlarge the allowance. No numerical thresholds or production optimum selected.",
+    "counterevidence": "The reported70ms is10ms onset+50ms fade+10ms trailing boundary, not one interior hole. Last immutable interval[49568,49728) has highest probability in successor slot1 around0.35062; next active/clear evidence is slot1. Thus the exact example must not be silently promoted to A by a blanket70ms allowance.",
+    "limits": "The narrow interior-hole proposal does not color the exact clean-A example. One-sided onset/fade or successor-edge tolerance is a separate material acoustic tradeoff; no automatic broadening until an example becomes colored. ShortNo./numbers retain text even when gray."
+  },
+  "question3_later_attribution": {
+    "current_fact": "CausalBatchSession._submit computes attribution and constructs frozen STTSourceAudio together; _consume saves native result and _release reuses the saved attribution. Downstream SourceChild immutability requires final composition before translation, not necessarily before native recognition.",
+    "reason_limit": "No authoritative author rationale requiring submission-time freeze was found. Simpler snapshot lifetime/less pending-evidence retention is an inference, not a documented requirement.",
+    "proposal_not_implemented": "Keep source/context ranges, input cursor, native options, identity and display group immutable at submission. Snapshot attribution once on that slice's own native terminal, before contribution release/SourceChild admission, using only already-delivered immutable evidence. No added wait, re-decode, source recut or post-publication recolor.",
+    "required_mechanism": "Existing shared bounded frame cache must retain unresolved slices' needed source/context footprint until their own final snapshot. Merely moving _attribute is insufficient: current active-payload floor can prune earlier proof after a cut. Preserve hard cache bounds; loss/eviction remains conservative. Reset/epoch/capture fences prevent old source from acquiring a new epoch's equal numeric key. Snapshot on own result, not on later ordered release.",
+    "observed_opportunity": "Read-only recorded-evidence analysis at each own native result found13 of87 previously positive coverage gaps close;44 remain gaps. No origin becomes fully certain under the unchanged strict rule. Correction example missing10560samples at submit becomes0by result, while cleanB's6464sample gap persists. This is analysis, NOT a changed-runtime execution or guaranteed color improvement.",
+    "analysis_limit": "Recorded reconstruction does not replay request-specific pruning floor; evidence-delivery timestamps precede awaited engine delivery. Prior local harness used5ms pump while ordinary peer-channel drain is50ms; exact opportunity frequencies must not be generalized to normal startup.",
+    "next_bounded_validation": "Before implementation acceptance, replay pending retention/frontier/epoch handling over the existing clearAB/correction/shortNo/overlap records. Verify unchanged PCM/source order, exactly one final snapshot, no added wait, preserved uncertain successor edge and no post-release mutation."
+  },
+  "cloud_execution_authorization": {
+    "providers": ["Deepgram", "Gemini Transcribe"],
+    "gemini_credential_variable": "GOOGLE_API_KEY2",
+    "limit_per_provider": {"submitted_audio_seconds_including_replay":300,"recognition_starts":72},
+    "policy": "Task-chosen conservative maximum, not a spending target. Enforce before transmission/start; retain failures. No fallback Gemini key or unbounded retries. Existing local Gemma translates; no other paid LLM, download, private capture or VR workload.",
+    "evidence_ownership": "Cloud execution reports/archives/drivers authored by profile-experiment; Director assessment and independent review are separate. Previous local artifacts remain unchanged."
+  },
+  "question4_actual_cloud_findings": {
+    "evidence": ["issue218_cloud_report.json", "issue218_cloud_summary.json", "issue218_cloud_attempts.json", "issue218_cloud_budget.jsonl", "issue218_cloud_deepgram_raw.zip", "issue218_cloud_gemini_raw.zip"],
+    "valid_execution": "24 Deepgram and24 Gemini cases:4public-input cases x baseline/1.04/0.64 x2rotated repeats. Actual Nemotron F16/Vulkan, managed Gemma Vulkan translation and current Flet renderer,50ms evidence drain; no product changes.",
+    "deepgram": "Actual nova-3,10/24source units identified at1.04 and12/24at0.64. Not allgray, no new-arm-only returning-A Yeah./whole-return disappearance. However source-fragment composition harms actual translation: baseline Gentlemen of the press. -> 기자 여러분.; new Gentlemen -> 신사분들 plus of the press. -> 기자분들의. Both profiles DEFER for activation. Gray/cyan split is estimated word/transition ambiguity, not demonstrated contradictory known IDs.",
+    "gemini": "Exact current GeminiTranscribeSTTBackend, gemini-3.5-transcribe-live, explicit GOOGLE_API_KEY2 verified at client constructor, no alternate-key fallback. All30valid admitted source units unavailable/gray under independent-final/no proved capture correspondence policy. Baseline and both profiles share required-content omissions. All30decoded-SDK authoritative input_transcription fragments preserved; earlier words occur only in recorded speculative interim hypotheses. No proven adapter final-delta loss or service/model cause; raw WebSocket bytes not captured. DEFER complete-content and rich-attribution activation.",
+    "invalid_attempt": "First Gemini driver run mishandled independent terminal/static protocol, invalid comparison retained and excluded from valid findings. Its12starts/69.15175s still counted. Initial Deepgram driver startup failure used0starts/audio. Driver-only repairs did not mutate product.",
+    "actual_authorized_usage": {"deepgram_starts":24,"deepgram_audio_seconds":124.2,"gemini_starts_including_invalid":36,"gemini_audio_seconds_including_invalid":215.407,"valid_local_translation_calls":88,"monetary_charge":"unknown"},
+    "next_decisions": "Deepgram: qualify source-fragment/translation phrase preservation, not just colored early output. Gemini: bounded native-finality/raw-wire and source-correspondence qualification, not speculative-interim promotion. Neither is the Parakeet native-slice problem, and the proposed local attribution changes have not been tested or deployed."
+  },
+  "director_verification": {
+    "offline_reproduction": "Both provider archives extracted; current summarizer executed over valid traces in1.85s. Every per-run field matched the saved summary except extraction trace_path, including hashes, native-to-source mapping, timings and counters.",
+    "archive_crc_and_syntax": "Deepgram ZIP4members and Gemini ZIP5members passed zipfile CRC; both Python drivers passed ast.parse. No paid rerun for this verification.",
+    "actual_visuals": "Director observed Deepgram commit_18 gold source/translation fragment and commit_20 gray hair plus cyan B; Gemini run2 commit_53 shows gray B source/translation. Readback is not pixel onset or photon timing.",
+    "independent_review": "Pinned checkpoint and explicit coverage recorded separately in issue218_cloud_review_record.json."
+  },
+  "acceptance_boundary": "These are grounded design recommendations, not deployed fixes or empirically accepted new thresholds. Current cloud observations are recorded in the accompanying issue218_cloud execution report; they cannot retroactively validate an unimplemented attribution change or select a production profile."
+}
