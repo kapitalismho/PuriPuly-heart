@@ -1,0 +1,134 @@
+{
+  "schema": "issue218-policy-attempts-1",
+  "attempts": [
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_validation.py --route gpu --preflight --output build/issue218_policy_preflight_gpu",
+      "exit": 0,
+      "wall_seconds": 4.81,
+      "result": "Driver-only local input/runtime/model existence/hash preflight passed; no model inference, translation, renderer, capture or network calls. Candidate unpinned."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_validation.py --route deepgram-native-replay --preflight --output build/issue218_policy_preflight_replay",
+      "exit": 0,
+      "wall_seconds": 4.79,
+      "result": "Canonical baseline_rep1 capture/payload/request hash and successful cursor reconstruction passed for all four tapes; no network, credentials or model calls. Candidate unpinned."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_validation.py --route gpu --candidate dd3cad278dc683840c6eabaae9777159cb75a710 --output native/nemotron/issue218_policy_gpu",
+      "exit": 1,
+      "wall_seconds": 13.47,
+      "result": "Invalid task-driver setup: LocalGpuSTTBackend has no provider_id attribute. Actual Gemma Vulkan prepared, Flet renderer started and GPU backend prepared, but zero capture cases/native ASR requests/translation jobs. Fixed task driver to use the existing local helper's local_gpu scoped provider identifier; product untouched.",
+      "evidence": "native/nemotron/issue218_policy_invalid_setup.zip:trace.json"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_validation.py --route gpu --candidate dd3cad278dc683840c6eabaae9777159cb75a710 --output native/nemotron/issue218_policy_gpu_valid",
+      "exit": 0,
+      "wall_seconds": 317.38,
+      "result": "30 valid actual local GPU cases, 62 real Gemma translations; partial improvement and explicit missing identity criteria, not acoustic acceptance."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_validation.py --route deepgram-native-replay --candidate dd3cad278dc683840c6eabaae9777159cb75a710 --output native/nemotron/issue218_policy_deepgram_replay",
+      "exit": 1,
+      "wall_seconds": 47.59,
+      "result": "Invalid task-driver replay. CleanAB tape verified; ABA newly scheduled live VAD was one512sample frame behind the historical raw receipt cursor84288vs84800. No offset or fabricated correspondence. Changed task driver to original recorded native input/control schedule.",
+      "archive": "native/nemotron/issue218_policy_invalid_live_vad.zip"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_validation.py --route deepgram-native-replay --preflight --candidate dd3cad278dc683840c6eabaae9777159cb75a710 --output build/issue218_policy_fixed_replay_preflight",
+      "exit": 0,
+      "wall_seconds": 4.68,
+      "result": "Original tape PCM/request/control reconstruction preflight passed; no inference/network/UI."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_validation.py --route deepgram-native-replay --candidate dd3cad278dc683840c6eabaae9777159cb75a710 --output native/nemotron/issue218_policy_deepgram_fixed",
+      "exit": 1,
+      "wall_seconds": 13.78,
+      "result": "Invalid task-driver replay. Strict actualcapture guard found parallel capture task one512frame behind original submission; no future capture fed. Original recorded maps themselves are causal (all writes after mapped capture end). Replaced parallel scheduler with one chronological capture/native-input scheduler.",
+      "archive": "native/nemotron/issue218_policy_invalid_capture_schedule.zip"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_validation.py --route deepgram-native-replay --candidate dd3cad278dc683840c6eabaae9777159cb75a710 --output native/nemotron/issue218_policy_deepgram_valid",
+      "exit": 1,
+      "wall_seconds": 86.55,
+      "result": "Invalid task-driver consumer boundary: original PCM/control/raw cursors exact and causal; direct native adapter omitted current STTScopedTurnNormalizer before production peer callbacks, causing source release exceeds assembled text on second append. Added delegation to actual current normalizer, not text reconstruction/provider policy.",
+      "archive": "native/nemotron/issue218_policy_invalid_normalizer.zip"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_validation.py --route deepgram-native-replay --candidate dd3cad278dc683840c6eabaae9777159cb75a710 --output native/nemotron/issue218_policy_deepgram_final",
+      "exit": 0,
+      "wall_seconds": 98.69,
+      "result": "12 valid fixed-native-input/current-normalizer/source-join cases and 23 real Gemma Vulkan translations. Exact PCM/control/raw receipt cursors and causal originalcapture availability verified. Flet committed every snapshot but all23 owned readbacks and12 final pictures were blank; no renderer pixel pass or useful pixel latency claimed."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_summary.py --trace native/nemotron/issue218_policy_gpu_valid/trace.json --trace native/nemotron/issue218_policy_deepgram_final/trace.json --output native/nemotron/issue218_policy_summary.json --archive",
+      "exit": 0,
+      "wall_seconds": 1.47,
+      "result": "Initial full offline summary and immutable raw archives. Subsequent offline-only summary fixes corrected terminal fallback/scoped origin accounting, maximum ordered required-word matching and blank-pixel eligibility; no model/provider reruns."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_summary.py --trace native/nemotron/issue218_policy_gpu_valid/trace.json --trace native/nemotron/issue218_policy_deepgram_final/trace.json --output native/nemotron/issue218_policy_summary.json",
+      "exit": 0,
+      "result": "Final offline summary: all42 cases conserve authoritative source text exactly once, history once and ordered publication;4local baseline and9historical native-replay content failures. GPU62 positive owned readbacks; replay23 blank readbacks excluded from pixel timing."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --output native/nemotron/issue218_policy_renderer_probe_run1",
+      "exit": 0,
+      "wall_seconds": 91.89,
+      "result": "Renderer-only exact observed submissions: working4/4; Deepgram20/23positive. All20positive cloak0; last41/42/45blank cloak2. No models/providers.",
+      "raw_trace": "native/nemotron/issue218_policy_renderer_probe_run1.zip:trace.json",
+      "raw_trace_sha256": "0ce6643aa0271c1423a5532d6cf2cabfceb08f40279adf3b4ab14fd70e203db2",
+      "execution_driver_sha256": "05d4e6f88fd8b7ac1fd704692f53a85a8b83d2ec0c4609d8ba494d83da7bc0cb",
+      "execution_visibility_helper_sha256": null
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --output native/nemotron/issue218_policy_renderer_guarded",
+      "exit": 0,
+      "wall_seconds": 85.38,
+      "result": "Task visibility guard: Deepgram22/23valid incl41/42/45; numeric29invalid minimized/stale160x28layout after native restore. Auxiliary owned cloak-injection check deniedE_ACCESSDENIED before control snapshots; preserved taskdriver failure, not productfailure. Old top executed/exit0 does NOT imply surfacequalification.",
+      "raw_trace": "native/nemotron/issue218_policy_renderer_guarded.zip:trace.json",
+      "raw_trace_sha256": "06a66d8baae540897a8acd4f5180790bef1a52f07fd0647524cae9016a08780a",
+      "execution_driver_sha256": "a85da20182d2bc00eb793c5983c14b887a028a5ba20d3a4d23f70d4d8e0c6e27",
+      "execution_visibility_helper_sha256": "c6e34fd2fe88532f4563a6f5340d8898935ffb9df2a48c8b9d68d8df193fdcaa"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --repair-verify --output native/nemotron/issue218_policy_renderer_repair_verify",
+      "exit": 0,
+      "wall_seconds": 10.27,
+      "result": "Changed guard working4/4valid. Numeric29explicitly minimized; restored owned client no longer covered by backdrop, no pixels captured. Invalid preserved; no model/provider calls. Old executed/exit0 is execution only.",
+      "raw_trace": "native/nemotron/issue218_policy_renderer_repair_verify.zip:trace.json",
+      "raw_trace_sha256": "18490ed3e9f4fc2bfd6d0aabdd5713ab6bf2a48123926292ad63aab6759fc710",
+      "execution_driver_sha256": "1e3c2cf687d0b4fbe547f8924b244fb567e0ed14d74526d0f0c51daa472ae42a",
+      "execution_visibility_helper_sha256": "81485e6526f63921beb836237ba79c8230f035b28e2dd1cf423fdcbc3450e639"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --repair-verify --numeric-only --output native/nemotron/issue218_policy_renderer_numeric_recovered",
+      "exit": 1,
+      "wall_seconds": 4.3,
+      "result": "Numeric-only owner bounds correction restored1344x336 layout, but recapture cloak2; two owned COM move attempts E_ACCESSDENIED. Explicit invalidvisibility and nonzero exit; no pixels captured.",
+      "raw_trace": "native/nemotron/issue218_policy_renderer_numeric_recovered.zip:trace.json",
+      "raw_trace_sha256": "ad6115e867d23cac6b9db0556458c9353b43a60e4fda3c4e79a340d789cf3824",
+      "execution_driver_sha256": "77ee3f86ac5a2d52d8b036ef2e44741a4a02107ce48d07850ab8317d059fe0c2",
+      "execution_visibility_helper_sha256": "ae88587f6cbc4d22097fe155ec93fe0a1f0c00a5381e828b90ef0ba25fa6c3a7"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --repair-verify --numeric-only --output native/nemotron/issue218_policy_renderer_owned_show_final",
+      "exit": 0,
+      "wall_seconds": 4.2,
+      "result": "Final planned owned-show correction/targeted numeric29: restore+same owner bounds reapply, actualuncloakedgoldpixels1/1. Recapture alreadycloak0, so shell-cloak show/migration branch recovery is not proven. No further UI/COM experiments or model runs.",
+      "raw_trace": "native/nemotron/issue218_policy_renderer_owned_show_final.zip:trace.json",
+      "raw_trace_sha256": "7bed9366055be328b10f3e62bedeeb14b24c0627717c62ec149f32251c4ac77e",
+      "execution_driver_sha256": "77ee3f86ac5a2d52d8b036ef2e44741a4a02107ce48d07850ab8317d059fe0c2",
+      "execution_visibility_helper_sha256": "7829a79ea828b924e73f328ac8cd9d4bcea044b37bafb896904deaded0dbedb9"
+    }
+  ],
+  "driver_at_preflight_sha256": "e335ff88819a8c30960b4ec8484a5b6bc42c4c2f33305c7af69a6794e6c1dcb0",
+  "matrix_status": "Completed approved30GPU+12fixed-native-input replays on dd3cad278dc683840c6eabaae9777159cb75a710; explicit acceptance gaps, no production/default enablement. No live model execution remains. Zero provider network/credential reads.",
+  "renderer_only_status": "Stopped after completed final approved owned-show attempt. Full guarded22/23, changed-guard control4/4; failed numeric29 in full replay retained, separate finaltargeted29actualpixels1/1. OriginalE2Evisualtiming remains failed. No further experiments/modelruns.",
+  "historical_execution_paths_note": "Historical command strings, savedsummary inputs and immutable rawtrace embedded paths remain execution-time paths. Currenttrace/counter/preflight/source-snapshot references use archive:member. Filesystem-based drivers require explicit extraction; all directPNG paths remain valid. No probes/modelcalls authorized by reproductionmetadata.",
+  "artifact_cleanup": {
+    "ledger": "native/nemotron/issue218_policy_cleanup.json",
+    "removed_verified_nonPNG_copies": 18,
+    "bytes_removed": 131109893,
+    "archive_CRC_hash_member_equivalence": "14archives/233members/14nestedsourceZIPs passed; currentreaders complete; allZIPs/directPNGs retained."
+  }
+}

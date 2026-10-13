@@ -1,0 +1,517 @@
+{
+  "schema": "issue218-policy-artifact-cleanup-1",
+  "scope": "Director-authorized artifact-only CRC/hash/member verification and removal of redundant owned nonPNG directcopies; no probes/GUI/COM/modelcalls/product/Git operations.",
+  "verification": {
+    "archives": 14,
+    "outer_members": 233,
+    "nested_source_ZIPs": 14,
+    "result": "Allarchivecontainerhashes, exactmembersets, memberSHA256/bytes and CRCs passed; allpresentdirectcopies matched archivedmembers."
+  },
+  "verified_archives": [
+    {
+      "path": "native/nemotron/issue218_policy_preflight_gpu.zip",
+      "sha256": "7a143f9676a992f38065216aedced6322bbc4ca7a57cba35332be67c59e9e2d0",
+      "members": 2,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 567
+      },
+      "direct_copies_verified": []
+    },
+    {
+      "path": "native/nemotron/issue218_policy_preflight_replay.zip",
+      "sha256": "ab60b33d9bb84f998ef1c01a34152682ef9d6b8978499b07351c031dbc8eddbd",
+      "members": 2,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 567
+      },
+      "direct_copies_verified": []
+    },
+    {
+      "path": "native/nemotron/issue218_policy_invalid_setup.zip",
+      "sha256": "7549c5a19d1d6e7e4f3b51266c5c050a10aaedee847fbfaadd35657d9420948f",
+      "members": 4,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 567
+      },
+      "direct_copies_verified": []
+    },
+    {
+      "path": "native/nemotron/issue218_policy_invalid_live_vad.zip",
+      "sha256": "311e0afc0b371f23b2bb5cf970ca19577028214e23683ca1013dc9e7fee797ab",
+      "members": 6,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 567
+      },
+      "direct_copies_verified": []
+    },
+    {
+      "path": "native/nemotron/issue218_policy_invalid_capture_schedule.zip",
+      "sha256": "4d28dc7e22a4933a341326e8393e79ff4d22e1bed90be863928da64ae6bb78b4",
+      "members": 4,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 567
+      },
+      "direct_copies_verified": []
+    },
+    {
+      "path": "native/nemotron/issue218_policy_invalid_normalizer.zip",
+      "sha256": "a8b39c960bf1a23dc9942c92fd65a7b8fe22b11e60bffdceb18b7e93b8a611bd",
+      "members": 7,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 567
+      },
+      "direct_copies_verified": []
+    },
+    {
+      "path": "native/nemotron/issue218_policy_fixed_replay_preflight.zip",
+      "sha256": "81869f4033d18782a809faf73d69f52a22b91eec3e2b8f03470572aa5672d658",
+      "members": 2,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 567
+      },
+      "direct_copies_verified": []
+    },
+    {
+      "path": "native/nemotron/issue218_policy_gpu_valid.zip",
+      "sha256": "4f1573c87550cf209f32898e63a8c677a146ccf9631d6fe6cc7b31579c902d32",
+      "members": 96,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 567
+      },
+      "direct_copies_verified": [
+        "native/nemotron/issue218_policy_gpu_valid/commit_1.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_102.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_103.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_106.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_109.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_11.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_110.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_113.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_116.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_119.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_120.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_14.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_15.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_18.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_19.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_22.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_23.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_24.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_25.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_28.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_29.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_30.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_33.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_36.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_37.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_4.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_40.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_41.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_44.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_45.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_46.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_47.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_5.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_50.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_51.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_52.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_55.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_58.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_59.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_62.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_63.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_66.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_67.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_68.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_69.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_72.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_73.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_74.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_77.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_8.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_80.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_81.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_84.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_85.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_88.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_89.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_90.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_91.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_94.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_95.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_96.png",
+        "native/nemotron/issue218_policy_gpu_valid/commit_99.png",
+        "native/nemotron/issue218_policy_gpu_valid/execution_sources.zip",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_baseline_1.04_1_clean_A_B.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_baseline_1.04_1_distinct_repeated_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_baseline_1.04_1_linguistic_correction.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_baseline_1.04_1_short_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_baseline_1.04_1_six_second_rollover.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_baseline_1.04_2_clean_A_B.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_baseline_1.04_2_distinct_repeated_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_baseline_1.04_2_linguistic_correction.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_baseline_1.04_2_short_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_baseline_1.04_2_six_second_rollover.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_counters.jsonl",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_0.64_1_clean_A_B.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_0.64_1_distinct_repeated_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_0.64_1_linguistic_correction.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_0.64_1_short_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_0.64_1_six_second_rollover.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_0.64_2_clean_A_B.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_0.64_2_distinct_repeated_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_0.64_2_linguistic_correction.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_0.64_2_short_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_0.64_2_six_second_rollover.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_1.04_1_clean_A_B.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_1.04_1_distinct_repeated_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_1.04_1_linguistic_correction.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_1.04_1_short_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_1.04_1_six_second_rollover.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_1.04_2_clean_A_B.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_1.04_2_distinct_repeated_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_1.04_2_linguistic_correction.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_1.04_2_short_A_B_A.png",
+        "native/nemotron/issue218_policy_gpu_valid/gpu_new_1.04_2_six_second_rollover.png",
+        "native/nemotron/issue218_policy_gpu_valid/preflight.json",
+        "native/nemotron/issue218_policy_gpu_valid/trace.json"
+      ]
+    },
+    {
+      "path": "native/nemotron/issue218_policy_deepgram_final.zip",
+      "sha256": "7af7b60e0560889295b4b63193123f047db9f99f26d701d33acccf50f415507d",
+      "members": 39,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 567
+      },
+      "direct_copies_verified": [
+        "native/nemotron/issue218_policy_deepgram_final/commit_1.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_10.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_13.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_16.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_19.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_20.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_21.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_22.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_25.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_26.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_29.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_32.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_35.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_36.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_37.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_38.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_4.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_41.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_42.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_45.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_5.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_6.png",
+        "native/nemotron/issue218_policy_deepgram_final/commit_9.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_baseline_1.04_1_clean_A_B.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_baseline_1.04_1_distinct_repeated_A_B_A.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_baseline_1.04_1_linguistic_correction.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_baseline_1.04_1_short_A_B_A.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_new_0.64_1_clean_A_B.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_new_0.64_1_distinct_repeated_A_B_A.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_new_0.64_1_linguistic_correction.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_new_0.64_1_short_A_B_A.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_new_1.04_1_clean_A_B.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_new_1.04_1_distinct_repeated_A_B_A.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_new_1.04_1_linguistic_correction.png",
+        "native/nemotron/issue218_policy_deepgram_final/deepgram-native-replay_new_1.04_1_short_A_B_A.png",
+        "native/nemotron/issue218_policy_deepgram_final/execution_sources.zip",
+        "native/nemotron/issue218_policy_deepgram_final/gpu_counters.jsonl",
+        "native/nemotron/issue218_policy_deepgram_final/preflight.json",
+        "native/nemotron/issue218_policy_deepgram_final/trace.json"
+      ]
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_probe_run1.zip",
+      "sha256": "78fd0344760fc036e45a7936b95d67b8beff266d73788d0387949d69faeb91a8",
+      "members": 33,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 29
+      },
+      "direct_copies_verified": [
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_1.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_10.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_13.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_16.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_19.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_20.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_21.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_22.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_25.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_26.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_29.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_32.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_35.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_36.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_37.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_38.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_4.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_41.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_42.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_45.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_5.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_6.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_9.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/late_1_1000.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/late_1_250.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/execution_sources.zip",
+        "native/nemotron/issue218_policy_renderer_probe_run1/GPU_working_control/commit_22.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/GPU_working_control/commit_23.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/GPU_working_control/commit_24.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/GPU_working_control/commit_25.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/GPU_working_control/late_22_1000.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/GPU_working_control/late_22_250.png",
+        "native/nemotron/issue218_policy_renderer_probe_run1/trace.json"
+      ]
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_guarded.zip",
+      "sha256": "c6c571c24d10eb53be32dd6bdca14e4ed171941dab14e76fd89721a0da18f914",
+      "members": 27,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 30
+      },
+      "direct_copies_verified": [
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_1.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_10.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_13.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_16.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_19.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_20.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_21.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_22.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_25.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_26.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_29.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_32.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_35.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_36.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_37.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_38.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_4.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_41.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_42.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_45.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_5.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_6.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_9.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/late_1_1000.png",
+        "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/late_1_250.png",
+        "native/nemotron/issue218_policy_renderer_guarded/execution_sources.zip",
+        "native/nemotron/issue218_policy_renderer_guarded/trace.json"
+      ]
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_repair_verify.zip",
+      "sha256": "11482d67ebe3aac0453720ae49a1f0d05088b1d081f24257d8454146d47c6fcf",
+      "members": 6,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 30
+      },
+      "direct_copies_verified": [
+        "native/nemotron/issue218_policy_renderer_repair_verify/execution_sources.zip",
+        "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_22.png",
+        "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_23.png",
+        "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_24.png",
+        "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_25.png",
+        "native/nemotron/issue218_policy_renderer_repair_verify/trace.json"
+      ]
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_numeric_recovered.zip",
+      "sha256": "16b32cfcafddd0144dac927c906c690d437cac7c2ab700530ba9300889066750",
+      "members": 2,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 30
+      },
+      "direct_copies_verified": [
+        "native/nemotron/issue218_policy_renderer_numeric_recovered/execution_sources.zip",
+        "native/nemotron/issue218_policy_renderer_numeric_recovered/trace.json"
+      ]
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_owned_show_final.zip",
+      "sha256": "6f3e51ef62374be2c4159c9d0583854d906ad0cf225b4a52648315966e377622",
+      "members": 3,
+      "outer_CRC": "Allmembersfullyread; ZipExtFile verifiedCRC without error",
+      "member_hashes": "Exact inventory SHA256 and bytecounts matched",
+      "nested_source_zip_CRC": {
+        "result": "passed",
+        "members": 30
+      },
+      "direct_copies_verified": [
+        "native/nemotron/issue218_policy_renderer_owned_show_final/Deepgram_original_submissions/guard_recovered_29.png",
+        "native/nemotron/issue218_policy_renderer_owned_show_final/execution_sources.zip",
+        "native/nemotron/issue218_policy_renderer_owned_show_final/trace.json"
+      ]
+    }
+  ],
+  "removed_redundant_copies": [
+    {
+      "path": "native/nemotron/issue218_policy_gpu_valid/execution_sources.zip",
+      "archive_member": "native/nemotron/issue218_policy_gpu_valid.zip:execution_sources.zip",
+      "sha256": "9c12d03ec7c7ad7b695d1057153a00727400c28bee31aaba14af324ef42189aa",
+      "bytes": 1573310
+    },
+    {
+      "path": "native/nemotron/issue218_policy_gpu_valid/gpu_counters.jsonl",
+      "archive_member": "native/nemotron/issue218_policy_gpu_valid.zip:gpu_counters.jsonl",
+      "sha256": "eea84295064b8c3079081cb3531c52b16281b52d9c4bdfb076ccb0b9288e99ff",
+      "bytes": 30364330
+    },
+    {
+      "path": "native/nemotron/issue218_policy_gpu_valid/preflight.json",
+      "archive_member": "native/nemotron/issue218_policy_gpu_valid.zip:preflight.json",
+      "sha256": "6785d019ca9b43d621b6a96173bf04cbc9efa868b53e74d3c333434c259a7da1",
+      "bytes": 88183
+    },
+    {
+      "path": "native/nemotron/issue218_policy_gpu_valid/trace.json",
+      "archive_member": "native/nemotron/issue218_policy_gpu_valid.zip:trace.json",
+      "sha256": "66148f92fff4a80b95c626f356e944f326adfcdd0aa1c3330ba19693fcc6c734",
+      "bytes": 61806172
+    },
+    {
+      "path": "native/nemotron/issue218_policy_deepgram_final/execution_sources.zip",
+      "archive_member": "native/nemotron/issue218_policy_deepgram_final.zip:execution_sources.zip",
+      "sha256": "523e4083eccef6eff908cde92ed7cedfcfba2764a715f3341ad94d8484815b6d",
+      "bytes": 1575394
+    },
+    {
+      "path": "native/nemotron/issue218_policy_deepgram_final/gpu_counters.jsonl",
+      "archive_member": "native/nemotron/issue218_policy_deepgram_final.zip:gpu_counters.jsonl",
+      "sha256": "cba047978d9b73f12c2ed0b09a1f3473270e1663c1069b11e8fb2f1dd250fef5",
+      "bytes": 4863818
+    },
+    {
+      "path": "native/nemotron/issue218_policy_deepgram_final/preflight.json",
+      "archive_member": "native/nemotron/issue218_policy_deepgram_final.zip:preflight.json",
+      "sha256": "07093749e31910e58717c4a2e1aa405e61850cb1b972d981300e3e7a9704f403",
+      "bytes": 88793
+    },
+    {
+      "path": "native/nemotron/issue218_policy_deepgram_final/trace.json",
+      "archive_member": "native/nemotron/issue218_policy_deepgram_final.zip:trace.json",
+      "sha256": "484ac97a1e851a88c29758119b4bcd191f9f21a7d23fb36be7a7d44bc02d9fd3",
+      "bytes": 28594433
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_probe_run1/execution_sources.zip",
+      "archive_member": "native/nemotron/issue218_policy_renderer_probe_run1.zip:execution_sources.zip",
+      "sha256": "41e1ed550a49190eef541282c0505bee422c9bfbcf878d1f5a0d99d6abcb0042",
+      "bytes": 149795
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_probe_run1/trace.json",
+      "archive_member": "native/nemotron/issue218_policy_renderer_probe_run1.zip:trace.json",
+      "sha256": "0ce6643aa0271c1423a5532d6cf2cabfceb08f40279adf3b4ab14fd70e203db2",
+      "bytes": 588789
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_guarded/execution_sources.zip",
+      "archive_member": "native/nemotron/issue218_policy_renderer_guarded.zip:execution_sources.zip",
+      "sha256": "0829eed290d753c3573a6f84fd6c3725d689cacb4732dcbaa8eb56b603cf109a",
+      "bytes": 153485
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_guarded/trace.json",
+      "archive_member": "native/nemotron/issue218_policy_renderer_guarded.zip:trace.json",
+      "sha256": "06a66d8baae540897a8acd4f5180790bef1a52f07fd0647524cae9016a08780a",
+      "bytes": 580778
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_repair_verify/execution_sources.zip",
+      "archive_member": "native/nemotron/issue218_policy_renderer_repair_verify.zip:execution_sources.zip",
+      "sha256": "90d35b703bde830022b739d82276c7f010677010046d4acc091fafd6477327f8",
+      "bytes": 153918
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_repair_verify/trace.json",
+      "archive_member": "native/nemotron/issue218_policy_renderer_repair_verify.zip:trace.json",
+      "sha256": "18490ed3e9f4fc2bfd6d0aabdd5713ab6bf2a48123926292ad63aab6759fc710",
+      "bytes": 133425
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_numeric_recovered/execution_sources.zip",
+      "archive_member": "native/nemotron/issue218_policy_renderer_numeric_recovered.zip:execution_sources.zip",
+      "sha256": "cdbe590646b3fc572a2a1870cffb3b624fc0eb8c305bb51ccd2b152b8042f9ec",
+      "bytes": 154293
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_numeric_recovered/trace.json",
+      "archive_member": "native/nemotron/issue218_policy_renderer_numeric_recovered.zip:trace.json",
+      "sha256": "ad6115e867d23cac6b9db0556458c9353b43a60e4fda3c4e79a340d789cf3824",
+      "bytes": 43754
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_owned_show_final/execution_sources.zip",
+      "archive_member": "native/nemotron/issue218_policy_renderer_owned_show_final.zip:execution_sources.zip",
+      "sha256": "11ab34af706e973360317bfc66680189dec8be258ff614334e1b9bb3c28c146e",
+      "bytes": 154390
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_owned_show_final/trace.json",
+      "archive_member": "native/nemotron/issue218_policy_renderer_owned_show_final.zip:trace.json",
+      "sha256": "7bed9366055be328b10f3e62bedeeb14b24c0627717c62ec149f32251c4ac77e",
+      "bytes": 42833
+    }
+  ],
+  "bytes_removed": 131109893,
+  "preserved": "AllZIPs, readable rootreports, reproducibledrivers, savedmeasurementsummary and everydirectPNG retained. Earlierissueevidence untouched.",
+  "current_helpers": {
+    "native/nemotron/issue218_policy_visibility.py": "7829a79ea828b924e73f328ac8cd9d4bcea044b37bafb896904deaded0dbedb9",
+    "native/nemotron/issue218_experiment.py": "a78bf35e3dc61eb4139f27ec6ed54062a7a98088dff38c0db0b84a12922dbe78",
+    "native/nemotron/issue216_presentation.py": "ccc29e929ec6433a9e42d2c33f314199157ce06374d17a2ba659970608fb31cf"
+  },
+  "director_reused_evidence": "Director reports current summary reproduced: ALLmeasurementfields identical to savedsummary; onlyoutputcommand[6] and updatedsummarydriverhash differ. Not rerun byworker.",
+  "removed_empty_owned_directories": [
+    "native/nemotron/issue218_policy_renderer_guarded/GPU_working_control",
+    "native/nemotron/issue218_policy_renderer_repair_verify/Deepgram_original_submissions",
+    "native/nemotron/issue218_policy_renderer_numeric_recovered/Deepgram_original_submissions",
+    "native/nemotron/issue218_policy_renderer_numeric_recovered"
+  ]
+}

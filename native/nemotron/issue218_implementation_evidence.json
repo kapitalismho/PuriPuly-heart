@@ -1,0 +1,28 @@
+{
+  "schema": "issue218-practical-policy-director-evidence-1",
+  "baseline": "b2cfc0c42bfa07d1570c243fb17ab2e547b8da1e",
+  "measured_product": "dd3cad278dc683840c6eabaae9777159cb75a710",
+  "reviewed_repaired_product": "2bef240618b8dd3492c69ee32d5d54acaf1c04e1",
+  "summary_reproduction": {
+    "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_summary.py --trace native/nemotron/issue218_policy_gpu_valid/trace.json --trace native/nemotron/issue218_policy_deepgram_final/trace.json --output build/issue218_director_policy_summary.json",
+    "result": "Exit0. Recursive JSON comparison: all measurement fields identical. Only command[6] output path and the updated summary driver hash differ from the saved execution summary.",
+    "saved_summary_driver_sha256": "978341cf5e13d3f639bb5a135573902e984a210e772d997a97d4f57a19e86fea",
+    "reproduction_summary_driver_sha256": "0ebe0263508b9be60a33e15d6f5fb3440f5546ce2e2a0e9b46bbf4ca938dc7cf",
+    "GPU": {"cases":30,"translation_calls":62,"failed_content_cases":4,"execution_failures":0,"capture_mismatches":0,"native_pcm_mismatches":0},
+    "Deepgram_native_replay": {"cases":12,"translation_calls":23,"failed_content_cases":9,"execution_failures":0,"capture_mismatches":0,"native_pcm_mismatches":0},
+    "limit": "Offline reproduction of recorded runs, not execution of the repaired product or a new provider/model/GUI run. Direct trace paths identify the execution-time copies; canonical archived equivalents are in the task inventory."
+  },
+  "actual_images_observed": [
+    {"path":"native/nemotron/issue218_policy_gpu_valid/commit_29.png","observation":"Gold complete A sentence and independent cyan No./아니요. caption."},
+    {"path":"native/nemotron/issue218_policy_gpu_valid/commit_23.png","observation":"Gold A and cyan complete Gentlemen of the press./기자 여러분. caption."},
+    {"path":"native/nemotron/issue218_policy_gpu_valid/commit_24.png","observation":"Cyan B and gray returning-A prefix; observed continuity failure is retained."},
+    {"path":"native/nemotron/issue218_policy_deepgram_final/commit_20.png","observation":"Original matrix readback blank; ACK cannot qualify pixels."},
+    {"path":"native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_20.png","observation":"Separate renderer replay shows coherent gold Washed...hair. and cyan Gentlemen...press. with actual recorded Korean translations."},
+    {"path":"native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_22.png","observation":"Gray returning prefix and gold from his hair. tail; not complete returning identity or phrase repair across native releases."},
+    {"path":"native/nemotron/issue218_policy_renderer_owned_show_final/Deepgram_original_submissions/guard_recovered_29.png","observation":"Gold 아니. 아니. 셋. / No. No. Three. actual owned pixels after bounded window/layout recovery."}
+  ],
+  "renderer_evidence_limit": "The later guarded render-only replay and targeted recovery do not retroactively turn original blank screenshots into valid E2E latency observations. Historic blank-run cloak state was not recorded; attributing all blanks to the later reproduced Shell-cloak/minimized-layout mechanism is inference. No product renderer repair was justified.",
+  "review": "Independent whole-checkpoint review and F1/F2 repair verification are recorded in issue218_implementation_review.json. New task-local integration/renderer evidence has not yet received its independent evidence-checkpoint review.",
+  "remaining_owner_decision": "No late-publication allocator, extra speaker/display wait or blind-suffix identity estimation has been selected. Latest maintainer questions request causal explanation, not approval of these alternatives.",
+  "acceptance": "Implementation checkpoint accepted at the repaired product pin. Complete Goal and rich-continuity/profile/production acceptance remain pending; no remote operations authorized."
+}

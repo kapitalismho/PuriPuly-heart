@@ -38,6 +38,16 @@
   ],
   "execution_counterevidence": "Same-candidate actual30-case GPU/Nemotron/Gemma/Flet matrix at50ms improves meaningful A/B/No colors, but returningA remains gray across both ABA cases/profiles/repeats and cleanAB B is gray. This is an unmet Goal criterion, not a completed feature or independently diagnosed cache bug.",
   "next_owner": "continuity-repair",
-  "repair_state": "F1/F2 implemented by continuity-repair. Synchronous request-local native-terminal hook freezes before enqueue; streaming support is reused per fixed lawful release region. Focused contracts, actual Parakeet emission/dequeue smoke and bounded composition stress executed; independent REPAIR_VERIFY pending.",
-  "acceptance": "Not accepted yet. Implemented F1/F2 repairs require independent verification; actual continuity policy and renderer obligations remain unresolved. No production profile, remote publication, release or whole#218 completion authorized."
+  "repair_state": "F1/F2 independently verified at 2bef240618b8dd3492c69ee32d5d54acaf1c04e1. Original failure closure and directly related regressions are supported; unaffected whole-checkpoint coverage is retained.",
+  "repair_verification": {
+    "reviewer": "speaker-policy-review",
+    "mode": "REPAIR_VERIFY",
+    "previous_candidate": "dd3cad278dc683840c6eabaae9777159cb75a710",
+    "repaired_candidate": "2bef240618b8dd3492c69ee32d5d54acaf1c04e1",
+    "result": "repair_verified",
+    "F1": "Actual Parakeet projection smoke freezes before terminal enqueue; evidence delivered before later dequeue cannot alter the snapshot. Reviewer inspected callback lifetime, stale/reset/cancel/close, frontier advance, reentrancy, observer error conservation and existing CPU/GPU/Rolling callers.",
+    "F2": "Same-region support reuse removes the repeated transition scan while preserving qualified lexical grouping. Public session/source/translation behavior checks and the bounded stress probe support closure; no matched speedup or production percentile claimed.",
+    "limits": "No new acoustic continuity claim, later display allocator, remote transition or whole-Goal acceptance. Untracked integration validation/render artifacts were outside the reviewed product candidate."
+  },
+  "acceptance": "Director accepts the implementation checkpoint and bounded F1/F2 repairs at 2bef240618b8dd3492c69ee32d5d54acaf1c04e1. Goal remains incomplete: acoustic continuity policy and independent completion audit are unresolved. Subsequent integration/renderer-only evidence is indexed separately in issue218_implementation_evidence.json; original Deepgram E2E visual timing remains unqualified. No production profile, remote publication, release or whole#218 completion authorized."
 }

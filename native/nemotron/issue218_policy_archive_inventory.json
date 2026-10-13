@@ -1,0 +1,1456 @@
+{
+  "schema": "issue218-policy-archive-inventory-1",
+  "candidate": "dd3cad278dc683840c6eabaae9777159cb75a710",
+  "archives": [
+    {
+      "path": "native/nemotron/issue218_policy_preflight_gpu.zip",
+      "sha256": "7a143f9676a992f38065216aedced6322bbc4ca7a57cba35332be67c59e9e2d0",
+      "members": {
+        "execution_sources.zip": {
+          "sha256": "27b2d71b3b17250b7e42ffd91756add1f217c2172d809bda5df898d0e4ca66fe",
+          "bytes": 1573309,
+          "LF_only": null
+        },
+        "preflight.json": {
+          "sha256": "65c8bc4a474b46689a9456c55da6667238fb1baab92997dc849e9c75a800fbbc",
+          "bytes": 88107,
+          "LF_only": true
+        }
+      }
+    },
+    {
+      "path": "native/nemotron/issue218_policy_preflight_replay.zip",
+      "sha256": "ab60b33d9bb84f998ef1c01a34152682ef9d6b8978499b07351c031dbc8eddbd",
+      "members": {
+        "execution_sources.zip": {
+          "sha256": "27b2d71b3b17250b7e42ffd91756add1f217c2172d809bda5df898d0e4ca66fe",
+          "bytes": 1573309,
+          "LF_only": null
+        },
+        "preflight.json": {
+          "sha256": "c73d51a03aa8f3981fc451a0f284eabf235a8e4a31fe9645b6411450095d7df0",
+          "bytes": 88715,
+          "LF_only": true
+        }
+      }
+    },
+    {
+      "path": "native/nemotron/issue218_policy_invalid_setup.zip",
+      "sha256": "7549c5a19d1d6e7e4f3b51266c5c050a10aaedee847fbfaadd35657d9420948f",
+      "members": {
+        "execution_sources.zip": {
+          "sha256": "b8e158e8b317f23c031a267b983bf931de76337ee4f9db0079a778d9176626c7",
+          "bytes": 1573305,
+          "LF_only": null
+        },
+        "gpu_counters.jsonl": {
+          "sha256": "792e2b6fa1f218290f63f16fd26daa1357b432c6d2675bb6fb4c29b69f441d75",
+          "bytes": 607320,
+          "LF_only": false
+        },
+        "preflight.json": {
+          "sha256": "8ea3bf5d8d0ae54b300e61d359ccceed9b5fad5f05b9b973833d9980a126c344",
+          "bytes": 88177,
+          "LF_only": true
+        },
+        "trace.json": {
+          "sha256": "4ac450d24a24f2bd7e26e1f8e637eb041547702254cf21fd666037940aafaf23",
+          "bytes": 117917,
+          "LF_only": true
+        }
+      }
+    },
+    {
+      "path": "native/nemotron/issue218_policy_invalid_live_vad.zip",
+      "sha256": "311e0afc0b371f23b2bb5cf970ca19577028214e23683ca1013dc9e7fee797ab",
+      "members": {
+        "commit_1.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "deepgram-native-replay_baseline_1.04_1_clean_A_B.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "execution_sources.zip": {
+          "sha256": "9c12d03ec7c7ad7b695d1057153a00727400c28bee31aaba14af324ef42189aa",
+          "bytes": 1573310,
+          "LF_only": null
+        },
+        "gpu_counters.jsonl": {
+          "sha256": "cb906b538bb05217bf8a731886bd91bc9eef0ddaaae2d7e4e56094de363d7a0d",
+          "bytes": 3947032,
+          "LF_only": false
+        },
+        "preflight.json": {
+          "sha256": "c0c5b9b23df15f7454d6d7c6f804bd122705e432a821ba294be84c80b7b29b88",
+          "bytes": 88794,
+          "LF_only": true
+        },
+        "trace.json": {
+          "sha256": "6159cde1e7cb17d94df23ed66023a473c4d0678abaadd330c622e8b2ac840cc2",
+          "bytes": 1375744,
+          "LF_only": true
+        }
+      }
+    },
+    {
+      "path": "native/nemotron/issue218_policy_invalid_capture_schedule.zip",
+      "sha256": "4d28dc7e22a4933a341326e8393e79ff4d22e1bed90be863928da64ae6bb78b4",
+      "members": {
+        "execution_sources.zip": {
+          "sha256": "1f69148835bd67723134e713bed101737f21fc73080db5302f7daafbe786777a",
+          "bytes": 1575055,
+          "LF_only": null
+        },
+        "gpu_counters.jsonl": {
+          "sha256": "c1bc41eb6260ea62f4f46e989f7a435f18c89edc765f120d7e9d3ff916f41f1f",
+          "bytes": 709479,
+          "LF_only": false
+        },
+        "preflight.json": {
+          "sha256": "c87b8907eb751dda63b2a25b9c29868352f806e1c0e454ba2412fd609b3be001",
+          "bytes": 88793,
+          "LF_only": true
+        },
+        "trace.json": {
+          "sha256": "b440ee3783f29d8e319a34f5a54623331ea756cb72d7bc5eefd61d3c34f61f1d",
+          "bytes": 248771,
+          "LF_only": true
+        }
+      }
+    },
+    {
+      "path": "native/nemotron/issue218_policy_invalid_normalizer.zip",
+      "sha256": "a8b39c960bf1a23dc9942c92fd65a7b8fe22b11e60bffdceb18b7e93b8a611bd",
+      "members": {
+        "commit_1.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_4.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_baseline_1.04_1_clean_A_B.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "execution_sources.zip": {
+          "sha256": "a7d0ab9d23775aba9e9885c22a1e0c063603513fd6d6cf51c6a3f86be514e571",
+          "bytes": 1575164,
+          "LF_only": null
+        },
+        "gpu_counters.jsonl": {
+          "sha256": "4c3c37908476922494eeec00ee4011c2ed3a3318ea67126b0ba045b07fc3c813",
+          "bytes": 7892477,
+          "LF_only": false
+        },
+        "preflight.json": {
+          "sha256": "a424ce735fadf31e3b1063c0a8ba34bda5771f6dee3466bf7bf3b615885273dc",
+          "bytes": 88793,
+          "LF_only": true
+        },
+        "trace.json": {
+          "sha256": "0e2a417a809cd70eec51d435805f5c35e2769af8b4c9d18b37ca1d92cd5c78f6",
+          "bytes": 2382129,
+          "LF_only": true
+        }
+      }
+    },
+    {
+      "path": "native/nemotron/issue218_policy_fixed_replay_preflight.zip",
+      "sha256": "81869f4033d18782a809faf73d69f52a22b91eec3e2b8f03470572aa5672d658",
+      "members": {
+        "execution_sources.zip": {
+          "sha256": "1f69148835bd67723134e713bed101737f21fc73080db5302f7daafbe786777a",
+          "bytes": 1575055,
+          "LF_only": null
+        },
+        "preflight.json": {
+          "sha256": "e2beceb86c9421faba7a1610fe839180b0c8b8ccb74e83b296f8a45298f653ea",
+          "bytes": 88810,
+          "LF_only": true
+        }
+      }
+    },
+    {
+      "path": "native/nemotron/issue218_policy_gpu_valid.zip",
+      "sha256": "4f1573c87550cf209f32898e63a8c677a146ccf9631d6fe6cc7b31579c902d32",
+      "members": {
+        "commit_1.png": {
+          "sha256": "5a36044009e71018b7781b5ed090a0962895268d6699374218d75540fa6565b7",
+          "bytes": 13528,
+          "LF_only": null
+        },
+        "commit_102.png": {
+          "sha256": "480632f37c30faf2fb88a1497928decf09d4861bc6114684f07eafdd4a883e3c",
+          "bytes": 27252,
+          "LF_only": null
+        },
+        "commit_103.png": {
+          "sha256": "99f3f63478f922f42814c8481bb7d68f835ab331df917c28901b1f801790b455",
+          "bytes": 32455,
+          "LF_only": null
+        },
+        "commit_106.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "commit_109.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "commit_11.png": {
+          "sha256": "ca22d381c601f131f1cd5b26dbbab425f06d5f97f7db0a55dd4e4318a0329ae4",
+          "bytes": 12916,
+          "LF_only": null
+        },
+        "commit_110.png": {
+          "sha256": "2b426bd97171a553015419c1d6d55a19f220cd7fe36f2583ab2ee62c74a580e3",
+          "bytes": 17594,
+          "LF_only": null
+        },
+        "commit_113.png": {
+          "sha256": "c0499f22bad3682ac6e8ccfb41ed8eb2eb58d817c2c92fbfba3c38536888a1e9",
+          "bytes": 22087,
+          "LF_only": null
+        },
+        "commit_116.png": {
+          "sha256": "ca22d381c601f131f1cd5b26dbbab425f06d5f97f7db0a55dd4e4318a0329ae4",
+          "bytes": 12916,
+          "LF_only": null
+        },
+        "commit_119.png": {
+          "sha256": "caa052fe0b9ed71dddc3ff4a9eff4188dbf31452a1a4f13104dbe1b937b8f23a",
+          "bytes": 26370,
+          "LF_only": null
+        },
+        "commit_120.png": {
+          "sha256": "68770d6acc98afe41d4b919e6df6fe7a210a7f29962e4b8ff5758885bd8664e9",
+          "bytes": 30549,
+          "LF_only": null
+        },
+        "commit_14.png": {
+          "sha256": "d328a7f10751b69b122c8d17c290eb9d4112082ee151dfc4c741fc409f27a04a",
+          "bytes": 26823,
+          "LF_only": null
+        },
+        "commit_15.png": {
+          "sha256": "5b1db9a1b022609224a8f935cb2382007e5d78d3b00b6acac57a0395f1cfde3d",
+          "bytes": 31719,
+          "LF_only": null
+        },
+        "commit_18.png": {
+          "sha256": "1e37429515bf8809aa0c8388815afa7387ba9e691123cbefa4d82d9b5f6b1872",
+          "bytes": 17327,
+          "LF_only": null
+        },
+        "commit_19.png": {
+          "sha256": "c31803c766485db57968d74e32ee5dd75781c8f2a742b9750464eb9b2bbcefc6",
+          "bytes": 22958,
+          "LF_only": null
+        },
+        "commit_22.png": {
+          "sha256": "36600561f04d8dbbeb3b79eccfe29256ffa49cce97a04ec6bcfa25daec493c40",
+          "bytes": 17613,
+          "LF_only": null
+        },
+        "commit_23.png": {
+          "sha256": "a5c805a4fd97b8612459e1171a255939ed0226a54209a5c402140aed5eb9eb05",
+          "bytes": 22442,
+          "LF_only": null
+        },
+        "commit_24.png": {
+          "sha256": "8e6a386ef139ad1b0162a712c8c9c1eec6971488a7bef3a584ae54f398bb157a",
+          "bytes": 21593,
+          "LF_only": null
+        },
+        "commit_25.png": {
+          "sha256": "7ebdd1f54d2e7ce23eccf45068ffc203424e066adee320b8e52e9145756c2a79",
+          "bytes": 20619,
+          "LF_only": null
+        },
+        "commit_28.png": {
+          "sha256": "8135b1f70240750ee3bc780b4657db402e8cc48e617b632e0ac33f011e0f8f7d",
+          "bytes": 16671,
+          "LF_only": null
+        },
+        "commit_29.png": {
+          "sha256": "b1d6111db46273ac90dfba479f4eedbbbafe895be5f7a775dd60c4e2ed283b9c",
+          "bytes": 19575,
+          "LF_only": null
+        },
+        "commit_30.png": {
+          "sha256": "b50f6585016cbc3de3c4921f769b9b41689a202340b3521fa9ed19803d32bacd",
+          "bytes": 19872,
+          "LF_only": null
+        },
+        "commit_33.png": {
+          "sha256": "ca22d381c601f131f1cd5b26dbbab425f06d5f97f7db0a55dd4e4318a0329ae4",
+          "bytes": 12916,
+          "LF_only": null
+        },
+        "commit_36.png": {
+          "sha256": "f77799410a9d18c8f9a9acf02970c274faa8179bfa70f44b126b3770f16a8368",
+          "bytes": 26853,
+          "LF_only": null
+        },
+        "commit_37.png": {
+          "sha256": "242a2de58c513e146c3ce7663e4a059959329bb3c106c8b26f2735d3408f41d6",
+          "bytes": 31911,
+          "LF_only": null
+        },
+        "commit_4.png": {
+          "sha256": "5a36044009e71018b7781b5ed090a0962895268d6699374218d75540fa6565b7",
+          "bytes": 13528,
+          "LF_only": null
+        },
+        "commit_40.png": {
+          "sha256": "99132f067929aadc64b4f4245aeecdcf811b38a95756de15be6b1928c10e70b9",
+          "bytes": 16635,
+          "LF_only": null
+        },
+        "commit_41.png": {
+          "sha256": "ba8fd618777c7d682b53e11a877392d63ee171f8f50182672af356e369665c7c",
+          "bytes": 21532,
+          "LF_only": null
+        },
+        "commit_44.png": {
+          "sha256": "b68e0eec63a51c92a916cda9230a75ff07c5c0927d7531a90c0e1fd43c014bb7",
+          "bytes": 16375,
+          "LF_only": null
+        },
+        "commit_45.png": {
+          "sha256": "3a130af0dda1891c0ec878ad454b1009a13f0a89433a2cd02a52d8ff21a46a07",
+          "bytes": 21196,
+          "LF_only": null
+        },
+        "commit_46.png": {
+          "sha256": "0ab87b3d3f82e5fbe7bcaa7835132f8b5a8604dc1b2c55a3f0a77258b75745af",
+          "bytes": 22046,
+          "LF_only": null
+        },
+        "commit_47.png": {
+          "sha256": "1cfdcf3dd3adcad11b6bd7d61f20275307ac67fbec90b373894fcd9f584b9493",
+          "bytes": 21042,
+          "LF_only": null
+        },
+        "commit_5.png": {
+          "sha256": "4104078cc047a6250902778c799e1a051adfc8e4a2ba2d7a613af9b78579b26b",
+          "bytes": 17534,
+          "LF_only": null
+        },
+        "commit_50.png": {
+          "sha256": "54a0f75b1376d3770dc5594dd0efb3e03a475d0fdc3dbfa0699e5cc73a717291",
+          "bytes": 17175,
+          "LF_only": null
+        },
+        "commit_51.png": {
+          "sha256": "0f913a4a9183f48c7f950bd52035308e68f411a2826ca9b0d91dabbf3d6a6d40",
+          "bytes": 20072,
+          "LF_only": null
+        },
+        "commit_52.png": {
+          "sha256": "5a550935cdbf465fbf745f1a0f945263d71c092851203dce698341eaed5625f8",
+          "bytes": 19467,
+          "LF_only": null
+        },
+        "commit_55.png": {
+          "sha256": "947fbbe65e489729cf43abd75aa3347d44d54cbae5b2f4e10df5a2dbc595a177",
+          "bytes": 12938,
+          "LF_only": null
+        },
+        "commit_58.png": {
+          "sha256": "95aa29b0be6f015b00bf13e8b90047add39a1358038bc7929a1f7dee3c61334a",
+          "bytes": 25963,
+          "LF_only": null
+        },
+        "commit_59.png": {
+          "sha256": "71656fefb40d81a8325e381e83b0377682c626085cd27ca977698b6dd2ffd2ce",
+          "bytes": 30228,
+          "LF_only": null
+        },
+        "commit_62.png": {
+          "sha256": "913650bdc4748847805c9a17384ad4a74b851578ba974193911713a215874492",
+          "bytes": 17636,
+          "LF_only": null
+        },
+        "commit_63.png": {
+          "sha256": "5443b053b5c66ff09ebdc84b630d3d5d5c972f8cfea90a15209a545cd5a05b5f",
+          "bytes": 22460,
+          "LF_only": null
+        },
+        "commit_66.png": {
+          "sha256": "1d5471a002ce017ee4786929d333c46a684cc4e177c173fd876edf98aecf44d6",
+          "bytes": 17301,
+          "LF_only": null
+        },
+        "commit_67.png": {
+          "sha256": "103eca42ac3ed9338fa1897e9fdf6b658b5ed79b21e83af2c11527653f065600",
+          "bytes": 22133,
+          "LF_only": null
+        },
+        "commit_68.png": {
+          "sha256": "0a1cb52fdf1494b3c3435a7cecbab1c5c75a16825ec3ae15a0ba823f51af3945",
+          "bytes": 22089,
+          "LF_only": null
+        },
+        "commit_69.png": {
+          "sha256": "61de4ab2925fa31d9ac9876ddc3cfcf78cacb0a216bdc8aa373e162d6367909c",
+          "bytes": 21113,
+          "LF_only": null
+        },
+        "commit_72.png": {
+          "sha256": "03779359a44a98ff05f48ab9150ad19f9395a82c3324e787b0a7c93fb26b3067",
+          "bytes": 16776,
+          "LF_only": null
+        },
+        "commit_73.png": {
+          "sha256": "e81909a1724cd77c340d4697110f72ec4d8aeb5350b2773f161ff634f7c7f917",
+          "bytes": 19683,
+          "LF_only": null
+        },
+        "commit_74.png": {
+          "sha256": "5a550935cdbf465fbf745f1a0f945263d71c092851203dce698341eaed5625f8",
+          "bytes": 19467,
+          "LF_only": null
+        },
+        "commit_77.png": {
+          "sha256": "ca22d381c601f131f1cd5b26dbbab425f06d5f97f7db0a55dd4e4318a0329ae4",
+          "bytes": 12916,
+          "LF_only": null
+        },
+        "commit_8.png": {
+          "sha256": "8282914b74cdab0036414eaee72ea81a80291fd12c3b2d511da2c39be352bd73",
+          "bytes": 23894,
+          "LF_only": null
+        },
+        "commit_80.png": {
+          "sha256": "0b91927fa5b3acab9329fe6c83bef456f1c34b705fc3801755fdb1c3a7eb9685",
+          "bytes": 28549,
+          "LF_only": null
+        },
+        "commit_81.png": {
+          "sha256": "8ddcfa068ad7460a5679d6fb855bb98ea26726ee8c214ff6c5d85df5649a22b4",
+          "bytes": 33621,
+          "LF_only": null
+        },
+        "commit_84.png": {
+          "sha256": "03779359a44a98ff05f48ab9150ad19f9395a82c3324e787b0a7c93fb26b3067",
+          "bytes": 16776,
+          "LF_only": null
+        },
+        "commit_85.png": {
+          "sha256": "8c3d2a4342ff60a46814c3bd08ca37aef5ac66e51802655f65de1a558cc7dfdc",
+          "bytes": 21606,
+          "LF_only": null
+        },
+        "commit_88.png": {
+          "sha256": "1e37429515bf8809aa0c8388815afa7387ba9e691123cbefa4d82d9b5f6b1872",
+          "bytes": 17327,
+          "LF_only": null
+        },
+        "commit_89.png": {
+          "sha256": "b0ba47c8fc6dfdd46320957f04b98af6fa723d9bbb3b345db28d3f87193f42a0",
+          "bytes": 23004,
+          "LF_only": null
+        },
+        "commit_90.png": {
+          "sha256": "94852dc388d6c7768a54d2e97562a4af3b186bb629ac9cda8e771cdacce6442b",
+          "bytes": 22784,
+          "LF_only": null
+        },
+        "commit_91.png": {
+          "sha256": "692cf704d04e78257e152e2613291f89f700eae845159fa52499ad595a9fae47",
+          "bytes": 20927,
+          "LF_only": null
+        },
+        "commit_94.png": {
+          "sha256": "a979326df55bb2f76a04e3a1595a55e6fa4017375e648be0c6c900ff87376f02",
+          "bytes": 16396,
+          "LF_only": null
+        },
+        "commit_95.png": {
+          "sha256": "8f61bef68ff511ce64e58af9d24d8408bd004ed80b3c242bc56e489235e15462",
+          "bytes": 19318,
+          "LF_only": null
+        },
+        "commit_96.png": {
+          "sha256": "3e442e1ff698fdeeff9de1ecfdbdbe25f885aa437bb808f952221359ee1b97af",
+          "bytes": 19875,
+          "LF_only": null
+        },
+        "commit_99.png": {
+          "sha256": "947fbbe65e489729cf43abd75aa3347d44d54cbae5b2f4e10df5a2dbc595a177",
+          "bytes": 12938,
+          "LF_only": null
+        },
+        "execution_sources.zip": {
+          "sha256": "9c12d03ec7c7ad7b695d1057153a00727400c28bee31aaba14af324ef42189aa",
+          "bytes": 1573310,
+          "LF_only": null
+        },
+        "gpu_baseline_1.04_1_clean_A_B.png": {
+          "sha256": "5a36044009e71018b7781b5ed090a0962895268d6699374218d75540fa6565b7",
+          "bytes": 13528,
+          "LF_only": null
+        },
+        "gpu_baseline_1.04_1_distinct_repeated_A_B_A.png": {
+          "sha256": "4104078cc047a6250902778c799e1a051adfc8e4a2ba2d7a613af9b78579b26b",
+          "bytes": 17534,
+          "LF_only": null
+        },
+        "gpu_baseline_1.04_1_linguistic_correction.png": {
+          "sha256": "ca22d381c601f131f1cd5b26dbbab425f06d5f97f7db0a55dd4e4318a0329ae4",
+          "bytes": 12916,
+          "LF_only": null
+        },
+        "gpu_baseline_1.04_1_short_A_B_A.png": {
+          "sha256": "8282914b74cdab0036414eaee72ea81a80291fd12c3b2d511da2c39be352bd73",
+          "bytes": 23894,
+          "LF_only": null
+        },
+        "gpu_baseline_1.04_1_six_second_rollover.png": {
+          "sha256": "5b1db9a1b022609224a8f935cb2382007e5d78d3b00b6acac57a0395f1cfde3d",
+          "bytes": 31719,
+          "LF_only": null
+        },
+        "gpu_baseline_1.04_2_clean_A_B.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "gpu_baseline_1.04_2_distinct_repeated_A_B_A.png": {
+          "sha256": "2b426bd97171a553015419c1d6d55a19f220cd7fe36f2583ab2ee62c74a580e3",
+          "bytes": 17594,
+          "LF_only": null
+        },
+        "gpu_baseline_1.04_2_linguistic_correction.png": {
+          "sha256": "ca22d381c601f131f1cd5b26dbbab425f06d5f97f7db0a55dd4e4318a0329ae4",
+          "bytes": 12916,
+          "LF_only": null
+        },
+        "gpu_baseline_1.04_2_short_A_B_A.png": {
+          "sha256": "c0499f22bad3682ac6e8ccfb41ed8eb2eb58d817c2c92fbfba3c38536888a1e9",
+          "bytes": 22087,
+          "LF_only": null
+        },
+        "gpu_baseline_1.04_2_six_second_rollover.png": {
+          "sha256": "68770d6acc98afe41d4b919e6df6fe7a210a7f29962e4b8ff5758885bd8664e9",
+          "bytes": 30549,
+          "LF_only": null
+        },
+        "gpu_counters.jsonl": {
+          "sha256": "eea84295064b8c3079081cb3531c52b16281b52d9c4bdfb076ccb0b9288e99ff",
+          "bytes": 30364330,
+          "LF_only": false
+        },
+        "gpu_new_0.64_1_clean_A_B.png": {
+          "sha256": "ba8fd618777c7d682b53e11a877392d63ee171f8f50182672af356e369665c7c",
+          "bytes": 21532,
+          "LF_only": null
+        },
+        "gpu_new_0.64_1_distinct_repeated_A_B_A.png": {
+          "sha256": "1cfdcf3dd3adcad11b6bd7d61f20275307ac67fbec90b373894fcd9f584b9493",
+          "bytes": 21042,
+          "LF_only": null
+        },
+        "gpu_new_0.64_1_linguistic_correction.png": {
+          "sha256": "947fbbe65e489729cf43abd75aa3347d44d54cbae5b2f4e10df5a2dbc595a177",
+          "bytes": 12938,
+          "LF_only": null
+        },
+        "gpu_new_0.64_1_short_A_B_A.png": {
+          "sha256": "5a550935cdbf465fbf745f1a0f945263d71c092851203dce698341eaed5625f8",
+          "bytes": 19467,
+          "LF_only": null
+        },
+        "gpu_new_0.64_1_six_second_rollover.png": {
+          "sha256": "71656fefb40d81a8325e381e83b0377682c626085cd27ca977698b6dd2ffd2ce",
+          "bytes": 30228,
+          "LF_only": null
+        },
+        "gpu_new_0.64_2_clean_A_B.png": {
+          "sha256": "8c3d2a4342ff60a46814c3bd08ca37aef5ac66e51802655f65de1a558cc7dfdc",
+          "bytes": 21606,
+          "LF_only": null
+        },
+        "gpu_new_0.64_2_distinct_repeated_A_B_A.png": {
+          "sha256": "692cf704d04e78257e152e2613291f89f700eae845159fa52499ad595a9fae47",
+          "bytes": 20927,
+          "LF_only": null
+        },
+        "gpu_new_0.64_2_linguistic_correction.png": {
+          "sha256": "947fbbe65e489729cf43abd75aa3347d44d54cbae5b2f4e10df5a2dbc595a177",
+          "bytes": 12938,
+          "LF_only": null
+        },
+        "gpu_new_0.64_2_short_A_B_A.png": {
+          "sha256": "3e442e1ff698fdeeff9de1ecfdbdbe25f885aa437bb808f952221359ee1b97af",
+          "bytes": 19875,
+          "LF_only": null
+        },
+        "gpu_new_0.64_2_six_second_rollover.png": {
+          "sha256": "99f3f63478f922f42814c8481bb7d68f835ab331df917c28901b1f801790b455",
+          "bytes": 32455,
+          "LF_only": null
+        },
+        "gpu_new_1.04_1_clean_A_B.png": {
+          "sha256": "c31803c766485db57968d74e32ee5dd75781c8f2a742b9750464eb9b2bbcefc6",
+          "bytes": 22958,
+          "LF_only": null
+        },
+        "gpu_new_1.04_1_distinct_repeated_A_B_A.png": {
+          "sha256": "7ebdd1f54d2e7ce23eccf45068ffc203424e066adee320b8e52e9145756c2a79",
+          "bytes": 20619,
+          "LF_only": null
+        },
+        "gpu_new_1.04_1_linguistic_correction.png": {
+          "sha256": "ca22d381c601f131f1cd5b26dbbab425f06d5f97f7db0a55dd4e4318a0329ae4",
+          "bytes": 12916,
+          "LF_only": null
+        },
+        "gpu_new_1.04_1_short_A_B_A.png": {
+          "sha256": "b50f6585016cbc3de3c4921f769b9b41689a202340b3521fa9ed19803d32bacd",
+          "bytes": 19872,
+          "LF_only": null
+        },
+        "gpu_new_1.04_1_six_second_rollover.png": {
+          "sha256": "242a2de58c513e146c3ce7663e4a059959329bb3c106c8b26f2735d3408f41d6",
+          "bytes": 31911,
+          "LF_only": null
+        },
+        "gpu_new_1.04_2_clean_A_B.png": {
+          "sha256": "5443b053b5c66ff09ebdc84b630d3d5d5c972f8cfea90a15209a545cd5a05b5f",
+          "bytes": 22460,
+          "LF_only": null
+        },
+        "gpu_new_1.04_2_distinct_repeated_A_B_A.png": {
+          "sha256": "61de4ab2925fa31d9ac9876ddc3cfcf78cacb0a216bdc8aa373e162d6367909c",
+          "bytes": 21113,
+          "LF_only": null
+        },
+        "gpu_new_1.04_2_linguistic_correction.png": {
+          "sha256": "ca22d381c601f131f1cd5b26dbbab425f06d5f97f7db0a55dd4e4318a0329ae4",
+          "bytes": 12916,
+          "LF_only": null
+        },
+        "gpu_new_1.04_2_short_A_B_A.png": {
+          "sha256": "5a550935cdbf465fbf745f1a0f945263d71c092851203dce698341eaed5625f8",
+          "bytes": 19467,
+          "LF_only": null
+        },
+        "gpu_new_1.04_2_six_second_rollover.png": {
+          "sha256": "8ddcfa068ad7460a5679d6fb855bb98ea26726ee8c214ff6c5d85df5649a22b4",
+          "bytes": 33621,
+          "LF_only": null
+        },
+        "preflight.json": {
+          "sha256": "6785d019ca9b43d621b6a96173bf04cbc9efa868b53e74d3c333434c259a7da1",
+          "bytes": 88183,
+          "LF_only": true
+        },
+        "trace.json": {
+          "sha256": "66148f92fff4a80b95c626f356e944f326adfcdd0aa1c3330ba19693fcc6c734",
+          "bytes": 61806172,
+          "LF_only": true
+        }
+      }
+    },
+    {
+      "path": "native/nemotron/issue218_policy_deepgram_final.zip",
+      "sha256": "7af7b60e0560889295b4b63193123f047db9f99f26d701d33acccf50f415507d",
+      "members": {
+        "commit_1.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_10.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_13.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_16.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_19.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_20.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_21.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_22.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_25.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_26.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_29.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_32.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_35.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_36.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_37.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_38.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_4.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_41.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_42.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_45.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_5.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_6.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "commit_9.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_baseline_1.04_1_clean_A_B.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_baseline_1.04_1_distinct_repeated_A_B_A.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_baseline_1.04_1_linguistic_correction.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_baseline_1.04_1_short_A_B_A.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_new_0.64_1_clean_A_B.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_new_0.64_1_distinct_repeated_A_B_A.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_new_0.64_1_linguistic_correction.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_new_0.64_1_short_A_B_A.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_new_1.04_1_clean_A_B.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_new_1.04_1_distinct_repeated_A_B_A.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_new_1.04_1_linguistic_correction.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "deepgram-native-replay_new_1.04_1_short_A_B_A.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "execution_sources.zip": {
+          "sha256": "523e4083eccef6eff908cde92ed7cedfcfba2764a715f3341ad94d8484815b6d",
+          "bytes": 1575394,
+          "LF_only": null
+        },
+        "gpu_counters.jsonl": {
+          "sha256": "cba047978d9b73f12c2ed0b09a1f3473270e1663c1069b11e8fb2f1dd250fef5",
+          "bytes": 4863818,
+          "LF_only": false
+        },
+        "preflight.json": {
+          "sha256": "07093749e31910e58717c4a2e1aa405e61850cb1b972d981300e3e7a9704f403",
+          "bytes": 88793,
+          "LF_only": true
+        },
+        "trace.json": {
+          "sha256": "484ac97a1e851a88c29758119b4bcd191f9f21a7d23fb36be7a7d44bc02d9fd3",
+          "bytes": 28594433,
+          "LF_only": true
+        }
+      }
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_probe_run1.zip",
+      "sha256": "78fd0344760fc036e45a7936b95d67b8beff266d73788d0387949d69faeb91a8",
+      "members": {
+        "Deepgram_original_submissions/commit_1.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_10.png": {
+          "sha256": "3a09ef8b59874d21fde1675f5693790fc7559e4bde2590e9899245f988d6d444",
+          "bytes": 25949,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_13.png": {
+          "sha256": "235745826739e6b713cb78a83e70664e741773a37de3b25663a71b4ffa335115",
+          "bytes": 12612,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_16.png": {
+          "sha256": "83e2580c4a5efbef3aa2b8bb40e5e73c46110715f5c62109b988df5ff4a912d9",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_19.png": {
+          "sha256": "4a93f8c1c121a75aaffc329b294ac04601da064dc824dfbbe0b80b03ce1b513f",
+          "bytes": 17315,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_20.png": {
+          "sha256": "8a3edf513e7031afdbb2dffa7fba78ac5506a2e5b0ef1e3254ed1ee10a19cb8d",
+          "bytes": 22088,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_21.png": {
+          "sha256": "cde4556aee8742a70a3f9c193d2f36ffe92d1a913f0a341df79dbe4f21e8fbc7",
+          "bytes": 21290,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_22.png": {
+          "sha256": "819ff11f5488fa6c8a0af099e01db83c251a1387015f5b7785dade05b4e31721",
+          "bytes": 20170,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_25.png": {
+          "sha256": "ee8e215189aaf3c987ddce2661764b4825412d73ca98aa229440a31ae4d3f8a7",
+          "bytes": 20143,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_26.png": {
+          "sha256": "8e118d892d137f11e973d1bafe4ddc1d1e47e106ccd4820281e4190c127c08a3",
+          "bytes": 26321,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_29.png": {
+          "sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+          "bytes": 12622,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_32.png": {
+          "sha256": "dc70fbe1d5c803cabc6ad3581f3c6b2755953c8cf38891537133923c33a0b7a3",
+          "bytes": 13533,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_35.png": {
+          "sha256": "43f434d9684df516df76e89e24848381970fb8f220f02a0951f4ec4c3b48e85a",
+          "bytes": 17372,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_36.png": {
+          "sha256": "5f3256ea0776bc37e56a813eed8cf6fdf3c454d80e4e4dfc361a470dde170dda",
+          "bytes": 22250,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_37.png": {
+          "sha256": "38b18487aac83e049db44f3e10b50be2f43324fe5793112fcaf7ef33b6302992",
+          "bytes": 22163,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_38.png": {
+          "sha256": "cf778727f409ada170bc644287d3bb3a6931dcf09ebd8e3f6e03eba63e28caa1",
+          "bytes": 21065,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_4.png": {
+          "sha256": "d7abb9f74411c79bb8f3fdb71ca4a7d51ac43596cae54711dd21029f13fd4b02",
+          "bytes": 19829,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_41.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_42.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_45.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_5.png": {
+          "sha256": "cc436ae91344cf3a2668a6ec8e1a57de9acfd2cd4a23a8e17fefae3ee6f53b7c",
+          "bytes": 27791,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_6.png": {
+          "sha256": "5a9a6a69d9e1dd0046ac71ba8d59bd698a72be72aa15668687c6f16b9316f163",
+          "bytes": 21239,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_9.png": {
+          "sha256": "5259939d97a05ac321bb5f02486317cb5d3b90c13c454bc8a0109449392ee1a7",
+          "bytes": 19684,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/late_1_1000.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/late_1_250.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "execution_sources.zip": {
+          "sha256": "41e1ed550a49190eef541282c0505bee422c9bfbcf878d1f5a0d99d6abcb0042",
+          "bytes": 149795,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_22.png": {
+          "sha256": "36600561f04d8dbbeb3b79eccfe29256ffa49cce97a04ec6bcfa25daec493c40",
+          "bytes": 17613,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_23.png": {
+          "sha256": "a5c805a4fd97b8612459e1171a255939ed0226a54209a5c402140aed5eb9eb05",
+          "bytes": 22442,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_24.png": {
+          "sha256": "8e6a386ef139ad1b0162a712c8c9c1eec6971488a7bef3a584ae54f398bb157a",
+          "bytes": 21593,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_25.png": {
+          "sha256": "7ebdd1f54d2e7ce23eccf45068ffc203424e066adee320b8e52e9145756c2a79",
+          "bytes": 20619,
+          "LF_only": null
+        },
+        "GPU_working_control/late_22_1000.png": {
+          "sha256": "36600561f04d8dbbeb3b79eccfe29256ffa49cce97a04ec6bcfa25daec493c40",
+          "bytes": 17613,
+          "LF_only": null
+        },
+        "GPU_working_control/late_22_250.png": {
+          "sha256": "36600561f04d8dbbeb3b79eccfe29256ffa49cce97a04ec6bcfa25daec493c40",
+          "bytes": 17613,
+          "LF_only": null
+        },
+        "trace.json": {
+          "sha256": "0ce6643aa0271c1423a5532d6cf2cabfceb08f40279adf3b4ab14fd70e203db2",
+          "bytes": 588789,
+          "LF_only": true
+        }
+      },
+      "execution_snapshot_provenance": "First probe driver reconstructed from known edit delta and exact recorded SHA match; presentation/helpers hash-matched. Added snapshot does not rewrite original trace."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_guarded.zip",
+      "sha256": "c6c571c24d10eb53be32dd6bdca14e4ed171941dab14e76fd89721a0da18f914",
+      "members": {
+        "Deepgram_original_submissions/commit_1.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_10.png": {
+          "sha256": "3a09ef8b59874d21fde1675f5693790fc7559e4bde2590e9899245f988d6d444",
+          "bytes": 25949,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_13.png": {
+          "sha256": "235745826739e6b713cb78a83e70664e741773a37de3b25663a71b4ffa335115",
+          "bytes": 12612,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_16.png": {
+          "sha256": "83e2580c4a5efbef3aa2b8bb40e5e73c46110715f5c62109b988df5ff4a912d9",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_19.png": {
+          "sha256": "4a93f8c1c121a75aaffc329b294ac04601da064dc824dfbbe0b80b03ce1b513f",
+          "bytes": 17315,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_20.png": {
+          "sha256": "8a3edf513e7031afdbb2dffa7fba78ac5506a2e5b0ef1e3254ed1ee10a19cb8d",
+          "bytes": 22088,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_21.png": {
+          "sha256": "cde4556aee8742a70a3f9c193d2f36ffe92d1a913f0a341df79dbe4f21e8fbc7",
+          "bytes": 21290,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_22.png": {
+          "sha256": "819ff11f5488fa6c8a0af099e01db83c251a1387015f5b7785dade05b4e31721",
+          "bytes": 20170,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_25.png": {
+          "sha256": "ee8e215189aaf3c987ddce2661764b4825412d73ca98aa229440a31ae4d3f8a7",
+          "bytes": 20143,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_26.png": {
+          "sha256": "8e118d892d137f11e973d1bafe4ddc1d1e47e106ccd4820281e4190c127c08a3",
+          "bytes": 26321,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_29.png": {
+          "sha256": "6768f9887d820f1d100c9e688ff638c45b976f364b89f5fee71210167d267b72",
+          "bytes": 8283,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_32.png": {
+          "sha256": "dc70fbe1d5c803cabc6ad3581f3c6b2755953c8cf38891537133923c33a0b7a3",
+          "bytes": 13533,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_35.png": {
+          "sha256": "43f434d9684df516df76e89e24848381970fb8f220f02a0951f4ec4c3b48e85a",
+          "bytes": 17372,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_36.png": {
+          "sha256": "5f3256ea0776bc37e56a813eed8cf6fdf3c454d80e4e4dfc361a470dde170dda",
+          "bytes": 22250,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_37.png": {
+          "sha256": "38b18487aac83e049db44f3e10b50be2f43324fe5793112fcaf7ef33b6302992",
+          "bytes": 22163,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_38.png": {
+          "sha256": "cf778727f409ada170bc644287d3bb3a6931dcf09ebd8e3f6e03eba63e28caa1",
+          "bytes": 21065,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_4.png": {
+          "sha256": "d7abb9f74411c79bb8f3fdb71ca4a7d51ac43596cae54711dd21029f13fd4b02",
+          "bytes": 19829,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_41.png": {
+          "sha256": "55f0212a3c2bc92a78064871ccb9a7c2b7eeed75caf025f0936184c35de04697",
+          "bytes": 19599,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_42.png": {
+          "sha256": "73bd96011716b95729af6a73b6fcb6a067e31cca07df6615aa74a24752fcd69e",
+          "bytes": 26342,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_45.png": {
+          "sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+          "bytes": 12622,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_5.png": {
+          "sha256": "cc436ae91344cf3a2668a6ec8e1a57de9acfd2cd4a23a8e17fefae3ee6f53b7c",
+          "bytes": 27791,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_6.png": {
+          "sha256": "5a9a6a69d9e1dd0046ac71ba8d59bd698a72be72aa15668687c6f16b9316f163",
+          "bytes": 21239,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_9.png": {
+          "sha256": "5259939d97a05ac321bb5f02486317cb5d3b90c13c454bc8a0109449392ee1a7",
+          "bytes": 19684,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/late_1_1000.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/late_1_250.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "execution_sources.zip": {
+          "sha256": "0829eed290d753c3573a6f84fd6c3725d689cacb4732dcbaa8eb56b603cf109a",
+          "bytes": 153485,
+          "LF_only": null
+        },
+        "trace.json": {
+          "sha256": "06a66d8baae540897a8acd4f5180790bef1a52f07fd0647524cae9016a08780a",
+          "bytes": 580778,
+          "LF_only": true
+        }
+      },
+      "execution_snapshot_provenance": "Exact driver/helper/presentation source snapshots saved before execution; raw source zip and trace hashes preserved."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_repair_verify.zip",
+      "sha256": "11482d67ebe3aac0453720ae49a1f0d05088b1d081f24257d8454146d47c6fcf",
+      "members": {
+        "execution_sources.zip": {
+          "sha256": "90d35b703bde830022b739d82276c7f010677010046d4acc091fafd6477327f8",
+          "bytes": 153918,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_22.png": {
+          "sha256": "36600561f04d8dbbeb3b79eccfe29256ffa49cce97a04ec6bcfa25daec493c40",
+          "bytes": 17613,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_23.png": {
+          "sha256": "a5c805a4fd97b8612459e1171a255939ed0226a54209a5c402140aed5eb9eb05",
+          "bytes": 22442,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_24.png": {
+          "sha256": "8e6a386ef139ad1b0162a712c8c9c1eec6971488a7bef3a584ae54f398bb157a",
+          "bytes": 21593,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_25.png": {
+          "sha256": "7ebdd1f54d2e7ce23eccf45068ffc203424e066adee320b8e52e9145756c2a79",
+          "bytes": 20619,
+          "LF_only": null
+        },
+        "trace.json": {
+          "sha256": "18490ed3e9f4fc2bfd6d0aabdd5713ab6bf2a48123926292ad63aab6759fc710",
+          "bytes": 133425,
+          "LF_only": true
+        }
+      },
+      "execution_snapshot_provenance": "Exact driver/helper/presentation source snapshots saved before execution; raw source zip and trace hashes preserved."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_numeric_recovered.zip",
+      "sha256": "16b32cfcafddd0144dac927c906c690d437cac7c2ab700530ba9300889066750",
+      "members": {
+        "execution_sources.zip": {
+          "sha256": "cdbe590646b3fc572a2a1870cffb3b624fc0eb8c305bb51ccd2b152b8042f9ec",
+          "bytes": 154293,
+          "LF_only": null
+        },
+        "trace.json": {
+          "sha256": "ad6115e867d23cac6b9db0556458c9353b43a60e4fda3c4e79a340d789cf3824",
+          "bytes": 43754,
+          "LF_only": true
+        }
+      },
+      "execution_snapshot_provenance": "Exact driver/helper/presentation source snapshots saved before execution; raw source zip and trace hashes preserved."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_owned_show_final.zip",
+      "sha256": "6f3e51ef62374be2c4159c9d0583854d906ad0cf225b4a52648315966e377622",
+      "members": {
+        "Deepgram_original_submissions/guard_recovered_29.png": {
+          "sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+          "bytes": 12622,
+          "LF_only": null
+        },
+        "execution_sources.zip": {
+          "sha256": "11ab34af706e973360317bfc66680189dec8be258ff614334e1b9bb3c28c146e",
+          "bytes": 154390,
+          "LF_only": null
+        },
+        "trace.json": {
+          "sha256": "7bed9366055be328b10f3e62bedeeb14b24c0627717c62ec149f32251c4ac77e",
+          "bytes": 42833,
+          "LF_only": true
+        }
+      },
+      "execution_snapshot_provenance": "Exact driver/helper/presentation source snapshots saved before execution; raw source zip and trace hashes preserved."
+    }
+  ],
+  "summary_file": {
+    "path": "native/nemotron/issue218_policy_summary.json",
+    "sha256": "b96813baa235d98145a88e780e790d8f532f77ab432f8447f88c72b3ae893af0"
+  },
+  "current_drivers": {
+    "native/nemotron/issue218_policy_validation.py": "5bffbbf4218e07354c7e97e6d9d17513b40517fa5243979b2954c33cececfb2f",
+    "native/nemotron/issue218_policy_summary.py": "0ebe0263508b9be60a33e15d6f5fb3440f5546ce2e2a0e9b46bbf4ca938dc7cf",
+    "native/nemotron/issue218_policy_renderer_probe.py": "77ee3f86ac5a2d52d8b036ef2e44741a4a02107ce48d07850ab8317d059fe0c2",
+    "native/nemotron/issue218_policy_visibility.py": "7829a79ea828b924e73f328ac8cd9d4bcea044b37bafb896904deaded0dbedb9"
+  },
+  "preservation": "Execution source snapshots match execution-time manifests. Current summary driver is separately hashed; task-driver fixes do not relabel old execution snapshots. JSON reports serialize UTF8 LF and sanitized home paths; binary model/native artifacts are hash-only.",
+  "deliverables": {
+    "native/nemotron/issue218_policy_validation.py": {
+      "sha256": "5bffbbf4218e07354c7e97e6d9d17513b40517fa5243979b2954c33cececfb2f",
+      "bytes": 42212
+    },
+    "native/nemotron/issue218_policy_summary.py": {
+      "sha256": "0ebe0263508b9be60a33e15d6f5fb3440f5546ce2e2a0e9b46bbf4ca938dc7cf",
+      "bytes": 15439
+    },
+    "native/nemotron/issue218_policy_summary.json": {
+      "sha256": "b96813baa235d98145a88e780e790d8f532f77ab432f8447f88c72b3ae893af0",
+      "bytes": 26347041
+    },
+    "native/nemotron/issue218_policy_attempts.json": {
+      "sha256": "d37c2e783c05d58a0b2b8d4bc952d8d26f6ea043c74964c0c6f127c40a87f632",
+      "bytes": 12015
+    },
+    "native/nemotron/issue218_policy_report.json": {
+      "sha256": "9189910d96535b19f7e8fca2ab11d7b105f39e7226639df3e3a5e6e9c7142c76",
+      "bytes": 152891
+    },
+    "native/nemotron/issue218_policy_report.md": {
+      "sha256": "572ef60c085d4199580be4ebc0d8baef5faf4b38fdfc2d16101ae094a013331a",
+      "bytes": 22780
+    },
+    "native/nemotron/issue218_policy_renderer_probe.py": {
+      "sha256": "77ee3f86ac5a2d52d8b036ef2e44741a4a02107ce48d07850ab8317d059fe0c2",
+      "bytes": 16046
+    },
+    "native/nemotron/issue218_policy_visibility.py": {
+      "sha256": "7829a79ea828b924e73f328ac8cd9d4bcea044b37bafb896904deaded0dbedb9",
+      "bytes": 12800
+    },
+    "native/nemotron/issue218_policy_renderer_findings.json": {
+      "sha256": "8a4aafdbf737a3e4cafb00173c5a1caad433da5b9a281ec0d31f143204fb4ebc",
+      "bytes": 157732
+    },
+    "native/nemotron/issue218_policy_cleanup.json": {
+      "sha256": "cd8dd75767479bce99e2f827438ceeabfee0cc72102560e7968016dd47641482",
+      "bytes": 31409
+    }
+  },
+  "cleanup": {
+    "removed_after_archival": [
+      "build/issue218_policy_preflight_gpu",
+      "build/issue218_policy_preflight_replay",
+      "build/issue218_policy_fixed_replay_preflight",
+      "native/nemotron/issue218_policy_gpu",
+      "native/nemotron/issue218_policy_deepgram_replay",
+      "native/nemotron/issue218_policy_deepgram_fixed",
+      "native/nemotron/issue218_policy_deepgram_valid"
+    ],
+    "superseded_summary_removed": "native/nemotron/issue218_policy_gpu_summary.json",
+    "removed_verified_redundant_nonPNG_direct_copies": [
+      {
+        "path": "native/nemotron/issue218_policy_gpu_valid/execution_sources.zip",
+        "archive_member": "native/nemotron/issue218_policy_gpu_valid.zip:execution_sources.zip",
+        "sha256": "9c12d03ec7c7ad7b695d1057153a00727400c28bee31aaba14af324ef42189aa",
+        "bytes": 1573310
+      },
+      {
+        "path": "native/nemotron/issue218_policy_gpu_valid/gpu_counters.jsonl",
+        "archive_member": "native/nemotron/issue218_policy_gpu_valid.zip:gpu_counters.jsonl",
+        "sha256": "eea84295064b8c3079081cb3531c52b16281b52d9c4bdfb076ccb0b9288e99ff",
+        "bytes": 30364330
+      },
+      {
+        "path": "native/nemotron/issue218_policy_gpu_valid/preflight.json",
+        "archive_member": "native/nemotron/issue218_policy_gpu_valid.zip:preflight.json",
+        "sha256": "6785d019ca9b43d621b6a96173bf04cbc9efa868b53e74d3c333434c259a7da1",
+        "bytes": 88183
+      },
+      {
+        "path": "native/nemotron/issue218_policy_gpu_valid/trace.json",
+        "archive_member": "native/nemotron/issue218_policy_gpu_valid.zip:trace.json",
+        "sha256": "66148f92fff4a80b95c626f356e944f326adfcdd0aa1c3330ba19693fcc6c734",
+        "bytes": 61806172
+      },
+      {
+        "path": "native/nemotron/issue218_policy_deepgram_final/execution_sources.zip",
+        "archive_member": "native/nemotron/issue218_policy_deepgram_final.zip:execution_sources.zip",
+        "sha256": "523e4083eccef6eff908cde92ed7cedfcfba2764a715f3341ad94d8484815b6d",
+        "bytes": 1575394
+      },
+      {
+        "path": "native/nemotron/issue218_policy_deepgram_final/gpu_counters.jsonl",
+        "archive_member": "native/nemotron/issue218_policy_deepgram_final.zip:gpu_counters.jsonl",
+        "sha256": "cba047978d9b73f12c2ed0b09a1f3473270e1663c1069b11e8fb2f1dd250fef5",
+        "bytes": 4863818
+      },
+      {
+        "path": "native/nemotron/issue218_policy_deepgram_final/preflight.json",
+        "archive_member": "native/nemotron/issue218_policy_deepgram_final.zip:preflight.json",
+        "sha256": "07093749e31910e58717c4a2e1aa405e61850cb1b972d981300e3e7a9704f403",
+        "bytes": 88793
+      },
+      {
+        "path": "native/nemotron/issue218_policy_deepgram_final/trace.json",
+        "archive_member": "native/nemotron/issue218_policy_deepgram_final.zip:trace.json",
+        "sha256": "484ac97a1e851a88c29758119b4bcd191f9f21a7d23fb36be7a7d44bc02d9fd3",
+        "bytes": 28594433
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_probe_run1/execution_sources.zip",
+        "archive_member": "native/nemotron/issue218_policy_renderer_probe_run1.zip:execution_sources.zip",
+        "sha256": "41e1ed550a49190eef541282c0505bee422c9bfbcf878d1f5a0d99d6abcb0042",
+        "bytes": 149795
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_probe_run1/trace.json",
+        "archive_member": "native/nemotron/issue218_policy_renderer_probe_run1.zip:trace.json",
+        "sha256": "0ce6643aa0271c1423a5532d6cf2cabfceb08f40279adf3b4ab14fd70e203db2",
+        "bytes": 588789
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_guarded/execution_sources.zip",
+        "archive_member": "native/nemotron/issue218_policy_renderer_guarded.zip:execution_sources.zip",
+        "sha256": "0829eed290d753c3573a6f84fd6c3725d689cacb4732dcbaa8eb56b603cf109a",
+        "bytes": 153485
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_guarded/trace.json",
+        "archive_member": "native/nemotron/issue218_policy_renderer_guarded.zip:trace.json",
+        "sha256": "06a66d8baae540897a8acd4f5180790bef1a52f07fd0647524cae9016a08780a",
+        "bytes": 580778
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_repair_verify/execution_sources.zip",
+        "archive_member": "native/nemotron/issue218_policy_renderer_repair_verify.zip:execution_sources.zip",
+        "sha256": "90d35b703bde830022b739d82276c7f010677010046d4acc091fafd6477327f8",
+        "bytes": 153918
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_repair_verify/trace.json",
+        "archive_member": "native/nemotron/issue218_policy_renderer_repair_verify.zip:trace.json",
+        "sha256": "18490ed3e9f4fc2bfd6d0aabdd5713ab6bf2a48123926292ad63aab6759fc710",
+        "bytes": 133425
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_numeric_recovered/execution_sources.zip",
+        "archive_member": "native/nemotron/issue218_policy_renderer_numeric_recovered.zip:execution_sources.zip",
+        "sha256": "cdbe590646b3fc572a2a1870cffb3b624fc0eb8c305bb51ccd2b152b8042f9ec",
+        "bytes": 154293
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_numeric_recovered/trace.json",
+        "archive_member": "native/nemotron/issue218_policy_renderer_numeric_recovered.zip:trace.json",
+        "sha256": "ad6115e867d23cac6b9db0556458c9353b43a60e4fda3c4e79a340d789cf3824",
+        "bytes": 43754
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_owned_show_final/execution_sources.zip",
+        "archive_member": "native/nemotron/issue218_policy_renderer_owned_show_final.zip:execution_sources.zip",
+        "sha256": "11ab34af706e973360317bfc66680189dec8be258ff614334e1b9bb3c28c146e",
+        "bytes": 154390
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_owned_show_final/trace.json",
+        "archive_member": "native/nemotron/issue218_policy_renderer_owned_show_final.zip:trace.json",
+        "sha256": "7bed9366055be328b10f3e62bedeeb14b24c0627717c62ec149f32251c4ac77e",
+        "bytes": 42833
+      }
+    ],
+    "removed_empty_owned_directories": [
+      "native/nemotron/issue218_policy_renderer_guarded/GPU_working_control",
+      "native/nemotron/issue218_policy_renderer_repair_verify/Deepgram_original_submissions",
+      "native/nemotron/issue218_policy_renderer_numeric_recovered/Deepgram_original_submissions",
+      "native/nemotron/issue218_policy_renderer_numeric_recovered"
+    ],
+    "preserved": "AllZIPs, readable rootreports, reproducibledrivers, savedmeasurementsummary and everydirectPNG retained. Earlierissueevidence untouched.",
+    "verification_ledger": "native/nemotron/issue218_policy_cleanup.json"
+  },
+  "renderer_only_boundary": "Exact previously real-translated source snapshots through current actual Flet; no new ASR/Gemma/cloud qualification, no backfilled E2Elatency, no product/Git/settings mutations. All further desktop/COM experiments stopped after final approved attempt.",
+  "archive_verification": {
+    "archives": 14,
+    "outer_members": 233,
+    "nested_source_ZIPs": 14,
+    "result": "Allarchivecontainerhashes, exactmembersets, memberSHA256/bytes and CRCs passed; allpresentdirectcopies matched archivedmembers."
+  },
+  "historical_execution_paths_note": "Historical command strings, savedsummary inputs and immutable rawtrace embedded paths remain execution-time paths. Currenttrace/counter/preflight/source-snapshot references use archive:member. Filesystem-based drivers require explicit extraction; all directPNG paths remain valid. No probes/modelcalls authorized by reproductionmetadata.",
+  "current_helpers": {
+    "native/nemotron/issue218_policy_visibility.py": "7829a79ea828b924e73f328ac8cd9d4bcea044b37bafb896904deaded0dbedb9",
+    "native/nemotron/issue218_experiment.py": "a78bf35e3dc61eb4139f27ec6ed54062a7a98088dff38c0db0b84a12922dbe78",
+    "native/nemotron/issue216_presentation.py": "ccc29e929ec6433a9e42d2c33f314199157ce06374d17a2ba659970608fb31cf"
+  }
+}

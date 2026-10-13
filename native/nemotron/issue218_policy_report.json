@@ -1,0 +1,4614 @@
+{
+  "schema": "issue218-practical-policy-report-1",
+  "candidate": "dd3cad278dc683840c6eabaae9777159cb75a710",
+  "starting_baseline": "b2cfc0c42bfa07d1570c243fb17ab2e547b8da1e",
+  "status": "approved_matrix_executed; partial_improvement_with_required_acceptance_gaps",
+  "scope": "Validation-only task-local drivers/evidence; no product/docs/Git/GitHub/default-profile mutation, paid/network provider calls, ambient capture, VRChat or SteamVR.",
+  "execution": {
+    "gpu": {
+      "cases": 30,
+      "matrix": "5 reused cases x matched post-repair no-earlycut baseline/full1.04/full.64 x2 rotated repeats",
+      "wall_seconds": 317.38,
+      "real_translation_jobs": 62,
+      "execution_driver_sha256": "d3ef7d0306e7a758f146872ed843847cdd705cd11862f461aa65aae27a38d458",
+      "positive_owned_readbacks": 62,
+      "identified_sources": 26,
+      "own_final_consumer_snapshots": 48,
+      "content_failures": 4,
+      "content_failure_scope": "Both matched baseline repetitions of cleanAB and distinctABA. All20 new-arm cases contain ordered required words; not a perfect-verbatim or meaning pass.",
+      "clear_AB": "Repeated distinctABA A0/B1 in both profiles/repeats has actual gold/cyan pixels. CleanAB B remains gray.",
+      "returning_A": "Separate returningA content retained, but published identity gray in both ABA cases/all new arms/repeats; no return continuity acceptance.",
+      "short_No": "All4 new-arm shortABA runs retain independent No. source, real 아니요. translation and cyan pixels, not absorbed into A. ReturningA gray remains.",
+      "numbers": "All6 linguistic correction cases preserve No/no/three. .64 new sources identified;1.04 unavailable.",
+      "six_second": "All6 runs retain required continuation words with real500ms onset/300ms rollover/no trim. Both .64 new runs preserve same-epoch0 gold across sources;1.04 gray. Existing hard-rollover with-the repetition and translated continuation fragmentation remain."
+    },
+    "deepgram_native_replay": {
+      "cases": 12,
+      "matrix": "Same canonical baseline_rep1 four original native tapes x3arms x1",
+      "wall_seconds": 98.69,
+      "execution_driver_sha256": "dd4c3bd163904db1742341e564d98bcdf8f22e87e141730c481a66a11b36ffce",
+      "real_translation_jobs": 23,
+      "identified_sources_metadata_only": 10,
+      "positive_owned_readbacks": 0,
+      "blank_owned_readbacks": 23,
+      "native_ASR": "Historical decoded SDK Results and original successful PCM/control/receipt cursor chronology, rebase host origin only; not fresh cloud latency/provider or VAD qualification. Current actual _DeepgramSDKSession/_build_transcript_event, STTScopedTurnNormalizer, StreamingSpeakerSession and peer handlers consume them.",
+      "speaker": "Current real Nemotron profiles at50ms drain, current Silero capture observations. One chronological capture/native-input scheduler verifies every source endpoint already captured; no future capture fed, no guessed cursor or delayed final.",
+      "canonical_tapes": {
+        "archive": "<USER_HOME>\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\listen-integrate-the-initial-fp16-vulkan-nemotro\\native\\nemotron\\issue218_cloud_deepgram_raw.zip",
+        "archive_sha256": "7554260beb589938b392141d3ccbb31fa3ae6c90993ecb52211c1fb454a1daea",
+        "member": "valid/trace.json",
+        "member_sha256": "cbcb49ae13ed87856579f2d1ea33779273c66991db716f426bc9f53f508c0ec7",
+        "historical_candidate": "c7e7ae0d5bfb8a5ab8637c0dbc1e40eb0f84e6f9",
+        "clock": "Only playback host origin rebased; lexical clocks, successful PCM maps, receipt delays and controls retained. Native ASR timings are historical, not fresh cloud latency."
+      },
+      "content_failures": 9,
+      "strict_failure_scope": "Each arm cleanAB omits whole A; repeatedABA initial He absent and native returning fragments/replay duplication remain; shortABA initial He/native boundary washedthe glue remains. Numeric complete in3arms. Native text is exactly conserved, not repaired by replay.",
+      "phrases": "Both new arms preserve complete Washed the detritus from his hair. and Gentlemen of the press. as coherent separate sources with real local translations; no old confidence-only Gentlemen/of-the-press fragmentation. Jobs8per new arm vs7baseline, not fewer-jobs acceptance.",
+      "short_ABA": "Recorded No. remains exact within the already-finalized mixed gray native phrase; no majority A attribution or deletion. Distinct short B source/visible A-B-A is NOT qualified in this replay.",
+      "return": "Recorded final from his hair. retains same Nemotron0 as initialA in both arms; preceding returning fragment unavailable. This is partial source identity, not complete return identity acceptance."
+    }
+  },
+  "preserved_observed": {
+    "capture_and_native_PCM_mismatches": 0,
+    "exact_authoritative_text_conservation_cases": 42,
+    "history_registered_once_cases": 42,
+    "ordered_source_and_publication_cases": 42,
+    "GPU_registry_index": 0,
+    "GPU_device": "AMD Radeon RX7900XTX / vulkan-index-0",
+    "Gemma_effective_backend": "vulkan",
+    "Nemotron_backend": "Vulkan; neural_cpu_fallback forbidden; F16 artifact with F32 auxiliary tensors, not all-F16",
+    "geometry": {
+      "1.04": "9/4/0/264/264/222",
+      "0.64": "6/2/0/264/264/222"
+    },
+    "onset_ms": 500,
+    "rollover_context_ms": 300,
+    "translation_concurrency": 3,
+    "trim": false,
+    "native_synthetic_tail": false,
+    "prompt": "Current production resolve_system_prompt default, exact rendered prompts and prior context in prepared records. Managed owner production prepare/prefix warmup, resident runtime, cache-prompt; no fake Qwen/Gemma responses.",
+    "product_source_manifests_identical_across_two_valid_runs": true,
+    "artifact_hashes": {
+      "runtime_manifest_sha256": "4615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9",
+      "gpu_model_sha256": "c75a961b7134a6c952d89797865cb0d0376876185aee04ef6d12c31c2952e4e1",
+      "gpu_worker_sha256": "5ee4541f289e7aebb76808d3375dd45059518307aa67dee6d91d51cb28cc990d",
+      "gemma_models_sha256": {
+        "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf": "df0fd4ee07072c607c29a0a1cb4f98918426cca12f45a2776bdd6ee6d09a4de3",
+        "mtp-gemma-4-E4B-it.gguf": "423074e537504b4f9ec5eafed5c639fac82c96631626efccacdd3c4039b20605"
+      },
+      "gemma_server_sha256": "c5f9d7db35cb636d93c66562d787de14189a14f5920743b326533f7c869ce2a0"
+    },
+    "Nemotron_artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+    "dependencies": {
+      "numpy": "2.5.1",
+      "onnxruntime": "1.28.0",
+      "sherpa-onnx": "1.13.5",
+      "sherpa-onnx-core": "1.13.5",
+      "httpx": "0.28.1",
+      "flet": "1.0.0",
+      "psutil": "7.2.2",
+      "deepgram-sdk": "5.3.4"
+    }
+  },
+  "own_final_gaps": {
+    "source": "native/nemotron/issue218_speaker_policy_report.json#post_matrix_own_final_disposition",
+    "source_sha256": "8a75ac119d95e6a8bcac3f77592cc2ad37fc41a732ef17362903d6ecc91445bc",
+    "bounded_read_only_disposition": {
+      "candidate": "dd3cad278dc683840c6eabaae9777159cb75a710",
+      "trace": "native/nemotron/issue218_policy_gpu_valid.zip:trace.json",
+      "trace_sha256_as_recorded_by_validation_summary": "66148f92fff4a80b95c626f356e944f326adfcdd0aa1c3330ba19693fcc6c734",
+      "summary": "native/nemotron/issue218_policy_summary.json",
+      "method": "Read-only interval reconstruction from evidence-poll prefixes constrained by each authoritative own-final epoch and immutable frontier. No model/test rerun, product edit, wait, recoloring or heuristic retune.",
+      "evidence_poll_ms": 50,
+      "new_path_own_final_snapshots": 48,
+      "observed_states": {
+        "identified": 26,
+        "unavailable": 21,
+        "uncertain": 1
+      },
+      "observed_cache_frames_min_max": [
+        62,
+        840
+      ],
+      "hard_cache_cap": 2048,
+      "observed_runtime_reasons": [
+        null,
+        "omitted_silence",
+        "vad_pause"
+      ],
+      "root_cause": "All 21 unavailable snapshots have missing terminal-suffix eligible coverage, despite useful clear support for the expected key in the preceding delivered audio. The missing intervals are absent even from the reconstructed delivered prefix; stale active-floor pruning or cache exhaustion is not needed to explain these results. There is no observed reset/epoch discontinuity. The decisive unavailable branch is the hard coverage fence, not a whole-input confidence or majority vote.",
+      "same_intervals_observed_in_both_repeats": [
+        {
+          "case": "clean_A_B",
+          "profiles": [
+            "1.04",
+            "0.64"
+          ],
+          "final": "B",
+          "source": [
+            49728,
+            77312
+          ],
+          "missing": [
+            70848,
+            77312
+          ],
+          "missing_ms": 404,
+          "scoring_speech_overlap_ms": 267.75,
+          "clear_unique_support_ms": {
+            "1": 1310
+          },
+          "late_gap_closure_poll_delay_ms": {
+            "1.04": [
+              527.536,
+              556.5
+            ],
+            "0.64": [
+              182.241,
+              192.659
+            ]
+          }
+        },
+        {
+          "case": "distinct_repeated_A_B_A",
+          "profile": "1.04",
+          "final": "returning A before hard rollover",
+          "source": [
+            75968,
+            105472
+          ],
+          "missing": [
+            93888,
+            105472
+          ],
+          "missing_ms": 724,
+          "scoring_speech_overlap_ms": 724,
+          "clear_unique_support_ms": {
+            "0": 1110
+          },
+          "late_gap_closure_poll_delay_ms": [
+            946.434,
+            982.152
+          ]
+        },
+        {
+          "case": "distinct_repeated_A_B_A",
+          "profile": "0.64",
+          "final": "returning A before hard rollover",
+          "source": [
+            75808,
+            105472
+          ],
+          "missing": [
+            101568,
+            105472
+          ],
+          "missing_ms": 244,
+          "scoring_speech_overlap_ms": 244,
+          "clear_unique_support_ms": {
+            "0": 1590
+          },
+          "late_gap_closure_poll_delay_ms": [
+            341.182,
+            293.339
+          ]
+        },
+        {
+          "case": "short_A_B_A",
+          "profile": "1.04",
+          "final": "returning A",
+          "source": [
+            54528,
+            92160
+          ],
+          "missing": [
+            82368,
+            92160
+          ],
+          "missing_ms": 612,
+          "scoring_speech_overlap_ms": 612,
+          "clear_unique_support_ms": {
+            "0": 1720
+          },
+          "late_gap_closure_poll_delay_ms": [
+            358.205,
+            350.234
+          ]
+        },
+        {
+          "case": "short_A_B_A",
+          "profile": "0.64",
+          "final": "returning A",
+          "source": [
+            54528,
+            92160
+          ],
+          "missing": [
+            86208,
+            92160
+          ],
+          "missing_ms": 372,
+          "scoring_speech_overlap_ms": 372,
+          "clear_unique_support_ms": {
+            "0": 1960
+          },
+          "late_gap_closure_poll_delay_ms": [
+            183.628,
+            203.692
+          ]
+        },
+        {
+          "case": "linguistic_correction",
+          "profile": "1.04",
+          "source": [
+            8704,
+            41984
+          ],
+          "missing": [
+            35264,
+            41984
+          ],
+          "missing_ms": 420,
+          "scoring_speech_overlap_ms": 0,
+          "clear_unique_support_ms": {
+            "0": 1080
+          },
+          "late_gap_closure_poll_delay_ms": [
+            347.493,
+            505.352
+          ]
+        },
+        {
+          "case": "six_second_rollover",
+          "profile": "1.04",
+          "final": "first source",
+          "source": [
+            20992,
+            116736
+          ],
+          "missing": [
+            116672,
+            116736
+          ],
+          "missing_ms": 4,
+          "scoring_speech_overlap_ms": 4,
+          "clear_unique_support_ms": {
+            "0": 6000
+          },
+          "late_gap_closure_poll_delay_ms": [
+            514.325,
+            612.62
+          ]
+        },
+        {
+          "case": "six_second_rollover",
+          "profile": "1.04",
+          "final": "rollover successor",
+          "source": [
+            116736,
+            136704
+          ],
+          "missing": [
+            128192,
+            136704
+          ],
+          "missing_ms": 532,
+          "scoring_speech_overlap_ms": 408,
+          "clear_unique_support_ms": {
+            "0": 546
+          },
+          "late_gap_closure_poll_delay_ms": [
+            551.562,
+            374.906
+          ]
+        },
+        {
+          "case": "distinct_repeated_A_B_A",
+          "profile": "1.04",
+          "final": "rollover successor",
+          "source": [
+            105472,
+            120832
+          ],
+          "replay": [
+            100672,
+            105472
+          ],
+          "missing": [
+            105408,
+            120832
+          ],
+          "missing_ms": 964,
+          "scoring_speech_overlap_ms": 613.5625,
+          "clear_unique_support_ms": {},
+          "late_gap_closure_poll_delay_ms": [
+            491.641,
+            508.702
+          ]
+        }
+      ],
+      "other_rollover_snapshots": [
+        {
+          "case": "distinct_repeated_A_B_A",
+          "profile": "0.64",
+          "repeat": 1,
+          "source": [
+            105472,
+            120832
+          ],
+          "missing": [
+            116928,
+            120832
+          ],
+          "missing_ms": 244,
+          "scoring_speech_overlap_ms": 0,
+          "clear_unique_support_ms": {
+            "0": 236
+          },
+          "late_gap_closure_poll_delay_ms": 38.553
+        },
+        {
+          "case": "distinct_repeated_A_B_A",
+          "profile": "0.64",
+          "repeat": 2,
+          "source": [
+            105472,
+            120832
+          ],
+          "missing": [],
+          "state": "uncertain",
+          "unique_uncertainty": [
+            109248,
+            111168
+          ],
+          "unique_uncertainty_ms": 120,
+          "clear_unique_support_ms": {
+            "0": 236
+          },
+          "uncertainty_to_clear_support_ratio": 0.5084745763,
+          "decisive_limit": "20% unique-clear-support ratio; replay does not enlarge the denominator"
+        },
+        {
+          "case": "six_second_rollover",
+          "profile": "0.64",
+          "repeats": [
+            1,
+            2
+          ],
+          "both_sources": "Complete eligible coverage; both identified as same-epoch slot 0."
+        }
+      ],
+      "identity_disposition": "Returning speech already has clear delivered slot-0 support in the same valid epoch. Later evidence inside the missing returning-A intervals also supports slot 0. Thus the trace supports continued anonymous-slot identity, not a demonstrated model reset. It does NOT provide published returning-A identity: later evidence cannot be used after the request's own-final snapshot.",
+      "acceptance_disposition": "Useful initial A/B and separate short-No gains remain measured positives, but clean-B and published returning-A identity requirements are empirically unmet. Under the approved hard-coverage plus own-final/no-future/no-wait agreement these suffixes remain unavailable. Do not mask gray as successful continuity, retune thresholds, exempt actual new speech, recolor publication or rerun the matrix to reconfirm the observation. Any relaxation or redesign of this timing/coverage fence is a shared maintainer decision rather than an authorized defect repair.",
+      "limits": [
+        "Evidence-poll timestamps are recorded before awaited engine acceptance. Late closure delays identify the first recorded poll containing all closing evidence, not a verified lock-acceptance or renderer timestamp.",
+        "No complete retained-cache snapshot was recorded. Authoritative cache counts remain below the hard cap; the absent eligible suffixes explain the unavailable decision without relying on cache/pruning reconstruction.",
+        "Assembly annotations are scoring only; speech overlap inside the missing interval is not oracle input to attribution.",
+        "Later same-epoch slot-0 evidence is retrospective root-cause evidence only, not eligible own-final proof or a general model-accuracy guarantee."
+      ],
+      "historical_source_owner_summary": "native/nemotron/issue218_policy_gpu_summary.json"
+    },
+    "snapshot_rows": [
+      {
+        "case": "clean_A_B",
+        "arm": "1.04",
+        "repetition": 1,
+        "states": {
+          "identified": 1,
+          "unavailable": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154882.7478335,
+            "immutable": 57600,
+            "retained_frames": 449,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                49728
+              ]
+            ],
+            "source_capture_piece_count": 79
+          },
+          {
+            "at": 154883.4249235,
+            "immutable": 69120,
+            "retained_frames": 165,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                49728,
+                77312
+              ]
+            ],
+            "source_capture_piece_count": 54
+          }
+        ]
+      },
+      {
+        "case": "distinct_repeated_A_B_A",
+        "arm": "1.04",
+        "repetition": 1,
+        "states": {
+          "identified": 2,
+          "unavailable": 2
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154891.7176317,
+            "immutable": 57600,
+            "retained_frames": 449,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                49728
+              ]
+            ],
+            "source_capture_piece_count": 79
+          },
+          {
+            "at": 154893.0079601,
+            "immutable": 80640,
+            "retained_frames": 254,
+            "result": "identified",
+            "slot": "1",
+            "source_sample_ranges": [
+              [
+                49728,
+                75968
+              ]
+            ],
+            "source_capture_piece_count": 52
+          },
+          {
+            "at": 154894.0598402,
+            "immutable": 92160,
+            "retained_frames": 140,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                75968,
+                105472
+              ]
+            ],
+            "source_capture_piece_count": 58
+          },
+          {
+            "at": 154894.9541235,
+            "immutable": 103680,
+            "retained_frames": 62,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                105472,
+                120832
+              ]
+            ],
+            "source_capture_piece_count": 30
+          }
+        ]
+      },
+      {
+        "case": "short_A_B_A",
+        "arm": "1.04",
+        "repetition": 1,
+        "states": {
+          "identified": 2,
+          "unavailable": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154903.5119822,
+            "immutable": 57600,
+            "retained_frames": 449,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                47808
+              ]
+            ],
+            "source_capture_piece_count": 75
+          },
+          {
+            "at": 154903.6073092,
+            "immutable": 57600,
+            "retained_frames": 89,
+            "result": "identified",
+            "slot": "1",
+            "source_sample_ranges": [
+              [
+                47808,
+                54528
+              ]
+            ],
+            "source_capture_piece_count": 14
+          },
+          {
+            "at": 154905.0269263,
+            "immutable": 80640,
+            "retained_frames": 217,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                54528,
+                92160
+              ]
+            ],
+            "source_capture_piece_count": 74
+          }
+        ]
+      },
+      {
+        "case": "linguistic_correction",
+        "arm": "1.04",
+        "repetition": 1,
+        "states": {
+          "unavailable": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154912.5376116,
+            "immutable": 34560,
+            "retained_frames": 269,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                8704,
+                41984
+              ]
+            ],
+            "source_capture_piece_count": 65
+          }
+        ]
+      },
+      {
+        "case": "six_second_rollover",
+        "arm": "1.04",
+        "repetition": 1,
+        "states": {
+          "unavailable": 2
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154924.3771245,
+            "immutable": 103680,
+            "retained_frames": 809,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                20992,
+                116736
+              ]
+            ],
+            "source_capture_piece_count": 187
+          },
+          {
+            "at": 154925.1654302,
+            "immutable": 115200,
+            "retained_frames": 128,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                116736,
+                136704
+              ]
+            ],
+            "source_capture_piece_count": 39
+          }
+        ]
+      },
+      {
+        "case": "clean_A_B",
+        "arm": "0.64",
+        "repetition": 1,
+        "states": {
+          "identified": 1,
+          "unavailable": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154933.8264345,
+            "immutable": 53760,
+            "retained_frames": 420,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                49728
+              ]
+            ],
+            "source_capture_piece_count": 79
+          },
+          {
+            "at": 154934.8218631,
+            "immutable": 69120,
+            "retained_frames": 165,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                49728,
+                77312
+              ]
+            ],
+            "source_capture_piece_count": 54
+          }
+        ]
+      },
+      {
+        "case": "distinct_repeated_A_B_A",
+        "arm": "0.64",
+        "repetition": 1,
+        "states": {
+          "identified": 2,
+          "unavailable": 2
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154943.2869975,
+            "immutable": 53760,
+            "retained_frames": 420,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                49728
+              ]
+            ],
+            "source_capture_piece_count": 79
+          },
+          {
+            "at": 154944.631627,
+            "immutable": 76800,
+            "retained_frames": 225,
+            "result": "identified",
+            "slot": "1",
+            "source_sample_ranges": [
+              [
+                49728,
+                75808
+              ]
+            ],
+            "source_capture_piece_count": 52
+          },
+          {
+            "at": 154946.0917334,
+            "immutable": 99840,
+            "retained_frames": 201,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                75808,
+                105472
+              ]
+            ],
+            "source_capture_piece_count": 58
+          },
+          {
+            "at": 154947.015916,
+            "immutable": 115200,
+            "retained_frames": 128,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                105472,
+                120832
+              ]
+            ],
+            "source_capture_piece_count": 30
+          }
+        ]
+      },
+      {
+        "case": "short_A_B_A",
+        "arm": "0.64",
+        "repetition": 1,
+        "states": {
+          "identified": 2,
+          "unavailable": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154955.4250291,
+            "immutable": 53760,
+            "retained_frames": 420,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                47808
+              ]
+            ],
+            "source_capture_piece_count": 75
+          },
+          {
+            "at": 154955.5350591,
+            "immutable": 53760,
+            "retained_frames": 63,
+            "result": "identified",
+            "slot": "1",
+            "source_sample_ranges": [
+              [
+                47808,
+                54528
+              ]
+            ],
+            "source_capture_piece_count": 14
+          },
+          {
+            "at": 154957.3532731,
+            "immutable": 84480,
+            "retained_frames": 248,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                54528,
+                92160
+              ]
+            ],
+            "source_capture_piece_count": 74
+          }
+        ]
+      },
+      {
+        "case": "linguistic_correction",
+        "arm": "0.64",
+        "repetition": 1,
+        "states": {
+          "identified": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154965.2930841,
+            "immutable": 46080,
+            "retained_frames": 330,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                8704,
+                41984
+              ]
+            ],
+            "source_capture_piece_count": 65
+          }
+        ]
+      },
+      {
+        "case": "six_second_rollover",
+        "arm": "0.64",
+        "repetition": 1,
+        "states": {
+          "identified": 2
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154977.2468315,
+            "immutable": 107520,
+            "retained_frames": 840,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                20992,
+                116736
+              ]
+            ],
+            "source_capture_piece_count": 187
+          },
+          {
+            "at": 154978.1485973,
+            "immutable": 130560,
+            "retained_frames": 202,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                116736,
+                136704
+              ]
+            ],
+            "source_capture_piece_count": 39
+          }
+        ]
+      },
+      {
+        "case": "clean_A_B",
+        "arm": "1.04",
+        "repetition": 2,
+        "states": {
+          "identified": 1,
+          "unavailable": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154987.450313,
+            "immutable": 57600,
+            "retained_frames": 449,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                49728
+              ]
+            ],
+            "source_capture_piece_count": 79
+          },
+          {
+            "at": 154988.1428402,
+            "immutable": 69120,
+            "retained_frames": 165,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                49728,
+                77312
+              ]
+            ],
+            "source_capture_piece_count": 54
+          }
+        ]
+      },
+      {
+        "case": "distinct_repeated_A_B_A",
+        "arm": "1.04",
+        "repetition": 2,
+        "states": {
+          "identified": 2,
+          "unavailable": 2
+        },
+        "freeze_snapshots": [
+          {
+            "at": 154996.9201936,
+            "immutable": 57600,
+            "retained_frames": 449,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                49728
+              ]
+            ],
+            "source_capture_piece_count": 79
+          },
+          {
+            "at": 154998.2611122,
+            "immutable": 80640,
+            "retained_frames": 254,
+            "result": "identified",
+            "slot": "1",
+            "source_sample_ranges": [
+              [
+                49728,
+                75968
+              ]
+            ],
+            "source_capture_piece_count": 52
+          },
+          {
+            "at": 154999.2911483,
+            "immutable": 92160,
+            "retained_frames": 140,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                75968,
+                105472
+              ]
+            ],
+            "source_capture_piece_count": 58
+          },
+          {
+            "at": 155000.2117058,
+            "immutable": 103680,
+            "retained_frames": 62,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                105472,
+                120832
+              ]
+            ],
+            "source_capture_piece_count": 30
+          }
+        ]
+      },
+      {
+        "case": "short_A_B_A",
+        "arm": "1.04",
+        "repetition": 2,
+        "states": {
+          "identified": 2,
+          "unavailable": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 155008.5959989,
+            "immutable": 57600,
+            "retained_frames": 449,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                47808
+              ]
+            ],
+            "source_capture_piece_count": 75
+          },
+          {
+            "at": 155008.6884219,
+            "immutable": 57600,
+            "retained_frames": 89,
+            "result": "identified",
+            "slot": "1",
+            "source_sample_ranges": [
+              [
+                47808,
+                54528
+              ]
+            ],
+            "source_capture_piece_count": 14
+          },
+          {
+            "at": 155010.1541033,
+            "immutable": 80640,
+            "retained_frames": 217,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                54528,
+                92160
+              ]
+            ],
+            "source_capture_piece_count": 74
+          }
+        ]
+      },
+      {
+        "case": "linguistic_correction",
+        "arm": "1.04",
+        "repetition": 2,
+        "states": {
+          "unavailable": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 155017.4629453,
+            "immutable": 34560,
+            "retained_frames": 269,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                8704,
+                41984
+              ]
+            ],
+            "source_capture_piece_count": 65
+          }
+        ]
+      },
+      {
+        "case": "six_second_rollover",
+        "arm": "1.04",
+        "repetition": 2,
+        "states": {
+          "unavailable": 2
+        },
+        "freeze_snapshots": [
+          {
+            "at": 155029.0165696,
+            "immutable": 103680,
+            "retained_frames": 809,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                20992,
+                116736
+              ]
+            ],
+            "source_capture_piece_count": 187
+          },
+          {
+            "at": 155029.9403986,
+            "immutable": 115200,
+            "retained_frames": 128,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                116736,
+                136704
+              ]
+            ],
+            "source_capture_piece_count": 39
+          }
+        ]
+      },
+      {
+        "case": "clean_A_B",
+        "arm": "0.64",
+        "repetition": 2,
+        "states": {
+          "identified": 1,
+          "unavailable": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 155038.3224014,
+            "immutable": 53760,
+            "retained_frames": 420,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                49728
+              ]
+            ],
+            "source_capture_piece_count": 79
+          },
+          {
+            "at": 155039.3017027,
+            "immutable": 69120,
+            "retained_frames": 165,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                49728,
+                77312
+              ]
+            ],
+            "source_capture_piece_count": 54
+          }
+        ]
+      },
+      {
+        "case": "distinct_repeated_A_B_A",
+        "arm": "0.64",
+        "repetition": 2,
+        "states": {
+          "identified": 2,
+          "unavailable": 1,
+          "uncertain": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 155047.6178479,
+            "immutable": 53760,
+            "retained_frames": 420,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                49728
+              ]
+            ],
+            "source_capture_piece_count": 79
+          },
+          {
+            "at": 155048.9335173,
+            "immutable": 76800,
+            "retained_frames": 225,
+            "result": "identified",
+            "slot": "1",
+            "source_sample_ranges": [
+              [
+                49728,
+                75808
+              ]
+            ],
+            "source_capture_piece_count": 52
+          },
+          {
+            "at": 155050.4309502,
+            "immutable": 99840,
+            "retained_frames": 201,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                75808,
+                105472
+              ]
+            ],
+            "source_capture_piece_count": 58
+          },
+          {
+            "at": 155051.3331878,
+            "immutable": 122880,
+            "retained_frames": 166,
+            "result": "uncertain",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                105472,
+                120832
+              ]
+            ],
+            "source_capture_piece_count": 30
+          }
+        ]
+      },
+      {
+        "case": "short_A_B_A",
+        "arm": "0.64",
+        "repetition": 2,
+        "states": {
+          "identified": 2,
+          "unavailable": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 155059.6881887,
+            "immutable": 53760,
+            "retained_frames": 420,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                9728,
+                47808
+              ]
+            ],
+            "source_capture_piece_count": 75
+          },
+          {
+            "at": 155059.7899192,
+            "immutable": 53760,
+            "retained_frames": 63,
+            "result": "identified",
+            "slot": "1",
+            "source_sample_ranges": [
+              [
+                47808,
+                54528
+              ]
+            ],
+            "source_capture_piece_count": 14
+          },
+          {
+            "at": 155061.5403266,
+            "immutable": 84480,
+            "retained_frames": 248,
+            "result": "unavailable",
+            "slot": null,
+            "source_sample_ranges": [
+              [
+                54528,
+                92160
+              ]
+            ],
+            "source_capture_piece_count": 74
+          }
+        ]
+      },
+      {
+        "case": "linguistic_correction",
+        "arm": "0.64",
+        "repetition": 2,
+        "states": {
+          "identified": 1
+        },
+        "freeze_snapshots": [
+          {
+            "at": 155069.3153044,
+            "immutable": 46080,
+            "retained_frames": 330,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                8704,
+                41984
+              ]
+            ],
+            "source_capture_piece_count": 65
+          }
+        ]
+      },
+      {
+        "case": "six_second_rollover",
+        "arm": "0.64",
+        "repetition": 2,
+        "states": {
+          "identified": 2
+        },
+        "freeze_snapshots": [
+          {
+            "at": 155081.1818184,
+            "immutable": 107520,
+            "retained_frames": 840,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                20992,
+                116736
+              ]
+            ],
+            "source_capture_piece_count": 187
+          },
+          {
+            "at": 155082.120214,
+            "immutable": 130560,
+            "retained_frames": 202,
+            "result": "identified",
+            "slot": "0",
+            "source_sample_ranges": [
+              [
+                116736,
+                136704
+              ]
+            ],
+            "source_capture_piece_count": 39
+          }
+        ]
+      }
+    ],
+    "measurement_limit": "Driver observes actual _consume/_attribute dequeue-time snapshot, not a newly added native-emission field. Director independently accepted F1 eligibility-race/F2 support-scan repairs after reviewing dd3cad; these snapshots do not claim those defects fixed. GPU trace lacks per512 CaptureStreamInput.speech_observed/probabilities; missing suffix cannot retroactively be asserted VAD-known quiet."
+  },
+  "resources": {
+    "actual_GPU_counter_samples": 300,
+    "invalid_counter_values": 0,
+    "adapter_peak_bytes": {
+      "\\\\desktop-2ofvr87\\gpu adapter memory(luid_0x00000000_0x0000f7a2_phys_0)\\dedicated usage": 11329855488,
+      "\\\\desktop-2ofvr87\\gpu adapter memory(luid_0x00000000_0x00011f66_phys_0)\\dedicated usage": 0,
+      "\\\\desktop-2ofvr87\\gpu adapter memory(luid_0x00000000_0x0000f7a2_phys_0)\\shared usage": 2308300800,
+      "\\\\desktop-2ofvr87\\gpu adapter memory(luid_0x00000000_0x00011f66_phys_0)\\shared usage": 8192
+    },
+    "counter_limit": "1s Windows adapter/process counters include surrounding applications; no isolated inference GPU timestamps or whole-host peakVRAM qualification.",
+    "speaker_peak_bounds": {
+      "pending_samples": 18432,
+      "pending_items": 17,
+      "retained_map_pieces": 38,
+      "evidence_items": 148,
+      "evidence_evictions": 0,
+      "overloads": 0,
+      "copied_samples": 169024,
+      "max_copy_samples": 512
+    },
+    "speaker_pending_at_drain": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "poll": "Configured production sleep50ms; actual Windows/event-loop medians about62ms and maximum170.127ms are retained, not reported as exact50ms deadlines.",
+    "process_samples": "Exact process/RSS/private/CPU-time and queue samples retained per case; no shared model workloads."
+  },
+  "presentation": {
+    "GPU_images_observed": [
+      "native/nemotron/issue218_policy_gpu_valid/commit_23.png",
+      "native/nemotron/issue218_policy_gpu_valid/commit_51.png",
+      "native/nemotron/issue218_policy_gpu_valid/commit_52.png",
+      "native/nemotron/issue218_policy_gpu_valid/commit_59.png"
+    ],
+    "GPU_observation": "Actual English/Korean captions show initialA gold, B/shortNo cyan, returningA gray; .64 rollover both gold. Colors follow actual allocator, not numeric slot assumed palette.",
+    "replay_blank_images_observed": [
+      "native/nemotron/issue218_policy_deepgram_final/commit_20.png",
+      "native/nemotron/issue218_policy_deepgram_final/commit_22.png",
+      "native/nemotron/issue218_policy_deepgram_final/commit_25.png",
+      "native/nemotron/issue218_policy_deepgram_final/commit_45.png"
+    ],
+    "replay_disposition": "Originalmatrix23timed+12final ownedPNGblank despite committedsnapshots; pixel/E2Elatency remain null and originalvisualtimingfailed. Subsequentrenderer-onlyprobe demonstrates concrete shellcloak2/minimizedstale-layout prerequisites, notsource/palette/generation0defect. Historicalcloakstate absent; attributionofeveryoldblanktoobservedmechanismis[INFERENCE]. Separatefullguarded22/23+changedguardcontrol4/4+finaltargetednumeric29pixels1/1 retained separately, notmatrixreplacement.",
+    "boundary": "Owned HWND/PID/client/opaque-backdrop/foreign-intersection checks; no full-screen/private capture. Readback completion is an upper software-pixel observation bound, never photon onset or HMD readability.",
+    "earlier_invalid_attempt_renderer_compatibility": {
+      "archive": "native/nemotron/issue218_policy_invalid_live_vad.zip",
+      "image": "commit_1.png",
+      "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+      "observed": "Actual gray 기자 여러분./Gentlemen of the press. pixels in the first PCM/cursor-verified cleanAB subcase. Whole attempt invalid on laterABA receiptcursor, so this is bounded renderer compatibility evidence only, not a valid-arm matrix replacement or rich-color qualification."
+    },
+    "renderer_only": {
+      "finding_ledger": "native/nemotron/issue218_policy_renderer_findings.json",
+      "status": "bounded_renderer_only_representative_surface_verified; original_E2E_visual_timing_failed_unchanged",
+      "qualified_evidence": {
+        "full_guarded_replay": {
+          "valid": 22,
+          "requested": 23,
+          "invalid_numeric_revision": 29,
+          "previous_blank41_42_45_valid": true
+        },
+        "changed_guard_working_control": {
+          "valid": 4,
+          "requested": 4
+        },
+        "final_targeted_numeric_recovery": {
+          "valid": 1,
+          "requested": 1,
+          "revision": 29,
+          "gold_pixels": 2228,
+          "no_COM_migration_required_in_successful_recapture": true
+        },
+        "interpretation": "Separate22/23full guarded+4/4countercontrol+1/1targeted recovery; representative distinct text/layout/palette paths verified, NOT fullmatrixE2Epass or original visual-latency replacement."
+      },
+      "numeric_equivalence": {
+        "requested_visual_fields": [
+          "appearance_seq",
+          "card_revision",
+          "channel",
+          "block_variant",
+          "primary_text",
+          "secondary_text",
+          "secondary_enabled",
+          "primary_language",
+          "secondary_language",
+          "source_text_hash",
+          "source_text_len",
+          "publication_scope",
+          "publication_generation",
+          "publication_order",
+          "publication_index",
+          "speaker_style"
+        ],
+        "requested_visual_payload_equal": true,
+        "visual_payload": {
+          "calibration": {
+            "anchor": "head_locked",
+            "offset_x": 0.0,
+            "offset_y": -0.45,
+            "distance": 1.1,
+            "text_scale": 1.0,
+            "background_alpha": 0.24
+          },
+          "blocks": [
+            {
+              "appearance_seq": 2,
+              "card_revision": 1,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "아니. 아니. 셋.",
+              "secondary_text": "No. No. Three.",
+              "secondary_enabled": true,
+              "primary_language": "ko",
+              "secondary_language": "en",
+              "source_text_hash": "6c86e476d0f228c6",
+              "source_text_len": 14,
+              "publication_scope": "peer",
+              "publication_generation": 0,
+              "publication_order": 0,
+              "publication_index": 0,
+              "speaker_style": "gold"
+            }
+          ]
+        },
+        "nonvisual_differences": [
+          "revision",
+          "id",
+          "occupant_key",
+          "update_id",
+          "logical_turn_key",
+          "origin_wall_clock_ms"
+        ],
+        "positive_images_byte_identical": true,
+        "PNG_sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+        "meaning": "Alreadyvalidated45covers same requested text/style/layout path as29; final29alsoqualified. Original/fullguarded/failedtargeted29 outcomes not erased."
+      },
+      "actual_images_observed": [
+        {
+          "path": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_20.png",
+          "sha256": "8a3edf513e7031afdbb2dffa7fba78ac5506a2e5b0ef1e3254ed1ee10a19cb8d",
+          "observed": "Whole Washed sentence gold and Gentlemen sentence cyan, actual Korean/English readable."
+        },
+        {
+          "path": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_22.png",
+          "sha256": "819ff11f5488fa6c8a0af099e01db83c251a1387015f5b7785dade05b4e31721",
+          "observed": "Returning prefix gray, same-A native tail gold; native fragment limitation remains."
+        },
+        {
+          "path": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_41.png",
+          "sha256": "55f0212a3c2bc92a78064871ccb9a7c2b7eeed75caf025f0936184c35de04697",
+          "observed": "Whole already-glued native phrase gray; No readable/preserved, not an independently colored B."
+        },
+        {
+          "path": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_42.png",
+          "sha256": "73bd96011716b95729af6a73b6fcb6a067e31cca07df6615aa74a24752fcd69e",
+          "observed": "Gray No-containing phrase plus gray continuation, actual text retained."
+        },
+        {
+          "path": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_45.png",
+          "sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+          "observed": "One finalized gold 아니. 아니. 셋. / No. No. Three. card."
+        },
+        {
+          "path": "native/nemotron/issue218_policy_renderer_owned_show_final/Deepgram_original_submissions/guard_recovered_29.png",
+          "sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+          "observed": "Exact same numeric gold card after actual owned restore/layout correction."
+        },
+        {
+          "path": "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_23.png",
+          "sha256": "a5c805a4fd97b8612459e1171a255939ed0226a54209a5c402140aed5eb9eb05",
+          "observed": "Working recorded A gold / B cyan, real whole English/Korean captions."
+        },
+        {
+          "path": "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_24.png",
+          "sha256": "8e6a386ef139ad1b0162a712c8c9c1eec6971488a7bef3a584ae54f398bb157a",
+          "observed": "Working recorded cyan B / gray return, not fake continuity coloring."
+        }
+      ],
+      "diagnosis": {
+        "first_unguarded_positive_cloak0": 20,
+        "first_unguarded_blank_cloak2": 3,
+        "blank_revisions": [
+          41,
+          42,
+          45
+        ],
+        "known_fact": "DWM_CLOAKED_SHELL2 means compositor-not-visible, even when native/Flet visible flags and retained text/ACK are correct; not proof of foreign virtual desktop or generation0 cause.",
+        "product_defect_demonstrated": false,
+        "task_fix": "Owned visibility guard, bounded native show/restore/current-desktop move if available, same-public-owner layout reapply to owned backdrop after native restoration; never content/palette/sourcepolicy decisions.",
+        "permission_limit": "Prior targeted run retained cloak2 after two owned-only MoveWindowToDesktop E_ACCESSDENIED attempts. Final successful recapture was alreadyuncloaked; universal shell-cloak recovery remains unproven, and inaccessible visibility explicitly invalidates readback.",
+        "primary_source": "https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute"
+      },
+      "original_blank_timing_unchanged": true,
+      "further_experiments_authorized": false
+    }
+  },
+  "per_case": [
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "arm": "baseline",
+      "repetition": 1,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he",
+        "washed",
+        "the",
+        "detritus",
+        "from",
+        "his",
+        "hair"
+      ],
+      "jobs": 1,
+      "states": {
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "언론 여러분."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_1.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.4841114000009838,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.7241518999799155
+        }
+      ],
+      "actual_positive_readbacks": 1,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "arm": "baseline",
+      "repetition": 1,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he",
+        "washed",
+        "the",
+        "detritus",
+        "from",
+        "his",
+        "hair",
+        "he",
+        "washed",
+        "the",
+        "detritus"
+      ],
+      "jobs": 2,
+      "states": {
+        "unavailable": 2
+      },
+      "sources": [
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "언론 여러분."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_4.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_5.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.4428347999928519,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.6937796999991406
+        },
+        {
+          "text": "From his hair.",
+          "speaker": {
+            "text": "From his hair.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "머리에서요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_5.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.2852683999808505,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.5399682999996003
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "arm": "baseline",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 1,
+      "states": {
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair. No, he washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair. No, he washed the detritus from his hair.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그가 머리에서 찌꺼기를 씻어냈어요. 아니, 그가 머리에서 찌꺼기를 씻어냈어요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_8.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.8919418999867048,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.127267900010338
+        }
+      ],
+      "actual_positive_readbacks": 1,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "arm": "baseline",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 1,
+      "states": {
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "No, no, three.",
+          "speaker": {
+            "text": "No, no, three.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "아니, 아니, 셋."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_11.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.3855289999919478,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.6135757000010926
+        }
+      ],
+      "actual_positive_readbacks": 1,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "arm": "baseline",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 2,
+      "states": {
+        "unavailable": 2
+      },
+      "sources": [
+        {
+          "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+          "speaker": {
+            "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "유엔은 또한 지구 온난화로 피해를 입은 국가들이 대처할 수 있도록 기금을 마련하는 것도 희망하고 있어요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_14.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_15.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.9961592999752611,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.2579256999888457
+        },
+        {
+          "text": "With the impacts.",
+          "speaker": {
+            "text": "With the impacts.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그 영향들 말이죠."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_15.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.6041303999954835,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.8639769000001252
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "arm": "1.04",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 2,
+      "states": {
+        "identified": 1,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "1",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그는 머리에서 찌꺼기를 씻어냈어요."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_18.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_19.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.09998759999871254,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.15203110000584275
+        },
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": null,
+            "session_scope": "1",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "언론 관계자 여러분."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_19.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.492374599998584,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.7456282000057399
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "arm": "1.04",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 4,
+      "states": {
+        "identified": 2,
+        "unavailable": 2
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "3",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그는 머리에서 떨어진 것들을 씻었어요."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_22.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_23.png"
+          ],
+          "ACK_lead_to_first_seal_s": 1.90933260001475,
+          "nonempty_stable_readback_lead_to_first_seal_s": 1.656773399998201
+        },
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": "1",
+            "session_scope": "3",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "cyan"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_23.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_24.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.7074091999966186,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.44910300002084114
+        },
+        {
+          "text": "He washed the detritus from his.",
+          "speaker": {
+            "text": "He washed the detritus from his.",
+            "speaker_id": null,
+            "session_scope": "3",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그는 머리에서 이물질을 씻어냈어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_24.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_25.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.4930791999795474,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.7395183999906294
+        },
+        {
+          "text": "From his hair.",
+          "speaker": {
+            "text": "From his hair.",
+            "speaker_id": null,
+            "session_scope": "3",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "머리에서요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_25.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.2339763999916613,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.493607599986717
+        }
+      ],
+      "actual_positive_readbacks": 4,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "arm": "1.04",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 3,
+      "states": {
+        "identified": 2,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "5",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그가 머리에서 때를 씻어냈어요."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_28.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_29.png"
+          ],
+          "ACK_lead_to_first_seal_s": 1.051851500000339,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.7900073000055272
+        },
+        {
+          "text": "No.",
+          "speaker": {
+            "text": "No.",
+            "speaker_id": "1",
+            "session_scope": "5",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "아니요."
+          ],
+          "styles_requested": [
+            "cyan"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_29.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_30.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.7855547000071965,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.5458639999851584
+        },
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": null,
+            "session_scope": "5",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그는 머리에서 찌꺼기를 씻어냈어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_30.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.4884299999976065,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.7232733000128064
+        }
+      ],
+      "actual_positive_readbacks": 3,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "arm": "1.04",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 1,
+      "states": {
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "No, no, three.",
+          "speaker": {
+            "text": "No, no, three.",
+            "speaker_id": null,
+            "session_scope": "7",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "아니, 아니, 셋."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_33.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.4516398999840021,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.7046566999924835
+        }
+      ],
+      "actual_positive_readbacks": 1,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "arm": "1.04",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 2,
+      "states": {
+        "unavailable": 2
+      },
+      "sources": [
+        {
+          "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+          "speaker": {
+            "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+            "speaker_id": null,
+            "session_scope": "9",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "유엔은 또한 지구 온난화로 영향을 받는 국가들이 대처할 수 있도록 기금을 마무리하기를 희망하고 있습니다."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_36.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_37.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.1105192999821156,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.3610408999957144
+        },
+        {
+          "text": "With the impacts.",
+          "speaker": {
+            "text": "With the impacts.",
+            "speaker_id": null,
+            "session_scope": "9",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "영향들 말이에요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_37.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.6122443999920506,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.856619900005171
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "arm": "0.64",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 2,
+      "states": {
+        "identified": 1,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "11",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그는 머리에서 부스러기를 씻어냈어."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_40.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_41.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.5413362000253983,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.28142579999985173
+        },
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": null,
+            "session_scope": "11",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_41.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.34137209999607876,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.5731132999935653
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "arm": "0.64",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 4,
+      "states": {
+        "identified": 2,
+        "unavailable": 2
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "13",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그는 머리의 오물을 씻어냈어."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_44.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_45.png"
+          ],
+          "ACK_lead_to_first_seal_s": 2.3735135000024457,
+          "nonempty_stable_readback_lead_to_first_seal_s": 2.1257406000222545
+        },
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": "1",
+            "session_scope": "13",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "cyan"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_45.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_46.png"
+          ],
+          "ACK_lead_to_first_seal_s": 1.1124882000149228,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.870900600013556
+        },
+        {
+          "text": "He washed the detritus from his.",
+          "speaker": {
+            "text": "He washed the detritus from his.",
+            "speaker_id": null,
+            "session_scope": "13",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그는 머리에서 찌꺼기를 씻어냈어요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_46.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_47.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.503593000001274,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.7573588999803178
+        },
+        {
+          "text": "From his hair.",
+          "speaker": {
+            "text": "From his hair.",
+            "speaker_id": null,
+            "session_scope": "13",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "머리에서요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_47.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.2652543000003789,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.524881599994842
+        }
+      ],
+      "actual_positive_readbacks": 4,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "arm": "0.64",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 3,
+      "states": {
+        "identified": 2,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "15",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그는 머리에서 부스러기들을 씻어냈어요."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_50.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_51.png"
+          ],
+          "ACK_lead_to_first_seal_s": 1.42363689999911,
+          "nonempty_stable_readback_lead_to_first_seal_s": 1.1807125000050291
+        },
+        {
+          "text": "No.",
+          "speaker": {
+            "text": "No.",
+            "speaker_id": "1",
+            "session_scope": "15",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "아니요."
+          ],
+          "styles_requested": [
+            "cyan"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_51.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_52.png"
+          ],
+          "ACK_lead_to_first_seal_s": 1.1759639999945648,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.9325293000147212
+        },
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": null,
+            "session_scope": "15",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그는 머리의 오물을 씻어냈어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_52.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.46653239999432117,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.7231398999865633
+        }
+      ],
+      "actual_positive_readbacks": 3,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "arm": "0.64",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 1,
+      "states": {
+        "identified": 1
+      },
+      "sources": [
+        {
+          "text": "No, no, three.",
+          "speaker": {
+            "text": "No, no, three.",
+            "speaker_id": "0",
+            "session_scope": "17",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "아니, 아니, 셋."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_55.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.4524548999906983,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.7192108999879565
+        }
+      ],
+      "actual_positive_readbacks": 1,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "arm": "0.64",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 2,
+      "states": {
+        "identified": 2
+      },
+      "sources": [
+        {
+          "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+          "speaker": {
+            "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+            "speaker_id": "0",
+            "session_scope": "19",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "UN도 지구 온난화로 영향을 받는 국가들이 대처할 수 있도록 기금을 마련하기를 희망하고 있어요."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_58.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_59.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.0261262999847531,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.2900244999909773
+        },
+        {
+          "text": "With the impacts.",
+          "speaker": {
+            "text": "With the impacts.",
+            "speaker_id": "0",
+            "session_scope": "19",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그 영향들로요."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_59.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.6657139000017196,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.9236758999759331
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "arm": "1.04",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 2,
+      "states": {
+        "identified": 1,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "21",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그는 머리에서 떨어진 것들을 씻어냈어요."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_62.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_63.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.2396907999936957,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.00011850000009872019
+        },
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": null,
+            "session_scope": "21",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_63.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.32511480001267046,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.5751631000021007
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "arm": "1.04",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 4,
+      "states": {
+        "identified": 2,
+        "unavailable": 2
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "23",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그는 머리에서 이물질을 씻어냈어요."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_66.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_67.png"
+          ],
+          "ACK_lead_to_first_seal_s": 1.919710899994243,
+          "nonempty_stable_readback_lead_to_first_seal_s": 1.6543015000061132
+        },
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": "1",
+            "session_scope": "23",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "cyan"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_67.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_68.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.6911976999836043,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.4577879999997094
+        },
+        {
+          "text": "He washed the detritus from his.",
+          "speaker": {
+            "text": "He washed the detritus from his.",
+            "speaker_id": null,
+            "session_scope": "23",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그가 자기 머리에서 이물질을 씻어냈어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_68.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_69.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.5122531999950297,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.7419432000024244
+        },
+        {
+          "text": "From his hair.",
+          "speaker": {
+            "text": "From his hair.",
+            "speaker_id": null,
+            "session_scope": "23",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "머리에서요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_69.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.2524159000022337,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.5162623999931384
+        }
+      ],
+      "actual_positive_readbacks": 4,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "arm": "1.04",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 3,
+      "states": {
+        "identified": 2,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "25",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그는 머리에서 이물질을 씻어냈어."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_72.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_73.png"
+          ],
+          "ACK_lead_to_first_seal_s": 1.0648807999968994,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.8099707000073977
+        },
+        {
+          "text": "No.",
+          "speaker": {
+            "text": "No.",
+            "speaker_id": "1",
+            "session_scope": "25",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "아니요."
+          ],
+          "styles_requested": [
+            "cyan"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_73.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_74.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.8051497999986168,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.5649280000070576
+        },
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": null,
+            "session_scope": "25",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그는 머리의 오물을 씻어냈어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_74.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.4477894000010565,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.6913970000168774
+        }
+      ],
+      "actual_positive_readbacks": 3,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "arm": "1.04",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 1,
+      "states": {
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "No, no, three.",
+          "speaker": {
+            "text": "No, no, three.",
+            "speaker_id": null,
+            "session_scope": "27",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "아니, 아니, 셋."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_77.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.39215519998106174,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.627739899995504
+        }
+      ],
+      "actual_positive_readbacks": 1,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "arm": "1.04",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 2,
+      "states": {
+        "unavailable": 2
+      },
+      "sources": [
+        {
+          "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+          "speaker": {
+            "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+            "speaker_id": null,
+            "session_scope": "29",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "유엔은 또한 지구 온난화의 영향을 받는 국가들이 이에 대처할 수 있도록 돕기 위한 기금을 마련하기를 희망하고 있어요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_80.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_81.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.0651114000065718,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.3073834999813698
+        },
+        {
+          "text": "With the impacts.",
+          "speaker": {
+            "text": "With the impacts.",
+            "speaker_id": null,
+            "session_scope": "29",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그 영향들 말이에요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_81.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.6565414000069723,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.8952191999997012
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "arm": "0.64",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 2,
+      "states": {
+        "identified": 1,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "31",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그는 머리에서 이물질을 씻어냈어."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_84.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_85.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.5358615000150166,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.26547240000218153
+        },
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": null,
+            "session_scope": "31",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_85.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.334543599979952,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.586098600004334
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "arm": "0.64",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 4,
+      "states": {
+        "identified": 2,
+        "unavailable": 1,
+        "uncertain": 1
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "33",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그는 머리에서 찌꺼기를 씻어냈어요."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_88.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_89.png"
+          ],
+          "ACK_lead_to_first_seal_s": 2.3557142000063322,
+          "nonempty_stable_readback_lead_to_first_seal_s": 2.1130756000056863
+        },
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": "1",
+            "session_scope": "33",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "언론의 신사 여러분."
+          ],
+          "styles_requested": [
+            "cyan"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_89.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_90.png"
+          ],
+          "ACK_lead_to_first_seal_s": 1.1144546000286937,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.8760179000091739
+        },
+        {
+          "text": "He washed the detritus from his.",
+          "speaker": {
+            "text": "He washed the detritus from his.",
+            "speaker_id": null,
+            "session_scope": "33",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그는 머리에서 그 부스러기들을 씻어냈어요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_90.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_91.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.5014032999752089,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.7423887999902945
+        },
+        {
+          "text": "From his hair.",
+          "speaker": {
+            "text": "From his hair.",
+            "speaker_id": null,
+            "session_scope": "33",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "uncertain"
+          },
+          "translations": [
+            "머리에서요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_91.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.2379176999966148,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.4840213999850675
+        }
+      ],
+      "actual_positive_readbacks": 4,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "arm": "0.64",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 3,
+      "states": {
+        "identified": 2,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": "0",
+            "session_scope": "35",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그는 머리의 부스러기를 씻어냈어."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_94.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_95.png"
+          ],
+          "ACK_lead_to_first_seal_s": 1.3808916000125464,
+          "nonempty_stable_readback_lead_to_first_seal_s": 1.1511427000223193
+        },
+        {
+          "text": "No.",
+          "speaker": {
+            "text": "No.",
+            "speaker_id": "1",
+            "session_scope": "35",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "아니요."
+          ],
+          "styles_requested": [
+            "cyan"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_95.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_96.png"
+          ],
+          "ACK_lead_to_first_seal_s": 1.1462083000224084,
+          "nonempty_stable_readback_lead_to_first_seal_s": 0.9095015000202693
+        },
+        {
+          "text": "He washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair.",
+            "speaker_id": null,
+            "session_scope": "35",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그가 머리에서 오물들을 씻어냈어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_96.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.4815039999957662,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.7295326000021305
+        }
+      ],
+      "actual_positive_readbacks": 3,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "arm": "0.64",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 1,
+      "states": {
+        "identified": 1
+      },
+      "sources": [
+        {
+          "text": "No, no, three.",
+          "speaker": {
+            "text": "No, no, three.",
+            "speaker_id": "0",
+            "session_scope": "37",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "아니, 아니, 셋."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_99.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.41215739998733625,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.657585899985861
+        }
+      ],
+      "actual_positive_readbacks": 1,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "arm": "0.64",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 2,
+      "states": {
+        "identified": 2
+      },
+      "sources": [
+        {
+          "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+          "speaker": {
+            "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+            "speaker_id": "0",
+            "session_scope": "39",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "유엔은 또한 지구 온난화의 영향을 받는 국가들이 대처할 수 있도록 기금을 마련하는 것을 희망하고 있습니다."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_102.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_103.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.095580199995311,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.3504333999881055
+        },
+        {
+          "text": "With the impacts.",
+          "speaker": {
+            "text": "With the impacts.",
+            "speaker_id": "0",
+            "session_scope": "39",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그 영향들 말이에요."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_103.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.7118674999801442,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.948347500001546
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "arm": "baseline",
+      "repetition": 2,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he",
+        "washed",
+        "the",
+        "detritus",
+        "from",
+        "his",
+        "hair"
+      ],
+      "jobs": 1,
+      "states": {
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_106.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.40273359999991953,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.6386123000120278
+        }
+      ],
+      "actual_positive_readbacks": 1,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "arm": "baseline",
+      "repetition": 2,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he",
+        "washed",
+        "the",
+        "detritus",
+        "from",
+        "his",
+        "hair",
+        "he",
+        "washed",
+        "the",
+        "detritus"
+      ],
+      "jobs": 2,
+      "states": {
+        "unavailable": 2
+      },
+      "sources": [
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_109.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_110.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.5448239999823272,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.7870950999786146
+        },
+        {
+          "text": "From his hair.",
+          "speaker": {
+            "text": "From his hair.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그분 머리에서요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_110.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.2498123999976087,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.4954403000010643
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "arm": "baseline",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 1,
+      "states": {
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "He washed the detritus from his hair. No, he washed the detritus from his hair.",
+          "speaker": {
+            "text": "He washed the detritus from his hair. No, he washed the detritus from his hair.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "머리에서 때를 씻어냈어. 아니, 머리에서 때를 씻어냈어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_113.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.7732523999875411,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.0164473000040743
+        }
+      ],
+      "actual_positive_readbacks": 1,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "arm": "baseline",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 1,
+      "states": {
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "No, no, three.",
+          "speaker": {
+            "text": "No, no, three.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "아니, 아니, 셋."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_116.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.3669088000024203,
+          "nonempty_stable_readback_lead_to_first_seal_s": -0.5945455000037327
+        }
+      ],
+      "actual_positive_readbacks": 1,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "arm": "baseline",
+      "repetition": 2,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 2,
+      "states": {
+        "unavailable": 2
+      },
+      "sources": [
+        {
+          "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+          "speaker": {
+            "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "유엔 또한 지구 온난화로 피해를 입은 국가들이 대처할 수 있도록 기금을 마련하기를 희망하고 있어요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_119.png",
+            "native/nemotron/issue218_policy_gpu_valid/commit_120.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.8475544999819249,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.083393899985822
+        },
+        {
+          "text": "With the impacts.",
+          "speaker": {
+            "text": "With the impacts.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그 영향들로요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_gpu_valid/commit_120.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.5705242999829352,
+          "nonempty_stable_readback_lead_to_first_seal_s": -1.8085189999837894
+        }
+      ],
+      "actual_positive_readbacks": 2,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": null
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "clean_A_B",
+      "arm": "baseline",
+      "repetition": 1,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he",
+        "washed",
+        "the",
+        "detritus",
+        "from",
+        "his",
+        "hair"
+      ],
+      "jobs": 1,
+      "states": {
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_1.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.4237359999970067,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "distinct_repeated_A_B_A",
+      "arm": "baseline",
+      "repetition": 1,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he"
+      ],
+      "jobs": 3,
+      "states": {
+        "unavailable": 3
+      },
+      "sources": [
+        {
+          "text": "Washed the detritus from his hair. Gentlemen of the press.",
+          "speaker": {
+            "text": "Washed the detritus from his hair. Gentlemen of the press.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그의 머리에서 이물질을 씻어냈어요. 언론 여러분."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_4.png",
+            "native/nemotron/issue218_policy_deepgram_final/commit_5.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.8331162999966182,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        },
+        {
+          "text": "He washed the detritus from his",
+          "speaker": {
+            "text": "He washed the detritus from his",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그가 머리에서 찌꺼기를 씻어냈어요"
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_5.png",
+            "native/nemotron/issue218_policy_deepgram_final/commit_6.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.656727099994896,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        },
+        {
+          "text": "from his hair.",
+          "speaker": {
+            "text": "from his hair.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "머리에서요."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_6.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.4516354999796022,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "short_A_B_A",
+      "arm": "baseline",
+      "repetition": 1,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he",
+        "washed",
+        "the"
+      ],
+      "jobs": 2,
+      "states": {
+        "unavailable": 2
+      },
+      "sources": [
+        {
+          "text": "Washed the detritus from his hair. No. He washed",
+          "speaker": {
+            "text": "Washed the detritus from his hair. No. He washed",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "머리에서 찌꺼기를 씻어냈어. 아니. 씻었어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_9.png",
+            "native/nemotron/issue218_policy_deepgram_final/commit_10.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.03675670002121478,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        },
+        {
+          "text": "the detritus from his hair.",
+          "speaker": {
+            "text": "the detritus from his hair.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그의 머리에서 떨어진 것들."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_10.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.5581007000000682,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "linguistic_correction",
+      "arm": "baseline",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 1,
+      "states": {
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "No. No. Three.",
+          "speaker": {
+            "text": "No. No. Three.",
+            "speaker_id": null,
+            "session_scope": "",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "아니. 아니. 셋."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_13.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.4023262999835424,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "clean_A_B",
+      "arm": "1.04",
+      "repetition": 1,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he",
+        "washed",
+        "the",
+        "detritus",
+        "from",
+        "his",
+        "hair"
+      ],
+      "jobs": 1,
+      "states": {
+        "identified": 1
+      },
+      "sources": [
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": "1",
+            "session_scope": "1",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_16.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.4535694000078365,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "distinct_repeated_A_B_A",
+      "arm": "1.04",
+      "repetition": 1,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he"
+      ],
+      "jobs": 4,
+      "states": {
+        "identified": 3,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "Washed the detritus from his hair. ",
+          "speaker": {
+            "text": "Washed the detritus from his hair. ",
+            "speaker_id": "0",
+            "session_scope": "3",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "머리에서 찌꺼기를 씻어냈어요."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_19.png",
+            "native/nemotron/issue218_policy_deepgram_final/commit_20.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.8601822000055108,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        },
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": "1",
+            "session_scope": "3",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "cyan"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_20.png",
+            "native/nemotron/issue218_policy_deepgram_final/commit_21.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.5392801999987569,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        },
+        {
+          "text": "He washed the detritus from his",
+          "speaker": {
+            "text": "He washed the detritus from his",
+            "speaker_id": null,
+            "session_scope": "3",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그는 머리의 찌꺼기를 씻어냈어"
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_21.png",
+            "native/nemotron/issue218_policy_deepgram_final/commit_22.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.7636357999872416,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        },
+        {
+          "text": "from his hair.",
+          "speaker": {
+            "text": "from his hair.",
+            "speaker_id": "0",
+            "session_scope": "3",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "그의 머리에서."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_22.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.4939481999899726,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "short_A_B_A",
+      "arm": "1.04",
+      "repetition": 1,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he",
+        "washed",
+        "the"
+      ],
+      "jobs": 2,
+      "states": {
+        "mixed": 1,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "Washed the detritus from his hair. No. He washed",
+          "speaker": {
+            "text": "Washed the detritus from his hair. No. He washed",
+            "speaker_id": null,
+            "session_scope": "5",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "mixed"
+          },
+          "translations": [
+            "머리에서 떨어진 것들을 씻어냈어. 아니. 씻었어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_25.png",
+            "native/nemotron/issue218_policy_deepgram_final/commit_26.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.03653139999369159,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        },
+        {
+          "text": "the detritus from his hair.",
+          "speaker": {
+            "text": "the detritus from his hair.",
+            "speaker_id": null,
+            "session_scope": "5",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "머리에서 때를 씻어냈어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_26.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.6329353000037372,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "linguistic_correction",
+      "arm": "1.04",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 1,
+      "states": {
+        "identified": 1
+      },
+      "sources": [
+        {
+          "text": "No. No. Three.",
+          "speaker": {
+            "text": "No. No. Three.",
+            "speaker_id": "0",
+            "session_scope": "7",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "아니. 아니. 셋."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_29.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.40789349999977276,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "clean_A_B",
+      "arm": "0.64",
+      "repetition": 1,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he",
+        "washed",
+        "the",
+        "detritus",
+        "from",
+        "his",
+        "hair"
+      ],
+      "jobs": 1,
+      "states": {
+        "identified": 1
+      },
+      "sources": [
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": "1",
+            "session_scope": "9",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "언론 여러분."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_32.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.47866729999077506,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "distinct_repeated_A_B_A",
+      "arm": "0.64",
+      "repetition": 1,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he"
+      ],
+      "jobs": 4,
+      "states": {
+        "identified": 3,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "Washed the detritus from his hair. ",
+          "speaker": {
+            "text": "Washed the detritus from his hair. ",
+            "speaker_id": "0",
+            "session_scope": "11",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "머리에 있는 부스러기들을 씻어줬어."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_35.png",
+            "native/nemotron/issue218_policy_deepgram_final/commit_36.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.8859238000004552,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        },
+        {
+          "text": "Gentlemen of the press.",
+          "speaker": {
+            "text": "Gentlemen of the press.",
+            "speaker_id": "1",
+            "session_scope": "11",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "기자 여러분."
+          ],
+          "styles_requested": [
+            "cyan"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_36.png",
+            "native/nemotron/issue218_policy_deepgram_final/commit_37.png"
+          ],
+          "ACK_lead_to_first_seal_s": 0.6069220000063069,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        },
+        {
+          "text": "He washed the detritus from his",
+          "speaker": {
+            "text": "He washed the detritus from his",
+            "speaker_id": null,
+            "session_scope": "11",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그가 머리에서 이물질을 씻어냈어요"
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_37.png",
+            "native/nemotron/issue218_policy_deepgram_final/commit_38.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.7500016999838408,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        },
+        {
+          "text": "from his hair.",
+          "speaker": {
+            "text": "from his hair.",
+            "speaker_id": "0",
+            "session_scope": "11",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "머리에서."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_38.png"
+          ],
+          "ACK_lead_to_first_seal_s": -1.434810499980813,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "short_A_B_A",
+      "arm": "0.64",
+      "repetition": 1,
+      "content": "failed_content",
+      "missing_required_words": [
+        "he",
+        "washed",
+        "the"
+      ],
+      "jobs": 2,
+      "states": {
+        "mixed": 1,
+        "unavailable": 1
+      },
+      "sources": [
+        {
+          "text": "Washed the detritus from his hair. No. He washed",
+          "speaker": {
+            "text": "Washed the detritus from his hair. No. He washed",
+            "speaker_id": null,
+            "session_scope": "13",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "mixed"
+          },
+          "translations": [
+            "머리에 묻은 잔머리를 씻었어. 아니. 그가 씻었어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_41.png",
+            "native/nemotron/issue218_policy_deepgram_final/commit_42.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.0024689999991096556,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        },
+        {
+          "text": "the detritus from his hair.",
+          "speaker": {
+            "text": "the detritus from his hair.",
+            "speaker_id": null,
+            "session_scope": "13",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "unavailable"
+          },
+          "translations": [
+            "그의 머리에서 때를 씻어냈어."
+          ],
+          "styles_requested": [
+            "gray"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_42.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.6890845000161789,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "linguistic_correction",
+      "arm": "0.64",
+      "repetition": 1,
+      "content": "complete_required_words",
+      "missing_required_words": [],
+      "jobs": 1,
+      "states": {
+        "identified": 1
+      },
+      "sources": [
+        {
+          "text": "No. No. Three.",
+          "speaker": {
+            "text": "No. No. Three.",
+            "speaker_id": "0",
+            "session_scope": "15",
+            "source_start_ms": null,
+            "source_end_ms": null,
+            "overlaps_previous": false,
+            "source": "nemotron",
+            "attribution_state": "identified"
+          },
+          "translations": [
+            "아니. 아니. 셋."
+          ],
+          "styles_requested": [
+            "gold"
+          ],
+          "images": [
+            "native/nemotron/issue218_policy_deepgram_final/commit_45.png"
+          ],
+          "ACK_lead_to_first_seal_s": -0.40737699999590404,
+          "nonempty_stable_readback_lead_to_first_seal_s": null
+        }
+      ],
+      "actual_positive_readbacks": 0,
+      "exact_conservation_once": true,
+      "history_once": true,
+      "source_order": true,
+      "publication_order": true,
+      "causal_recorded_input": true
+    }
+  ],
+  "reproduction_commands": {
+    "GPU": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_validation.py --route gpu --candidate dd3cad278dc683840c6eabaae9777159cb75a710 --output native/nemotron/issue218_policy_gpu_valid",
+    "replay": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_validation.py --route deepgram-native-replay --candidate dd3cad278dc683840c6eabaae9777159cb75a710 --output native/nemotron/issue218_policy_deepgram_final",
+    "offline_summary": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_summary.py --trace build/issue218_policy_archive_gpu/trace.json --trace build/issue218_policy_archive_replay/trace.json --output build/issue218_policy_reproduced_summary.json",
+    "scope": "No additional dd3cad matrix authorized. Reproduce offline analysis from archived trace/source hashes, not new model/provider calls merely to reconfirm. Future targeted reruns require changed-candidate applicability/Director scope.",
+    "renderer_only_archived_executions": [
+      ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --output native/nemotron/issue218_policy_renderer_probe_run1",
+      ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --output native/nemotron/issue218_policy_renderer_guarded",
+      ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --repair-verify --output native/nemotron/issue218_policy_renderer_repair_verify",
+      ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --repair-verify --numeric-only --output native/nemotron/issue218_policy_renderer_numeric_recovered",
+      ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --repair-verify --numeric-only --output native/nemotron/issue218_policy_renderer_owned_show_final"
+    ],
+    "renderer_only_scope": "Use archived execution_sources.zip perattempt. Currentdriverhashes differ; no further UI recovery/COM/desktop experiments or ASR/translation matrix authorized. This is reproductionmetadata, not a new execution request.",
+    "historical_offline_summary": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_summary.py --trace native/nemotron/issue218_policy_gpu_valid/trace.json --trace native/nemotron/issue218_policy_deepgram_final/trace.json --output native/nemotron/issue218_policy_summary.json",
+    "offline_archive_extraction": [
+      ".venv/Scripts/python.exe -m zipfile -e native/nemotron/issue218_policy_gpu_valid.zip build/issue218_policy_archive_gpu",
+      ".venv/Scripts/python.exe -m zipfile -e native/nemotron/issue218_policy_deepgram_final.zip build/issue218_policy_archive_replay"
+    ],
+    "renderer_input_archive_members": {
+      "gpu": "native/nemotron/issue218_policy_gpu_valid.zip:trace.json",
+      "recorded": "native/nemotron/issue218_policy_deepgram_final.zip:trace.json"
+    },
+    "renderer_input_extraction_note": "HistoricalCLI defaults expect olddirectpaths; ifseparatelyauthorized, explicitlyextractinputarchives first or pass extractedbuildpaths via --gpu-trace/--recorded-trace. No further rendererexecution currentlyauthorized."
+  },
+  "durability": {
+    "inventory": "native/nemotron/issue218_policy_archive_inventory.json",
+    "attempt_ledger": "native/nemotron/issue218_policy_attempts.json",
+    "summary": "native/nemotron/issue218_policy_summary.json",
+    "valid_trace_sha256s": {
+      "gpu": "66148f92fff4a80b95c626f356e944f326adfcdd0aa1c3330ba19693fcc6c734",
+      "deepgram-native-replay": "484ac97a1e851a88c29758119b4bcd191f9f21a7d23fb36be7a7d44bc02d9fd3"
+    },
+    "raw_archives": [
+      {
+        "path": "native/nemotron/issue218_policy_gpu_valid.zip",
+        "sha256": "4f1573c87550cf209f32898e63a8c677a146ccf9631d6fe6cc7b31579c902d32"
+      },
+      {
+        "path": "native/nemotron/issue218_policy_deepgram_final.zip",
+        "sha256": "7af7b60e0560889295b4b63193123f047db9f99f26d701d33acccf50f415507d"
+      }
+    ],
+    "serialization": "Actual UTF8 LF sanitized trace bytes and exact execution source snapshots hashed/archive retained; current driver hashes separately recorded. Original prior evidence/drivers preserved unchanged.",
+    "cleanup": {
+      "earlier_cleanup": {
+        "removed_after_archival": [
+          "build/issue218_policy_preflight_gpu",
+          "build/issue218_policy_preflight_replay",
+          "build/issue218_policy_fixed_replay_preflight",
+          "native/nemotron/issue218_policy_gpu",
+          "native/nemotron/issue218_policy_deepgram_replay",
+          "native/nemotron/issue218_policy_deepgram_fixed",
+          "native/nemotron/issue218_policy_deepgram_valid"
+        ],
+        "removed_superseded_summary": "native/nemotron/issue218_policy_gpu_summary.json",
+        "valid_direct_traces_retained": "Active read-only continuity-repair input; immutable archives preserve all execution snapshots/PNGs."
+      },
+      "current_artifact_cleanup_ledger": "native/nemotron/issue218_policy_cleanup.json",
+      "direct_PNGs_retained": true,
+      "redundant_nonPNG_direct_copies_removed": 18,
+      "active_nonPNG_references": "archive:member, with explicit offlineextraction commands"
+    },
+    "renderer_archives": [
+      {
+        "path": "native/nemotron/issue218_policy_renderer_probe_run1.zip",
+        "sha256": "78fd0344760fc036e45a7936b95d67b8beff266d73788d0387949d69faeb91a8"
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_guarded.zip",
+        "sha256": "c6c571c24d10eb53be32dd6bdca14e4ed171941dab14e76fd89721a0da18f914"
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_repair_verify.zip",
+        "sha256": "11482d67ebe3aac0453720ae49a1f0d05088b1d081f24257d8454146d47c6fcf"
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_numeric_recovered.zip",
+        "sha256": "16b32cfcafddd0144dac927c906c690d437cac7c2ab700530ba9300889066750"
+      },
+      {
+        "path": "native/nemotron/issue218_policy_renderer_owned_show_final.zip",
+        "sha256": "6f3e51ef62374be2c4159c9d0583854d906ad0cf225b4a52648315966e377622"
+      }
+    ],
+    "current_task_harness_changes": "Validationdriver delegates GuardedDesktop and includes helper in source snapshot manifest; future summary respects explicit readback_valid=False. No postguardASR/translationexecution or summaryrerun; old summary/rawtraces/archives unchanged.",
+    "director_offline_summary_reproduction": "Director reports current summary reproduced: ALLmeasurementfields identical to savedsummary; onlyoutputcommand[6] and updatedsummarydriverhash differ. Not rerun byworker."
+  },
+  "decisions_needed": [
+    "Required cleanB/published returningA acoustic criteria empirically unmet; no allgray/partialcolor acceptance or profile default. F1/F2 changes belong to Director/continuity-repair, not validation worker.",
+    "Rendererengineeringdecision sufficientlysupported: representativeactualsurfaces verified, task-ownedvisibility/layoutguard only; noproductpresentationmutation justified. Originalmatrixvisualtimingfailed remains, fullguardednumeric29failed remains separate from finaltargetedpositive. Stopdesktop/COMqualification. Source-policy decision/F1-F2 changed-candidate acoustic acceptance remainsDirector-owned."
+  ],
+  "historical_execution_paths_note": "Historical command strings, savedsummary inputs and immutable rawtrace embedded paths remain execution-time paths. Currenttrace/counter/preflight/source-snapshot references use archive:member. Filesystem-based drivers require explicit extraction; all directPNG paths remain valid. No probes/modelcalls authorized by reproductionmetadata.",
+  "artifact_cleanup": {
+    "ledger": "native/nemotron/issue218_policy_cleanup.json",
+    "removed_verified_nonPNG_copies": 18,
+    "bytes_removed": 131109893,
+    "archive_CRC_hash_member_equivalence": "14archives/233members/14nestedsourceZIPs passed; currentreaders complete; allZIPs/directPNGs retained."
+  }
+}

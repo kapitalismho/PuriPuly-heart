@@ -1,0 +1,3291 @@
+{
+  "schema": "issue218-renderer-only-findings-1",
+  "status": "bounded_renderer_only_representative_surface_verified; original_E2E_visual_timing_failed_unchanged",
+  "historical_product_candidate": "dd3cad278dc683840c6eabaae9777159cb75a710",
+  "current_product_applicability": "Uncommitted F1/F2 core changes reported by Director; renderer-only data bypasses ASR/translation/source policy. Exact presentation file hashes recorded.",
+  "privacy": {
+    "ASR_calls": 0,
+    "Gemma_calls": 0,
+    "provider_network_calls": 0,
+    "credential_reads": false,
+    "ambient_capture": false,
+    "VRChat_SteamVR": false
+  },
+  "boundary": "Exact previously real-translated source snapshots through current actual Flet; no new ASR/Gemma/cloud qualification, no backfilled E2Elatency, no product/Git/settings mutations. All further desktop/COM experiments stopped after final approved attempt.",
+  "original_blank_evidence": {
+    "trace": "native/nemotron/issue218_policy_deepgram_final.zip:trace.json",
+    "trace_sha256": "484ac97a1e851a88c29758119b4bcd191f9f21a7d23fb36be7a7d44bc02d9fd3",
+    "timed_blank_readbacks": 23,
+    "final_blank_images": 12,
+    "useful_pixel_latency": null,
+    "state": "Failed visual timing preserved; historical DWM cloak state absent.",
+    "cause_attribution": "[INFERENCE] Later shell-cloak/minimized-layout reproduction is consistent with original visibility/capture failure but cannot prove every original blank cause."
+  },
+  "diagnosis": {
+    "first_unguarded_positive_cloak0": 20,
+    "first_unguarded_blank_cloak2": 3,
+    "blank_revisions": [
+      41,
+      42,
+      45
+    ],
+    "known_fact": "DWM_CLOAKED_SHELL2 means compositor-not-visible, even when native/Flet visible flags and retained text/ACK are correct; not proof of foreign virtual desktop or generation0 cause.",
+    "product_defect_demonstrated": false,
+    "task_fix": "Owned visibility guard, bounded native show/restore/current-desktop move if available, same-public-owner layout reapply to owned backdrop after native restoration; never content/palette/sourcepolicy decisions.",
+    "permission_limit": "Prior targeted run retained cloak2 after two owned-only MoveWindowToDesktop E_ACCESSDENIED attempts. Final successful recapture was alreadyuncloaked; universal shell-cloak recovery remains unproven, and inaccessible visibility explicitly invalidates readback.",
+    "primary_source": "https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute"
+  },
+  "qualified_evidence": {
+    "full_guarded_replay": {
+      "valid": 22,
+      "requested": 23,
+      "invalid_numeric_revision": 29,
+      "previous_blank41_42_45_valid": true
+    },
+    "changed_guard_working_control": {
+      "valid": 4,
+      "requested": 4
+    },
+    "final_targeted_numeric_recovery": {
+      "valid": 1,
+      "requested": 1,
+      "revision": 29,
+      "gold_pixels": 2228,
+      "no_COM_migration_required_in_successful_recapture": true
+    },
+    "interpretation": "Separate22/23full guarded+4/4countercontrol+1/1targeted recovery; representative distinct text/layout/palette paths verified, NOT fullmatrixE2Epass or original visual-latency replacement."
+  },
+  "numeric_equivalence": {
+    "requested_visual_fields": [
+      "appearance_seq",
+      "card_revision",
+      "channel",
+      "block_variant",
+      "primary_text",
+      "secondary_text",
+      "secondary_enabled",
+      "primary_language",
+      "secondary_language",
+      "source_text_hash",
+      "source_text_len",
+      "publication_scope",
+      "publication_generation",
+      "publication_order",
+      "publication_index",
+      "speaker_style"
+    ],
+    "requested_visual_payload_equal": true,
+    "visual_payload": {
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0.0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1.0,
+        "background_alpha": 0.24
+      },
+      "blocks": [
+        {
+          "appearance_seq": 2,
+          "card_revision": 1,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "아니. 아니. 셋.",
+          "secondary_text": "No. No. Three.",
+          "secondary_enabled": true,
+          "primary_language": "ko",
+          "secondary_language": "en",
+          "source_text_hash": "6c86e476d0f228c6",
+          "source_text_len": 14,
+          "publication_scope": "peer",
+          "publication_generation": 0,
+          "publication_order": 0,
+          "publication_index": 0,
+          "speaker_style": "gold"
+        }
+      ]
+    },
+    "nonvisual_differences": [
+      "revision",
+      "id",
+      "occupant_key",
+      "update_id",
+      "logical_turn_key",
+      "origin_wall_clock_ms"
+    ],
+    "positive_images_byte_identical": true,
+    "PNG_sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+    "meaning": "Alreadyvalidated45covers same requested text/style/layout path as29; final29alsoqualified. Original/fullguarded/failedtargeted29 outcomes not erased."
+  },
+  "actual_images_observed": [
+    {
+      "path": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_20.png",
+      "sha256": "8a3edf513e7031afdbb2dffa7fba78ac5506a2e5b0ef1e3254ed1ee10a19cb8d",
+      "observed": "Whole Washed sentence gold and Gentlemen sentence cyan, actual Korean/English readable."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_22.png",
+      "sha256": "819ff11f5488fa6c8a0af099e01db83c251a1387015f5b7785dade05b4e31721",
+      "observed": "Returning prefix gray, same-A native tail gold; native fragment limitation remains."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_41.png",
+      "sha256": "55f0212a3c2bc92a78064871ccb9a7c2b7eeed75caf025f0936184c35de04697",
+      "observed": "Whole already-glued native phrase gray; No readable/preserved, not an independently colored B."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_42.png",
+      "sha256": "73bd96011716b95729af6a73b6fcb6a067e31cca07df6615aa74a24752fcd69e",
+      "observed": "Gray No-containing phrase plus gray continuation, actual text retained."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_45.png",
+      "sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+      "observed": "One finalized gold 아니. 아니. 셋. / No. No. Three. card."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_owned_show_final/Deepgram_original_submissions/guard_recovered_29.png",
+      "sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+      "observed": "Exact same numeric gold card after actual owned restore/layout correction."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_23.png",
+      "sha256": "a5c805a4fd97b8612459e1171a255939ed0226a54209a5c402140aed5eb9eb05",
+      "observed": "Working recorded A gold / B cyan, real whole English/Korean captions."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_24.png",
+      "sha256": "8e6a386ef139ad1b0162a712c8c9c1eec6971488a7bef3a584ae54f398bb157a",
+      "observed": "Working recorded cyan B / gray return, not fake continuity coloring."
+    }
+  ],
+  "remaining_acceptance": "Original acoustic cleanB/returningA gray and historical native shortBglue/omissions remain. No allgray/partialcolor feature acceptance, profile/default choice, HMD/photon/VR qualification. F1/F2 changed-candidate acoustic applicability belongs to Director.",
+  "probes": [
+    {
+      "name": "issue218_policy_renderer_probe_run1",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --output native/nemotron/issue218_policy_renderer_probe_run1",
+      "exit": 0,
+      "wall_seconds": 91.89,
+      "result": "Renderer-only exact observed submissions: working4/4; Deepgram20/23positive. All20positive cloak0; last41/42/45blank cloak2. No models/providers.",
+      "raw_trace": "native/nemotron/issue218_policy_renderer_probe_run1.zip:trace.json",
+      "raw_trace_sha256": "0ce6643aa0271c1423a5532d6cf2cabfceb08f40279adf3b4ab14fd70e203db2",
+      "execution_driver_sha256": "05d4e6f88fd8b7ac1fd704692f53a85a8b83d2ec0c4609d8ba494d83da7bc0cb",
+      "execution_visibility_helper_sha256": null,
+      "execution_sources_zip_sha256": "41e1ed550a49190eef541282c0505bee422c9bfbcf878d1f5a0d99d6abcb0042",
+      "presentation_sources": {
+        "src/puripuly_heart/core/overlay/__init__.py": {
+          "historical_sha256": "13ce2bd3e16b19e1682cd78d30290e95a0c78346b191326c617c9acc06455238",
+          "current_sha256": "13ce2bd3e16b19e1682cd78d30290e95a0c78346b191326c617c9acc06455238"
+        },
+        "src/puripuly_heart/core/overlay/bridge.py": {
+          "historical_sha256": "b18f1c3c9c619d239b73c061fd38b477ce0e56b9bff5d1254150289e7da0ab2c",
+          "current_sha256": "b18f1c3c9c619d239b73c061fd38b477ce0e56b9bff5d1254150289e7da0ab2c"
+        },
+        "src/puripuly_heart/core/overlay/bridge_mailbox.py": {
+          "historical_sha256": "45cd242c894e3df812ca39d70484828cf678db75a9ddf4e136ba9195fc074bd1",
+          "current_sha256": "45cd242c894e3df812ca39d70484828cf678db75a9ddf4e136ba9195fc074bd1"
+        },
+        "src/puripuly_heart/core/overlay/bridge_session.py": {
+          "historical_sha256": "d309f04088a6dfaa13a2ea24408b7d6dfde4b51c64177705ef1276fa8a4a6c21",
+          "current_sha256": "d309f04088a6dfaa13a2ea24408b7d6dfde4b51c64177705ef1276fa8a4a6c21"
+        },
+        "src/puripuly_heart/core/overlay/bridge_transport.py": {
+          "historical_sha256": "09f07e8b28ec84426073cc275ebb2c1aec2632e2c58cf52007a512a189200986",
+          "current_sha256": "09f07e8b28ec84426073cc275ebb2c1aec2632e2c58cf52007a512a189200986"
+        },
+        "src/puripuly_heart/core/overlay/diagnostics.py": {
+          "historical_sha256": "9191a559bf1b863a1ef831734950a085132d9c02433edf4b78de4f3f4ed7acac",
+          "current_sha256": "9191a559bf1b863a1ef831734950a085132d9c02433edf4b78de4f3f4ed7acac"
+        },
+        "src/puripuly_heart/core/overlay/manifest.py": {
+          "historical_sha256": "b5d9b97a202c5e3f9aa041f341e965bdb657935e0b4e8d31a85bf8346fd42fc5",
+          "current_sha256": "b5d9b97a202c5e3f9aa041f341e965bdb657935e0b4e8d31a85bf8346fd42fc5"
+        },
+        "src/puripuly_heart/core/overlay/openvr_vendor.py": {
+          "historical_sha256": "3dd95478a62ad1d037a50ad1ae96367dfd525867b9546652bfd619560154cae7",
+          "current_sha256": "3dd95478a62ad1d037a50ad1ae96367dfd525867b9546652bfd619560154cae7"
+        },
+        "src/puripuly_heart/core/overlay/presenter.py": {
+          "historical_sha256": "4b010e1f6b3f03beb822f289b8fb0a7223ac027f914e2db349cbab89c230e6f6",
+          "current_sha256": "4b010e1f6b3f03beb822f289b8fb0a7223ac027f914e2db349cbab89c230e6f6"
+        },
+        "src/puripuly_heart/core/overlay/presenter_acceptance.py": {
+          "historical_sha256": "1c3d3a03bd196cb19a7401a9e7f3e16fa52cdd80328f98927adfac544d6ae1c7",
+          "current_sha256": "1c3d3a03bd196cb19a7401a9e7f3e16fa52cdd80328f98927adfac544d6ae1c7"
+        },
+        "src/puripuly_heart/core/overlay/presenter_projection.py": {
+          "historical_sha256": "11c6b411a7a726ec10e0d5437d8880a4ac7a853a1e5eb418143a437b7373a3df",
+          "current_sha256": "11c6b411a7a726ec10e0d5437d8880a4ac7a853a1e5eb418143a437b7373a3df"
+        },
+        "src/puripuly_heart/core/overlay/presenter_sources.py": {
+          "historical_sha256": "28c6969aab2d8fce601edd9ce910663454845fac15cca571e5c5b77dc2036a12",
+          "current_sha256": "28c6969aab2d8fce601edd9ce910663454845fac15cca571e5c5b77dc2036a12"
+        },
+        "src/puripuly_heart/core/overlay/process.py": {
+          "historical_sha256": "e0fc2ca0e72110d6a6099f9d49351507af4ab944ad3f80ca6bb3a0d53adb9864",
+          "current_sha256": "e0fc2ca0e72110d6a6099f9d49351507af4ab944ad3f80ca6bb3a0d53adb9864"
+        },
+        "src/puripuly_heart/core/overlay/process_adapter.py": {
+          "historical_sha256": "ee99f6ef686c470fc47823c2e4514b1a5d27f22e2aca8174c3f2342567866eaa",
+          "current_sha256": "ee99f6ef686c470fc47823c2e4514b1a5d27f22e2aca8174c3f2342567866eaa"
+        },
+        "src/puripuly_heart/core/overlay/process_runners.py": {
+          "historical_sha256": "77caaa0956fbace243c39559b10a70365087c694fe23ef2cc631a62a041a06d1",
+          "current_sha256": "77caaa0956fbace243c39559b10a70365087c694fe23ef2cc631a62a041a06d1"
+        },
+        "src/puripuly_heart/core/overlay/protocol.py": {
+          "historical_sha256": "ef410f1362a07956ffb2f01f7c51c0209e338f1c06ae49e774b28522748d74f7",
+          "current_sha256": "ef410f1362a07956ffb2f01f7c51c0209e338f1c06ae49e774b28522748d74f7"
+        },
+        "src/puripuly_heart/core/overlay/sink.py": {
+          "historical_sha256": "893eb2211174e213935f4aeabe922c72f09670945e50951466669f4308695ba3",
+          "current_sha256": "893eb2211174e213935f4aeabe922c72f09670945e50951466669f4308695ba3"
+        },
+        "src/puripuly_heart/core/overlay/state.py": {
+          "historical_sha256": "079986a8f0bbcf6eb0c639db6044270f6523e11a67cbd7620aaae97abd3938ca",
+          "current_sha256": "079986a8f0bbcf6eb0c639db6044270f6523e11a67cbd7620aaae97abd3938ca"
+        },
+        "src/puripuly_heart/ui/desktop_overlay.py": {
+          "historical_sha256": "5a414519475433ba39996bb1b94b91fc2365dd0a7ddc87c58b5055c9333cb353",
+          "current_sha256": "5a414519475433ba39996bb1b94b91fc2365dd0a7ddc87c58b5055c9333cb353"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_card_repro.py": {
+          "historical_sha256": "befcf5ca1ab8104bdf01ea8efe4738c1b2e4081798e6066d2136e63e5d93d8f7",
+          "current_sha256": "befcf5ca1ab8104bdf01ea8efe4738c1b2e4081798e6066d2136e63e5d93d8f7"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_repro.py": {
+          "historical_sha256": "3152ba3a8e3638f714e52b71208204a49f60e06e6a14bc0748cd3facdb606be7",
+          "current_sha256": "3152ba3a8e3638f714e52b71208204a49f60e06e6a14bc0748cd3facdb606be7"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_startup.py": {
+          "historical_sha256": "732a2e6d155dcffcb12a2b41686f8058bc7a91ce8c22466b0268f224b06f15fd",
+          "current_sha256": "732a2e6d155dcffcb12a2b41686f8058bc7a91ce8c22466b0268f224b06f15fd"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/__init__.py": {
+          "historical_sha256": "0ee2636ffe47e4062c484c7a1df628853ff5b003975bd48c74599607bd6e4afd",
+          "current_sha256": "0ee2636ffe47e4062c484c7a1df628853ff5b003975bd48c74599607bd6e4afd"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/contract.py": {
+          "historical_sha256": "dc0959f27616303640e0b2bfaf1e5afc33659bee2641512cfed1d4a947d72b37",
+          "current_sha256": "dc0959f27616303640e0b2bfaf1e5afc33659bee2641512cfed1d4a947d72b37"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/renderer.py": {
+          "historical_sha256": "a226dceddfe44c051dd5d41b522f5d04843cc8028dd5a693a28b328c85925258",
+          "current_sha256": "a226dceddfe44c051dd5d41b522f5d04843cc8028dd5a693a28b328c85925258"
+        },
+        "src/puripuly_heart/ui/desktop_window_zorder.py": {
+          "historical_sha256": "65440726bccb1cf322211b0eb307f47c5e8d21c50d0cc918b83f377e9b20917c",
+          "current_sha256": "65440726bccb1cf322211b0eb307f47c5e8d21c50d0cc918b83f377e9b20917c"
+        }
+      },
+      "status": "renderer_only_probe_executed",
+      "stages": [
+        {
+          "label": "GPU_working_control",
+          "execution_status": "render_only_replay_executed",
+          "surface_status": null,
+          "requested_nonempty_snapshots": 4,
+          "diagnostic_positive_pixel_readbacks": 4,
+          "guarded_valid_readbacks": null,
+          "error": null,
+          "readbacks": [
+            {
+              "revision": 22,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "a02eb50609710472d2b2df4dc523b685d64b475c9d8112f4e24c971f86ce3c33",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그는 머리에서 떨어진 것들을 씻었어요.",
+                  "secondary_text": "He washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 7467,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/GPU_working_control/commit_22.png",
+              "PNG_sha256": "36600561f04d8dbbeb3b79eccfe29256ffa49cce97a04ec6bcfa25daec493c40",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 23,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "125720449f5e1793ac456eb6d7b6864308b0926fb7d89f9be954742cf5b77bcb",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그는 머리에서 떨어진 것들을 씻었어요.",
+                  "secondary_text": "He washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                },
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 7467,
+                "cyan": 2812,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/GPU_working_control/commit_23.png",
+              "PNG_sha256": "a5c805a4fd97b8612459e1171a255939ed0226a54209a5c402140aed5eb9eb05",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 24,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "8f41ef5b3be03119566a0a4dbd104c6d91674d2393e15044b1cd8a3452d8c04f",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                },
+                {
+                  "primary_text": "그는 머리에서 이물질을 씻어냈어.",
+                  "secondary_text": "He washed the detritus from his.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 2812,
+                "gray": 6709
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/GPU_working_control/commit_24.png",
+              "PNG_sha256": "8e6a386ef139ad1b0162a712c8c9c1eec6971488a7bef3a584ae54f398bb157a",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 25,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "95151bcfc9ec467fe3cfeddf6f0912fb486310e3e0a6c5db595f4be9da0bb9cf",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그는 머리에서 이물질을 씻어냈어.",
+                  "secondary_text": "He washed the detritus from his.",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "머리에서요.",
+                  "secondary_text": "From his hair.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 9080
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/GPU_working_control/commit_25.png",
+              "PNG_sha256": "7ebdd1f54d2e7ce23eccf45068ffc203424e066adee320b8e52e9145756c2a79",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            }
+          ]
+        },
+        {
+          "label": "Deepgram_original_submissions",
+          "execution_status": "render_only_replay_executed",
+          "surface_status": null,
+          "requested_nonempty_snapshots": 23,
+          "diagnostic_positive_pixel_readbacks": 20,
+          "guarded_valid_readbacks": null,
+          "error": null,
+          "readbacks": [
+            {
+              "revision": 1,
+              "case": "clean_A_B",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "0a0f9af3c74c9cefa93a0598328adfc1ef42f2f4ad48aa525ab2941c11e2bb75",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 2812
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_1.png",
+              "PNG_sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 4,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "37b41f607e22b54eab5f3b00e448c89ce1b77fdfb0d33c214019cdd7f0db4fe4",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그의 머리에서 이물질을 씻어냈어요. 언론 여러분.",
+                  "secondary_text": "Washed the detritus from his hair. Gentlemen of the press.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 10119
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_4.png",
+              "PNG_sha256": "d7abb9f74411c79bb8f3fdb71ca4a7d51ac43596cae54711dd21029f13fd4b02",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 5,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "08d58958746c756ed08a804b9df451326e0f484d8f14c37ff31b0bcbbaff5c35",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그의 머리에서 이물질을 씻어냈어요. 언론 여러분.",
+                  "secondary_text": "Washed the detritus from his hair. Gentlemen of the press.",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "그가 머리에서 찌꺼기를 씻어냈어요",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 16849
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_5.png",
+              "PNG_sha256": "cc436ae91344cf3a2668a6ec8e1a57de9acfd2cd4a23a8e17fefae3ee6f53b7c",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 6,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "72a356a1774bd69741c4b627234a06813606ef739f07d346fa7dace2f4af567f",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그가 머리에서 찌꺼기를 씻어냈어요",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "머리에서요.",
+                  "secondary_text": "from his hair.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 9085
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_6.png",
+              "PNG_sha256": "5a9a6a69d9e1dd0046ac71ba8d59bd698a72be72aa15668687c6f16b9316f163",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 9,
+              "case": "short_A_B_A",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "455b36b91797785cb717cf570748f297923dda93c44fde5f3b6fd0e23e1c48af",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 찌꺼기를 씻어냈어. 아니. 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 8359
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_9.png",
+              "PNG_sha256": "5259939d97a05ac321bb5f02486317cb5d3b90c13c454bc8a0109449392ee1a7",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 10,
+              "case": "short_A_B_A",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "e6a3c3ae90584f8ece773e8cb6b845972de3935bf560b8ebb8c04d280db742e1",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 찌꺼기를 씻어냈어. 아니. 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "그의 머리에서 떨어진 것들.",
+                  "secondary_text": "the detritus from his hair.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 13528
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_10.png",
+              "PNG_sha256": "3a09ef8b59874d21fde1675f5693790fc7559e4bde2590e9899245f988d6d444",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 13,
+              "case": "linguistic_correction",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "1bc62cf451f289dd319e58df865e5cac46ffe964351a8d8f920215bdba447784",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "아니. 아니. 셋.",
+                  "secondary_text": "No. No. Three.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 2228
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_13.png",
+              "PNG_sha256": "235745826739e6b713cb78a83e70664e741773a37de3b25663a71b4ffa335115",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 16,
+              "case": "clean_A_B",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "8517121381ec41a84c1118f067a2966df4a6fd272c93beb04559b4da0f8bc4f3",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 2812,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_16.png",
+              "PNG_sha256": "83e2580c4a5efbef3aa2b8bb40e5e73c46110715f5c62109b988df5ff4a912d9",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 19,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "f2c1b647ab40423f9c155cf72df19f41b5bdfb1a7ee651fcb010393c2b8e4b30",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 찌꺼기를 씻어냈어요.",
+                  "secondary_text": "Washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 6274,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_19.png",
+              "PNG_sha256": "4a93f8c1c121a75aaffc329b294ac04601da064dc824dfbbe0b80b03ce1b513f",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 20,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "e186f9d1a364842ccc36675797fc45e13df02022176ebe4fdda7489ef9051f33",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 찌꺼기를 씻어냈어요.",
+                  "secondary_text": "Washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                },
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 6274,
+                "cyan": 2812,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_20.png",
+              "PNG_sha256": "8a3edf513e7031afdbb2dffa7fba78ac5506a2e5b0ef1e3254ed1ee10a19cb8d",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 21,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "23f9e7fd87e3e040046b1306c1c12b050029cf9f43c265d39f06696b85778214",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                },
+                {
+                  "primary_text": "그는 머리의 찌꺼기를 씻어냈어",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 2812,
+                "gray": 6015
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_21.png",
+              "PNG_sha256": "cde4556aee8742a70a3f9c193d2f36ffe92d1a913f0a341df79dbe4f21e8fbc7",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 22,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "f0241254390abaa408973ca98a0e0290f192b3093e96fd91f9940eaf1ff0be4e",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그는 머리의 찌꺼기를 씻어냈어",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "그의 머리에서.",
+                  "secondary_text": "from his hair.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 2574,
+                "cyan": 0,
+                "gray": 6015
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_22.png",
+              "PNG_sha256": "819ff11f5488fa6c8a0af099e01db83c251a1387015f5b7785dade05b4e31721",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 25,
+              "case": "short_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "891397b3a1063258cf58ebc4524387497de272646ab5092bcc0fd3dcea29ca4c",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 떨어진 것들을 씻어냈어. 아니. 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 9289
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_25.png",
+              "PNG_sha256": "ee8e215189aaf3c987ddce2661764b4825412d73ca98aa229440a31ae4d3f8a7",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 26,
+              "case": "short_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "80d83353845bf101abe45c24935e2c238b232ef4eb251ff8482cd1a20c5ea686",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 떨어진 것들을 씻어냈어. 아니. 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "머리에서 때를 씻어냈어.",
+                  "secondary_text": "the detritus from his hair.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 14275
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_26.png",
+              "PNG_sha256": "8e118d892d137f11e973d1bafe4ddc1d1e47e106ccd4820281e4190c127c08a3",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 29,
+              "case": "linguistic_correction",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "f3a9f3c4395aebd8fb4fa7cad314afac124a3c8989ac963026e6c1366fbe0551",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "아니. 아니. 셋.",
+                  "secondary_text": "No. No. Three.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 2228,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_29.png",
+              "PNG_sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 32,
+              "case": "clean_A_B",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "9803af168fc0efa54d7ebb55137edaf58c7abcdbc596239f43eefb81a56b100e",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "언론 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 3044,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_32.png",
+              "PNG_sha256": "dc70fbe1d5c803cabc6ad3581f3c6b2755953c8cf38891537133923c33a0b7a3",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 35,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "bbd01926d0123b0b560bdede17ad2365d4b5740708ac4bf4d48b9846888beebf",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에 있는 부스러기들을 씻어줬어.",
+                  "secondary_text": "Washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 6998,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_35.png",
+              "PNG_sha256": "43f434d9684df516df76e89e24848381970fb8f220f02a0951f4ec4c3b48e85a",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 36,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "ff0f8a6002f8d1487c9772d43759b0235e89fbb79baf8bfd11f92567bf408c99",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에 있는 부스러기들을 씻어줬어.",
+                  "secondary_text": "Washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                },
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 6998,
+                "cyan": 2812,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_36.png",
+              "PNG_sha256": "5f3256ea0776bc37e56a813eed8cf6fdf3c454d80e4e4dfc361a470dde170dda",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 37,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "b70c40b0e7dd7d8ded8dd3c8216ba8a4ac996faaa5f50c507725116cd4c3e096",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                },
+                {
+                  "primary_text": "그가 머리에서 이물질을 씻어냈어요",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 2812,
+                "gray": 6978
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_37.png",
+              "PNG_sha256": "38b18487aac83e049db44f3e10b50be2f43324fe5793112fcaf7ef33b6302992",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 38,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "c0c404fdb9f7bbb4dd345a7c641b56765801529df4a1c308f481bfb3e646346b",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그가 머리에서 이물질을 씻어냈어요",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "머리에서.",
+                  "secondary_text": "from his hair.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 2013,
+                "cyan": 0,
+                "gray": 6978
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_38.png",
+              "PNG_sha256": "cf778727f409ada170bc644287d3bb3a6931dcf09ebd8e3f6e03eba63e28caa1",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 41,
+              "case": "short_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "b460c08d0ee1e63105184d09d5cd771376e2cc3c5e71718fbffa3fb051e67b1e",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에 묻은 잔머리를 씻었어. 아니. 그가 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": false,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_41.png",
+              "PNG_sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+              "overlay_cloak_at_dispatch": 2,
+              "overlay_cloak_after_readback": 2,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 42,
+              "case": "short_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "98c2a2ebb013d3fc143e2fc0fe7b2f740e863c46f4070bcd91e103b00c0ba51b",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에 묻은 잔머리를 씻었어. 아니. 그가 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "그의 머리에서 때를 씻어냈어.",
+                  "secondary_text": "the detritus from his hair.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": false,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_42.png",
+              "PNG_sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+              "overlay_cloak_at_dispatch": 2,
+              "overlay_cloak_after_readback": 2,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 45,
+              "case": "linguistic_correction",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "df6cb024b33bf07b22c23c5ff3291c75f5d32b7b9b7e0385fbdcbb811db1b056",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "아니. 아니. 셋.",
+                  "secondary_text": "No. No. Three.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": null,
+              "diagnostic_positive_pixels": false,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_probe_run1/Deepgram_original_submissions/commit_45.png",
+              "PNG_sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+              "overlay_cloak_at_dispatch": 2,
+              "overlay_cloak_after_readback": 2,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": null,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "issue218_policy_renderer_guarded",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --output native/nemotron/issue218_policy_renderer_guarded",
+      "exit": 0,
+      "wall_seconds": 85.38,
+      "result": "Task visibility guard: Deepgram22/23valid incl41/42/45; numeric29invalid minimized/stale160x28layout after native restore. Auxiliary owned cloak-injection check deniedE_ACCESSDENIED before control snapshots; preserved taskdriver failure, not productfailure. Old top executed/exit0 does NOT imply surfacequalification.",
+      "raw_trace": "native/nemotron/issue218_policy_renderer_guarded.zip:trace.json",
+      "raw_trace_sha256": "06a66d8baae540897a8acd4f5180790bef1a52f07fd0647524cae9016a08780a",
+      "execution_driver_sha256": "a85da20182d2bc00eb793c5983c14b887a028a5ba20d3a4d23f70d4d8e0c6e27",
+      "execution_visibility_helper_sha256": "c6e34fd2fe88532f4563a6f5340d8898935ffb9df2a48c8b9d68d8df193fdcaa",
+      "execution_sources_zip_sha256": "0829eed290d753c3573a6f84fd6c3725d689cacb4732dcbaa8eb56b603cf109a",
+      "presentation_sources": {
+        "src/puripuly_heart/core/overlay/__init__.py": {
+          "historical_sha256": "13ce2bd3e16b19e1682cd78d30290e95a0c78346b191326c617c9acc06455238",
+          "current_sha256": "13ce2bd3e16b19e1682cd78d30290e95a0c78346b191326c617c9acc06455238"
+        },
+        "src/puripuly_heart/core/overlay/bridge.py": {
+          "historical_sha256": "b18f1c3c9c619d239b73c061fd38b477ce0e56b9bff5d1254150289e7da0ab2c",
+          "current_sha256": "b18f1c3c9c619d239b73c061fd38b477ce0e56b9bff5d1254150289e7da0ab2c"
+        },
+        "src/puripuly_heart/core/overlay/bridge_mailbox.py": {
+          "historical_sha256": "45cd242c894e3df812ca39d70484828cf678db75a9ddf4e136ba9195fc074bd1",
+          "current_sha256": "45cd242c894e3df812ca39d70484828cf678db75a9ddf4e136ba9195fc074bd1"
+        },
+        "src/puripuly_heart/core/overlay/bridge_session.py": {
+          "historical_sha256": "d309f04088a6dfaa13a2ea24408b7d6dfde4b51c64177705ef1276fa8a4a6c21",
+          "current_sha256": "d309f04088a6dfaa13a2ea24408b7d6dfde4b51c64177705ef1276fa8a4a6c21"
+        },
+        "src/puripuly_heart/core/overlay/bridge_transport.py": {
+          "historical_sha256": "09f07e8b28ec84426073cc275ebb2c1aec2632e2c58cf52007a512a189200986",
+          "current_sha256": "09f07e8b28ec84426073cc275ebb2c1aec2632e2c58cf52007a512a189200986"
+        },
+        "src/puripuly_heart/core/overlay/diagnostics.py": {
+          "historical_sha256": "9191a559bf1b863a1ef831734950a085132d9c02433edf4b78de4f3f4ed7acac",
+          "current_sha256": "9191a559bf1b863a1ef831734950a085132d9c02433edf4b78de4f3f4ed7acac"
+        },
+        "src/puripuly_heart/core/overlay/manifest.py": {
+          "historical_sha256": "b5d9b97a202c5e3f9aa041f341e965bdb657935e0b4e8d31a85bf8346fd42fc5",
+          "current_sha256": "b5d9b97a202c5e3f9aa041f341e965bdb657935e0b4e8d31a85bf8346fd42fc5"
+        },
+        "src/puripuly_heart/core/overlay/openvr_vendor.py": {
+          "historical_sha256": "3dd95478a62ad1d037a50ad1ae96367dfd525867b9546652bfd619560154cae7",
+          "current_sha256": "3dd95478a62ad1d037a50ad1ae96367dfd525867b9546652bfd619560154cae7"
+        },
+        "src/puripuly_heart/core/overlay/presenter.py": {
+          "historical_sha256": "4b010e1f6b3f03beb822f289b8fb0a7223ac027f914e2db349cbab89c230e6f6",
+          "current_sha256": "4b010e1f6b3f03beb822f289b8fb0a7223ac027f914e2db349cbab89c230e6f6"
+        },
+        "src/puripuly_heart/core/overlay/presenter_acceptance.py": {
+          "historical_sha256": "1c3d3a03bd196cb19a7401a9e7f3e16fa52cdd80328f98927adfac544d6ae1c7",
+          "current_sha256": "1c3d3a03bd196cb19a7401a9e7f3e16fa52cdd80328f98927adfac544d6ae1c7"
+        },
+        "src/puripuly_heart/core/overlay/presenter_projection.py": {
+          "historical_sha256": "11c6b411a7a726ec10e0d5437d8880a4ac7a853a1e5eb418143a437b7373a3df",
+          "current_sha256": "11c6b411a7a726ec10e0d5437d8880a4ac7a853a1e5eb418143a437b7373a3df"
+        },
+        "src/puripuly_heart/core/overlay/presenter_sources.py": {
+          "historical_sha256": "28c6969aab2d8fce601edd9ce910663454845fac15cca571e5c5b77dc2036a12",
+          "current_sha256": "28c6969aab2d8fce601edd9ce910663454845fac15cca571e5c5b77dc2036a12"
+        },
+        "src/puripuly_heart/core/overlay/process.py": {
+          "historical_sha256": "e0fc2ca0e72110d6a6099f9d49351507af4ab944ad3f80ca6bb3a0d53adb9864",
+          "current_sha256": "e0fc2ca0e72110d6a6099f9d49351507af4ab944ad3f80ca6bb3a0d53adb9864"
+        },
+        "src/puripuly_heart/core/overlay/process_adapter.py": {
+          "historical_sha256": "ee99f6ef686c470fc47823c2e4514b1a5d27f22e2aca8174c3f2342567866eaa",
+          "current_sha256": "ee99f6ef686c470fc47823c2e4514b1a5d27f22e2aca8174c3f2342567866eaa"
+        },
+        "src/puripuly_heart/core/overlay/process_runners.py": {
+          "historical_sha256": "77caaa0956fbace243c39559b10a70365087c694fe23ef2cc631a62a041a06d1",
+          "current_sha256": "77caaa0956fbace243c39559b10a70365087c694fe23ef2cc631a62a041a06d1"
+        },
+        "src/puripuly_heart/core/overlay/protocol.py": {
+          "historical_sha256": "ef410f1362a07956ffb2f01f7c51c0209e338f1c06ae49e774b28522748d74f7",
+          "current_sha256": "ef410f1362a07956ffb2f01f7c51c0209e338f1c06ae49e774b28522748d74f7"
+        },
+        "src/puripuly_heart/core/overlay/sink.py": {
+          "historical_sha256": "893eb2211174e213935f4aeabe922c72f09670945e50951466669f4308695ba3",
+          "current_sha256": "893eb2211174e213935f4aeabe922c72f09670945e50951466669f4308695ba3"
+        },
+        "src/puripuly_heart/core/overlay/state.py": {
+          "historical_sha256": "079986a8f0bbcf6eb0c639db6044270f6523e11a67cbd7620aaae97abd3938ca",
+          "current_sha256": "079986a8f0bbcf6eb0c639db6044270f6523e11a67cbd7620aaae97abd3938ca"
+        },
+        "src/puripuly_heart/ui/desktop_overlay.py": {
+          "historical_sha256": "5a414519475433ba39996bb1b94b91fc2365dd0a7ddc87c58b5055c9333cb353",
+          "current_sha256": "5a414519475433ba39996bb1b94b91fc2365dd0a7ddc87c58b5055c9333cb353"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_card_repro.py": {
+          "historical_sha256": "befcf5ca1ab8104bdf01ea8efe4738c1b2e4081798e6066d2136e63e5d93d8f7",
+          "current_sha256": "befcf5ca1ab8104bdf01ea8efe4738c1b2e4081798e6066d2136e63e5d93d8f7"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_repro.py": {
+          "historical_sha256": "3152ba3a8e3638f714e52b71208204a49f60e06e6a14bc0748cd3facdb606be7",
+          "current_sha256": "3152ba3a8e3638f714e52b71208204a49f60e06e6a14bc0748cd3facdb606be7"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_startup.py": {
+          "historical_sha256": "732a2e6d155dcffcb12a2b41686f8058bc7a91ce8c22466b0268f224b06f15fd",
+          "current_sha256": "732a2e6d155dcffcb12a2b41686f8058bc7a91ce8c22466b0268f224b06f15fd"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/__init__.py": {
+          "historical_sha256": "0ee2636ffe47e4062c484c7a1df628853ff5b003975bd48c74599607bd6e4afd",
+          "current_sha256": "0ee2636ffe47e4062c484c7a1df628853ff5b003975bd48c74599607bd6e4afd"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/contract.py": {
+          "historical_sha256": "dc0959f27616303640e0b2bfaf1e5afc33659bee2641512cfed1d4a947d72b37",
+          "current_sha256": "dc0959f27616303640e0b2bfaf1e5afc33659bee2641512cfed1d4a947d72b37"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/renderer.py": {
+          "historical_sha256": "a226dceddfe44c051dd5d41b522f5d04843cc8028dd5a693a28b328c85925258",
+          "current_sha256": "a226dceddfe44c051dd5d41b522f5d04843cc8028dd5a693a28b328c85925258"
+        },
+        "src/puripuly_heart/ui/desktop_window_zorder.py": {
+          "historical_sha256": "65440726bccb1cf322211b0eb307f47c5e8d21c50d0cc918b83f377e9b20917c",
+          "current_sha256": "65440726bccb1cf322211b0eb307f47c5e8d21c50d0cc918b83f377e9b20917c"
+        }
+      },
+      "status": "renderer_only_probe_executed",
+      "stages": [
+        {
+          "label": "GPU_working_control",
+          "execution_status": "failed",
+          "surface_status": null,
+          "requested_nonempty_snapshots": 0,
+          "diagnostic_positive_pixel_readbacks": 0,
+          "guarded_valid_readbacks": 0,
+          "error": "Controlled owned-window cloak unavailable: -2147024891",
+          "readbacks": []
+        },
+        {
+          "label": "Deepgram_original_submissions",
+          "execution_status": "render_only_replay_executed",
+          "surface_status": "visibility_or_caption_failure",
+          "requested_nonempty_snapshots": 23,
+          "diagnostic_positive_pixel_readbacks": 22,
+          "guarded_valid_readbacks": 22,
+          "error": null,
+          "readbacks": [
+            {
+              "revision": 1,
+              "case": "clean_A_B",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "0a0f9af3c74c9cefa93a0598328adfc1ef42f2f4ad48aa525ab2941c11e2bb75",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 2812
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_1.png",
+              "PNG_sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 4,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "37b41f607e22b54eab5f3b00e448c89ce1b77fdfb0d33c214019cdd7f0db4fe4",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그의 머리에서 이물질을 씻어냈어요. 언론 여러분.",
+                  "secondary_text": "Washed the detritus from his hair. Gentlemen of the press.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 10119
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_4.png",
+              "PNG_sha256": "d7abb9f74411c79bb8f3fdb71ca4a7d51ac43596cae54711dd21029f13fd4b02",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 5,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "08d58958746c756ed08a804b9df451326e0f484d8f14c37ff31b0bcbbaff5c35",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그의 머리에서 이물질을 씻어냈어요. 언론 여러분.",
+                  "secondary_text": "Washed the detritus from his hair. Gentlemen of the press.",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "그가 머리에서 찌꺼기를 씻어냈어요",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 16849
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_5.png",
+              "PNG_sha256": "cc436ae91344cf3a2668a6ec8e1a57de9acfd2cd4a23a8e17fefae3ee6f53b7c",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 6,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "72a356a1774bd69741c4b627234a06813606ef739f07d346fa7dace2f4af567f",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그가 머리에서 찌꺼기를 씻어냈어요",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "머리에서요.",
+                  "secondary_text": "from his hair.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 9085
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_6.png",
+              "PNG_sha256": "5a9a6a69d9e1dd0046ac71ba8d59bd698a72be72aa15668687c6f16b9316f163",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 9,
+              "case": "short_A_B_A",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "455b36b91797785cb717cf570748f297923dda93c44fde5f3b6fd0e23e1c48af",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 찌꺼기를 씻어냈어. 아니. 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 8359
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_9.png",
+              "PNG_sha256": "5259939d97a05ac321bb5f02486317cb5d3b90c13c454bc8a0109449392ee1a7",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 10,
+              "case": "short_A_B_A",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "e6a3c3ae90584f8ece773e8cb6b845972de3935bf560b8ebb8c04d280db742e1",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 찌꺼기를 씻어냈어. 아니. 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "그의 머리에서 떨어진 것들.",
+                  "secondary_text": "the detritus from his hair.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 13528
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_10.png",
+              "PNG_sha256": "3a09ef8b59874d21fde1675f5693790fc7559e4bde2590e9899245f988d6d444",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 13,
+              "case": "linguistic_correction",
+              "mode": "baseline",
+              "profile": null,
+              "snapshot_sha256": "1bc62cf451f289dd319e58df865e5cac46ffe964351a8d8f920215bdba447784",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "아니. 아니. 셋.",
+                  "secondary_text": "No. No. Three.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 2228
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_13.png",
+              "PNG_sha256": "235745826739e6b713cb78a83e70664e741773a37de3b25663a71b4ffa335115",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 16,
+              "case": "clean_A_B",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "8517121381ec41a84c1118f067a2966df4a6fd272c93beb04559b4da0f8bc4f3",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 2812,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_16.png",
+              "PNG_sha256": "83e2580c4a5efbef3aa2b8bb40e5e73c46110715f5c62109b988df5ff4a912d9",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 19,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "f2c1b647ab40423f9c155cf72df19f41b5bdfb1a7ee651fcb010393c2b8e4b30",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 찌꺼기를 씻어냈어요.",
+                  "secondary_text": "Washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 6274,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_19.png",
+              "PNG_sha256": "4a93f8c1c121a75aaffc329b294ac04601da064dc824dfbbe0b80b03ce1b513f",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 20,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "e186f9d1a364842ccc36675797fc45e13df02022176ebe4fdda7489ef9051f33",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 찌꺼기를 씻어냈어요.",
+                  "secondary_text": "Washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                },
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 6274,
+                "cyan": 2812,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_20.png",
+              "PNG_sha256": "8a3edf513e7031afdbb2dffa7fba78ac5506a2e5b0ef1e3254ed1ee10a19cb8d",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 21,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "23f9e7fd87e3e040046b1306c1c12b050029cf9f43c265d39f06696b85778214",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                },
+                {
+                  "primary_text": "그는 머리의 찌꺼기를 씻어냈어",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 2812,
+                "gray": 6015
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_21.png",
+              "PNG_sha256": "cde4556aee8742a70a3f9c193d2f36ffe92d1a913f0a341df79dbe4f21e8fbc7",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 22,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "f0241254390abaa408973ca98a0e0290f192b3093e96fd91f9940eaf1ff0be4e",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그는 머리의 찌꺼기를 씻어냈어",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "그의 머리에서.",
+                  "secondary_text": "from his hair.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 2574,
+                "cyan": 0,
+                "gray": 6015
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_22.png",
+              "PNG_sha256": "819ff11f5488fa6c8a0af099e01db83c251a1387015f5b7785dade05b4e31721",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 25,
+              "case": "short_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "891397b3a1063258cf58ebc4524387497de272646ab5092bcc0fd3dcea29ca4c",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 떨어진 것들을 씻어냈어. 아니. 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 9289
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_25.png",
+              "PNG_sha256": "ee8e215189aaf3c987ddce2661764b4825412d73ca98aa229440a31ae4d3f8a7",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 26,
+              "case": "short_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "80d83353845bf101abe45c24935e2c238b232ef4eb251ff8482cd1a20c5ea686",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에서 떨어진 것들을 씻어냈어. 아니. 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "머리에서 때를 씻어냈어.",
+                  "secondary_text": "the detritus from his hair.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 14275
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_26.png",
+              "PNG_sha256": "8e118d892d137f11e973d1bafe4ddc1d1e47e106ccd4820281e4190c127c08a3",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 29,
+              "case": "linguistic_correction",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "f3a9f3c4395aebd8fb4fa7cad314afac124a3c8989ac963026e6c1366fbe0551",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "아니. 아니. 셋.",
+                  "secondary_text": "No. No. Three.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": false,
+              "diagnostic_positive_pixels": false,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_29.png",
+              "PNG_sha256": "6768f9887d820f1d100c9e688ff638c45b976f364b89f5fee71210167d267b72",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": true,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": "No requested caption pixels or unstable revision; not valid readback",
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 32,
+              "case": "clean_A_B",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "9803af168fc0efa54d7ebb55137edaf58c7abcdbc596239f43eefb81a56b100e",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "언론 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 3044,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_32.png",
+              "PNG_sha256": "dc70fbe1d5c803cabc6ad3581f3c6b2755953c8cf38891537133923c33a0b7a3",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 35,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "bbd01926d0123b0b560bdede17ad2365d4b5740708ac4bf4d48b9846888beebf",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에 있는 부스러기들을 씻어줬어.",
+                  "secondary_text": "Washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 6998,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_35.png",
+              "PNG_sha256": "43f434d9684df516df76e89e24848381970fb8f220f02a0951f4ec4c3b48e85a",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 36,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "ff0f8a6002f8d1487c9772d43759b0235e89fbb79baf8bfd11f92567bf408c99",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에 있는 부스러기들을 씻어줬어.",
+                  "secondary_text": "Washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                },
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 6998,
+                "cyan": 2812,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_36.png",
+              "PNG_sha256": "5f3256ea0776bc37e56a813eed8cf6fdf3c454d80e4e4dfc361a470dde170dda",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 37,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "b70c40b0e7dd7d8ded8dd3c8216ba8a4ac996faaa5f50c507725116cd4c3e096",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                },
+                {
+                  "primary_text": "그가 머리에서 이물질을 씻어냈어요",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 2812,
+                "gray": 6978
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_37.png",
+              "PNG_sha256": "38b18487aac83e049db44f3e10b50be2f43324fe5793112fcaf7ef33b6302992",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 38,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "c0c404fdb9f7bbb4dd345a7c641b56765801529df4a1c308f481bfb3e646346b",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그가 머리에서 이물질을 씻어냈어요",
+                  "secondary_text": "He washed the detritus from his",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "머리에서.",
+                  "secondary_text": "from his hair.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 2013,
+                "cyan": 0,
+                "gray": 6978
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_38.png",
+              "PNG_sha256": "cf778727f409ada170bc644287d3bb3a6931dcf09ebd8e3f6e03eba63e28caa1",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 41,
+              "case": "short_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "b460c08d0ee1e63105184d09d5cd771376e2cc3c5e71718fbffa3fb051e67b1e",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에 묻은 잔머리를 씻었어. 아니. 그가 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 9159
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_41.png",
+              "PNG_sha256": "55f0212a3c2bc92a78064871ccb9a7c2b7eeed75caf025f0936184c35de04697",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 42,
+              "case": "short_A_B_A",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "98c2a2ebb013d3fc143e2fc0fe7b2f740e863c46f4070bcd91e103b00c0ba51b",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "머리에 묻은 잔머리를 씻었어. 아니. 그가 씻었어.",
+                  "secondary_text": "Washed the detritus from his hair. No. He washed",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "그의 머리에서 때를 씻어냈어.",
+                  "secondary_text": "the detritus from his hair.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 14648
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_42.png",
+              "PNG_sha256": "73bd96011716b95729af6a73b6fcb6a067e31cca07df6615aa74a24752fcd69e",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 45,
+              "case": "linguistic_correction",
+              "mode": "new",
+              "profile": "0.64",
+              "snapshot_sha256": "df6cb024b33bf07b22c23c5ff3291c75f5d32b7b9b7e0385fbdcbb811db1b056",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "아니. 아니. 셋.",
+                  "secondary_text": "No. No. Three.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 2228,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_guarded/Deepgram_original_submissions/commit_45.png",
+              "PNG_sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "issue218_policy_renderer_repair_verify",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --repair-verify --output native/nemotron/issue218_policy_renderer_repair_verify",
+      "exit": 0,
+      "wall_seconds": 10.27,
+      "result": "Changed guard working4/4valid. Numeric29explicitly minimized; restored owned client no longer covered by backdrop, no pixels captured. Invalid preserved; no model/provider calls. Old executed/exit0 is execution only.",
+      "raw_trace": "native/nemotron/issue218_policy_renderer_repair_verify.zip:trace.json",
+      "raw_trace_sha256": "18490ed3e9f4fc2bfd6d0aabdd5713ab6bf2a48123926292ad63aab6759fc710",
+      "execution_driver_sha256": "1e3c2cf687d0b4fbe547f8924b244fb567e0ed14d74526d0f0c51daa472ae42a",
+      "execution_visibility_helper_sha256": "81485e6526f63921beb836237ba79c8230f035b28e2dd1cf423fdcbc3450e639",
+      "execution_sources_zip_sha256": "90d35b703bde830022b739d82276c7f010677010046d4acc091fafd6477327f8",
+      "presentation_sources": {
+        "src/puripuly_heart/core/overlay/__init__.py": {
+          "historical_sha256": "13ce2bd3e16b19e1682cd78d30290e95a0c78346b191326c617c9acc06455238",
+          "current_sha256": "13ce2bd3e16b19e1682cd78d30290e95a0c78346b191326c617c9acc06455238"
+        },
+        "src/puripuly_heart/core/overlay/bridge.py": {
+          "historical_sha256": "b18f1c3c9c619d239b73c061fd38b477ce0e56b9bff5d1254150289e7da0ab2c",
+          "current_sha256": "b18f1c3c9c619d239b73c061fd38b477ce0e56b9bff5d1254150289e7da0ab2c"
+        },
+        "src/puripuly_heart/core/overlay/bridge_mailbox.py": {
+          "historical_sha256": "45cd242c894e3df812ca39d70484828cf678db75a9ddf4e136ba9195fc074bd1",
+          "current_sha256": "45cd242c894e3df812ca39d70484828cf678db75a9ddf4e136ba9195fc074bd1"
+        },
+        "src/puripuly_heart/core/overlay/bridge_session.py": {
+          "historical_sha256": "d309f04088a6dfaa13a2ea24408b7d6dfde4b51c64177705ef1276fa8a4a6c21",
+          "current_sha256": "d309f04088a6dfaa13a2ea24408b7d6dfde4b51c64177705ef1276fa8a4a6c21"
+        },
+        "src/puripuly_heart/core/overlay/bridge_transport.py": {
+          "historical_sha256": "09f07e8b28ec84426073cc275ebb2c1aec2632e2c58cf52007a512a189200986",
+          "current_sha256": "09f07e8b28ec84426073cc275ebb2c1aec2632e2c58cf52007a512a189200986"
+        },
+        "src/puripuly_heart/core/overlay/diagnostics.py": {
+          "historical_sha256": "9191a559bf1b863a1ef831734950a085132d9c02433edf4b78de4f3f4ed7acac",
+          "current_sha256": "9191a559bf1b863a1ef831734950a085132d9c02433edf4b78de4f3f4ed7acac"
+        },
+        "src/puripuly_heart/core/overlay/manifest.py": {
+          "historical_sha256": "b5d9b97a202c5e3f9aa041f341e965bdb657935e0b4e8d31a85bf8346fd42fc5",
+          "current_sha256": "b5d9b97a202c5e3f9aa041f341e965bdb657935e0b4e8d31a85bf8346fd42fc5"
+        },
+        "src/puripuly_heart/core/overlay/openvr_vendor.py": {
+          "historical_sha256": "3dd95478a62ad1d037a50ad1ae96367dfd525867b9546652bfd619560154cae7",
+          "current_sha256": "3dd95478a62ad1d037a50ad1ae96367dfd525867b9546652bfd619560154cae7"
+        },
+        "src/puripuly_heart/core/overlay/presenter.py": {
+          "historical_sha256": "4b010e1f6b3f03beb822f289b8fb0a7223ac027f914e2db349cbab89c230e6f6",
+          "current_sha256": "4b010e1f6b3f03beb822f289b8fb0a7223ac027f914e2db349cbab89c230e6f6"
+        },
+        "src/puripuly_heart/core/overlay/presenter_acceptance.py": {
+          "historical_sha256": "1c3d3a03bd196cb19a7401a9e7f3e16fa52cdd80328f98927adfac544d6ae1c7",
+          "current_sha256": "1c3d3a03bd196cb19a7401a9e7f3e16fa52cdd80328f98927adfac544d6ae1c7"
+        },
+        "src/puripuly_heart/core/overlay/presenter_projection.py": {
+          "historical_sha256": "11c6b411a7a726ec10e0d5437d8880a4ac7a853a1e5eb418143a437b7373a3df",
+          "current_sha256": "11c6b411a7a726ec10e0d5437d8880a4ac7a853a1e5eb418143a437b7373a3df"
+        },
+        "src/puripuly_heart/core/overlay/presenter_sources.py": {
+          "historical_sha256": "28c6969aab2d8fce601edd9ce910663454845fac15cca571e5c5b77dc2036a12",
+          "current_sha256": "28c6969aab2d8fce601edd9ce910663454845fac15cca571e5c5b77dc2036a12"
+        },
+        "src/puripuly_heart/core/overlay/process.py": {
+          "historical_sha256": "e0fc2ca0e72110d6a6099f9d49351507af4ab944ad3f80ca6bb3a0d53adb9864",
+          "current_sha256": "e0fc2ca0e72110d6a6099f9d49351507af4ab944ad3f80ca6bb3a0d53adb9864"
+        },
+        "src/puripuly_heart/core/overlay/process_adapter.py": {
+          "historical_sha256": "ee99f6ef686c470fc47823c2e4514b1a5d27f22e2aca8174c3f2342567866eaa",
+          "current_sha256": "ee99f6ef686c470fc47823c2e4514b1a5d27f22e2aca8174c3f2342567866eaa"
+        },
+        "src/puripuly_heart/core/overlay/process_runners.py": {
+          "historical_sha256": "77caaa0956fbace243c39559b10a70365087c694fe23ef2cc631a62a041a06d1",
+          "current_sha256": "77caaa0956fbace243c39559b10a70365087c694fe23ef2cc631a62a041a06d1"
+        },
+        "src/puripuly_heart/core/overlay/protocol.py": {
+          "historical_sha256": "ef410f1362a07956ffb2f01f7c51c0209e338f1c06ae49e774b28522748d74f7",
+          "current_sha256": "ef410f1362a07956ffb2f01f7c51c0209e338f1c06ae49e774b28522748d74f7"
+        },
+        "src/puripuly_heart/core/overlay/sink.py": {
+          "historical_sha256": "893eb2211174e213935f4aeabe922c72f09670945e50951466669f4308695ba3",
+          "current_sha256": "893eb2211174e213935f4aeabe922c72f09670945e50951466669f4308695ba3"
+        },
+        "src/puripuly_heart/core/overlay/state.py": {
+          "historical_sha256": "079986a8f0bbcf6eb0c639db6044270f6523e11a67cbd7620aaae97abd3938ca",
+          "current_sha256": "079986a8f0bbcf6eb0c639db6044270f6523e11a67cbd7620aaae97abd3938ca"
+        },
+        "src/puripuly_heart/ui/desktop_overlay.py": {
+          "historical_sha256": "5a414519475433ba39996bb1b94b91fc2365dd0a7ddc87c58b5055c9333cb353",
+          "current_sha256": "5a414519475433ba39996bb1b94b91fc2365dd0a7ddc87c58b5055c9333cb353"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_card_repro.py": {
+          "historical_sha256": "befcf5ca1ab8104bdf01ea8efe4738c1b2e4081798e6066d2136e63e5d93d8f7",
+          "current_sha256": "befcf5ca1ab8104bdf01ea8efe4738c1b2e4081798e6066d2136e63e5d93d8f7"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_repro.py": {
+          "historical_sha256": "3152ba3a8e3638f714e52b71208204a49f60e06e6a14bc0748cd3facdb606be7",
+          "current_sha256": "3152ba3a8e3638f714e52b71208204a49f60e06e6a14bc0748cd3facdb606be7"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_startup.py": {
+          "historical_sha256": "732a2e6d155dcffcb12a2b41686f8058bc7a91ce8c22466b0268f224b06f15fd",
+          "current_sha256": "732a2e6d155dcffcb12a2b41686f8058bc7a91ce8c22466b0268f224b06f15fd"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/__init__.py": {
+          "historical_sha256": "0ee2636ffe47e4062c484c7a1df628853ff5b003975bd48c74599607bd6e4afd",
+          "current_sha256": "0ee2636ffe47e4062c484c7a1df628853ff5b003975bd48c74599607bd6e4afd"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/contract.py": {
+          "historical_sha256": "dc0959f27616303640e0b2bfaf1e5afc33659bee2641512cfed1d4a947d72b37",
+          "current_sha256": "dc0959f27616303640e0b2bfaf1e5afc33659bee2641512cfed1d4a947d72b37"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/renderer.py": {
+          "historical_sha256": "a226dceddfe44c051dd5d41b522f5d04843cc8028dd5a693a28b328c85925258",
+          "current_sha256": "a226dceddfe44c051dd5d41b522f5d04843cc8028dd5a693a28b328c85925258"
+        },
+        "src/puripuly_heart/ui/desktop_window_zorder.py": {
+          "historical_sha256": "65440726bccb1cf322211b0eb307f47c5e8d21c50d0cc918b83f377e9b20917c",
+          "current_sha256": "65440726bccb1cf322211b0eb307f47c5e8d21c50d0cc918b83f377e9b20917c"
+        }
+      },
+      "status": "renderer_only_probe_executed",
+      "stages": [
+        {
+          "label": "GPU_working_control",
+          "execution_status": "render_only_replay_executed",
+          "surface_status": "all_recorded_captions_visibly_verified",
+          "requested_nonempty_snapshots": 4,
+          "diagnostic_positive_pixel_readbacks": 4,
+          "guarded_valid_readbacks": 4,
+          "error": null,
+          "readbacks": [
+            {
+              "revision": 22,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "a02eb50609710472d2b2df4dc523b685d64b475c9d8112f4e24c971f86ce3c33",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그는 머리에서 떨어진 것들을 씻었어요.",
+                  "secondary_text": "He washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 7467,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_22.png",
+              "PNG_sha256": "36600561f04d8dbbeb3b79eccfe29256ffa49cce97a04ec6bcfa25daec493c40",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 23,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "125720449f5e1793ac456eb6d7b6864308b0926fb7d89f9be954742cf5b77bcb",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그는 머리에서 떨어진 것들을 씻었어요.",
+                  "secondary_text": "He washed the detritus from his hair.",
+                  "speaker_style": "gold"
+                },
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 7467,
+                "cyan": 2812,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_23.png",
+              "PNG_sha256": "a5c805a4fd97b8612459e1171a255939ed0226a54209a5c402140aed5eb9eb05",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 24,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "8f41ef5b3be03119566a0a4dbd104c6d91674d2393e15044b1cd8a3452d8c04f",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "기자 여러분.",
+                  "secondary_text": "Gentlemen of the press.",
+                  "speaker_style": "cyan"
+                },
+                {
+                  "primary_text": "그는 머리에서 이물질을 씻어냈어.",
+                  "secondary_text": "He washed the detritus from his.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 2812,
+                "gray": 6709
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_24.png",
+              "PNG_sha256": "8e6a386ef139ad1b0162a712c8c9c1eec6971488a7bef3a584ae54f398bb157a",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            },
+            {
+              "revision": 25,
+              "case": "distinct_repeated_A_B_A",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "95151bcfc9ec467fe3cfeddf6f0912fb486310e3e0a6c5db595f4be9da0bb9cf",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "그는 머리에서 이물질을 씻어냈어.",
+                  "secondary_text": "He washed the detritus from his.",
+                  "speaker_style": "gray"
+                },
+                {
+                  "primary_text": "머리에서요.",
+                  "secondary_text": "From his hair.",
+                  "speaker_style": "gray"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 0,
+                "cyan": 0,
+                "gray": 9080
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_repair_verify/GPU_working_control/commit_25.png",
+              "PNG_sha256": "7ebdd1f54d2e7ce23eccf45068ffc203424e066adee320b8e52e9145756c2a79",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": false,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": null,
+              "invalid_reason": null,
+              "owned_layout_recovery": null
+            }
+          ]
+        },
+        {
+          "label": "Deepgram_original_submissions",
+          "execution_status": "render_only_replay_executed",
+          "surface_status": "visibility_or_caption_failure",
+          "requested_nonempty_snapshots": 1,
+          "diagnostic_positive_pixel_readbacks": 0,
+          "guarded_valid_readbacks": 0,
+          "error": null,
+          "readbacks": [
+            {
+              "revision": 29,
+              "case": "linguistic_correction",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "f3a9f3c4395aebd8fb4fa7cad314afac124a3c8989ac963026e6c1366fbe0551",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "아니. 아니. 셋.",
+                  "secondary_text": "No. No. Three.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": false,
+              "diagnostic_positive_pixels": false,
+              "actual_color_pixels": null,
+              "PNG": null,
+              "PNG_sha256": null,
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": true,
+              "visibility_valid": null,
+              "capture_error": "owned opaque backdrop does not cover overlay client; no pixels captured",
+              "initial_capture_error": null,
+              "invalid_reason": "owned opaque backdrop does not cover overlay client; no pixels captured",
+              "owned_layout_recovery": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "issue218_policy_renderer_numeric_recovered",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --repair-verify --numeric-only --output native/nemotron/issue218_policy_renderer_numeric_recovered",
+      "exit": 1,
+      "wall_seconds": 4.3,
+      "result": "Numeric-only owner bounds correction restored1344x336 layout, but recapture cloak2; two owned COM move attempts E_ACCESSDENIED. Explicit invalidvisibility and nonzero exit; no pixels captured.",
+      "raw_trace": "native/nemotron/issue218_policy_renderer_numeric_recovered.zip:trace.json",
+      "raw_trace_sha256": "ad6115e867d23cac6b9db0556458c9353b43a60e4fda3c4e79a340d789cf3824",
+      "execution_driver_sha256": "77ee3f86ac5a2d52d8b036ef2e44741a4a02107ce48d07850ab8317d059fe0c2",
+      "execution_visibility_helper_sha256": "ae88587f6cbc4d22097fe155ec93fe0a1f0c00a5381e828b90ef0ba25fa6c3a7",
+      "execution_sources_zip_sha256": "cdbe590646b3fc572a2a1870cffb3b624fc0eb8c305bb51ccd2b152b8042f9ec",
+      "presentation_sources": {
+        "src/puripuly_heart/core/overlay/__init__.py": {
+          "historical_sha256": "13ce2bd3e16b19e1682cd78d30290e95a0c78346b191326c617c9acc06455238",
+          "current_sha256": "13ce2bd3e16b19e1682cd78d30290e95a0c78346b191326c617c9acc06455238"
+        },
+        "src/puripuly_heart/core/overlay/bridge.py": {
+          "historical_sha256": "b18f1c3c9c619d239b73c061fd38b477ce0e56b9bff5d1254150289e7da0ab2c",
+          "current_sha256": "b18f1c3c9c619d239b73c061fd38b477ce0e56b9bff5d1254150289e7da0ab2c"
+        },
+        "src/puripuly_heart/core/overlay/bridge_mailbox.py": {
+          "historical_sha256": "45cd242c894e3df812ca39d70484828cf678db75a9ddf4e136ba9195fc074bd1",
+          "current_sha256": "45cd242c894e3df812ca39d70484828cf678db75a9ddf4e136ba9195fc074bd1"
+        },
+        "src/puripuly_heart/core/overlay/bridge_session.py": {
+          "historical_sha256": "d309f04088a6dfaa13a2ea24408b7d6dfde4b51c64177705ef1276fa8a4a6c21",
+          "current_sha256": "d309f04088a6dfaa13a2ea24408b7d6dfde4b51c64177705ef1276fa8a4a6c21"
+        },
+        "src/puripuly_heart/core/overlay/bridge_transport.py": {
+          "historical_sha256": "09f07e8b28ec84426073cc275ebb2c1aec2632e2c58cf52007a512a189200986",
+          "current_sha256": "09f07e8b28ec84426073cc275ebb2c1aec2632e2c58cf52007a512a189200986"
+        },
+        "src/puripuly_heart/core/overlay/diagnostics.py": {
+          "historical_sha256": "9191a559bf1b863a1ef831734950a085132d9c02433edf4b78de4f3f4ed7acac",
+          "current_sha256": "9191a559bf1b863a1ef831734950a085132d9c02433edf4b78de4f3f4ed7acac"
+        },
+        "src/puripuly_heart/core/overlay/manifest.py": {
+          "historical_sha256": "b5d9b97a202c5e3f9aa041f341e965bdb657935e0b4e8d31a85bf8346fd42fc5",
+          "current_sha256": "b5d9b97a202c5e3f9aa041f341e965bdb657935e0b4e8d31a85bf8346fd42fc5"
+        },
+        "src/puripuly_heart/core/overlay/openvr_vendor.py": {
+          "historical_sha256": "3dd95478a62ad1d037a50ad1ae96367dfd525867b9546652bfd619560154cae7",
+          "current_sha256": "3dd95478a62ad1d037a50ad1ae96367dfd525867b9546652bfd619560154cae7"
+        },
+        "src/puripuly_heart/core/overlay/presenter.py": {
+          "historical_sha256": "4b010e1f6b3f03beb822f289b8fb0a7223ac027f914e2db349cbab89c230e6f6",
+          "current_sha256": "4b010e1f6b3f03beb822f289b8fb0a7223ac027f914e2db349cbab89c230e6f6"
+        },
+        "src/puripuly_heart/core/overlay/presenter_acceptance.py": {
+          "historical_sha256": "1c3d3a03bd196cb19a7401a9e7f3e16fa52cdd80328f98927adfac544d6ae1c7",
+          "current_sha256": "1c3d3a03bd196cb19a7401a9e7f3e16fa52cdd80328f98927adfac544d6ae1c7"
+        },
+        "src/puripuly_heart/core/overlay/presenter_projection.py": {
+          "historical_sha256": "11c6b411a7a726ec10e0d5437d8880a4ac7a853a1e5eb418143a437b7373a3df",
+          "current_sha256": "11c6b411a7a726ec10e0d5437d8880a4ac7a853a1e5eb418143a437b7373a3df"
+        },
+        "src/puripuly_heart/core/overlay/presenter_sources.py": {
+          "historical_sha256": "28c6969aab2d8fce601edd9ce910663454845fac15cca571e5c5b77dc2036a12",
+          "current_sha256": "28c6969aab2d8fce601edd9ce910663454845fac15cca571e5c5b77dc2036a12"
+        },
+        "src/puripuly_heart/core/overlay/process.py": {
+          "historical_sha256": "e0fc2ca0e72110d6a6099f9d49351507af4ab944ad3f80ca6bb3a0d53adb9864",
+          "current_sha256": "e0fc2ca0e72110d6a6099f9d49351507af4ab944ad3f80ca6bb3a0d53adb9864"
+        },
+        "src/puripuly_heart/core/overlay/process_adapter.py": {
+          "historical_sha256": "ee99f6ef686c470fc47823c2e4514b1a5d27f22e2aca8174c3f2342567866eaa",
+          "current_sha256": "ee99f6ef686c470fc47823c2e4514b1a5d27f22e2aca8174c3f2342567866eaa"
+        },
+        "src/puripuly_heart/core/overlay/process_runners.py": {
+          "historical_sha256": "77caaa0956fbace243c39559b10a70365087c694fe23ef2cc631a62a041a06d1",
+          "current_sha256": "77caaa0956fbace243c39559b10a70365087c694fe23ef2cc631a62a041a06d1"
+        },
+        "src/puripuly_heart/core/overlay/protocol.py": {
+          "historical_sha256": "ef410f1362a07956ffb2f01f7c51c0209e338f1c06ae49e774b28522748d74f7",
+          "current_sha256": "ef410f1362a07956ffb2f01f7c51c0209e338f1c06ae49e774b28522748d74f7"
+        },
+        "src/puripuly_heart/core/overlay/sink.py": {
+          "historical_sha256": "893eb2211174e213935f4aeabe922c72f09670945e50951466669f4308695ba3",
+          "current_sha256": "893eb2211174e213935f4aeabe922c72f09670945e50951466669f4308695ba3"
+        },
+        "src/puripuly_heart/core/overlay/state.py": {
+          "historical_sha256": "079986a8f0bbcf6eb0c639db6044270f6523e11a67cbd7620aaae97abd3938ca",
+          "current_sha256": "079986a8f0bbcf6eb0c639db6044270f6523e11a67cbd7620aaae97abd3938ca"
+        },
+        "src/puripuly_heart/ui/desktop_overlay.py": {
+          "historical_sha256": "5a414519475433ba39996bb1b94b91fc2365dd0a7ddc87c58b5055c9333cb353",
+          "current_sha256": "5a414519475433ba39996bb1b94b91fc2365dd0a7ddc87c58b5055c9333cb353"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_card_repro.py": {
+          "historical_sha256": "befcf5ca1ab8104bdf01ea8efe4738c1b2e4081798e6066d2136e63e5d93d8f7",
+          "current_sha256": "befcf5ca1ab8104bdf01ea8efe4738c1b2e4081798e6066d2136e63e5d93d8f7"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_repro.py": {
+          "historical_sha256": "3152ba3a8e3638f714e52b71208204a49f60e06e6a14bc0748cd3facdb606be7",
+          "current_sha256": "3152ba3a8e3638f714e52b71208204a49f60e06e6a14bc0748cd3facdb606be7"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_startup.py": {
+          "historical_sha256": "732a2e6d155dcffcb12a2b41686f8058bc7a91ce8c22466b0268f224b06f15fd",
+          "current_sha256": "732a2e6d155dcffcb12a2b41686f8058bc7a91ce8c22466b0268f224b06f15fd"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/__init__.py": {
+          "historical_sha256": "0ee2636ffe47e4062c484c7a1df628853ff5b003975bd48c74599607bd6e4afd",
+          "current_sha256": "0ee2636ffe47e4062c484c7a1df628853ff5b003975bd48c74599607bd6e4afd"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/contract.py": {
+          "historical_sha256": "dc0959f27616303640e0b2bfaf1e5afc33659bee2641512cfed1d4a947d72b37",
+          "current_sha256": "dc0959f27616303640e0b2bfaf1e5afc33659bee2641512cfed1d4a947d72b37"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/renderer.py": {
+          "historical_sha256": "a226dceddfe44c051dd5d41b522f5d04843cc8028dd5a693a28b328c85925258",
+          "current_sha256": "a226dceddfe44c051dd5d41b522f5d04843cc8028dd5a693a28b328c85925258"
+        },
+        "src/puripuly_heart/ui/desktop_window_zorder.py": {
+          "historical_sha256": "65440726bccb1cf322211b0eb307f47c5e8d21c50d0cc918b83f377e9b20917c",
+          "current_sha256": "65440726bccb1cf322211b0eb307f47c5e8d21c50d0cc918b83f377e9b20917c"
+        }
+      },
+      "status": "renderer_only_probe_partial",
+      "stages": [
+        {
+          "label": "Deepgram_original_submissions",
+          "execution_status": "render_only_replay_executed",
+          "surface_status": "visibility_or_caption_failure",
+          "requested_nonempty_snapshots": 1,
+          "diagnostic_positive_pixel_readbacks": 0,
+          "guarded_valid_readbacks": 0,
+          "error": null,
+          "readbacks": [
+            {
+              "revision": 29,
+              "case": "linguistic_correction",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "f3a9f3c4395aebd8fb4fa7cad314afac124a3c8989ac963026e6c1366fbe0551",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "아니. 아니. 셋.",
+                  "secondary_text": "No. No. Three.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": false,
+              "diagnostic_positive_pixels": false,
+              "actual_color_pixels": null,
+              "PNG": null,
+              "PNG_sha256": null,
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 2,
+              "native_minimized_at_dispatch": true,
+              "visibility_valid": null,
+              "capture_error": "Owned overlay/backdrop not visibly composed: [{'hwnd': 854394, 'pid': 43356, 'visible': True, 'iconic': False, 'cloaked': 2, 'cloak_hresult': 0}, {'hwnd': 592226, 'pid': 29884, 'visible': True, 'iconic': False, 'cloaked': 0, 'cloak_hresult': 0}]",
+              "initial_capture_error": "owned opaque backdrop does not cover overlay client; no pixels captured",
+              "invalid_reason": "Owned overlay/backdrop not visibly composed: [{'hwnd': 854394, 'pid': 43356, 'visible': True, 'iconic': False, 'cloaked': 2, 'cloak_hresult': 0}, {'hwnd': 592226, 'pid': 29884, 'visible': True, 'iconic': False, 'cloaked': 0, 'cloak_hresult': 0}]",
+              "owned_layout_recovery": {
+                "before_visual_state": {
+                  "slot_count": 1,
+                  "line_count": 2,
+                  "surface_visible": true,
+                  "interaction_mode": "locked",
+                  "window_width": 160,
+                  "window_height": 28
+                },
+                "owned_overlay_rect": [
+                  0,
+                  0,
+                  1344,
+                  336
+                ],
+                "owned_backdrop_rect": [
+                  32,
+                  32,
+                  1376,
+                  368
+                ],
+                "control": {
+                  "command": "apply_window_bounds",
+                  "x": 32,
+                  "y": 32,
+                  "width": 1344,
+                  "height": 336
+                },
+                "started_at": 19432.6431243,
+                "scope": "One current-owner bounds reapply to owned opaque backdrop after native restore; same immutable snapshot/text/palette/revision, no unrelated HWND or OS desktop mutation",
+                "after_visual_state": {
+                  "slot_count": 1,
+                  "line_count": 2,
+                  "surface_visible": true,
+                  "interaction_mode": "locked",
+                  "window_width": 1344,
+                  "window_height": 336
+                },
+                "completed_at": 19432.9298319
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "issue218_policy_renderer_owned_show_final",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_policy_renderer_probe.py --repair-verify --numeric-only --output native/nemotron/issue218_policy_renderer_owned_show_final",
+      "exit": 0,
+      "wall_seconds": 4.2,
+      "result": "Final planned owned-show correction/targeted numeric29: restore+same owner bounds reapply, actualuncloakedgoldpixels1/1. Recapture alreadycloak0, so shell-cloak show/migration branch recovery is not proven. No further UI/COM experiments or model runs.",
+      "raw_trace": "native/nemotron/issue218_policy_renderer_owned_show_final.zip:trace.json",
+      "raw_trace_sha256": "7bed9366055be328b10f3e62bedeeb14b24c0627717c62ec149f32251c4ac77e",
+      "execution_driver_sha256": "77ee3f86ac5a2d52d8b036ef2e44741a4a02107ce48d07850ab8317d059fe0c2",
+      "execution_visibility_helper_sha256": "7829a79ea828b924e73f328ac8cd9d4bcea044b37bafb896904deaded0dbedb9",
+      "execution_sources_zip_sha256": "11ab34af706e973360317bfc66680189dec8be258ff614334e1b9bb3c28c146e",
+      "presentation_sources": {
+        "src/puripuly_heart/core/overlay/__init__.py": {
+          "historical_sha256": "13ce2bd3e16b19e1682cd78d30290e95a0c78346b191326c617c9acc06455238",
+          "current_sha256": "13ce2bd3e16b19e1682cd78d30290e95a0c78346b191326c617c9acc06455238"
+        },
+        "src/puripuly_heart/core/overlay/bridge.py": {
+          "historical_sha256": "b18f1c3c9c619d239b73c061fd38b477ce0e56b9bff5d1254150289e7da0ab2c",
+          "current_sha256": "b18f1c3c9c619d239b73c061fd38b477ce0e56b9bff5d1254150289e7da0ab2c"
+        },
+        "src/puripuly_heart/core/overlay/bridge_mailbox.py": {
+          "historical_sha256": "45cd242c894e3df812ca39d70484828cf678db75a9ddf4e136ba9195fc074bd1",
+          "current_sha256": "45cd242c894e3df812ca39d70484828cf678db75a9ddf4e136ba9195fc074bd1"
+        },
+        "src/puripuly_heart/core/overlay/bridge_session.py": {
+          "historical_sha256": "d309f04088a6dfaa13a2ea24408b7d6dfde4b51c64177705ef1276fa8a4a6c21",
+          "current_sha256": "d309f04088a6dfaa13a2ea24408b7d6dfde4b51c64177705ef1276fa8a4a6c21"
+        },
+        "src/puripuly_heart/core/overlay/bridge_transport.py": {
+          "historical_sha256": "09f07e8b28ec84426073cc275ebb2c1aec2632e2c58cf52007a512a189200986",
+          "current_sha256": "09f07e8b28ec84426073cc275ebb2c1aec2632e2c58cf52007a512a189200986"
+        },
+        "src/puripuly_heart/core/overlay/diagnostics.py": {
+          "historical_sha256": "9191a559bf1b863a1ef831734950a085132d9c02433edf4b78de4f3f4ed7acac",
+          "current_sha256": "9191a559bf1b863a1ef831734950a085132d9c02433edf4b78de4f3f4ed7acac"
+        },
+        "src/puripuly_heart/core/overlay/manifest.py": {
+          "historical_sha256": "b5d9b97a202c5e3f9aa041f341e965bdb657935e0b4e8d31a85bf8346fd42fc5",
+          "current_sha256": "b5d9b97a202c5e3f9aa041f341e965bdb657935e0b4e8d31a85bf8346fd42fc5"
+        },
+        "src/puripuly_heart/core/overlay/openvr_vendor.py": {
+          "historical_sha256": "3dd95478a62ad1d037a50ad1ae96367dfd525867b9546652bfd619560154cae7",
+          "current_sha256": "3dd95478a62ad1d037a50ad1ae96367dfd525867b9546652bfd619560154cae7"
+        },
+        "src/puripuly_heart/core/overlay/presenter.py": {
+          "historical_sha256": "4b010e1f6b3f03beb822f289b8fb0a7223ac027f914e2db349cbab89c230e6f6",
+          "current_sha256": "4b010e1f6b3f03beb822f289b8fb0a7223ac027f914e2db349cbab89c230e6f6"
+        },
+        "src/puripuly_heart/core/overlay/presenter_acceptance.py": {
+          "historical_sha256": "1c3d3a03bd196cb19a7401a9e7f3e16fa52cdd80328f98927adfac544d6ae1c7",
+          "current_sha256": "1c3d3a03bd196cb19a7401a9e7f3e16fa52cdd80328f98927adfac544d6ae1c7"
+        },
+        "src/puripuly_heart/core/overlay/presenter_projection.py": {
+          "historical_sha256": "11c6b411a7a726ec10e0d5437d8880a4ac7a853a1e5eb418143a437b7373a3df",
+          "current_sha256": "11c6b411a7a726ec10e0d5437d8880a4ac7a853a1e5eb418143a437b7373a3df"
+        },
+        "src/puripuly_heart/core/overlay/presenter_sources.py": {
+          "historical_sha256": "28c6969aab2d8fce601edd9ce910663454845fac15cca571e5c5b77dc2036a12",
+          "current_sha256": "28c6969aab2d8fce601edd9ce910663454845fac15cca571e5c5b77dc2036a12"
+        },
+        "src/puripuly_heart/core/overlay/process.py": {
+          "historical_sha256": "e0fc2ca0e72110d6a6099f9d49351507af4ab944ad3f80ca6bb3a0d53adb9864",
+          "current_sha256": "e0fc2ca0e72110d6a6099f9d49351507af4ab944ad3f80ca6bb3a0d53adb9864"
+        },
+        "src/puripuly_heart/core/overlay/process_adapter.py": {
+          "historical_sha256": "ee99f6ef686c470fc47823c2e4514b1a5d27f22e2aca8174c3f2342567866eaa",
+          "current_sha256": "ee99f6ef686c470fc47823c2e4514b1a5d27f22e2aca8174c3f2342567866eaa"
+        },
+        "src/puripuly_heart/core/overlay/process_runners.py": {
+          "historical_sha256": "77caaa0956fbace243c39559b10a70365087c694fe23ef2cc631a62a041a06d1",
+          "current_sha256": "77caaa0956fbace243c39559b10a70365087c694fe23ef2cc631a62a041a06d1"
+        },
+        "src/puripuly_heart/core/overlay/protocol.py": {
+          "historical_sha256": "ef410f1362a07956ffb2f01f7c51c0209e338f1c06ae49e774b28522748d74f7",
+          "current_sha256": "ef410f1362a07956ffb2f01f7c51c0209e338f1c06ae49e774b28522748d74f7"
+        },
+        "src/puripuly_heart/core/overlay/sink.py": {
+          "historical_sha256": "893eb2211174e213935f4aeabe922c72f09670945e50951466669f4308695ba3",
+          "current_sha256": "893eb2211174e213935f4aeabe922c72f09670945e50951466669f4308695ba3"
+        },
+        "src/puripuly_heart/core/overlay/state.py": {
+          "historical_sha256": "079986a8f0bbcf6eb0c639db6044270f6523e11a67cbd7620aaae97abd3938ca",
+          "current_sha256": "079986a8f0bbcf6eb0c639db6044270f6523e11a67cbd7620aaae97abd3938ca"
+        },
+        "src/puripuly_heart/ui/desktop_overlay.py": {
+          "historical_sha256": "5a414519475433ba39996bb1b94b91fc2365dd0a7ddc87c58b5055c9333cb353",
+          "current_sha256": "5a414519475433ba39996bb1b94b91fc2365dd0a7ddc87c58b5055c9333cb353"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_card_repro.py": {
+          "historical_sha256": "befcf5ca1ab8104bdf01ea8efe4738c1b2e4081798e6066d2136e63e5d93d8f7",
+          "current_sha256": "befcf5ca1ab8104bdf01ea8efe4738c1b2e4081798e6066d2136e63e5d93d8f7"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_repro.py": {
+          "historical_sha256": "3152ba3a8e3638f714e52b71208204a49f60e06e6a14bc0748cd3facdb606be7",
+          "current_sha256": "3152ba3a8e3638f714e52b71208204a49f60e06e6a14bc0748cd3facdb606be7"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_startup.py": {
+          "historical_sha256": "732a2e6d155dcffcb12a2b41686f8058bc7a91ce8c22466b0268f224b06f15fd",
+          "current_sha256": "732a2e6d155dcffcb12a2b41686f8058bc7a91ce8c22466b0268f224b06f15fd"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/__init__.py": {
+          "historical_sha256": "0ee2636ffe47e4062c484c7a1df628853ff5b003975bd48c74599607bd6e4afd",
+          "current_sha256": "0ee2636ffe47e4062c484c7a1df628853ff5b003975bd48c74599607bd6e4afd"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/contract.py": {
+          "historical_sha256": "dc0959f27616303640e0b2bfaf1e5afc33659bee2641512cfed1d4a947d72b37",
+          "current_sha256": "dc0959f27616303640e0b2bfaf1e5afc33659bee2641512cfed1d4a947d72b37"
+        },
+        "src/puripuly_heart/ui/desktop_overlay_surface/renderer.py": {
+          "historical_sha256": "a226dceddfe44c051dd5d41b522f5d04843cc8028dd5a693a28b328c85925258",
+          "current_sha256": "a226dceddfe44c051dd5d41b522f5d04843cc8028dd5a693a28b328c85925258"
+        },
+        "src/puripuly_heart/ui/desktop_window_zorder.py": {
+          "historical_sha256": "65440726bccb1cf322211b0eb307f47c5e8d21c50d0cc918b83f377e9b20917c",
+          "current_sha256": "65440726bccb1cf322211b0eb307f47c5e8d21c50d0cc918b83f377e9b20917c"
+        }
+      },
+      "status": "renderer_only_probe_surface_verified",
+      "stages": [
+        {
+          "label": "Deepgram_original_submissions",
+          "execution_status": "render_only_replay_executed",
+          "surface_status": "all_recorded_captions_visibly_verified",
+          "requested_nonempty_snapshots": 1,
+          "diagnostic_positive_pixel_readbacks": 1,
+          "guarded_valid_readbacks": 1,
+          "error": null,
+          "readbacks": [
+            {
+              "revision": 29,
+              "case": "linguistic_correction",
+              "mode": "new",
+              "profile": "1.04",
+              "snapshot_sha256": "f3a9f3c4395aebd8fb4fa7cad314afac124a3c8989ac963026e6c1366fbe0551",
+              "exact_recorded_snapshot": true,
+              "visible_blocks_requested": [
+                {
+                  "primary_text": "아니. 아니. 셋.",
+                  "secondary_text": "No. No. Three.",
+                  "speaker_style": "gold"
+                }
+              ],
+              "guarded_readback_valid": true,
+              "diagnostic_positive_pixels": true,
+              "actual_color_pixels": {
+                "gold": 2228,
+                "cyan": 0,
+                "gray": 0
+              },
+              "PNG": "native/nemotron/issue218_policy_renderer_owned_show_final/Deepgram_original_submissions/guard_recovered_29.png",
+              "PNG_sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+              "overlay_cloak_at_dispatch": 0,
+              "overlay_cloak_after_readback": 0,
+              "native_minimized_at_dispatch": true,
+              "visibility_valid": true,
+              "capture_error": null,
+              "initial_capture_error": "owned opaque backdrop does not cover overlay client; no pixels captured",
+              "invalid_reason": null,
+              "owned_layout_recovery": {
+                "before_visual_state": {
+                  "slot_count": 1,
+                  "line_count": 2,
+                  "surface_visible": true,
+                  "interaction_mode": "locked",
+                  "window_width": 160,
+                  "window_height": 28
+                },
+                "owned_overlay_rect": [
+                  0,
+                  0,
+                  1344,
+                  336
+                ],
+                "owned_backdrop_rect": [
+                  32,
+                  32,
+                  1376,
+                  368
+                ],
+                "control": {
+                  "command": "apply_window_bounds",
+                  "x": 32,
+                  "y": 32,
+                  "width": 1344,
+                  "height": 336
+                },
+                "started_at": 19576.8147581,
+                "scope": "One current-owner bounds reapply to owned opaque backdrop after native restore; same immutable snapshot/text/palette/revision, no unrelated HWND or OS desktop mutation",
+                "after_visual_state": {
+                  "slot_count": 1,
+                  "line_count": 2,
+                  "surface_visible": true,
+                  "interaction_mode": "locked",
+                  "window_width": 1344,
+                  "window_height": 336
+                },
+                "completed_at": 19577.0412289
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "archives": [
+    {
+      "path": "native/nemotron/issue218_policy_renderer_probe_run1.zip",
+      "sha256": "78fd0344760fc036e45a7936b95d67b8beff266d73788d0387949d69faeb91a8",
+      "members": {
+        "Deepgram_original_submissions/commit_1.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_10.png": {
+          "sha256": "3a09ef8b59874d21fde1675f5693790fc7559e4bde2590e9899245f988d6d444",
+          "bytes": 25949,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_13.png": {
+          "sha256": "235745826739e6b713cb78a83e70664e741773a37de3b25663a71b4ffa335115",
+          "bytes": 12612,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_16.png": {
+          "sha256": "83e2580c4a5efbef3aa2b8bb40e5e73c46110715f5c62109b988df5ff4a912d9",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_19.png": {
+          "sha256": "4a93f8c1c121a75aaffc329b294ac04601da064dc824dfbbe0b80b03ce1b513f",
+          "bytes": 17315,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_20.png": {
+          "sha256": "8a3edf513e7031afdbb2dffa7fba78ac5506a2e5b0ef1e3254ed1ee10a19cb8d",
+          "bytes": 22088,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_21.png": {
+          "sha256": "cde4556aee8742a70a3f9c193d2f36ffe92d1a913f0a341df79dbe4f21e8fbc7",
+          "bytes": 21290,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_22.png": {
+          "sha256": "819ff11f5488fa6c8a0af099e01db83c251a1387015f5b7785dade05b4e31721",
+          "bytes": 20170,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_25.png": {
+          "sha256": "ee8e215189aaf3c987ddce2661764b4825412d73ca98aa229440a31ae4d3f8a7",
+          "bytes": 20143,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_26.png": {
+          "sha256": "8e118d892d137f11e973d1bafe4ddc1d1e47e106ccd4820281e4190c127c08a3",
+          "bytes": 26321,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_29.png": {
+          "sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+          "bytes": 12622,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_32.png": {
+          "sha256": "dc70fbe1d5c803cabc6ad3581f3c6b2755953c8cf38891537133923c33a0b7a3",
+          "bytes": 13533,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_35.png": {
+          "sha256": "43f434d9684df516df76e89e24848381970fb8f220f02a0951f4ec4c3b48e85a",
+          "bytes": 17372,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_36.png": {
+          "sha256": "5f3256ea0776bc37e56a813eed8cf6fdf3c454d80e4e4dfc361a470dde170dda",
+          "bytes": 22250,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_37.png": {
+          "sha256": "38b18487aac83e049db44f3e10b50be2f43324fe5793112fcaf7ef33b6302992",
+          "bytes": 22163,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_38.png": {
+          "sha256": "cf778727f409ada170bc644287d3bb3a6931dcf09ebd8e3f6e03eba63e28caa1",
+          "bytes": 21065,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_4.png": {
+          "sha256": "d7abb9f74411c79bb8f3fdb71ca4a7d51ac43596cae54711dd21029f13fd4b02",
+          "bytes": 19829,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_41.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_42.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_45.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_5.png": {
+          "sha256": "cc436ae91344cf3a2668a6ec8e1a57de9acfd2cd4a23a8e17fefae3ee6f53b7c",
+          "bytes": 27791,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_6.png": {
+          "sha256": "5a9a6a69d9e1dd0046ac71ba8d59bd698a72be72aa15668687c6f16b9316f163",
+          "bytes": 21239,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_9.png": {
+          "sha256": "5259939d97a05ac321bb5f02486317cb5d3b90c13c454bc8a0109449392ee1a7",
+          "bytes": 19684,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/late_1_1000.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/late_1_250.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "execution_sources.zip": {
+          "sha256": "41e1ed550a49190eef541282c0505bee422c9bfbcf878d1f5a0d99d6abcb0042",
+          "bytes": 149795,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_22.png": {
+          "sha256": "36600561f04d8dbbeb3b79eccfe29256ffa49cce97a04ec6bcfa25daec493c40",
+          "bytes": 17613,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_23.png": {
+          "sha256": "a5c805a4fd97b8612459e1171a255939ed0226a54209a5c402140aed5eb9eb05",
+          "bytes": 22442,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_24.png": {
+          "sha256": "8e6a386ef139ad1b0162a712c8c9c1eec6971488a7bef3a584ae54f398bb157a",
+          "bytes": 21593,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_25.png": {
+          "sha256": "7ebdd1f54d2e7ce23eccf45068ffc203424e066adee320b8e52e9145756c2a79",
+          "bytes": 20619,
+          "LF_only": null
+        },
+        "GPU_working_control/late_22_1000.png": {
+          "sha256": "36600561f04d8dbbeb3b79eccfe29256ffa49cce97a04ec6bcfa25daec493c40",
+          "bytes": 17613,
+          "LF_only": null
+        },
+        "GPU_working_control/late_22_250.png": {
+          "sha256": "36600561f04d8dbbeb3b79eccfe29256ffa49cce97a04ec6bcfa25daec493c40",
+          "bytes": 17613,
+          "LF_only": null
+        },
+        "trace.json": {
+          "sha256": "0ce6643aa0271c1423a5532d6cf2cabfceb08f40279adf3b4ab14fd70e203db2",
+          "bytes": 588789,
+          "LF_only": true
+        }
+      },
+      "execution_snapshot_provenance": "First probe driver reconstructed from known edit delta and exact recorded SHA match; presentation/helpers hash-matched. Added snapshot does not rewrite original trace."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_guarded.zip",
+      "sha256": "c6c571c24d10eb53be32dd6bdca14e4ed171941dab14e76fd89721a0da18f914",
+      "members": {
+        "Deepgram_original_submissions/commit_1.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_10.png": {
+          "sha256": "3a09ef8b59874d21fde1675f5693790fc7559e4bde2590e9899245f988d6d444",
+          "bytes": 25949,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_13.png": {
+          "sha256": "235745826739e6b713cb78a83e70664e741773a37de3b25663a71b4ffa335115",
+          "bytes": 12612,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_16.png": {
+          "sha256": "83e2580c4a5efbef3aa2b8bb40e5e73c46110715f5c62109b988df5ff4a912d9",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_19.png": {
+          "sha256": "4a93f8c1c121a75aaffc329b294ac04601da064dc824dfbbe0b80b03ce1b513f",
+          "bytes": 17315,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_20.png": {
+          "sha256": "8a3edf513e7031afdbb2dffa7fba78ac5506a2e5b0ef1e3254ed1ee10a19cb8d",
+          "bytes": 22088,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_21.png": {
+          "sha256": "cde4556aee8742a70a3f9c193d2f36ffe92d1a913f0a341df79dbe4f21e8fbc7",
+          "bytes": 21290,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_22.png": {
+          "sha256": "819ff11f5488fa6c8a0af099e01db83c251a1387015f5b7785dade05b4e31721",
+          "bytes": 20170,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_25.png": {
+          "sha256": "ee8e215189aaf3c987ddce2661764b4825412d73ca98aa229440a31ae4d3f8a7",
+          "bytes": 20143,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_26.png": {
+          "sha256": "8e118d892d137f11e973d1bafe4ddc1d1e47e106ccd4820281e4190c127c08a3",
+          "bytes": 26321,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_29.png": {
+          "sha256": "6768f9887d820f1d100c9e688ff638c45b976f364b89f5fee71210167d267b72",
+          "bytes": 8283,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_32.png": {
+          "sha256": "dc70fbe1d5c803cabc6ad3581f3c6b2755953c8cf38891537133923c33a0b7a3",
+          "bytes": 13533,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_35.png": {
+          "sha256": "43f434d9684df516df76e89e24848381970fb8f220f02a0951f4ec4c3b48e85a",
+          "bytes": 17372,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_36.png": {
+          "sha256": "5f3256ea0776bc37e56a813eed8cf6fdf3c454d80e4e4dfc361a470dde170dda",
+          "bytes": 22250,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_37.png": {
+          "sha256": "38b18487aac83e049db44f3e10b50be2f43324fe5793112fcaf7ef33b6302992",
+          "bytes": 22163,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_38.png": {
+          "sha256": "cf778727f409ada170bc644287d3bb3a6931dcf09ebd8e3f6e03eba63e28caa1",
+          "bytes": 21065,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_4.png": {
+          "sha256": "d7abb9f74411c79bb8f3fdb71ca4a7d51ac43596cae54711dd21029f13fd4b02",
+          "bytes": 19829,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_41.png": {
+          "sha256": "55f0212a3c2bc92a78064871ccb9a7c2b7eeed75caf025f0936184c35de04697",
+          "bytes": 19599,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_42.png": {
+          "sha256": "73bd96011716b95729af6a73b6fcb6a067e31cca07df6615aa74a24752fcd69e",
+          "bytes": 26342,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_45.png": {
+          "sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+          "bytes": 12622,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_5.png": {
+          "sha256": "cc436ae91344cf3a2668a6ec8e1a57de9acfd2cd4a23a8e17fefae3ee6f53b7c",
+          "bytes": 27791,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_6.png": {
+          "sha256": "5a9a6a69d9e1dd0046ac71ba8d59bd698a72be72aa15668687c6f16b9316f163",
+          "bytes": 21239,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/commit_9.png": {
+          "sha256": "5259939d97a05ac321bb5f02486317cb5d3b90c13c454bc8a0109449392ee1a7",
+          "bytes": 19684,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/late_1_1000.png": {
+          "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+          "bytes": 8161,
+          "LF_only": null
+        },
+        "Deepgram_original_submissions/late_1_250.png": {
+          "sha256": "01e83295809ea2cb58a7dd29b01650ae0a50822a287d3ee1266dc88dafeb97aa",
+          "bytes": 13541,
+          "LF_only": null
+        },
+        "execution_sources.zip": {
+          "sha256": "0829eed290d753c3573a6f84fd6c3725d689cacb4732dcbaa8eb56b603cf109a",
+          "bytes": 153485,
+          "LF_only": null
+        },
+        "trace.json": {
+          "sha256": "06a66d8baae540897a8acd4f5180790bef1a52f07fd0647524cae9016a08780a",
+          "bytes": 580778,
+          "LF_only": true
+        }
+      },
+      "execution_snapshot_provenance": "Exact driver/helper/presentation source snapshots saved before execution; raw source zip and trace hashes preserved."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_repair_verify.zip",
+      "sha256": "11482d67ebe3aac0453720ae49a1f0d05088b1d081f24257d8454146d47c6fcf",
+      "members": {
+        "execution_sources.zip": {
+          "sha256": "90d35b703bde830022b739d82276c7f010677010046d4acc091fafd6477327f8",
+          "bytes": 153918,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_22.png": {
+          "sha256": "36600561f04d8dbbeb3b79eccfe29256ffa49cce97a04ec6bcfa25daec493c40",
+          "bytes": 17613,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_23.png": {
+          "sha256": "a5c805a4fd97b8612459e1171a255939ed0226a54209a5c402140aed5eb9eb05",
+          "bytes": 22442,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_24.png": {
+          "sha256": "8e6a386ef139ad1b0162a712c8c9c1eec6971488a7bef3a584ae54f398bb157a",
+          "bytes": 21593,
+          "LF_only": null
+        },
+        "GPU_working_control/commit_25.png": {
+          "sha256": "7ebdd1f54d2e7ce23eccf45068ffc203424e066adee320b8e52e9145756c2a79",
+          "bytes": 20619,
+          "LF_only": null
+        },
+        "trace.json": {
+          "sha256": "18490ed3e9f4fc2bfd6d0aabdd5713ab6bf2a48123926292ad63aab6759fc710",
+          "bytes": 133425,
+          "LF_only": true
+        }
+      },
+      "execution_snapshot_provenance": "Exact driver/helper/presentation source snapshots saved before execution; raw source zip and trace hashes preserved."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_numeric_recovered.zip",
+      "sha256": "16b32cfcafddd0144dac927c906c690d437cac7c2ab700530ba9300889066750",
+      "members": {
+        "execution_sources.zip": {
+          "sha256": "cdbe590646b3fc572a2a1870cffb3b624fc0eb8c305bb51ccd2b152b8042f9ec",
+          "bytes": 154293,
+          "LF_only": null
+        },
+        "trace.json": {
+          "sha256": "ad6115e867d23cac6b9db0556458c9353b43a60e4fda3c4e79a340d789cf3824",
+          "bytes": 43754,
+          "LF_only": true
+        }
+      },
+      "execution_snapshot_provenance": "Exact driver/helper/presentation source snapshots saved before execution; raw source zip and trace hashes preserved."
+    },
+    {
+      "path": "native/nemotron/issue218_policy_renderer_owned_show_final.zip",
+      "sha256": "6f3e51ef62374be2c4159c9d0583854d906ad0cf225b4a52648315966e377622",
+      "members": {
+        "Deepgram_original_submissions/guard_recovered_29.png": {
+          "sha256": "285cfe00456f8a88967bba0baa869b285ec29f8e89574baf2a4b4d2fae2e09be",
+          "bytes": 12622,
+          "LF_only": null
+        },
+        "execution_sources.zip": {
+          "sha256": "11ab34af706e973360317bfc66680189dec8be258ff614334e1b9bb3c28c146e",
+          "bytes": 154390,
+          "LF_only": null
+        },
+        "trace.json": {
+          "sha256": "7bed9366055be328b10f3e62bedeeb14b24c0627717c62ec149f32251c4ac77e",
+          "bytes": 42833,
+          "LF_only": true
+        }
+      },
+      "execution_snapshot_provenance": "Exact driver/helper/presentation source snapshots saved before execution; raw source zip and trace hashes preserved."
+    }
+  ],
+  "retention": "All14ownedarchives andeverydirectPNG retained. Redundanttrace/counter/preflight/execution-snapshot directcopies removed afterexactmemberverification. Firstprobe hash-verified execution-snapshot reconstruction provenance remains disclosed.",
+  "historical_execution_paths_note": "Historical command strings, savedsummary inputs and immutable rawtrace embedded paths remain execution-time paths. Currenttrace/counter/preflight/source-snapshot references use archive:member. Filesystem-based drivers require explicit extraction; all directPNG paths remain valid. No probes/modelcalls authorized by reproductionmetadata.",
+  "artifact_cleanup": {
+    "ledger": "native/nemotron/issue218_policy_cleanup.json",
+    "removed_verified_nonPNG_copies": 18,
+    "bytes_removed": 131109893,
+    "archive_CRC_hash_member_equivalence": "14archives/233members/14nestedsourceZIPs passed; currentreaders complete; allZIPs/directPNGs retained."
+  }
+}
