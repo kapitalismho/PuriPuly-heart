@@ -1,0 +1,49 @@
+{
+  "schema": "issue218-independent-review-record-1",
+  "baseline": "ea488774c3d1a89b92130b862d2d4102c91c1349",
+  "reviewed_candidate": "0773d00786f0062e6fdab830ff4401c7dba0529a",
+  "review_mode": "Fresh independent whole-checkpoint FULL_REVIEW plus declared combined terminal completion-evidence audit; investigation-only checkpoint, no product changes.",
+  "reviewer": "experiment-review",
+  "checkpoint_result": "no_material_findings",
+  "terminal_verdict": "accepted",
+  "scope": "Accepted as a durable, supported negative non-VR investigation report. NOT full amended #218 qualification, #211 feature acceptance, a qualified #219 migration baseline, profile selection or production enablement. R5 remains unverified; failed/unknown criteria remain intact and the issue remains open.",
+  "director_adjudication": {
+    "checkpoint": "ACCEPT at 0773d00786f0062e6fdab830ff4401c7dba0529a for the bounded negative investigation deliverable",
+    "route_dispositions": "ACCEPT both tested routes' defer/defer proposals; no profile winner or default",
+    "findings": [],
+    "full_goal_acceptance": "Not granted; evidence gaps and activation failures are preserved in issue218_acceptance.json.",
+    "new_changes_after_review": "This review record only. No executable, measurements, configuration, images, report findings or acceptance boundaries changed."
+  },
+  "coverage": {
+    "R1": "Inspected assembled production-owner experiment path, frozen candidate and reused prerequisite evidence. Not persisted full-app startup; missing repository #217 terminal verdict disclosed.",
+    "R2": "Inspected same F16 artifact/Vulkan device, both full geometries and matched per-route audio/ASR/translation/UI policy.",
+    "R3": "Inspected real matched baseline plus both new profiles, with actual six-second continuation and common current renderer pacing.",
+    "R4": "Inspected contemporaneous evidence/submission/final/admission/translation/ordered publication and actual renderer ACK/readback. Scoring references do not enter selector.",
+    "R5": "Coverage accounting inspected; Chinese/spontaneous code switching/distinct eight-over-eight acoustic pressure remain unverified. Synthetic overlap and palette fixtures do not discharge natural conversational acoustics.",
+    "R6": "Useful and complete-turn outcomes, attribution/calls/resources inspected. Precise GPU timestamp queries, physical capture loss and identified-speaker error rate remain unknown.",
+    "R7": "Actual CPU/GPU local-ASR co-residency, rotated repeated non-VR workloads and counter limits inspected. VR/HMD deferred by authority, not a current blocker.",
+    "R8": "Defer decisions supported by observations; no invented threshold/score, profile winner or enablement approval.",
+    "R9": "Configuration/activation manifest inspected; empirical source-preservation and useful established-key gates stay open for their owners.",
+    "CC1": "Durable artifacts, commands, driver snapshots, portable and original-byte provenance inspected; offline reproduction evidence reused.",
+    "CC2": "Valid three-arm real E2E observations and positive early useful translated captions supported; not rich-speaker activation.",
+    "CC3": "Applicable deterministic receipts reused; CPU semantic damage and zero identified/color outcome retained as failed activation quality.",
+    "CC4": "Both tested local routes defer; other routes retain earlier bounded qualifications, no fresh cloud claim.",
+    "CC5": "No selection before owner acceptance; negative investigation delivery does not close #218/#211.",
+    "CC6": "Failed, unknown, blocked and not-run outcomes remain distinct; fixtures/host clocks/ACK/readback/photon evidence are not conflated."
+  },
+  "decisive_independent_checks": [
+    "Original CPU initial and rotated traces independently show returning sentence in baseline, Yeah. in new1.04, empty return in new0.64; exact delivered PCM is intact and damage already exists in native ASR.",
+    "Original GPU ABA trace confirms causal evidence before submission, real translation completion and timed useful source/translation readback before enclosing six-second end for both profiles.",
+    "Original GPU comparison and unchanged whole-input attribution implementation support zero identified-source outcome despite actual clear slot probabilities; not model incapability or palette overflow.",
+    "Archived driver comparison confirms final metadata-only backend.model_id label and owned-build output allowance did not change selector/audio/model behavior; execution snapshots retain original run identity.",
+    "Local-only provider selection, managed local translation guards, input provenance checks, destination isolation and PID-owned capture/cleanup were inspected. No private or cloud workload was executed by review."
+  ],
+  "verification": {
+    "reviewer_performed": "Read-only authority/diff/source/original-trace inspection, source/native/context relationships across all five traces, archived-driver comparison, selected PNG observation and focused stdlib RGB decoding.",
+    "reused": "Director reproduced all84 observations' analysis with identical case/statistical/counter results in2.50s; bothZIP CRC passes and three Python AST syntax passes. Applicable prior deterministic source/control/runtime/presentation receipts reused without rerun.",
+    "not_performed": "No new inference, cloud calls, audio capture/playback, tests/build/lint, downloads, VR launches, product changes or remote operations during review.",
+    "image_tool_limit": "Reviewer withdrew an image-reader-only missing-English-row concern after RGB decoding/capture hashes and identical glyph masks resolved it. Director reported the inconsistent tool rendering through xd://report_issue; no product or evidence repair inferred."
+  },
+  "next_decision": "Deliver the supported negative report; retain both profiles as unselected. Owner-authorized work must qualify CPU returning-content preservation and useful whole-input established-key/readiness handling before activation. Full acoustic/counter/capture qualification and maintainer tradeoff acceptance remain open; deferred VR work is separate.",
+  "remote_state": "#218 remains open/In progress. No push, merge, PR publication, issue closure, deployment, release or worktree cleanup."
+}
