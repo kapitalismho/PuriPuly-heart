@@ -23,6 +23,6 @@
     ]
   },
   "upstream": {"observed_origin_dev": "3db94433fd474c6ad6a5353e8b36c87f4856e2d7", "change": "QQ auth diagnostic/recovery #226; changed paths do not overlap #217 surfaces.", "disposition": "Fetched and inspected; not merged/rebased under repository explicit-merge-approval rule. Candidate boundary unchanged."},
-  "repair_verification": "Pending repaired committed candidate and bounded REPAIR_VERIFY; unaffected renderer/native execution evidence remains applicable unless repair changes its input contract.",
-  "terminal_audit": "Pending independent final-candidate completion-evidence audit."
+  "repair_verification": {"candidate": "11502b44a9834935c56a622819e367436d825d29", "result": "repair_verified", "coverage": "F1/F2/F3 and E1 closed; directly related regressions supported by passing focused suites and real-runtime smokes. No broader mechanism change requires fresh full review.", "evidence": ["issue217_source_repair_report.json", "issue217_presenter_repair_report.json", "issue217_verification_index.json"], "retained_coverage": "Unaffected whole-checkpoint and native/desktop hardware/GUI/build/startup coverage remains applicable; no native/UI/schema product changes in repairs.", "director_disposition": "Accepted checkpoint at this reviewed repair commit; final Goal acceptance requires separate terminal evidence audit."},
+  "terminal_audit": "Separate independent final-candidate completion-evidence audit, reported in the Director delivery. This file records checkpoint evidence, not a substitute terminal verdict."
 }
