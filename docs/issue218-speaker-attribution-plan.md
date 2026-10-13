@@ -131,7 +131,7 @@ Total new usage, including two invalid task-driver attempts retained separately:
 
 ### Speaker/source implementation readiness
 
-The owner reports 260 passing source/translation checks, 510 passing provider-route checks and 172 passing scoped-engine cancellation/order/drain checks under the actual repository `.venv` interpreter. Earlier global-interpreter attempts lacked the declared `truststore` dependency and are invalid environment observations, not product failures or acceptance evidence.
+The [speaker-policy report](../native/nemotron/issue218_speaker_policy_report.json) records 261 passing source/translation checks, 510 passing provider-route checks and 172 passing scoped-engine cancellation/order/drain checks: 943 total under the actual repository `.venv` interpreter. Focused Ruff checks passed after removing two obsolete imports. Earlier global-interpreter attempts lacked the declared `truststore` dependency and are invalid environment observations, not product failures or acceptance evidence.
 
 A throwaway causal session exercised evidence arriving during native ASR: attribution identified the local source at its own final, with unchanged 16,000-sample PCM and English options, then one source/history/translation admission. A recorded Deepgram join smoke produced coherent A/B/returning phrases in three jobs without physical cuts. These are execution/protocol checks, not the pending actual GPU/translation/renderer measurements.
 

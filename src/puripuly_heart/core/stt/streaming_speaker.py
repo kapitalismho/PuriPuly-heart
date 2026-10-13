@@ -6,7 +6,6 @@ import time
 from collections import deque
 from dataclasses import dataclass, field, replace
 
-from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.speaker.contracts import SpeakerEvidence
 from puripuly_heart.core.stt.backend import (
     STTAudioBoundary,

@@ -1,0 +1,92 @@
+{
+  "agreement": "docs/issue218-speaker-attribution-plan.md outcomes A/B, including maintainer correction permitting bounded proven-used foreign replay edges",
+  "baseline": "b2cfc0c42bfa07d1570c243fb17ab2e547b8da1e",
+  "candidate": "d1164dfc680f4fd5b77b835a31b87286bb883f43",
+  "post_pin_cleanup": "Maintainer-authorized removal of unused AudioCaptureSpan imports only in batch_speaker.py and streaming_speaker.py; no behavior change. Director repin pending. Existing behavior evidence remains applicable.",
+  "changed_files": [
+    "src/puripuly_heart/core/stt/batch_speaker.py",
+    "src/puripuly_heart/core/stt/streaming_speaker.py",
+    "src/puripuly_heart/core/stt/speaker_attribution.py",
+    "tests/core/test_causal_batch_speaker.py",
+    "tests/core/test_streaming_speaker.py",
+    "native/nemotron/issue218_speaker_policy_report.json"
+  ],
+  "implementation": {
+    "local_snapshot": "Submission freezes native request identity/options/PCM/source/context/group. Own native terminal snapshots attribution once from delivered closed or immutable-frontier-covered evidence, before source-order release and immutable SourceChild admission. A later native terminal waiting behind an earlier source does not wait for or consume later evidence. Already-snapshotted attribution survives later reset without recoloring.",
+    "retention": "Existing 2048-frame hard cap remains. Pruning retains unresolved child source/context and active unsubmitted footprints, plus the existing 8000-sample onset vicinity. Each own-final snapshot releases its retention need. Cache eviction remains missing coverage, not a tolerated confidence hole. Epoch/reset invalidates unresolved snapshots; capture mismatch cannot identify a source. Omitted-silence coverage remains quiet rather than fabricated speech.",
+    "replay_provenance": "Replay is proved by exact same-capture interval intersection with previously submitted source/context ranges, retained in a separate bounded 2048-entry footprint deque. Uncovered context is unique onset, not presumed replay. Reset/epoch clears replay proof. Unsupported clocks/provenance do not manufacture replay or identity.",
+    "streaming_composition": "Within an already-finalized lawful release, confidence alone adds no split. Supported distinct-key audio transitions may select complete native lexical cuts; both keys must have clear eligible support inside that fixed release region. Known lexical identities must match the physical predecessor/successor keys, preventing historical transitions from splitting a later single-speaker phrase. Existing early-prefix releases and independent release boundaries remain immutable. Unknown text clocks and unowned text remain unavailable; unsupported Gemini mapping remains unsupported.",
+    "shared_owner": "Both wrappers use speaker_attribution.py for probability semantics and representative attribution. Existing SourceChild/context/publication owners and public provider interfaces are unchanged. No physical cloud cut, fixed wait, future evidence, re-decode, guessed text partition or published recoloring was added."
+  },
+  "heuristics": {
+    "active_probability": 0.5,
+    "clear_probability": 0.8,
+    "quiet_runner_probability_max": 0.2,
+    "competing_runner_probability_min": 0.35,
+    "ambiguous_contiguous_seconds_max": 0.12,
+    "ambiguous_total_seconds_max": 0.2,
+    "ambiguous_to_clear_unique_support_ratio_max": 0.2,
+    "global_minimum_utterance_duration": null,
+    "eligibility": "Eight finite probabilities in [0,1]; a candidate requires clear unique source or unreplayed onset support. Quiet frames do not provide identity support. Every unique or replay interval still requires eligible coverage. Any clear competing NEW/onset identity, competing runner or overlap vetoes identification regardless of duration. Multiple speaker/capture epochs cannot be merged.",
+    "ambiguity_budget": "Nonclear unique speech and a clear foreign PROVEN replay edge consume the SAME contiguous/total/relative budget. Replay cannot enlarge the denominator or supply the candidate. Substantial clear foreign replay exceeding that budget is mixed. Nonclear replay cannot vote for identity. Missing evidence and discontinuities remain unavailable, not acoustic ambiguity.",
+    "rationale": "Preserve existing probability thresholds while requiring representative clear support. 120 ms contiguous and 200 ms total bound an acoustic edge/hole rather than a whole utterance; 20% of unique clear support prevents long silence/context or a long speaker from laundering a short correction. These are explicit reversible starting heuristics, not measured acoustic optima.",
+    "counterexamples": [
+      "100 ms proven replay A plus two seconds clear new B is identified B; 300 ms foreign replay A is mixed.",
+      "The same 100 ms A interval supplied as NEW source or unreplayed onset vetoes B even though it fits the replay budget.",
+      "Any clear 10 ms competing new speaker vetoes a long majority speaker; complete streaming 50 ms No. between A spans remains an independent B source.",
+      "A 200 ms contiguous uncertainty hole fails the 120 ms bound. Two separated 110 ms holes fail the 200 ms total bound.",
+      "20 ms uncertainty versus 80 ms clear support fails the 20% ratio; no absolute minimum rejects an otherwise clear short utterance.",
+      "A missing 10 ms central evidence interval is unavailable rather than treated as a low-confidence acoustic hole.",
+      "A real competing voice that never reaches clear support and does not trigger competing/overlap probabilities may be tolerated within the acoustic ambiguity budget. This is an explicitly accepted misassignment risk, not a proved speaker-accuracy guarantee.",
+      "Estimated lexical timing that genuinely encloses clear A and B cannot be assigned to B by duration majority. Coherent gray is preferred for that unit when no supported lexical partition exists."
+    ]
+  },
+  "final_product_environment_checks": [
+    {
+      "command": ".venv/Scripts/python.exe -m pytest tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py tests/core/test_source_context_contract.py tests/core/test_translation_turn_owner.py tests/core/test_translation_request_owner.py tests/integration/test_speaker_identity_pipeline.py -o addopts=\"-s\" -q",
+      "result": "261 passed in 2.10s"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m pytest tests/providers/test_deepgram_backend.py tests/providers/test_deepgram_session.py tests/providers/test_deepgram_reuse.py tests/providers/test_soniox_backend.py tests/providers/test_soniox_reuse.py tests/providers/test_gemini_transcribe_backend.py tests/providers/test_gemini_transcribe_reuse.py tests/providers/test_gemini_transcribe_lifecycle.py tests/providers/test_elevenlabs_scribe_backend.py tests/providers/test_elevenlabs_scribe_reuse.py tests/providers/test_qwen_audio.py tests/providers/test_qwen_async.py tests/providers/test_local_qwen_sherpa.py -o addopts=\"-s\" -q",
+      "result": "510 passed, 3 warnings in 33.38s",
+      "warnings": ["Deepgram Pydantic V1/Python 3.14 compatibility warning", "websockets.legacy deprecation", "google-genai _UnionGenericAlias deprecation"],
+      "reuse": "No product behavior changed after this run; only the explicit NEW-source replay regression case and authorized unused-import cleanup were subsequently added."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m pytest tests/core/test_stt_scoped_engine.py -o addopts=\"-s\" -q",
+      "result": "172 passed in 21.60s",
+      "reuse": "No product behavior changed after this run; only the explicit NEW-source replay regression case and authorized unused-import cleanup were subsequently added."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/streaming_speaker.py src/puripuly_heart/core/stt/speaker_attribution.py tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py",
+      "result": "All checks passed!",
+      "scope": "Authorized cleanup removed only two unused AudioCaptureSpan imports; no behavior change."
+    }
+  ],
+  "checks_total": 943,
+  "changed_path_smoke": {
+    "execution": "Throwaway .venv Python causal request/session execution; no script file retained. Local Qwen product adapter/session with controlled native recognizer and translator, followed by recorded Deepgram evidence/native-event source join through current production source/context admission owners.",
+    "local": {"source_text": "no", "speaker_id": "0", "speaker_epoch": "11", "native_calls": 1, "pcm_samples": 16000, "native_options": {"language": "English"}, "source_children": 1, "history_entries": 1, "translation_calls": 1, "submission_audio_unchanged": true, "evidence_delivered_after_submission": true, "attribution_frozen_before_sourcechild": true},
+    "recorded_deepgram": {"raw_sources": ["Washed the detritus from his hair. ", "Gentlemen of the press.", "He washed the detritus from his"], "attribution": ["identified", "identified", "unavailable"], "speaker_ids": ["0", "1", null], "source_children": 3, "context_entries": 3, "transition_interval": [42048, 49888], "safe_successor_position": 49888, "source_before_enclosing_end": true, "successor_progress_samples": 512, "optional_controls": 0, "external_connections": 0},
+    "limits": "Recorded provider/evidence replay is not a fresh cloud service run. Controlled recognition/translation is not real GPU ASR, Nemotron, Gemma or Flet rendering qualification. The validation owner supplies those separate observations after Director pin."
+  },
+  "earlier_invalid_or_repaired_attempts": [
+    "Global python interpreter lacked required truststore. Global 147-pass core run and 603-pass/20-failure route run do not qualify the actual product environment. No dependency/global environment was mutated; declared dependencies already existed in repository .venv.",
+    "One all-in-one global-interpreter check timed out at 180 seconds. Partitioned .venv source, route and scoped-engine checks subsequently completed successfully.",
+    "Initial changed-code regressions exposed confidence-only splitting of returning He and a previously released crossing-source constraint. Final release-local support and physical-key correspondence guards fixed the product issue; obsolete same-speaker uncertainty expectations were removed rather than re-pinned.",
+    "The first throwaway smoke reached successful source admission but report extraction used nonexistent FinalSpeakerRun.speaker_scope_id. The observer was corrected to session_scope and the final smoke completed; no product mutation was involved."
+  ],
+  "unobserved_or_pending": [
+    "Actual 50 ms production-drain GPU Qwen/Nemotron/Gemma acoustic usefulness and attribution accuracy remain the policy-validation owner's work after Director pin.",
+    "Real Korean translation meaning and actual Flet styles/color/readback are not claimed by these controlled contract checks.",
+    "Both Nemotron profile comparisons, production default/profile acceptance, VRChat/SteamVR/HMD coexistence and photon latency remain outside this implementation handoff.",
+    "No new cloud call, Parakeet model/native repair, synthetic Parakeet tail, provider dependency mutation, Git/GitHub mutation or maintained-doc edit was performed by this owner.",
+    "Old-code regression failure is inferred from submission-time freeze/strict purity/confidence-fragmentation logic; old measured native failures were not rerun merely to confirm them."
+  ],
+  "maintained_doc_proposals_for_director": [
+    "architecture.md causal local batch section: replace submission-time conservative whole-input attribution with immutable submission provenance plus own-native-final attribution snapshot, and document unresolved-footprint retention/cap/reset behavior.",
+    "architecture.md streaming section: describe confidence-only finalized-phrase preservation, shared bounded representative policy, and complete lexical cuts requiring release-local supported distinct keys. Earlier immutable releases remain separate.",
+    "architecture.md local speaker evidence section: link the shared probability/budget constants and distinguish probability immutability, representative attribution and speaker-accuracy qualification.",
+    "issue218-speaker-attribution-plan.md: record exact starting limits, proven-used replay correction, the 943 .venv checks, controlled smoke evidence, and the still-pending actual GPU/Gemma/Flet acceptance observations. Do not present this handoff as production enablement or profile acceptance."
+  ]
+}
