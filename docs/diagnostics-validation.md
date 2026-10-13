@@ -1,6 +1,6 @@
 # Diagnostic failure verification — #228
 
-Implementation authority: [#228](https://github.com/kapitalismho/PuriPuly-heart/issues/228), with child outcomes #229–#232. Source baseline: `75c4485a6787d504f5335d1602973f63b4d0c234`. This record distinguishes executed software observations from hardware or external-service claims. The implementation commit and independent review range are identified in the delivery record; working-source fingerprints below identify the original live observations.
+Implementation authority: [#228](https://github.com/kapitalismho/PuriPuly-heart/issues/228), with child outcomes #229–#232. Source baseline: `75c4485a6787d504f5335d1602973f63b4d0c234`. This record distinguishes executed software observations from hardware or external-service claims. Original live observations appear first; the reviewed repair checkpoints and their later evidence are recorded below.
 
 ## Environment and isolation
 
@@ -246,3 +246,79 @@ Permanent regression coverage includes `tests/core/test_diagnostics.py`, `test_d
 The settings/failed-file and pressure runs exercised `core/runtime_logging.py` SHA-256 `a0ea46cc6968bcf4ddcd32e09544dddf10fa6b94c1b7e32c403c16e17da8e1ac` and `app/services/application_control.py` SHA-256 `95d1efa54441bbb295b0f03adc5da333d3b9bffd679deec457633401257a8a7b`. The settings probe was `1fefafbe6546d89a09f72df476b4d92a1014c1bd3dd0fca4390ae90edf7a2166`; the output probe was `b4bc926cdea196502e0c7318a161100cad1f22e16d30ed2dd7fc4e6ff930458d`. The removed application fixture's UTF-8 source digest was `8b74ed348e6de30dc487962dd57c0d31987e6befffa38b587f2f5e647bc895e1`. Later finite provider-label additions have their own focused ingress checks; earlier live proof is not represented as exercising those newly added labels.
 
 No real provider account login/refresh/revocation, paid request, ambient capture, physical GPU recognition failure, actual OpenVR session or HMD presentation was exercised. Installed hardware/tooling is not treated as execution evidence. Deterministic local failures establish the stated software behavior only. History remains finite and restart-scoped, main-file evidence is not a lossless durable audit, and process exit is not universal cleanup confirmation.
+
+## Reviewed repair checkpoints
+
+The first integrated checkpoint was `48d8a08bf84460c24ebf8c8566d57e323c86382e`. Independent whole-code and focused-privacy reviews found eleven material issues. None was waived. Repairs were pinned at `02657c0f679e650bf7208deec0aea298330f1d93`; a bounded follow-up identified remaining Peer admission paths, repaired at `a665c294b5cc8bcb270ddbb0b869f2026b10bc05`. Both originating reviewers verified the remaining repairs and retained unaffected coverage.
+
+The repairs cover:
+
+- The remaining GitHub prompt persistence caller, native lazy-builder failure handling, and truthful bounded secondary-cause omission counts.
+- Explicit Self and Peer provider admission identity before first retention, including inactive preparation and a second provider command that reuses the running capture generation. Startup and handoff preserve the native cause through convergence and control receipts.
+- Failed OSC full-publication obligations: empty or unrelated deltas do not establish recovery.
+- GPU activation failure followed by actual temporary-directory cleanup denial: primary cause, settled state and resource ownership survive.
+- Fixed CLI input-error metadata, finite renderer event/disposition validation before artifact retention, known desktop startup codes and visible top-level detail rejection.
+- Safe Self/Peer snapshot projection without `MappingProxyType` deep-copy failure or raw diagnostic-field serialization.
+
+The last Peer/control delta changes neither the shared normalizer nor file/subscriber delivery. The exact-`02657c0f` foundation and pressure observations below remain applicable to their exercised paths; they are not relabeled as new executions on the later commit.
+
+### Completed regression coverage
+
+One monolithic Python run timed out after 1,800 seconds at approximately 92%, with failures and no final XML. It is **not** a completed passing run. Its obsolete consumers and concrete defects were repaired, then complete, bounded owner partitions and cross-cutting partitions were executed.
+
+The final command inventory covers all **462 nonpaid Python pytest files**. Nine paid/external/model integration files are explicitly excluded. The three deterministic nonpaid integration files are included, with `INTEGRATION=1` restricted to the required files. Whole-file/directory commands establish file coverage; targeted repairs do not receive whole-file credit. Overlapping memberships are deduplicated.
+
+| Verification group | Observed result |
+|---|---|
+| Foundation's complete 21-file area | 328 passed |
+| Application, UI and application-owned core partitions | 2,380 passed; later affected convergence subset 154 passed |
+| Speech's complete bounded partitions | 2,362 passing executions, including overlapping cases |
+| Output's complete area | 1,583 passed, zero failed or skipped |
+| Director cross-cutting partition | 1,234 passed, three skipped, two failures subsequently closed individually |
+| Director remaining HTTP-extension file | 31 passed |
+| Final Peer affected whole-file suite | 112 passed |
+| Final Peer composed startup/handoff file | Four passed |
+| Final typed control-carrier regression | Three passed |
+| Native Rust software suite | 289 passed, one ignored; unchanged native source |
+| Repository Python lint | `ruff check src tests` passed at the final repair pin |
+
+These are separate suite results, **not an additive unique-test total**. The interrupted monolithic run is not hidden by the partition results. Conditional hardware/model skips and the ignored native test are not passes.
+
+### Refreshed Windows delivery and control observations
+
+On `02657c0f`, the standard composed settings-denial/file/restart probe exited zero in 15.627 seconds. Seventeen relevant source hashes were identical before and after.
+
+- Actual settings replacement denial retained `settings_save_failed`, `PermissionError`, errno 13 and winerror 5. The CLI exited four; settings bytes and effective locale remained unchanged. Receipt, later operation lookup, independent history, follow replay and the single selected main-file record shared diagnostic `56bd1a5424534e2c8dff7a1c8a45f51c`, operation `a2234894125d48eabd123033bcc5728d` and request `5cf27edb331ba64d07bcdfe04f724885`.
+- Healthy delivery observed six enqueued/six written, no pending records or loss, and explicitly `written_not_durable`. Restart lookup reported `foreign_instance`, empty results and a gap.
+- An actual directory at the log-file target produced independently queryable `log_file_delivery_failed`, zero written/four delivery failures and unavailable file evidence. CLI stop exited zero with cleanup unobserved; the host exited one.
+
+The same original pressure scenario was refreshed on that pin: all sixteen assertions passed with sixteen identical before/after source fingerprints.
+
+- The actual file worker stalled for 22.092593 seconds while a locale mutation completed in 0.225119 seconds; CLI state and committed bytes independently agreed.
+- Two authenticated no-read consumers disconnected independently. A healthy CLI follower received 4,004 events without parse errors or gaps.
+- The bounded queue dropped 2,017 records; history/replay disclosed eviction gaps. Rejected optional detail preserved failure identity, and the actual file later contained safe metadata, not the forbidden values.
+- Bounded logging close raised `TimeoutError`; host exit one remained distinct from CLI stop zero/cleanup unobserved. All recorded owned process identities exited.
+
+The refreshed pressure report SHA-256 is `5963912020c33bc8aecdcf56e2fac2acf7811b163d04102f5d91492921b382d8`. Post-close health is a direct observation around close, not a fabricated CLI query after endpoint freeze.
+
+### Final admission and output closure observations
+
+Four actual Self CLI cases cover active/inactive provider creation and warmup failure. Operation-filtered history retains the first native diagnostic, and the degraded transaction refers to that same identity.
+
+Four actual Peer CLI cases cover startup and running handoff, each with creation and warmup failure. Startup receipts preserve the native `cause_diagnostics` and an explicitly linked command wrapper. Handoff transactions retain the native diagnostic ID, the second command's identity and the unchanged capture generation; the previous attachment remains active. Inactive Peer preparation has native-owner regression coverage, not an invented CLI observation.
+
+Peer fixtures preseed terms acceptance only in isolated initial test settings; no command accepts real-user terms. Their overlay prerequisite is fixture-connected, and audio/VAD are generated. These cases prove native ownership, correlation and outcomes, not ambient capture, physical overlay readiness or model/GPU execution.
+
+Output closure additionally exercised real loopback OSC sends after a failed unchanged-state resynchronization, a real native-protocol child whose invalid renderer strings were excluded from its automatically written failure artifact, and an actual Windows delete-sharing denial during GPU-protocol-child cleanup. The OOM primary remained distinct from linked cleanup `PermissionError`, and later explicit close released the owned process and directory.
+
+Latest output evidence contains 113 exact source/test hash matches and three explicitly reconstructed import-only differences. The known pre-format import blocks reproduce the recorded hashes exactly; production AST and relevant test bodies are unchanged. All eight separately recorded composed-output source hashes match the repair pin. This is bounded evidence applicability, not a new test execution.
+
+### Application refresh and GUI evidence limit
+
+The later production-composed headless refresh exercised the real public GitHub prompt mutation without opening a browser and observed its durable clicked flag. A separate real settings mutation committed revision three to four with locale `ja`, while an explicitly synthetic runtime-apply failure left effective locale `en`. Its receipt retained four native secondary causes, reported four known omissions and set truncation true. Five retained history records shared the initiating operation/request and expected identities, with zero rejected detail. Normal stop and host both exited zero; process disappearance still did not claim universal cleanup.
+
+The original actual GUI observation remains the evidence for visible Basic presentation, retained pending draft and the next successful queued action. Its recorded `ui/app.py` hash, `4d6a505ef0c182d679322a0656da528d8273398e9f7a382b82c0c77c5f0352b0`, exactly matches the historical first checkpoint. A bounded comparison to the later source finds only the queue's data-only application-instance/request identity change; other UI application functions and the settings renderer are unchanged.
+
+Two later actual native GUI hosts, including one controlled restart on `a665c294`, attached the Basic view and owned their Flet windows, but bounded owned-window capture returned a complete black surface. Visibility, restored state, DPI, cloak, capture affinity and typed `PrintWindow` handling did not establish a fresh observable frame. Window-ready and `ui_attached` are not rendering acknowledgments. **No fresh visible Basic, pending-draft or next-mutation pass is claimed for those attempts.** The prior GUI observation and its source-applicability map remain separate evidence, not fabricated fresh pixels.
+
+Both later GUI hosts stopped normally, and all six recorded owned GUI process identities were absent afterward. Temporary settings, secrets, discovery, logs, screenshots and execution scaffolds were removed; non-application captures were discarded immediately. The unresolved fresh-capture prerequisite is recorded rather than replaced by a headless or model-only GUI claim.
