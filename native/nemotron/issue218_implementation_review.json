@@ -1,0 +1,43 @@
+{
+  "schema": "issue218-practical-policy-checkpoint-review-1",
+  "baseline": "b2cfc0c42bfa07d1570c243fb17ab2e547b8da1e",
+  "reviewed_candidate": "dd3cad278dc683840c6eabaae9777159cb75a710",
+  "reviewer": "speaker-policy-review",
+  "mode": "FULL_REVIEW",
+  "scope": "Whole committed implementation checkpoint: local final-time/representative attribution, streaming phrase composition, dependency/license cutover, focused contracts and Parakeet/Gemini evidence. Later issue218_policy integration drivers/results are not candidate-reviewed product changes.",
+  "review_result": "findings",
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "P1",
+      "title": "Attribution eligibility is frozen at terminal dequeue rather than native terminal emission",
+      "location": "src/puripuly_heart/core/stt/batch_speaker.py:415-438 at reviewed candidate",
+      "decision": "ACCEPT",
+      "evidence": "Reviewer executed a controlled repository-.venv session: emit authoritative Alpha. terminal with no speaker evidence, deliver clear speaker0 before wrapper dequeue, then consume. Candidate identifies0 using post-emission evidence. CPU/GPU providers enqueue terminals separately from wrapper consumption. Existing out-of-order test covers evidence after snapshot, not this interval.",
+      "required_repair": "Bind own-final attribution to the terminal's actual evidence-delivery eligibility boundary, without new waiting, submission-time fallback, PCM/options changes or ordered-release-dependent timing. Preserve a failing-before/passing-after delivery-order regression.",
+      "limit": "This scheduler-dependent causality bug is not claimed to cause the separate actual gray-tail observations."
+    },
+    {
+      "id": "F2",
+      "severity": "P2",
+      "title": "Streaming final composition repeats identical release-region support scans for each transition",
+      "location": "src/puripuly_heart/core/stt/streaming_speaker.py:447-470 at reviewed candidate",
+      "decision": "ACCEPT",
+      "evidence": "Reviewer inspected O(T*F*W) repeated owned-range/frame proof and executed a legal bounded synthetic six-second/60-word/2048-frame comparison. Both versions produced60 groups; baseline0.0556027s, candidate0.4059241s. This is a controlled CPU stress probe, not a production latency percentile.",
+      "required_repair": "Compute/reuse ownership and clear-key support once per fixed lawful release region while preserving exact lexical cuts, distinct keys and unsupported-clock handling. Exercise the high-retention/multi-transition path and unchanged source groups."
+    }
+  ],
+  "unaffected_coverage": [
+    "Bounded unresolved-footprint retention, hard frame cap, capture/reset/epoch fences and immutable post-snapshot attribution",
+    "Unique source/onset support, bounded ambiguity and proven replay distinction; clear competing new short speech cannot be outvoted",
+    "Submitted PCM/options/group provenance, source-order release and exactly-once source/context admission",
+    "Confidence-only final phrase coalescing, qualified distinct-key lexical cuts and immutable earlier releases",
+    "Unsupported clocks/native labels/Gemini correspondence remain conservative; wrapping remains Peer-only",
+    "Observed Parakeet package-level1.13.5 repair and compatible matched dependency/license cutover, with lexical/rollover limitations",
+    "Observed Gemini raw-wire final conservation, invalid-attempt accounting and bounded absence rather than a fabricated service or mapping fix"
+  ],
+  "execution_counterevidence": "Same-candidate actual30-case GPU/Nemotron/Gemma/Flet matrix at50ms improves meaningful A/B/No colors, but returningA remains gray across both ABA cases/profiles/repeats and cleanAB B is gray. This is an unmet Goal criterion, not a completed feature or independently diagnosed cache bug.",
+  "next_owner": "continuity-repair",
+  "repair_state": "F1/F2 implemented by continuity-repair. Synchronous request-local native-terminal hook freezes before enqueue; streaming support is reused per fixed lawful release region. Focused contracts, actual Parakeet emission/dequeue smoke and bounded composition stress executed; independent REPAIR_VERIFY pending.",
+  "acceptance": "Not accepted yet. Implemented F1/F2 repairs require independent verification; actual continuity policy and renderer obligations remain unresolved. No production profile, remote publication, release or whole#218 completion authorized."
+}

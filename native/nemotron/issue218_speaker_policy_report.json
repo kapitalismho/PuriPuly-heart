@@ -1,8 +1,9 @@
 {
   "agreement": "docs/issue218-speaker-attribution-plan.md outcomes A/B, including maintainer correction permitting bounded proven-used foreign replay edges",
   "baseline": "b2cfc0c42bfa07d1570c243fb17ab2e547b8da1e",
-  "candidate": "d1164dfc680f4fd5b77b835a31b87286bb883f43",
-  "post_pin_cleanup": "Maintainer-authorized removal of unused AudioCaptureSpan imports only in batch_speaker.py and streaming_speaker.py; no behavior change. Director repin pending. Existing behavior evidence remains applicable.",
+  "candidate": "dd3cad278dc683840c6eabaae9777159cb75a710",
+  "behavior_check_candidate_before_import_cleanup": "d1164dfc680f4fd5b77b835a31b87286bb883f43",
+  "post_pin_cleanup": "Maintainer-authorized removal of unused AudioCaptureSpan imports only in batch_speaker.py and streaming_speaker.py; no behavior change. Replacement dd3cad was subsequently executed by policy-validation. Existing behavior evidence remains applicable.",
   "changed_files": [
     "src/puripuly_heart/core/stt/batch_speaker.py",
     "src/puripuly_heart/core/stt/streaming_speaker.py",
@@ -77,8 +78,8 @@
     "The first throwaway smoke reached successful source admission but report extraction used nonexistent FinalSpeakerRun.speaker_scope_id. The observer was corrected to session_scope and the final smoke completed; no product mutation was involved."
   ],
   "unobserved_or_pending": [
-    "Actual 50 ms production-drain GPU Qwen/Nemotron/Gemma acoustic usefulness and attribution accuracy remain the policy-validation owner's work after Director pin.",
-    "Real Korean translation meaning and actual Flet styles/color/readback are not claimed by these controlled contract checks.",
+    "At initial implementation handoff actual GPU/Gemma/Flet observations were pending. Policy-validation subsequently produced the pinned 30-case, 50 ms GPU matrix; the read-only own-final evidence disposition below does not replace its full acoustic/content/renderer acceptance report.",
+    "Real Korean translation meaning and actual Flet styles/color/readback are not claimed by the controlled contract checks; consult the validation owner's independent measured matrix.",
     "Both Nemotron profile comparisons, production default/profile acceptance, VRChat/SteamVR/HMD coexistence and photon latency remain outside this implementation handoff.",
     "No new cloud call, Parakeet model/native repair, synthetic Parakeet tail, provider dependency mutation, Git/GitHub mutation or maintained-doc edit was performed by this owner.",
     "Old-code regression failure is inferred from submission-time freeze/strict purity/confidence-fragmentation logic; old measured native failures were not rerun merely to confirm them."
@@ -87,6 +88,44 @@
     "architecture.md causal local batch section: replace submission-time conservative whole-input attribution with immutable submission provenance plus own-native-final attribution snapshot, and document unresolved-footprint retention/cap/reset behavior.",
     "architecture.md streaming section: describe confidence-only finalized-phrase preservation, shared bounded representative policy, and complete lexical cuts requiring release-local supported distinct keys. Earlier immutable releases remain separate.",
     "architecture.md local speaker evidence section: link the shared probability/budget constants and distinguish probability immutability, representative attribution and speaker-accuracy qualification.",
-    "issue218-speaker-attribution-plan.md: record exact starting limits, proven-used replay correction, the 943 .venv checks, controlled smoke evidence, and the still-pending actual GPU/Gemma/Flet acceptance observations. Do not present this handoff as production enablement or profile acceptance."
-  ]
+    "issue218-speaker-attribution-plan.md: record exact starting limits, proven-used replay correction, the 943 .venv checks, controlled smoke evidence, and subsequent measured own-final suffix-coverage limitations. Do not present useful partial attribution as completed returning-speaker acceptance or production/profile enablement."
+  ],
+  "post_matrix_own_final_disposition": {
+    "candidate": "dd3cad278dc683840c6eabaae9777159cb75a710",
+    "trace": "native/nemotron/issue218_policy_gpu_valid/trace.json",
+    "trace_sha256_as_recorded_by_validation_summary": "66148f92fff4a80b95c626f356e944f326adfcdd0aa1c3330ba19693fcc6c734",
+    "summary": "native/nemotron/issue218_policy_gpu_summary.json",
+    "method": "Read-only interval reconstruction from evidence-poll prefixes constrained by each authoritative own-final epoch and immutable frontier. No model/test rerun, product edit, wait, recoloring or heuristic retune.",
+    "evidence_poll_ms": 50,
+    "new_path_own_final_snapshots": 48,
+    "observed_states": {"identified": 26, "unavailable": 21, "uncertain": 1},
+    "observed_cache_frames_min_max": [62, 840],
+    "hard_cache_cap": 2048,
+    "observed_runtime_reasons": [null, "omitted_silence", "vad_pause"],
+    "root_cause": "All 21 unavailable snapshots have missing terminal-suffix eligible coverage, despite useful clear support for the expected key in the preceding delivered audio. The missing intervals are absent even from the reconstructed delivered prefix; stale active-floor pruning or cache exhaustion is not needed to explain these results. There is no observed reset/epoch discontinuity. The decisive unavailable branch is the hard coverage fence, not a whole-input confidence or majority vote.",
+    "same_intervals_observed_in_both_repeats": [
+      {"case": "clean_A_B", "profiles": ["1.04", "0.64"], "final": "B", "source": [49728, 77312], "missing": [70848, 77312], "missing_ms": 404, "scoring_speech_overlap_ms": 267.75, "clear_unique_support_ms": {"1": 1310}, "late_gap_closure_poll_delay_ms": {"1.04": [527.536, 556.5], "0.64": [182.241, 192.659]}},
+      {"case": "distinct_repeated_A_B_A", "profile": "1.04", "final": "returning A before hard rollover", "source": [75968, 105472], "missing": [93888, 105472], "missing_ms": 724, "scoring_speech_overlap_ms": 724, "clear_unique_support_ms": {"0": 1110}, "late_gap_closure_poll_delay_ms": [946.434, 982.152]},
+      {"case": "distinct_repeated_A_B_A", "profile": "0.64", "final": "returning A before hard rollover", "source": [75808, 105472], "missing": [101568, 105472], "missing_ms": 244, "scoring_speech_overlap_ms": 244, "clear_unique_support_ms": {"0": 1590}, "late_gap_closure_poll_delay_ms": [341.182, 293.339]},
+      {"case": "short_A_B_A", "profile": "1.04", "final": "returning A", "source": [54528, 92160], "missing": [82368, 92160], "missing_ms": 612, "scoring_speech_overlap_ms": 612, "clear_unique_support_ms": {"0": 1720}, "late_gap_closure_poll_delay_ms": [358.205, 350.234]},
+      {"case": "short_A_B_A", "profile": "0.64", "final": "returning A", "source": [54528, 92160], "missing": [86208, 92160], "missing_ms": 372, "scoring_speech_overlap_ms": 372, "clear_unique_support_ms": {"0": 1960}, "late_gap_closure_poll_delay_ms": [183.628, 203.692]},
+      {"case": "linguistic_correction", "profile": "1.04", "source": [8704, 41984], "missing": [35264, 41984], "missing_ms": 420, "scoring_speech_overlap_ms": 0, "clear_unique_support_ms": {"0": 1080}, "late_gap_closure_poll_delay_ms": [347.493, 505.352]},
+      {"case": "six_second_rollover", "profile": "1.04", "final": "first source", "source": [20992, 116736], "missing": [116672, 116736], "missing_ms": 4, "scoring_speech_overlap_ms": 4, "clear_unique_support_ms": {"0": 6000}, "late_gap_closure_poll_delay_ms": [514.325, 612.62]},
+      {"case": "six_second_rollover", "profile": "1.04", "final": "rollover successor", "source": [116736, 136704], "missing": [128192, 136704], "missing_ms": 532, "scoring_speech_overlap_ms": 408, "clear_unique_support_ms": {"0": 546}, "late_gap_closure_poll_delay_ms": [551.562, 374.906]},
+      {"case": "distinct_repeated_A_B_A", "profile": "1.04", "final": "rollover successor", "source": [105472, 120832], "replay": [100672, 105472], "missing": [105408, 120832], "missing_ms": 964, "scoring_speech_overlap_ms": 613.5625, "clear_unique_support_ms": {}, "late_gap_closure_poll_delay_ms": [491.641, 508.702]}
+    ],
+    "other_rollover_snapshots": [
+      {"case": "distinct_repeated_A_B_A", "profile": "0.64", "repeat": 1, "source": [105472, 120832], "missing": [116928, 120832], "missing_ms": 244, "scoring_speech_overlap_ms": 0, "clear_unique_support_ms": {"0": 236}, "late_gap_closure_poll_delay_ms": 38.553},
+      {"case": "distinct_repeated_A_B_A", "profile": "0.64", "repeat": 2, "source": [105472, 120832], "missing": [], "state": "uncertain", "unique_uncertainty": [109248, 111168], "unique_uncertainty_ms": 120, "clear_unique_support_ms": {"0": 236}, "uncertainty_to_clear_support_ratio": 0.5084745763, "decisive_limit": "20% unique-clear-support ratio; replay does not enlarge the denominator"},
+      {"case": "six_second_rollover", "profile": "0.64", "repeats": [1, 2], "both_sources": "Complete eligible coverage; both identified as same-epoch slot 0."}
+    ],
+    "identity_disposition": "Returning speech already has clear delivered slot-0 support in the same valid epoch. Later evidence inside the missing returning-A intervals also supports slot 0. Thus the trace supports continued anonymous-slot identity, not a demonstrated model reset. It does NOT provide published returning-A identity: later evidence cannot be used after the request's own-final snapshot.",
+    "acceptance_disposition": "Useful initial A/B and separate short-No gains remain measured positives, but clean-B and published returning-A identity requirements are empirically unmet. Under the approved hard-coverage plus own-final/no-future/no-wait agreement these suffixes remain unavailable. Do not mask gray as successful continuity, retune thresholds, exempt actual new speech, recolor publication or rerun the matrix to reconfirm the observation. Any relaxation or redesign of this timing/coverage fence is a shared maintainer decision rather than an authorized defect repair.",
+    "limits": [
+      "Evidence-poll timestamps are recorded before awaited engine acceptance. Late closure delays identify the first recorded poll containing all closing evidence, not a verified lock-acceptance or renderer timestamp.",
+      "No complete retained-cache snapshot was recorded. Authoritative cache counts remain below the hard cap; the absent eligible suffixes explain the unavailable decision without relying on cache/pruning reconstruction.",
+      "Assembly annotations are scoring only; speech overlap inside the missing interval is not oracle input to attribution.",
+      "Later same-epoch slot-0 evidence is retrospective root-cause evidence only, not eligible own-final proof or a general model-accuracy guarantee."
+    ]
+  }
 }

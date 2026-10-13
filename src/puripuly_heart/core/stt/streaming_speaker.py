@@ -385,6 +385,7 @@ class StreamingSpeakerSession:
         mapped = [self._mapped(turn, timing) for timing in lexical]
         speakers = [self._speaker(turn, timing) for timing in lexical]
         final = isinstance(event, STTProviderTurnTerminal) or event.source_release is not None
+        supported_regions = {}
         for boundary, predecessor, successor in self._timeline.transitions():
             transition_start = (
                 boundary.transition_start_sample
@@ -447,25 +448,27 @@ class StreamingSpeakerSession:
                 if final and cut not in fixed_endpoints:
                     lower = max(point for point in fixed_endpoints if point < cut)
                     upper = min(point for point in fixed_endpoints if point > cut)
-                    owned = [
-                        span
-                        for timing, ranges in zip(lexical, mapped)
-                        if lower <= timing.text_start and timing.text_end <= upper
-                        for span in ranges
-                    ]
-                    supported = {
-                        (frame.epoch, frame.slots)
-                        for frame in self._timeline.stable_frames()
-                        if frame.clear
-                        and any(
-                            span.capture_epoch == frame.span.capture_epoch
-                            and span.normalized_start_sample < frame.span.normalized_end_sample
-                            and frame.span.normalized_start_sample < span.normalized_end_sample
-                            for span in owned
-                        )
-                    }
+                    region = (lower, upper)
+                    if region not in supported_regions:
+                        owned = [
+                            span
+                            for timing, ranges in zip(lexical, mapped)
+                            if lower <= timing.text_start and timing.text_end <= upper
+                            for span in ranges
+                        ]
+                        supported_regions[region] = {
+                            (frame.epoch, frame.slots)
+                            for frame in self._timeline.stable_frames()
+                            if frame.clear
+                            and any(
+                                span.capture_epoch == frame.span.capture_epoch
+                                and span.normalized_start_sample < frame.span.normalized_end_sample
+                                and frame.span.normalized_start_sample < span.normalized_end_sample
+                                for span in owned
+                            )
+                        }
                     if not all(
-                        (frame.epoch, frame.slots) in supported
+                        (frame.epoch, frame.slots) in supported_regions[region]
                         for frame in (predecessor, successor)
                     ):
                         continue

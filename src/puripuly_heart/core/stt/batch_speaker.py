@@ -361,6 +361,7 @@ class CausalBatchSession:
                 parent.request,
                 identity=child_id,
                 isolate_failure=True,
+                on_native_terminal=self._snapshot_native_terminal,
             )
         )
         sequence = 0
@@ -412,31 +413,38 @@ class CausalBatchSession:
             self._active = None
             await self._release()
 
+    def _snapshot_native_terminal(self, event):
+        child = self._slices.get(event.identity)
+        if self._closed or child is None or child.parent.cancelled or child.speaker is not None:
+            return
+        child.speaker = (
+            self._attribute(
+                child.audio.source_ranges,
+                child.unique_context,
+                child.replayed_context,
+            )
+            if child.evidence_valid
+            and all(
+                span.capture_epoch == child.identity.segment.capture_epoch
+                for span in (*child.audio.source_ranges, *child.audio.context_ranges)
+            )
+            else FinalSpeakerRun(
+                "", None, "", source="nemotron", attribution_state="unavailable"
+            )
+        )
+        child.audio = replace(child.audio, speaker_attribution=child.speaker.attribution)
+
     async def _consume(self):
         try:
             async for event in self.inner.turn_events():
                 if isinstance(event, STTProviderTurnTerminal):
                     async with self._lock:
+                        if self._closed:
+                            continue
                         child = self._slices.pop(event.identity, None)
                         if child is not None:
-                            child.speaker = (
-                                self._attribute(
-                                    child.audio.source_ranges,
-                                    child.unique_context,
-                                    child.replayed_context,
-                                )
-                                if child.evidence_valid
-                                and all(
-                                    span.capture_epoch == child.identity.segment.capture_epoch
-                                    for span in (*child.audio.source_ranges, *child.audio.context_ranges)
-                                )
-                                else FinalSpeakerRun(
-                                    "", None, "", source="nemotron", attribution_state="unavailable"
-                                )
-                            )
-                            child.audio = replace(
-                                child.audio, speaker_attribution=child.speaker.attribution
-                            )
+                            if child.speaker is None:
+                                raise RuntimeError("native terminal did not snapshot speaker evidence")
                             child.result = event
                             self._prune_frames()
                             await self._release()

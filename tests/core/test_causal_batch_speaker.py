@@ -1341,3 +1341,130 @@ async def test_missing_central_eligible_evidence_is_not_a_confidence_hole():
     finally:
         await session.close()
         await backend.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("late_evidence", ["new", "immutable", "reset", "loss"])
+async def test_native_emission_freezes_evidence_before_wrapper_dequeue(late_evidence):
+    from tests.core.test_stt_scoped_engine import ControlledScopedSession
+
+    inner = ControlledScopedSession()
+    session = CausalBatchSession(inner)
+    req = request()
+    try:
+        await session.begin_turn(req)
+        await payload(session, req, 0, 16000, 1)
+        await seal(session, req)
+        if late_evidence != "new":
+            await session.observe_speaker_evidence(
+                (evidence(0, 16000, (0,), immutable=0 if late_evidence == "immutable"
+                          else 16000, state="open"),)
+            )
+        child_id = inner.requests[0].identity
+        child = session._slices[child_id]
+        inner.emit(STTProviderTurnTerminal(child_id, "final", "Alpha.",
+                                          text_authority="authoritative"))
+        assert child.result is None
+        expected = "0" if late_evidence in ("reset", "loss") else None
+        assert child.speaker.speaker_id == expected
+        if late_evidence == "new":
+            late = evidence(0, 16000, (0,), ready=1.0)
+        elif late_evidence == "immutable":
+            late = SpeakerEvidence("capture", 11, 1.0, (), 16000, 16000)
+        elif late_evidence == "reset":
+            late = evidence(0, 16000, (1,), epoch=12, ready=1.0)
+        else:
+            late = SpeakerEvidence("capture", 11, 1.0, (), 16000, 16000,
+                                   reason="input_overload")
+        await session.observe_speaker_evidence((late,))
+        result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
+        assert result.final_speaker_runs[0].speaker_id == expected
+        assert result.source_audio[0].speaker_attribution == child.speaker.attribution
+        assert result.text == "Alpha."
+        assert result.source_audio[0].source_ranges == (span(0, 16000),)
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_synchronous_terminal_during_seal_snapshots_without_reentering_wrapper_lock():
+    from tests.core.test_stt_scoped_engine import ControlledScopedSession
+
+    inner = ControlledScopedSession()
+    inner.terminal_on_seal = ("final", "Alpha.")
+    session = CausalBatchSession(inner)
+    req = request()
+    snapshots = []
+    snapshot = session._snapshot_native_terminal
+
+    def observe_native_terminal(event):
+        assert session._lock.locked()
+        snapshot(event)
+        snapshots.append(session._slices[event.identity].speaker)
+
+    session._snapshot_native_terminal = observe_native_terminal
+    try:
+        await session.begin_turn(req)
+        await payload(session, req, 0, 16000, 1)
+        await session.observe_speaker_evidence((evidence(0, 16000, (0,)),))
+        await asyncio.wait_for(seal(session, req), 2)
+        assert [speaker.speaker_id for speaker in snapshots] == ["0"]
+        result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
+        assert result.final_speaker_runs[0].speaker_id == "0"
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retirement", ["abort", "close"])
+async def test_retired_request_native_callback_cannot_touch_speaker_evidence(retirement):
+    from tests.core.test_stt_scoped_engine import ControlledScopedSession
+
+    inner = ControlledScopedSession()
+    session = CausalBatchSession(inner)
+    req = request()
+    try:
+        await session.begin_turn(req)
+        await payload(session, req, 0, 16000, 1)
+        await seal(session, req)
+        native_request = inner.requests[0]
+        child = session._slices[native_request.identity]
+
+        def unexpected_attribution(*args):
+            raise AssertionError("retired native callback touched evidence")
+
+        session._attribute = unexpected_attribution
+        if retirement == "abort":
+            await session.abort_turn(req.identity, reason="cancelled")
+        else:
+            await session.close()
+        native_request.on_native_terminal(
+            STTProviderTurnTerminal(native_request.identity, "final", "late")
+        )
+        assert child.speaker is None
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_native_terminal_during_close_is_conserved_without_unsnapshotted_publication():
+    from tests.core.test_stt_scoped_engine import ControlledScopedSession
+
+    class ClosingSession(ControlledScopedSession):
+        async def close(self):
+            if self.requests:
+                self.native_terminal_accepted = self.emit(
+                    STTProviderTurnTerminal(self.requests[0].identity, "failed")
+                )
+                await asyncio.sleep(0)
+            await super().close()
+
+    inner = ClosingSession()
+    session = CausalBatchSession(inner)
+    req = request()
+    await session.begin_turn(req)
+    await payload(session, req, 0, 16000, 1)
+    await seal(session, req)
+    await session.close()
+    assert session._consumer.cancelled() or session._consumer.exception() is None
+    assert inner.native_terminal_accepted

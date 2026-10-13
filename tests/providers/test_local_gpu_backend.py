@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -179,7 +180,13 @@ async def test_gpu_scoped_terminal_preserves_identity_and_expiry_is_not_empty(
         source_mode="auto",
     )
     session = await backend.open_session(projection=SCOPED_PROJECTION)
-    first = _scoped_request(1)
+    native_terminals = []
+
+    def observe_native_terminal(event):
+        assert session._event_projection.scoped_event_depth == 0
+        native_terminals.append(event)
+
+    first = replace(_scoped_request(1), on_native_terminal=observe_native_terminal)
     await session.begin_turn(first)
     await session.send_turn_audio(
         first.identity,
@@ -199,9 +206,10 @@ async def test_gpu_scoped_terminal_preserves_identity_and_expiry_is_not_empty(
     assert terminal.identity == first.identity
     assert terminal.outcome == "final"
     assert terminal.final_language_runs[0].language == "en"
+    assert native_terminals == [terminal]
 
     runtime.submit_failures.append(GpuASRWorkExpired("expired"))
-    second = _scoped_request(2)
+    second = replace(_scoped_request(2), on_native_terminal=observe_native_terminal)
     await session.begin_turn(second)
     await session.send_turn_audio(
         second.identity,
@@ -220,6 +228,8 @@ async def test_gpu_scoped_terminal_preserves_identity_and_expiry_is_not_empty(
     assert terminal.identity == second.identity
     assert terminal.outcome == "expired"
     assert terminal.text_authority == "none"
+    assert len(native_terminals) == 2
+    assert native_terminals[-1] is terminal
     await session.close()
     await backend.close()
 

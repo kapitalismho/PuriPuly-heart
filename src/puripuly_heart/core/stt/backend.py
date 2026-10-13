@@ -67,6 +67,9 @@ class STTProviderTurnRequest:
     isolate_failure: bool = False
     native_options: object | None = None
     optional_cutoff_at_monotonic_s: float | None = None
+    on_native_terminal: Callable[[STTProviderTurnTerminal], None] | None = field(
+        default=None, compare=False, repr=False
+    )
 
 
 @dataclass(frozen=True, slots=True)

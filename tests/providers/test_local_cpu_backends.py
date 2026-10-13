@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -178,7 +179,15 @@ async def test_local_cpu_scoped_decode_snapshots_pcm_and_emits_one_terminal(
     monkeypatch.setattr(backend, "_ensure_recognizer", ensure)
     monkeypatch.setattr(backend, "decode_f32", decode)
     session = await backend.open_session(projection=SCOPED_PROJECTION)
-    request = _scoped_request(channel=channel)
+    native_terminals = []
+
+    def observe_native_terminal(event):
+        assert session._event_projection.scoped_event_depth == 0
+        native_terminals.append(event)
+
+    request = replace(
+        _scoped_request(channel=channel), on_native_terminal=observe_native_terminal
+    )
     await session.begin_turn(request)
     await session.send_turn_audio(
         request.identity,
@@ -197,6 +206,7 @@ async def test_local_cpu_scoped_decode_snapshots_pcm_and_emits_one_terminal(
     assert isinstance(terminal, STTProviderTurnTerminal)
     assert terminal.outcome == "final"
     assert terminal.text == "same same"
+    assert native_terminals == [terminal]
     assert len(decoded) == 1
     assert decoded[0].size == 160
     await session.close()

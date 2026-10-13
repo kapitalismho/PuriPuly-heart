@@ -187,3 +187,57 @@ async def test_explicit_retirement_rejects_late_callbacks(retirement: str) -> No
     assert projection.is_current(request.identity) is False
     assert projection.terminal(terminal) is False
     projection.close()
+
+
+@pytest.mark.asyncio
+async def test_native_terminal_observer_runs_once_before_enqueue_and_reentry_is_stale():
+    projection = STTSessionEventProjection(STTSessionProjection("scoped", "epoch-1"))
+    observed = []
+
+    def observe(event):
+        assert projection.scoped_event_depth == 0
+        assert not projection.can_terminal(event.identity)
+        assert not projection.terminal(event)
+        observed.append(event)
+
+    request = replace(_request(), on_native_terminal=observe)
+    projection.begin(request)
+    terminal = STTProviderTurnTerminal(request.identity, "final", "Alpha.")
+    assert projection.terminal(terminal)
+    assert not projection.terminal(terminal)
+    assert observed == [terminal]
+    assert await anext(projection.turn_events()) is terminal
+    projection.close()
+
+
+@pytest.mark.asyncio
+async def test_native_terminal_observer_error_propagates_and_conserves_terminal():
+    projection = STTSessionEventProjection(STTSessionProjection("scoped", "epoch-1"))
+
+    def observe(event):
+        raise ValueError("native snapshot failed")
+
+    request = replace(_request(), on_native_terminal=observe)
+    projection.begin(request)
+    terminal = STTProviderTurnTerminal(request.identity, "final", "Alpha.")
+    with pytest.raises(ValueError, match="native snapshot failed"):
+        projection.terminal(terminal)
+    assert not projection.terminal(terminal)
+    assert await anext(projection.turn_events()) is terminal
+    projection.close()
+
+
+@pytest.mark.parametrize("retirement", ["retire", "end_epoch", "close"])
+def test_stale_native_terminal_never_invokes_request_observer(retirement):
+    projection = STTSessionEventProjection(STTSessionProjection("scoped", "epoch-1"))
+    observed = []
+    request = replace(_request(), on_native_terminal=observed.append)
+    projection.begin(request)
+    if retirement == "end_epoch":
+        projection.end_epoch(orderly=False, reason="reset")
+    else:
+        getattr(projection, retirement)()
+    assert not projection.terminal(STTProviderTurnTerminal(request.identity, "final", "late"))
+    assert not observed
+    assert not projection._native_terminal_observers
+    projection.close()

@@ -65,6 +65,7 @@ class ControlledScopedSession:
     calls: list[tuple[object, ...]]
     terminal_on_seal: tuple[str, str] | None = None
     allows_sealed_turn_overlap: bool = False
+    native_terminal_callbacks: dict[STTProviderTurnIdentity, Any] = field(default_factory=dict)
 
     def __init__(self) -> None:
         self.buffer = STTProviderEventBuffer()
@@ -78,9 +79,12 @@ class ControlledScopedSession:
         self.calls = []
         self.terminal_on_seal = None
         self.allows_sealed_turn_overlap = False
+        self.native_terminal_callbacks = {}
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         self.requests.append(request)
+        if request.on_native_terminal is not None:
+            self.native_terminal_callbacks[request.identity] = request.on_native_terminal
         self.calls.append(("begin", request.identity))
         await self.begin_gate.wait()
         self.calls.append(("begin_done", request.identity))
@@ -121,7 +125,7 @@ class ControlledScopedSession:
         self.calls.append(("seal_done", identity))
         if self.terminal_on_seal is not None:
             outcome, text = self.terminal_on_seal
-            self.buffer.put(
+            self.emit(
                 STTProviderTurnTerminal(
                     identity=identity,
                     outcome=outcome,
@@ -132,6 +136,7 @@ class ControlledScopedSession:
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         self.calls.append(("abort", identity, reason))
+        self.native_terminal_callbacks.pop(identity, None)
 
     async def turn_events(self):
         async for event in self.buffer.events():
@@ -143,9 +148,20 @@ class ControlledScopedSession:
     async def close(self) -> None:
         self.calls.append(("close",))
         self.buffer.close()
+        self.native_terminal_callbacks.clear()
 
     def emit(self, event: object) -> bool:
-        return self.buffer.put(cast(STTProviderTurnEvent, event))
+        observer = (
+            self.native_terminal_callbacks.pop(event.identity, None)
+            if isinstance(event, STTProviderTurnTerminal)
+            else None
+        )
+        try:
+            if observer is not None:
+                observer(event)
+        finally:
+            accepted = self.buffer.put(cast(STTProviderTurnEvent, event))
+        return accepted
 
 
 class BarrierCleanupScopedSession(ControlledScopedSession):

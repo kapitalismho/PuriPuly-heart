@@ -1,0 +1,573 @@
+{
+  "schema": "issue218-continuity-repair-1",
+  "measured_candidate": "dd3cad278dc683840c6eabaae9777159cb75a710",
+  "authoritative_gray_diagnosis": "native/nemotron/issue218_speaker_policy_report.json:post_matrix_own_final_disposition",
+  "trace": "native/nemotron/issue218_policy_gpu_valid/trace.json",
+  "trace_sha256": "66148f92fff4a80b95c626f356e944f326adfcdd0aa1c3330ba19693fcc6c734",
+  "mutation_authority": "Director approved F1 synchronous request-local hook and F2 fixed-region support reuse. Late-publication styling remains an unimplemented policy decision.",
+  "diagnosis": {
+    "states_reused": {
+      "snapshots": 48,
+      "identified": 26,
+      "unavailable": 21,
+      "uncertain": 1
+    },
+    "missing_cause": "Missing terminal-suffix immutable evidence at own native final, including actual speech. No observed reset/loss or cache exhaustion; unavailable suffixes remain absent even if all delivered frames are retained.",
+    "clear_support_and_blind_suffix_seconds": [
+      {
+        "case": "clean_A_B B",
+        "profiles": [
+          "1.04",
+          "0.64"
+        ],
+        "clear_unique": 1.31,
+        "source_footprint": 1.724,
+        "blind_suffix": 0.404
+      },
+      {
+        "case": "distinct_repeated_A_B_A return prefix",
+        "profile": "1.04",
+        "clear_unique": 1.11,
+        "source_footprint": 1.844,
+        "blind_suffix": 0.724
+      },
+      {
+        "case": "distinct_repeated_A_B_A return prefix",
+        "profile": "0.64",
+        "clear_unique": 1.59,
+        "source_footprint": 1.854,
+        "blind_suffix": 0.244
+      },
+      {
+        "case": "short_A_B_A return",
+        "profile": "1.04",
+        "clear_unique": 1.72,
+        "source_footprint": 2.352,
+        "blind_suffix": 0.612
+      },
+      {
+        "case": "short_A_B_A return",
+        "profile": "0.64",
+        "clear_unique": 1.96,
+        "source_footprint": 2.352,
+        "blind_suffix": 0.372
+      }
+    ],
+    "short_other_protection": "The actual No has 350 ms unique clear slot-1 support and remains a separate identified source. Observed foreign NEW/onset support remains a veto regardless of majority. Blind suffix allowances of 372-724 ms can hide a whole comparable short utterance; prefix-only identity cannot guarantee the unseen last speaker.",
+    "continuation_disjoint_cause": "The 1.04 continuation has no clear NEW support at own final; replay cannot supply the candidate. The 0.64 continuation eventually has complete coverage but 120 ms uncertainty versus 236 ms unique clear support (50.85%), so the current 20% policy leaves it uncertain even when later full proof is available.",
+    "quiet_counterevidence": "Exact capture reconstruction hashes matched. Later probabilities, diagnosis-only, show 150 ms clear B in clean-B blind suffix, 724/244 ms clear A in repeated-return prefix gaps, and 340/100 ms clear A in short-return gaps. These are not just known quiet tails.",
+    "unavailable_material": "Current GPU trace does not retain per-frame CaptureStreamInput.speech_observed or Silero probabilities. Start/end VAD events, PCM and later Nemotron probabilities cannot retrospectively certify causal VAD-known quiet inside each missing range. No VAD/model rerun performed."
+  },
+  "publication_counterfactual": {
+    "method": "Offline reconstruction from original evidence_poll prefixes and immutable frontiers, with hypothetical retention of the fixed original source/onset/replay footprint until publication. Applied unchanged current attribute_speaker policy; compared with actual Gemma completion, ordered publication entry and first actual Flet snapshot submission. No changed product path or rendering was executed.",
+    "result": {
+      "affected_gray_sources": 16,
+      "hypothetical_identified_before_first_snapshot": 6,
+      "profile_0_64_identified": 6,
+      "profile_0_64_affected": 8,
+      "profile_1_04_identified": 0,
+      "profile_1_04_affected": 8
+    },
+    "limits": [
+      "Poll timestamps precede awaited engine acceptance; lock-acceptance times are not recorded. These are counterfactual availability estimates, not executed late-style outputs or first-photon proof.",
+      "Actual own-final attribution releases retention; the reconstruction deliberately retains old required frames. Implementing late styling needs a separate bounded footprint lifetime.",
+      "First later frame is not full closing proof. The 1.04 repeated-return prefix still lacks 64 samples / 4 ms at natural publication; full proof closes 946-982 ms after final.",
+      "The 1.04 short-return rep1 proof was runtime-ready before first snapshot but delivered by the 50 ms poll 26.824 ms later; rep2 readiness itself followed the first snapshot. Ready alone is not delivered eligibility.",
+      "Complete evidence at publication would not fix the short continuation uncertainty ratio; no thresholds were changed.",
+      "No fixed wait, no first-publication postponement, no late recoloring, no ASR re-decode, and no source/text/origin/order/history mutation were introduced."
+    ],
+    "rows": [
+      {
+        "case_index": 5,
+        "case": "clean_A_B",
+        "profile": "1.04",
+        "repetition": 1,
+        "own_final_index": 1,
+        "text": "Gentlemen of the press.",
+        "source_id": "afe11eb1-92dd-5d68-b358-792de3f9ff4e",
+        "own_final_monotonic_s": 154883.4249235,
+        "publication_entry_monotonic_s": 154883.6501709,
+        "first_snapshot_monotonic_s": 154883.6511884,
+        "translation_complete_after_final_ms": 224.658,
+        "first_full_poll_after_final_ms": 527.536,
+        "full_poll_minus_first_snapshot_ms": 301.271,
+        "state_before_first_snapshot": "unavailable",
+        "complete_proof_before_first_snapshot": false,
+        "hypothetical_identified_before_first_snapshot": false,
+        "eventual_complete_coverage_state": "identified"
+      },
+      {
+        "case_index": 6,
+        "case": "distinct_repeated_A_B_A",
+        "profile": "1.04",
+        "repetition": 1,
+        "own_final_index": 2,
+        "text": "He washed the detritus from his.",
+        "source_id": "b5e2af44-01ae-5c55-86a2-b09c8eb98f2e",
+        "own_final_monotonic_s": 154894.0598402,
+        "publication_entry_monotonic_s": 154894.4070147,
+        "first_snapshot_monotonic_s": 154894.4081505,
+        "translation_complete_after_final_ms": 346.552,
+        "first_full_poll_after_final_ms": 946.434,
+        "full_poll_minus_first_snapshot_ms": 598.124,
+        "state_before_first_snapshot": "unavailable",
+        "complete_proof_before_first_snapshot": false,
+        "hypothetical_identified_before_first_snapshot": false,
+        "eventual_complete_coverage_state": "identified"
+      },
+      {
+        "case_index": 6,
+        "case": "distinct_repeated_A_B_A",
+        "profile": "1.04",
+        "repetition": 1,
+        "own_final_index": 3,
+        "text": "From his hair.",
+        "source_id": "ba3fb3e9-257c-5504-a859-4d6ef0e793e7",
+        "own_final_monotonic_s": 154894.9541235,
+        "publication_entry_monotonic_s": 154895.1477073,
+        "first_snapshot_monotonic_s": 154895.1487922,
+        "translation_complete_after_final_ms": 192.927,
+        "first_full_poll_after_final_ms": 491.641,
+        "full_poll_minus_first_snapshot_ms": 296.973,
+        "state_before_first_snapshot": "unavailable",
+        "complete_proof_before_first_snapshot": false,
+        "hypothetical_identified_before_first_snapshot": false,
+        "eventual_complete_coverage_state": "uncertain"
+      },
+      {
+        "case_index": 7,
+        "case": "short_A_B_A",
+        "profile": "1.04",
+        "repetition": 1,
+        "own_final_index": 2,
+        "text": "He washed the detritus from his hair.",
+        "source_id": "edc097f7-02d7-5367-88cc-a77cd1e02c37",
+        "own_final_monotonic_s": 154905.0269263,
+        "publication_entry_monotonic_s": 154905.3571166,
+        "first_snapshot_monotonic_s": 154905.3583075,
+        "translation_complete_after_final_ms": 329.441,
+        "first_full_poll_after_final_ms": 358.205,
+        "full_poll_minus_first_snapshot_ms": 26.824,
+        "state_before_first_snapshot": "unavailable",
+        "complete_proof_before_first_snapshot": false,
+        "hypothetical_identified_before_first_snapshot": false,
+        "eventual_complete_coverage_state": "identified"
+      },
+      {
+        "case_index": 10,
+        "case": "clean_A_B",
+        "profile": "0.64",
+        "repetition": 1,
+        "own_final_index": 1,
+        "text": "Gentlemen of the press.",
+        "source_id": "80157486-0155-5efa-a756-04504d102630",
+        "own_final_monotonic_s": 154934.8218631,
+        "publication_entry_monotonic_s": 154935.0308909,
+        "first_snapshot_monotonic_s": 154935.0319233,
+        "translation_complete_after_final_ms": 208.38,
+        "first_full_poll_after_final_ms": 182.241,
+        "full_poll_minus_first_snapshot_ms": -27.819,
+        "state_before_first_snapshot": "identified",
+        "complete_proof_before_first_snapshot": true,
+        "hypothetical_identified_before_first_snapshot": true,
+        "eventual_complete_coverage_state": "identified"
+      },
+      {
+        "case_index": 11,
+        "case": "distinct_repeated_A_B_A",
+        "profile": "0.64",
+        "repetition": 1,
+        "own_final_index": 2,
+        "text": "He washed the detritus from his.",
+        "source_id": "b864bd77-161c-5486-ae88-29df1cfac6fa",
+        "own_final_monotonic_s": 154946.0917334,
+        "publication_entry_monotonic_s": 154946.4509368,
+        "first_snapshot_monotonic_s": 154946.4522071,
+        "translation_complete_after_final_ms": 358.567,
+        "first_full_poll_after_final_ms": 341.182,
+        "full_poll_minus_first_snapshot_ms": -19.292,
+        "state_before_first_snapshot": "identified",
+        "complete_proof_before_first_snapshot": true,
+        "hypothetical_identified_before_first_snapshot": true,
+        "eventual_complete_coverage_state": "identified"
+      },
+      {
+        "case_index": 11,
+        "case": "distinct_repeated_A_B_A",
+        "profile": "0.64",
+        "repetition": 1,
+        "own_final_index": 3,
+        "text": "From his hair.",
+        "source_id": "9d03d591-9940-5aa9-a25f-14e1a39dfc11",
+        "own_final_monotonic_s": 154947.015916,
+        "publication_entry_monotonic_s": 154947.2132843,
+        "first_snapshot_monotonic_s": 154947.2142284,
+        "translation_complete_after_final_ms": 196.871,
+        "first_full_poll_after_final_ms": 38.553,
+        "full_poll_minus_first_snapshot_ms": -159.76,
+        "state_before_first_snapshot": "uncertain",
+        "complete_proof_before_first_snapshot": true,
+        "hypothetical_identified_before_first_snapshot": false,
+        "eventual_complete_coverage_state": "uncertain"
+      },
+      {
+        "case_index": 12,
+        "case": "short_A_B_A",
+        "profile": "0.64",
+        "repetition": 1,
+        "own_final_index": 2,
+        "text": "He washed the detritus from his hair.",
+        "source_id": "9b716bf6-3977-50e6-b9d9-3943e0799acd",
+        "own_final_monotonic_s": 154957.3532731,
+        "publication_entry_monotonic_s": 154957.6581842,
+        "first_snapshot_monotonic_s": 154957.6593574,
+        "translation_complete_after_final_ms": 304.159,
+        "first_full_poll_after_final_ms": 183.628,
+        "full_poll_minus_first_snapshot_ms": -122.456,
+        "state_before_first_snapshot": "identified",
+        "complete_proof_before_first_snapshot": true,
+        "hypothetical_identified_before_first_snapshot": true,
+        "eventual_complete_coverage_state": "identified"
+      },
+      {
+        "case_index": 15,
+        "case": "clean_A_B",
+        "profile": "1.04",
+        "repetition": 2,
+        "own_final_index": 1,
+        "text": "Gentlemen of the press.",
+        "source_id": "2d2e86de-5129-5825-bff4-93a6091fd773",
+        "own_final_monotonic_s": 154988.1428402,
+        "publication_entry_monotonic_s": 154988.3386798,
+        "first_snapshot_monotonic_s": 154988.3397023,
+        "translation_complete_after_final_ms": 195.247,
+        "first_full_poll_after_final_ms": 556.5,
+        "full_poll_minus_first_snapshot_ms": 359.637,
+        "state_before_first_snapshot": "unavailable",
+        "complete_proof_before_first_snapshot": false,
+        "hypothetical_identified_before_first_snapshot": false,
+        "eventual_complete_coverage_state": "identified"
+      },
+      {
+        "case_index": 16,
+        "case": "distinct_repeated_A_B_A",
+        "profile": "1.04",
+        "repetition": 2,
+        "own_final_index": 2,
+        "text": "He washed the detritus from his.",
+        "source_id": "102c82d5-8d2a-544e-a43e-e7a42c6a972d",
+        "own_final_monotonic_s": 154999.2911483,
+        "publication_entry_monotonic_s": 154999.6621393,
+        "first_snapshot_monotonic_s": 154999.6632446,
+        "translation_complete_after_final_ms": 370.377,
+        "first_full_poll_after_final_ms": 982.152,
+        "full_poll_minus_first_snapshot_ms": 610.056,
+        "state_before_first_snapshot": "unavailable",
+        "complete_proof_before_first_snapshot": false,
+        "hypothetical_identified_before_first_snapshot": false,
+        "eventual_complete_coverage_state": "identified"
+      },
+      {
+        "case_index": 16,
+        "case": "distinct_repeated_A_B_A",
+        "profile": "1.04",
+        "repetition": 2,
+        "own_final_index": 3,
+        "text": "From his hair.",
+        "source_id": "b5cc3d4a-9fc2-5597-b506-6f228e29096f",
+        "own_final_monotonic_s": 155000.2117058,
+        "publication_entry_monotonic_s": 155000.4024165,
+        "first_snapshot_monotonic_s": 155000.4033688,
+        "translation_complete_after_final_ms": 190.217,
+        "first_full_poll_after_final_ms": 508.702,
+        "full_poll_minus_first_snapshot_ms": 317.039,
+        "state_before_first_snapshot": "unavailable",
+        "complete_proof_before_first_snapshot": false,
+        "hypothetical_identified_before_first_snapshot": false,
+        "eventual_complete_coverage_state": "uncertain"
+      },
+      {
+        "case_index": 17,
+        "case": "short_A_B_A",
+        "profile": "1.04",
+        "repetition": 2,
+        "own_final_index": 2,
+        "text": "He washed the detritus from his hair.",
+        "source_id": "aac80b85-30d8-54fe-97b2-8d4331daae16",
+        "own_final_monotonic_s": 155010.1541033,
+        "publication_entry_monotonic_s": 155010.4362923,
+        "first_snapshot_monotonic_s": 155010.4377579,
+        "translation_complete_after_final_ms": 281.369,
+        "first_full_poll_after_final_ms": 350.234,
+        "full_poll_minus_first_snapshot_ms": 66.579,
+        "state_before_first_snapshot": "unavailable",
+        "complete_proof_before_first_snapshot": false,
+        "hypothetical_identified_before_first_snapshot": false,
+        "eventual_complete_coverage_state": "identified"
+      },
+      {
+        "case_index": 20,
+        "case": "clean_A_B",
+        "profile": "0.64",
+        "repetition": 2,
+        "own_final_index": 1,
+        "text": "Gentlemen of the press.",
+        "source_id": "4a99c114-73f3-5b94-8216-73de9343c71c",
+        "own_final_monotonic_s": 155039.3017027,
+        "publication_entry_monotonic_s": 155039.5057007,
+        "first_snapshot_monotonic_s": 155039.5067225,
+        "translation_complete_after_final_ms": 203.41,
+        "first_full_poll_after_final_ms": 192.659,
+        "full_poll_minus_first_snapshot_ms": -12.361,
+        "state_before_first_snapshot": "identified",
+        "complete_proof_before_first_snapshot": true,
+        "hypothetical_identified_before_first_snapshot": true,
+        "eventual_complete_coverage_state": "identified"
+      },
+      {
+        "case_index": 21,
+        "case": "distinct_repeated_A_B_A",
+        "profile": "0.64",
+        "repetition": 2,
+        "own_final_index": 2,
+        "text": "He washed the detritus from his.",
+        "source_id": "d559761b-ba62-50fd-b9b8-c0452bf74a59",
+        "own_final_monotonic_s": 155050.4309502,
+        "publication_entry_monotonic_s": 155050.7893002,
+        "first_snapshot_monotonic_s": 155050.7906514,
+        "translation_complete_after_final_ms": 357.716,
+        "first_full_poll_after_final_ms": 293.339,
+        "full_poll_minus_first_snapshot_ms": -66.362,
+        "state_before_first_snapshot": "identified",
+        "complete_proof_before_first_snapshot": true,
+        "hypothetical_identified_before_first_snapshot": true,
+        "eventual_complete_coverage_state": "identified"
+      },
+      {
+        "case_index": 21,
+        "case": "distinct_repeated_A_B_A",
+        "profile": "0.64",
+        "repetition": 2,
+        "own_final_index": 3,
+        "text": "From his hair.",
+        "source_id": "4c799c54-786b-5bdf-860b-3a9f1d500468",
+        "own_final_monotonic_s": 155051.3331878,
+        "publication_entry_monotonic_s": 155051.5250091,
+        "first_snapshot_monotonic_s": 155051.5259728,
+        "translation_complete_after_final_ms": 191.317,
+        "first_full_poll_after_final_ms": 59.274,
+        "full_poll_minus_first_snapshot_ms": -133.511,
+        "state_before_first_snapshot": "uncertain",
+        "complete_proof_before_first_snapshot": true,
+        "hypothetical_identified_before_first_snapshot": false,
+        "eventual_complete_coverage_state": "uncertain"
+      },
+      {
+        "case_index": 22,
+        "case": "short_A_B_A",
+        "profile": "0.64",
+        "repetition": 2,
+        "own_final_index": 2,
+        "text": "He washed the detritus from his hair.",
+        "source_id": "d1c5c54e-83bb-578c-84f4-dea061bfff07",
+        "own_final_monotonic_s": 155061.5403266,
+        "publication_entry_monotonic_s": 155061.8641295,
+        "first_snapshot_monotonic_s": 155061.8655229,
+        "translation_complete_after_final_ms": 322.992,
+        "first_full_poll_after_final_ms": 203.692,
+        "full_poll_minus_first_snapshot_ms": -121.504,
+        "state_before_first_snapshot": "identified",
+        "complete_proof_before_first_snapshot": true,
+        "hypothetical_identified_before_first_snapshot": true,
+        "eventual_complete_coverage_state": "identified"
+      }
+    ],
+    "design_findings": [
+      "SourceChild is frozen version 1 and includes own-final speaker and immutable RecognitionTextOrigin. Do not overwrite it or its origins after translation admission.",
+      "TranslationOutputSubmission and Translation already carry separate SpeakerAssignment; presenter accepts that assignment before unit.applied / speaker_style latch, then freezes first-readable style. Renderer wire shape need not change merely to supply a later one-time assignment.",
+      "PeerSpeakerIdentityAllocator currently allocates at on_parent_admitted and suppresses older/equal source-order allocation. Re-observing a late gray source through the current allocator is not a safe update; move display-only allocation to the existing ordered prepublication boundary if authorized.",
+      "The existing boring publication seam is PeerTranslationChannelOwner._publish_translation_result after await_translation_parent_output and before project_translation_result. Source-only/failure output and earlier readable streaming/preview events require the same one-time latch, not a translation-only assumption.",
+      "A style snapshot must be keyed by source identity/revision plus original capture/provider/speaker epochs, retain only its exact fixed footprint with existing hard limits, release on first readable publication/cancel/reset/retirement, and remain unavailable on missing/competing evidence. No waiting and no assumption that slower translation always covers diarization latency.",
+      "Display assignments must preserve source order and actual A-B-A partition. Existing same-key/display-group aggregation must be verified not to merge across an intervening different speaker when late identities become available.",
+      "This is a material attribution-versus-publication lifetime and allocator contract expansion, even though the separate presentation field and first-readable latch already exist. It needs Director/maintainer policy resolution and additional ownership before implementation."
+    ]
+  },
+  "implemented_repairs": {
+    "F1": "Added optional synchronous request-local on_native_terminal capability; existing STTSessionEventProjection invokes it exactly once before enqueue after retiring the terminal identity against reentry. CausalBatchSession snapshots speaker/audio attribution at that hook, not deferred dequeue. Closed/cancelled/stale requests do not touch evidence; later reset/closure/delivery cannot change a frozen verdict. Callback errors propagate while conserving the native terminal queue event.",
+    "F2": "Caches owned support once per fixed lawful release region within _complete_text_groups. Preserves existing lexical cuts, clock qualification and distinct-key guard; removes repeated identical T*F*W support scans.",
+    "product_files": [
+      "src/puripuly_heart/core/stt/backend.py",
+      "src/puripuly_heart/core/stt/session_projection.py",
+      "src/puripuly_heart/core/stt/batch_speaker.py",
+      "src/puripuly_heart/core/stt/streaming_speaker.py"
+    ],
+    "test_files": [
+      "tests/core/test_stt_session_projection.py",
+      "tests/core/test_causal_batch_speaker.py",
+      "tests/core/test_streaming_speaker.py",
+      "tests/core/test_stt_scoped_engine.py",
+      "tests/providers/test_local_cpu_backends.py",
+      "tests/providers/test_local_gpu_backend.py"
+    ],
+    "local_provider_migration": "CPU Qwen/Parakeet/Auto and GPU already forward the exact request through projection.begin and emit through projection.terminal, so provider implementations remain intentionally unchanged. Actual adapter tests now assert the hook precedes queue emission, including CPU instance decode_f32 overrides; ControlledScopedSession emit and synchronous terminal_on_seal migrate to the same capability.",
+    "unchanged": "Probability thresholds/budgets, missing-new-coverage rule, SourceChild contract, translation semantics, palette/presenter lifetime, PCM/options and native dependencies."
+  },
+  "verification": [
+    {
+      "command": ".venv/Scripts/python.exe -m pytest tests/core/test_stt_session_projection.py tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py tests/core/test_stt_scoped_engine.py tests/providers/test_local_cpu_backends.py tests/providers/test_local_gpu_backend.py -q",
+      "result": "349 passed; 26.09 s. Count recovered from the 349 successful progress markers in the original retained background result, whose summary was suppressed. No test rerun was performed merely to obtain this count. Original focused run preceded the final close guard and later test-convention correction.",
+      "original_count_evidence": {
+        "session": "history://continuity-repair",
+        "retained_record_id": "1ccd964a",
+        "background_job": "bg_29",
+        "successful_progress_markers": 349,
+        "summary_suppressed": true,
+        "method": "Counted the all-dot progress line in the original custom_message async-result record; completed process handle was no longer available."
+      }
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/stt/backend.py src/puripuly_heart/core/stt/session_projection.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/streaming_speaker.py tests/core/test_stt_session_projection.py tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py tests/core/test_stt_scoped_engine.py tests/providers/test_local_cpu_backends.py tests/providers/test_local_gpu_backend.py",
+      "result": "All checks passed before final close guard."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m pytest tests/core/test_causal_batch_speaker.py -q && .venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/stt/batch_speaker.py tests/core/test_causal_batch_speaker.py",
+      "result": "Passed after final close guard; all lint checks passed; 1.81 s."
+    },
+    {
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-B",
+        "-c",
+        "\nimport asyncio,json,time\nimport pytest\nfrom tests.core.test_streaming_speaker import test_high_retention_final_reuses_support_per_lawful_release_region\nfrom puripuly_heart.core.stt.streaming_speaker import StreamingSpeakerSession\nasync def main():\n rows=[]\n for region_count in (1,3):\n  patch=pytest.MonkeyPatch();original=StreamingSpeakerSession._complete_text_groups\n  def measured(self,turn,event,timings):\n   start=time.perf_counter();groups=list(original(self,turn,event,timings));elapsed=time.perf_counter()-start\n   rows.append(dict(retained_frames=len(self._timeline.frames),words=len(timings),duration_seconds=6,lawful_release_regions=region_count,groups=len(groups),complete_text_groups_seconds=elapsed))\n   return groups\n  patch.setattr(StreamingSpeakerSession,'_complete_text_groups',measured)\n  try:await test_high_retention_final_reuses_support_per_lawful_release_region(patch,region_count)\n  finally:patch.undo()\n print(json.dumps(rows))\nasyncio.run(main())\n"
+      ],
+      "result": [
+        {
+          "retained_frames": 2048,
+          "words": 60,
+          "duration_seconds": 6,
+          "lawful_release_regions": 1,
+          "groups": 60,
+          "complete_text_groups_seconds": 0.019220399990445003
+        },
+        {
+          "retained_frames": 2048,
+          "words": 60,
+          "duration_seconds": 6,
+          "lawful_release_regions": 3,
+          "groups": 60,
+          "complete_text_groups_seconds": 0.021750799991423264
+        }
+      ],
+      "limits": "Single legal 2048-frame/60-word/6-second synthetic CPU-path observation with 1 and 3 fixed regions; 60 groups in both. Reuses reviewer baseline 55.6 ms and old candidate 405.9 ms as prior counterevidence; new fixture construction differs, so no matched speedup ratio is claimed. The historical probe invoked the then-existing stress fixture; that permanent fixture was subsequently replaced with consumer-only behavior coverage. Exact scan-call-count assertions/instrumentation have been removed from permanent tests. Timing/scan efficiency remains task-local probe evidence, without a permanent timing threshold. Product F2 implementation is unchanged.",
+      "probe_code_sha256": "77f24182672dc7c5df5983482349db37b2ef1d2078ae761d3aaad445b4275d6b"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m pytest tests/core/test_streaming_speaker.py::test_high_retention_final_preserves_owned_groups_and_qualified_clock -q && .venv/Scripts/python.exe -m ruff check tests/core/test_streaming_speaker.py",
+      "result": "4 passed; affected consumer tests only. Ruff all checks passed; combined wall time 2.48 s.",
+      "checks": "Uses public evidence acceptance, provider update/session release and downstream source/translation owners. Qualified clocks preserve 60 distinct ordered source children, exact text/ranges, alternating identities and 60 translation calls. Unqualified clocks preserve one coherent gray source, with no fabricated word identities. No exact internal support-scan-count assertions, monkeypatch instrumentation or permanent timing threshold remain.",
+      "initial_invalid_expectations": "The first test-edit run yielded 1 pass/3 failures because the new test incorrectly expected unknown-clock consumer splitting across result spans inside one release, and equated bounded retained history length with all 60 admitted jobs. The observable outgoing groups, qualified 60 children and 60 calls already matched. Corrected the test expectations to existing coherent-gray behavior and bounded history; no product change was made."
+    }
+  ],
+  "director_docs_changes_proposed": [
+    "Plan/architecture own-native-final wording should name synchronous native terminal emission hook rather than consumer dequeue.",
+    "Record accepted F1/F2 closure and focused behavior/performance evidence without claiming all GPU gray outcomes fixed.",
+    "Retain initial own-final missing-coverage qualification failure and the publication-only policy decision as separate from repaired code bugs."
+  ],
+  "remaining": "Focused actual installed Parakeet CPU F1 smoke completed. No repaired-candidate GPU/native-replay/GUI matrix rerun, no late-publication style implementation, no profile/VR/cloud qualification. Director owns docs/git and scoped integration/acceptance.",
+  "validation_index": "native/nemotron/issue218_policy_summary.json",
+  "actual_native_F1_smoke": {
+    "command": [
+      ".venv/Scripts/python.exe",
+      "-B",
+      "-c",
+      "\nimport asyncio,hashlib,importlib.metadata,json,sys,time\nfrom pathlib import Path\nfrom types import SimpleNamespace\nfrom uuid import UUID\nsys.path.insert(0,'src')\nsys.path.insert(0,'native/nemotron')\nimport issue215_smoke as prior\nfrom issue218_parakeet_probe import archived_jobs,frozen,digest\nfrom puripuly_heart.core.audio.format import AudioCaptureSpan,float32_to_pcm16le_bytes\nfrom puripuly_heart.core.audio.ownership import AudioSegmentIdentity,AudioSegmentSettingsSnapshot\nfrom puripuly_heart.core.speaker.contracts import ProbabilityFrame,SourceMapPiece,SpeakerEvidence\nfrom puripuly_heart.core.stt.backend import STTProviderTurnIdentity,STTProviderTurnRequest,STTProviderTurnTerminal,STTSessionProjection\nfrom puripuly_heart.core.stt.batch_speaker import CausalBatchSession\nfrom puripuly_heart.providers.stt.local_parakeet_sherpa import LocalParakeetV3SherpaSTTBackend\nclass ObservedBatch(CausalBatchSession):\n def __init__(self,inner):\n  self.dequeue_gate=asyncio.Event()\n  self.native_emitted=asyncio.Event()\n  self.observations=[]\n  super().__init__(inner)\n async def _consume(self):\n  await self.dequeue_gate.wait()\n  await super()._consume()\n def _snapshot_native_terminal(self,event):\n  super()._snapshot_native_terminal(event)\n  child=self._slices[event.identity]\n  self.observations.append(dict(at=time.monotonic(),native_outcome=event.outcome,native_text=event.text,projection_queue_depth_before_enqueue=self.inner._event_projection.scoped_event_depth,consumer_dequeue_gate_open=self.dequeue_gate.is_set(),child_result_not_dequeued=child.result is None,frames_at_native_final=len(self._frames),immutable_at_native_final=self._immutable,snapshot=prior.serial(child.speaker),source_ranges=prior.serial(child.audio.source_ranges),context_ranges=prior.serial(child.audio.context_ranges)))\n  self.native_emitted.set()\nasync def main():\n started=time.monotonic()\n versions={name:importlib.metadata.version(name) for name in ('sherpa-onnx','sherpa-onnx-core','numpy','onnxruntime')}\n assert versions['sherpa-onnx']==versions['sherpa-onnx-core']=='1.13.5'\n model=Path.home()/'AppData/Local/puripuly-heart/models/parakeet-tdt-0.6b-v3-int8-sherpa'\n expected=json.loads(Path('native/nemotron/issue218_parakeet_product_smoke.json').read_text(encoding='utf-8'))\n model_hashes={name:digest(model/name) for name in expected['model_sha256']}\n assert model_hashes==expected['model_sha256']\n _,cases=prior.input_cases(SimpleNamespace(corpus=Path.home()/'.cache/puripuly-heart/sim-v02-public-corpus-600-v1',correction_root=Path.cwd().parent/'listen-mega-integrate-nemotron-speaker-tracking/docs/experiments/issue-212-clarification'))\n values,_=cases['distinct_repeated_A_B_A']\n jobs=archived_jobs(values,float32_to_pcm16le_bytes(values))\n job=next(j for j in jobs if j['pcm16_sha256']=='563945ae319de1dbb7286714e9bf651d30ce1462ce1a6b75750021162b85a586')\n backend=LocalParakeetV3SherpaSTTBackend(model_dir=model,num_threads=2,language_hint=None)\n await backend._ensure_recognizer()\n raw=job['request'];ri=raw['identity'];segment=ri['segment']\n identity=STTProviderTurnIdentity(AudioSegmentIdentity(**{**segment,'segment_id':UUID(segment['segment_id'])}),ri['provider_epoch_id'],ri['provider_turn_id'],frozen(ri['settings_scope']))\n settings=AudioSegmentSettingsSnapshot(**{k:frozen(v) for k,v in raw['settings'].items()})\n inner=await backend.open_session(projection=STTSessionProjection('scoped',identity.provider_epoch_id))\n session=ObservedBatch(inner)\n req=STTProviderTurnRequest(identity,settings,channel=raw['channel'],display_group_id=UUID(raw['display_group_id']) if raw['display_group_id'] else None,isolate_failure=raw['isolate_failure'])\n try:\n  await session.begin_turn(req)\n  offset=0\n  for payload in job['submission']['payloads']:\n   end=offset+payload['samples']*2\n   await session.send_turn_audio(identity,job['pcm'][offset:end],payload_sequence=payload['payload_sequence'],source_ranges=tuple(AudioCaptureSpan(**s) for s in payload['source_ranges']),context_only=payload['context_only'])\n   offset=end\n  assert offset==len(job['pcm'])\n  await session.seal_turn(identity,sealed_content_ranges=tuple(AudioCaptureSpan(**s) for s in job['submission']['sealed_content_ranges']),seal_reason=job['submission']['seal_reason'],observed_trailing_silence_ms=job['submission']['observed_trailing_silence_ms'])\n  native_child=next(iter(session._slices.values()))\n  queued_options=native_child.parent.request.native_options\n  native_options={name:prior.serial(getattr(queued_options,name,None)) for name in ('model_id','provider_id','num_threads','language_hint','hotwords')}\n  assert native_options['num_threads']==2 and native_options['language_hint'] is None\n  await asyncio.wait_for(session.native_emitted.wait(),30)\n  observation=session.observations[0]\n  assert len(session.observations)==1\n  assert observation['native_outcome']=='final' and observation['native_text']\n  assert observation['projection_queue_depth_before_enqueue']==0\n  assert observation['child_result_not_dequeued'] and not observation['consumer_dequeue_gate_open']\n  assert inner._event_projection.scoped_event_depth==1\n  frozen_speaker=native_child.speaker\n  assert frozen_speaker.attribution_state=='unavailable' and frozen_speaker.speaker_id is None\n  trace=json.loads(Path('native/nemotron/issue218_policy_gpu_valid/trace.json').read_text(encoding='utf-8'))\n  case=trace['cases'][6]\n  proof=[]\n  for item in case['evidence']:\n   pieces=tuple(SourceMapPiece(p['compact_start_sample'],p['compact_end_sample'],AudioCaptureSpan(**p['capture']) if p['capture'] else None,p['kind']) for p in item['source_map'])\n   f=item['frame']\n   frame=ProbabilityFrame(f['start_sample'],f['end_sample'],tuple(f['probabilities']),tuple(f['active_slots'])) if f else None\n   proof.append(SpeakerEvidence(item['capture_session_id'],item['speaker_epoch'],item['observation_ready_monotonic_s'],pieces,item['processed_through_sample'],item['immutable_through_sample'],frame,item['range_state'],item['reason']))\n  late_delivery_started=time.monotonic()\n  await session.observe_speaker_evidence(tuple(proof))\n  late_current=session._attribute(native_child.audio.source_ranges,native_child.unique_context,native_child.replayed_context)\n  assert late_current.attribution_state=='identified' and late_current.speaker_id=='0'\n  assert native_child.speaker is frozen_speaker and native_child.result is None\n  assert inner._event_projection.scoped_event_depth==1\n  session.dequeue_gate.set()\n  stream=session.turn_events()\n  while True:\n   terminal=await asyncio.wait_for(anext(stream),5)\n   if isinstance(terminal,STTProviderTurnTerminal):break\n  assert terminal.text==observation['native_text']\n  assert terminal.outcome=='final' and len(terminal.source_audio)==1\n  assert terminal.final_speaker_runs[0].speaker_id is None\n  assert terminal.final_speaker_runs[0].attribution_state=='unavailable'\n  assert terminal.source_audio[0].speaker_attribution==frozen_speaker.attribution\n  assert terminal.source_audio[0].source_ranges==native_child.audio.source_ranges\n  assert terminal.source_audio[0].display_group_id==req.display_group_id\n  import sherpa_onnx\n  result=dict(schema='issue218-f1-actual-parakeet-hook-smoke-1',status='passed',python=sys.version,dependencies=versions,native_runtime={name:str(getattr(sherpa_onnx,name)) for name in ('version','git_sha1','onnxruntime_version')},model_sha256=model_hashes,approved_archive='native/nemotron/issue218_evidence.zip',approved_capture_ranges=job['capture_ranges'],pcm16_sha256=hashlib.sha256(job['pcm']).hexdigest(),samples=len(job['pcm'])//2,native_decode_requests=1,native_options=native_options,hook_observation=observation,late_delivery_started_at=late_delivery_started,replayed_probability_source='native/nemotron/issue218_policy_gpu_valid/trace.json:cases[6].evidence',replayed_probability_items=len(proof),late_current_diagnostic=prior.serial(late_current),frozen_snapshot_unchanged_before_dequeue=True,published_terminal=dict(outcome=terminal.outcome,text=terminal.text,text_authority=terminal.text_authority,speaker=prior.serial(terminal.final_speaker_runs[0]),source_audio=prior.serial(terminal.source_audio)),wall_seconds=time.monotonic()-started,limits='One real installed Parakeet CPU decode, exact approved PCM/model/options, through current CausalBatchSession and actual STTSessionEventProjection. Consumer gate is task-local scheduling instrumentation. Late proof replays existing real Nemotron frames, not live Nemotron/GPU inference. No translation, cloud, renderer, wait policy or product mutation; prior lexical hand substitution remains.')\n  print(json.dumps(result))\n finally:\n  session.dequeue_gate.set()\n  await session.close()\n  await backend.close()\nasyncio.run(main())\n"
+    ],
+    "probe_code_sha256": "0211d5ef895bd9f0db035033430261e1c8f187c7473a57cee60e27fb185b62d4",
+    "exit_code": 0,
+    "stdout": "{\"schema\": \"issue218-f1-actual-parakeet-hook-smoke-1\", \"status\": \"passed\", \"python\": \"3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]\", \"dependencies\": {\"sherpa-onnx\": \"1.13.5\", \"sherpa-onnx-core\": \"1.13.5\", \"numpy\": \"2.5.1\", \"onnxruntime\": \"1.28.0\"}, \"native_runtime\": {\"version\": \"1.13.5\", \"git_sha1\": \"3dc7c569\", \"onnxruntime_version\": \"1.28.0\"}, \"model_sha256\": {\"decoder.int8.onnx\": \"179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e\", \"encoder.int8.onnx\": \"acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247\", \"installed-manifest.json\": \"82b63f3fb4ab1c08821dbad59bc5683e7d1cde57e7291754c8f211f833ffee61\", \"joiner.int8.onnx\": \"3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3\", \"tokens.txt\": \"d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d\"}, \"approved_archive\": \"native/nemotron/issue218_evidence.zip\", \"approved_capture_ranges\": [[75968, 105472, \"new_content\"]], \"pcm16_sha256\": \"563945ae319de1dbb7286714e9bf651d30ce1462ce1a6b75750021162b85a586\", \"samples\": 29504, \"native_decode_requests\": 1, \"native_options\": {\"model_id\": \"parakeet-tdt-0.6b-v3-int8-sherpa\", \"provider_id\": \"local_parakeet_v3\", \"num_threads\": 2, \"language_hint\": null, \"hotwords\": []}, \"hook_observation\": {\"at\": 18454.3959685, \"native_outcome\": \"final\", \"native_text\": \"He washed the detritus from his hand.\", \"projection_queue_depth_before_enqueue\": 0, \"consumer_dequeue_gate_open\": false, \"child_result_not_dequeued\": true, \"frames_at_native_final\": 0, \"immutable_at_native_final\": 0, \"snapshot\": {\"text\": \"\", \"speaker_id\": null, \"session_scope\": \"\", \"source_start_ms\": null, \"source_end_ms\": null, \"overlaps_previous\": false, \"source\": \"nemotron\", \"attribution_state\": \"unavailable\"}, \"source_ranges\": [{\"capture_epoch\": 7, \"callback_sequence\": 148, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 75968, \"source_end_sample\": 76288, \"source_start_monotonic_s\": 135598.76303139998, \"source_end_monotonic_s\": 135598.7830314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 75968, \"normalized_end_sample\": 76288}, {\"capture_epoch\": 7, \"callback_sequence\": 149, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 76288, \"source_end_sample\": 76800, \"source_start_monotonic_s\": 135598.7830314, \"source_end_monotonic_s\": 135598.81503139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 76288, \"normalized_end_sample\": 76800}, {\"capture_epoch\": 7, \"callback_sequence\": 150, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 76800, \"source_end_sample\": 77312, \"source_start_monotonic_s\": 135598.81503139998, \"source_end_monotonic_s\": 135598.8470314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 76800, \"normalized_end_sample\": 77312}, {\"capture_epoch\": 7, \"callback_sequence\": 151, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 77312, \"source_end_sample\": 77824, \"source_start_monotonic_s\": 135598.8470314, \"source_end_monotonic_s\": 135598.8790314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 77312, \"normalized_end_sample\": 77824}, {\"capture_epoch\": 7, \"callback_sequence\": 152, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 77824, \"source_end_sample\": 78336, \"source_start_monotonic_s\": 135598.8790314, \"source_end_monotonic_s\": 135598.9110314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 77824, \"normalized_end_sample\": 78336}, {\"capture_epoch\": 7, \"callback_sequence\": 153, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 78336, \"source_end_sample\": 78848, \"source_start_monotonic_s\": 135598.9110314, \"source_end_monotonic_s\": 135598.9430314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 78336, \"normalized_end_sample\": 78848}, {\"capture_epoch\": 7, \"callback_sequence\": 154, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 78848, \"source_end_sample\": 79360, \"source_start_monotonic_s\": 135598.9430314, \"source_end_monotonic_s\": 135598.97503139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 78848, \"normalized_end_sample\": 79360}, {\"capture_epoch\": 7, \"callback_sequence\": 155, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 79360, \"source_end_sample\": 79872, \"source_start_monotonic_s\": 135598.97503139998, \"source_end_monotonic_s\": 135599.0070314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 79360, \"normalized_end_sample\": 79872}, {\"capture_epoch\": 7, \"callback_sequence\": 156, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 79872, \"source_end_sample\": 80384, \"source_start_monotonic_s\": 135599.0070314, \"source_end_monotonic_s\": 135599.0390314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 79872, \"normalized_end_sample\": 80384}, {\"capture_epoch\": 7, \"callback_sequence\": 157, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 80384, \"source_end_sample\": 80896, \"source_start_monotonic_s\": 135599.0390314, \"source_end_monotonic_s\": 135599.0710314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 80384, \"normalized_end_sample\": 80896}, {\"capture_epoch\": 7, \"callback_sequence\": 158, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 80896, \"source_end_sample\": 81408, \"source_start_monotonic_s\": 135599.0710314, \"source_end_monotonic_s\": 135599.10303139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 80896, \"normalized_end_sample\": 81408}, {\"capture_epoch\": 7, \"callback_sequence\": 159, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 81408, \"source_end_sample\": 81920, \"source_start_monotonic_s\": 135599.10303139998, \"source_end_monotonic_s\": 135599.1350314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 81408, \"normalized_end_sample\": 81920}, {\"capture_epoch\": 7, \"callback_sequence\": 160, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 81920, \"source_end_sample\": 82432, \"source_start_monotonic_s\": 135599.1350314, \"source_end_monotonic_s\": 135599.1670314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 81920, \"normalized_end_sample\": 82432}, {\"capture_epoch\": 7, \"callback_sequence\": 161, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 82432, \"source_end_sample\": 82944, \"source_start_monotonic_s\": 135599.1670314, \"source_end_monotonic_s\": 135599.1990314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 82432, \"normalized_end_sample\": 82944}, {\"capture_epoch\": 7, \"callback_sequence\": 162, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 82944, \"source_end_sample\": 83456, \"source_start_monotonic_s\": 135599.1990314, \"source_end_monotonic_s\": 135599.23103139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 82944, \"normalized_end_sample\": 83456}, {\"capture_epoch\": 7, \"callback_sequence\": 163, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 83456, \"source_end_sample\": 83968, \"source_start_monotonic_s\": 135599.23103139998, \"source_end_monotonic_s\": 135599.26303139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 83456, \"normalized_end_sample\": 83968}, {\"capture_epoch\": 7, \"callback_sequence\": 164, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 83968, \"source_end_sample\": 84480, \"source_start_monotonic_s\": 135599.26303139998, \"source_end_monotonic_s\": 135599.2950314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 83968, \"normalized_end_sample\": 84480}, {\"capture_epoch\": 7, \"callback_sequence\": 165, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 84480, \"source_end_sample\": 84992, \"source_start_monotonic_s\": 135599.2950314, \"source_end_monotonic_s\": 135599.3270314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 84480, \"normalized_end_sample\": 84992}, {\"capture_epoch\": 7, \"callback_sequence\": 166, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 84992, \"source_end_sample\": 85504, \"source_start_monotonic_s\": 135599.3270314, \"source_end_monotonic_s\": 135599.3590314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 84992, \"normalized_end_sample\": 85504}, {\"capture_epoch\": 7, \"callback_sequence\": 167, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 85504, \"source_end_sample\": 86016, \"source_start_monotonic_s\": 135599.3590314, \"source_end_monotonic_s\": 135599.39103139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 85504, \"normalized_end_sample\": 86016}, {\"capture_epoch\": 7, \"callback_sequence\": 168, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 86016, \"source_end_sample\": 86528, \"source_start_monotonic_s\": 135599.39103139998, \"source_end_monotonic_s\": 135599.4230314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 86016, \"normalized_end_sample\": 86528}, {\"capture_epoch\": 7, \"callback_sequence\": 169, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 86528, \"source_end_sample\": 87040, \"source_start_monotonic_s\": 135599.4230314, \"source_end_monotonic_s\": 135599.4550314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 86528, \"normalized_end_sample\": 87040}, {\"capture_epoch\": 7, \"callback_sequence\": 170, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 87040, \"source_end_sample\": 87552, \"source_start_monotonic_s\": 135599.4550314, \"source_end_monotonic_s\": 135599.4870314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 87040, \"normalized_end_sample\": 87552}, {\"capture_epoch\": 7, \"callback_sequence\": 171, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 87552, \"source_end_sample\": 88064, \"source_start_monotonic_s\": 135599.4870314, \"source_end_monotonic_s\": 135599.51903139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 87552, \"normalized_end_sample\": 88064}, {\"capture_epoch\": 7, \"callback_sequence\": 172, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 88064, \"source_end_sample\": 88576, \"source_start_monotonic_s\": 135599.51903139998, \"source_end_monotonic_s\": 135599.55103139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 88064, \"normalized_end_sample\": 88576}, {\"capture_epoch\": 7, \"callback_sequence\": 173, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 88576, \"source_end_sample\": 89088, \"source_start_monotonic_s\": 135599.55103139998, \"source_end_monotonic_s\": 135599.5830314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 88576, \"normalized_end_sample\": 89088}, {\"capture_epoch\": 7, \"callback_sequence\": 174, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 89088, \"source_end_sample\": 89600, \"source_start_monotonic_s\": 135599.5830314, \"source_end_monotonic_s\": 135599.6150314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 89088, \"normalized_end_sample\": 89600}, {\"capture_epoch\": 7, \"callback_sequence\": 175, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 89600, \"source_end_sample\": 90112, \"source_start_monotonic_s\": 135599.6150314, \"source_end_monotonic_s\": 135599.6470314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 89600, \"normalized_end_sample\": 90112}, {\"capture_epoch\": 7, \"callback_sequence\": 176, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 90112, \"source_end_sample\": 90624, \"source_start_monotonic_s\": 135599.6470314, \"source_end_monotonic_s\": 135599.67903139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 90112, \"normalized_end_sample\": 90624}, {\"capture_epoch\": 7, \"callback_sequence\": 177, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 90624, \"source_end_sample\": 91136, \"source_start_monotonic_s\": 135599.67903139998, \"source_end_monotonic_s\": 135599.7110314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 90624, \"normalized_end_sample\": 91136}, {\"capture_epoch\": 7, \"callback_sequence\": 178, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 91136, \"source_end_sample\": 91648, \"source_start_monotonic_s\": 135599.7110314, \"source_end_monotonic_s\": 135599.7430314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 91136, \"normalized_end_sample\": 91648}, {\"capture_epoch\": 7, \"callback_sequence\": 179, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 91648, \"source_end_sample\": 92160, \"source_start_monotonic_s\": 135599.7430314, \"source_end_monotonic_s\": 135599.7750314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 91648, \"normalized_end_sample\": 92160}, {\"capture_epoch\": 7, \"callback_sequence\": 180, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 92160, \"source_end_sample\": 92672, \"source_start_monotonic_s\": 135599.7750314, \"source_end_monotonic_s\": 135599.80703139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 92160, \"normalized_end_sample\": 92672}, {\"capture_epoch\": 7, \"callback_sequence\": 181, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 92672, \"source_end_sample\": 93184, \"source_start_monotonic_s\": 135599.80703139998, \"source_end_monotonic_s\": 135599.83903139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 92672, \"normalized_end_sample\": 93184}, {\"capture_epoch\": 7, \"callback_sequence\": 182, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 93184, \"source_end_sample\": 93696, \"source_start_monotonic_s\": 135599.83903139998, \"source_end_monotonic_s\": 135599.8710314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 93184, \"normalized_end_sample\": 93696}, {\"capture_epoch\": 7, \"callback_sequence\": 183, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 93696, \"source_end_sample\": 94208, \"source_start_monotonic_s\": 135599.8710314, \"source_end_monotonic_s\": 135599.9030314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 93696, \"normalized_end_sample\": 94208}, {\"capture_epoch\": 7, \"callback_sequence\": 184, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 94208, \"source_end_sample\": 94720, \"source_start_monotonic_s\": 135599.9030314, \"source_end_monotonic_s\": 135599.9350314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 94208, \"normalized_end_sample\": 94720}, {\"capture_epoch\": 7, \"callback_sequence\": 185, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 94720, \"source_end_sample\": 95232, \"source_start_monotonic_s\": 135599.9350314, \"source_end_monotonic_s\": 135599.96703139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 94720, \"normalized_end_sample\": 95232}, {\"capture_epoch\": 7, \"callback_sequence\": 186, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 95232, \"source_end_sample\": 95744, \"source_start_monotonic_s\": 135599.96703139998, \"source_end_monotonic_s\": 135599.9990314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 95232, \"normalized_end_sample\": 95744}, {\"capture_epoch\": 7, \"callback_sequence\": 187, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 95744, \"source_end_sample\": 96256, \"source_start_monotonic_s\": 135599.9990314, \"source_end_monotonic_s\": 135600.0310314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 95744, \"normalized_end_sample\": 96256}, {\"capture_epoch\": 7, \"callback_sequence\": 188, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 96256, \"source_end_sample\": 96768, \"source_start_monotonic_s\": 135600.0310314, \"source_end_monotonic_s\": 135600.0630314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 96256, \"normalized_end_sample\": 96768}, {\"capture_epoch\": 7, \"callback_sequence\": 189, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 96768, \"source_end_sample\": 97280, \"source_start_monotonic_s\": 135600.0630314, \"source_end_monotonic_s\": 135600.09503139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 96768, \"normalized_end_sample\": 97280}, {\"capture_epoch\": 7, \"callback_sequence\": 190, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 97280, \"source_end_sample\": 97792, \"source_start_monotonic_s\": 135600.09503139998, \"source_end_monotonic_s\": 135600.12703139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 97280, \"normalized_end_sample\": 97792}, {\"capture_epoch\": 7, \"callback_sequence\": 191, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 97792, \"source_end_sample\": 98304, \"source_start_monotonic_s\": 135600.12703139998, \"source_end_monotonic_s\": 135600.1590314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 97792, \"normalized_end_sample\": 98304}, {\"capture_epoch\": 7, \"callback_sequence\": 192, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 98304, \"source_end_sample\": 98816, \"source_start_monotonic_s\": 135600.1590314, \"source_end_monotonic_s\": 135600.1910314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 98304, \"normalized_end_sample\": 98816}, {\"capture_epoch\": 7, \"callback_sequence\": 193, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 98816, \"source_end_sample\": 99328, \"source_start_monotonic_s\": 135600.1910314, \"source_end_monotonic_s\": 135600.2230314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 98816, \"normalized_end_sample\": 99328}, {\"capture_epoch\": 7, \"callback_sequence\": 194, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 99328, \"source_end_sample\": 99840, \"source_start_monotonic_s\": 135600.2230314, \"source_end_monotonic_s\": 135600.25503139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 99328, \"normalized_end_sample\": 99840}, {\"capture_epoch\": 7, \"callback_sequence\": 195, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 99840, \"source_end_sample\": 100352, \"source_start_monotonic_s\": 135600.25503139998, \"source_end_monotonic_s\": 135600.2870314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 99840, \"normalized_end_sample\": 100352}, {\"capture_epoch\": 7, \"callback_sequence\": 196, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 100352, \"source_end_sample\": 100864, \"source_start_monotonic_s\": 135600.2870314, \"source_end_monotonic_s\": 135600.3190314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 100352, \"normalized_end_sample\": 100864}, {\"capture_epoch\": 7, \"callback_sequence\": 197, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 100864, \"source_end_sample\": 101376, \"source_start_monotonic_s\": 135600.3190314, \"source_end_monotonic_s\": 135600.3510314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 100864, \"normalized_end_sample\": 101376}, {\"capture_epoch\": 7, \"callback_sequence\": 198, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 101376, \"source_end_sample\": 101888, \"source_start_monotonic_s\": 135600.3510314, \"source_end_monotonic_s\": 135600.38303139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 101376, \"normalized_end_sample\": 101888}, {\"capture_epoch\": 7, \"callback_sequence\": 199, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 101888, \"source_end_sample\": 102400, \"source_start_monotonic_s\": 135600.38303139998, \"source_end_monotonic_s\": 135600.41503139999, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 101888, \"normalized_end_sample\": 102400}, {\"capture_epoch\": 7, \"callback_sequence\": 200, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 102400, \"source_end_sample\": 102912, \"source_start_monotonic_s\": 135600.41503139999, \"source_end_monotonic_s\": 135600.4470314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 102400, \"normalized_end_sample\": 102912}, {\"capture_epoch\": 7, \"callback_sequence\": 201, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 102912, \"source_end_sample\": 103424, \"source_start_monotonic_s\": 135600.4470314, \"source_end_monotonic_s\": 135600.4790314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 102912, \"normalized_end_sample\": 103424}, {\"capture_epoch\": 7, \"callback_sequence\": 202, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 103424, \"source_end_sample\": 103936, \"source_start_monotonic_s\": 135600.4790314, \"source_end_monotonic_s\": 135600.5110314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 103424, \"normalized_end_sample\": 103936}, {\"capture_epoch\": 7, \"callback_sequence\": 203, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 103936, \"source_end_sample\": 104448, \"source_start_monotonic_s\": 135600.5110314, \"source_end_monotonic_s\": 135600.54303139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 103936, \"normalized_end_sample\": 104448}, {\"capture_epoch\": 7, \"callback_sequence\": 204, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 104448, \"source_end_sample\": 104960, \"source_start_monotonic_s\": 135600.54303139998, \"source_end_monotonic_s\": 135600.5750314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 104448, \"normalized_end_sample\": 104960}, {\"capture_epoch\": 7, \"callback_sequence\": 205, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 104960, \"source_end_sample\": 105472, \"source_start_monotonic_s\": 135600.5750314, \"source_end_monotonic_s\": 135600.6070314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 104960, \"normalized_end_sample\": 105472}], \"context_ranges\": []}, \"late_delivery_started_at\": 18454.8122677, \"replayed_probability_source\": \"native/nemotron/issue218_policy_gpu_valid/trace.json:cases[6].evidence\", \"replayed_probability_items\": 1123, \"late_current_diagnostic\": {\"text\": \"\", \"speaker_id\": \"0\", \"session_scope\": \"3\", \"source_start_ms\": null, \"source_end_ms\": null, \"overlaps_previous\": false, \"source\": \"nemotron\", \"attribution_state\": \"identified\"}, \"frozen_snapshot_unchanged_before_dequeue\": true, \"published_terminal\": {\"outcome\": \"final\", \"text\": \"He washed the detritus from his hand.\", \"text_authority\": \"authoritative\", \"speaker\": {\"text\": \"He washed the detritus from his hand.\", \"speaker_id\": null, \"session_scope\": \"\", \"source_start_ms\": null, \"source_end_ms\": null, \"overlaps_previous\": false, \"source\": \"nemotron\", \"attribution_state\": \"unavailable\"}, \"source_audio\": [{\"contribution_id\": \"2b12b098f8184ca68207dbd03e499693:1\", \"source_ranges\": [{\"capture_epoch\": 7, \"callback_sequence\": 148, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 75968, \"source_end_sample\": 76288, \"source_start_monotonic_s\": 135598.76303139998, \"source_end_monotonic_s\": 135598.7830314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 75968, \"normalized_end_sample\": 76288}, {\"capture_epoch\": 7, \"callback_sequence\": 149, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 76288, \"source_end_sample\": 76800, \"source_start_monotonic_s\": 135598.7830314, \"source_end_monotonic_s\": 135598.81503139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 76288, \"normalized_end_sample\": 76800}, {\"capture_epoch\": 7, \"callback_sequence\": 150, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 76800, \"source_end_sample\": 77312, \"source_start_monotonic_s\": 135598.81503139998, \"source_end_monotonic_s\": 135598.8470314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 76800, \"normalized_end_sample\": 77312}, {\"capture_epoch\": 7, \"callback_sequence\": 151, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 77312, \"source_end_sample\": 77824, \"source_start_monotonic_s\": 135598.8470314, \"source_end_monotonic_s\": 135598.8790314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 77312, \"normalized_end_sample\": 77824}, {\"capture_epoch\": 7, \"callback_sequence\": 152, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 77824, \"source_end_sample\": 78336, \"source_start_monotonic_s\": 135598.8790314, \"source_end_monotonic_s\": 135598.9110314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 77824, \"normalized_end_sample\": 78336}, {\"capture_epoch\": 7, \"callback_sequence\": 153, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 78336, \"source_end_sample\": 78848, \"source_start_monotonic_s\": 135598.9110314, \"source_end_monotonic_s\": 135598.9430314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 78336, \"normalized_end_sample\": 78848}, {\"capture_epoch\": 7, \"callback_sequence\": 154, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 78848, \"source_end_sample\": 79360, \"source_start_monotonic_s\": 135598.9430314, \"source_end_monotonic_s\": 135598.97503139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 78848, \"normalized_end_sample\": 79360}, {\"capture_epoch\": 7, \"callback_sequence\": 155, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 79360, \"source_end_sample\": 79872, \"source_start_monotonic_s\": 135598.97503139998, \"source_end_monotonic_s\": 135599.0070314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 79360, \"normalized_end_sample\": 79872}, {\"capture_epoch\": 7, \"callback_sequence\": 156, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 79872, \"source_end_sample\": 80384, \"source_start_monotonic_s\": 135599.0070314, \"source_end_monotonic_s\": 135599.0390314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 79872, \"normalized_end_sample\": 80384}, {\"capture_epoch\": 7, \"callback_sequence\": 157, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 80384, \"source_end_sample\": 80896, \"source_start_monotonic_s\": 135599.0390314, \"source_end_monotonic_s\": 135599.0710314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 80384, \"normalized_end_sample\": 80896}, {\"capture_epoch\": 7, \"callback_sequence\": 158, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 80896, \"source_end_sample\": 81408, \"source_start_monotonic_s\": 135599.0710314, \"source_end_monotonic_s\": 135599.10303139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 80896, \"normalized_end_sample\": 81408}, {\"capture_epoch\": 7, \"callback_sequence\": 159, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 81408, \"source_end_sample\": 81920, \"source_start_monotonic_s\": 135599.10303139998, \"source_end_monotonic_s\": 135599.1350314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 81408, \"normalized_end_sample\": 81920}, {\"capture_epoch\": 7, \"callback_sequence\": 160, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 81920, \"source_end_sample\": 82432, \"source_start_monotonic_s\": 135599.1350314, \"source_end_monotonic_s\": 135599.1670314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 81920, \"normalized_end_sample\": 82432}, {\"capture_epoch\": 7, \"callback_sequence\": 161, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 82432, \"source_end_sample\": 82944, \"source_start_monotonic_s\": 135599.1670314, \"source_end_monotonic_s\": 135599.1990314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 82432, \"normalized_end_sample\": 82944}, {\"capture_epoch\": 7, \"callback_sequence\": 162, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 82944, \"source_end_sample\": 83456, \"source_start_monotonic_s\": 135599.1990314, \"source_end_monotonic_s\": 135599.23103139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 82944, \"normalized_end_sample\": 83456}, {\"capture_epoch\": 7, \"callback_sequence\": 163, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 83456, \"source_end_sample\": 83968, \"source_start_monotonic_s\": 135599.23103139998, \"source_end_monotonic_s\": 135599.26303139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 83456, \"normalized_end_sample\": 83968}, {\"capture_epoch\": 7, \"callback_sequence\": 164, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 83968, \"source_end_sample\": 84480, \"source_start_monotonic_s\": 135599.26303139998, \"source_end_monotonic_s\": 135599.2950314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 83968, \"normalized_end_sample\": 84480}, {\"capture_epoch\": 7, \"callback_sequence\": 165, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 84480, \"source_end_sample\": 84992, \"source_start_monotonic_s\": 135599.2950314, \"source_end_monotonic_s\": 135599.3270314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 84480, \"normalized_end_sample\": 84992}, {\"capture_epoch\": 7, \"callback_sequence\": 166, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 84992, \"source_end_sample\": 85504, \"source_start_monotonic_s\": 135599.3270314, \"source_end_monotonic_s\": 135599.3590314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 84992, \"normalized_end_sample\": 85504}, {\"capture_epoch\": 7, \"callback_sequence\": 167, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 85504, \"source_end_sample\": 86016, \"source_start_monotonic_s\": 135599.3590314, \"source_end_monotonic_s\": 135599.39103139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 85504, \"normalized_end_sample\": 86016}, {\"capture_epoch\": 7, \"callback_sequence\": 168, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 86016, \"source_end_sample\": 86528, \"source_start_monotonic_s\": 135599.39103139998, \"source_end_monotonic_s\": 135599.4230314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 86016, \"normalized_end_sample\": 86528}, {\"capture_epoch\": 7, \"callback_sequence\": 169, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 86528, \"source_end_sample\": 87040, \"source_start_monotonic_s\": 135599.4230314, \"source_end_monotonic_s\": 135599.4550314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 86528, \"normalized_end_sample\": 87040}, {\"capture_epoch\": 7, \"callback_sequence\": 170, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 87040, \"source_end_sample\": 87552, \"source_start_monotonic_s\": 135599.4550314, \"source_end_monotonic_s\": 135599.4870314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 87040, \"normalized_end_sample\": 87552}, {\"capture_epoch\": 7, \"callback_sequence\": 171, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 87552, \"source_end_sample\": 88064, \"source_start_monotonic_s\": 135599.4870314, \"source_end_monotonic_s\": 135599.51903139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 87552, \"normalized_end_sample\": 88064}, {\"capture_epoch\": 7, \"callback_sequence\": 172, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 88064, \"source_end_sample\": 88576, \"source_start_monotonic_s\": 135599.51903139998, \"source_end_monotonic_s\": 135599.55103139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 88064, \"normalized_end_sample\": 88576}, {\"capture_epoch\": 7, \"callback_sequence\": 173, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 88576, \"source_end_sample\": 89088, \"source_start_monotonic_s\": 135599.55103139998, \"source_end_monotonic_s\": 135599.5830314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 88576, \"normalized_end_sample\": 89088}, {\"capture_epoch\": 7, \"callback_sequence\": 174, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 89088, \"source_end_sample\": 89600, \"source_start_monotonic_s\": 135599.5830314, \"source_end_monotonic_s\": 135599.6150314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 89088, \"normalized_end_sample\": 89600}, {\"capture_epoch\": 7, \"callback_sequence\": 175, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 89600, \"source_end_sample\": 90112, \"source_start_monotonic_s\": 135599.6150314, \"source_end_monotonic_s\": 135599.6470314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 89600, \"normalized_end_sample\": 90112}, {\"capture_epoch\": 7, \"callback_sequence\": 176, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 90112, \"source_end_sample\": 90624, \"source_start_monotonic_s\": 135599.6470314, \"source_end_monotonic_s\": 135599.67903139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 90112, \"normalized_end_sample\": 90624}, {\"capture_epoch\": 7, \"callback_sequence\": 177, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 90624, \"source_end_sample\": 91136, \"source_start_monotonic_s\": 135599.67903139998, \"source_end_monotonic_s\": 135599.7110314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 90624, \"normalized_end_sample\": 91136}, {\"capture_epoch\": 7, \"callback_sequence\": 178, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 91136, \"source_end_sample\": 91648, \"source_start_monotonic_s\": 135599.7110314, \"source_end_monotonic_s\": 135599.7430314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 91136, \"normalized_end_sample\": 91648}, {\"capture_epoch\": 7, \"callback_sequence\": 179, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 91648, \"source_end_sample\": 92160, \"source_start_monotonic_s\": 135599.7430314, \"source_end_monotonic_s\": 135599.7750314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 91648, \"normalized_end_sample\": 92160}, {\"capture_epoch\": 7, \"callback_sequence\": 180, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 92160, \"source_end_sample\": 92672, \"source_start_monotonic_s\": 135599.7750314, \"source_end_monotonic_s\": 135599.80703139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 92160, \"normalized_end_sample\": 92672}, {\"capture_epoch\": 7, \"callback_sequence\": 181, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 92672, \"source_end_sample\": 93184, \"source_start_monotonic_s\": 135599.80703139998, \"source_end_monotonic_s\": 135599.83903139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 92672, \"normalized_end_sample\": 93184}, {\"capture_epoch\": 7, \"callback_sequence\": 182, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 93184, \"source_end_sample\": 93696, \"source_start_monotonic_s\": 135599.83903139998, \"source_end_monotonic_s\": 135599.8710314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 93184, \"normalized_end_sample\": 93696}, {\"capture_epoch\": 7, \"callback_sequence\": 183, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 93696, \"source_end_sample\": 94208, \"source_start_monotonic_s\": 135599.8710314, \"source_end_monotonic_s\": 135599.9030314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 93696, \"normalized_end_sample\": 94208}, {\"capture_epoch\": 7, \"callback_sequence\": 184, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 94208, \"source_end_sample\": 94720, \"source_start_monotonic_s\": 135599.9030314, \"source_end_monotonic_s\": 135599.9350314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 94208, \"normalized_end_sample\": 94720}, {\"capture_epoch\": 7, \"callback_sequence\": 185, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 94720, \"source_end_sample\": 95232, \"source_start_monotonic_s\": 135599.9350314, \"source_end_monotonic_s\": 135599.96703139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 94720, \"normalized_end_sample\": 95232}, {\"capture_epoch\": 7, \"callback_sequence\": 186, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 95232, \"source_end_sample\": 95744, \"source_start_monotonic_s\": 135599.96703139998, \"source_end_monotonic_s\": 135599.9990314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 95232, \"normalized_end_sample\": 95744}, {\"capture_epoch\": 7, \"callback_sequence\": 187, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 95744, \"source_end_sample\": 96256, \"source_start_monotonic_s\": 135599.9990314, \"source_end_monotonic_s\": 135600.0310314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 95744, \"normalized_end_sample\": 96256}, {\"capture_epoch\": 7, \"callback_sequence\": 188, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 96256, \"source_end_sample\": 96768, \"source_start_monotonic_s\": 135600.0310314, \"source_end_monotonic_s\": 135600.0630314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 96256, \"normalized_end_sample\": 96768}, {\"capture_epoch\": 7, \"callback_sequence\": 189, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 96768, \"source_end_sample\": 97280, \"source_start_monotonic_s\": 135600.0630314, \"source_end_monotonic_s\": 135600.09503139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 96768, \"normalized_end_sample\": 97280}, {\"capture_epoch\": 7, \"callback_sequence\": 190, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 97280, \"source_end_sample\": 97792, \"source_start_monotonic_s\": 135600.09503139998, \"source_end_monotonic_s\": 135600.12703139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 97280, \"normalized_end_sample\": 97792}, {\"capture_epoch\": 7, \"callback_sequence\": 191, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 97792, \"source_end_sample\": 98304, \"source_start_monotonic_s\": 135600.12703139998, \"source_end_monotonic_s\": 135600.1590314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 97792, \"normalized_end_sample\": 98304}, {\"capture_epoch\": 7, \"callback_sequence\": 192, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 98304, \"source_end_sample\": 98816, \"source_start_monotonic_s\": 135600.1590314, \"source_end_monotonic_s\": 135600.1910314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 98304, \"normalized_end_sample\": 98816}, {\"capture_epoch\": 7, \"callback_sequence\": 193, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 98816, \"source_end_sample\": 99328, \"source_start_monotonic_s\": 135600.1910314, \"source_end_monotonic_s\": 135600.2230314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 98816, \"normalized_end_sample\": 99328}, {\"capture_epoch\": 7, \"callback_sequence\": 194, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 99328, \"source_end_sample\": 99840, \"source_start_monotonic_s\": 135600.2230314, \"source_end_monotonic_s\": 135600.25503139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 99328, \"normalized_end_sample\": 99840}, {\"capture_epoch\": 7, \"callback_sequence\": 195, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 99840, \"source_end_sample\": 100352, \"source_start_monotonic_s\": 135600.25503139998, \"source_end_monotonic_s\": 135600.2870314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 99840, \"normalized_end_sample\": 100352}, {\"capture_epoch\": 7, \"callback_sequence\": 196, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 100352, \"source_end_sample\": 100864, \"source_start_monotonic_s\": 135600.2870314, \"source_end_monotonic_s\": 135600.3190314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 100352, \"normalized_end_sample\": 100864}, {\"capture_epoch\": 7, \"callback_sequence\": 197, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 100864, \"source_end_sample\": 101376, \"source_start_monotonic_s\": 135600.3190314, \"source_end_monotonic_s\": 135600.3510314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 100864, \"normalized_end_sample\": 101376}, {\"capture_epoch\": 7, \"callback_sequence\": 198, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 101376, \"source_end_sample\": 101888, \"source_start_monotonic_s\": 135600.3510314, \"source_end_monotonic_s\": 135600.38303139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 101376, \"normalized_end_sample\": 101888}, {\"capture_epoch\": 7, \"callback_sequence\": 199, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 101888, \"source_end_sample\": 102400, \"source_start_monotonic_s\": 135600.38303139998, \"source_end_monotonic_s\": 135600.41503139999, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 101888, \"normalized_end_sample\": 102400}, {\"capture_epoch\": 7, \"callback_sequence\": 200, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 102400, \"source_end_sample\": 102912, \"source_start_monotonic_s\": 135600.41503139999, \"source_end_monotonic_s\": 135600.4470314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 102400, \"normalized_end_sample\": 102912}, {\"capture_epoch\": 7, \"callback_sequence\": 201, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 102912, \"source_end_sample\": 103424, \"source_start_monotonic_s\": 135600.4470314, \"source_end_monotonic_s\": 135600.4790314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 102912, \"normalized_end_sample\": 103424}, {\"capture_epoch\": 7, \"callback_sequence\": 202, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 103424, \"source_end_sample\": 103936, \"source_start_monotonic_s\": 135600.4790314, \"source_end_monotonic_s\": 135600.5110314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 103424, \"normalized_end_sample\": 103936}, {\"capture_epoch\": 7, \"callback_sequence\": 203, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 103936, \"source_end_sample\": 104448, \"source_start_monotonic_s\": 135600.5110314, \"source_end_monotonic_s\": 135600.54303139998, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 103936, \"normalized_end_sample\": 104448}, {\"capture_epoch\": 7, \"callback_sequence\": 204, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 104448, \"source_end_sample\": 104960, \"source_start_monotonic_s\": 135600.54303139998, \"source_end_monotonic_s\": 135600.5750314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 104448, \"normalized_end_sample\": 104960}, {\"capture_epoch\": 7, \"callback_sequence\": 205, \"source_sample_rate_hz\": 16000, \"source_start_sample\": 104960, \"source_end_sample\": 105472, \"source_start_monotonic_s\": 135600.5750314, \"source_end_monotonic_s\": 135600.6070314, \"discontinuity_before\": null, \"normalized_sample_rate_hz\": 16000, \"normalized_start_sample\": 104960, \"normalized_end_sample\": 105472}], \"context_ranges\": [], \"display_group_id\": \"e712e31c-3fc6-4e7e-adaf-7c94d1a16cfa\", \"speaker_attribution\": {\"state\": \"unavailable\", \"key\": null, \"source\": \"nemotron\", \"speaker_scope_id\": \"\"}}]}, \"wall_seconds\": 4.2139367000017955, \"limits\": \"One real installed Parakeet CPU decode, exact approved PCM/model/options, through current CausalBatchSession and actual STTSessionEventProjection. Consumer gate is task-local scheduling instrumentation. Late proof replays existing real Nemotron frames, not live Nemotron/GPU inference. No translation, cloud, renderer, wait policy or product mutation; prior lexical hand substitution remains.\"}\n",
+    "stderr": "",
+    "observations": {
+      "status": "passed",
+      "dependencies": {
+        "sherpa-onnx": "1.13.5",
+        "sherpa-onnx-core": "1.13.5",
+        "numpy": "2.5.1",
+        "onnxruntime": "1.28.0"
+      },
+      "native_runtime": {
+        "version": "1.13.5",
+        "git_sha1": "3dc7c569",
+        "onnxruntime_version": "1.28.0"
+      },
+      "pcm16_sha256": "563945ae319de1dbb7286714e9bf651d30ce1462ce1a6b75750021162b85a586",
+      "samples": 29504,
+      "native_options": {
+        "model_id": "parakeet-tdt-0.6b-v3-int8-sherpa",
+        "provider_id": "local_parakeet_v3",
+        "num_threads": 2,
+        "language_hint": null,
+        "hotwords": []
+      },
+      "projection_queue_depth_before_enqueue": 0,
+      "consumer_dequeue_gate_open_at_hook": false,
+      "snapshot_at_native_final": {
+        "text": "",
+        "speaker_id": null,
+        "session_scope": "",
+        "source_start_ms": null,
+        "source_end_ms": null,
+        "overlaps_previous": false,
+        "source": "nemotron",
+        "attribution_state": "unavailable"
+      },
+      "late_current_diagnostic": {
+        "text": "",
+        "speaker_id": "0",
+        "session_scope": "3",
+        "source_start_ms": null,
+        "source_end_ms": null,
+        "overlaps_previous": false,
+        "source": "nemotron",
+        "attribution_state": "identified"
+      },
+      "frozen_snapshot_unchanged_before_dequeue": true,
+      "published_outcome": "final",
+      "published_text": "He washed the detritus from his hand.",
+      "published_speaker": {
+        "text": "He washed the detritus from his hand.",
+        "speaker_id": null,
+        "session_scope": "",
+        "source_start_ms": null,
+        "source_end_ms": null,
+        "overlaps_previous": false,
+        "source": "nemotron",
+        "attribution_state": "unavailable"
+      },
+      "replayed_probability_items": 1123,
+      "wall_seconds": 4.2139367000017955,
+      "full_output_location": "stdout in this same record; source provenance is not duplicated in the parsed summary"
+    },
+    "invalid_attempts": [
+      {
+        "command": [
+          ".venv/Scripts/python.exe",
+          "-B",
+          "-c",
+          "\nimport asyncio,hashlib,importlib.metadata,json,sys,time\nfrom pathlib import Path\nfrom types import SimpleNamespace\nfrom uuid import UUID\nsys.path.insert(0,'src')\nsys.path.insert(0,'native/nemotron')\nimport issue215_smoke as prior\nfrom issue218_parakeet_probe import archived_jobs,frozen,digest\nfrom puripuly_heart.core.audio.format import AudioCaptureSpan,float32_to_pcm16le_bytes\nfrom puripuly_heart.core.audio.ownership import AudioSegmentIdentity,AudioSegmentSettingsSnapshot\nfrom puripuly_heart.core.speaker.contracts import ProbabilityFrame,SourceMapPiece,SpeakerEvidence\nfrom puripuly_heart.core.stt.backend import STTProviderTurnIdentity,STTProviderTurnRequest,STTProviderTurnTerminal,STTSessionProjection\nfrom puripuly_heart.core.stt.batch_speaker import CausalBatchSession\nfrom puripuly_heart.providers.stt.local_parakeet_sherpa import LocalParakeetV3SherpaSTTBackend\nclass ObservedBatch(CausalBatchSession):\n def __init__(self,inner):\n  self.dequeue_gate=asyncio.Event()\n  self.native_emitted=asyncio.Event()\n  self.observations=[]\n  super().__init__(inner)\n async def _consume(self):\n  await self.dequeue_gate.wait()\n  await super()._consume()\n def _snapshot_native_terminal(self,event):\n  super()._snapshot_native_terminal(event)\n  child=self._slices[event.identity]\n  self.observations.append(dict(at=time.monotonic(),native_outcome=event.outcome,native_text=event.text,projection_queue_depth_before_enqueue=self.inner._event_projection.scoped_event_depth,consumer_dequeue_gate_open=self.dequeue_gate.is_set(),child_result_not_dequeued=child.result is None,frames_at_native_final=len(self._frames),immutable_at_native_final=self._immutable,snapshot=prior.serial(child.speaker),source_ranges=prior.serial(child.audio.source_ranges),context_ranges=prior.serial(child.audio.context_ranges)))\n  self.native_emitted.set()\nasync def main():\n started=time.monotonic()\n versions={name:importlib.metadata.version(name) for name in ('sherpa-onnx','sherpa-onnx-core','numpy','onnxruntime')}\n assert versions['sherpa-onnx']==versions['sherpa-onnx-core']=='1.13.5'\n model=Path.home()/'AppData/Local/puripuly-heart/models/parakeet-tdt-0.6b-v3-int8-sherpa'\n expected=json.loads(Path('native/nemotron/issue218_parakeet_product_smoke.json').read_text(encoding='utf-8'))\n model_hashes={name:digest(model/name) for name in expected['model_sha256']}\n assert model_hashes==expected['model_sha256']\n _,cases=prior.input_cases(SimpleNamespace(corpus=Path.home()/'.cache/puripuly-heart/sim-v02-public-corpus-600-v1',correction_root=Path.cwd().parent/'listen-mega-integrate-nemotron-speaker-tracking/docs/experiments/issue-212-clarification'))\n values,_=cases['distinct_repeated_A_B_A']\n jobs=archived_jobs(values,float32_to_pcm16le_bytes(values))\n job=next(j for j in jobs if j['pcm16_sha256']=='563945ae319de1dbb7286714e9bf651d30ce1462ce1a6b75750021162b85a586')\n backend=LocalParakeetV3SherpaSTTBackend(model_dir=model,num_threads=2,language_hint=None)\n await backend._ensure_recognizer()\n raw=job['request'];ri=raw['identity'];segment=ri['segment']\n identity=STTProviderTurnIdentity(AudioSegmentIdentity(**{**segment,'segment_id':UUID(segment['segment_id'])}),ri['provider_epoch_id'],ri['provider_turn_id'],frozen(ri['settings_scope']))\n settings=AudioSegmentSettingsSnapshot(**{k:frozen(v) for k,v in raw['settings'].items()})\n inner=await backend.open_session(projection=STTSessionProjection('scoped',identity.provider_epoch_id))\n session=ObservedBatch(inner)\n req=STTProviderTurnRequest(identity,settings,channel=raw['channel'],display_group_id=UUID(raw['display_group_id']) if raw['display_group_id'] else None,isolate_failure=raw['isolate_failure'])\n try:\n  await session.begin_turn(req)\n  offset=0\n  for payload in job['submission']['payloads']:\n   end=offset+payload['samples']*2\n   await session.send_turn_audio(identity,job['pcm'][offset:end],payload_sequence=payload['payload_sequence'],source_ranges=tuple(AudioCaptureSpan(**s) for s in payload['source_ranges']),context_only=payload['context_only'])\n   offset=end\n  assert offset==len(job['pcm'])\n  await session.seal_turn(identity,sealed_content_ranges=tuple(AudioCaptureSpan(**s) for s in job['submission']['sealed_content_ranges']),seal_reason=job['submission']['seal_reason'],observed_trailing_silence_ms=job['submission']['observed_trailing_silence_ms'])\n  native_child=next(iter(session._slices.values()))\n  queued_options=inner._request_backends[native_child.identity]\n  native_options={name:prior.serial(getattr(queued_options,name,None)) for name in ('model_id','provider_id','num_threads','language_hint','hotwords')}\n  assert native_options['num_threads']==2 and native_options['language_hint'] is None\n  await asyncio.wait_for(session.native_emitted.wait(),30)\n  observation=session.observations[0]\n  assert len(session.observations)==1\n  assert observation['native_outcome']=='final' and observation['native_text']\n  assert observation['projection_queue_depth_before_enqueue']==0\n  assert observation['child_result_not_dequeued'] and not observation['consumer_dequeue_gate_open']\n  assert inner._event_projection.scoped_event_depth==1\n  frozen_speaker=native_child.speaker\n  assert frozen_speaker.attribution_state=='unavailable' and frozen_speaker.speaker_id is None\n  trace=json.loads(Path('native/nemotron/issue218_policy_gpu_valid/trace.json').read_text(encoding='utf-8'))\n  case=trace['cases'][6]\n  proof=[]\n  for item in case['evidence']:\n   pieces=tuple(SourceMapPiece(p['compact_start_sample'],p['compact_end_sample'],AudioCaptureSpan(**p['capture']) if p['capture'] else None,p['kind']) for p in item['source_map'])\n   f=item['frame']\n   frame=ProbabilityFrame(f['start_sample'],f['end_sample'],tuple(f['probabilities']),tuple(f['active_slots'])) if f else None\n   proof.append(SpeakerEvidence(item['capture_session_id'],item['speaker_epoch'],item['observation_ready_monotonic_s'],pieces,item['processed_through_sample'],item['immutable_through_sample'],frame,item['range_state'],item['reason']))\n  late_delivery_started=time.monotonic()\n  await session.observe_speaker_evidence(tuple(proof))\n  late_current=session._attribute(native_child.audio.source_ranges,native_child.unique_context,native_child.replayed_context)\n  assert late_current.attribution_state=='identified' and late_current.speaker_id=='0'\n  assert native_child.speaker is frozen_speaker and native_child.result is None\n  assert inner._event_projection.scoped_event_depth==1\n  session.dequeue_gate.set()\n  stream=session.turn_events()\n  while True:\n   terminal=await asyncio.wait_for(anext(stream),5)\n   if isinstance(terminal,STTProviderTurnTerminal):break\n  assert terminal.text==observation['native_text']\n  assert terminal.outcome=='final' and len(terminal.source_audio)==1\n  assert terminal.final_speaker_runs[0].speaker_id is None\n  assert terminal.final_speaker_runs[0].attribution_state=='unavailable'\n  assert terminal.source_audio[0].speaker_attribution==frozen_speaker.attribution\n  assert terminal.source_audio[0].source_ranges==native_child.audio.source_ranges\n  assert terminal.source_audio[0].display_group_id==req.display_group_id\n  import sherpa_onnx\n  result=dict(schema='issue218-f1-actual-parakeet-hook-smoke-1',status='passed',python=sys.version,dependencies=versions,native_runtime={name:str(getattr(sherpa_onnx,name)) for name in ('version','git_sha1','onnxruntime_version')},model_sha256=model_hashes,approved_archive='native/nemotron/issue218_evidence.zip',approved_capture_ranges=job['capture_ranges'],pcm16_sha256=hashlib.sha256(job['pcm']).hexdigest(),samples=len(job['pcm'])//2,native_decode_requests=1,native_options=native_options,hook_observation=observation,late_delivery_started_at=late_delivery_started,replayed_probability_source='native/nemotron/issue218_policy_gpu_valid/trace.json:cases[6].evidence',replayed_probability_items=len(proof),late_current_diagnostic=prior.serial(late_current),frozen_snapshot_unchanged_before_dequeue=True,published_terminal=dict(outcome=terminal.outcome,text=terminal.text,text_authority=terminal.text_authority,speaker=prior.serial(terminal.final_speaker_runs[0]),source_audio=prior.serial(terminal.source_audio)),wall_seconds=time.monotonic()-started,limits='One real installed Parakeet CPU decode, exact approved PCM/model/options, through current CausalBatchSession and actual STTSessionEventProjection. Consumer gate is task-local scheduling instrumentation. Late proof replays existing real Nemotron frames, not live Nemotron/GPU inference. No translation, cloud, renderer, wait policy or product mutation; prior lexical hand substitution remains.')\n  print(json.dumps(result))\n finally:\n  session.dequeue_gate.set()\n  await session.close()\n  await backend.close()\nasyncio.run(main())\n"
+        ],
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 105, in <module>\n    asyncio.run(main())\n    ~~~~~~~~~~~^^^^^^^^\n  File \"C:\\Python314\\Lib\\asyncio\\runners.py\", line 205, in run\n    return runner.run(main)\n           ~~~~~~~~~~^^^^^^\n  File \"C:\\Python314\\Lib\\asyncio\\runners.py\", line 128, in run\n    return self._loop.run_until_complete(task)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Python314\\Lib\\asyncio\\base_events.py\", line 720, in run_until_complete\n    return future.result()\n           ~~~~~~~~~~~~~^^\n  File \"<string>\", line 60, in main\n    queued_options=inner._request_backends[native_child.identity]\n                   ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^\nKeyError: STTProviderTurnIdentity(segment=AudioSegmentIdentity(activation_generation=1, segment_order=1, segment_id=UUID('e712e31c-3fc6-4e7e-adaf-7c94d1a16cfa'), capture_epoch=7), provider_epoch_id='728ca53b46a54cbb8eea017903c5e0a8', provider_turn_id='f99829cf31a340148cde6fd2601fe91c', settings_scope=('local_parakeet_v3', ('local_parakeet_v3', 'cpu', 'parakeet-tdt-0.6b-v3-int8-sherpa'), ('issue218',)))\n",
+        "disposition": "Task-local instrumentation error: CPU seal transfers and pops the request backend into the native decode job. The observer attempted to read the consumed map. One exact request was submitted; this attempt did not reach its proof assertions and is not product-failure or verification evidence."
+      }
+    ],
+    "authority": "Director requested one focused actual installed Parakeet 1.13.5 changed-path F1 smoke before pinning; no full matrix, GPU, cloud, renderer or policy expansion.",
+    "interpretation": "Actual CPU projection invoked the current request hook before queue insertion and before gated terminal-consumer dequeue. Snapshot was unavailable with no eligible evidence. Existing recorded real Nemotron probability proof delivered afterward would identify current slot 0, but the stored snapshot and eventual native text/source output stayed unavailable. This exercises the native emission cutoff, not acoustic color qualification. Exactly one valid native request completed; one earlier request was submitted in an invalid task-instrumentation attempt."
+  },
+  "test_convention_correction": {
+    "changed_file": "tests/core/test_streaming_speaker.py",
+    "removed": "Exact internal stable-frame/support scan-call-count assertion and instrumentation; private direct grouping-method invocation.",
+    "retained": "Consumer behavior over the 2048-frame input: source/release identity, exact text conservation, 60 ordered distinct identities/source children/translation jobs with qualified clocks, conservative unqualified-clock behavior, and retained history contents under existing bounds.",
+    "product_changes": "None; F1/F2 product repairs remain frozen. No architecture or palette allocator change."
+  }
+}
