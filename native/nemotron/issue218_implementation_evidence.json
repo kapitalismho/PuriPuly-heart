@@ -22,7 +22,36 @@
     {"path":"native/nemotron/issue218_policy_renderer_owned_show_final/Deepgram_original_submissions/guard_recovered_29.png","observation":"Gold 아니. 아니. 셋. / No. No. Three. actual owned pixels after bounded window/layout recovery."}
   ],
   "renderer_evidence_limit": "The later guarded render-only replay and targeted recovery do not retroactively turn original blank screenshots into valid E2E latency observations. Historic blank-run cloak state was not recorded; attributing all blanks to the later reproduced Shell-cloak/minimized-layout mechanism is inference. No product renderer repair was justified.",
-  "review": "Independent whole-checkpoint review and F1/F2 repair verification are recorded in issue218_implementation_review.json. New task-local integration/renderer evidence has not yet received its independent evidence-checkpoint review.",
+  "review": {
+    "prior_product_review": "Independent whole-checkpoint review and F1/F2 repair verification are recorded in issue218_implementation_review.json; unaffected coverage retained.",
+    "reviewer": "integration-evidence-review",
+    "mode": "FULL_REVIEW, focused task-local integration/evidence checkpoint; not terminal Goal closure",
+    "baseline": "2bef240618b8dd3492c69ee32d5d54acaf1c04e1",
+    "candidate": "6443c3749802442c965262e126ed9a30a2efca55",
+    "result": "no_material_findings",
+    "coverage": [
+      "GPU30 and original-native Deepgram replay12: inspected original traces, measured driver snapshots, PCM/control/cursor/capture chronology and real adapter/normalizer/engine/translation paths. Deepgram is fixed-input replay, not fresh provider/live-VAD qualification.",
+      "Conservation/order/translation accounting and required-word failures: inspected original records and summary rules; reused Director reproduction. Token availability is not perfect-verbatim or semantic qualification.",
+      "Original blank matrix versus renderer-only evidence: inspected original archives, failed attempts and actual PNGs. Guarded22/23 plus separate targeted1/1 and control4/4 are supported, not retroactive E2E timing or general shell recovery.",
+      "Invalid attempts, archives and applicability: inspected four original invalid acoustic traces, current-versus-measured driver snapshots, inventory and cleanup records. Reused complete archive verification rather than rerunning it.",
+      "Chunk/right-context explanation: inspected selected cases5/6/10/11, native whole-chunk geometry and emitted frontiers. The4ms grid overrun and delayed full closure are supported; reconstructed16–53ms envelopes are not pure GPU timings or universal headroom.",
+      "Task-driver evidence invalidation/security/side effects: inspected all four new drivers and capture/renderer/translation helpers. No concrete material defect found; window recovery is owned-window bounded and translation remains managed-local/OSC-guarded."
+    ],
+    "primary_refs": [
+      "issue218_policy_gpu_valid.zip:trace.json / execution_sources.zip",
+      "issue218_policy_deepgram_final.zip:trace.json / execution_sources.zip",
+      "issue218_policy_archive_inventory.json",
+      "issue218_policy_attempts.json",
+      "issue218_policy_cleanup.json",
+      "issue218_policy_renderer_findings.json",
+      "issue218_policy_summary.py",
+      "issue218_policy_validation.py",
+      "issue218_policy_renderer_probe.py",
+      "issue218_policy_visibility.py"
+    ],
+    "execution_limit": "Read-only source, record and image inspection; no new provider/model/GUI/VR/test execution, no CRC or summary rerun. Acoustic measurements remain dd3cad observations, not a new repaired-product matrix.",
+    "director_disposition": "ACCEPT this bounded evidence checkpoint. Declared acoustic continuity and original replay visual-timing limits remain; no whole-Goal, profile, production or remote-operation acceptance."
+  },
   "remaining_owner_decision": "No late-publication allocator, extra speaker/display wait or blind-suffix identity estimation has been selected. Latest maintainer questions request causal explanation, not approval of these alternatives.",
-  "acceptance": "Implementation checkpoint accepted at the repaired product pin. Complete Goal and rich-continuity/profile/production acceptance remain pending; no remote operations authorized."
+  "acceptance": "Implementation checkpoint accepted at the repaired product pin; focused integration/evidence checkpoint accepted at6443c3749802442c965262e126ed9a30a2efca55. Complete Goal and rich-continuity/profile/production acceptance remain pending; no remote operations authorized."
 }
