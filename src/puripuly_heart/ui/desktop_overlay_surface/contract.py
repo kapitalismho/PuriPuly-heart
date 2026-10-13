@@ -328,6 +328,7 @@ class DesktopCaptionSlot:
     appearance_seq: int
     lines: tuple[DesktopCaptionLine, ...]
     secondary_enabled: bool
+    card_revision: int = 0
     card_width: float = 0.0
     card_text_width: float = 0.0
     active: bool = False

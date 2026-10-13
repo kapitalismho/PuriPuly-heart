@@ -187,6 +187,7 @@ async def _terminal_from_soniox_tokens(
         opened_at_monotonic_s=0.0,
         sealed_at_monotonic_s=0.0,
         seal_reason="silence",
+        display_group_id=segment_id,
     )
     receipt = AudioSegmentTerminalReceipt(
         identity=segment_identity,
@@ -394,14 +395,78 @@ async def test_soniox_segments_preserve_attribution_through_output_and_presenter
         ]
         revisions = {event.speaker_assignment.source_text_revision for event in events}
         assert len(revisions) == 1 and None not in revisions
+        assert len({event.source_child.source_id for event in events}) == 3
+        assert {event.source_child.display_group_id for event in events} == {
+            receipt.identity.segment_id
+        }
+        assert [event.source_child.order for event in events] == sorted(
+            event.source_child.order for event in events
+        )
         latest = presenter.snapshot().blocks
         assert latest[-1].speaker_style == "gold"
-        assert latest[-1].primary_text == "Again"
-        assert latest[-1].secondary_text == "Alice"
+        assert latest[-1].primary_text == "Hello Again"
+        assert latest[-1].secondary_text == "Alice Alice"
+        assert latest[0].primary_text == "World"
+        assert latest[-1].card_revision >= 2
     finally:
         provider.release["Alice "].set()
         provider.release["Alice"].set()
         provider.release["Beto "].set()
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_a_b_a_separate_requests_keep_source_order_and_destination_payloads():
+    clock = FakeClock(_now=100.0)
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    provider = _SegmentTranslationProvider()
+    overlay = _RecordingOverlaySink(presenter)
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=osc,
+        peer_translation_enabled=True,
+        overlay_sink=overlay,
+        clock=clock,
+    )
+    session = _soniox_session()
+    group = uuid4()
+    harness.output_runtime.activate_peer_generation(1)
+    await harness.start()
+    try:
+        for order, text, speaker in ((1, "Alice ", "A"), (2, "Beto ", "B"), (3, "Alice", "A")):
+            receipt, terminal = await _terminal_from_soniox_tokens(
+                session,
+                speaker=speaker,
+                text=text,
+                start_ms=order * 100,
+                end_ms=order * 100 + 90,
+                generation=1,
+                order=order,
+            )
+            receipt = replace(receipt, segment=replace(receipt.segment, display_group_id=group))
+            harness.record_peer_speech_end_for_test(receipt.identity.segment_id)
+            await harness.peer_owner.handle_provider_turn_terminal(receipt, terminal)
+            await harness.peer_owner.translation_turns.wait_for_idle()
+            await harness.output_runtime.wait_for_peer_output_idle()
+            clock.advance(1)
+        events = [event for event in overlay.events if event.type == "translation_final"]
+        assert [event.source_text for event in events] == ["Alice ", "Beto ", "Alice"]
+        assert [event.text for event in events] == ["Hello", "World", "Again"]
+        assert len({event.parent_utterance_id for event in events}) == 3
+        assert len({event.source_child.source_id for event in events}) == 3
+        assert {event.source_child.display_group_id for event in events} == {group}
+        assert [event.source_child.order for event in events] == sorted(
+            event.source_child.order for event in events
+        )
+        blocks = presenter.snapshot().blocks
+        assert [block.primary_text for block in blocks] == ["World", "Hello Again"]
+        assert [block.secondary_text for block in blocks] == ["Beto", "Alice Alice"]
+        assert provider.calls == ["Alice ", "Beto ", "Alice"]
+        assert osc.messages == []
+    finally:
         await harness.stop()
         await presenter.close()
 

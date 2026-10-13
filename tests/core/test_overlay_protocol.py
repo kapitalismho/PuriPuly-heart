@@ -197,6 +197,7 @@ def test_overlay_presentation_block_defaults_missing_or_null_content_languages_t
             "id": "self:1",
             "occupant_key": "self:1",
             "appearance_seq": 1,
+            "card_revision": 0,
             "channel": "self",
             "block_variant": "finalized",
             "primary_text": "hello",
@@ -225,6 +226,7 @@ def test_scoped_block_rejects_invalid_publication_index() -> None:
                 "id": "peer:child",
                 "occupant_key": "peer:child",
                 "appearance_seq": 1,
+                "card_revision": 0,
                 "channel": "peer",
                 "block_variant": "finalized",
                 "primary_text": "translated",
@@ -295,6 +297,7 @@ def test_overlay_presentation_block_rejects_self_active_peer_combination() -> No
                 "id": "self:active-peer",
                 "occupant_key": "self:active-peer",
                 "appearance_seq": 1,
+                "card_revision": 0,
                 "channel": "self",
                 "block_variant": "active_peer",
                 "primary_text": "hello",
@@ -417,6 +420,7 @@ def test_overlay_presentation_block_from_dict_defaults_missing_update_id_and_ori
             "id": "self:1",
             "occupant_key": "self:1",
             "appearance_seq": 1,
+            "card_revision": 0,
             "channel": "self",
             "block_variant": "finalized",
             "primary_text": "hello",
@@ -518,6 +522,7 @@ def test_overlay_presentation_block_rejects_invalid_field_types(
         "id": "self:1",
         "occupant_key": "self:1",
         "appearance_seq": 1,
+        "card_revision": 0,
         "channel": "self",
         "block_variant": "finalized",
         "primary_text": "hello",
@@ -602,3 +607,41 @@ def test_speaker_divider_roundtrips_and_is_omitted_when_absent() -> None:
     assert OverlayPresentationSnapshot.from_dict({"revision": 3}).speaker_divider is False
     with pytest.raises(ValueError, match="speaker_divider must be a bool"):
         OverlayPresentationSnapshot.from_dict({"revision": 4, "speaker_divider": "yes"})
+
+
+@pytest.mark.parametrize("value", [-1, True, 1.5, "1", None])
+def test_caption_card_revision_rejects_invalid_wire_values(value: object) -> None:
+    block = OverlayPresentationBlock(
+        id="card:a",
+        occupant_key="card:a",
+        appearance_seq=3,
+        channel="peer",
+        block_variant="finalized",
+        primary_text="Again. Again.",
+        secondary_text="",
+        secondary_enabled=False,
+        card_revision=2,
+    )
+    payload = block.to_dict()
+    payload["card_revision"] = value
+    with pytest.raises(ValueError, match="card_revision"):
+        OverlayPresentationBlock.from_dict(payload)
+
+
+def test_caption_card_revision_round_trips_independently_of_latestness() -> None:
+    block = OverlayPresentationBlock(
+        id="card:a",
+        occupant_key="card:a",
+        appearance_seq=3,
+        channel="peer",
+        block_variant="finalized",
+        primary_text="Again. Again.",
+        secondary_text="",
+        secondary_enabled=False,
+        card_revision=2,
+    )
+    assert OverlayPresentationBlock.from_dict(block.to_dict()) == block
+    payload = block.to_dict()
+    del payload["card_revision"]
+    with pytest.raises(ValueError, match="card_revision"):
+        OverlayPresentationBlock.from_dict(payload)

@@ -11,10 +11,7 @@ import pytest
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
-from puripuly_heart.core.overlay.presenter import (
-    PEER_REPLACEMENT_INTERVAL_SECONDS,
-    OverlayPresenter,
-)
+from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import (
     OverlayApplicationReceipt,
     OverlayEventAdapter,
@@ -22,7 +19,6 @@ from puripuly_heart.core.overlay.sink import (
     OverlayPublicationScope,
     UtteranceClosed,
 )
-from puripuly_heart.core.runtime.output_batch import OUTPUT_BATCH_MAX_UNSENT
 from puripuly_heart.domain.models import OSCMessage, Transcript
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from tests.helpers.fakes import FakeSender
@@ -225,14 +221,14 @@ class BlockingOverlaySink(RecordingOverlaySink):
             raise
 
 
-class PacedOverlaySink(RecordingOverlaySink):
+class ProtectedOverlaySink(RecordingOverlaySink):
     def __init__(self) -> None:
         super().__init__()
         self.started = asyncio.Event()
         self.release = asyncio.Event()
 
     async def emit(self, _event: OverlayEventUnion) -> None:
-        raise AssertionError("Peer writer must use presenter-paced admission")
+        raise AssertionError("Peer writer must use presenter-protected admission")
 
     async def emit_peer_when_admissible(
         self,
@@ -1905,15 +1901,15 @@ async def _wait_for_done(task: asyncio.Task[object]) -> None:
 
 
 @pytest.mark.asyncio
-async def test_peer_writer_awaits_presenter_pacing_before_application_receipt() -> None:
+async def test_peer_writer_awaits_presenter_admission_before_application_receipt() -> None:
     OutputRuntime = _output_runtime_class()
-    overlay = PacedOverlaySink()
+    overlay = ProtectedOverlaySink()
     owner = OutputRuntime(
         chatbox=RecordingChatbox(),
         clock=FakeClock(_now=10.0),
         overlay_sink=overlay,
     )
-    event = _overlay_event(event_id="paced", channel="peer")
+    event = _overlay_event(event_id="protected", channel="peer")
 
     accepted = await _publish_peer_overlay(owner, event, source_order=1)
     await asyncio.wait_for(overlay.started.wait(), timeout=0.5)
@@ -1988,88 +1984,7 @@ async def test_peer_overlay_pressure_retains_eight_and_evicts_oldest_wholly_unse
 
 
 @pytest.mark.asyncio
-async def test_output_presenter_five_ready_peers_follow_two_slot_pacing_schedule() -> None:
-    OutputRuntime = _output_runtime_class()
-    clock = FakeClock(_now=10.0)
-
-    async def controlled_sleep(delay: float) -> None:
-        if delay > PEER_REPLACEMENT_INTERVAL_SECONDS:
-            await asyncio.Event().wait()
-        clock.advance(delay)
-        await asyncio.sleep(0)
-
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-        clock=clock,
-        sleep=controlled_sleep,
-        translation_enabled=False,
-        visible_window_target_blocks=2,
-    )
-    owner = OutputRuntime(
-        chatbox=RecordingChatbox(),
-        clock=clock,
-        overlay_sink=presenter,
-    )
-    adapter = OverlayEventAdapter(clock=clock)
-    turn_ids = [uuid4() for _ in range(5)]
-
-    for order, turn_id in enumerate(turn_ids, start=1):
-        event = adapter.transcript_final(
-            Transcript(
-                utterance_id=turn_id,
-                channel="peer",
-                text=f"peer {order}",
-                is_final=True,
-                created_at=clock.now(),
-            ),
-            source_language="en",
-            target_language="ja",
-        )
-        result = await _publish_peer_overlay(owner, event, source_order=order)
-        assert result.decision.reason == "accepted_handoff"
-    await owner.wait_for_peer_output_idle()
-
-    assert clock.now() == 10.0 + 3 * PEER_REPLACEMENT_INTERVAL_SECONDS
-    assert [block.id for block in presenter.snapshot().blocks] == [
-        f"peer:{turn_ids[3]}",
-        f"peer:{turn_ids[4]}",
-    ]
-    assert (
-        sum(decision.reason == "application_applied" for decision in owner.routing_decisions) == 5
-    )
-    pacing_waits = [
-        decision for decision in owner.routing_decisions if decision.reason == "logical_pacing_wait"
-    ]
-    assert len(pacing_waits) == 3
-    assert all(
-        decision.metadata["stage"] == "logical_pacing"
-        and decision.metadata["outcome"] == "waiting"
-        and decision.metadata["physical_ack"] is False
-        and decision.metadata["wait_reason"] == "replacement_gate"
-        and isinstance(decision.metadata["pending_batches"], int)
-        and 0 <= decision.metadata["pending_batches"] <= OUTPUT_BATCH_MAX_UNSENT
-        for decision in pacing_waits
-    )
-    paced_outcomes = [
-        decision
-        for decision in owner.routing_decisions
-        if decision.reason == "application_applied" and "handoff_wait_ms" in decision.metadata
-    ]
-    assert len(paced_outcomes) == 3
-    assert all(
-        decision.metadata["stage"] == "application_accepted"
-        and decision.metadata["outcome"] == "applied"
-        and decision.metadata["physical_ack"] is False
-        and decision.metadata["handoff_wait_ms"] == PEER_REPLACEMENT_INTERVAL_SECONDS * 1000
-        and decision.metadata["wait_reason"] == "replacement_gate"
-        for decision in paced_outcomes
-    )
-    await owner.close()
-    await presenter.close()
-
-
-@pytest.mark.asyncio
-async def test_retirement_cancels_presenter_paced_peer_and_preserves_self_occupant() -> None:
+async def test_retirement_cancels_protected_peer_and_preserves_self_occupant() -> None:
     OutputRuntime = _output_runtime_class()
     clock = FakeClock(_now=10.0)
 
@@ -2118,16 +2033,16 @@ async def test_retirement_cancels_presenter_paced_peer_and_preserves_self_occupa
     await asyncio.sleep(0)
     assert accepted.decision.reason == "accepted_handoff"
     assert presenter.snapshot().blocks[0].id == f"self:{self_turn}"
-    pacing_waits = [
+    admission_waits = [
         decision
         for decision in owner.routing_decisions
-        if decision.publication_id == event.event_id and decision.reason == "logical_pacing_wait"
+        if decision.publication_id == event.event_id and decision.reason == "protected_rows_wait"
     ]
-    assert len(pacing_waits) == 1
-    assert pacing_waits[0].metadata["wait_reason"] == "protected_rows"
-    assert pacing_waits[0].metadata["stage"] == "logical_pacing"
-    assert pacing_waits[0].metadata["outcome"] == "waiting"
-    assert pacing_waits[0].metadata["physical_ack"] is False
+    assert len(admission_waits) == 1
+    assert admission_waits[0].metadata["wait_reason"] == "protected_rows"
+    assert admission_waits[0].metadata["stage"] == "presentation_admission"
+    assert admission_waits[0].metadata["outcome"] == "waiting"
+    assert admission_waits[0].metadata["physical_ack"] is False
 
     owner.retire_peer_generation(1)
     await owner.wait_for_peer_output_idle()
@@ -2147,96 +2062,6 @@ async def test_retirement_cancels_presenter_paced_peer_and_preserves_self_occupa
     assert terminal.metadata["handoff_wait_ms"] == 0
     assert terminal.metadata["wait_reason"] == "protected_rows"
     assert isinstance(terminal.metadata["pending_batches"], int)
-    await owner.close()
-    await presenter.close()
-
-
-@pytest.mark.asyncio
-async def test_retirement_cleans_pacing_waits_and_cannot_publish_after_cancellation() -> None:
-    OutputRuntime = _output_runtime_class()
-    clock = FakeClock(_now=10.0)
-    pacing_started = asyncio.Event()
-    pacing_cancelled = asyncio.Event()
-
-    async def blocked_sleep(delay: float) -> None:
-        if delay == PEER_REPLACEMENT_INTERVAL_SECONDS:
-            pacing_started.set()
-        try:
-            await asyncio.Event().wait()
-        except asyncio.CancelledError:
-            if delay == PEER_REPLACEMENT_INTERVAL_SECONDS:
-                pacing_cancelled.set()
-            raise
-
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-        clock=clock,
-        sleep=blocked_sleep,
-        translation_enabled=False,
-        visible_window_target_blocks=1,
-    )
-    adapter = OverlayEventAdapter(clock=clock)
-    owner = OutputRuntime(
-        chatbox=RecordingChatbox(),
-        clock=clock,
-        overlay_sink=presenter,
-    )
-    first_turn = uuid4()
-    first = adapter.transcript_final(
-        Transcript(
-            utterance_id=first_turn,
-            channel="peer",
-            text="selected peer",
-            is_final=True,
-            created_at=clock.now(),
-        ),
-        source_language="en",
-        target_language="ja",
-    )
-    await _publish_peer_overlay(owner, first, source_order=1)
-    await owner.wait_for_peer_output_idle()
-    await presenter.emit(adapter.utterance_closed(utterance_id=first_turn, channel="peer"))
-    assert [block.id for block in presenter.snapshot().blocks] == [f"peer:{first_turn}"]
-    current = asyncio.current_task()
-    baseline_tasks = {
-        task for task in asyncio.all_tasks() if task is not current and not task.done()
-    }
-
-    waiting_turn = uuid4()
-    waiting = adapter.transcript_final(
-        Transcript(
-            utterance_id=waiting_turn,
-            channel="peer",
-            text="cancelled peer",
-            is_final=True,
-            created_at=clock.now(),
-        ),
-        source_language="en",
-        target_language="ja",
-    )
-    accepted = await _publish_peer_overlay(owner, waiting, source_order=2)
-    await asyncio.wait_for(pacing_started.wait(), timeout=0.5)
-    assert accepted.decision.reason == "accepted_handoff"
-
-    owner.retire_peer_generation(1)
-    await owner.wait_for_peer_output_idle()
-    await asyncio.wait_for(pacing_cancelled.wait(), timeout=0.5)
-    await asyncio.sleep(0)
-
-    remaining_tasks = {
-        task for task in asyncio.all_tasks() if task is not current and not task.done()
-    }
-    assert remaining_tasks <= baseline_tasks
-    assert [block.id for block in presenter.snapshot().blocks] == [f"peer:{first_turn}"]
-    assert not any(
-        decision.publication_id == waiting.event_id and decision.reason == "application_applied"
-        for decision in owner.routing_decisions
-    )
-    assert any(
-        decision.publication_id == waiting.event_id
-        and decision.reason == "publication_generation_retired"
-        for decision in owner.routing_decisions
-    )
     await owner.close()
     await presenter.close()
 

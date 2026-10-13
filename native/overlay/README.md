@@ -11,20 +11,38 @@ Windows Rust runtime for the VR subtitle overlay.
   - `src/puripuly_heart/core/runtime/overlay.py`
   - `src/puripuly_heart/ui/desktop_overlay.py`
 
-The shared bridge is version 15 with execution contract r2 and exclusive native
-presentation retries. Authentication and readiness require
-`speaker_identity_presentation: {"version":2,"policy":"immutable_first_readable_style"}`;
-version 14 and earlier are incompatible because native no longer independently
-retires captions from semantic frontiers. Python fixes a caption's `speaker_style` at first
-readable publication and sends only that style, not speaker identity. SELF
-remains white. Peers without diarization (unsupported providers or Soniox with
-diarization OFF) use gold `#FFD700` without consuming or resetting speaker slots.
-With diarization enabled, peers use four stable per-scope styles (gold, cyan
-`#40DBFF`, coral `#FF7F5C`, blue `#7593FF`), or gray `#B4B4B4` when
-unidentified, malformed, not ready, handed off, or past the fourth speaker in a scope.
+The shared bridge is version 16 with execution contract r2 and exclusive native
+presentation retries. Authentication and readiness require both
+`speaker_identity_presentation: {"version":2,"policy":"immutable_first_readable_style"}`
+and `caption_card_presentation: {"version":1,"policy":"source_bound_accumulation"}`.
+Version 15 and earlier are incompatible. Python fixes a caption's `speaker_style` at
+first readable publication and sends only that style, not speaker identity. SELF
+remains white. With speaker tracking disabled, the existing plain Peer presentation
+uses gold `#FFD700` without consuming speaker slots. Nemotron is the speaker authority
+when tracking is enabled, independently of ASR provider: peers use four stable
+per-epoch styles (gold, cyan `#40DBFF`, coral `#FF7F5C`, blue `#7593FF`), or gray
+`#B4B4B4` when unidentified, mixed, unavailable, handed off, or past the fourth key.
 The canonical style colors live in `src/renderer/types.rs`. The same selected
 color applies to source and translation and participates in native
 render-cache invalidation and replay.
+
+Card `id` and `occupant_key` remain stable across accumulation. `appearance_seq`
+is the mutable latestness rank; both native and desktop apply its order rather than
+keeping an existing occupant in a sticky slot. `card_revision` participates in
+snapshot, frame and card-cache invalidation alongside text and style; unchanged
+line/layout/glyph resources remain reusable. Desktop width retention follows card
+identity, not its rank.
+
+Python binds each admitted source once. Only a new source with a verified matching
+display group, speaker epoch/key and compatible presentation can append to a
+currently visible card. It moves that card newest and restarts its whole lifetime
+at readable application. Source/context order remains unchanged; expired or evicted
+accumulated history is not restored. Same-source completion, targets, retries,
+metadata and replay neither append an utterance nor renew its lifetime. Caption
+aggregation never changes OSC/chatbox payloads.
+This no-renew rule also covers finalized SELF cards: late translation does not add
+the former four-second minimum or restart eight seconds. Active SELF preview and
+slot protection remain separate from finalized-card lifetime.
 
 The snapshot's `speaker_divider` flag asks native to draw a gray band between
 the two caption slots. Python sets it only when both visible blocks are peer
@@ -38,6 +56,9 @@ Python owns caption expiry and send-time pruning. Native renders the blocks in
 each accepted replacement snapshot without filtering them by semantic retirement
 frontiers, exchanging validity leases, or autonomously expiring captions.
 Equal or older snapshot revisions remain rejected.
+Reconnect replay uses the original Python-held card deadlines, not a fresh lifetime.
+The artificial one-second occupant replacement delay is removed; source-order,
+active-source/SELF admission protection, bounded delivery and watchdogs remain.
 Old captions can remain if removal cannot be delivered or replacement rendering
 fails. Health reports presentation progress, not caption freshness. Runtime
 generation retirement, bounded recovery, OFF/shutdown, and the 500 ms empty-frame
@@ -99,6 +120,20 @@ The cross-language active-source tests invoke `uv run --frozen python` to produc
 snapshots through the actual Python Presenter before exercising native reducer
 and retry ownership. Install `uv` and the locked Python test environment before
 running the Rust suite.
+
+The source-card cross-language fixture also runs the actual Python presenter:
+
+```powershell
+uv run --frozen python -m tests.helpers.overlay_source_cards
+uv run --frozen python -m puripuly_heart.ui.desktop_overlay_card_repro --output-dir <new-empty-directory> --dwell-ms 2000
+```
+
+The second command opens a finite, synthetic Flet window covering accumulation,
+replay, style changes, gray/divider cases, SELF and removal. Its JSON records describe
+logical state; actual window captures or native texture readback are required for
+rendering claims. Neither proves HMD readability, transparency compositing or photon
+latency. The sanitized #217 records are `issue217_render_report.json`,
+`issue217_desktop_report.json` and `issue217_evidence/`.
 
 ```powershell
 cargo test --locked --manifest-path native/overlay/Cargo.toml

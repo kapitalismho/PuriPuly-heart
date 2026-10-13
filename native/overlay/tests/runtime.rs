@@ -929,6 +929,10 @@ async fn connect_test_bridge() -> (
             auth_payload["capabilities"]["speaker_identity_presentation"],
             json!({"version":2,"policy":"immutable_first_readable_style"})
         );
+        assert_eq!(
+            auth_payload["capabilities"]["caption_card_presentation"],
+            json!({"version":1,"policy":"source_bound_accumulation"})
+        );
         assert!(auth_payload["capabilities"]
             .get("speaker_transition_presentation")
             .is_none());
@@ -1893,6 +1897,7 @@ async fn event_loop_cancels_stale_readiness_submits_latest_then_handles_shutdown
                             "id": "self:cancel",
                             "occupant_key": "self:cancel",
                             "appearance_seq": 1,
+                            "card_revision": 0,
                             "channel": "self",
                             "block_variant": "finalized",
                             "primary_text": format!("synthetic-{revision}"),
@@ -1954,6 +1959,7 @@ async fn initial_readiness_processes_new_snapshot_before_submit_and_ready() {
                 "id": "self:initial-latest",
                 "occupant_key": "self:initial-latest",
                 "appearance_seq": 1,
+                "card_revision": 0,
                 "channel": "self",
                 "block_variant": "finalized",
                 "primary_text": "latest",
@@ -2425,6 +2431,10 @@ async fn runtime_emits_overlay_ready_only_after_first_texture_submit() {
     assert_eq!(
         ready["capabilities"]["speaker_identity_presentation"],
         json!({"version":2,"policy":"immutable_first_readable_style"})
+    );
+    assert_eq!(
+        ready["capabilities"]["caption_card_presentation"],
+        json!({"version":1,"policy":"source_bound_accumulation"})
     );
     assert!(ready["capabilities"]
         .get("speaker_transition_presentation")
@@ -2916,7 +2926,7 @@ fn divider_requires_two_occupied_slots_and_ignores_slot_order() {
         .iter()
         .map(|slot| slot.as_ref().unwrap().occupant_key.clone())
         .collect::<Vec<_>>();
-    assert_eq!(reordered_slots, vec!["peer:h", "peer:g"]);
+    assert_eq!(reordered_slots, vec!["peer:g", "peer:h"]);
     assert_eq!(rendered_speaker_divider(&runtime), expected);
 }
 
@@ -6520,19 +6530,23 @@ fn check_startup_contract_reports_current_contract_version() {
         payload["speaker_identity_presentation"],
         json!({"version":2,"policy":"immutable_first_readable_style"})
     );
+    assert_eq!(
+        payload["caption_card_presentation"],
+        json!({"version":1,"policy":"source_bound_accumulation"})
+    );
     assert!(payload.get("speaker_transition_presentation").is_none());
 }
 
 #[test]
 fn validate_manifest_rejects_old_transition_and_future_contract_versions() {
-    for contract_version in [12, 13, 14, 16] {
+    for contract_version in [12, 13, 14, 15, 17] {
         let manifest = OverlayManifest {
             contract_version,
             ..test_manifest()
         };
         let error = validate_manifest(&manifest).unwrap_err();
         assert!(matches!(error, StartupError::ContractMismatch(_)));
-        assert!(error.to_string().contains("expected contract_version=15"));
+        assert!(error.to_string().contains("expected contract_version=16"));
     }
 }
 
@@ -6683,10 +6697,86 @@ async fn production_owner_renders_python_active_self_without_renewing_exhausted_
     assert!(owner
         .successful_attempt_audit_for_test()
         .iter()
-        .any(|attempt| attempt.logical_causes.to_vec().iter().any(|cause|
-            cause.kind == PresentationCauseKind::SceneUpdate
+        .any(|attempt| attempt
+            .logical_causes
+            .to_vec()
+            .iter()
+            .any(|cause| cause.kind == PresentationCauseKind::SceneUpdate
                 && cause.trigger_generation == Some(attempt.logical_revision))));
     assert!(owner.runtime().state().blocks().is_empty());
     assert!(owner.resources_released());
     server.await.unwrap();
+}
+
+#[test]
+fn python_presenter_accumulation_reorders_stable_native_cards_and_replays_current_state() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+    let output = Command::new("uv")
+        .args([
+            "run",
+            "--frozen",
+            "python",
+            "-m",
+            "tests.helpers.overlay_source_cards",
+        ])
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let snapshots: Vec<OverlayPresentationSnapshot> =
+        serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(snapshots.len(), 4);
+    let mut runtime = OverlayRuntime::new(snapshots[0].clone());
+    let first_a = runtime.state().scene().slots()[0].as_ref().unwrap().clone();
+    runtime.apply_snapshot(snapshots[1].clone());
+    let first_b = runtime.state().scene().slots()[1].as_ref().unwrap().clone();
+    assert_eq!(first_a.speaker_style.as_deref(), Some("gold"));
+    assert_eq!(first_b.speaker_style.as_deref(), Some("cyan"));
+    runtime.apply_snapshot(snapshots[2].clone());
+    let b = runtime.state().scene().slots()[0].as_ref().unwrap();
+    let a = runtime.state().scene().slots()[1].as_ref().unwrap();
+    assert_eq!(a.id, first_a.id);
+    assert_eq!(a.occupant_key, first_a.occupant_key);
+    assert_eq!(a.slot_entry_order, first_a.slot_entry_order);
+    assert_eq!(b.id, first_b.id);
+    assert_eq!(b.primary_text, first_b.primary_text);
+    assert_eq!(b.secondary_text, first_b.secondary_text);
+    assert_eq!(b.card_revision, first_b.card_revision);
+    assert_eq!(b.speaker_style, first_b.speaker_style);
+    assert!(a.appearance_seq > b.appearance_seq);
+    assert!(a.card_revision > first_a.card_revision);
+    assert!(a.primary_text.contains("First A"));
+    assert!(a.primary_text.contains("Next A"));
+    assert_eq!(a.secondary_text.matches("same phrase").count(), 2);
+    assert_eq!(
+        runtime
+            .state()
+            .blocks()
+            .iter()
+            .find(|block| block.id == a.id)
+            .unwrap()
+            .publication_order,
+        Some(3)
+    );
+    let projected = runtime.caption_blocks();
+    assert_eq!(projected[1].card_revision, a.card_revision);
+    let replay = runtime.apply_snapshot(snapshots[3].clone());
+    assert!(matches!(
+        replay,
+        SnapshotApplyOutcome::Applied {
+            visual_changed: false,
+            ..
+        }
+    ));
+    assert_eq!(projected, runtime.caption_blocks());
+    let reconnected = OverlayRuntime::new(snapshots[3].clone());
+    assert_eq!(projected, reconnected.caption_blocks());
 }

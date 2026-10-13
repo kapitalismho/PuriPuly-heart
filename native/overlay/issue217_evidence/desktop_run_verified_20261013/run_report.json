@@ -1,0 +1,140 @@
+{
+  "status": "dispatched",
+  "window_title": "PuriPuly #217 Synthetic Caption Cards",
+  "synthetic_only": true,
+  "dwell_ms": 10000,
+  "records": [
+    {
+      "name": "first_a",
+      "revision": 1,
+      "monotonic_ms": 2545,
+      "visual_state": {
+        "slot_count": 1,
+        "line_count": 2,
+        "surface_visible": true,
+        "interaction_mode": "locked",
+        "window_width": 1344,
+        "window_height": 336
+      }
+    },
+    {
+      "name": "a_b",
+      "revision": 2,
+      "monotonic_ms": 12547,
+      "visual_state": {
+        "slot_count": 2,
+        "line_count": 4,
+        "surface_visible": true,
+        "interaction_mode": "locked",
+        "window_width": 1344,
+        "window_height": 336
+      }
+    },
+    {
+      "name": "a_b_a_accumulation",
+      "revision": 3,
+      "monotonic_ms": 22553,
+      "visual_state": {
+        "slot_count": 2,
+        "line_count": 4,
+        "surface_visible": true,
+        "interaction_mode": "locked",
+        "window_width": 1344,
+        "window_height": 336
+      }
+    },
+    {
+      "name": "replacement_replay",
+      "revision": 4,
+      "monotonic_ms": 32558,
+      "visual_state": {
+        "slot_count": 2,
+        "line_count": 4,
+        "surface_visible": true,
+        "interaction_mode": "locked",
+        "window_width": 1344,
+        "window_height": 336
+      }
+    },
+    {
+      "name": "same_text_style_redraw",
+      "revision": 5,
+      "monotonic_ms": 42572,
+      "visual_state": {
+        "slot_count": 2,
+        "line_count": 4,
+        "surface_visible": true,
+        "interaction_mode": "locked",
+        "window_width": 1344,
+        "window_height": 336
+      }
+    },
+    {
+      "name": "epoch_handoff_gray",
+      "revision": 6,
+      "monotonic_ms": 52584,
+      "visual_state": {
+        "slot_count": 2,
+        "line_count": 4,
+        "surface_visible": true,
+        "interaction_mode": "locked",
+        "window_width": 1344,
+        "window_height": 336
+      }
+    },
+    {
+      "name": "established_overflow_divider",
+      "revision": 7,
+      "monotonic_ms": 62596,
+      "visual_state": {
+        "slot_count": 2,
+        "line_count": 4,
+        "surface_visible": true,
+        "interaction_mode": "locked",
+        "window_width": 1344,
+        "window_height": 336
+      }
+    },
+    {
+      "name": "unknown_gray_no_divider",
+      "revision": 8,
+      "monotonic_ms": 72602,
+      "visual_state": {
+        "slot_count": 2,
+        "line_count": 4,
+        "surface_visible": true,
+        "interaction_mode": "locked",
+        "window_width": 1344,
+        "window_height": 336
+      }
+    },
+    {
+      "name": "self_white",
+      "revision": 9,
+      "monotonic_ms": 82617,
+      "visual_state": {
+        "slot_count": 1,
+        "line_count": 2,
+        "surface_visible": true,
+        "interaction_mode": "locked",
+        "window_width": 1344,
+        "window_height": 336
+      }
+    },
+    {
+      "name": "python_owned_removal",
+      "revision": 10,
+      "monotonic_ms": 92625,
+      "visual_state": {
+        "slot_count": 0,
+        "line_count": 0,
+        "surface_visible": false,
+        "interaction_mode": "locked",
+        "window_width": 1344,
+        "window_height": 336
+      }
+    }
+  ],
+  "pixel_inspection": "not performed by this executable",
+  "repetition": "two distinct synthetic source contributions retained; no acoustic claim"
+}

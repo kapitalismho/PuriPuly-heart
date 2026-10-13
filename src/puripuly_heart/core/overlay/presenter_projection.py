@@ -69,10 +69,12 @@ class NativeRetryIntentProjection:
         self._episode_targets.update(targets)
         self._episode_generations.update(generations)
 
-    def advance(self, channel: str, event: OverlayEventUnion | None) -> None:
+    def advance(
+        self, channel: str, event: OverlayEventUnion | None, *, target: str | None = None
+    ) -> None:
         if event is None or event.utterance_id is None:
             return
-        target = f"{channel}:{event.utterance_id}"
+        target = target or f"{channel}:{event.utterance_id}"
         generations = self.generations
         targets = self.targets
         next_generation = self.next_generation(
@@ -88,7 +90,7 @@ class NativeRetryIntentProjection:
                 self=generations.self, peer=next_generation
             )
             self.targets = NativeFreshRenderTargets(self=targets.self, peer=target)
-        self._advance_episode(channel, event)
+        self._advance_episode(channel, event, target=target)
 
     def prune(self, rendered_blocks: list[OverlayPresentationBlock]) -> None:
         visible = {block.id for block in rendered_blocks if block.primary_text.strip()}
@@ -104,14 +106,13 @@ class NativeRetryIntentProjection:
             peer=self.episodes.peer if peer_target is not None else None,
         )
 
-    def _advance_episode(self, channel: str, event: OverlayEventUnion) -> None:
+    def _advance_episode(self, channel: str, event: OverlayEventUnion, *, target: str) -> None:
         phase = (
             "final"
             if isinstance(event, (SelfTranscriptFinal, PeerTranscriptFinal, TranslationFinal))
             else "stream"
         )
         current = self.episodes.self if channel == "self" else self.episodes.peer
-        target = f"{channel}:{event.utterance_id}"
         current_target = self._episode_targets.get(channel)
         replace_episode = current is None or current.phase != phase or current_target != target
         if channel == "self" and isinstance(event, TranslationFinal):

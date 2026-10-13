@@ -1385,6 +1385,7 @@ fn materialize_resolved_block_layout(
 
     ResolvedBlockLayout {
         id: block.id.clone(),
+        card_revision: block.card_revision,
         layout_cache_key,
         channel: block.channel,
         speaker_style: block.speaker_style,

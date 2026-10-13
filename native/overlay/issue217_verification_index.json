@@ -1,0 +1,38 @@
+{
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/217",
+  "baseline": "ce95d66437b12e5418f7d50b69a4bab457336fa7",
+  "authority": ["https://github.com/kapitalismho/PuriPuly-heart/issues/211", "https://github.com/kapitalismho/PuriPuly-heart/issues/214"],
+  "candidate": "Containing implementation commit; Director pins exact SHA in review handoff",
+  "coverage": {
+    "R1": {"evidence": ["issue217_source_report.json", "tests/core/test_source_context_contract.py", "tests/core/test_causal_batch_speaker.py"], "claim": "Canonical SourceChild keeps independently verified enclosing group across request slices; natural/hardcut successor and unknown provenance stay distinct."},
+    "R2": {"evidence": ["issue217_presenter_report.json", "tests/core/test_overlay_source_cards.py"], "claim": "Only currently visible compatible group + established speaker epoch/key appends; overflow-gray identity is distinct from unknown gray."},
+    "R3": {"evidence": ["issue217_presenter_report.json", "tests/core/test_overlay_source_cards.py"], "claim": "New source is applied atomically with text, rank, revision and full-card TTL; other card unchanged; stale expiry fenced."},
+    "R4": {"evidence": ["issue217_presenter_report.json", "tests/core/test_overlay_source_cards.py", "tests/core/test_overlay_bridge_mailbox_speaker_divider.py"], "claim": "Separate source/attempt/card identity; completion, targets, retries, metadata, markers and reconnect do not append/renew; expired/evicted accumulated history not resurrected."},
+    "R5": {"evidence": ["issue217_presenter_report.json", "tests/core/test_overlay_presenter.py", "tests/core/runtime/test_output_runtime.py"], "claim": "Artificial one-second gate and dedicated timer state removed; protected-row/SELF/source order, bounded delivery, cancellation and watchdog behavior preserved."},
+    "R6": {"evidence": ["issue217_render_report.json", "issue217_desktop_report.json", "tests/core/test_overlay_speaker_modes.py", "issue217_presenter_snapshots.json"], "claim": "Palette/frozen style/epoch handoff/gray divider preserved; native/desktop rank and revision respected; actual texture readback and actual GUI captures support rendering, not HMD claims."},
+    "R7": {"evidence": ["issue217_source_report.json", "tests/core/test_source_context_contract.py", "tests/integration/test_speaker_identity_pipeline.py"], "claim": "Caption-only aggregation; ordered source/context and ordinary destination payloads unchanged; Peer OSC prohibited."},
+    "R8": {"evidence": ["issue217_render_report.json", "issue217_negotiation_results.xml", "issue217_integration_results.xml"], "claim": "Bridge v16 plus exact caption_card_presentation capability; Python/native/desktop auth/readiness/startup migrated without v15 shim; release build/assembly/startup and five real-process integrations pass."},
+    "R9": {"evidence": ["issue217_source_report.json", "issue217_presenter_report.json", "issue217_desktop_report.json"], "claim": "Render canonical effective text once; distinct equal-text sources retained; no display deduplicator or ASR acoustic-repeat claim."}
+  },
+  "shared_integration": {
+    "python": {"command": "uv run --frozen pytest tests/core tests/ui tests/app tests/config tests/integration -o addopts= -q --junitxml=native/overlay/issue217_python_integration_results.xml", "status": "running"},
+    "final_presenter_native": {"command": "cargo test --locked --manifest-path native/overlay/Cargo.toml --target-dir C:/pph-217-render-target python_presenter_accumulation_reorders_stable_native_cards_and_replays_current_state -- --nocapture", "status": "passed", "passed": 1, "filtered": 286},
+    "formatting": "Configured Ruff import sorting and Black applied to changed Python surfaces; final shared tests pending. Native cargo fmt and focused checks in renderer report."
+  },
+  "decisions": [
+    "Keep Python as sole owner of source grouping, speaker policy and expiry; native renders ranked current state.",
+    "Apply no-renew rule to already-readable finalized SELF as well as Peer; obsolete four-second completion floor removed, active SELF preview/slot protection retained.",
+    "No new acoustic normalization, ASR/provider change, layout redesign, badges, lanes or display-size limits.",
+    "Existing non-tracking plain Peer gold behavior retained; active tracking has Nemotron-only authority and conservative gray fallback."
+  ],
+  "evidence_limits": [
+    "No HMD/controller, SteamVR/VRChat launch, wearer readability or photon-latency check.",
+    "Title-only synthetic GUI capture does not qualify composited transparency.",
+    "No cloud/API/audio/model inference or actual acoustic repetition experiment; final assembled usefulness/profile selection remains #218.",
+    "Existing opt-in native memory/performance probe ignored; ordinary integration-gated tests separately exercised in the required five-test zero-skip tier.",
+    "Conflicting initial image-tool observations were withdrawn after unchanged hashes and independent RGB/System.Drawing decoding; no speculative renderer repair."
+  ],
+  "repository_state_at_start": {"branch": "listen-integrate-the-initial-fp16-vulkan-nemotro", "preexisting_dirty_paths": [], "tracking": "No branch upstream; fetched origin/dev was an ancestor (14 local commits).", "issue_project": "Existing PuriPuly Project status changed Backlog -> In progress and read back."},
+  "remote_operations": "No push, PR publication, merge, release, deployment, issue closure or worktree cleanup authorized/performed.",
+  "review": "Pending stable committed candidate independent checkpoint review and terminal evidence audit."
+}

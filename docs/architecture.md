@@ -448,6 +448,22 @@ Implementation: `core/runtime/output.py`, `core/orchestrator/translation_output_
   - Invalid declared values are rejected observably before retention or diagnostic artifacts.
   - Ingress does not accept arbitrary strings for later redaction.
 
+The overlay event carries the canonical immutable `SourceChild` when available;
+source identity/order and verified display grouping are not inferred from an
+attempt, translation parent or provider request. The presenter binds admitted
+sources to independently identified visible cards. New compatible same-group,
+same-speaker-epoch/key sources may accumulate and move a card newest without
+changing source/context order or other destinations. Unknown identity/provenance
+remains independent, and expired/evicted accumulated history is not resurrected.
+
+Only new readable source application renews a finalized card's lifetime. Translation
+completion, another target, metadata, retry and reconnect replay retain its deadline.
+Python owns frozen speaker styles, gray-divider eligibility and expiry revisions;
+native and desktop consume complete ranked snapshots with stable card identity and
+explicit card revision. Renderer caches include text, style and revision without
+adding another speaker policy, source filter or native expiry owner. The negotiated
+bridge contract is documented in [`native/overlay/README.md`](../native/overlay/README.md).
+
 Behavior: `tests/core/test_overlay_presenter.py`, `native/overlay/tests/runtime.rs`.
 
 ## Runtime Logging

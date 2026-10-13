@@ -21,6 +21,7 @@ from .bridge_transport import OverlayTransportExecutor, TransportWriteCancelled
 from .child_diagnostics import project_child_failure
 from .diagnostics import OverlayDiagnosticsRecorder
 from .manifest import (
+    OVERLAY_CAPTION_CARD_CONTRACT,
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_NATIVE_RETRY_CONTRACT,
@@ -507,6 +508,7 @@ class OverlayBridge:
             execution_contract=OVERLAY_EXECUTION_CONTRACT,
             native_retry_contract=OVERLAY_NATIVE_RETRY_CONTRACT,
             speaker_identity_contract=OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+            caption_card_contract=OVERLAY_CAPTION_CARD_CONTRACT,
         )
 
     def _load_message(self, payload: Any) -> dict[str, Any]:

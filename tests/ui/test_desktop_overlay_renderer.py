@@ -18,6 +18,7 @@ import websockets
 
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CAPTION_CARD_CONTRACT,
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_SPEAKER_IDENTITY_CONTRACT,
@@ -3884,7 +3885,9 @@ async def test_desktop_overlay_render_page_applies_grow_only_card_width_to_visib
         long_width = _caption_card_controls(app.page)[0].width
 
         await window.dispatch_snapshot(
-            OverlayPresentationSnapshot(revision=4, blocks=[same_short_block])
+            OverlayPresentationSnapshot(
+                revision=4, blocks=[replace(same_short_block, appearance_seq=3, card_revision=2)]
+            )
         )
         shortened_width = _caption_card_controls(app.page)[0].width
 
@@ -5536,6 +5539,7 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                "caption_card_presentation": OVERLAY_CAPTION_CARD_CONTRACT,
             },
         }
         assert window.started.is_set()
@@ -5547,6 +5551,7 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                "caption_card_presentation": OVERLAY_CAPTION_CARD_CONTRACT,
             },
         }
         assert token not in json.dumps(sink.events)
@@ -5574,6 +5579,7 @@ async def test_desktop_overlay_malformed_initial_snapshot_is_startup_error_with_
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                "caption_card_presentation": OVERLAY_CAPTION_CARD_CONTRACT,
             },
         }
         await connection.send(
@@ -5635,6 +5641,7 @@ async def test_desktop_overlay_rejects_unframed_initial_runtime_controls() -> No
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                "caption_card_presentation": OVERLAY_CAPTION_CARD_CONTRACT,
             },
         }
         await connection.send(
@@ -5767,6 +5774,7 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                "caption_card_presentation": OVERLAY_CAPTION_CARD_CONTRACT,
             },
         }
         await connection.send(
@@ -5817,6 +5825,7 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                "caption_card_presentation": OVERLAY_CAPTION_CARD_CONTRACT,
             },
         }
 
@@ -6114,6 +6123,7 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                "caption_card_presentation": OVERLAY_CAPTION_CARD_CONTRACT,
             },
         }
         await connection.send(
@@ -6149,6 +6159,7 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                "caption_card_presentation": OVERLAY_CAPTION_CARD_CONTRACT,
             },
         }
         runtime_error = await asyncio.wait_for(received.get(), timeout=1.0)
@@ -6450,3 +6461,43 @@ async def test_desktop_runtime_window_failure_preserves_safe_cause(boundary: str
         assert "SYNTHETIC_PRIVATE" not in json.dumps(sink.events)
     finally:
         await renderer.shutdown()
+
+
+def test_desktop_accumulated_card_rank_and_revision_are_independent_of_identity() -> None:
+    a = _block(
+        "card:a",
+        channel="peer",
+        block_variant="finalized",
+        appearance_seq=1,
+        primary_text="Again.",
+        secondary_text="Encore.",
+        secondary_enabled=True,
+        speaker_style="gold",
+    )
+    b = _block(
+        "card:b",
+        channel="peer",
+        block_variant="finalized",
+        appearance_seq=2,
+        primary_text="B.",
+        speaker_style="cyan",
+    )
+    initial = desktop_overlay.build_desktop_caption_plan(
+        OverlayPresentationSnapshot(revision=1, blocks=[a, b])
+    )
+    accumulated = replace(
+        a,
+        appearance_seq=3,
+        card_revision=2,
+        primary_text="Again. Again.",
+        secondary_text="Encore. Encore.",
+    )
+    final = desktop_overlay.build_desktop_caption_plan(
+        OverlayPresentationSnapshot(revision=2, blocks=[accumulated, b])
+    )
+    assert [slot.block_id for slot in final.slots] == ["card:b", "card:a"]
+    assert final.slots[1].occupant_key == initial.slots[0].occupant_key
+    assert final.slots[1].card_revision == 2
+    assert {line.color for line in final.slots[1].lines} == {"#FFD700"}
+    assert final.slots[0].lines == initial.slots[1].lines
+    assert [line.text for line in final.slots[1].lines] == ["Again. Again.", "Encore. Encore."]

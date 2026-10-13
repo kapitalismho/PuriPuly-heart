@@ -58,6 +58,7 @@ from puripuly_heart.core.diagnostic_validation import (
 from puripuly_heart.core.diagnostics import safe_exception_fields
 from puripuly_heart.core.overlay.child_diagnostics import project_child_failure
 from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CAPTION_CARD_CONTRACT,
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_SPEAKER_IDENTITY_CONTRACT,
@@ -2840,6 +2841,7 @@ class DesktopOverlayRenderer:
                         "capabilities": {
                             "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                             "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                            "caption_card_presentation": OVERLAY_CAPTION_CARD_CONTRACT,
                         },
                     }
                 )
@@ -2886,6 +2888,7 @@ class DesktopOverlayRenderer:
             ready_event["capabilities"] = {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                "caption_card_presentation": OVERLAY_CAPTION_CARD_CONTRACT,
             }
             startup_generation = getattr(self.window, "startup_generation", 0)
             if isinstance(startup_generation, int) and startup_generation > 0:

@@ -1,0 +1,235 @@
+[
+  {
+    "revision": 1,
+    "calibration": {
+      "anchor": "spatial_locked",
+      "offset_x": 0.0,
+      "offset_y": -0.45,
+      "distance": 1.1,
+      "text_scale": 1.0,
+      "background_alpha": 0.24
+    },
+    "blocks": [
+      {
+        "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+        "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+        "appearance_seq": 2,
+        "card_revision": 1,
+        "channel": "peer",
+        "block_variant": "finalized",
+        "primary_text": "First A",
+        "secondary_text": "same phrase",
+        "secondary_enabled": true,
+        "update_id": "fa8aa26ef8bf46d8854be80281584ba8",
+        "primary_language": "ko",
+        "secondary_language": "en",
+        "publication_scope": "peer",
+        "publication_generation": 1,
+        "publication_order": 1,
+        "publication_index": 0,
+        "speaker_style": "gold"
+      }
+    ],
+    "native_fresh_render_generations": {
+      "peer": 1
+    },
+    "native_fresh_render_targets": {
+      "peer": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b"
+    },
+    "native_quiet_tail_episodes": {
+      "peer": {
+        "phase": "final",
+        "generation": 1
+      }
+    }
+  },
+  {
+    "revision": 2,
+    "calibration": {
+      "anchor": "spatial_locked",
+      "offset_x": 0.0,
+      "offset_y": -0.45,
+      "distance": 1.1,
+      "text_scale": 1.0,
+      "background_alpha": 0.24
+    },
+    "blocks": [
+      {
+        "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+        "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+        "appearance_seq": 2,
+        "card_revision": 1,
+        "channel": "peer",
+        "block_variant": "finalized",
+        "primary_text": "First A",
+        "secondary_text": "same phrase",
+        "secondary_enabled": true,
+        "update_id": "fa8aa26ef8bf46d8854be80281584ba8",
+        "primary_language": "ko",
+        "secondary_language": "en",
+        "publication_scope": "peer",
+        "publication_generation": 1,
+        "publication_order": 1,
+        "publication_index": 0,
+        "speaker_style": "gold"
+      },
+      {
+        "id": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+        "occupant_key": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+        "appearance_seq": 3,
+        "card_revision": 1,
+        "channel": "peer",
+        "block_variant": "finalized",
+        "primary_text": "B",
+        "secondary_text": "B words",
+        "secondary_enabled": true,
+        "update_id": "1e18c1a1308d42679def382573ec90d6",
+        "primary_language": "ko",
+        "secondary_language": "en",
+        "publication_scope": "peer",
+        "publication_generation": 1,
+        "publication_order": 2,
+        "publication_index": 0,
+        "speaker_style": "cyan"
+      }
+    ],
+    "native_fresh_render_generations": {
+      "peer": 2
+    },
+    "native_fresh_render_targets": {
+      "peer": "peer:5d955921-0a1a-5933-b226-750c9cbfba17"
+    },
+    "native_quiet_tail_episodes": {
+      "peer": {
+        "phase": "final",
+        "generation": 2
+      }
+    }
+  },
+  {
+    "revision": 3,
+    "calibration": {
+      "anchor": "spatial_locked",
+      "offset_x": 0.0,
+      "offset_y": -0.45,
+      "distance": 1.1,
+      "text_scale": 1.0,
+      "background_alpha": 0.24
+    },
+    "blocks": [
+      {
+        "id": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+        "occupant_key": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+        "appearance_seq": 3,
+        "card_revision": 1,
+        "channel": "peer",
+        "block_variant": "finalized",
+        "primary_text": "B",
+        "secondary_text": "B words",
+        "secondary_enabled": true,
+        "update_id": "1e18c1a1308d42679def382573ec90d6",
+        "primary_language": "ko",
+        "secondary_language": "en",
+        "publication_scope": "peer",
+        "publication_generation": 1,
+        "publication_order": 2,
+        "publication_index": 0,
+        "speaker_style": "cyan"
+      },
+      {
+        "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+        "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+        "appearance_seq": 4,
+        "card_revision": 2,
+        "channel": "peer",
+        "block_variant": "finalized",
+        "primary_text": "First A Next A",
+        "secondary_text": "same phrase same phrase",
+        "secondary_enabled": true,
+        "update_id": "1205659e3ac74e42a36df0db08f406a9",
+        "primary_language": "ko",
+        "secondary_language": "en",
+        "publication_scope": "peer",
+        "publication_generation": 1,
+        "publication_order": 3,
+        "publication_index": 0,
+        "speaker_style": "gold"
+      }
+    ],
+    "native_fresh_render_generations": {
+      "peer": 3
+    },
+    "native_fresh_render_targets": {
+      "peer": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b"
+    },
+    "native_quiet_tail_episodes": {
+      "peer": {
+        "phase": "final",
+        "generation": 3
+      }
+    }
+  },
+  {
+    "revision": 4,
+    "calibration": {
+      "anchor": "spatial_locked",
+      "offset_x": 0.0,
+      "offset_y": -0.45,
+      "distance": 1.1,
+      "text_scale": 1.0,
+      "background_alpha": 0.24
+    },
+    "blocks": [
+      {
+        "id": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+        "occupant_key": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+        "appearance_seq": 3,
+        "card_revision": 1,
+        "channel": "peer",
+        "block_variant": "finalized",
+        "primary_text": "B",
+        "secondary_text": "B words",
+        "secondary_enabled": true,
+        "update_id": "1e18c1a1308d42679def382573ec90d6",
+        "primary_language": "ko",
+        "secondary_language": "en",
+        "publication_scope": "peer",
+        "publication_generation": 1,
+        "publication_order": 2,
+        "publication_index": 0,
+        "speaker_style": "cyan"
+      },
+      {
+        "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+        "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+        "appearance_seq": 4,
+        "card_revision": 2,
+        "channel": "peer",
+        "block_variant": "finalized",
+        "primary_text": "First A Next A",
+        "secondary_text": "same phrase same phrase",
+        "secondary_enabled": true,
+        "update_id": "1205659e3ac74e42a36df0db08f406a9",
+        "primary_language": "ko",
+        "secondary_language": "en",
+        "publication_scope": "peer",
+        "publication_generation": 1,
+        "publication_order": 3,
+        "publication_index": 0,
+        "speaker_style": "gold"
+      }
+    ],
+    "native_fresh_render_generations": {
+      "peer": 1
+    },
+    "native_fresh_render_targets": {
+      "peer": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b"
+    },
+    "native_quiet_tail_episodes": {
+      "peer": {
+        "phase": "final",
+        "generation": 1
+      }
+    }
+  }
+]

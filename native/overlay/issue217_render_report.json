@@ -1,0 +1,72 @@
+{
+  "issue": 217,
+  "authority": ["https://github.com/kapitalismho/PuriPuly-heart/issues/217", "https://github.com/kapitalismho/PuriPuly-heart/issues/211#R5", "https://github.com/kapitalismho/PuriPuly-heart/issues/211#R8"],
+  "baseline": "ce95d66437b12e5418f7d50b69a4bab457336fa7",
+  "status": "implemented_and_focused_native_shared_boundary_checks_passed",
+  "integration_authority": "Director retains Git mutations, final integration, review and acceptance",
+  "environment": {
+    "os": "Windows 10.0.22631 x64",
+    "rustc": "1.97.1 (8bab26f4f 2026-07-14), x86_64-pc-windows-msvc, LLVM 22.1.6",
+    "python": "3.14.7",
+    "flet": "1.0.0",
+    "flet_desktop": "1.0.0",
+    "graphics_adapter_observed_in_actual_test": "AMD Radeon RX 7900 XTX",
+    "graphics_driver_inventory": "32.0.31041.1004",
+    "graphics_backend": "D3d11Hardware",
+    "graphics_adapter_luid": {"high": 0, "low": 63394},
+    "graphics_vendor_id": 4098,
+    "graphics_device_id": 29772,
+    "cargo_target_dir": "C:/pph-217-render-target",
+    "inputs": "Fixed synthetic snapshots/text; actual Presenter fixture uses deterministic SourceChild identities. No audio or cloud calls."
+  },
+  "implementation": {
+    "negotiation": "Bridge version 16; exact caption_card_presentation capability {version:1,policy:source_bound_accumulation} in Python/native/desktop auth, readiness and native startup declaration. Version 15 rejected; existing speaker style and retry capabilities preserved.",
+    "wire": "card_revision defaults to 0 on Python construction and is serialized explicitly; Python/Rust v16 wire parsers require the nonnegative revision field.",
+    "native": "Stable card/occupant identity and slot entry order; apply appearance_seq rank order to each replacement snapshot. Revision propagates through DTO, slot, CaptionBlock, resolved/visible card, logical/frame identities, block-cache key and damage tracking. Text/style/layout line and glyph caches do not carry card revision. Two-slot reconciliation sorts a fixed reference array and retains existing allocated slot strings.",
+    "desktop": "Rank order and revision propagated to retained caption plan; width-floor identity is (block_id,occupant_key), not appearance_seq. Existing source/translation style, divider and retained-control patch paths reused.",
+    "policy_boundary": "No renderer-side source grouping, palette allocation, identity inference, text deduplication, caption expiry or native TTL. Original Python mailbox deadlines remain outside wire snapshots.",
+    "synthetic_gui_surface": "python -m puripuly_heart.ui.desktop_overlay_card_repro; unique synthetic title, fixed snapshots, checkerboard backdrop, finite owned Flet lifecycle and task-local snapshot/run artifacts."
+  },
+  "checks": [
+    {"command": "cargo fmt --manifest-path native/overlay/Cargo.toml", "result": "passed"},
+    {"command": "cargo test --locked --manifest-path native/overlay/Cargo.toml --target-dir C:/pph-217-render-target -- --skip windows_graphics_", "result": "passed", "passed": 260, "ignored": 1, "filtered": 26, "ignored_reason": "Existing opt-in synthetic renderer memory/performance probe", "includes": "Actual Python Presenter A-B-A fixture consumed through tests.helpers.overlay_source_cards; stable native identities, rank, repeated distinct text contributions, revision, latest source publication order and replay equivalence"},
+    {"command": "cargo test --locked --manifest-path native/overlay/Cargo.toml --target-dir C:/pph-217-render-target windows_graphics_ -- --test-threads=1 --nocapture", "result": "passed", "passed": 26, "failed": 0, "ignored": 0, "evidence": "Actual Windows D3D11 texture rendering, staging CopyResource/Map pixel readback: both source/translation style changes, divider appear/clear, append with unchanged B pixels, A/B reorder, revision-only card invalidation with reusable layout cache, reconnect-equivalent pixels and gray paint"},
+    {"command": "cargo test --locked --manifest-path native/overlay/Cargo.toml --target-dir C:/pph-217-render-target windows_graphics_accumulated_cards_reorder_revision_and_reconnect_pixels -- --test-threads=1 --nocapture", "result": "passed", "passed": 1, "purpose": "Added adapter descriptor trace to identify the hardware used by the already-passing readback case; final test still passes"},
+    {"command": "cargo build --locked --release --manifest-path native/overlay/Cargo.toml --bin PuriPulyHeartOverlay --target-dir C:/pph-217-render-target", "result": "passed"},
+    {"command": "PowerShell New-Item/Copy-Item runtime assembly", "result": "passed", "files": ["build/overlay/PuriPulyHeartOverlay.exe", "build/overlay/openvr_api.dll", "build/overlay/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc"]},
+    {"command": "build/overlay/PuriPulyHeartOverlay.exe --check-startup-contract", "result": "passed", "payload": {"app_version":"2.8.2","caption_card_presentation":{"policy":"source_bound_accumulation","version":1},"contract_version":16,"execution_contract":{"revision":"r2","version":1},"native_presentation_retry":{"ownership":"exclusive","version":1},"speaker_identity_presentation":{"policy":"immutable_first_readable_style","version":2}}},
+    {"command": "uv run --frozen pytest tests/core/test_overlay_protocol.py tests/core/test_overlay_manifest.py tests/core/test_overlay_bridge.py tests/app/test_overlay_process_manager.py tests/ui/test_desktop_overlay_renderer.py tests/ui/test_desktop_overlay_card_repro.py tests/app/test_desktop_overlay_repro.py tests/app/test_desktop_overlay_runner.py tests/config/test_public_compatibility_surfaces.py::test_overlay_contract_snapshot_matches_manifest_and_protocol_wire_shape -q", "result": "passed_exit_0", "skipped": 2, "skip_note": "INTEGRATION disabled for this focused ordinary run; real-process tier separately ran with zero skips", "warnings": "33 preexisting asyncio.iscoroutinefunction deprecation warnings"},
+    {"command": "uv run --frozen pytest tests/core/test_overlay_bridge.py::test_native_auth_rejects_non_exact_caption_card_contract tests/app/test_overlay_process_manager.py::test_overlay_ready_rejects_non_exact_caption_card_contract tests/ui/test_desktop_overlay_renderer.py::test_desktop_accumulated_card_rank_and_revision_are_independent_of_identity -o addopts= --junitxml=native/overlay/issue217_negotiation_results.xml -q", "result": "passed", "passed": 13, "failed": 0, "skipped": 0},
+    {"command": "uv run --frozen pytest tests/app/test_overlay_translation_enabled_sync.py tests/app/test_overlay_process_manager.py::test_overlay_ready_rejects_non_exact_native_retry_contract tests/app/test_desktop_overlay_repro.py::test_raw_ingress_requires_current_speaker_identity_capability -o addopts= -q", "result": "passed", "passed": 14, "failed": 0, "skipped": 0},
+    {"command": "INTEGRATION=1 uv run --frozen pytest tests/app/test_desktop_overlay_runner.py::test_import_run_desktop_overlay_dispatch_is_provider_secret_and_stt_free tests/app/test_desktop_overlay_runner.py::test_import_preview_dispatch_is_provider_secret_and_stt_free tests/core/runtime/test_overlay_runtime.py::test_overlay_runtime_receives_real_subprocess_shutdown_ack_before_reader_cleanup tests/ui/test_flet_desktop_view_process_owner.py::test_windows_kill_on_close_job_reaps_assigned_real_process tests/ui/test_flet_desktop_view_process_owner.py::test_owner_reaps_real_process_and_pid_file_across_ten_cycles -o addopts= --junitxml=native/overlay/issue217_integration_results.xml -q", "result": "passed", "passed": 5, "failed": 0, "errors": 0, "skipped": 0}
+  ],
+  "runtime_assembly_sha256": {
+    "PuriPulyHeartOverlay.exe": "88588FFDA9AD8657C0B462E25C2A2EC5C17C62BE4CBC975BDDDDE0EA51D3A843",
+    "openvr_api.dll": "BAB8AC6EF64E68A9CA53315B0014D131088584B2EFDFA6DB511D67EC03CFCB4A",
+    "NotoSansCJK-Medium.ttc": "197D5E1E019FACA33A4D55931C7D68B8056F3B97CB862049F5CB8DE9EFDFB8CE"
+  },
+  "diagnosed_failures": [
+    "First deterministic Rust run failed two obsolete fixture expectations: sticky physical slot order and version-15 mismatch text. Revised to rank order and rejection of versions 15/17. Final full deterministic run passes.",
+    "PowerShell-style backslash executable invocation through shell failed command parsing (exit 127); normalized forward-slash path startup check passes.",
+    "One PowerShell screenshot-hash diagnostic could not resolve Get-FileHash; sha256sum pinned the same files successfully.",
+    "No desktop product defect established. Missing-card interpretation was withdrawn after original PNG hashes, independent ffmpeg/System.Drawing RGB decoding and Director inspection agreed. No speculative product repair or passing rerun substituted."
+  ],
+  "desktop_evidence_reused": {
+    "owner": "Director-assigned desktop-validation, validation-only",
+    "report": "native/overlay/issue217_desktop_report.json",
+    "status": "All ten actual Flet synthetic stages supported by title-only capture; independent RGB evidence resolves misleading image-tool views",
+    "capture_scope": "Unique synthetic caption window only, 1344x336; no full-desktop capture",
+    "replay_sha256": "05b4dad6a7af3ac1af99a5682241ef3f6ee46ef70bb39a5090f550faa770eb86",
+    "limits": "Captured black background does not establish composited checkerboard/transparency. Synthetic source-unit labels establish fixture intent, not acoustic provenance or diarization quality."
+  },
+  "artifacts": ["native/overlay/issue217_presenter_snapshots.json", "native/overlay/issue217_integration_results.xml", "native/overlay/issue217_negotiation_results.xml", "native/overlay/issue217_desktop_report.json", "native/overlay/issue217_evidence"],
+  "unrun": ["SteamVR launch", "HMD/controller rendering and wearer readability", "HMD photon latency", "Real acoustic repetition or diarization study", "Cloud/audio/provider integration", "Repository-wide final validation (Director ownership)"],
+  "documentation_proposals_for_director": [
+    "Native README: replace version 15 with version 16 and add exact caption_card_presentation capability alongside existing style/retry declarations.",
+    "Document independent stable card id/occupant_key, mutable appearance_seq latestness, explicit card_revision and native/desktop rank-order replacement behavior; remove sticky-placement implications.",
+    "Document revision invalidation at card/frame/block cache boundaries while low-level text/layout caches remain reusable; Python alone owns grouping, identity, palette, source binding and original replay deadlines.",
+    "Add durable synthetic GUI command and evidence limits; keep all five Native README completion tiers and zero-skip integration requirement.",
+    "Reconcile historical unsupported-provider/Soniox gold description with #211 Nemotron-only authority and unavailable gray policy, in coordination with presenter/source owners."
+  ],
+  "cleanup": "No throwaway scripts created; no maintained docs or Git mutations performed. Runtime assembly is local, not a release or deployment. JUnit machine hostname removed from retained task evidence."
+}

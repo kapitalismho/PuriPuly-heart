@@ -60,6 +60,7 @@ pub struct CaptionBlock {
     pub id: String,
     pub occupant_key: String,
     pub occupant_generation: u64,
+    pub card_revision: u64,
     pub primary_text: String,
     pub secondary_text: String,
     pub secondary_enabled: bool,
@@ -136,6 +137,7 @@ impl CaptionBlock {
             occupant_key: id.clone(),
             occupant_generation: 0,
             id,
+            card_revision: 0,
             primary_text: primary_text.into(),
             secondary_text: String::new(),
             secondary_enabled: true,
@@ -157,6 +159,11 @@ impl CaptionBlock {
     pub fn with_occupant(mut self, occupant_key: impl Into<String>, generation: u64) -> Self {
         self.occupant_key = occupant_key.into();
         self.occupant_generation = generation;
+        self
+    }
+
+    pub fn with_card_revision(mut self, revision: u64) -> Self {
+        self.card_revision = revision;
         self
     }
 
@@ -354,6 +361,7 @@ impl DamageBand {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VisibleCaptionBlock {
     pub id: String,
+    pub card_revision: u64,
     pub channel: Option<CaptionChannel>,
     pub speaker_style: SpeakerStyle,
     pub block_variant: CaptionBlockVariant,
@@ -480,6 +488,7 @@ pub struct ResolvedLineLayout {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResolvedBlockLayout {
     pub id: String,
+    pub card_revision: u64,
     pub layout_cache_key: LayoutCacheKey,
     pub channel: Option<CaptionChannel>,
     pub speaker_style: SpeakerStyle,
@@ -501,6 +510,7 @@ impl ResolvedBlockLayout {
     pub fn block_cache_key(&self) -> BlockCacheKey {
         BlockCacheKey {
             id: self.id.clone(),
+            card_revision: self.card_revision,
             layout: self.layout_cache_key.clone(),
         }
     }
@@ -532,6 +542,7 @@ impl From<ResolvedBlockLayout> for VisibleCaptionBlock {
     fn from(value: ResolvedBlockLayout) -> Self {
         Self {
             id: value.id,
+            card_revision: value.card_revision,
             channel: value.channel,
             speaker_style: value.speaker_style,
             block_variant: value.block_variant,
@@ -594,6 +605,7 @@ pub struct LineCacheKey {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BlockCacheKey {
     pub id: String,
+    pub card_revision: u64,
     pub layout: LayoutCacheKey,
 }
 

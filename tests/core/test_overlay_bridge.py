@@ -16,6 +16,7 @@ from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CAPTION_CARD_CONTRACT,
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_NATIVE_RETRY_CONTRACT,
@@ -46,6 +47,7 @@ def _native_auth() -> str:
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
                 "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+                "caption_card_presentation": OVERLAY_CAPTION_CARD_CONTRACT,
             },
         }
     )
@@ -1457,3 +1459,23 @@ async def test_active_self_stalled_bridge_coalesces_and_never_replays_removed_ta
     finally:
         await presenter.close()
         await bridge.stop()
+
+
+@pytest.mark.parametrize(
+    "capability",
+    [
+        None,
+        {"version": 2, "policy": "source_bound_accumulation"},
+        {"version": 1, "policy": "utterance_replacement"},
+        {"version": 1, "policy": "source_bound_accumulation", "extension": True},
+    ],
+)
+def test_native_auth_rejects_non_exact_caption_card_contract(capability: object) -> None:
+    bridge = OverlayBridge(session_token="expected-token", overlay_instance_id="overlay-test")
+    payload = json.loads(_native_auth())
+    payload["capabilities"]["caption_card_presentation"] = capability
+    assert not bridge._is_valid_auth_payload(payload)
+    payload["capabilities"]["caption_card_presentation"] = OVERLAY_CAPTION_CARD_CONTRACT
+    assert bridge._is_valid_auth_payload(payload)
+    payload["contract_version"] = 15
+    assert not bridge._is_valid_auth_payload(payload)

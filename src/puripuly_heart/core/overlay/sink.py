@@ -3,13 +3,16 @@ from __future__ import annotations
 import itertools
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import ClassVar, Literal, Protocol
+from typing import TYPE_CHECKING, ClassVar, Literal, Protocol
 from uuid import UUID, uuid4
 
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.messages import DiagnosticFieldValue
 from puripuly_heart.core.output.subtitle import PeerSubtitlePublication
 from puripuly_heart.domain.models import ChannelId, SpeakerAssignment, Transcript
+
+if TYPE_CHECKING:
+    from puripuly_heart.core.orchestrator.translation_turn import SourceChild
 
 AppliedContextMode = Literal["integrated"]
 OverlayTurnKind = Literal["manual", "self", "peer"]
@@ -53,6 +56,7 @@ class OverlayEvent:
     source_text_len: int | None = None
     logical_turn_key: str | None = None
     speaker_assignment: SpeakerAssignment | None = None
+    source_child: SourceChild | None = None
     turn_kind: OverlayTurnKind | None = None
     parent_utterance_id: UUID | None = None
     turn_generation: int | None = None
@@ -241,11 +245,16 @@ class OverlayEventAdapter:
             logical_turn_key=logical_turn_key,
             output_scope=output_scope,
             speaker_assignment=speaker_assignment,
+            source_child=transcript.source_child,
         )
         event_cls = SelfTranscriptFinal if transcript.channel == "self" else PeerTranscriptFinal
         return event_cls(
             **common,
-            text=transcript.text,
+            text=(
+                transcript.source_child.effective_text
+                if transcript.source_child is not None
+                else transcript.text
+            ),
             source_language=source_language,
             target_language=target_language,
             is_final=True,
@@ -389,6 +398,7 @@ class OverlayEventAdapter:
         logical_turn_key: str | None = None,
         speaker_assignment: SpeakerAssignment | None = None,
         output_scope: OverlayPublicationScope | None = None,
+        source_child: SourceChild | None = None,
     ) -> TranslationFinal:
         return TranslationFinal(
             **self._common_event_fields(
@@ -403,9 +413,10 @@ class OverlayEventAdapter:
                 logical_turn_key=logical_turn_key,
                 speaker_assignment=speaker_assignment,
                 output_scope=output_scope,
+                source_child=source_child,
             ),
             text=text,
-            source_text=source_text,
+            source_text=source_child.effective_text if source_child is not None else source_text,
             source_language=source_language,
             target_language=target_language,
             is_final=True,
@@ -452,6 +463,7 @@ class OverlayEventAdapter:
         target_count: int = 1,
         retained_payload_bytes: int = 0,
         output_scope: OverlayPublicationScope | None = None,
+        source_child: SourceChild | None = None,
     ) -> dict[str, object]:
         if output_scope is not None:
             turn_kind = output_scope.turn_kind
@@ -476,6 +488,7 @@ class OverlayEventAdapter:
             "source_text_len": source_text_len,
             "logical_turn_key": logical_turn_key,
             "speaker_assignment": speaker_assignment,
+            "source_child": source_child,
             "turn_kind": turn_kind,
             "parent_utterance_id": parent_utterance_id,
             "turn_generation": turn_generation,

@@ -1,0 +1,377 @@
+[
+  {
+    "name": "first_a",
+    "source_units": [
+      "source:a1"
+    ],
+    "snapshot": {
+      "revision": 1,
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0.0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1.0,
+        "background_alpha": 0.24
+      },
+      "blocks": [
+        {
+          "id": "card:a",
+          "occupant_key": "card:a",
+          "appearance_seq": 1,
+          "card_revision": 1,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "Again.",
+          "secondary_text": "Encore.",
+          "secondary_enabled": true,
+          "speaker_style": "gold"
+        }
+      ]
+    }
+  },
+  {
+    "name": "a_b",
+    "source_units": [
+      "source:a1",
+      "source:b1"
+    ],
+    "snapshot": {
+      "revision": 2,
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0.0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1.0,
+        "background_alpha": 0.24
+      },
+      "blocks": [
+        {
+          "id": "card:a",
+          "occupant_key": "card:a",
+          "appearance_seq": 1,
+          "card_revision": 1,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "Again.",
+          "secondary_text": "Encore.",
+          "secondary_enabled": true,
+          "speaker_style": "gold"
+        },
+        {
+          "id": "card:b",
+          "occupant_key": "card:b",
+          "appearance_seq": 2,
+          "card_revision": 1,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "B stays unchanged.",
+          "secondary_text": "B reste inchangé.",
+          "secondary_enabled": true,
+          "speaker_style": "cyan"
+        }
+      ]
+    }
+  },
+  {
+    "name": "a_b_a_accumulation",
+    "source_units": [
+      "source:a1",
+      "source:b1",
+      "source:a2"
+    ],
+    "snapshot": {
+      "revision": 3,
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0.0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1.0,
+        "background_alpha": 0.24
+      },
+      "blocks": [
+        {
+          "id": "card:a",
+          "occupant_key": "card:a",
+          "appearance_seq": 3,
+          "card_revision": 2,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "Again. Again.",
+          "secondary_text": "Encore. Encore.",
+          "secondary_enabled": true,
+          "speaker_style": "gold"
+        },
+        {
+          "id": "card:b",
+          "occupant_key": "card:b",
+          "appearance_seq": 2,
+          "card_revision": 1,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "B stays unchanged.",
+          "secondary_text": "B reste inchangé.",
+          "secondary_enabled": true,
+          "speaker_style": "cyan"
+        }
+      ]
+    }
+  },
+  {
+    "name": "replacement_replay",
+    "source_units": [
+      "source:a1",
+      "source:b1",
+      "source:a2"
+    ],
+    "snapshot": {
+      "revision": 4,
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0.0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1.0,
+        "background_alpha": 0.24
+      },
+      "blocks": [
+        {
+          "id": "card:b",
+          "occupant_key": "card:b",
+          "appearance_seq": 2,
+          "card_revision": 1,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "B stays unchanged.",
+          "secondary_text": "B reste inchangé.",
+          "secondary_enabled": true,
+          "speaker_style": "cyan"
+        },
+        {
+          "id": "card:a",
+          "occupant_key": "card:a",
+          "appearance_seq": 3,
+          "card_revision": 2,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "Again. Again.",
+          "secondary_text": "Encore. Encore.",
+          "secondary_enabled": true,
+          "speaker_style": "gold"
+        }
+      ]
+    }
+  },
+  {
+    "name": "same_text_style_redraw",
+    "source_units": [],
+    "snapshot": {
+      "revision": 5,
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0.0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1.0,
+        "background_alpha": 0.24
+      },
+      "blocks": [
+        {
+          "id": "card:b",
+          "occupant_key": "card:b",
+          "appearance_seq": 2,
+          "card_revision": 1,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "B stays unchanged.",
+          "secondary_text": "B reste inchangé.",
+          "secondary_enabled": true,
+          "speaker_style": "cyan"
+        },
+        {
+          "id": "card:a",
+          "occupant_key": "card:a",
+          "appearance_seq": 3,
+          "card_revision": 3,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "Again. Again.",
+          "secondary_text": "Encore. Encore.",
+          "secondary_enabled": true,
+          "speaker_style": "coral"
+        }
+      ]
+    }
+  },
+  {
+    "name": "epoch_handoff_gray",
+    "source_units": [],
+    "snapshot": {
+      "revision": 6,
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0.0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1.0,
+        "background_alpha": 0.24
+      },
+      "blocks": [
+        {
+          "id": "card:a",
+          "occupant_key": "card:a",
+          "appearance_seq": 3,
+          "card_revision": 2,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "Again. Again.",
+          "secondary_text": "Encore. Encore.",
+          "secondary_enabled": true,
+          "speaker_style": "gold"
+        },
+        {
+          "id": "card:new-epoch",
+          "occupant_key": "card:new-epoch",
+          "appearance_seq": 4,
+          "card_revision": 1,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "New epoch remains gray.",
+          "secondary_text": "La nouvelle époque reste grise.",
+          "secondary_enabled": true,
+          "speaker_style": "gray"
+        }
+      ]
+    }
+  },
+  {
+    "name": "established_overflow_divider",
+    "source_units": [],
+    "snapshot": {
+      "revision": 7,
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0.0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1.0,
+        "background_alpha": 0.24
+      },
+      "blocks": [
+        {
+          "id": "card:a",
+          "occupant_key": "card:a",
+          "appearance_seq": 3,
+          "card_revision": 3,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "Again. Again.",
+          "secondary_text": "Encore. Encore.",
+          "secondary_enabled": true,
+          "speaker_style": "gray"
+        },
+        {
+          "id": "card:b",
+          "occupant_key": "card:b",
+          "appearance_seq": 2,
+          "card_revision": 1,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "B stays unchanged.",
+          "secondary_text": "B reste inchangé.",
+          "secondary_enabled": true,
+          "speaker_style": "gray"
+        }
+      ],
+      "speaker_divider": true
+    }
+  },
+  {
+    "name": "unknown_gray_no_divider",
+    "source_units": [],
+    "snapshot": {
+      "revision": 8,
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0.0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1.0,
+        "background_alpha": 0.24
+      },
+      "blocks": [
+        {
+          "id": "card:a",
+          "occupant_key": "card:a",
+          "appearance_seq": 3,
+          "card_revision": 3,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "Again. Again.",
+          "secondary_text": "Encore. Encore.",
+          "secondary_enabled": true,
+          "speaker_style": "gray"
+        },
+        {
+          "id": "card:b",
+          "occupant_key": "card:b",
+          "appearance_seq": 2,
+          "card_revision": 1,
+          "channel": "peer",
+          "block_variant": "finalized",
+          "primary_text": "B stays unchanged.",
+          "secondary_text": "B reste inchangé.",
+          "secondary_enabled": true,
+          "speaker_style": "gray"
+        }
+      ]
+    }
+  },
+  {
+    "name": "self_white",
+    "source_units": [],
+    "snapshot": {
+      "revision": 9,
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0.0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1.0,
+        "background_alpha": 0.24
+      },
+      "blocks": [
+        {
+          "id": "card:self",
+          "occupant_key": "card:self",
+          "appearance_seq": 1,
+          "card_revision": 1,
+          "channel": "self",
+          "block_variant": "finalized",
+          "primary_text": "SELF stays white.",
+          "secondary_text": "SELF reste blanc.",
+          "secondary_enabled": true,
+          "speaker_style": "gold"
+        }
+      ]
+    }
+  },
+  {
+    "name": "python_owned_removal",
+    "source_units": [],
+    "snapshot": {
+      "revision": 10,
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0.0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1.0,
+        "background_alpha": 0.24
+      },
+      "blocks": []
+    }
+  }
+]

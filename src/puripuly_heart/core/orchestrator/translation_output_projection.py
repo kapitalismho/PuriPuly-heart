@@ -3183,6 +3183,7 @@ class TranslationOutputProjectionOwner:
             "source_text_hash": translation.source_text_hash,
             "source_text_len": translation.source_text_len,
             "logical_turn_key": translation.logical_turn_key,
+            "source_child": translation.source_child,
         }
         if translation.channel == "peer":
             metadata["speaker_assignment"] = translation.speaker_assignment

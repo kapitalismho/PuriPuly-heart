@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use serde::{Deserialize, Serialize};
 
 use crate::renderer::CaptionLayoutPolicy;
@@ -54,6 +52,7 @@ pub struct OverlayPresentationBlock {
     pub id: String,
     pub occupant_key: String,
     pub appearance_seq: u64,
+    pub card_revision: u64,
     pub channel: String,
     pub block_variant: OverlayPresentationBlockVariant,
     pub primary_text: String,
@@ -232,6 +231,7 @@ pub struct OverlaySlot {
     pub id: String,
     pub occupant_key: String,
     pub appearance_seq: u64,
+    pub card_revision: u64,
     pub channel: String,
     pub block_variant: OverlayPresentationBlockVariant,
     pub primary_text: String,
@@ -258,6 +258,7 @@ impl OverlaySlot {
             id: block.id.clone(),
             occupant_key: block.occupant_key.clone(),
             appearance_seq: block.appearance_seq,
+            card_revision: block.card_revision,
             channel: block.channel.clone(),
             block_variant: block.block_variant,
             primary_text: block.primary_text.clone(),
@@ -273,21 +274,42 @@ impl OverlaySlot {
         }
     }
 
-    fn update_from_block(&mut self, block: &OverlayPresentationBlock) {
-        self.id = block.id.clone();
-        self.occupant_key = block.occupant_key.clone();
+    fn update_from_block(&mut self, block: &OverlayPresentationBlock) -> bool {
+        let changed = self.id != block.id
+            || self.occupant_key != block.occupant_key
+            || self.appearance_seq != block.appearance_seq
+            || self.card_revision != block.card_revision
+            || self.channel != block.channel
+            || self.block_variant != block.block_variant
+            || self.primary_text != block.primary_text
+            || self.secondary_text != block.secondary_text
+            || self.secondary_enabled != block.secondary_enabled
+            || self.primary_language != block.primary_language
+            || self.secondary_language != block.secondary_language
+            || self.update_id != block.update_id
+            || self.origin_wall_clock_ms != block.origin_wall_clock_ms
+            || self.session_scope != block.session_scope
+            || self.speaker_style != block.speaker_style;
+        if !changed {
+            return false;
+        }
+        self.id.clone_from(&block.id);
+        self.occupant_key.clone_from(&block.occupant_key);
         self.appearance_seq = block.appearance_seq;
-        self.channel = block.channel.clone();
+        self.card_revision = block.card_revision;
+        self.channel.clone_from(&block.channel);
         self.block_variant = block.block_variant;
-        self.primary_text = block.primary_text.clone();
-        self.secondary_text = block.secondary_text.clone();
+        self.primary_text.clone_from(&block.primary_text);
+        self.secondary_text.clone_from(&block.secondary_text);
         self.secondary_enabled = block.secondary_enabled;
-        self.primary_language = block.primary_language.clone();
-        self.secondary_language = block.secondary_language.clone();
-        self.update_id = block.update_id.clone();
+        self.primary_language.clone_from(&block.primary_language);
+        self.secondary_language
+            .clone_from(&block.secondary_language);
+        self.update_id.clone_from(&block.update_id);
         self.origin_wall_clock_ms = block.origin_wall_clock_ms;
-        self.session_scope = block.session_scope.clone();
-        self.speaker_style = block.speaker_style.clone();
+        self.session_scope.clone_from(&block.session_scope);
+        self.speaker_style.clone_from(&block.speaker_style);
+        true
     }
 }
 
@@ -316,94 +338,45 @@ impl OverlayScene {
     }
 
     fn apply_snapshot(&mut self, blocks: &[OverlayPresentationBlock], text_scale: f32) -> bool {
-        let previous = self.slots.clone();
-        let mut sorted = blocks.to_vec();
-        sorted.sort_by(|left, right| {
-            left.appearance_seq
-                .cmp(&right.appearance_seq)
-                .then_with(|| left.occupant_key.cmp(&right.occupant_key))
-        });
         debug_assert!(
-            sorted.len() <= SLOT_COUNT,
+            blocks.len() <= SLOT_COUNT,
             "presenter must cap visible blocks to two"
         );
-
-        let mut assigned = self.update_existing_slots(&sorted);
-        self.clear_missing_slots(&sorted);
-        self.fill_empty_slots(&sorted, &mut assigned);
-        self.recompute_slot_anchors(text_scale);
-
-        previous != self.slots
-    }
-
-    fn update_existing_slots(&mut self, blocks: &[OverlayPresentationBlock]) -> HashSet<String> {
-        let mut assigned = HashSet::new();
-        for block in blocks {
-            if let Some(slot) = self
-                .slots
-                .iter_mut()
-                .flatten()
-                .find(|slot| slot.occupant_key == block.occupant_key)
-            {
-                slot.update_from_block(block);
-                assigned.insert(block.occupant_key.clone());
-            }
-        }
-        assigned
-    }
-
-    fn clear_missing_slots(&mut self, blocks: &[OverlayPresentationBlock]) {
-        let snapshot_keys = blocks
-            .iter()
-            .map(|block| block.occupant_key.as_str())
-            .collect::<HashSet<_>>();
-        for slot in &mut self.slots {
-            if slot
-                .as_ref()
-                .is_some_and(|existing| !snapshot_keys.contains(existing.occupant_key.as_str()))
-            {
-                *slot = None;
-            }
-        }
-    }
-
-    fn fill_empty_slots(
-        &mut self,
-        blocks: &[OverlayPresentationBlock],
-        assigned: &mut HashSet<String>,
-    ) {
-        for block in blocks {
-            if assigned.contains(&block.occupant_key) {
-                continue;
-            }
-            let Some((slot_index, slot)) = self
-                .slots
-                .iter_mut()
-                .enumerate()
-                .find(|(_, slot)| slot.is_none())
-            else {
-                break;
-            };
-            *slot = Some(OverlaySlot::from_block(
-                block,
-                slot_index,
-                self.next_slot_entry_order,
-            ));
-            self.next_slot_entry_order += 1;
-            assigned.insert(block.occupant_key.clone());
-        }
-    }
-
-    fn recompute_slot_anchors(&mut self, text_scale: f32) {
+        let mut sorted = [blocks.first(), blocks.get(1)];
+        sorted.sort_by_key(|block| {
+            block
+                .map(|block| (false, block.appearance_seq, block.occupant_key.as_str()))
+                .unwrap_or((true, 0, ""))
+        });
         let slot_height_px =
             CaptionLayoutPolicy::default().stable_block_height_px(true, text_scale);
-        for (slot_index, slot) in self.slots.iter_mut().enumerate() {
-            if let Some(slot) = slot {
-                slot.slot_index = slot_index;
-                slot.anchor_top_px =
-                    SLOT_TOP_PADDING_PX + slot_index as f32 * (slot_height_px + SLOT_SPACING_PX);
-            }
+        let mut retained = std::mem::take(&mut self.slots);
+        let mut changed = false;
+        for (slot_index, block) in sorted.into_iter().flatten().enumerate() {
+            let existing = retained
+                .iter_mut()
+                .find(|slot| {
+                    slot.as_ref()
+                        .is_some_and(|slot| slot.occupant_key == block.occupant_key)
+                })
+                .and_then(Option::take);
+            let mut slot = if let Some(mut slot) = existing {
+                changed |= slot.update_from_block(block);
+                slot
+            } else {
+                changed = true;
+                let slot = OverlaySlot::from_block(block, slot_index, self.next_slot_entry_order);
+                self.next_slot_entry_order += 1;
+                slot
+            };
+            let anchor_top_px =
+                SLOT_TOP_PADDING_PX + slot_index as f32 * (slot_height_px + SLOT_SPACING_PX);
+            changed |= slot.slot_index != slot_index || slot.anchor_top_px != anchor_top_px;
+            slot.slot_index = slot_index;
+            slot.anchor_top_px = anchor_top_px;
+            self.slots[slot_index] = Some(slot);
         }
+        changed || retained.iter().any(Option::is_some)
     }
 }
 

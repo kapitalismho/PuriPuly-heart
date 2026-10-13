@@ -378,13 +378,30 @@ mod tests {
         assert_ne!(
             (BlockCacheKey {
                 id: "same-block".into(),
+                card_revision: 0,
                 layout: base.clone(),
             }),
             (BlockCacheKey {
                 id: "same-block".into(),
+                card_revision: 0,
                 layout: changed_secondary,
             })
         );
+    }
+
+    #[test]
+    fn card_revision_invalidates_block_cache_without_changing_layout_identity() {
+        let base = BlockCacheKey {
+            id: "card:a".into(),
+            card_revision: 1,
+            layout: layout_key(7),
+        };
+        let revised = BlockCacheKey {
+            card_revision: 2,
+            ..base.clone()
+        };
+        assert_ne!(base, revised);
+        assert_eq!(base.layout, revised.layout);
     }
 
     #[test]

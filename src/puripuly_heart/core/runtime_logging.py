@@ -178,7 +178,7 @@ LATENCY_TRACE_POINT_CONTRACTS: dict[str, LatencyTracePointContract] = {
     ),
     "peer_overlay_applied": LatencyTracePointContract(
         name="peer_overlay_applied",
-        timing_semantics="Recorded when the peer presenter returns an applied application receipt after logical pacing.",
+        timing_semantics="Recorded when the peer presenter returns an applied application receipt after protected-row admission.",
         acceptance_expectation="This is presenter application receipt, not native renderer or physical HMD acknowledgement.",
     ),
     "dashboard_translation_applied": LatencyTracePointContract(
@@ -1966,7 +1966,7 @@ def _format_output_routing_decision(decision: OutputRoutingDecision) -> str:
     if isinstance(physical_ack, bool):
         parts.append(f"physical_ack={str(physical_ack).lower()}")
     wait_reason = metadata.get("wait_reason")
-    if wait_reason in {"replacement_gate", "protected_rows"}:
+    if wait_reason == "protected_rows":
         parts.append(f"wait_reason={wait_reason}")
     for name in ("handoff_wait_ms", "pending_batches"):
         value = metadata.get(name)

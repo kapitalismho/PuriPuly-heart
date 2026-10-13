@@ -119,7 +119,7 @@
     }
   },
   "overlay": {
-    "contract_version": 15,
+    "contract_version": 16,
     "manifest_fields": [
       "app_version",
       "bridge_url",
@@ -179,6 +179,7 @@
       "id",
       "occupant_key",
       "appearance_seq",
+      "card_revision",
       "channel",
       "block_variant",
       "primary_text",

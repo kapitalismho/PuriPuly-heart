@@ -66,12 +66,14 @@ class OverlayPresentationBlock:
     publication_order: int | None = None
     publication_index: int | None = None
     speaker_style: SpeakerStyle | None = None
+    card_revision: int = 0
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
             "id": self.id,
             "occupant_key": self.occupant_key,
             "appearance_seq": self.appearance_seq,
+            "card_revision": self.card_revision,
             "channel": self.channel,
             "block_variant": self.block_variant,
             "primary_text": self.primary_text,
@@ -128,6 +130,7 @@ class OverlayPresentationBlock:
             id=_require_string_field(data, "id"),
             occupant_key=occupant_key,
             appearance_seq=appearance_seq,
+            card_revision=_require_non_negative_int_field(data, "card_revision"),
             channel=channel,
             block_variant=block_variant,
             primary_text=_require_string_field(data, "primary_text"),

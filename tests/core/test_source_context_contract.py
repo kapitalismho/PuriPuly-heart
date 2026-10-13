@@ -22,7 +22,10 @@ from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
 from puripuly_heart.core.orchestrator.translation_request import TranslationProcessRequest
-from puripuly_heart.core.orchestrator.translation_turn import TranslationTurnRequest
+from puripuly_heart.core.orchestrator.translation_turn import (
+    TranslationTurnProcessResult,
+    TranslationTurnRequest,
+)
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.stt.backend import (
     STTAudioBoundary,
@@ -52,6 +55,7 @@ from puripuly_heart.domain.recognition import (
     RecognitionUnitIdentity,
 )
 from puripuly_heart.providers.stt.soniox import _SonioxSession
+from tests.core.test_output_owner_wiring import RecordingOverlay
 from tests.core.test_stt_scoped_engine import ControlledScopedSession, settings, span, watchdogs
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
@@ -137,12 +141,13 @@ async def until(predicate):
             await asyncio.sleep(0)
 
 
-def harness_for(provider):
+def harness_for(provider, *, overlay_sink=None, **configuration):
     harness = compose_translation_test_harness(
         stt=None,
         llm=provider,
         osc=RecordingOscQueue(),
         clock=FakeClock(10),
+        overlay_sink=overlay_sink,
         source_language="en",
         target_language="ja",
         peer_source_language="en",
@@ -150,7 +155,8 @@ def harness_for(provider):
         integrated_context_enabled=True,
         concurrency_limit=2,
         translation_enabled=True,
-        peer_translation_enabled=True,
+        peer_translation_enabled=configuration.pop("peer_translation_enabled", True),
+        **configuration,
     )
     harness.output_runtime.activate_peer_generation(1)
     trace = OutputTrace(harness.translation_turns.output)
@@ -220,7 +226,8 @@ def test_missing_or_malformed_terminal_ownership_cannot_become_gray_success():
 async def test_batch_and_streaming_adapter_sources_reach_context_and_output_before_audio_closes():
     provider = ControlledProvider()
     provider.gates["A"] = asyncio.Event()
-    harness, trace = harness_for(provider)
+    overlay = RecordingOverlay()
+    harness, trace = harness_for(provider, overlay_sink=overlay)
     snapshot, identity = source_fixture()
     normalizer = STTScopedTurnNormalizer(identity)
     try:
@@ -311,6 +318,26 @@ async def test_batch_and_streaming_adapter_sources_reach_context_and_output_befo
             }
         assert first_event.transcript.utterance_id != identity.segment.segment_id
         assert provider.high_water <= 2
+        finals = [event for event in overlay.events if event.type == "translation_final"]
+        assert len(finals) == 4
+        assert [event.source_child for event in finals] == [
+            item.source_child for item in trace.items
+        ]
+        assert all(
+            event.source_child is item.source_child
+            and event.utterance_id == item.child_utterance_id
+            and event.source_text == item.source_child.effective_text
+            for event, item in zip(finals, trace.items, strict=True)
+        )
+        assert [event.source_child.order for event in finals] == sorted(
+            event.source_child.order for event in finals
+        )
+        assert [event.source_child.display_group_id for event in finals] == [
+            snapshot.display_group_id,
+            snapshot.display_group_id,
+            snapshot.display_group_id,
+            batch_snapshot.display_group_id,
+        ]
     finally:
         provider.gates["A"].set()
         await close(harness)
@@ -319,7 +346,8 @@ async def test_batch_and_streaming_adapter_sources_reach_context_and_output_befo
 @pytest.mark.asyncio
 async def test_frozen_aba_sources_share_targets_and_increment_prior_sibling_context():
     provider = ControlledProvider()
-    harness, trace = harness_for(provider)
+    overlay = RecordingOverlay()
+    harness, trace = harness_for(provider, overlay_sink=overlay)
     snapshot, identity = source_fixture()
     try:
         update = STTScopedTurnNormalizer(identity).apply_update(
@@ -375,6 +403,111 @@ async def test_frozen_aba_sources_share_targets_and_increment_prior_sibling_cont
             (1, 2),
             (2, 3),
         ]
+        finals = [event for event in overlay.events if event.type == "translation_final"]
+        assert len(finals) == 6
+        assert all(
+            event.source_child is item.source_child
+            and event.utterance_id == item.child_utterance_id
+            for event, item in zip(finals, trace.items, strict=True)
+        )
+        assert finals[0].source_child is finals[1].source_child
+        assert finals[2].source_child is finals[3].source_child
+        assert finals[4].source_child is finals[5].source_child
+        assert len({event.source_child.source_id for event in finals}) == 3
+        assert harness.output_runtime.chatbox.messages == []
+    finally:
+        await close(harness)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["translated", "source_only", "failed"])
+@pytest.mark.parametrize("known_group", [True, False])
+async def test_source_provenance_survives_actual_peer_projection_without_group_inference(
+    outcome, known_group
+):
+    provider = ControlledProvider()
+    overlay = RecordingOverlay()
+    harness, trace = harness_for(
+        provider,
+        overlay_sink=overlay,
+        peer_translation_enabled=outcome != "source_only",
+    )
+    snapshot, identity = source_fixture()
+    if not known_group:
+        snapshot = replace(snapshot, display_group_id=None)
+    text = "fail" if outcome == "failed" else "same"
+    try:
+        terminal = STTScopedTurnNormalizer(identity).apply_terminal(
+            STTProviderTurnTerminal(identity, "final", text, text_authority="authoritative")
+        )
+        receipt = AudioSegmentTerminalReceipt(identity.segment, "final", snapshot, 2)
+        await harness.peer_owner.handle_provider_turn_terminal(receipt, terminal)
+        await finish(harness)
+        assert len(trace.items) == 1
+        submission = trace.items[0]
+        assert submission.outcome == outcome
+        finals = [
+            event
+            for event in overlay.events
+            if event.type in {"translation_final", "peer_transcript_final"}
+        ]
+        assert len(finals) == 1
+        event = finals[0]
+        source = submission.source_child
+        assert event.source_child is source
+        assert event.source_child.source_id == source.source_id
+        assert event.source_child.order == source.order
+        assert event.source_child.display_group_id == snapshot.display_group_id
+        assert event.utterance_id == submission.child_utterance_id
+        assert (
+            event.source_text if event.type == "translation_final" else event.text
+        ) == source.effective_text
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == (
+            [] if outcome == "source_only" else [text]
+        )
+        assert harness.output_runtime.chatbox.messages == []
+        assert all(
+            event.source_child is None
+            for event in overlay.events
+            if event.type == "utterance_closed"
+        )
+    finally:
+        await close(harness)
+
+
+@pytest.mark.asyncio
+async def test_unsubmitted_terminal_fallback_preserves_admitted_source_and_effective_text():
+    overlay = RecordingOverlay()
+    harness, trace = harness_for(ControlledProvider(), overlay_sink=overlay)
+    children = []
+
+    async def cancelled_processor(child, cancellation_requested):
+        children.append(child)
+        return TranslationTurnProcessResult("cancelled")
+
+    harness.translation_turns.process_child = cancelled_processor
+    snapshot, identity = source_fixture()
+    try:
+        terminal = STTScopedTurnNormalizer(identity).apply_terminal(
+            STTProviderTurnTerminal(identity, "final", "fallback", text_authority="authoritative")
+        )
+        await harness.peer_owner.handle_provider_turn_terminal(
+            AudioSegmentTerminalReceipt(identity.segment, "final", snapshot, 2), terminal
+        )
+        await finish(harness)
+        assert trace.items == []
+        assert len(children) == 1
+        finals = [event for event in overlay.events if event.type == "peer_transcript_final"]
+        assert len(finals) == 1
+        assert finals[0].source_child is children[0].source_child
+        assert finals[0].source_child.display_group_id == snapshot.display_group_id
+        assert finals[0].text == children[0].source_child.effective_text == "fallback"
+        assert finals[0].utterance_id == children[0].utterance_id
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == ["fallback"]
+        assert harness.peer_runtime.translation_history[0].source_id == (
+            children[0].source_child.source_id
+        )
+        assert harness.output_runtime.chatbox.messages == []
     finally:
         await close(harness)
 

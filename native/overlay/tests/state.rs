@@ -67,6 +67,7 @@ fn overlay_state_preserves_snapshot_slot_correlation_observability_metadata() {
                 "id": "self:1",
                 "occupant_key": "self:1",
                 "appearance_seq": 1,
+                "card_revision": 0,
                 "channel": "self",
                 "block_variant": "finalized",
                 "primary_text": "hello",
@@ -101,6 +102,7 @@ fn overlay_state_deserializes_active_peer_variant() {
             "id": "peer:turn-1",
             "occupant_key": "peer:turn-1",
             "appearance_seq": 1,
+            "card_revision": 0,
             "channel": "peer",
             "block_variant": "active_peer",
             "primary_text": "",
@@ -125,6 +127,7 @@ fn overlay_state_deserializes_active_peer_variant() {
             "id": "self:legacy",
             "occupant_key": "self:legacy",
             "appearance_seq": 1,
+            "card_revision": 0,
             "channel": "self",
             "block_variant": "finalized",
             "primary_text": "hello",
@@ -147,6 +150,7 @@ fn overlay_state_treats_language_only_update_as_visual_change_without_reassignin
             "id": "self:language",
             "occupant_key": "self:language",
             "appearance_seq": 1,
+            "card_revision": 0,
             "channel": "self",
             "block_variant": "finalized",
             "primary_text": "こんにちは",
@@ -163,6 +167,7 @@ fn overlay_state_treats_language_only_update_as_visual_change_without_reassignin
             "id": "self:language",
             "occupant_key": "self:language",
             "appearance_seq": 1,
+            "card_revision": 0,
             "channel": "self",
             "block_variant": "finalized",
             "primary_text": "こんにちは",
@@ -314,7 +319,7 @@ fn overlay_state_treats_equal_revision_snapshots_as_noop() {
 }
 
 #[test]
-fn overlay_state_keeps_slot_two_anchor_when_slot_one_disappears() {
+fn overlay_state_compacts_slots_in_presentation_rank_order_when_oldest_disappears() {
     let mut state = OverlayState::default();
 
     assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
@@ -329,7 +334,7 @@ fn overlay_state_keeps_slot_two_anchor_when_slot_one_disappears() {
         speaker_divider: false,
     }));
 
-    let second_top = state.scene().slots()[1].as_ref().unwrap().anchor_top_px;
+    let first_top = state.scene().slots()[0].as_ref().unwrap().anchor_top_px;
 
     assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
@@ -340,10 +345,10 @@ fn overlay_state_keeps_slot_two_anchor_when_slot_one_disappears() {
         speaker_divider: false,
     }));
 
-    assert!(state.scene().slots()[0].is_none());
+    assert!(state.scene().slots()[1].is_none());
     assert_eq!(
-        state.scene().slots()[1].as_ref().unwrap().anchor_top_px,
-        second_top
+        state.scene().slots()[0].as_ref().unwrap().anchor_top_px,
+        first_top
     );
 }
 
@@ -469,7 +474,7 @@ fn overlay_state_promotes_active_peer_matching_occupant_key_without_reassigning_
 }
 
 #[test]
-fn overlay_state_fills_first_empty_slot_before_replacing_again() {
+fn overlay_state_orders_new_card_after_retained_older_card() {
     let mut state = OverlayState::default();
 
     assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
@@ -512,6 +517,67 @@ fn overlay_state_fills_first_empty_slot_before_replacing_again() {
             .iter()
             .map(|slot| slot.as_ref().map(|slot| slot.id.clone()))
             .collect::<Vec<_>>(),
-        vec![Some("self:3".to_string()), Some("peer:2".to_string())]
+        vec![Some("peer:2".to_string()), Some("self:3".to_string())]
     );
+}
+
+#[test]
+fn accumulated_card_moves_latest_with_identity_and_entry_continuity() {
+    let mut state = OverlayState::default();
+    let mut a = slot_block("card:a", "occupant:a", 1, "peer", "Again.", "Encore.", true);
+    a.speaker_style = Some("gold".into());
+    a.card_revision = 1;
+    let mut b = slot_block("card:b", "occupant:b", 2, "peer", "B.", "B source.", true);
+    b.speaker_style = Some("cyan".into());
+    b.card_revision = 1;
+    state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 1,
+        blocks: vec![a.clone(), b.clone()],
+        ..Default::default()
+    });
+    let a_entry = state.scene().slots()[0].as_ref().unwrap().slot_entry_order;
+    let b_entry = state.scene().slots()[1].as_ref().unwrap().slot_entry_order;
+    a.appearance_seq = 3;
+    a.card_revision = 2;
+    a.primary_text = "Again. Again.".into();
+    a.secondary_text = "Encore. Encore.".into();
+    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 2,
+        blocks: vec![a.clone(), b.clone()],
+        ..Default::default()
+    }));
+    let oldest = state.scene().slots()[0].as_ref().unwrap();
+    let newest = state.scene().slots()[1].as_ref().unwrap();
+    assert_eq!(
+        (oldest.id.as_str(), newest.id.as_str()),
+        ("card:b", "card:a")
+    );
+    assert_eq!(oldest.slot_entry_order, b_entry);
+    assert_eq!(newest.slot_entry_order, a_entry);
+    assert_eq!(newest.card_revision, 2);
+    assert_eq!(newest.primary_text, "Again. Again.");
+    assert_eq!(oldest.primary_text, b.primary_text);
+    assert!(!state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 3,
+        blocks: vec![b, a],
+        ..Default::default()
+    }));
+}
+
+#[test]
+fn card_revision_only_change_invalidates_visible_scene() {
+    let mut state = OverlayState::default();
+    let mut a = slot_block("card:a", "card:a", 1, "peer", "Same", "Same source", true);
+    state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 1,
+        blocks: vec![a.clone()],
+        ..Default::default()
+    });
+    a.card_revision = 1;
+    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 2,
+        blocks: vec![a],
+        ..Default::default()
+    }));
+    assert_eq!(state.scene().slots()[0].as_ref().unwrap().card_revision, 1);
 }

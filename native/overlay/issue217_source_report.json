@@ -1,0 +1,43 @@
+{
+  "issue": 217,
+  "component": "upstream-source-overlay-propagation",
+  "environment": "Windows x64; repository uv Python environment; synthetic input and in-process controlled translation provider; no cloud or device inference",
+  "runtime_smoke": {
+    "command": "uv run python .issue217_source_smoke.py",
+    "exit_code": 0,
+    "result": "passed",
+    "execution": "Standalone asyncio script, not pytest. Two synthetic STT terminal contributions per scenario passed through contribution_transcript, TranslationTurnLifecycleOwner, peer output projection, OutputRuntime and the real OverlayEventAdapter into a recording sink.",
+    "assertions": ["Event source_child is the exact submission SourceChild object", "Explicit display_group_id preserved, including None", "Attempt utterance_id unchanged", "Event source payload equals frozen effective_text", "Exactly two distinct source IDs per scenario", "Authoritative source orders remain sorted", "History counts match existing eligibility", "No peer OSC messages"],
+    "original_sanitized_events": [
+      {"scenario":"translated_shared_targets","history_count":2,"cloud_calls":0,"osc_messages":0,"events":[
+        {"type":"translation_final","source_id":"a462862b-c01d-53ca-bbc7-b52ccacfb8c0","display_group_id":"a1a44736-848c-4e7e-951f-da3ded14d2b7","order":[1,1,0],"attempt_id":"d52edd8a-271c-5e09-bb99-e83d9a000007","target_language":"ja","effective_text":"synthetic first"},
+        {"type":"translation_final","source_id":"a462862b-c01d-53ca-bbc7-b52ccacfb8c0","display_group_id":"a1a44736-848c-4e7e-951f-da3ded14d2b7","order":[1,1,0],"attempt_id":"976a7e00-dfaf-5248-b7cf-fabb7c329d1a","target_language":"ko","effective_text":"synthetic first"},
+        {"type":"translation_final","source_id":"6342605f-478f-558e-9254-fc67ace39147","display_group_id":"a1a44736-848c-4e7e-951f-da3ded14d2b7","order":[1,2,0],"attempt_id":"792b4721-4b5f-5227-97c0-eadec3821d3f","target_language":"ja","effective_text":"synthetic continuation"},
+        {"type":"translation_final","source_id":"6342605f-478f-558e-9254-fc67ace39147","display_group_id":"a1a44736-848c-4e7e-951f-da3ded14d2b7","order":[1,2,0],"attempt_id":"7d310de2-887c-5210-9bf4-d1f7f2aa53ef","target_language":"ko","effective_text":"synthetic continuation"}
+      ]},
+      {"scenario":"source_only_known_group","history_count":0,"cloud_calls":0,"osc_messages":0,"events":[
+        {"type":"peer_transcript_final","source_id":"0a2c2c27-8625-5587-afd1-9598f4b98a27","display_group_id":"0c1136a2-45af-437c-a513-57fcb7253224","order":[1,1,0],"attempt_id":"f641219d-81c7-5958-9225-104933ef942a","target_language":"ja","effective_text":"synthetic first"},
+        {"type":"peer_transcript_final","source_id":"4bb9d354-c925-59de-99d2-07a323cfc586","display_group_id":"0c1136a2-45af-437c-a513-57fcb7253224","order":[1,2,0],"attempt_id":"00471cb2-5aab-5849-8f3a-49e2742c9e8b","target_language":"ja","effective_text":"synthetic continuation"}
+      ]},
+      {"scenario":"translated_unknown_provenance","history_count":2,"cloud_calls":0,"osc_messages":0,"events":[
+        {"type":"translation_final","source_id":"46210b50-7cfe-5e54-9c58-f9b3f27534cf","display_group_id":null,"order":[1,1,0],"attempt_id":"f19b9272-ebd9-52d2-a006-160ae2f6f290","target_language":"ja","effective_text":"synthetic first"},
+        {"type":"translation_final","source_id":"fb73077f-41bc-5fcc-9623-a052232d72be","display_group_id":null,"order":[1,2,0],"attempt_id":"baf122b6-0520-56ae-b188-8105f761f74a","target_language":"ja","effective_text":"synthetic continuation"}
+      ]},
+      {"scenario":"source_only_unknown_provenance","history_count":0,"cloud_calls":0,"osc_messages":0,"events":[
+        {"type":"peer_transcript_final","source_id":"c07fb208-66e4-5d20-8679-8f67205ecb84","display_group_id":null,"order":[1,1,0],"attempt_id":"e495d5a2-c559-547a-a9ed-c4c0256e06d4","target_language":"ja","effective_text":"synthetic first"},
+        {"type":"peer_transcript_final","source_id":"e10d00af-f848-52d8-b77f-9255475be248","display_group_id":null,"order":[1,2,0],"attempt_id":"1127ae64-8044-5937-a7bf-3eddbed54e43","target_language":"ja","effective_text":"synthetic continuation"}
+      ]}
+    ]
+  },
+  "original_test_evidence": {
+    "command": "uv run pytest tests/core/test_source_context_contract.py tests/core/output/test_adapter_wrappers.py -q",
+    "exit_code": 0,
+    "result": "passed",
+    "coverage": ["Batch/streaming actual projection source identity/order/group propagation", "A-B-A shared sources across two targets without new history", "Translated/source-only/failure paths with known and unknown groups", "Unsubmitted cancellation terminal fallback", "Peer OSC prohibition and compatibility adapter regression"],
+    "initial_test_repairs": "Corrected fixture expectations to existing history eligibility: translation-disabled source-only has no history entry; admitted cancelled source retains one history entry. No product/history changes were made for those repairs."
+  },
+  "changed_product_paths": ["src/puripuly_heart/core/overlay/sink.py", "src/puripuly_heart/core/orchestrator/translation_output_projection.py"],
+  "changed_test_paths": ["tests/core/test_source_context_contract.py"],
+  "limitations": ["No renderer, TTL/card or real-device claim", "No cloud calls", "No maintained documentation edits or Git mutations"],
+  "cleanup": "Temporary .issue217_source_smoke.py removed after successful execution; this JSON is the retained task-local evidence."
+}

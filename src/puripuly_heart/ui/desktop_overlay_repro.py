@@ -25,6 +25,7 @@ from puripuly_heart.core.diagnostic_validation import (
     validate_desktop_overlay_repro_result,
 )
 from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CAPTION_CARD_CONTRACT,
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_SPEAKER_IDENTITY_CONTRACT,
@@ -182,6 +183,7 @@ class LocalAuthenticatedRawIngress:
             and capabilities.get("execution_contract") == OVERLAY_EXECUTION_CONTRACT
             and capabilities.get("speaker_identity_presentation")
             == OVERLAY_SPEAKER_IDENTITY_CONTRACT
+            and capabilities.get("caption_card_presentation") == OVERLAY_CAPTION_CARD_CONTRACT
         )
 
     async def wait_connected(self) -> None:

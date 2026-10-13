@@ -295,6 +295,7 @@ struct LogicalCaptionIdentity(Vec<LogicalCaptionBlockIdentity>, bool);
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct LogicalCaptionBlockIdentity {
     slot_index: usize,
+    card_revision: u64,
     channel: String,
     block_variant: OverlayPresentationBlockVariant,
     primary_text: String,
@@ -672,6 +673,10 @@ impl PresentationRuntime {
                 "speaker_identity_presentation": {
                     "version": 2,
                     "policy": "immutable_first_readable_style"
+                },
+                "caption_card_presentation": {
+                    "version": 1,
+                    "policy": "source_bound_accumulation"
                 }
             }
         });
@@ -1300,6 +1305,7 @@ fn frame_content_identity(blocks: &[CaptionBlock], presentation: &CaptionPresent
         block.id.hash(&mut hasher);
         block.occupant_key.hash(&mut hasher);
         block.occupant_generation.hash(&mut hasher);
+        block.card_revision.hash(&mut hasher);
         block.primary_text.hash(&mut hasher);
         block.secondary_text.hash(&mut hasher);
         block.secondary_enabled.hash(&mut hasher);
@@ -2379,6 +2385,7 @@ fn logical_caption_identity(state: &OverlayState) -> LogicalCaptionIdentity {
             .flatten()
             .map(|slot| LogicalCaptionBlockIdentity {
                 slot_index: slot.slot_index,
+                card_revision: slot.card_revision,
                 channel: slot.channel.clone(),
                 block_variant: slot.block_variant,
                 primary_text: slot.primary_text.clone(),
@@ -2542,6 +2549,7 @@ pub async fn run_cli(args: &[String]) -> i32 {
                 "execution_contract": {"version": 1, "revision": "r2"},
                 "native_presentation_retry": {"version": 1, "ownership": "exclusive"},
                 "speaker_identity_presentation": {"version": 2, "policy": "immutable_first_readable_style"},
+                "caption_card_presentation": {"version": 1, "policy": "source_bound_accumulation"},
             })
         );
         return 0;
@@ -2688,6 +2696,7 @@ fn caption_block_for_strip(strip: &OverlaySlot) -> CaptionBlock {
 
     CaptionBlock::new(strip.id.clone(), strip.primary_text.clone())
         .with_occupant(strip.occupant_key.clone(), strip.slot_entry_order)
+        .with_card_revision(strip.card_revision)
         .with_channel(channel)
         .with_speaker_style(SpeakerStyle::from_token(strip.speaker_style.as_deref()))
         .with_variant(variant)
@@ -2979,6 +2988,7 @@ mod tests {
                 "native_quiet_tail_episodes": {"peer": {"phase": phase, "generation": episode}},
                 "blocks": [{
                     "id": "peer:stable", "occupant_key": "peer:stable", "appearance_seq": 1,
+                    "card_revision": 0,
                     "channel": "peer", "block_variant": if phase == "final" { "finalized" } else { "active_peer" },
                     "primary_text": "visible", "secondary_text": "", "secondary_enabled": false
                 }]
@@ -3192,6 +3202,7 @@ mod tests {
                 "native_quiet_tail_episodes": {"self": {"phase": "final", "generation": 1}},
                 "blocks": [{
                     "id": "self:stable", "occupant_key": "self:stable", "appearance_seq": 1,
+                    "card_revision": 0,
                     "channel": "self", "block_variant": "finalized", "primary_text": "visible",
                     "secondary_text": "", "secondary_enabled": false
                 }]
@@ -4287,6 +4298,39 @@ mod tests {
             }
         );
         assert!(!runtime.redraw_requested());
+    }
+
+    #[test]
+    fn card_revision_invalidates_logical_and_frame_identity_without_text_changes() {
+        let mut snapshot = OverlayPresentationSnapshot {
+            revision: 1,
+            blocks: vec![block("card:a", "peer", "Same", "Same source", true)],
+            ..Default::default()
+        };
+        let mut runtime = OverlayRuntime::new(snapshot.clone());
+        let previous_logical = super::logical_caption_identity(runtime.state());
+        let presentation = crate::renderer::CaptionPresentation::default();
+        let previous_frame =
+            super::frame_content_identity(&runtime.caption_blocks(), &presentation);
+        runtime.clear_redraw_flag();
+        snapshot.revision = 2;
+        snapshot.blocks[0].card_revision = 1;
+        assert!(matches!(
+            runtime.apply_snapshot(snapshot),
+            SnapshotApplyOutcome::Applied {
+                visual_changed: true,
+                redraw_requested: true,
+                ..
+            }
+        ));
+        assert_ne!(
+            previous_logical,
+            super::logical_caption_identity(runtime.state())
+        );
+        assert_ne!(
+            previous_frame,
+            super::frame_content_identity(&runtime.caption_blocks(), &presentation)
+        );
     }
 }
 

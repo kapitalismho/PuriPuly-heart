@@ -1,0 +1,400 @@
+{
+  "issue": 217,
+  "related_requirement": "#211 R5",
+  "status": "desktop_synthetic_rendering_supported_with_capture_and_image_view_caveats",
+  "authority": "validation-only; no product/Git/maintained-doc changes",
+  "runtime": {
+    "os": "Windows 10.0.22631 x64",
+    "gpu": "Radeon RX7900XTX (assignment supplied)",
+    "uv": "0.9.17 (2b5d65e61 2025-12-09)",
+    "ffmpeg": "8.0.1-full_build-www.gyan.dev",
+    "python": "3.14.7 MSC v.1944 AMD64",
+    "flet": "1.0.0"
+  },
+  "command": [
+    "uv",
+    "run",
+    "--frozen",
+    "python",
+    "-m",
+    "puripuly_heart.ui.desktop_overlay_card_repro",
+    "--output-dir",
+    "native\\overlay\\issue217_evidence\\desktop_run_verified_20261013",
+    "--dwell-ms",
+    "10000"
+  ],
+  "gui_exit_code": 0,
+  "gui_stderr": "",
+  "capture": {
+    "method": "ffmpeg gdigrab exact unique title only",
+    "title": "PuriPuly #217 Synthetic Caption Cards",
+    "scope": "1344x336 native synthetic caption window only; no full-desktop capture",
+    "stage_delay_s": 1,
+    "dwell_ms": 10000,
+    "records": [
+      {
+        "stage": "first_a",
+        "command": [
+          "ffmpeg",
+          "-y",
+          "-f",
+          "gdigrab",
+          "-framerate",
+          "10",
+          "-i",
+          "title=PuriPuly #217 Synthetic Caption Cards",
+          "-frames:v",
+          "1",
+          "native\\overlay\\issue217_evidence\\first_a.png"
+        ],
+        "returncode": 0,
+        "duration_s": 0.4353374999918742
+      },
+      {
+        "stage": "a_b",
+        "command": [
+          "ffmpeg",
+          "-y",
+          "-f",
+          "gdigrab",
+          "-framerate",
+          "10",
+          "-i",
+          "title=PuriPuly #217 Synthetic Caption Cards",
+          "-frames:v",
+          "1",
+          "native\\overlay\\issue217_evidence\\a_b.png"
+        ],
+        "returncode": 0,
+        "duration_s": 0.45133489998988807
+      },
+      {
+        "stage": "a_b_a_accumulation",
+        "command": [
+          "ffmpeg",
+          "-y",
+          "-f",
+          "gdigrab",
+          "-framerate",
+          "10",
+          "-i",
+          "title=PuriPuly #217 Synthetic Caption Cards",
+          "-frames:v",
+          "1",
+          "native\\overlay\\issue217_evidence\\a_b_a_accumulation.png"
+        ],
+        "returncode": 0,
+        "duration_s": 0.43163240001013037
+      },
+      {
+        "stage": "replacement_replay",
+        "command": [
+          "ffmpeg",
+          "-y",
+          "-f",
+          "gdigrab",
+          "-framerate",
+          "10",
+          "-i",
+          "title=PuriPuly #217 Synthetic Caption Cards",
+          "-frames:v",
+          "1",
+          "native\\overlay\\issue217_evidence\\replacement_replay.png"
+        ],
+        "returncode": 0,
+        "duration_s": 0.4332949999952689
+      },
+      {
+        "stage": "same_text_style_redraw",
+        "command": [
+          "ffmpeg",
+          "-y",
+          "-f",
+          "gdigrab",
+          "-framerate",
+          "10",
+          "-i",
+          "title=PuriPuly #217 Synthetic Caption Cards",
+          "-frames:v",
+          "1",
+          "native\\overlay\\issue217_evidence\\same_text_style_redraw.png"
+        ],
+        "returncode": 0,
+        "duration_s": 0.43480049999197945
+      },
+      {
+        "stage": "epoch_handoff_gray",
+        "command": [
+          "ffmpeg",
+          "-y",
+          "-f",
+          "gdigrab",
+          "-framerate",
+          "10",
+          "-i",
+          "title=PuriPuly #217 Synthetic Caption Cards",
+          "-frames:v",
+          "1",
+          "native\\overlay\\issue217_evidence\\epoch_handoff_gray.png"
+        ],
+        "returncode": 0,
+        "duration_s": 0.4339763000025414
+      },
+      {
+        "stage": "established_overflow_divider",
+        "command": [
+          "ffmpeg",
+          "-y",
+          "-f",
+          "gdigrab",
+          "-framerate",
+          "10",
+          "-i",
+          "title=PuriPuly #217 Synthetic Caption Cards",
+          "-frames:v",
+          "1",
+          "native\\overlay\\issue217_evidence\\established_overflow_divider.png"
+        ],
+        "returncode": 0,
+        "duration_s": 0.43414660000416916
+      },
+      {
+        "stage": "unknown_gray_no_divider",
+        "command": [
+          "ffmpeg",
+          "-y",
+          "-f",
+          "gdigrab",
+          "-framerate",
+          "10",
+          "-i",
+          "title=PuriPuly #217 Synthetic Caption Cards",
+          "-frames:v",
+          "1",
+          "native\\overlay\\issue217_evidence\\unknown_gray_no_divider.png"
+        ],
+        "returncode": 0,
+        "duration_s": 0.43124939998961054
+      },
+      {
+        "stage": "self_white",
+        "command": [
+          "ffmpeg",
+          "-y",
+          "-f",
+          "gdigrab",
+          "-framerate",
+          "10",
+          "-i",
+          "title=PuriPuly #217 Synthetic Caption Cards",
+          "-frames:v",
+          "1",
+          "native\\overlay\\issue217_evidence\\self_white.png"
+        ],
+        "returncode": 0,
+        "duration_s": 0.432046400004765
+      },
+      {
+        "stage": "python_owned_removal",
+        "command": [
+          "ffmpeg",
+          "-y",
+          "-f",
+          "gdigrab",
+          "-framerate",
+          "10",
+          "-i",
+          "title=PuriPuly #217 Synthetic Caption Cards",
+          "-frames:v",
+          "1",
+          "native\\overlay\\issue217_evidence\\python_owned_removal.png"
+        ],
+        "returncode": 0,
+        "duration_s": 0.4336757999990368
+      }
+    ],
+    "background_caveat": "Captured background is black, not checkerboard. Window-only gdigrab does not establish transparency/composited-backdrop appearance; layered/dirty-region capture artifact versus display defect is unresolved."
+  },
+  "evidence_run": "native/overlay/issue217_evidence/desktop_run_verified_20261013",
+  "initial_attempt": {
+    "output_dir": "native/overlay/issue217_evidence/desktop_run_20261013",
+    "dwell_ms": 5000,
+    "status": "Discarded timing alignment; startup JSON without name interrupted reader and backlog caused mislabeled captures; final two captures failed after window exit. Initial images overwritten by synchronized capture BEFORE failures were inspected. No later passing rerun exists."
+  },
+  "actual_pixel_observations": [
+    {
+      "stage": "first_a",
+      "result": "pass",
+      "proof": "Source Again. and translation Encore. both gold."
+    },
+    {
+      "stage": "a_b",
+      "result": "pass",
+      "proof": "Gold A above cyan B, both source/translation visible."
+    },
+    {
+      "stage": "a_b_a_accumulation",
+      "result": "pass",
+      "proof": "B now above A; A source Again. Again. and translation Encore. Encore. visibly retain repeated phrase, both gold; B both cyan."
+    },
+    {
+      "stage": "replacement_replay",
+      "result": "pass_rgb_evidence",
+      "proof": "Byte-identical SHA256 to fully rendered A-B-A; both bands independently contain 6310/4505 nonblack RGB pixels. Opaque inspection copy shows both full cards. Earlier visual-loss interpretation withdrawn."
+    },
+    {
+      "stage": "same_text_style_redraw",
+      "result": "pass_style_with_image_view_caveat",
+      "proof": "Both A lines visibly coral with same repeated text; B-band RGB count remains 6310, exactly matching prior full cyan B. Multimodal tool still displays partial B on opaque copy, inconsistent with native quantitative decoding; not a product defect."
+    },
+    {
+      "stage": "epoch_handoff_gray",
+      "result": "pass",
+      "proof": "Accumulated A both gold; new epoch source and translation both gray."
+    },
+    {
+      "stage": "established_overflow_divider",
+      "result": "pass",
+      "proof": "Two gray source/translation cards and visible horizontal divider."
+    },
+    {
+      "stage": "unknown_gray_no_divider",
+      "result": "pass_rgb_evidence",
+      "proof": "Opaque inspection copy shows both complete gray cards without divider; independent System.Drawing and ffmpeg count 6310/4505 nonblack RGB pixels. Earlier all-black interpretation withdrawn."
+    },
+    {
+      "stage": "self_white",
+      "result": "pass",
+      "proof": "SELF source and translation both white."
+    },
+    {
+      "stage": "python_owned_removal",
+      "result": "pass",
+      "proof": "No caption pixels visible after removal."
+    }
+  ],
+  "logical_only": [
+    "snapshots.json stage inputs and distinct source:a1/source:a2 identities",
+    "run_report.json dispatched snapshots and renderer visual state",
+    "Python-owned removal causality comes from synthetic program stage definition, not pixels alone",
+    "Distinct acoustic sources, actual diarization and end-to-end presenter provenance are not proven by synthetic pixels"
+  ],
+  "unavailable_checks": [
+    "HMD/controller/OpenVR hardware interaction and real headset appearance not exercised",
+    "SteamVR and VRChat neither launched nor interrupted",
+    "No audio, cloud or API use",
+    "Composited checkerboard/transparency appearance not established by title-only capture"
+  ],
+  "inspection": "All ten synchronized PNGs opened through read. :img PNG rejected by tool; bare PNG read decoded successfully.",
+  "preservation": "All original synchronized PNGs preserved unmodified. Three separately named _rgb_inspection PNGs derived from originals without application rerun. No later repaired passing run exists.",
+  "helpers": "No throwaway helper scripts created. Optional montage preparation failed because PIL unavailable; no montage artifact generated.",
+  "decision_needed": "No product defect confirmed. Director assesses scoped desktop acceptance with window-capture alpha/compositing caveat and unavailable HMD checks.",
+  "pixel_evidence": {
+    "sha256": {
+      "first_a": "92b8b548a3865dfe9419c8993b2422e7d919d368087aac311b45ad1907793163",
+      "a_b": "beb95890e412ddcc8942f3b1964ecbdd8ab088a124391a2771726d3d0bd2dd75",
+      "a_b_a_accumulation": "05b4dad6a7af3ac1af99a5682241ef3f6ee46ef70bb39a5090f550faa770eb86",
+      "replacement_replay": "05b4dad6a7af3ac1af99a5682241ef3f6ee46ef70bb39a5090f550faa770eb86",
+      "same_text_style_redraw": "fef13b9d341720f000001b106f83ea7769f1279983f1f72a5039d79e1728ddfe",
+      "epoch_handoff_gray": "e8fb2a10c5f92f0e0daa7e0bcf406a93b14ae70c32ffb661d81fb634f228f494",
+      "established_overflow_divider": "7b73db872815ef653de87c0dcd76df98367471fd146602c60c7339263397ae89",
+      "unknown_gray_no_divider": "d1c3cd93c9135c6b8f098f246b0f2bfd514aaa1a3dc2eb2ff44b0037ac7bb407",
+      "self_white": "f0751cbd9553d42ad6cbbec8ce448642695a7bfb3bb6dfda577b487f0c618ade",
+      "python_owned_removal": "c769681eaac12eb5c0662c66a53da567476a2405f32af473ce874a86c3d811b4"
+    },
+    "nonblack_pixel_counts_threshold20": {
+      "first_a": {
+        "top_B_band": 1618,
+        "bottom_A_band": 672
+      },
+      "a_b": {
+        "top_B_band": 2290,
+        "bottom_A_band": 6310
+      },
+      "a_b_a_accumulation": {
+        "top_B_band": 6310,
+        "bottom_A_band": 4505
+      },
+      "replacement_replay": {
+        "top_B_band": 6310,
+        "bottom_A_band": 4505
+      },
+      "same_text_style_redraw": {
+        "top_B_band": 6310,
+        "bottom_A_band": 4505
+      },
+      "epoch_handoff_gray": {
+        "top_B_band": 4505,
+        "bottom_A_band": 8870
+      },
+      "established_overflow_divider": {
+        "top_B_band": 7128,
+        "bottom_A_band": 5323
+      },
+      "unknown_gray_no_divider": {
+        "top_B_band": 6310,
+        "bottom_A_band": 4505
+      },
+      "self_white": {
+        "top_B_band": 3943,
+        "bottom_A_band": 1535
+      },
+      "python_owned_removal": {
+        "top_B_band": 0,
+        "bottom_A_band": 0
+      }
+    },
+    "system_drawing": [
+      {
+        "name": "a_b_a_accumulation",
+        "sha256": "05B4DAD6A7AF3AC1AF99A5682241EF3F6EE46EF70BB39A5090F550FAA770EB86",
+        "top": 6310,
+        "bottom": 4505,
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "pixel_format": "Format32bppArgb",
+        "mtime_utc": "2026-10-13T01:15:10.2373844Z"
+      },
+      {
+        "name": "replacement_replay",
+        "sha256": "05B4DAD6A7AF3AC1AF99A5682241EF3F6EE46EF70BB39A5090F550FAA770EB86",
+        "top": 6310,
+        "bottom": 4505,
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "pixel_format": "Format32bppArgb",
+        "mtime_utc": "2026-10-13T01:15:20.2423640Z"
+      },
+      {
+        "name": "same_text_style_redraw",
+        "sha256": "FEF13B9D341720F000001B106F83EA7769F1279983F1F72A5039D79E1728DDFE",
+        "top": 6310,
+        "bottom": 4505,
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "pixel_format": "Format32bppArgb",
+        "mtime_utc": "2026-10-13T01:15:30.2556954Z"
+      },
+      {
+        "name": "unknown_gray_no_divider",
+        "sha256": "D1C3CD93C9135C6B8F098F246B0F2BFD514AAA1A3DC2EB2FF44B0037AC7BB407",
+        "top": 6310,
+        "bottom": 4505,
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "pixel_format": "Format32bppArgb",
+        "mtime_utc": "2026-10-13T01:16:00.2862368Z"
+      }
+    ],
+    "system_drawing_command": [
+      "powershell",
+      "-NoProfile",
+      "-Command",
+      "Add-Type -AssemblyName System.Drawing; $names=@('a_b_a_accumulation','replacement_replay','same_text_style_redraw','unknown_gray_no_divider'); foreach($n in $names){ $p=Join-Path (Get-Location) ('native/overlay/issue217_evidence/'+$n+'.png'); $im=[System.Drawing.Bitmap]::FromFile($p); $top=0; $bottom=0; $amin=255; $amax=0; for($y=0;$y -lt $im.Height;$y++){for($x=0;$x -lt $im.Width;$x++){ $c=$im.GetPixel($x,$y); $amin=[Math]::Min($amin,$c.A); $amax=[Math]::Max($amax,$c.A); if([Math]::Max($c.R,[Math]::Max($c.G,$c.B)) -gt 20){if($y -lt 168){$top++}else{$bottom++}} }}; [pscustomobject]@{name=$n;sha256=(Get-FileHash $p -Algorithm SHA256).Hash;top=$top;bottom=$bottom;alpha_min=$amin;alpha_max=$amax;pixel_format=$im.PixelFormat.ToString();mtime_utc=(Get-Item $p).LastWriteTimeUtc.ToString('o')} | ConvertTo-Json -Compress; $im.Dispose() }"
+    ],
+    "replay_byte_identical_to_accumulation": true,
+    "original_files_unchanged_since_capture": true,
+    "alpha_caveat": "Original Format32bppArgb alpha ranges 0..255; RGB occupancy is independent of alpha. Opaque copies discard alpha for inspection only, not proof of desktop compositing."
+  },
+  "image_tool_discrepancy": "Earlier read image views reported missing replay B and black gray frame; contradicted by identical replay SHA256, independent native decoding, Director views and opaque copies. Tool issue filed; failure interpretation retracted."
+}

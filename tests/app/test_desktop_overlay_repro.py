@@ -333,6 +333,7 @@ def test_raw_ingress_requires_current_speaker_identity_capability() -> None:
         "capabilities": {
             "execution_contract": repro.OVERLAY_EXECUTION_CONTRACT,
             "speaker_identity_presentation": repro.OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+            "caption_card_presentation": repro.OVERLAY_CAPTION_CARD_CONTRACT,
         },
     }
 

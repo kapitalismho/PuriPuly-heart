@@ -28,6 +28,7 @@ from .child_diagnostics import (
 )
 from .diagnostics import OverlayDiagnosticsRecorder, default_overlay_diagnostics_dir
 from .manifest import (
+    OVERLAY_CAPTION_CARD_CONTRACT,
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_SPEAKER_IDENTITY_CONTRACT,
@@ -1163,6 +1164,7 @@ class OverlayProcessManager:
                 or capabilities.get("execution_contract") != OVERLAY_EXECUTION_CONTRACT
                 or capabilities.get("speaker_identity_presentation")
                 != OVERLAY_SPEAKER_IDENTITY_CONTRACT
+                or capabilities.get("caption_card_presentation") != OVERLAY_CAPTION_CARD_CONTRACT
                 or (
                     self.selected_target != "desktop"
                     and not self._supports_native_retry_ownership(event)

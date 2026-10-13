@@ -73,14 +73,18 @@ class OverlayLogicalTurnEntry:
     ever_visible: bool = False
     visible_since: float | None = None
     last_meaningful_visible_at: float | None = None
-    translation_visible_since: float | None = None
-    translation_observed_visible_since: float | None = None
     last_updated_seq: int = 0
     closed_seq: int | None = None
     closed_at: float | None = None
     retained_hidden: bool = False
     window_evicted_at: float | None = None
     expiration_revision: int = 0
+    card_revision: int = 0
+    source_managed: bool = False
+    source_application_pending: bool = False
+    display_group_id: UUID | None = None
+    layout_key: tuple[object, ...] | None = None
+    publication_ordering: tuple[str, int, int, int] | None = None
 
     @property
     def block_id(self) -> str:
@@ -147,6 +151,8 @@ class OverlayPresentationEntry(Protocol):
     speaker_assignment: SpeakerAssignment | None
     speaker_style: str | None
     occupant_key: str
+    card_revision: int
+    source_managed: bool
     appearance_seq: int | None
     publishable_seq: int | None
     retained_hidden: bool
@@ -298,7 +304,6 @@ class OverlayPresentationState:
         event: SelfActiveUpdate,
         *,
         now: float,
-        show_translation: bool,
         terminal_update_reason: OverlayTerminalUpdateReason,
     ) -> OverlayReductionResult:
 
@@ -311,14 +316,11 @@ class OverlayPresentationState:
             utterance_id=event.utterance_id,
             event_seq=event.seq,
             now=now,
-            show_translation=show_translation,
             terminal_update_reason=terminal_update_reason,
         )
         if active_entry is None:
             return OverlayReductionResult(False)
         key, entry = active_entry
-
-        previous_rendered_translation_text = self._rendered_self_translation_text(entry)
 
         if self._active_update_matches_live_payload(
             channel=event.channel,
@@ -381,13 +383,7 @@ class OverlayPresentationState:
             entry.live_logical_turn_key = None
             if not entry.translation_text.strip():
                 entry.translation_seq = None
-        self._update_self_translation_visibility(
-            entry,
-            previous_rendered_text=previous_rendered_translation_text,
-            next_rendered_text=self._rendered_self_translation_text(entry),
-            now=now,
-            show_translation=show_translation,
-        )
+
         entry.last_updated_seq = event.seq
         self.set_live_turn_key_for_channel(event.channel, key)
         return OverlayReductionResult(True)
@@ -397,7 +393,6 @@ class OverlayPresentationState:
         event: SelfActiveClear,
         *,
         now: float,
-        show_translation: bool,
     ) -> OverlayReductionResult:
 
         live_self = self.live_entry_for_channel("self")
@@ -412,15 +407,8 @@ class OverlayPresentationState:
 
             return OverlayReductionResult(False)
 
-        previous_rendered_translation_text = self._rendered_self_translation_text(entry)
         self._clear_self_live_payload(entry)
-        self._update_self_translation_visibility(
-            entry,
-            previous_rendered_text=previous_rendered_translation_text,
-            next_rendered_text=self._rendered_self_translation_text(entry),
-            now=now,
-            show_translation=show_translation,
-        )
+
         entry.last_updated_seq = event.seq
         if self.live_self_turn_key == key:
             self.live_self_turn_key = None
@@ -438,7 +426,6 @@ class OverlayPresentationState:
         event: SelfTranscriptFinal,
         *,
         now: float,
-        show_translation: bool,
         next_appearance_seq: NextAppearanceSeq,
         terminal_update_reason: OverlayTerminalUpdateReason,
     ) -> OverlayReductionResult:
@@ -459,7 +446,6 @@ class OverlayPresentationState:
         ):
             return OverlayReductionResult(False)
 
-        previous_rendered_translation_text = self._rendered_self_translation_text(entry)
         self._remember_entry_input_seq(entry, event_seq=event.seq)
         entry.original_text = event.text
         entry.original_language = event_source_language
@@ -478,20 +464,9 @@ class OverlayPresentationState:
                 entry.translation_logical_turn_key = entry.live_logical_turn_key
                 if entry.live_seq is not None:
                     entry.translation_seq = entry.live_seq
-                if show_translation:
-                    if entry.translation_visible_since is None:
-                        entry.translation_visible_since = now
-                    if entry.translation_observed_visible_since is None:
-                        entry.translation_observed_visible_since = now
             self._clear_self_live_payload(entry)
             self.live_self_turn_key = None
-        self._update_self_translation_visibility(
-            entry,
-            previous_rendered_text=previous_rendered_translation_text,
-            next_rendered_text=self._rendered_self_translation_text(entry),
-            now=now,
-            show_translation=show_translation,
-        )
+
         self.retired_preview_self_seqs.pop(key, None)
         self._refresh_entry_visibility_and_expiration(
             key,
@@ -507,7 +482,6 @@ class OverlayPresentationState:
         event: TranslationStreamUpdate | TranslationFinal,
         *,
         now: float,
-        show_translation: bool,
         next_appearance_seq: NextAppearanceSeq,
         terminal_update_reason: OverlayTerminalUpdateReason,
     ) -> OverlayReductionResult:
@@ -529,7 +503,7 @@ class OverlayPresentationState:
             return OverlayReductionResult(False)
         if event_source_language is not None:
             entry.original_language = event_source_language
-        previous_rendered_translation_text = self._rendered_self_translation_text(entry)
+
         self._remember_entry_input_seq(entry, event_seq=event.seq)
         if entry.retained_hidden and event.text.strip():
             entry.retained_hidden = False
@@ -554,14 +528,7 @@ class OverlayPresentationState:
             entry.translation_logical_turn_key = None
             if not entry.live_secondary_text.strip():
                 entry.translation_seq = None
-        if not entry.retained_hidden:
-            self._update_self_translation_visibility(
-                entry,
-                previous_rendered_text=previous_rendered_translation_text,
-                next_rendered_text=self._rendered_self_translation_text(entry),
-                now=now,
-                show_translation=show_translation,
-            )
+
         entry.last_updated_seq = event.seq
         self.retired_preview_self_seqs.pop(key, None)
         self._refresh_entry_visibility_and_expiration(
@@ -614,7 +581,6 @@ class OverlayPresentationState:
             utterance_id=event.utterance_id,
             event_seq=event.seq,
             now=now,
-            show_translation=True,
             terminal_update_reason=terminal_update_reason,
         )
         if active_entry is None:
@@ -746,13 +712,7 @@ class OverlayPresentationState:
             entry.original_seq = event.seq
         elif event_source_language is not None:
             entry.original_language = event_source_language
-        if not entry.retained_hidden:
-            entry.translation_visible_since = self._next_translation_visible_since(
-                previous_text=entry.translation_text,
-                next_text=event.text,
-                previous_visible_since=entry.translation_visible_since,
-                now=now,
-            )
+
         first_readable_translation = bool(event.text.strip()) and entry.speaker_style is None
         entry.translation_text = event.text
         if event.text.strip():
@@ -779,8 +739,7 @@ class OverlayPresentationState:
                 entry.speaker_assignment = None
             if not entry.live_secondary_text.strip():
                 entry.translation_seq = None
-        if event.text.strip() and entry.translation_observed_visible_since is None:
-            entry.translation_observed_visible_since = now
+
         entry.last_updated_seq = event.seq
         self._refresh_entry_visibility_and_expiration(
             key,
@@ -820,10 +779,8 @@ class OverlayPresentationState:
         self,
         *,
         now: float,
-        show_translation: bool,
         late_arrival_window_seconds: float,
         visible_ttl_seconds: float,
-        self_translation_min_visible_seconds: float,
     ) -> bool:
         expired_keys = [
             key
@@ -831,10 +788,8 @@ class OverlayPresentationState:
             if (
                 deadline := self.entry_expiration_deadline(
                     entry,
-                    show_translation=show_translation,
                     late_arrival_window_seconds=late_arrival_window_seconds,
                     visible_ttl_seconds=visible_ttl_seconds,
-                    self_translation_min_visible_seconds=self_translation_min_visible_seconds,
                 )
             )
             is not None
@@ -868,7 +823,12 @@ class OverlayPresentationState:
         ordering = entry_ordering or {}
         blocks = []
         for key, block in rendered_entries:
-            block_ordering = ordering.get(key)
+            entry = self.entries.get(key)
+            block_ordering = (
+                entry.publication_ordering
+                if entry is not None and entry.source_managed
+                else ordering.get(key)
+            )
             if block_ordering is not None:
                 scope, generation, order, index = block_ordering
                 block = replace(
@@ -1023,6 +983,7 @@ class OverlayPresentationState:
             block.id,
             block.occupant_key,
             block.appearance_seq,
+            block.card_revision,
             block.channel,
             block.block_variant,
             block.primary_text,
@@ -1061,28 +1022,9 @@ class OverlayPresentationState:
         self,
         entry: OverlayPresentationEntry,
         *,
-        show_translation: bool,
         late_arrival_window_seconds: float,
         visible_ttl_seconds: float,
-        self_translation_min_visible_seconds: float,
     ) -> float | None:
-        return self.entry_expiration_components(
-            entry,
-            show_translation=show_translation,
-            late_arrival_window_seconds=late_arrival_window_seconds,
-            visible_ttl_seconds=visible_ttl_seconds,
-            self_translation_min_visible_seconds=self_translation_min_visible_seconds,
-        )[0]
-
-    def entry_expiration_components(
-        self,
-        entry: OverlayPresentationEntry,
-        *,
-        show_translation: bool,
-        late_arrival_window_seconds: float,
-        visible_ttl_seconds: float,
-        self_translation_min_visible_seconds: float,
-    ) -> tuple[float | None, float | None, float | None]:
         hidden_deadline = (
             entry.window_evicted_at + late_arrival_window_seconds
             if entry.retained_hidden and entry.window_evicted_at is not None
@@ -1091,34 +1033,18 @@ class OverlayPresentationState:
         visible_anchor = entry.last_meaningful_visible_at
         if visible_anchor is None and entry.visible_since is not None:
             visible_anchor = entry.visible_since
-
-        visible_deadline: float | None = None
-        if visible_anchor is not None:
-            visible_deadline = visible_anchor + visible_ttl_seconds
-        elif entry.closed_at is not None:
-            visible_deadline = entry.closed_at + late_arrival_window_seconds
-
-        translation_deadline: float | None = None
-        if (
-            entry.channel == "self"
-            and show_translation
-            and entry.translation_visible_since is not None
-        ):
-            translation_deadline = (
-                entry.translation_visible_since + self_translation_min_visible_seconds
+        deadline = (
+            visible_anchor + visible_ttl_seconds
+            if visible_anchor is not None
+            else (
+                entry.closed_at + late_arrival_window_seconds
+                if entry.closed_at is not None
+                else None
             )
-        effective_deadline = visible_deadline
-        if translation_deadline is not None:
-            if effective_deadline is None:
-                effective_deadline = translation_deadline
-            else:
-                effective_deadline = max(effective_deadline, translation_deadline)
+        )
         if hidden_deadline is not None:
-            if effective_deadline is None:
-                effective_deadline = hidden_deadline
-            else:
-                effective_deadline = min(effective_deadline, hidden_deadline)
-        return effective_deadline, visible_deadline, translation_deadline
+            deadline = min(deadline, hidden_deadline) if deadline is not None else hidden_deadline
+        return deadline
 
     def _active_update_entry_or_none(
         self,
@@ -1127,7 +1053,6 @@ class OverlayPresentationState:
         utterance_id: UUID | None,
         event_seq: int,
         now: float,
-        show_translation: bool,
         terminal_update_reason: OverlayTerminalUpdateReason,
     ) -> tuple[OverlayEntryKey, OverlayLogicalTurnEntry] | None:
         key = self.entry_key(channel, utterance_id)
@@ -1147,7 +1072,6 @@ class OverlayPresentationState:
                 self._clear_live_self_pointer(
                     reason="live_self_replaced",
                     now=now,
-                    show_translation=show_translation,
                 )
             else:
                 self._clear_live_peer_pointer()
@@ -1192,22 +1116,15 @@ class OverlayPresentationState:
         *,
         reason: str,
         now: float,
-        show_translation: bool,
     ) -> None:
         live_self = self.live_entry_for_channel("self")
         if live_self is None:
             return
         key, entry = live_self
-        previous_rendered_translation_text = self._rendered_self_translation_text(entry)
+
         self._clear_self_live_payload(entry)
         self.live_self_turn_key = None
-        self._update_self_translation_visibility(
-            entry,
-            previous_rendered_text=previous_rendered_translation_text,
-            next_rendered_text=self._rendered_self_translation_text(entry),
-            now=now,
-            show_translation=show_translation,
-        )
+
         if self._should_retire_preview_only_self_entry(entry):
             self._retire_preview_only_self_entry(key, entry, reason=reason, now=now)
 
@@ -1233,47 +1150,6 @@ class OverlayPresentationState:
         entry.live_source_text_len = None
         entry.live_logical_turn_key = None
         entry.live_seq = None
-
-    def _rendered_self_translation_text(self, entry: OverlayLogicalTurnEntry) -> str:
-        live_secondary_text = entry.live_secondary_text.strip()
-        if live_secondary_text:
-            return live_secondary_text
-        return entry.translation_text.strip()
-
-    def _update_self_translation_visibility(
-        self,
-        entry: OverlayLogicalTurnEntry,
-        *,
-        previous_rendered_text: str,
-        next_rendered_text: str,
-        now: float,
-        show_translation: bool,
-    ) -> None:
-        if not show_translation:
-            return
-        entry.translation_visible_since = self._next_translation_visible_since(
-            previous_text=previous_rendered_text,
-            next_text=next_rendered_text,
-            previous_visible_since=entry.translation_visible_since,
-            now=now,
-        )
-        if next_rendered_text and entry.translation_observed_visible_since is None:
-            entry.translation_observed_visible_since = now
-
-    def _next_translation_visible_since(
-        self,
-        *,
-        previous_text: str,
-        next_text: str,
-        previous_visible_since: float | None,
-        now: float,
-    ) -> float | None:
-        next_clean = next_text.strip()
-        if not next_clean:
-            return None
-        if previous_text.strip() != next_clean:
-            return now
-        return previous_visible_since
 
     def _remember_entry_input_seq(
         self,

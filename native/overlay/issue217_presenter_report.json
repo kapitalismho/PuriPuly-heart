@@ -1,0 +1,427 @@
+{
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/217",
+  "authority": [
+    "https://github.com/kapitalismho/PuriPuly-heart/issues/211",
+    "https://github.com/kapitalismho/PuriPuly-heart/issues/214"
+  ],
+  "date": "2026-10-13",
+  "supplied_baseline": "ce95d66437b12e5418f7d50b69a4bab457336fa7",
+  "scope": "Presenter/source-to-card implementation and focused behavior verification; no Git, maintained documentation, native renderer, desktop GUI, ASR, GPU or HMD mutations/checks.",
+  "environment": {
+    "python": "3.14.7",
+    "platform": "Windows",
+    "machine": "AMD64"
+  },
+  "result": "passed",
+  "changed_surfaces": [
+    "src/puripuly_heart/core/overlay/presenter.py",
+    "src/puripuly_heart/core/overlay/state.py",
+    "src/puripuly_heart/core/overlay/presenter_projection.py",
+    "src/puripuly_heart/core/overlay/presenter_sources.py",
+    "src/puripuly_heart/core/runtime/output.py",
+    "src/puripuly_heart/core/runtime_logging.py",
+    "tests/core/test_overlay_presenter.py",
+    "tests/core/test_overlay_source_cards.py",
+    "tests/core/test_overlay_active_freshness.py",
+    "tests/core/test_runtime_logging.py",
+    "tests/core/runtime/test_output_runtime.py",
+    "tests/integration/test_speaker_identity_pipeline.py",
+    "tests/helpers/overlay_source_cards.py"
+  ],
+  "intentionally_unchanged": {
+    "presenter_acceptance.py": "Reuse existing publication receipts and semantic retirement ordering; canonical source keys are registered and retired separately from card identity.",
+    "bridge_mailbox.py": "Existing Python-only per-card monotonic deadlines already preserve reconnect/send-time expiry; exercised through actual presenter snapshots.",
+    "test_overlay_speaker_modes.py": "Preserved palette, immutable readable style, overflow-only divider and epoch-handoff tests pass unchanged.",
+    "sink_protocol_manifest_native_desktop": "Owned by coordinated source/renderer workers; consume landed SourceChild and card_revision contracts without parallel edits."
+  },
+  "decisions": [
+    "SourceChild is the sole immutable source/effective-text/group authority. None grouping stays independent; no parent, attempt, color, text or provider-ID inference.",
+    "Bounded exact source and attempt ledgers are independent of stable UUID5 visible-card identity. Same verified group, genuine speaker epoch/key, frozen style, row preferences and source/target languages gate NEW source append only.",
+    "Already-bound source completion, target-language changes, retries and metadata update the source contribution/card representation without another append, latestness change or TTL renewal.",
+    "A distinct applied source composes available source/translation rows in one snapshot, advances latestness/card revision and refreshes only its full-card lifetime. Card spatial publication coordinates follow the latest source application; source ordering stays source keyed.",
+    "First-readable application, not hidden source receipt or translation attempt creation, starts TTL. Hidden pending entries remain bounded and retain the existing closed-source five-second late-arrival fence. Binding can use only the then-visible compatible card, never expired history.",
+    "R4 no-renew applies to legacy finalized SELF/Peer too. Removed completion-triggered four-second SELF floor and generic finalized-content TTL refresh. Active SELF preview progress and active-source slot/admission protection remain.",
+    "Removed artificial one-second replacement timer/state; kept protected_rows admission, source-order release, watchdog/output cancellation and existing two-slot selection.",
+    "No text deduplicator/filter added. Caption composition never feeds accumulated text back to translation requests, source/context history, OSC/chatbox or prompts."
+  ],
+  "checks": [
+    {
+      "status": "failed_expected_before_fix",
+      "command": "uv run --frozen pytest tests/core/test_overlay_source_cards.py -q",
+      "scenario": "A-B-A across distinct request/attempt IDs with canonical group; unfixed presenter replaced A instead of retaining its card and appending.",
+      "evidence": "artifact://11",
+      "note": "Presenter still unfixed; source worker had supplied the event SourceChild interface."
+    },
+    {
+      "status": "diagnosed_and_removed_obsolete_tests",
+      "observed": [
+        "Peer completion test pinned another full eight-second lifetime.",
+        "Legacy SELF preference-toggle test pinned an extra finalized lifetime."
+      ],
+      "action": "Removed obsolete timer/floor implementation assertions rather than repinning them; new behavior fixtures assert no renewal and first-readable application."
+    },
+    {
+      "status": "passed",
+      "command": "uv run --frozen ruff check --fix <13 changed owned Python files> && uv run --frozen black <same files>",
+      "files": [
+        "src/puripuly_heart/core/overlay/presenter.py",
+        "src/puripuly_heart/core/overlay/state.py",
+        "src/puripuly_heart/core/overlay/presenter_projection.py",
+        "src/puripuly_heart/core/overlay/presenter_sources.py",
+        "src/puripuly_heart/core/runtime/output.py",
+        "src/puripuly_heart/core/runtime_logging.py",
+        "tests/core/test_overlay_presenter.py",
+        "tests/core/test_overlay_source_cards.py",
+        "tests/core/test_overlay_active_freshness.py",
+        "tests/core/test_runtime_logging.py",
+        "tests/core/runtime/test_output_runtime.py",
+        "tests/integration/test_speaker_identity_pipeline.py",
+        "tests/helpers/overlay_source_cards.py"
+      ],
+      "result": "Ruff: 2 errors fixed, 0 remaining. Black: 8 reformatted, 5 unchanged."
+    },
+    {
+      "status": "passed",
+      "command": "uv run --frozen pytest tests/core/test_overlay_source_cards.py tests/core/test_overlay_presenter.py tests/core/test_overlay_speaker_modes.py tests/core/test_overlay_active_freshness.py tests/core/test_overlay_bridge_mailbox_speaker_divider.py tests/core/runtime/test_output_runtime.py tests/core/test_runtime_logging.py tests/integration/test_speaker_identity_pipeline.py",
+      "result": {
+        "passed": 270,
+        "failed": 0,
+        "duration_seconds": 28.01
+      },
+      "timing": "After final owned-surface formatting."
+    },
+    {
+      "status": "passed",
+      "command": "uv run --frozen python -m tests.helpers.overlay_source_cards",
+      "result": "Four real Presenter fake-clock snapshots: A, A+B, B+A append, reconnect retry epoch.",
+      "snapshots": [
+        {
+          "revision": 1,
+          "speaker_divider": false,
+          "retry_target": {
+            "peer": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b"
+          },
+          "blocks": [
+            {
+              "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "appearance_seq": 2,
+              "card_revision": 1,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "First A",
+              "secondary_text": "same phrase",
+              "secondary_enabled": true,
+              "speaker_style": "gold",
+              "publication_order": 1,
+              "publication_index": 0
+            }
+          ]
+        },
+        {
+          "revision": 2,
+          "speaker_divider": false,
+          "retry_target": {
+            "peer": "peer:5d955921-0a1a-5933-b226-750c9cbfba17"
+          },
+          "blocks": [
+            {
+              "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "appearance_seq": 2,
+              "card_revision": 1,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "First A",
+              "secondary_text": "same phrase",
+              "secondary_enabled": true,
+              "speaker_style": "gold",
+              "publication_order": 1,
+              "publication_index": 0
+            },
+            {
+              "id": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "occupant_key": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "appearance_seq": 3,
+              "card_revision": 1,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "B",
+              "secondary_text": "B words",
+              "secondary_enabled": true,
+              "speaker_style": "cyan",
+              "publication_order": 2,
+              "publication_index": 0
+            }
+          ]
+        },
+        {
+          "revision": 3,
+          "speaker_divider": false,
+          "retry_target": {
+            "peer": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b"
+          },
+          "blocks": [
+            {
+              "id": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "occupant_key": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "appearance_seq": 3,
+              "card_revision": 1,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "B",
+              "secondary_text": "B words",
+              "secondary_enabled": true,
+              "speaker_style": "cyan",
+              "publication_order": 2,
+              "publication_index": 0
+            },
+            {
+              "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "appearance_seq": 4,
+              "card_revision": 2,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "First A Next A",
+              "secondary_text": "same phrase same phrase",
+              "secondary_enabled": true,
+              "speaker_style": "gold",
+              "publication_order": 3,
+              "publication_index": 0
+            }
+          ]
+        },
+        {
+          "revision": 4,
+          "speaker_divider": false,
+          "retry_target": {
+            "peer": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b"
+          },
+          "blocks": [
+            {
+              "id": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "occupant_key": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "appearance_seq": 3,
+              "card_revision": 1,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "B",
+              "secondary_text": "B words",
+              "secondary_enabled": true,
+              "speaker_style": "cyan",
+              "publication_order": 2,
+              "publication_index": 0
+            },
+            {
+              "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "appearance_seq": 4,
+              "card_revision": 2,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "First A Next A",
+              "secondary_text": "same phrase same phrase",
+              "secondary_enabled": true,
+              "speaker_style": "gold",
+              "publication_order": 3,
+              "publication_index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "status": "passed",
+      "command": "uv run --frozen python -c <throwaway SystemClock presenter smoke>",
+      "clock": "SystemClock",
+      "elapsed_seconds": 8.238,
+      "result": "Real async timers: stable A card append, B unchanged, completion/reconnect preserve deadlines, original full-card expiry clears scene.",
+      "transport": "Recording Python presentation transport; not native/desktop/HMD rendering.",
+      "snapshots": [
+        {
+          "revision": 1,
+          "speaker_divider": false,
+          "retry_target": {
+            "peer": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b"
+          },
+          "blocks": [
+            {
+              "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "appearance_seq": 2,
+              "card_revision": 1,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "First A",
+              "secondary_text": "same phrase",
+              "secondary_enabled": true,
+              "speaker_style": "gold",
+              "publication_order": 1,
+              "publication_index": 0
+            }
+          ]
+        },
+        {
+          "revision": 2,
+          "speaker_divider": false,
+          "retry_target": {
+            "peer": "peer:5d955921-0a1a-5933-b226-750c9cbfba17"
+          },
+          "blocks": [
+            {
+              "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "appearance_seq": 2,
+              "card_revision": 1,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "First A",
+              "secondary_text": "same phrase",
+              "secondary_enabled": true,
+              "speaker_style": "gold",
+              "publication_order": 1,
+              "publication_index": 0
+            },
+            {
+              "id": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "occupant_key": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "appearance_seq": 3,
+              "card_revision": 1,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "B",
+              "secondary_text": "B words",
+              "secondary_enabled": true,
+              "speaker_style": "cyan",
+              "publication_order": 2,
+              "publication_index": 0
+            }
+          ]
+        },
+        {
+          "revision": 3,
+          "speaker_divider": false,
+          "retry_target": {
+            "peer": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b"
+          },
+          "blocks": [
+            {
+              "id": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "occupant_key": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "appearance_seq": 3,
+              "card_revision": 1,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "B",
+              "secondary_text": "B words",
+              "secondary_enabled": true,
+              "speaker_style": "cyan",
+              "publication_order": 2,
+              "publication_index": 0
+            },
+            {
+              "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "appearance_seq": 4,
+              "card_revision": 2,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "First A Next A",
+              "secondary_text": "same phrase same phrase",
+              "secondary_enabled": true,
+              "speaker_style": "gold",
+              "publication_order": 3,
+              "publication_index": 0
+            }
+          ]
+        },
+        {
+          "revision": 5,
+          "speaker_divider": false,
+          "retry_target": {
+            "peer": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b"
+          },
+          "blocks": [
+            {
+              "id": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "occupant_key": "peer:5d955921-0a1a-5933-b226-750c9cbfba17",
+              "appearance_seq": 3,
+              "card_revision": 1,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "B",
+              "secondary_text": "B words",
+              "secondary_enabled": true,
+              "speaker_style": "cyan",
+              "publication_order": 2,
+              "publication_index": 0
+            },
+            {
+              "id": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "occupant_key": "peer:9852eea5-5862-5000-8ffe-670b7b9df06b",
+              "appearance_seq": 4,
+              "card_revision": 3,
+              "channel": "peer",
+              "block_variant": "finalized",
+              "primary_text": "First A Next A revised",
+              "secondary_text": "same phrase same phrase",
+              "secondary_enabled": true,
+              "speaker_style": "gold",
+              "publication_order": 3,
+              "publication_index": 0
+            }
+          ]
+        },
+        {
+          "revision": 7,
+          "speaker_divider": false,
+          "retry_target": null,
+          "blocks": []
+        }
+      ]
+    }
+  ],
+  "covered_behavior": [
+    "A-B-A in separate output requests with unchanged source publication order and individual destination payloads; Peer OSC remains empty.",
+    "Same, different and unknown enclosing groups; visible expiry/eviction/SELF removal and stale replay fences.",
+    "Unknown gray versus established identical overflow-gray keys; divider and epoch-handoff/style freeze.",
+    "Source/target-language, layout and frozen-style incompatibility for new source append; same-source target language updates stay on one card without TTL renewal.",
+    "Actual first-readable pending-source application and full TTL; expired former candidates are not resurrected; closed pending work expires at existing late-arrival deadline.",
+    "Other-card text/style/revision/deadline unchanged; stale timer callback cannot remove a newer appended card.",
+    "Duplicate receipts, retries, metadata, same-source completion, no-new-source markers and native retry/reconnect epochs do not append or renew.",
+    "Distinct equal-text source units remain twice in accumulated source/translation rows; repeated enclosing groups retire old state without old source resurrection.",
+    "Legacy finalized SELF/Peer completion no-renew, no four-second floor; SELF active progress, finalization continuity and protected-row cancellation."
+  ],
+  "qualitative_repeat_observation": "Distinct synthetic source units remain visibly repeated; no ASR or cloud invocation.",
+  "remaining_gaps": [
+    {
+      "status": "not_run_by_this_worker",
+      "check": "Native/desktop pixel rendering, shared schema negotiation and actual renderer assembly/integration.",
+      "owner": "Director and renderer worker"
+    },
+    {
+      "status": "not_run",
+      "check": "Actual ASR/cloud audio, diarizer GPU/model execution, SteamVR/HMD/VRChat device usefulness and #218 qualification."
+    },
+    {
+      "status": "pending_director",
+      "check": "Combined shared integration validation, independent review and maintained documentation changes."
+    }
+  ],
+  "doc_proposals": [
+    {
+      "path": "docs/architecture.md",
+      "proposal": "Describe canonical source/attempt/card separation, conservative verified group/key compatibility, first-readable pending application, append-only source-driven latestness/TTL and bounded source retention; remove one-second caption pacing and finalized SELF completion-floor wording."
+    },
+    {
+      "path": "native/overlay/README.md",
+      "proposal": "Use coordinated v16 caption-card contract: stable id/occupant, mutable appearance rank, card_revision; Python-only deadlines and original-expiry reconnect; distinguish deterministic presenter evidence from actual renderer/HMD checks."
+    },
+    {
+      "path": "release notes or maintained changelog",
+      "proposal": "User-visible: returning A accumulates/moves newest only within a known compatible visible group; independent cards replace immediately unless protected; late completion/metadata/target changes no longer extend finalized SELF or Peer lifetime."
+    }
+  ],
+  "integration_authority": "No merge, review approval, release or final program acceptance asserted."
+}

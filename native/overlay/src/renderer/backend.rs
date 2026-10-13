@@ -2457,6 +2457,7 @@ fn compute_damage_band(
                 (
                     block.visual_bounds.as_block_bounds(),
                     &block.layout_cache_key,
+                    block.card_revision,
                 ),
             )
         })
@@ -2470,24 +2471,27 @@ fn compute_damage_band(
                 (
                     block.visual_bounds.as_block_bounds(),
                     &block.layout_cache_key,
+                    block.card_revision,
                 ),
             )
         })
         .collect::<std::collections::HashMap<_, _>>();
 
     let mut changed_bounds = Vec::new();
-    for (id, (bounds, layout_key)) in &previous_bounds {
+    for (id, (bounds, layout_key, card_revision)) in &previous_bounds {
         match next_bounds.get(id) {
-            Some((next_bounds, next_layout_key))
-                if next_bounds == bounds && next_layout_key == layout_key => {}
-            Some((next_bounds, _)) => {
+            Some((next_bounds, next_layout_key, next_card_revision))
+                if next_bounds == bounds
+                    && next_layout_key == layout_key
+                    && next_card_revision == card_revision => {}
+            Some((next_bounds, _, _)) => {
                 changed_bounds.push(*bounds);
                 changed_bounds.push(*next_bounds);
             }
             None => changed_bounds.push(*bounds),
         }
     }
-    for (id, (bounds, _)) in &next_bounds {
+    for (id, (bounds, _, _)) in &next_bounds {
         if !previous_bounds.contains_key(id) {
             changed_bounds.push(*bounds);
         }
@@ -2726,6 +2730,170 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_graphics_accumulated_cards_reorder_revision_and_reconnect_pixels() {
+        use crate::renderer::SpeakerStyle;
+        use crate::state::{OverlayPresentationBlock, OverlayPresentationSnapshot};
+        use windows::core::Interface;
+
+        async fn draw(
+            renderer: &mut super::WindowsCaptionRenderer,
+            blocks: Vec<CaptionBlock>,
+        ) -> (super::RenderedFrame, Vec<u8>) {
+            let frame = renderer
+                .render(
+                    &CaptionLayoutPolicy::default(),
+                    &CaptionPresentation::default(),
+                    blocks,
+                    super::DEFAULT_SURFACE_WIDTH_PX,
+                    super::DEFAULT_SURFACE_HEIGHT_PX,
+                    None,
+                )
+                .unwrap();
+            assert_eq!(
+                renderer
+                    .prepare_frame_for_submission(&ReadinessCancellation::default())
+                    .await,
+                ReadinessOutcome::Ready,
+            );
+            (frame, texture_pixels(renderer))
+        }
+
+        let mut renderer = super::WindowsCaptionRenderer::new(None).unwrap();
+        println!(
+            "issue217 hardware={:?} adapter={:?}",
+            renderer.presentation_backend, renderer.adapter_identity
+        );
+        let dxgi_device: windows::Win32::Graphics::Dxgi::IDXGIDevice =
+            renderer._d3d_device.cast().unwrap();
+        let descriptor = unsafe { dxgi_device.GetAdapter().unwrap().GetDesc().unwrap() };
+        let name_end = descriptor
+            .Description
+            .iter()
+            .position(|value| *value == 0)
+            .unwrap_or(descriptor.Description.len());
+        println!(
+            "issue217 adapter_name={} vendor_id={} device_id={}",
+            String::from_utf16_lossy(&descriptor.Description[..name_end]),
+            descriptor.VendorId,
+            descriptor.DeviceId
+        );
+        let mut a = OverlayPresentationBlock {
+            id: "card:a".into(),
+            occupant_key: "card:a".into(),
+            appearance_seq: 1,
+            card_revision: 1,
+            channel: "peer".into(),
+            primary_text: "Again.".into(),
+            secondary_text: "Encore.".into(),
+            secondary_enabled: true,
+            speaker_style: Some("gold".into()),
+            ..Default::default()
+        };
+        let b = OverlayPresentationBlock {
+            id: "card:b".into(),
+            occupant_key: "card:b".into(),
+            appearance_seq: 2,
+            card_revision: 1,
+            channel: "peer".into(),
+            primary_text: "Unchanged B".into(),
+            secondary_text: "B source".into(),
+            secondary_enabled: true,
+            speaker_style: Some("cyan".into()),
+            ..Default::default()
+        };
+        let mut runtime = crate::runtime::OverlayRuntime::new(OverlayPresentationSnapshot {
+            revision: 1,
+            blocks: vec![a.clone(), b.clone()],
+            ..Default::default()
+        });
+        let (initial, initial_pixels) = draw(&mut renderer, runtime.caption_blocks()).await;
+        let width = super::DEFAULT_SURFACE_WIDTH_PX as usize;
+        let b_top = initial.layout().visible_blocks[1].visual_bounds.top_px as usize;
+        a.card_revision = 2;
+        a.primary_text = "Again. Again.".into();
+        a.secondary_text = "Encore. Encore.".into();
+        runtime.apply_snapshot(OverlayPresentationSnapshot {
+            revision: 2,
+            blocks: vec![a.clone(), b.clone()],
+            ..Default::default()
+        });
+        let (_, appended_pixels) = draw(&mut renderer, runtime.caption_blocks()).await;
+        assert_ne!(initial_pixels, appended_pixels);
+        assert_eq!(
+            &initial_pixels[b_top * width * 4..],
+            &appended_pixels[b_top * width * 4..]
+        );
+        a.appearance_seq = 3;
+        runtime.apply_snapshot(OverlayPresentationSnapshot {
+            revision: 3,
+            blocks: vec![a.clone(), b.clone()],
+            ..Default::default()
+        });
+        let (reordered, reordered_pixels) = draw(&mut renderer, runtime.caption_blocks()).await;
+        assert_eq!(reordered.layout().visible_blocks[0].id, "card:b");
+        assert_eq!(reordered.layout().visible_blocks[1].id, "card:a");
+        assert_ne!(appended_pixels, reordered_pixels);
+        for (block, rgb) in reordered
+            .layout()
+            .visible_blocks
+            .iter()
+            .zip([[64u8, 219, 255], [255u8, 215, 0]])
+        {
+            for (top, size) in block
+                .primary_lines
+                .iter()
+                .map(|line| (line.origin_y, line.font_size_px))
+                .chain(
+                    block
+                        .secondary_line
+                        .iter()
+                        .map(|line| (line.origin_y, line.font_size_px)),
+                )
+            {
+                let start = top.max(0.0) as usize * width * 4;
+                let end = ((top + size * 1.5).min(super::DEFAULT_SURFACE_HEIGHT_PX as f32)
+                    as usize)
+                    * width
+                    * 4;
+                assert!(reordered_pixels[start..end].chunks_exact(4).any(|pixel| {
+                    pixel[3] > 245
+                        && pixel[2].abs_diff(rgb[0]) < 8
+                        && pixel[1].abs_diff(rgb[1]) < 8
+                        && pixel[0].abs_diff(rgb[2]) < 8
+                }));
+            }
+        }
+        a.card_revision = 3;
+        let replay = OverlayPresentationSnapshot {
+            revision: 4,
+            blocks: vec![b, a],
+            ..Default::default()
+        };
+        runtime.apply_snapshot(replay.clone());
+        let (revision_only, revision_pixels) = draw(&mut renderer, runtime.caption_blocks()).await;
+        assert_eq!(revision_only.layout().visible_blocks[1].card_revision, 3);
+        assert!(revision_only.layout().damage_band.is_some());
+        assert!(revision_only.diagnostics().block_cache_misses > 0);
+        assert!(revision_only.diagnostics().layout_cache_hits > 0);
+        assert_eq!(reordered_pixels, revision_pixels);
+        let mut reconnected = super::WindowsCaptionRenderer::new(None).unwrap();
+        let replay_runtime = crate::runtime::OverlayRuntime::new(replay);
+        let (_, replay_pixels) = draw(&mut reconnected, replay_runtime.caption_blocks()).await;
+        assert_eq!(revision_pixels, replay_pixels);
+        let gray = CaptionBlock::new("epoch:new", "Same text")
+            .with_channel(CaptionChannel::PeerChannel)
+            .with_speaker_style(SpeakerStyle::Gray)
+            .with_secondary_text("Same source", true)
+            .with_card_revision(1);
+        let (_, gray_pixels) = draw(&mut renderer, vec![gray]).await;
+        assert!(gray_pixels.chunks_exact(4).any(|pixel| pixel[3] > 245
+            && pixel[2].abs_diff(180) < 8
+            && pixel[1].abs_diff(180) < 8
+            && pixel[0].abs_diff(180) < 8));
     }
 
     #[cfg(windows)]
@@ -3045,6 +3213,7 @@ mod tests {
         let bounds = BlockBounds::new(100.0, top_px, 800.0, bottom_px);
         ResolvedBlockLayout {
             id: id.to_string(),
+            card_revision: 0,
             layout_cache_key: layout_key(key_seed),
             channel: Some(CaptionChannel::PeerChannel),
             speaker_style: crate::renderer::SpeakerStyle::Gray,

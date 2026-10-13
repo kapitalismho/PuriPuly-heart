@@ -88,24 +88,18 @@ async def test_active_self_noop_and_hidden_secondary_do_not_renew_freshness_or_a
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("active", [True, False])
-async def test_mixed_self_peer_pacing_and_late_translation_preserve_shared_window(
+async def test_mixed_self_peer_and_late_translation_preserve_shared_window(
     active: bool,
 ) -> None:
     clock = FakeClock(_now=10.0)
-    waits = []
 
-    async def paced_sleep(delay: float) -> None:
-        if delay <= 1.0:
-            waits.append(delay)
-            clock.advance(delay)
-            await asyncio.sleep(0)
-        else:
-            await asyncio.Event().wait()
+    async def blocked_sleep(_delay: float) -> None:
+        await asyncio.Event().wait()
 
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(anchor="spatial_locked"),
         clock=clock,
-        sleep=paced_sleep,
+        sleep=blocked_sleep,
         native_retry_enabled=True,
     )
     adapter = OverlayEventAdapter(clock=clock)
@@ -159,8 +153,6 @@ async def test_mixed_self_peer_pacing_and_late_translation_preserve_shared_windo
                 )
             )
             assert receipt.outcome == "applied"
-        assert waits == pytest.approx([1.0])
-        assert clock.now() == pytest.approx(11.1)
         before_translation = presenter.snapshot()
         assert len(before_translation.blocks) == 2
         receipt = await presenter.emit(
