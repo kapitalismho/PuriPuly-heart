@@ -25,7 +25,11 @@
   "independent_activity": "Read-only exact diff/source/caller/original JSON/archive inspection, snapshot comparison and selected original-record analysis. No private-env/credential reads, calls, inference, tests/builds, screenshots, mutations or remote operations.",
   "preserved_limits": "Proposals not implemented; no ASR native internal cause, accepted uncertainty threshold, raw-wire Gemini diagnosis, production profile or full#218/VR acceptance. User receives a scoped experiment and grounded design assessment, not fixes disguised as completed.",
   "repair_verification": {
-    "status":"pending_bounded_review",
-    "scope":"Record/index resolution and corrected scope-ordered cleanAB palette wording only. No measurement, driver, product, policy or budget changes; unaffected whole-checkpoint coverage retained."
+    "status":"repair_verified",
+    "terminal_verdict":"accepted",
+    "reviewed_repair_candidate":"7f330691599c3ea26fe55ba376dd4bb9c659e0f7",
+    "scope":"Record/index resolution and corrected scope-ordered cleanAB palette wording only. Exact three-file repair inspected; R1 and C1 closed, no remaining findings. No measurement, driver, product, policy or budget changes; unaffected whole-checkpoint coverage retained.",
+    "director_acceptance":"ACCEPT the four requested investigation outcomes at the reviewed repair candidate. Not product-quality approval, profile/default activation, full#218 acceptance or remote-operation authority.",
+    "final_record_append":"This actual returned verification is the only subsequent change. No new execution or measurement is claimed; prior evidence remains applicable."
   }
 }
