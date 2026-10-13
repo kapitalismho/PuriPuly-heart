@@ -110,6 +110,39 @@ def test_headless_runtime_error_is_localized_in_dashboard_state(caplog) -> None:
     ]
 
 
+async def test_mixed_provider_language_and_osc_changes_are_all_committed(tmp_path, monkeypatch):
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
+    path = tmp_path / "settings.json"
+    isolated_settings(path)
+    app = compose_headless_application(path)
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance("mixed-settings")
+        submitted = await control.submit(
+            "settings.apply",
+            {
+                "changes": {
+                    "translation.model": "deepseek_v4_flash_41",
+                    "translation.connection": "official_byok",
+                    "languages": {"source": "ja", "target": "en"},
+                    "osc.connection": {"mode": "manual", "send_port": 9200, "receive_port": 9201},
+                }
+            },
+            request_id="mixed-settings",
+        )
+        result = await control.wait(submitted["operation_id"], timeout=10)
+        assert result["status"] in {"applied", "degraded"}
+        intent = (await control.query("settings.current", {}))["settings"]["intent"]
+        assert intent["translation"]["connection"] == "official_byok"
+        assert intent["languages"]["source_language"] == "ja"
+        assert intent["languages"]["target_language"] == "en"
+        assert intent["osc"]["connection_mode"] == "manual"
+        assert intent["osc"]["send_port"] == 9200
+    finally:
+        await app.stop()
+
+
 @pytest.mark.asyncio
 async def test_declared_extension_secret_roundtrip_is_private_and_revision_safe(
     tmp_path, monkeypatch

@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import threading
+import time
 from collections.abc import Callable, Sequence
 from functools import partial
 from pathlib import Path
@@ -64,6 +65,7 @@ def _worker_payload(request: HuggingFaceDownloadRequest) -> dict[str, object]:
         "remote_path": request.remote_path,
         "local_dir": str(request.local_dir),
         "expected_size_bytes": request.expected_size_bytes,
+        "endpoint": request.endpoint,
     }
 
 
@@ -198,6 +200,18 @@ class HuggingFaceXetDownloadAdapter:
 
             try:
                 environment = _worker_environment(disable_xet=False)
+                if request.endpoint is not None:
+                    if request.endpoint not in {"https://huggingface.co", "https://hf-mirror.com"}:
+                        raise ValueError("Unsupported public model endpoint")
+                    environment["HF_ENDPOINT"] = request.endpoint
+                    environment["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
+                    environment["HF_HUB_ETAG_TIMEOUT"] = "15"
+                    environment["HF_HUB_DOWNLOAD_TIMEOUT"] = "30"
+                    if request.endpoint == "https://hf-mirror.com":
+                        environment["HF_HUB_DISABLE_XET"] = "1"
+                    huggingface_tokens = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN")
+                    for name in huggingface_tokens:
+                        environment.pop(name, None)
             except Exception as exc:
                 raise LocalSTTDownloadPortError(
                     "Hugging Face download network configuration failed",
@@ -278,6 +292,8 @@ class HuggingFaceXetDownloadAdapter:
             completed_path: Path | None = None
 
             with event_path.open("r", encoding="utf-8") as event_stream:
+                last_progress = time.monotonic()
+                last_bytes = -1
                 while True:
                     if cancel_event is not None and cancel_event.is_set():
                         raise LocalSTTDownloadPortCancelled("Hugging Face/Xet download cancelled")
@@ -285,6 +301,11 @@ class HuggingFaceXetDownloadAdapter:
                     if not line:
                         if process.returncode is not None:
                             break
+                        if time.monotonic() - last_progress > 90:
+                            raise LocalSTTDownloadPortError(
+                                "Download made no progress; retry or change source",
+                                failure_code="download_timeout",
+                            )
                         await asyncio.sleep(0.05)
                         continue
                     try:
@@ -297,6 +318,9 @@ class HuggingFaceXetDownloadAdapter:
                         ) from exc
                     message_type = message.get("type")
                     if message_type == "progress" and on_progress is not None:
+                        if int(message["downloaded_bytes"]) > last_bytes:
+                            last_progress = time.monotonic()
+                            last_bytes = int(message["downloaded_bytes"])
                         on_progress(
                             HuggingFaceDownloadProgress(
                                 downloaded_bytes=max(0, int(message["downloaded_bytes"])),
@@ -354,6 +378,7 @@ class _WorkerProgress:
         self.total = kwargs.get("total")
         self.n = int(kwargs.get("initial", 0) or 0)
         self._lock = threading.Lock()
+        self._last_emit = 0.0
 
     def __enter__(self) -> _WorkerProgress:
         return self
@@ -367,6 +392,9 @@ class _WorkerProgress:
             return
         with self._lock:
             self.n += increment
+            if time.monotonic() - self._last_emit < 0.25 and self.n != self.total:
+                return
+            self._last_emit = time.monotonic()
             _write_worker_message(
                 {
                     "type": "progress",
@@ -437,6 +465,12 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
                 os.environ.pop(name)
         os.environ.update(environment)
         failure_code = "worker_import_failed"
+        if payload.get("endpoint") == "https://hf-mirror.com":
+            from puripuly_heart.core.local_translation.public_download import download_public_file
+
+            downloaded_path = download_public_file(payload, on_progress=_write_worker_message)
+            _write_worker_message({"type": "complete", "path": str(downloaded_path)})
+            return 0
         from huggingface_hub import hf_hub_download, set_client_factory
         from huggingface_hub.utils._http import hf_request_event_hook
 
@@ -447,7 +481,7 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
                 external_client,
                 policy=_worker_policy(environment),
                 follow_redirects=True,
-                timeout=None,
+                timeout=30.0 if payload.get("endpoint") else None,
                 event_hooks={"request": [hf_request_event_hook]},
             )
         )
@@ -474,10 +508,13 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
             "message": (
                 "Hugging Face download network configuration failed"
                 if failure_code == "network_configuration_failed"
-                else str(exc)
+                else "Public model download failed"
             ),
         }
         status_code = _http_status_code(exc)
+        if isinstance(exc, LocalSTTDownloadPortError):
+            message["failure_code"] = exc.failure_code
+            status_code = exc.status_code
         if status_code is not None:
             message["status_code"] = status_code
         os_error_code = _os_error_code(exc)

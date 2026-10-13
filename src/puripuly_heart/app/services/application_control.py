@@ -2266,22 +2266,17 @@ class ApplicationControlOwner:
                     ProviderApplyIntent((edit,)),
                     materialize_translation=self.settings.materialize_translation,
                 )
-        if any(
-            key in changes
-            for key in (
-                set(PROVIDER_EDITS)
-                | {
-                    "stt.provider",
-                    "peer_stt.provider",
-                    "stt.cloud_free_tier_providers",
-                    "translation.model",
-                    "translation.connection",
-                    "translation.connection_history",
-                    "translation.previous_llm_model",
-                    "managed.referral_id",
-                }
-            )
-        ):
+        provider_fields = set(PROVIDER_EDITS) | {
+            "stt.provider",
+            "peer_stt.provider",
+            "stt.cloud_free_tier_providers",
+            "translation.model",
+            "translation.connection",
+            "translation.connection_history",
+            "translation.previous_llm_model",
+            "managed.referral_id",
+        }
+        if changes.keys() <= provider_fields:
             return await self.application.apply_providers(updated)
         return await self.application.apply_settings(updated)
 

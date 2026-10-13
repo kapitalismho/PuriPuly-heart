@@ -3,6 +3,7 @@ from __future__ import annotations
 import locale
 from dataclasses import replace
 
+from puripuly_heart.config.paths import test_profile_name
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     UiIntent,
@@ -64,7 +65,7 @@ def new_settings_for_first_run(system_locale: str | None = None) -> AppSettingsV
             ui=UiIntent(locale=locale_value),
         ),
     )
-    return with_telemetry_enabled(settings, True)
+    return with_telemetry_enabled(settings, test_profile_name() is None)
 
 
 __all__ = [

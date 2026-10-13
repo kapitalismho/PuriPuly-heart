@@ -897,7 +897,7 @@ def _patch_app_construction(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         app_module,
         "TitleBar",
-        lambda _page, *, on_close: ft.Container(data=on_close),
+        lambda _page, *, on_close, **_tools: ft.Container(data=on_close),
     )
     monkeypatch.setattr(app_module, "BottomNavBar", lambda on_change: ft.Container(data=on_change))
     monkeypatch.setattr(app_module, "get_app_theme", lambda **_kwargs: "theme")

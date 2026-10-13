@@ -5,6 +5,7 @@ import contextlib
 import threading
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 from puripuly_heart.app.ports.managed_gemma_translation import (
     ManagedGemmaTranslationSelection,
@@ -19,6 +20,8 @@ from puripuly_heart.core.local_translation.provisioning import (
     GemmaProvisioningCancelled,
     GemmaProvisioningError,
     GemmaProvisioningUpdate,
+    LocalGemmaDownloadAdapter,
+    ensure_gemma_installed,
 )
 from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaReadiness,
@@ -139,6 +142,7 @@ class ManagedGemmaTranslationOwner:
                         "cancel_event": cancel_event,
                         "on_status": on_status,
                         "spec": spec,
+                        "source": selection.download_source,
                     },
                 ),
                 name=f"prepare-{generation}",
@@ -211,6 +215,56 @@ class ManagedGemmaTranslationOwner:
         if task is not None and not task.done():
             task.cancel()
         return True
+
+    async def install_assets(self, *, source: str, files: tuple[Path, ...] = (), on_status=None):
+        from puripuly_heart.core.feature_diagnostics import log_feature
+        from puripuly_heart.core.local_translation.assets import inspect_gemma_install
+
+        async with self._lock:
+            if self._closed:
+                raise RuntimeError("Model owner closed")
+            spec = resolve_gemma_spec()
+            if (
+                source == "local"
+                and not files
+                and inspect_gemma_install(spec=spec).status != "ready"
+            ):
+                raise GemmaProvisioningError(
+                    "Import the two pinned files first", failure_code="missing_file"
+                )
+            cancellation = threading.Event()
+            self._cancel_event = cancellation
+            downloader = (
+                LocalGemmaDownloadAdapter(files, spec) if source == "local" else self._downloader
+            )
+            task = start_lifecycle_task(
+                self._task_scope,
+                ensure_gemma_installed(
+                    source=source,
+                    spec=spec,
+                    downloader=downloader,
+                    cancel_event=cancellation,
+                    on_status=on_status,
+                ),
+                name="install-assets",
+            )
+            self._prepare_task = task
+            try:
+                return await task
+            except GemmaProvisioningCancelled:
+                raise
+            except Exception as error:
+                log_feature(
+                    "ModelDownload",
+                    "installation",
+                    getattr(error, "failure_code", "install_failed"),
+                    error=error,
+                )
+                raise
+            finally:
+                if self._prepare_task is task:
+                    self._prepare_task = None
+                    self._cancel_event = None
 
     def schedule_demand_sync(
         self,

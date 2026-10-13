@@ -33,6 +33,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCoordinator,
     application_shutdown_callback,
 )
+from puripuly_heart.app.services.quick_translate import QuickTranslateOwner
 from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
 from puripuly_heart.config.provider_values import QwenRegion
 from puripuly_heart.core.language import get_stt_compatibility_warning
@@ -50,6 +51,7 @@ from puripuly_heart.ui.components.local_qwen_hallucination_dialog import (
     LocalQwenHallucinationDialog,
 )
 from puripuly_heart.ui.components.microphone_test_dialog import MicrophoneTestDialog
+from puripuly_heart.ui.components.model_assets_dialog import ModelAssetsDialog
 from puripuly_heart.ui.components.peer_translation_eula_dialog import PeerTranslationEulaDialog
 from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDialog
 from puripuly_heart.ui.components.title_bar import TitleBar
@@ -75,6 +77,7 @@ from puripuly_heart.ui.i18n import (
     t,
 )
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from puripuly_heart.ui.quick_translate_window import spawn_quick_window, stop_quick_window
 from puripuly_heart.ui.settings.contract import (
     SettingsChatGptIntents,
     SettingsGeneralIntents,
@@ -218,6 +221,7 @@ class TranslatorApp:
         self._launch_high_priority_snackbar = None
         self._github_star_prompt_shown_this_launch = False
         self._microphone_test_dialog: MicrophoneTestDialog | None = None
+        self._quick_translate_owner = None
         self._foundation_preview_dialog: ft.AlertDialog | None = None
         self._foundation_adapter = FletFoundationAdapter(
             self.application,
@@ -230,6 +234,9 @@ class TranslatorApp:
         self._application_lifecycle = self._compose_application_lifecycle()
         self._setup_page()
         self._build_layout()
+        bind_quick = getattr(self.view_dashboard, "bind_quick_window_toggle", None)
+        if callable(bind_quick):
+            bind_quick(self._set_quick_visible)
 
         # Link Dashboard callbacks
         self.view_dashboard.bind_dashboard_intents(
@@ -395,6 +402,12 @@ class TranslatorApp:
         foundation_runtime = self._ensure_foundation_runtime()
         return (
             application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="QuickTranslateOwner",
+                callback_name="close_quick_window",
+                callback=self._close_quick_window,
+            ),
+            application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
                 owner_name="TranslatorApp",
                 callback_name="freeze_ui_ingress",
@@ -419,10 +432,18 @@ class TranslatorApp:
         self._shutting_down = True
         self._settings_mutation_queue = []
 
+    async def _close_quick_window(self) -> None:
+        quick = getattr(self, "_quick_translate_owner", None)
+        if quick is not None:
+            await quick.close()
+
     async def _on_page_lifecycle_end(self, _event=None) -> None:
         await self.shutdown()
 
     async def close_presentation(self) -> None:
+        quick = getattr(self, "_quick_translate_owner", None)
+        if quick is not None:
+            await quick.close()
         self._window_close_requested = True
         result = self.page.window.destroy()
         if inspect.isawaitable(result):
@@ -461,6 +482,10 @@ class TranslatorApp:
 
     def _setup_page(self):
         self.page.title = t("app.title")
+        from puripuly_heart.config.paths import test_profile_name
+
+        if test_profile_name() is not None:
+            self.page.title += " [TEST]"
         self.page.theme_mode = ft.ThemeMode.LIGHT
         register_ui_fonts(self.page)
         self.page.theme = get_app_theme(
@@ -495,7 +520,13 @@ class TranslatorApp:
         self.view_settings.set_overlay_runtime_state(self.overlay_state)
 
         # Custom title bar
-        self.title_bar = TitleBar(self.page, on_close=self._request_window_close)
+        self.title_bar = TitleBar(
+            self.page,
+            on_close=self._request_window_close,
+            on_model_assets=self._open_model_assets,
+            on_quick_translate=self._open_quick_translate,
+        )
+        self._model_assets_dialog = None
 
         # Bottom navigation (order: Home, Settings, Logs, About)
         self.bottom_nav = BottomNavBar(on_change=self._on_nav_change)
@@ -515,6 +546,62 @@ class TranslatorApp:
         self.content_area = shell.content_area
         self.layout = shell.layout
         self.page.add(shell.root)
+
+    def _open_model_assets(self) -> None:
+        if self._model_assets_dialog is None:
+            self._model_assets_dialog = ModelAssetsDialog(
+                self.page, self.application, self._run_page_task
+            )
+        self._model_assets_dialog.open()
+
+    def _quick_owner(self):
+        if self._quick_translate_owner is None:
+            self._quick_translate_owner = QuickTranslateOwner(
+                spawn=lambda: spawn_quick_window(get_locale()),
+                submit=self.application.submit_quick_text,
+                preferences=self.application.quick_window_preferences,
+                save_preferences=self.application.configure_quick_window,
+                stop=stop_quick_window,
+                on_visibility=self._quick_visibility_changed,
+            )
+        return self._quick_translate_owner
+
+    def _quick_visibility_changed(self, visible):
+        setter = getattr(self.view_dashboard, "set_quick_window_visible", None)
+        if callable(setter):
+            setter(visible)
+
+    def on_quick_conversation_event(self, event):
+        self._quick_owner().publish_event(event)
+
+    def sync_quick_context(self):
+        if getattr(self, "_quick_translate_owner", None) is None or getattr(
+            self, "_shutting_down", False
+        ):
+            return
+
+        async def sync():
+            await asyncio.sleep(0)
+            owner = getattr(self, "_quick_translate_owner", None)
+            if owner is not None:
+                owner.sync_context()
+
+        self._run_page_task(sync)
+
+    def _set_quick_visible(self, visible):
+        self._open_quick_translate(visible)
+
+    def _open_quick_translate(self, visible=None) -> None:
+        owner = self._quick_owner()
+
+        async def open_window():
+            try:
+                await owner.open(visible)
+            except Exception:
+                self._quick_visibility_changed(owner.visible)
+                self._show_snackbar(t("quick.error.window_start_failed"), COLOR_WARNING)
+
+        self._run_page_task(open_window)
 
     def _build_debug_preview_panel(self) -> DebugPreviewPanel:
         return DebugPreviewPanel(
@@ -1131,6 +1218,10 @@ class TranslatorApp:
 
     def apply_locale(self) -> None:
         self.page.title = t("app.title")
+        from puripuly_heart.config.paths import test_profile_name
+
+        if test_profile_name() is not None:
+            self.page.title += " [TEST]"
         self.page.theme = get_app_theme(
             font_family=font_for_language(get_locale()),
             body_letter_spacing=locale_body_letter_spacing(get_locale()),
@@ -1447,18 +1538,34 @@ class TranslatorApp:
     def _on_start_microphone_test(self) -> None:
         async def _task():
             dialog = self._get_microphone_test_dialog()
+            if dialog.is_open and self.application.state().microphone_test_active:
+                return
             dialog.reset()
             dialog.open()
-            started = await self.application.start_microphone_test(meter_callback=dialog.set_level)
-            if not started:
+            try:
+                started = await self.application.start_microphone_test(
+                    meter_callback=dialog.set_level, recording_seconds=10
+                )
+            except Exception as error:
+                from puripuly_heart.core.feature_diagnostics import log_feature
+
+                log_feature("AudioTest", "preflight", "capture_start_failed", error=error)
                 dialog.show_failure()
                 return
+            if not started:
+                from puripuly_heart.core.feature_diagnostics import log_feature
+
+                log_feature("AudioTest", "preflight", "capture_not_started")
+                dialog.show_failure()
+                return
+            if "has_recording" in self.application.microphone_test_snapshot():
+                self._start_audio_test_watch(dialog)
 
         self._queue_settings_mutation_task(_task)
 
     def _on_stop_microphone_test(self) -> None:
         async def _task() -> None:
-            await self.application.stop_microphone_test()
+            await self.application.clear_microphone_recording()
             self._close_microphone_test_dialog()
 
         self._queue_settings_mutation_task(_task)
@@ -1469,6 +1576,10 @@ class TranslatorApp:
             dialog = MicrophoneTestDialog(
                 self.page,
                 on_close=self._on_microphone_test_dialog_dismiss,
+                on_record=self._on_start_microphone_test,
+                on_stop=self._on_stop_audio_recording,
+                on_play=self._on_play_audio_recording,
+                on_stop_playback=self._on_stop_audio_playback,
             )
             self._microphone_test_dialog = dialog
         return dialog
@@ -1483,7 +1594,42 @@ class TranslatorApp:
     def _on_microphone_test_dialog_dismiss(self) -> None:
         self._on_stop_microphone_test()
 
+    def _start_audio_test_watch(self, dialog) -> None:
+        previous = getattr(self, "_audio_test_watch", None)
+        if previous is not None and not previous.done():
+            return
+
+        async def watch():
+            while dialog.is_open and not getattr(self, "_shutting_down", False):
+                snapshot = self.application.microphone_test_snapshot()
+                dialog.set_snapshot(snapshot)
+                if snapshot.get("failure_reason"):
+                    dialog.show_failure(snapshot["failure_reason"])
+                await asyncio.sleep(0.3)
+
+        self._audio_test_watch = self._run_page_task(watch)
+
+    def _on_stop_audio_recording(self) -> None:
+        self._run_page_task(self.application.stop_microphone_test)
+
+    def _on_play_audio_recording(self, processed: bool) -> None:
+        async def play():
+            try:
+                await self.application.play_microphone_recording(processed=processed)
+            except Exception as error:
+                from puripuly_heart.core.feature_diagnostics import log_feature
+
+                log_feature("AudioTest", "playback", "playback_failed", error=error)
+                self._get_microphone_test_dialog().show_failure("playback_failed")
+
+        self._run_page_task(play)
+
+    def _on_stop_audio_playback(self) -> None:
+        self._run_page_task(self.application.stop_microphone_playback)
+
     def _sync_microphone_test_dialog_if_inactive(self) -> None:
+        if self.application.microphone_test_snapshot().get("has_recording"):
+            return
         if self.application.state().microphone_test_active:
             return
         self._close_microphone_test_dialog()

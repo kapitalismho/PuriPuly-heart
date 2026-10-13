@@ -104,6 +104,7 @@ class LocalASRInstallRequest:
     locale: str | None
     origin: str
     explicit_gpu_intent: bool = False
+    preferred_source: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +114,7 @@ class LocalASRInstallResult:
     failed_model_ids: tuple[str, ...]
     cancelled: bool
     snapshot: LocalASRProvisioningSnapshot
+    failure_codes: tuple[str, ...] = ()
 
 
 LocalASRInstallResultHandler = Callable[
@@ -158,6 +160,7 @@ class LocalASRProvisioningPort(Protocol):
         request: LocalASRInstallRequest,
         *,
         result_handler: LocalASRInstallResultHandler | None = None,
+        on_status: Callable[..., object] | None = None,
     ) -> asyncio.Task[LocalASRInstallResult]: ...
 
     async def report_model_validation_failure(
@@ -167,7 +170,9 @@ class LocalASRProvisioningPort(Protocol):
         failure_type: str,
     ) -> LocalASRProvisioningSnapshot: ...
 
-    async def cancel_install(self, backend: LocalASRProvisioningBackend) -> None: ...
+    async def cancel_install(
+        self, backend: LocalASRProvisioningBackend, *, origin: str | None = None
+    ) -> None: ...
 
     async def close(self) -> None: ...
 

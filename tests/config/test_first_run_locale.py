@@ -134,7 +134,10 @@ def test_first_run_settings_preserve_provider_defaults() -> None:
 @pytest.mark.parametrize("system_locale", ["en_US", "ko_KR", "ja_JP", None])
 def test_first_run_settings_use_managed_gemma_primary_default(
     system_locale: str | None,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    if system_locale is None:
+        monkeypatch.setattr(canonical_defaults, "detect_system_locale", lambda: "en_US")
     settings = _new_first_run_settings(system_locale)
 
     translation = settings.intent.translation

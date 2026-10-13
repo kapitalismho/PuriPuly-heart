@@ -102,6 +102,15 @@ class DisplayCard(ft.Container):
         self._source_as_message = False
         self._translation_is_visible = False
         self.input_is_focused = False
+        self.on_quick_toggle = None
+        self.quick_toggle = ft.Switch(
+            label=t("quick.toggle"),
+            label_text_style=ft.TextStyle(color=COLOR_NEUTRAL_DARK, size=14),
+            value=False,
+            on_change=lambda event: (
+                self.on_quick_toggle(bool(event.control.value)) if self.on_quick_toggle else None
+            ),
+        )
 
         initial_size, initial_max_lines = _display_layout_for_length(
             _weighted_len(self._source_value)
@@ -168,7 +177,7 @@ class DisplayCard(ft.Container):
                     padding=ft.Padding.only(bottom=4),
                 ),
                 ft.Row(
-                    [self._input_field],
+                    [self._input_field, self.quick_toggle],
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
             ],
@@ -319,6 +328,7 @@ class DisplayCard(ft.Container):
         input_font_family: str | None = None,
     ) -> None:
         self._input_field.hint_text = t("display.input_hint")
+        self.quick_toggle.label = t("quick.toggle")
 
         # Explicitly set hint font to UI font (Display font)
         self._input_field.hint_style = ft.TextStyle(

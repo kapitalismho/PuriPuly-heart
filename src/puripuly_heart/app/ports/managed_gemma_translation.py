@@ -16,6 +16,7 @@ class ManagedGemmaTranslationSelection:
     system_prompt: str
     model_id: str = GEMMA_MODEL_ID
     vulkan_device: str = "Vulkan0"
+    download_source: str = "official"
 
     def __post_init__(self) -> None:
         if self.backend not in {"cpu", "gpu"}:

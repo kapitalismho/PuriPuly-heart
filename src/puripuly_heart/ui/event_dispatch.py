@@ -282,6 +282,7 @@ class UIEventBridge:
         clear_managed_auth_pending: object | None = None,
         on_github_star_translation_success: object | None = None,
         on_overlay_state_changed: object | None = None,
+        on_conversation_event: object | None = None,
     ):
         self.event_queue = event_queue
         self.runtime_logging = runtime_logging
@@ -290,6 +291,7 @@ class UIEventBridge:
         self._get_stt_state_callback = get_stt_state
         self._github_star_translation_success_callback = on_github_star_translation_success
         self._overlay_state_changed_callback = on_overlay_state_changed
+        self._conversation_event_callback = on_conversation_event
         self.dashboard_destination = dashboard_destination
         self.history_destination = history_destination
         self.error_destination = error_destination or AppErrorEventDestination(
@@ -401,6 +403,13 @@ class UIEventBridge:
         authority = getattr(event, "delivery_authority", None)
         if authority is not None and not authority.claim_delivery():
             return
+        if callable(self._conversation_event_callback):
+            try:
+                self._conversation_event_callback(event)
+            except Exception as error:
+                from puripuly_heart.core.feature_diagnostics import log_feature
+
+                log_feature("QuickTranslate", "presentation", "event_delivery_failed", error=error)
         mapped = map_ui_event(event)
         if mapped is None:
             return

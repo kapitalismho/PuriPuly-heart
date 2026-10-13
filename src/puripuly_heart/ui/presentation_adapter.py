@@ -128,9 +128,11 @@ class FletUiPresentationAdapter:
                 None,
             ),
             on_overlay_state_changed=getattr(self._app, "on_overlay_state_changed", None),
+            on_conversation_event=getattr(self._app, "on_quick_conversation_event", None),
         )
 
     def set_dashboard_translation_enabled(self, enabled: bool) -> None:
+        self._sync_quick_context()
         dashboard = getattr(self._app, "view_dashboard", None)
         setter = getattr(dashboard, "set_translation_enabled", None)
         if callable(setter):
@@ -266,6 +268,7 @@ class FletUiPresentationAdapter:
         peer_auto_detect_available: bool,
         secondary_target_language: str = "",
     ) -> None:
+        self._sync_quick_context()
         dashboard = getattr(self._app, "view_dashboard", None)
         if dashboard is None:
             return
@@ -348,6 +351,7 @@ class FletUiPresentationAdapter:
             set_peer_auto(peer_auto_detect_available)
 
     def project_osc_control_state(self, state: OscControlPresentationState) -> None:
+        self._sync_quick_context()
         dashboard = getattr(self._app, "view_dashboard", None)
         project_dashboard = getattr(dashboard, "project_osc_control_state", None)
         if callable(project_dashboard):
@@ -367,6 +371,7 @@ class FletUiPresentationAdapter:
         config_path: Path,
         preserve_custom_vocab_draft: bool = False,
     ) -> bool:
+        self._sync_quick_context()
         settings_view = getattr(self._app, "view_settings", None)
         loader = getattr(settings_view, "load_from_settings", None)
         if not callable(loader):
@@ -380,6 +385,11 @@ class FletUiPresentationAdapter:
             preserve_custom_vocab_draft=preserve_custom_vocab_draft,
         )
         return True
+
+    def _sync_quick_context(self):
+        callback = getattr(self._app, "sync_quick_context", None)
+        if callable(callback):
+            callback()
 
     def refresh_settings_after_openrouter_pkce_success(
         self,

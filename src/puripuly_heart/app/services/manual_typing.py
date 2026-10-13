@@ -10,6 +10,12 @@ from puripuly_heart.app.ports.manual_typing import SelfChatboxTypingPort
 MANUAL_INPUT_TYPING_REASON = "manual_input"
 
 
+class ManualTranslationFailed(RuntimeError):
+    def __init__(self, utterance_id):
+        super().__init__("translation_failed")
+        self.utterance_id = str(utterance_id)
+
+
 @dataclass(slots=True)
 class ManualTypingOwner:
     output_provider: Callable[[], SelfChatboxTypingPort | None]
@@ -29,7 +35,9 @@ class ManualTypingOwner:
     def submit_generation(self) -> int:
         return self._submit_generation
 
-    async def submit(self, submit: Callable[[], Awaitable[object]] | None) -> None:
+    async def submit(
+        self, submit: Callable[[], Awaitable[object]] | None, *, strict: bool = False
+    ) -> object | None:
         self.clear_input()
         if submit is None:
             return
@@ -37,8 +45,11 @@ class ManualTypingOwner:
         try:
             utterance_id = await submit()
             await self._wait_for_completion(utterance_id)
+            return utterance_id
         except Exception as exc:
             self.log_error(_format_manual_typing_error("submit", exc))
+            if strict:
+                raise
         finally:
             self.clear_submit(reason)
 
@@ -48,6 +59,16 @@ class ManualTypingOwner:
             self._reschedule_idle_timeout()
             return
         self.clear_input()
+
+    async def submit_for_result(self, submit, *, completion, result) -> tuple[str, str]:
+        utterance_id = await self.submit(submit, strict=True)
+        pending = completion(utterance_id)
+        if pending is not None and not pending.done():
+            await asyncio.shield(pending)
+        translation = result(utterance_id)
+        if translation is None:
+            raise ManualTranslationFailed(utterance_id)
+        return str(utterance_id), translation.translated_text
 
     async def release(self) -> None:
         task = self._cancel_idle_task()

@@ -107,13 +107,58 @@ class UiInputRuntimeAdapter:
     self_capture: SelfCaptureApplicationOwner
     connection_readiness: LlmConnectionReadinessOwner | None = None
 
+    def self_capture_test_state(self) -> tuple[bool, object]:
+        owner = self.self_capture.capture_owner_if_created()
+        snapshot = None if owner is None else owner.snapshot
+        return bool(snapshot and snapshot.desired_active), (
+            id(owner),
+            snapshot.generation if snapshot else None,
+        )
+
     async def submit_text(self, text: str) -> None:
         owner = self.pipeline.self_translation_channel
         submit = None if owner is None else lambda: owner.submit_text(text, source="You")
         await self.manual_typing.submit(submit)
 
+    async def submit_quick_text(self, text: str) -> tuple[str, str]:
+        owner = self.pipeline.self_translation_channel
+        if owner is None:
+            raise RuntimeError("backend_not_ready")
+        enabled = owner.config_snapshot().value.translation_enabled
+        if not enabled:
+            identity = await self.manual_typing.submit(
+                lambda: owner.submit_text(text, source="You"), strict=True
+            )
+            return str(identity), ""
+        if not owner.translation_requests.provider_available:
+            raise RuntimeError("backend_not_ready")
+
+        def result(utterance_id):
+            bundle = owner.runtime.utterances.get(utterance_id)
+            return None if bundle is None else bundle.translation
+
+        return await self.manual_typing.submit_for_result(
+            lambda: owner.submit_text(text, source="You"),
+            completion=lambda identity: owner.runtime.translation_tasks.get(identity),
+            result=result,
+        )
+
     def set_manual_input_activity(self, has_text: bool) -> None:
         self.manual_typing.set_input_activity(has_text)
+
+    def quick_window_context(self) -> dict:
+        owner = self.pipeline.self_translation_channel
+        if owner is None:
+            return dict(translation_enabled=False, peer_translation_enabled=False)
+        config = owner.config_snapshot().value
+        return dict(
+            translation_enabled=config.translation_enabled,
+            peer_translation_enabled=config.translation_enabled and config.peer_translation_enabled,
+            source_language=config.source_language,
+            target_language=config.target_language,
+            peer_source_language=config.peer_source_language or config.target_language,
+            peer_target_language=config.peer_target_language or config.source_language,
+        )
 
     async def set_translation_enabled(
         self, enabled: bool, *, allow_authorization: bool = True
@@ -139,6 +184,10 @@ class UiPeerCaptureRuntimeAdapter:
     peer: PeerApplicationRuntime
     overlay: OverlayApplicationOwner
     connection_readiness: LlmConnectionReadinessOwner | None = None
+
+    def peer_capture_test_state(self) -> tuple[bool, object]:
+        snapshot = self.peer.owner.snapshot()
+        return snapshot.intent_enabled, (id(self.peer.owner), snapshot.activation_generation)
 
     async def set_peer_translation_enabled(self, enabled: bool) -> object:
         result = await self.peer.owner.set_enabled(enabled)
@@ -180,10 +229,12 @@ class UiMicrophoneRuntimeAdapter:
         self,
         *,
         meter_callback=None,
+        recording_seconds=None,
     ) -> bool:
         return await self.microphone.start(
             meter_callback=meter_callback,
             level_log_interval_s=self.level_log_interval_seconds,
+            recording_seconds=recording_seconds,
         )
 
     def microphone_test_snapshot(self) -> dict[str, object]:
@@ -194,6 +245,15 @@ class UiMicrophoneRuntimeAdapter:
 
     async def stop_microphone_test(self) -> None:
         await self.microphone.stop()
+
+    async def play_microphone_recording(self, *, processed=False) -> None:
+        await self.microphone.play_recording(processed=processed)
+
+    async def stop_microphone_playback(self) -> None:
+        await self.microphone.stop_playback()
+
+    async def clear_microphone_recording(self) -> None:
+        await self.microphone.clear_recording()
 
 
 @dataclass(slots=True)
@@ -487,6 +547,62 @@ class UiProviderRuntimeAdapter:
     async def install_selected_gpu_model_if_needed(self) -> None:
         await self.gpu.install_selected_model_if_needed()
 
+    def selected_model_asset_ids(self) -> tuple[str, ...]:
+        from puripuly_heart.app.services.local_asr_selection import required_local_asr_model_ids
+        from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
+        from puripuly_heart.core.local_translation.assets import GEMMA_MODEL_ID
+
+        intent = self.settings.require_canonical().intent
+        ids = []
+        for provider in (intent.stt.provider, intent.peer_stt.provider):
+            ids.extend(required_local_asr_model_ids(provider))
+            if provider == "local_qwen_gpu":
+                ids.append(LOCAL_QWEN_GPU_MODEL_ID)
+        if intent.translation.model == "managed_gemma":
+            ids.append(GEMMA_MODEL_ID)
+        return tuple(dict.fromkeys(ids))
+
+    async def provision_asr_assets(self, *, model_id: str, source: str, on_status=None):
+        from puripuly_heart.core.local_asr_provisioning import LocalASRInstallRequest
+        from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
+        from puripuly_heart.core.local_stt_runtime_installer import (
+            LocalSTTRuntimeInstallCancelled,
+            LocalSTTRuntimeInstallError,
+        )
+
+        backend = "gpu" if model_id == LOCAL_QWEN_GPU_MODEL_ID else "cpu"
+        provisioning = self.gpu.provisioning_provider()
+        if provisioning.snapshot.activity_for(backend) is not None:
+            raise LocalSTTRuntimeInstallError(
+                "Another model task is active", failure_code="task_busy"
+            )
+        result = await provisioning.start_install(
+            LocalASRInstallRequest(
+                backend=backend,
+                model_ids=(model_id,),
+                locale=None,
+                origin="model_assets_dialog",
+                explicit_gpu_intent=backend == "gpu",
+                preferred_source=source,
+            ),
+            on_status=on_status,
+        )
+        if result.cancelled:
+            raise LocalSTTRuntimeInstallCancelled("Model task cancelled")
+        if result.failed_model_ids:
+            raise LocalSTTRuntimeInstallError(
+                "Model installation failed",
+                failure_code=result.failure_codes[0] if result.failure_codes else "unknown",
+            )
+        return result
+
+    async def cancel_asr_assets(self, *, model_id: str) -> None:
+        from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
+
+        backend = "gpu" if model_id == LOCAL_QWEN_GPU_MODEL_ID else "cpu"
+        provisioning = self.gpu.provisioning_provider()
+        await provisioning.cancel_install(backend, origin="model_assets_dialog")
+
     async def ensure_gpu_device_discovery(self) -> None:
         await self.gpu.ensure_device_discovery(
             force=False,
@@ -618,6 +734,19 @@ class UiProviderRuntimeAdapter:
         if succeeded and key in {"alibaba_api_key_beijing", "alibaba_api_key_singapore"}:
             await self.apply_providers(persist_settings=False)
         current = self.settings.canonical
+        if succeeded and current is not None:
+            translation = current.intent.translation
+            active_provider = provider_llm_for_translation(
+                translation.model, translation.connection
+            )
+            active_llm_key = {
+                "deepseek": "deepseek_api_key",
+                "openai": "openai_api_key",
+                "gemini": "google_api_key",
+                "openrouter": "openrouter_api_key",
+            }.get(active_provider)
+            if translation.connection in {"official_byok", "openrouter"} and key == active_llm_key:
+                await self.apply_providers(force_rebuild_llm=True, persist_settings=False)
         http_extension_id = (
             None if current is None else current.intent.translation.http_extension_id
         )
@@ -648,6 +777,85 @@ class UiProviderRuntimeAdapter:
         if action == "cancel":
             return False if self.managed_gemma is None else self.managed_gemma.cancel()
         raise ValueError(f"unsupported managed Gemma notice action: {action}")
+
+    def gemma_download_source(self) -> str:
+        return self.settings.require_canonical().intent.translation.download_source
+
+    async def configure_gemma_source(self, source: str) -> None:
+        if source not in {"official", "mirror", "local"}:
+            raise ValueError("Unsupported model source")
+        current = self.settings.require_canonical()
+        self.settings.begin()
+        try:
+            self.settings.canonical = replace(
+                current,
+                intent=replace(
+                    current.intent,
+                    translation=replace(current.intent.translation, download_source=source),
+                ),
+            )
+            await self.settings.persist_async()
+        except BaseException:
+            self.settings.rollback()
+            raise
+
+    def quick_window_preferences(self) -> dict:
+        ui = self.settings.require_canonical().intent.ui
+        return dict(
+            always_on_top=ui.quick_translate_always_on_top,
+            width=ui.quick_translate_width,
+            height=ui.quick_translate_height,
+            left=ui.quick_translate_left,
+            top=ui.quick_translate_top,
+            peer_display_mode=ui.quick_translate_peer_display_mode,
+            opacity_percent=ui.quick_translate_opacity_percent,
+        )
+
+    async def configure_quick_window(self, values: dict) -> None:
+        current = self.settings.require_canonical()
+        mode = values.get("peer_display_mode", current.intent.ui.quick_translate_peer_display_mode)
+        if mode not in {"both", "translation", "original"}:
+            raise ValueError("Unsupported chat display mode")
+        updated = replace(
+            current.intent.ui,
+            quick_translate_peer_display_mode=mode,
+            quick_translate_opacity_percent=max(
+                40,
+                min(
+                    100,
+                    int(
+                        values.get(
+                            "opacity_percent", current.intent.ui.quick_translate_opacity_percent
+                        )
+                    ),
+                ),
+            ),
+            quick_translate_always_on_top=bool(
+                values.get("always_on_top", current.intent.ui.quick_translate_always_on_top)
+            ),
+            quick_translate_width=max(
+                360, min(1000, int(values.get("width", current.intent.ui.quick_translate_width)))
+            ),
+            quick_translate_height=max(
+                300, min(1000, int(values.get("height", current.intent.ui.quick_translate_height)))
+            ),
+            quick_translate_left=int(values.get("left", current.intent.ui.quick_translate_left)),
+            quick_translate_top=int(values.get("top", current.intent.ui.quick_translate_top)),
+        )
+        self.settings.begin()
+        try:
+            self.settings.canonical = replace(current, intent=replace(current.intent, ui=updated))
+            await self.settings.persist_async()
+        except BaseException:
+            self.settings.rollback()
+            raise
+
+    async def provision_gemma_assets(self, *, source: str, files=(), on_status=None):
+        if self.managed_gemma is None:
+            raise RuntimeError("Managed model owner unavailable")
+        return await self.managed_gemma.install_assets(
+            source=source, files=files, on_status=on_status
+        )
 
 
 @dataclass(slots=True)

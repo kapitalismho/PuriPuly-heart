@@ -103,6 +103,28 @@ class UiApplicationRuntimeStub:
     def __getattr__(self, name: str) -> object:
         return getattr(self._backend, name)
 
+    def self_capture_test_state(self):
+        callback = getattr(self._backend, "self_capture_test_state", None)
+        return callback() if callback else (False, None)
+
+    def peer_capture_test_state(self):
+        callback = getattr(self._backend, "peer_capture_test_state", None)
+        return callback() if callback else (False, None)
+
+    def microphone_test_snapshot(self):
+        callback = getattr(self._backend, "microphone_test_snapshot", None)
+        return callback() if callback else {}
+
+    async def clear_microphone_recording(self):
+        callback = getattr(self._backend, "clear_microphone_recording", None)
+        if callback:
+            await callback()
+
+    async def stop_microphone_playback(self):
+        callback = getattr(self._backend, "stop_microphone_playback", None)
+        if callback:
+            await callback()
+
     def capture_settings_view_change(self, settings: object) -> object:
         capture = getattr(self._backend, "capture_settings_view_change", None)
         return capture(settings) if callable(capture) else settings

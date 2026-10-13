@@ -171,10 +171,12 @@ def default_gemma_install_dir(spec: GemmaModelSpec | None = None) -> Path:
     return default_models_dir() / resolved.install_dirname
 
 
-def _sha256_file(path: Path) -> str:
+def _sha256_file(path: Path, check_cancelled: Callable[[], None] | None = None) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            if check_cancelled is not None:
+                check_cancelled()
             digest.update(chunk)
     return digest.hexdigest()
 
@@ -201,6 +203,7 @@ def validate_gemma_install(
     *,
     verify_checksums: bool = True,
     spec: GemmaModelSpec | None = None,
+    check_cancelled: Callable[[], None] | None = None,
 ) -> InstalledGemmaManifest:
     resolved_spec = spec or e4b_gemma_spec()
     resolved = (install_dir or default_gemma_install_dir(resolved_spec)).resolve()
@@ -210,6 +213,8 @@ def validate_gemma_install(
         raise GemmaInstallInvalidError("Gemma model path is not a directory")
     manifest = _load_installed_manifest(resolved, resolved_spec)
     for asset in resolved_spec.assets:
+        if check_cancelled is not None:
+            check_cancelled()
         path = resolved / asset.filename
         if not path.is_file():
             raise GemmaInstallInvalidError(f"missing required Gemma file: {asset.filename}")
@@ -217,7 +222,7 @@ def validate_gemma_install(
             raise GemmaInstallInvalidError(
                 f"size mismatch for required Gemma file: {asset.filename}"
             )
-        if verify_checksums and _sha256_file(path) != asset.sha256:
+        if verify_checksums and _sha256_file(path, check_cancelled) != asset.sha256:
             raise GemmaInstallInvalidError(
                 f"checksum mismatch for required Gemma file: {asset.filename}"
             )
@@ -229,6 +234,7 @@ def inspect_gemma_install(
     *,
     verify_checksums: bool = False,
     spec: GemmaModelSpec | None = None,
+    check_cancelled: Callable[[], None] | None = None,
 ) -> GemmaInstallState:
     resolved_spec = spec or e4b_gemma_spec()
     resolved = (install_dir or default_gemma_install_dir(resolved_spec)).resolve()
@@ -237,6 +243,7 @@ def inspect_gemma_install(
             resolved,
             verify_checksums=verify_checksums,
             spec=resolved_spec,
+            check_cancelled=check_cancelled,
         )
     except GemmaInstallMissingError:
         return GemmaInstallState(status="missing", install_dir=resolved)

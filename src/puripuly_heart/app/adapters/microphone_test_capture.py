@@ -18,6 +18,7 @@ from puripuly_heart.core.audio.source import (
     MicrophoneTestRouteObservation,
     SelfMicCaptureChannelDecision,
 )
+from puripuly_heart.core.feature_diagnostics import log_feature
 
 MicrophoneTestLogSink = Callable[[str], None]
 MicrophoneTestMeterSink = Callable[
@@ -87,13 +88,7 @@ class MicrophoneTestCaptureAdapter:
                 )
                 requested_channels = decision.preferred_capture_channels
                 try:
-                    source = self.source_factory(
-                        sample_rate_hz=None,
-                        channels=requested_channels,
-                        device=observation.resolved_device_idx,
-                        wasapi_auto_convert=observation.wasapi_auto_convert,
-                        wasapi_exclusive=observation.wasapi_exclusive,
-                    )
+                    source = self._open_selected_source(observation, request, requested_channels)
                     if not runtime.attach_source(
                         source,
                         generation=capture_generation,
@@ -102,6 +97,7 @@ class MicrophoneTestCaptureAdapter:
                         return
                 except Exception as exc:
                     end_exception = exc
+                    log_feature("AudioTest", "device_open", "source_open_failed", error=exc)
                     if request.failure_callback is not None:
                         request.failure_callback(
                             capture_generation,
@@ -112,6 +108,22 @@ class MicrophoneTestCaptureAdapter:
                     return
 
                 opened = True
+                if request.opened_callback is not None:
+                    metadata = getattr(source, "opened_input_metadata", None)
+                    try:
+                        actual = metadata() if callable(metadata) else {}
+                    except Exception as error:
+                        import logging
+
+                        log_feature(
+                            "AudioTest",
+                            "device_metadata",
+                            "metadata_unavailable",
+                            error=error,
+                            level=logging.WARNING,
+                        )
+                        actual = {}
+                    request.opened_callback(actual)
 
                 frame_iterator = source.frames()
                 pending_frame = runtime.create_frame_task(
@@ -119,11 +131,23 @@ class MicrophoneTestCaptureAdapter:
                     generation=capture_generation,
                 )
                 while True:
-                    await asyncio.wait({pending_frame})
+                    if request.frame_callback is not None:
+                        done, _ = await asyncio.wait({pending_frame}, timeout=5)
+                        if not done:
+                            raise TimeoutError("no_audio_frames")
+                    else:
+                        await asyncio.wait({pending_frame})
                     try:
                         frame = pending_frame.result()
                     except StopAsyncIteration:
                         pending_frame = None
+                        if (
+                            request.frame_callback is not None
+                            and request.failure_callback is not None
+                        ):
+                            request.failure_callback(
+                                capture_generation, "capture_ended_early", None
+                            )
                         break
 
                     frame_count += 1
@@ -134,6 +158,9 @@ class MicrophoneTestCaptureAdapter:
                     )
                     if frame_count == 1 and request.ready_callback is not None:
                         request.ready_callback(capture_generation)
+                    if request.frame_callback is not None and not request.frame_callback(frame):
+                        pending_frame = None
+                        break
                     pending_frame = runtime.create_frame_task(
                         anext(frame_iterator),
                         generation=capture_generation,
@@ -145,6 +172,12 @@ class MicrophoneTestCaptureAdapter:
                 raise
             except Exception as exc:
                 end_exception = exc
+                log_feature(
+                    "AudioTest",
+                    "capture",
+                    "capture_timeout" if isinstance(exc, TimeoutError) else "capture_failed",
+                    error=exc,
+                )
                 if request.failure_callback is not None:
                     request.failure_callback(
                         capture_generation,
@@ -185,6 +218,32 @@ class MicrophoneTestCaptureAdapter:
         finally:
             if direct_generation:
                 runtime.end_direct_capture(capture_generation)
+
+    def _open_selected_source(self, observation, request, channels):
+        def open_channels(count):
+            return self.source_factory(
+                sample_rate_hz=None,
+                channels=count,
+                device=observation.resolved_device_idx,
+                wasapi_auto_convert=observation.wasapi_auto_convert,
+                wasapi_exclusive=observation.wasapi_exclusive,
+            )
+
+        try:
+            return open_channels(channels)
+        except Exception as error:
+            if channels <= request.internal_channels:
+                raise
+            import logging
+
+            log_feature(
+                "AudioTest",
+                "device_open",
+                "capture_channels_fallback",
+                error=error,
+                level=logging.WARNING,
+            )
+            return open_channels(request.internal_channels)
 
     @staticmethod
     async def _close_unattached_source(source: object) -> None:

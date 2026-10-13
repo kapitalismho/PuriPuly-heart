@@ -8,6 +8,7 @@ from collections import deque
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+from puripuly_heart.core.feature_diagnostics import log_feature
 from puripuly_heart.core.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
@@ -42,6 +43,7 @@ from puripuly_heart.core.local_stt_runtime_installer import (
     LocalSTTRuntimeInstallCancelled,
     LocalSTTRuntimeInstallError,
     RuntimeLocalSTTStatusUpdate,
+    StatusCallback,
     cleanup_local_stt_install_residue,
     ensure_local_stt_installed,
 )
@@ -239,6 +241,7 @@ class LocalASRProvisioningOwner:
         request: LocalASRInstallRequest,
         *,
         result_handler: LocalASRInstallResultHandler | None = None,
+        on_status: StatusCallback | None = None,
     ) -> asyncio.Task[LocalASRInstallResult]:
         self._require_open("start install")
         self._validate_request(request)
@@ -249,6 +252,7 @@ class LocalASRProvisioningOwner:
                 request,
                 cancel_event=cancel_event,
                 generation=generation,
+                status_handler=on_status,
             ),
         )
         if result_handler is not None:
@@ -287,8 +291,12 @@ class LocalASRProvisioningOwner:
         await self._publish_state()
         return self.snapshot
 
-    async def cancel_install(self, backend: LocalASRProvisioningBackend) -> None:
-        await self._runtime_for(backend).cancel()
+    async def cancel_install(
+        self, backend: LocalASRProvisioningBackend, *, origin: str | None = None
+    ) -> None:
+        runtime = self._runtime_for(backend)
+        if origin is None or runtime.origin == origin:
+            await runtime.cancel()
 
     async def close(self) -> None:
         if self._closed and not self._has_resources():
@@ -394,6 +402,7 @@ class LocalASRProvisioningOwner:
         *,
         cancel_event: threading.Event,
         generation: int,
+        status_handler: StatusCallback | None = None,
     ) -> LocalASRInstallResult:
         await self._ensure_startup_cleanup(
             wait_for_lease=True,
@@ -402,6 +411,7 @@ class LocalASRProvisioningOwner:
         runtime = self._runtime_for(request.backend)
         installed: list[str] = []
         failed: list[str] = []
+        failure_codes: list[str] = []
         cancelled = False
         active_model_id: str | None = None
         try:
@@ -441,6 +451,10 @@ class LocalASRProvisioningOwner:
                             update=current,
                         ),
                     )
+                    if status_handler is not None and runtime.is_current_generation(generation):
+                        outcome = status_handler(update)
+                        if inspect.isawaitable(outcome):
+                            await outcome
 
                 try:
                     manifest = self._manifest_for(request.backend, model_id)
@@ -452,6 +466,11 @@ class LocalASRProvisioningOwner:
                         on_status=on_status,
                         cancel_event=cancel_event,
                         huggingface_downloader=self._huggingface_downloader,
+                        **(
+                            {"preferred_source": request.preferred_source}
+                            if request.preferred_source
+                            else {}
+                        ),
                     )
                     if not runtime.is_current_generation(generation):
                         cancelled = True
@@ -498,6 +517,21 @@ class LocalASRProvisioningOwner:
                     break
                 except Exception as exc:
                     failed.append(model_id)
+                    code = getattr(exc, "failure_code", "unknown")
+                    if (
+                        not isinstance(code, str)
+                        or not code.isascii()
+                        or not code.replace("_", "").isalnum()
+                    ):
+                        code = "unknown"
+                    failure_codes.append(code)
+                    log_feature(
+                        "ModelDownload",
+                        "installation",
+                        code,
+                        error=exc,
+                        http_status=getattr(exc, "status_code", None),
+                    )
                     await self._restore_integrity_after_interruption(request.backend, model_id)
                     self._set_operation(model_id, operation="download_failed")
                     await self._emit_diagnostic(
@@ -541,6 +575,7 @@ class LocalASRProvisioningOwner:
             failed_model_ids=tuple(failed),
             cancelled=cancelled,
             snapshot=self.snapshot,
+            failure_codes=tuple(failure_codes),
         )
 
     async def _ensure_startup_cleanup(

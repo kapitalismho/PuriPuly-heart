@@ -25,6 +25,8 @@ class MicrophoneTestCaptureRequest:
         repr=False,
     )
     level_log_interval_s: float = 1.0
+    frame_callback: Callable[[object], bool] | None = field(default=None, repr=False)
+    opened_callback: Callable[[dict], None] | None = field(default=None, repr=False)
 
 
 class MicrophoneTestRuntimePort(Protocol):

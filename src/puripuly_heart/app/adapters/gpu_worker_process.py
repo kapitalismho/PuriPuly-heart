@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import secrets
+import subprocess
 import sys
 import tempfile
 import time
@@ -103,6 +104,7 @@ class DefaultGpuWorkerProcessFactory(GpuWorkerProcessFactoryPort):
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             reader, writer = await self._accept_authenticated_connection(
                 connection_queue,

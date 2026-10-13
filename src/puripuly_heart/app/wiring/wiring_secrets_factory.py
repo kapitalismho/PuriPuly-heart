@@ -4,7 +4,7 @@ import contextlib
 import os
 from pathlib import Path
 
-from puripuly_heart.config.paths import STABLE_APP_DIR_NAME
+from puripuly_heart.config.paths import STABLE_APP_DIR_NAME, test_profile_name, user_config_dir
 from puripuly_heart.config.provider_values import SecretsBackend
 from puripuly_heart.config.settings_vnext.schema import SecretsIntent
 from puripuly_heart.core.storage.secrets import (
@@ -27,6 +27,11 @@ def create_secret_store(
     passphrase = passphrase or os.getenv(SECRETS_PASSPHRASE_ENV)
 
     backend = _secrets_backend_value(settings.backend)
+    profile = test_profile_name()
+    if profile is not None:
+        if not config_path.resolve().is_relative_to(user_config_dir().resolve()):
+            raise ValueError("Test profile configuration must stay inside its isolated directory")
+        keyring_service_name = f"{STABLE_KEYRING_SERVICE_NAME}.test.{profile}"
     if backend == SecretsBackend.KEYRING.value:
         return KeyringSecretStore(service_name=keyring_service_name)
 
@@ -39,6 +44,8 @@ def create_secret_store(
         path = Path(settings.encrypted_file_path)
         if not path.is_absolute():
             path = config_path.parent / path
+        if profile is not None and not path.resolve().is_relative_to(user_config_dir().resolve()):
+            raise ValueError("Test profile secret storage must stay inside its isolated directory")
         return EncryptedFileSecretStore(path=path, passphrase=passphrase)
 
     raise ValueError(f"Unsupported secrets backend: {settings.backend}")
@@ -60,6 +67,8 @@ def _get_secret(
     if value:
         return value
     env = os.getenv(env_var)
+    if test_profile_name() is not None:
+        return None
     if env:
         return env
     return None
@@ -82,6 +91,8 @@ def _get_secret_any(
             with contextlib.suppress(Exception):
                 secrets.set(key, legacy_value)
             return legacy_value
+    if test_profile_name() is not None:
+        return None
     for env_var in env_vars:
         env = os.getenv(env_var)
         if env:

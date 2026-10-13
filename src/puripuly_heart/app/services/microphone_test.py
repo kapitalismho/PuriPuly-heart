@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
+import threading
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
 
@@ -9,6 +11,8 @@ from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestCapturePort,
     MicrophoneTestCaptureRequest,
 )
+from puripuly_heart.core.audio.test_recording import TestRecording
+from puripuly_heart.core.feature_diagnostics import log_feature
 from puripuly_heart.core.runtime.mic_test import MicTestRuntime
 
 MicrophoneTestMeterCallback = Callable[[float], object]
@@ -63,6 +67,8 @@ class MicrophoneTestSessionRequest:
         repr=False,
     )
     level_log_interval_s: float = 10.0
+    recording_seconds: float | None = None
+    target_sample_rate: int = 16000
 
 
 @dataclass(slots=True)
@@ -74,6 +80,7 @@ class MicrophoneTestSessionOwner:
     log_sink: MicrophoneTestLogSink | None = None
     diagnostics_sink: MicrophoneTestDiagnosticsSink | None = None
     runtime_factory: MicrophoneTestRuntimeFactory = MicTestRuntime
+    playback: Callable | None = None
     _runtime: MicTestRuntime | None = field(init=False, default=None, repr=False)
     _lifecycle_lock: asyncio.Lock | None = field(init=False, default=None, repr=False)
     _meter_level: float = field(init=False, default=0.0, repr=False)
@@ -87,6 +94,9 @@ class MicrophoneTestSessionOwner:
         repr=False,
     )
     _closed: bool = field(init=False, default=False, repr=False)
+    _recording: TestRecording | None = field(init=False, default=None, repr=False)
+    _playback_cancel: threading.Event | None = field(init=False, default=None, repr=False)
+    _playback_task: asyncio.Task | None = field(init=False, default=None, repr=False)
 
     @property
     def owner_name(self) -> str:
@@ -142,6 +152,14 @@ class MicrophoneTestSessionOwner:
             "meter_level": self._meter_level,
             "failure_reason": self._failure_reason,
             "failure_type": self._failure_type,
+            **(
+                {
+                    "playing": self._playback_task is not None and not self._playback_task.done(),
+                    **self._recording.snapshot(),
+                }
+                if self._recording is not None
+                else {}
+            ),
         }
 
     async def wait_ready(self) -> bool:
@@ -173,6 +191,7 @@ class MicrophoneTestSessionOwner:
         self._state = "failed"
         self._failure_reason = reason
         self._failure_type = error_type
+        log_feature("AudioTest", "capture", reason)
         if self._readiness is not None and not self._readiness.done():
             self._readiness.set_result(False)
 
@@ -203,7 +222,14 @@ class MicrophoneTestSessionOwner:
             if not await self._recover_before_start(runtime):
                 return False
             if not await self._prepare_self_capture():
+                log_feature("AudioTest", "preflight", "capture_pause_failed")
                 return False
+
+            if request.recording_seconds is not None:
+                await self.clear_recording()
+                self._recording = TestRecording(
+                    seconds=request.recording_seconds, target_rate=request.target_sample_rate
+                )
 
             try:
                 runtime.start(
@@ -217,7 +243,8 @@ class MicrophoneTestSessionOwner:
                 self._failure_type = None
                 self._meter_level = 0.0
                 self._readiness = asyncio.get_running_loop().create_future()
-            except RuntimeError:
+            except RuntimeError as error:
+                log_feature("AudioTest", "preflight", "session_start_failed", error=error)
                 return False
             return True
 
@@ -230,6 +257,8 @@ class MicrophoneTestSessionOwner:
         elif self._state == "ready":
             self._state = "off"
         self._meter_level = 0.0
+        if self._recording is not None:
+            self._recording.finish()
 
     async def stop(self) -> None:
         async with self._lock():
@@ -254,9 +283,56 @@ class MicrophoneTestSessionOwner:
             self._state = "off"
             self._failure_reason = None
             self._failure_type = None
+            if self._recording is not None:
+                self._recording.finish()
+
+    async def play_recording(self, *, processed=False, playback=None) -> None:
+        if self.active:
+            raise RuntimeError("Stop recording before playback")
+        if self._recording is None:
+            log_feature("AudioTest", "playback", "no_recording")
+            raise ValueError("no_recording")
+        if self._playback_task is not None and not self._playback_task.done():
+            return
+        cancellation = threading.Event()
+        self._playback_cancel = cancellation
+        samples, rate = self._recording.audio(processed=processed)
+        selected = playback or self.playback
+        if selected is None:
+            raise RuntimeError("Playback adapter unavailable")
+        task = asyncio.create_task(selected(samples, rate, cancellation))
+        self._playback_task = task
+        self._failure_reason = None
+        log_feature("AudioTest", "playback", "playback_started", level=logging.INFO)
+        try:
+            await task
+            log_feature("AudioTest", "playback", "playback_completed", level=logging.INFO)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            self._failure_reason = "playback_failed"
+            log_feature("AudioTest", "playback", "playback_failed", error=error)
+            raise
+        finally:
+            if self._playback_task is task:
+                self._playback_task = None
+                self._playback_cancel = None
+
+    async def stop_playback(self) -> None:
+        if self._playback_cancel is not None:
+            self._playback_cancel.set()
+        if self._playback_task is not None:
+            await asyncio.gather(self._playback_task, return_exceptions=True)
+
+    async def clear_recording(self) -> None:
+        await self.stop_playback()
+        if self._recording is not None:
+            self._recording.clear()
+        self._recording = None
 
     async def close(self) -> None:
         self._closed = True
+        await self.clear_recording()
         async with self._lock():
             self._state = "stopping"
             if self._readiness is not None and not self._readiness.done():
@@ -314,6 +390,8 @@ class MicrophoneTestSessionOwner:
                 ),
                 ready_callback=self.mark_ready,
                 failure_callback=self.mark_failure,
+                frame_callback=self._recording.append if self._recording is not None else None,
+                opened_callback=self._set_recording_device if self._recording is not None else None,
             )
             await self.capture_port.capture(capture_request, runtime=self.runtime)
         except asyncio.CancelledError:
@@ -327,6 +405,10 @@ class MicrophoneTestSessionOwner:
             )
         finally:
             self._end_session(generation)
+
+    def _set_recording_device(self, metadata: dict) -> None:
+        if self._recording is not None:
+            self._recording.device = dict(metadata)
 
     async def _recover_before_start(self, runtime: MicTestRuntime) -> bool:
         if runtime.has_active_direct_capture:

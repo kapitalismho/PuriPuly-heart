@@ -229,6 +229,7 @@ Installer_output/
 refactoring/
 .tmp/
 /scripts/*
+!/scripts/preview/
 !/scripts/bench_*.py
 !/scripts/ci/
 /scripts/ci/*

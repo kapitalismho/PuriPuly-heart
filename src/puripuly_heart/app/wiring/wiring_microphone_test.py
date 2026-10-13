@@ -4,6 +4,7 @@ import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 
+from puripuly_heart.app.adapters.audio_test_playback import play_recording
 from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestCapturePort,
     MicrophoneTestCaptureRequest,
@@ -89,6 +90,7 @@ class MicrophoneTestRuntime:
                 disable_self_capture=self.disable_self_capture,
                 log_sink=self.log_sink,
                 diagnostics_sink=self.on_diagnostic,
+                playback=play_recording,
             )
             self._owner = owner
         return owner
@@ -127,6 +129,7 @@ class MicrophoneTestRuntime:
         *,
         meter_callback: Callable[[float], object] | None,
         level_log_interval_s: float,
+        recording_seconds: float | None = None,
     ) -> bool:
         signature = self.audio_signature(self.audio_provider())
         if signature is None:
@@ -136,6 +139,8 @@ class MicrophoneTestRuntime:
                 audio_signature=signature,
                 meter_callback=meter_callback,
                 level_log_interval_s=level_log_interval_s,
+                recording_seconds=recording_seconds,
+                target_sample_rate=self.audio_provider().internal_sample_rate_hz,
             )
         )
 
@@ -146,6 +151,17 @@ class MicrophoneTestRuntime:
     async def close(self) -> None:
         if self._owner is not None:
             await self._owner.close()
+
+    async def play_recording(self, *, processed=False) -> None:
+        await self.owner().play_recording(processed=processed)
+
+    async def stop_playback(self) -> None:
+        if self._owner is not None:
+            await self._owner.stop_playback()
+
+    async def clear_recording(self) -> None:
+        if self._owner is not None:
+            await self._owner.clear_recording()
 
     def capture_port(self) -> MicrophoneTestCapturePort:
         return create_microphone_test_capture_adapter(

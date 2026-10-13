@@ -11,7 +11,22 @@ MODELS_DIRNAME = "models"
 HTTP_EXTENSIONS_DIRNAME = "http_extensions"
 
 
+def test_profile_name() -> str | None:
+    profile = os.getenv("PURIPULY_HEART_TEST_PROFILE")
+    if not profile:
+        return None
+    if not profile.isascii() or not profile.replace("-", "").isalnum() or len(profile) > 64:
+        raise ValueError("Invalid test profile name")
+    return profile
+
+
 def user_config_dir(*, app_dir_name: str = APP_DIR_NAME) -> Path:
+    profile = test_profile_name()
+    if profile is not None:
+        directory = os.getenv("PURIPULY_HEART_TEST_DATA_DIR")
+        if not directory or not Path(directory).is_absolute():
+            raise ValueError("Test profile requires an absolute isolated data directory")
+        return Path(directory)
     if sys.platform.startswith("win"):
         base = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
         if base:

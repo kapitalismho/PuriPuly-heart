@@ -197,6 +197,15 @@ class DashboardView(ft.Column):
     def stt_button(self) -> ft.Control:
         return self._capture_controls.self_capture_control()
 
+    def bind_quick_window_toggle(self, callback):
+        self.display_card.on_quick_toggle = callback
+
+    def set_quick_window_visible(self, visible):
+        from puripuly_heart.ui.flet_runtime import update_control_if_mounted
+
+        self.display_card.quick_toggle.value = bool(visible)
+        update_control_if_mounted(self.display_card.quick_toggle)
+
     @property
     def peer_button(self) -> ft.Control:
         return self._capture_controls.peer_capture_control()
