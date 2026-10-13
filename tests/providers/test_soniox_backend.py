@@ -1285,7 +1285,6 @@ async def test_soniox_session_local_server_preserves_finalize_and_remote_close()
         assert config["audio_format"] == "pcm_s16le"
         assert config["sample_rate"] == 16000
         assert config["num_channels"] == 1
-        assert config["enable_endpoint_detection"] is False
         assert config["language_hints"] == ["en"]
         assert config["context"] == {"terms": ["PuriPuly"]}
     assert wire_events.count(("audio", 3)) == 2

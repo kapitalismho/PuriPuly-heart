@@ -88,13 +88,20 @@ async def _complete_native_turn(
     member: STTProviderName, session: object, boundary: object, text: str
 ) -> None:
     if member is STTProviderName.DEEPGRAM:
-        session._build_transcript_event(_deepgram_result(text, from_finalize=True))
+        duration = 1 / session.sample_rate_hz
+        start = session._sent_samples / session.sample_rate_hz - duration
+        session._build_transcript_event(
+            _deepgram_result(text, from_finalize=True, start=start, duration=duration)
+        )
         await asyncio.sleep(0)
         return
     if member is STTProviderName.GEMINI_TRANSCRIBE:
         boundary.push(_gemini_message(final=text))
         return
     if member is STTProviderName.SONIOX:
+        await _wait(
+            lambda: session._written_manual_target == session._event_projection.active_identity
+        )
         boundary.push(
             json.dumps(
                 {
@@ -106,9 +113,17 @@ async def _complete_native_turn(
             )
         )
         return
-    from elevenlabs.types import CommittedTranscriptPayload
+    from elevenlabs.types import CommittedTranscriptWithTimestampsPayload, TranscriptionWord
 
-    session._on_committed(CommittedTranscriptPayload(text=text))
+    end = session._sent_samples / session.sample_rate_hz
+    words = (
+        [TranscriptionWord(text=text, type="word", start=end - 1 / session.sample_rate_hz, end=end)]
+        if text
+        else []
+    )
+    session._on_committed_with_timestamps(
+        CommittedTranscriptWithTimestampsPayload(text=text, words=words)
+    )
 
 
 @pytest.mark.asyncio
@@ -602,6 +617,8 @@ async def test_common_idle_close_defers_real_soniox_route_until_source_quiet() -
     assert prepared.opens == 1
     now = 360.0
     await sleeper.release_next()
+    await _wait(lambda: session._stopped)
+    socket.push(json.dumps({"tokens": [], "finished": True}))
     await _wait(lambda: socket.closed)
     assert prepared.opens == 1
     assert len([event for event in emitted if isinstance(event, STTProviderTurnTerminal)]) == 1
@@ -675,7 +692,12 @@ async def test_peer_production_dispatch_blocks_queued_b_before_soniox_a_terminal
     )
 
     terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
-    assert [terminal.text for terminal in terminals] == ["a", "b"]
+    assert [terminal.text for terminal in terminals] == ["a", ""]
+    units = [event for event in emitted if isinstance(event, STTRecognitionUnitTerminal)]
+    assert [event.unit.text for event in units] == ["b"]
+    assert (
+        units[0].unit.identity.stream.provider_epoch_id == terminals[0].identity.provider_epoch_id
+    )
     assert terminals[0].identity.provider_epoch_id == terminals[1].identity.provider_epoch_id
     assert prepared.opens == 1
     await dispatch.finish()

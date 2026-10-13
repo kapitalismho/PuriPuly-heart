@@ -190,7 +190,7 @@ class SonioxRealtimeSTTBackend(STTBackend):
     enable_speaker_diarization: bool = True
     language_hints_strict: bool = False
     connect_timeout_s: float = 5.0
-    enable_endpoint_detection: bool = False
+    enable_endpoint_detection: bool = True
 
     async def open_session(
         self,
@@ -337,7 +337,7 @@ class _SonioxSession(STTBackendSession):
     enable_language_identification: bool = False
     enable_speaker_diarization: bool = True
     language_hints_strict: bool = False
-    enable_endpoint_detection: bool = False
+    enable_endpoint_detection: bool = True
     projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
     max_session_age_s: ClassVar[float] = SONIOX_MAX_SESSION_AGE_S
     allows_stream_owned_units: ClassVar[bool] = True

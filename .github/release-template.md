@@ -15,7 +15,7 @@ Download `{{INSTALLER_EXE}}` from the Assets section below, then run it.
 - Soniox speech recognition and API-key verification now authenticate when opening the WebSocket connection. Update before **January 15, 2027**, when Soniox will reject older builds that authenticate only in the first configuration message. Existing API keys continue to work; no key reissuance or settings change is required.
 - Soniox's concurrent-connection limit now uses the existing bounded recovery policy.
 - Peer streaming recognition can release complete finalized source before the enclosing audio ends, using Nemotron evidence where provider timing is supported. Unsupported timing keeps normal text with unavailable attribution; native provider speaker IDs are not a fallback.
-- Streaming source admission preserves exact text and distinct repeated contributions across early prefixes, manual completion and late tails. Soniox automatic endpointing and replay-prefix trimming remain OFF by default.
+- Streaming source admission preserves exact text and distinct repeated contributions across early prefixes, manual completion and late tails. Soniox automatic endpointing is now ON by default for earlier finalized source, alongside the existing application-owned completion controls. Replay-prefix trimming remains OFF.
 
 ---
 **If PuriPuly has made your world a bit wider,

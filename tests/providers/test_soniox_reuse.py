@@ -642,8 +642,9 @@ async def test_soniox_native_ids_cannot_change_scoped_source_composition() -> No
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("endpointing", [False, True])
-async def test_soniox_local_wire_dual_control_and_stop_tail_smoke(endpointing: bool) -> None:
+@pytest.mark.parametrize("explicit_off", [False, True])
+async def test_soniox_local_wire_dual_control_and_stop_tail_smoke(explicit_off: bool) -> None:
+    endpointing = not explicit_off
     wire = []
     synthetic = []
 
@@ -700,7 +701,7 @@ async def test_soniox_local_wire_dual_control_and_stop_tail_smoke(endpointing: b
             api_key="local-smoke",
             language_hints=["en"],
             endpoint=f"ws://{host}:{port}",
-            enable_endpoint_detection=endpointing,
+            **({"enable_endpoint_detection": False} if explicit_off else {}),
             enable_speaker_diarization=False,
         )
         session = await backend.open_session(
@@ -744,13 +745,6 @@ async def test_soniox_local_wire_dual_control_and_stop_tail_smoke(endpointing: b
         await session.close()
     assert synthetic == [3200]
     assert wire[1:] == [("audio", 3200), ("audio", 6400), {"type": "finalize"}, "stop"]
-
-
-def test_soniox_automatic_endpointing_remains_opt_in() -> None:
-    assert (
-        SonioxRealtimeSTTBackend(api_key="k", language_hints=["en"]).enable_endpoint_detection
-        is False
-    )
 
 
 @pytest.mark.asyncio
