@@ -231,7 +231,10 @@ try {
             "/O$InstallerOutputDir",
             (Join-Path $repoRoot "installer.iss")
         )
-        Invoke-Checked -FilePath $ToolPython -ArgumentList @("-c", $metadataCheck, $appVersion, $installerPath)
+        Invoke-Checked -FilePath $ToolPython -ArgumentList @(
+            "-c", "import sys; from pathlib import Path; from puripuly_heart.release_evidence.release_identity import verify_pe_product_metadata; verify_pe_product_metadata(Path(sys.argv[2]), expected_version=sys.argv[1], inno=True)",
+            $appVersion, $installerPath
+        )
         $hash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
         Write-Host "Native installer: $installerPath"
         Write-Host "SHA256: $hash"

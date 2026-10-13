@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import os
+import shutil
 import struct
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -280,3 +284,94 @@ def test_project_text_version_matches_canonical_parameter_in_every_table(tmp_pat
     )
     with pytest.raises(RuntimeError, match="ProductVersion mismatch"):
         signing.unsigned_record(executable, VERSION)
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell caller requires pwsh")
+@pytest.mark.parametrize(
+    "mode,padded_outer,padded_host,passes",
+    [
+        ("outer", True, False, True),
+        ("outer", False, False, False),
+        ("project", True, False, True),
+        ("project", True, True, False),
+    ],
+)
+def test_local_release_metadata_callers_select_exact_target_profile(
+    tmp_path, mode, padded_outer, padded_host, passes
+):
+    root = Path(__file__).resolve().parents[2]
+    inno_name, inno_version = signing.inno_product_metadata(VERSION)
+    for name in signing.COMPONENTS[:-1]:
+        padded = padded_host and name == "PuriPulyHeart.exe"
+        write_versioned_pe(
+            tmp_path / name,
+            [
+                (
+                    1033,
+                    [
+                        (
+                            "000004b0",
+                            inno_name if padded else PRODUCT,
+                            inno_version if padded else VERSION,
+                        )
+                    ],
+                    (2, 8, 3, 0),
+                )
+            ],
+        )
+    outer = write_versioned_pe(
+        tmp_path / "Setup.exe",
+        [
+            (
+                1033,
+                [
+                    (
+                        "000004b0",
+                        inno_name if padded_outer else PRODUCT,
+                        inno_version if padded_outer else VERSION,
+                    )
+                ],
+                (2, 8, 3, 0),
+            )
+        ],
+    )
+    script = r"""
+$ErrorActionPreference = 'Stop'
+$ToolPython = $env:CALLER_PYTHON
+$appVersion = $env:CALLER_VERSION
+$installerPath = $env:CALLER_INSTALLER
+$OutputDir = $env:CALLER_PAYLOAD
+$hostExe = Join-Path $OutputDir 'PuriPulyHeart.exe'
+$tokens = $null
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($env:CALLER_SCRIPT, [ref]$tokens, [ref]$errors)
+if ($errors.Count) { throw ($errors | Out-String) }
+$invoke = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Invoke-Checked' }, $true)
+. ([scriptblock]::Create($invoke.Extent.Text))
+$assignment = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq '$metadataCheck' }, $true)
+. ([scriptblock]::Create($assignment.Extent.Text))
+$variable = if ($env:CALLER_MODE -eq 'outer') { '$installerPath' } else { '$hostExe' }
+$caller = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Invoke-Checked' -and $n.Extent.Text.Contains($variable) }, $true)
+. ([scriptblock]::Create($caller.Extent.Text))
+"""
+    result = subprocess.run(
+        ["pwsh", "-NoProfile", "-NonInteractive", "-Command", script],
+        env={
+            **os.environ,
+            "PYTHONPATH": str(root / "src"),
+            "CALLER_SCRIPT": str(root / "scripts/ci/build-native-release-artifacts.ps1"),
+            "CALLER_PYTHON": sys.executable,
+            "CALLER_VERSION": VERSION,
+            "CALLER_PAYLOAD": str(tmp_path),
+            "CALLER_INSTALLER": str(outer),
+            "CALLER_MODE": mode,
+        },
+        capture_output=True,
+        text=True,
+        errors="replace",
+        timeout=30,
+        check=False,
+    )
+    assert (result.returncode == 0) is passes, result.stdout + result.stderr
+    if not passes:
+        assert "ProductName mismatch" in result.stderr
