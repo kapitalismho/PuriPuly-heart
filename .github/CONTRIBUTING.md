@@ -30,6 +30,8 @@ The draft-release job installs the pinned `PYTHON_VERSION` before running releas
 
 SHA-256, Authenticode chain/publisher/timestamp, metadata, signed-byte handoff and provenance validation remain inside the pipeline. Durable Actions evidence links the tag, source SHA, workflow run and attempt, both uploaded artifact IDs and signing requests, validated outputs, and production draft asset ID/URL/digest. Candidate and evidence transfer between jobs uses returned artifact IDs. Required third-party licenses and corresponding-source bundles remain embedded in the installer.
 
+Release metadata follows the exact target-specific representation in [Code signing policy](../CODE_SIGNING.md#signing-scope): project executables are unpadded, while the stock Inno installer and uninstaller use their fixed-width fields. Both SignPath requests require canonical `version` and its derived `inno-version`; retain whitespace inside JSON values. Validate all PE version resources and retain their raw evidence rather than trimming or flattening metadata. Saved portal XML and live request parameters must match before the compatibility probe can be called successful; compiler/template verification must not be disabled to make metadata pass.
+
 Before creating a tag, commit matching versions in:
 
 - `pyproject.toml`

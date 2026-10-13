@@ -142,6 +142,7 @@ jobs:
           uv-version: ${{ env.UV_VERSION }}
           sync-args: --extra build
       - name: Require verified signing context and cutover authority
+        id: signing-context
         shell: pwsh
         timeout-minutes: 5
         env:
@@ -163,6 +164,9 @@ jobs:
             --ref "${{ github.ref }}" --workflow-ref "${{ github.workflow_ref }}" `
             --workflow-sha "${{ github.workflow_sha }}" --output "$env:SIGNING_EVIDENCE/context.json" @probe
           if ($LASTEXITCODE -ne 0) { throw "Signing context rejected." }
+          $context = Get-Content "$env:SIGNING_EVIDENCE/context.json" -Raw | ConvertFrom-Json
+          $innoVersionJson = ConvertTo-Json -InputObject $context.inno_version -Compress
+          "inno-version-json=$innoVersionJson" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
           ./scripts/ci/prepare-signing-trust.ps1 -TestSigning:($env:TEST_SIGNING -eq "true")
 
       - name: Cache pinned native inputs
@@ -285,6 +289,7 @@ jobs:
           output-artifact-directory: ${{ env.SIGNING_ROOT }}/signed-components
           parameters: |
             version: "${{ needs.verify-version.outputs.version }}"
+            inno-version: ${{ steps.signing-context.outputs.inno-version-json }}
 
       - name: Preserve component request evidence
         if: always()
@@ -335,6 +340,7 @@ jobs:
           output-artifact-directory: ${{ env.SIGNING_ROOT }}/signed-installer
           parameters: |
             version: "${{ needs.verify-version.outputs.version }}"
+            inno-version: ${{ steps.signing-context.outputs.inno-version-json }}
 
       - name: Preserve installer request evidence
         if: always()

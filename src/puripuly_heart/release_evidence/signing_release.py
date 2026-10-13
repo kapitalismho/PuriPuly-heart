@@ -20,9 +20,11 @@ from puripuly_heart.release_evidence.release_identity import (
     file_identity,
     installer_filename,
     verify_pe_product_metadata,
+    verify_product_metadata_records,
     verify_release_surface,
     write_provenance_file,
 )
+from puripuly_heart.release_evidence.windows_product_metadata import inno_product_metadata
 
 COMPONENTS = (
     "PuriPulyHeart.exe",
@@ -76,13 +78,14 @@ def payload_identity(path: Path) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def unsigned_record(path: Path, version: str) -> dict:
-    metadata = verify_pe_product_metadata(path, expected_version=version)
+def unsigned_record(path: Path, version: str, *, inno: bool = False) -> dict:
+    metadata = verify_pe_product_metadata(path, expected_version=version, inno=inno)
     return {
         **file_identity(path),
         "payload_sha256": payload_identity(path),
-        "product_name": metadata["ProductName"].strip(),
-        "product_version": metadata.get("ProductVersion", "").strip(),
+        "product_name": metadata["ProductName"],
+        "product_version": metadata["ProductVersion"],
+        "metadata_resources": metadata["version_resources"],
     }
 
 
@@ -139,7 +142,9 @@ def prepare(
         "script": file_identity(script),
         "cleanup": file_identity(cleanup),
         "uninstaller_filename": generated[0].name,
-        "targets": {p.name: unsigned_record(p, version) for p in files},
+        "targets": {
+            p.name: unsigned_record(p, version, inno=p.name == "uninstaller.exe") for p in files
+        },
         "payload": tree_identity(payload),
     }
     write_provenance_file(root / "prepared.json", record)
@@ -156,10 +161,8 @@ def tree_identity(root: Path) -> dict:
     return result
 
 
-def verify_signature(path: Path, version: str) -> dict:
-    metadata = verify_pe_product_metadata(path, expected_version=version)
-    if metadata.get("ProductVersion", "").strip() not in (version, f"{version}.0"):
-        raise RuntimeError(f"Text ProductVersion mismatch in {path.name}")
+def verify_signature(path: Path, version: str, *, inno: bool = False) -> dict:
+    metadata = verify_pe_product_metadata(path, expected_version=version, inno=inno)
     script = Path(__file__).resolve().parents[3] / "scripts" / "ci" / "verify-authenticode.ps1"
     result = subprocess.run(
         ["pwsh", "-NoProfile", "-File", str(script), "-FilePath", str(path)],
@@ -177,17 +180,18 @@ def verify_signature(path: Path, version: str) -> dict:
     return {
         **file_identity(path),
         "payload_sha256": payload_identity(path),
-        "product_name": metadata["ProductName"].strip(),
-        "product_version": metadata.get("ProductVersion", "").strip(),
+        "product_name": metadata["ProductName"],
+        "product_version": metadata["ProductVersion"],
+        "metadata_resources": metadata["version_resources"],
         "signature": signature,
     }
 
 
-def validate_result(directory: Path, expected: dict, version: str) -> dict:
+def validate_result(directory: Path, expected: dict, version: str, *, inno: bool = False) -> dict:
     paths = exact_files(directory, tuple(expected))
     validated = {}
     for path in paths:
-        target = verify_signature(path, version)
+        target = verify_signature(path, version, inno=inno or path.name == "uninstaller.exe")
         if target["payload_sha256"] != expected[path.name]["payload_sha256"]:
             raise RuntimeError(f"Signing changed the submitted payload: {path.name}")
         validated[path.name] = target
@@ -267,7 +271,10 @@ def rebuild(
     if tree_identity(handoff) != expected_tree:
         raise RuntimeError("Compiler changed the signed payload")
     installer = exact_files(output, [installer_filename(version)])[0]
-    record = {"version": version, "targets": {installer.name: unsigned_record(installer, version)}}
+    record = {
+        "version": version,
+        "targets": {installer.name: unsigned_record(installer, version, inno=True)},
+    }
     write_provenance_file(root / "installer-candidate.json", record)
     write_provenance_file(
         root / "rebuild-inputs.json",
@@ -290,7 +297,7 @@ def validate_installed(directory: Path, components: dict, version: str) -> dict:
     paths["uninstaller.exe"] = uninstallers[0]
     result = {}
     for name, path in paths.items():
-        verified = verify_signature(path, version)
+        verified = verify_signature(path, version, inno=name == "uninstaller.exe")
         if any(verified[key] != components[name][key] for key in ("size", "sha256")):
             raise RuntimeError(f"Installed signed-byte mismatch: {name}")
         result[name] = {**verified, "installed_filename": path.name}
@@ -303,7 +310,9 @@ def validate_installer(version: str, root: Path) -> dict:
         raise RuntimeError("Installer candidate version mismatch")
     record = {
         "version": version,
-        "targets": validate_result(root / "signed-installer", expected["targets"], version),
+        "targets": validate_result(
+            root / "signed-installer", expected["targets"], version, inno=True
+        ),
     }
     write_provenance_file(root / "validated-installer.json", record)
     return record
@@ -347,6 +356,7 @@ def verify_context(
         "root_sha256": os.environ["SIGNPATH_EXPECTED_ROOT_SHA256"].lower(),
         "approved_origin": approved_origin if not test else None,
         "production_ready": not test,
+        "inno_version": inno_product_metadata(version)[1],
     }
 
 
@@ -378,7 +388,7 @@ def validate_request(
         "status": "Completed",
         "workflowStatus": "Completed",
         "isFinalStatus": True,
-        "parameters": {"version": version},
+        "parameters": {"version": version, "inno-version": inno_product_metadata(version)[1]},
         "webLink": request.get("request_url"),
     }
     for field, value in expected.items():
@@ -444,6 +454,8 @@ def validate_provenance(
         or provenance.get("policy") != context.get("policy")
     ):
         raise RuntimeError("Signing source/ref provenance mismatch")
+    if context.get("inno_version") != inno_product_metadata(version)[1]:
+        raise RuntimeError("Inno metadata parameter provenance mismatch")
     workflow = provenance.get("workflow", {})
     if (
         provenance.get("build_origin") != HOSTED_ORIGIN
@@ -491,11 +503,15 @@ def validate_provenance(
                 or not signature.get("wintrust")
             ):
                 raise RuntimeError("Unsigned, unexpected or incomplete signature evidence")
-            if target.get("product_name") != "PuriPuly <3" or target.get("product_version") not in (
-                version,
-                f"{version}.0",
+            inno = group == "installer" or name == "uninstaller.exe"
+            metadata = verify_product_metadata_records(
+                target.get("metadata_resources"), expected_version=version, inno=inno
+            )
+            if (
+                metadata["ProductName"] != target["product_name"]
+                or metadata["ProductVersion"] != target["product_version"]
             ):
-                raise RuntimeError("Signing product metadata mismatch")
+                raise RuntimeError("Signing metadata summary disagrees with its resource evidence")
             comparison = (
                 validation["components"] if group == "installed" else submitted.get(group, {})
             )

@@ -102,7 +102,7 @@ def _decode_ver_bytes(raw: object) -> str:
         return data.decode("latin1").rstrip("\x00")
 
 
-def read_pe_product_metadata(exe_path: Path) -> dict[str, str]:
+def read_pe_product_metadata(exe_path: Path) -> list[dict[str, object]]:
     resolved = Path(exe_path).resolve()
     if not resolved.is_file():
         raise RuntimeError(f"PE file not found: {exe_path}")
@@ -115,38 +115,103 @@ def read_pe_product_metadata(exe_path: Path) -> dict[str, str]:
     except Exception as exc:
         raise RuntimeError(f"pefile probe failed for {resolved}: {exc}") from exc
     try:
-        try:
-            pe.parse_data_directories(
-                directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_RESOURCE"]]
-            )
-        except Exception as exc:
-            raise RuntimeError(f"pefile resource parse failed for {resolved}: {exc}") from exc
-        result: dict[str, str] = {}
-        for file_info in pe.FileInfo or []:
-            for entry in file_info:
-                if not hasattr(entry, "StringTable"):
-                    continue
-                for table in entry.StringTable:
-                    for key, value in table.entries.items():
-                        result[_decode_ver_bytes(key)] = _decode_ver_bytes(value)
-        try:
-            fixed = pe.VS_FIXEDFILEINFO[0]
-            filevers = (
+        pe.parse_data_directories(
+            directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_RESOURCE"]]
+        )
+        resources = []
+        directory = getattr(pe, "DIRECTORY_ENTRY_RESOURCE", None)
+        if directory is not None:
+            for kind in directory.entries:
+                if kind.id == pefile.RESOURCE_TYPE["RT_VERSION"]:
+                    for resource in kind.directory.entries:
+                        for language in resource.directory.entries:
+                            resource_id = (
+                                resource.id if resource.id is not None else str(resource.name)
+                            )
+                            resources.append((resource_id, language.id))
+        groups = getattr(pe, "FileInfo", [])
+        fixed_entries = getattr(pe, "VS_FIXEDFILEINFO", [])
+        if not resources or len(groups) != len(resources) or len(fixed_entries) != len(resources):
+            raise RuntimeError(f"Missing or malformed PE version resources: {exe_path}")
+        result = []
+        for (resource_id, language), group, fixed in zip(resources, groups, fixed_entries):
+            binary_file = (
                 f"{fixed.FileVersionMS >> 16}.{fixed.FileVersionMS & 0xFFFF}."
                 f"{fixed.FileVersionLS >> 16}.{fixed.FileVersionLS & 0xFFFF}"
             )
-            prodvers = (
+            binary_product = (
                 f"{fixed.ProductVersionMS >> 16}.{fixed.ProductVersionMS & 0xFFFF}."
                 f"{fixed.ProductVersionLS >> 16}.{fixed.ProductVersionLS & 0xFFFF}"
             )
-        except AttributeError, IndexError:
-            filevers = ""
-            prodvers = ""
-        result["__FileVersionBinary"] = filevers
-        result["__ProductVersionBinary"] = prodvers
+            count_before = len(result)
+            for entry in group:
+                for table in getattr(entry, "StringTable", []):
+                    result.append(
+                        {
+                            "resource_id": resource_id,
+                            "language": language,
+                            "translation": _decode_ver_bytes(table.LangID),
+                            "strings": {
+                                _decode_ver_bytes(key): _decode_ver_bytes(value)
+                                for key, value in table.entries.items()
+                            },
+                            "file_version_binary": binary_file,
+                            "product_version_binary": binary_product,
+                        }
+                    )
+            if len(result) == count_before:
+                raise RuntimeError(
+                    f"PE version resource {resource_id}/{language} contains no string tables"
+                )
+        if not result:
+            raise RuntimeError(f"PE version resources contain no string tables: {exe_path}")
         return result
     finally:
         pe.close()
+
+
+def verify_product_metadata_records(
+    records: list[dict[str, object]],
+    *,
+    expected_version: str,
+    expected_product: str = PRODUCT_NAME,
+    inno: bool = False,
+) -> dict[str, object]:
+    if not isinstance(records, list) or not records:
+        raise RuntimeError("Missing PE product metadata resource evidence")
+    numbers = version_tuple(expected_version)
+    expected_binary = ".".join(str(number) for number in numbers)
+    if inno:
+        from puripuly_heart.release_evidence.windows_product_metadata import inno_product_metadata
+
+        expected_product, text_version = inno_product_metadata(expected_version)
+        expected_text_versions = {text_version}
+    else:
+        expected_text_versions = {expected_version}
+    for record in records:
+        if not isinstance(record, dict) or not isinstance(record.get("strings"), dict):
+            raise RuntimeError("Malformed PE product metadata resource evidence")
+        strings = record.get("strings", {})
+        label = f"resource {record.get('resource_id')}/language {record.get('language')}/table {record.get('translation')}"
+        product = strings.get("ProductName", "")
+        if product != expected_product:
+            raise RuntimeError(
+                f"ProductName mismatch in {label}: expected {expected_product!r}, found {product!r}"
+            )
+        if record.get("product_version_binary") != expected_binary:
+            raise RuntimeError(f"binary ProductVersion mismatch in {label}")
+        text_version = strings.get("ProductVersion", "")
+        if text_version not in expected_text_versions:
+            raise RuntimeError(
+                f"ProductVersion mismatch in {label}: expected {expected_version!r}, found {text_version!r}"
+            )
+    first = records[0]
+    return {
+        **first["strings"],
+        "__FileVersionBinary": first["file_version_binary"],
+        "__ProductVersionBinary": first["product_version_binary"],
+        "version_resources": records,
+    }
 
 
 def verify_pe_product_metadata(
@@ -154,30 +219,14 @@ def verify_pe_product_metadata(
     *,
     expected_version: str,
     expected_product: str = PRODUCT_NAME,
-) -> dict[str, str]:
-    metadata = read_pe_product_metadata(exe_path)
-    product = metadata.get("ProductName", "").strip()
-    if product != expected_product:
-        raise RuntimeError(
-            f"ProductName mismatch in {exe_path}: expected {expected_product!r}, found {product!r}"
-        )
-    numbers = version_tuple(expected_version.strip())
-    expected_binary = f"{numbers[0]}.{numbers[1]}.{numbers[2]}.{numbers[3]}"
-    binary_product = metadata.get("__ProductVersionBinary", "").strip()
-    if binary_product:
-        if binary_product != expected_binary:
-            raise RuntimeError(
-                f"binary ProductVersion mismatch in {exe_path}: "
-                f"expected {expected_binary}, found {binary_product}"
-            )
-    else:
-        text_product = metadata.get("ProductVersion", "").strip()
-        if text_product not in {expected_version.strip(), expected_binary}:
-            raise RuntimeError(
-                f"ProductVersion mismatch in {exe_path}: "
-                f"expected {expected_version!r} ({expected_binary}), found {text_product!r}"
-            )
-    return metadata
+    inno: bool = False,
+) -> dict[str, object]:
+    return verify_product_metadata_records(
+        read_pe_product_metadata(exe_path),
+        expected_version=expected_version,
+        expected_product=expected_product,
+        inno=inno,
+    )
 
 
 def render_release_body(template_text: str, installer_exe: str) -> str:
