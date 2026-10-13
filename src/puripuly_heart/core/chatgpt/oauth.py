@@ -66,7 +66,9 @@ class ChatGptAuthError(RuntimeError):
         self.status_code = status_code
         self.diagnostics = diagnostics
         self.secondary_diagnostics = secondary_diagnostics[:4]
-        self.secondary_omitted_count = secondary_omitted_count + max(0, len(secondary_diagnostics) - 4)
+        self.secondary_omitted_count = secondary_omitted_count + max(
+            0, len(secondary_diagnostics) - 4
+        )
 
 
 class ChatGptReauthRequired(ChatGptAuthError):

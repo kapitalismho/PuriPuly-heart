@@ -116,7 +116,6 @@ async def test_replace_provider_reports_only_required_non_application(
         await owner.replace_provider(smooth_local=True)
 
 
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("desired_active", "expected_operation"),

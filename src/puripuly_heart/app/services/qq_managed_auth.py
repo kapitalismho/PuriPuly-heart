@@ -118,13 +118,19 @@ def _qq_exception_diagnostics(
     return _diagnostics(
         operation=phase,
         code=f"broker_{kind}" if phase == "broker_issue" and transport else code,
-        category="timeout"
-        if kind == "timeout"
-        else "network"
-        if transport
-        else "unknown"
-        if isinstance(exception, (TypeError, ValueError, KeyError, RuntimeError))
-        else DIAGNOSTIC_CATEGORY_TRANSACTION,
+        category=(
+            "timeout"
+            if kind == "timeout"
+            else (
+                "network"
+                if transport
+                else (
+                    "unknown"
+                    if isinstance(exception, (TypeError, ValueError, KeyError, RuntimeError))
+                    else DIAGNOSTIC_CATEGORY_TRANSACTION
+                )
+            )
+        ),
         fields=fields,
     )
 
@@ -204,12 +210,16 @@ class QqManagedAuthService:
                 emit_failure(
                     logging.getLogger(__name__),
                     result.diagnostics,
-                    severity="warning"
-                    if result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
-                    else "error",
-                    disposition="degraded"
-                    if result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
-                    else "failed",
+                    severity=(
+                        "warning"
+                        if result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
+                        else "error"
+                    ),
+                    disposition=(
+                        "degraded"
+                        if result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
+                        else "failed"
+                    ),
                 )
         for secondary in result.secondary_diagnostics:
             emit_failure(
@@ -569,11 +579,11 @@ class QqManagedAuthService:
                 causes += (
                     replace(
                         cause,
-                        cause_id=primary.diagnostic_id
-                        if primary is not None
-                        else causes[0].diagnostic_id
-                        if causes
-                        else cause.cause_id,
+                        cause_id=(
+                            primary.diagnostic_id
+                            if primary is not None
+                            else causes[0].diagnostic_id if causes else cause.cause_id
+                        ),
                     ),
                 )
         for cause in causes:
@@ -1329,17 +1339,19 @@ class QqManagedAuthService:
                 "restore_secret", exc, code="secret_restore_failed"
             )
         if not result.succeeded:
-            return False, sanitize_diagnostics(
-                result.diagnostics
-            ) if result.diagnostics is not None else _diagnostics(
-                operation="restore_secret",
-                code="secret_restore_failed",
-                category=DIAGNOSTIC_CATEGORY_TRANSACTION,
-                fields={
-                    "phase": "restore_secret",
-                    "secret_key": snapshot.key,
-                    "compensation_succeeded": False,
-                },
+            return False, (
+                sanitize_diagnostics(result.diagnostics)
+                if result.diagnostics is not None
+                else _diagnostics(
+                    operation="restore_secret",
+                    code="secret_restore_failed",
+                    category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                    fields={
+                        "phase": "restore_secret",
+                        "secret_key": snapshot.key,
+                        "compensation_succeeded": False,
+                    },
+                )
             )
         return True, None
 
@@ -1583,14 +1595,16 @@ def _broker_failure_result(
     if diagnostics is not None:
         diagnostics = replace(
             diagnostics,
-            code=f"broker_{network_kind}"
-            if network_kind in {"timeout", "proxy", "tls", "dns", "network"}
-            else diagnostics.code,
-            category="timeout"
-            if network_kind == "timeout"
-            else "network"
-            if network_kind in {"proxy", "tls", "dns", "network"}
-            else category,
+            code=(
+                f"broker_{network_kind}"
+                if network_kind in {"timeout", "proxy", "tls", "dns", "network"}
+                else diagnostics.code
+            ),
+            category=(
+                "timeout"
+                if network_kind == "timeout"
+                else "network" if network_kind in {"proxy", "tls", "dns", "network"} else category
+            ),
         )
     message_key = (
         f"qq_managed_auth.network_{network_kind}"

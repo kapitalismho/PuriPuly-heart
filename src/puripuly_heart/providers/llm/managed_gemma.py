@@ -24,9 +24,6 @@ from puripuly_heart.providers.llm.messages import build_translation_user_message
 logger = logging.getLogger(__name__)
 
 
-
-
-
 def _number(value: object) -> float:
     return float(value) if isinstance(value, int | float) else 0.0
 
@@ -44,7 +41,9 @@ def _response_text(payload: object) -> str:
         raise LLMResponseError("managed Gemma response was not an object", provider="managed_gemma")
     content = payload.get("content")
     if not isinstance(content, str) or not content.strip():
-        raise LLMResponseError("managed Gemma response contained empty content", provider="managed_gemma")
+        raise LLMResponseError(
+            "managed Gemma response contained empty content", provider="managed_gemma"
+        )
     return content.strip()
 
 
@@ -177,10 +176,14 @@ class HttpxManagedGemmaTransport:
                 "managed Gemma template response was not valid JSON", provider="managed_gemma"
             ) from exc
         if not isinstance(template_payload, dict):
-            raise LLMResponseError("managed Gemma template response was not an object", provider="managed_gemma")
+            raise LLMResponseError(
+                "managed Gemma template response was not an object", provider="managed_gemma"
+            )
         prompt = template_payload.get("prompt")
         if not isinstance(prompt, str) or not prompt:
-            raise LLMResponseError("managed Gemma template response did not contain a prompt", provider="managed_gemma")
+            raise LLMResponseError(
+                "managed Gemma template response did not contain a prompt", provider="managed_gemma"
+            )
         body: dict[str, object] = {
             "prompt": prompt,
             "stream": False,
@@ -253,7 +256,8 @@ class ManagedGemmaLLMProvider:
     ) -> Translation:
         if self._closed:
             raise LLMResponseError(
-                "managed Gemma provider is closed", provider="managed_gemma",
+                "managed Gemma provider is closed",
+                provider="managed_gemma",
                 diagnostic_category="lifecycle",
             )
         runtime_kwargs = {

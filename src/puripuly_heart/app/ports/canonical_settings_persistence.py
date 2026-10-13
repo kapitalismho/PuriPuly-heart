@@ -22,7 +22,9 @@ class CanonicalSettingsPersistenceError(RuntimeError):
         self.status = status
         self.diagnostics = diagnostics
         self.secondary_diagnostics = secondary_diagnostics[:4]
-        self.secondary_omitted_count = secondary_omitted_count + max(0, len(secondary_diagnostics) - 4)
+        self.secondary_omitted_count = secondary_omitted_count + max(
+            0, len(secondary_diagnostics) - 4
+        )
         super().__init__(message or status)
 
 

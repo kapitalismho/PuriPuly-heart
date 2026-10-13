@@ -275,8 +275,12 @@ class TranslationLatencyDiagnosticsOwner:
         return True
 
     def _emit_failure(
-        self, diagnostics: ErrorDiagnostics, *, severity: str = "error",
-        disposition: str = "failed", stage: str | None = None,
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
     ) -> None:
         if self.runtime_logging is not None:
             self.runtime_logging.emit_failure(
@@ -284,8 +288,11 @@ class TranslationLatencyDiagnosticsOwner:
             )
         else:
             emit_failure(
-                self.fallback_logger, diagnostics,
-                severity=severity, disposition=disposition, stage=stage,
+                self.fallback_logger,
+                diagnostics,
+                severity=severity,
+                disposition=disposition,
+                stage=stage,
             )
 
     def record_stt_event_loop_failure(
@@ -293,8 +300,11 @@ class TranslationLatencyDiagnosticsOwner:
         diagnostic: SttEventLoopFailureDiagnostic,
     ) -> None:
         provider, channel = (
-            self._stt_failure_context(diagnostic.provider, default_channel=diagnostic.default_channel)
-            if self.runtime_logging is not None else ("stt", diagnostic.default_channel)
+            self._stt_failure_context(
+                diagnostic.provider, default_channel=diagnostic.default_channel
+            )
+            if self.runtime_logging is not None
+            else ("stt", diagnostic.default_channel)
         )
         report = stt_failure_report(
             diagnostic.exception, provider=provider, operation="event_loop", channel=channel
@@ -339,7 +349,8 @@ class TranslationLatencyDiagnosticsOwner:
         report = replace(
             report,
             diagnostics=replace(
-                report.diagnostics, channel=diagnostic.channel,
+                report.diagnostics,
+                channel=diagnostic.channel,
                 turn_id=str(diagnostic.utterance_id) if diagnostic.utterance_id else None,
                 generation=diagnostic.turn_generation,
                 operation_id=diagnostic.operation_id,

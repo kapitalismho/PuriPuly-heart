@@ -120,13 +120,15 @@ class ChatGptAccountOwner:
             code = (
                 exc.code
                 if isinstance(exc, ChatGptAuthError)
-                else "timeout"
-                if isinstance(exc, TimeoutError)
-                else "loopback_unavailable"
-                if isinstance(exc, OSError) and self._phase == "loopback_bind"
-                else "network_error"
-                if isinstance(exc, httpx.HTTPError)
-                else "failed"
+                else (
+                    "timeout"
+                    if isinstance(exc, TimeoutError)
+                    else (
+                        "loopback_unavailable"
+                        if isinstance(exc, OSError) and self._phase == "loopback_bind"
+                        else "network_error" if isinstance(exc, httpx.HTTPError) else "failed"
+                    )
+                )
             )
             primary = (
                 exc.diagnostics if isinstance(exc, ChatGptAuthError) else None
@@ -134,15 +136,19 @@ class ChatGptAccountOwner:
                 component="chatgpt_account",
                 operation=self._phase,
                 code=f"chatgpt_{code}",
-                category="auth"
-                if isinstance(exc, ChatGptAuthError)
-                else "timeout"
-                if isinstance(exc, TimeoutError)
-                else "network"
-                if isinstance(exc, httpx.HTTPError)
-                else "lifecycle"
-                if isinstance(exc, OSError)
-                else "unknown",
+                category=(
+                    "auth"
+                    if isinstance(exc, ChatGptAuthError)
+                    else (
+                        "timeout"
+                        if isinstance(exc, TimeoutError)
+                        else (
+                            "network"
+                            if isinstance(exc, httpx.HTTPError)
+                            else "lifecycle" if isinstance(exc, OSError) else "unknown"
+                        )
+                    )
+                ),
                 visibility="basic",
                 content_policy="metadata_only",
                 status_code=exc.status_code if isinstance(exc, ChatGptAuthError) else None,
@@ -164,7 +170,9 @@ class ChatGptAccountOwner:
                 failure_code=code,
                 diagnostics=primary,
                 secondary_diagnostics=secondary,
-                secondary_omitted_count=exc.secondary_omitted_count if isinstance(exc, ChatGptAuthError) else 0,
+                secondary_omitted_count=(
+                    exc.secondary_omitted_count if isinstance(exc, ChatGptAuthError) else 0
+                ),
             )
 
     async def sign_out(self) -> ChatGptSignOutResult:

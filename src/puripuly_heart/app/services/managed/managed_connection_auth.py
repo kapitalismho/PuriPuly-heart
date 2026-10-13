@@ -396,9 +396,11 @@ class ManagedConnectionAuthService:
                             (
                                 replace(
                                     restoration_cause,
-                                    cause_id=clear_commit.diagnostics.diagnostic_id
-                                    if clear_commit.diagnostics is not None
-                                    else restoration_cause.cause_id,
+                                    cause_id=(
+                                        clear_commit.diagnostics.diagnostic_id
+                                        if clear_commit.diagnostics is not None
+                                        else restoration_cause.cause_id
+                                    ),
                                 ),
                             )
                             if restoration_cause is not None
@@ -1603,20 +1605,26 @@ def _delivery_ack_pending_result(
     return TransactionResult(
         status=TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
         message=message,
-        diagnostics=replace(
-            safe_cause,
-            fields={**fields, **safe_cause.fields},
-        )
-        if safe_cause is not None
-        else _metadata_diagnostics(
-            operation="clear_delivery_ack_token"
-            if ack_status == "token_clear_failed"
-            else "acknowledge_managed_key_delivery",
-            code="delivery_ack_token_clear_failed"
-            if ack_status == "token_clear_failed"
-            else "remote_delivery_ack_pending",
-            fields=fields,
-            exception=exception,
+        diagnostics=(
+            replace(
+                safe_cause,
+                fields={**fields, **safe_cause.fields},
+            )
+            if safe_cause is not None
+            else _metadata_diagnostics(
+                operation=(
+                    "clear_delivery_ack_token"
+                    if ack_status == "token_clear_failed"
+                    else "acknowledge_managed_key_delivery"
+                ),
+                code=(
+                    "delivery_ack_token_clear_failed"
+                    if ack_status == "token_clear_failed"
+                    else "remote_delivery_ack_pending"
+                ),
+                fields=fields,
+                exception=exception,
+            )
         ),
         secondary_diagnostics=secondary_diagnostics,
         secondary_omitted_count=secondary_omitted_count,

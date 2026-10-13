@@ -3171,7 +3171,8 @@ async def test_cancellation_after_dispatch_failure_remains_cancellation(
         assert not any(item.event.value == "failure" for item in diagnostics)
         evidence = [
             getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
-            for record in caplog.records if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
         ]
         assert any(
             item.code == "capture.peer.cleanup_failed"
@@ -3256,10 +3257,7 @@ async def test_unexpected_loop_completion_cleanup_failure_is_observable(
         with pytest.raises(OSError):
             await asyncio.wait_for(asyncio.shield(loop_task), timeout=1.0)
         await wait_until(
-            lambda: any(
-                hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
-                for record in caplog.records
-            )
+            lambda: any(hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE) for record in caplog.records)
         )
         assert owner.snapshot.state is PeerCaptureSessionState.STOPPED
         assert owner.snapshot.desired_active is False
@@ -3270,7 +3268,8 @@ async def test_unexpected_loop_completion_cleanup_failure_is_observable(
         assert provider.releases[-1] == ("drain", None)
         evidence = [
             getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
-            for record in caplog.records if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
         ]
         assert any(item.fields["exception_class"] == "OSError" for item in evidence)
         assert any(item.code == "capture.peer.cleanup_failed" for item in evidence)

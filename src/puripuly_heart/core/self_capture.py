@@ -178,7 +178,10 @@ class SelfCaptureProviderPort(Protocol):
     async def start_ingress(self) -> None: ...
 
     async def warmup(
-        self, *, operation_id: str | None = None, request_id: str | None = None,
+        self,
+        *,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> None: ...
 
     async def release(

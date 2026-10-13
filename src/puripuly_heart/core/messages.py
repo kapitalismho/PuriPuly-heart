@@ -222,7 +222,9 @@ class RuntimeApplyResult:
         excess = max(0, len(self.secondary_diagnostics) - 4)
         if excess:
             object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
-            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
+            object.__setattr__(
+                self, "secondary_omitted_count", self.secondary_omitted_count + excess
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,7 +239,9 @@ class TransactionResult:
         excess = max(0, len(self.secondary_diagnostics) - 4)
         if excess:
             object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
-            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
+            object.__setattr__(
+                self, "secondary_omitted_count", self.secondary_omitted_count + excess
+            )
 
 
 __all__ = [

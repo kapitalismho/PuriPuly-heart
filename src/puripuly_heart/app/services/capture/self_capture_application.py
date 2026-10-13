@@ -17,7 +17,9 @@ from puripuly_heart.core.self_capture import (
 class SelfCaptureRuntimeApplyError(RuntimeError):
     code = "self_stt_runtime_apply_not_converged"
 
-    def __init__(self, message: str, *, failure_diagnostics: ErrorDiagnostics | None = None) -> None:
+    def __init__(
+        self, message: str, *, failure_diagnostics: ErrorDiagnostics | None = None
+    ) -> None:
         self.failure_diagnostics = failure_diagnostics
         super().__init__(message)
 

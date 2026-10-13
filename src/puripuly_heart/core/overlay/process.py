@@ -158,7 +158,9 @@ class OverlayProcessManager:
     native_diagnostic_dropped: int | None = field(init=False, default=None)
     native_reliable_delivery_failures: int | None = field(init=False, default=None)
     _primary_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
-    _native_cleanup_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
+    _native_cleanup_diagnostics: ErrorDiagnostics | None = field(
+        init=False, default=None, repr=False
+    )
     _last_native_loss: tuple[object, ...] | None = field(init=False, default=None, repr=False)
     _last_native_status: tuple[object, ...] | None = field(init=False, default=None, repr=False)
     restart_scheduled: bool = field(init=False, default=False)
@@ -310,7 +312,10 @@ class OverlayProcessManager:
             )
 
     def _set_shutdown_failure(
-        self, cause: str, *, fields: dict[str, object] | None = None,
+        self,
+        cause: str,
+        *,
+        fields: dict[str, object] | None = None,
         diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         if self._shutdown_terminal_cause is None:
@@ -319,14 +324,41 @@ class OverlayProcessManager:
             self.failure_reason = cause
         if self._primary_diagnostics is None:
             self._primary_diagnostics = diagnostics or self._emit_failure(
-                cause, stage="cleanup" if self._shutdown_requested else "startup" if self._current_phase == "startup" else "connected",
-                fields={"exit_code": self._last_exit_code, "evidence_state": self.native_evidence_state, **(fields or {})},
+                cause,
+                stage=(
+                    "cleanup"
+                    if self._shutdown_requested
+                    else "startup" if self._current_phase == "startup" else "connected"
+                ),
+                fields={
+                    "exit_code": self._last_exit_code,
+                    "evidence_state": self.native_evidence_state,
+                    **(fields or {}),
+                },
             )
-        elif diagnostics is None and cause != self._primary_diagnostics.code and cause in {
-            "shutdown_cleanup_failed", "termination_unconfirmed", "shutdown_terminal_unavailable",
-            "shutdown_forced", "shutdown_not_acknowledged", "runtime_exit_nonzero",
-        }:
-            self._emit_failure(cause, stage="cleanup", fields={"exit_code": self._last_exit_code, "evidence_state": "incomplete", **(fields or {})}, cause=self._primary_diagnostics)
+        elif (
+            diagnostics is None
+            and cause != self._primary_diagnostics.code
+            and cause
+            in {
+                "shutdown_cleanup_failed",
+                "termination_unconfirmed",
+                "shutdown_terminal_unavailable",
+                "shutdown_forced",
+                "shutdown_not_acknowledged",
+                "runtime_exit_nonzero",
+            }
+        ):
+            self._emit_failure(
+                cause,
+                stage="cleanup",
+                fields={
+                    "exit_code": self._last_exit_code,
+                    "evidence_state": "incomplete",
+                    **(fields or {}),
+                },
+                cause=self._primary_diagnostics,
+            )
 
     def shutdown_receipt(self) -> dict[str, object]:
         stderr_evidence: list[dict[str, object]] = []
@@ -357,10 +389,16 @@ class OverlayProcessManager:
             "graceful_completed": self._shutdown_graceful_completed,
             "cleanup_succeeded": self._shutdown_cleanup_succeeded,
             "terminal_cause": self._shutdown_terminal_cause,
-            "primary_diagnostic_id": self._primary_diagnostics.diagnostic_id if self._primary_diagnostics else None,
+            "primary_diagnostic_id": (
+                self._primary_diagnostics.diagnostic_id if self._primary_diagnostics else None
+            ),
             "native_primary_failure_reason": self.native_primary_failure_reason,
             "native_cleanup_failure_reason": self.native_cleanup_failure_reason,
-            "native_cleanup_diagnostic_id": self._native_cleanup_diagnostics.diagnostic_id if self._native_cleanup_diagnostics else None,
+            "native_cleanup_diagnostic_id": (
+                self._native_cleanup_diagnostics.diagnostic_id
+                if self._native_cleanup_diagnostics
+                else None
+            ),
             "native_evidence_state": self.native_evidence_state,
             "native_diagnostic_dropped": self.native_diagnostic_dropped,
             "native_reliable_delivery_failures": self.native_reliable_delivery_failures,
@@ -648,7 +686,8 @@ class OverlayProcessManager:
                     else:
                         cause = "termination_unconfirmed"
                     self._set_shutdown_failure(
-                        cause, fields={"cleanup_stage": "process_terminate", **safe_exception_fields(exc)},
+                        cause,
+                        fields={"cleanup_stage": "process_terminate", **safe_exception_fields(exc)},
                     )
                     self.restart_scheduled = False
                     self._record_process(
@@ -686,7 +725,9 @@ class OverlayProcessManager:
             ):
                 self.native_evidence_state = "incomplete"
                 self._set_shutdown_failure(
-                    "shutdown_terminal_unavailable" if self._shutdown_acknowledged else "shutdown_not_acknowledged"
+                    "shutdown_terminal_unavailable"
+                    if self._shutdown_acknowledged
+                    else "shutdown_not_acknowledged"
                 )
             self._note_outer_exit_for_cleanup(process)
             self._detach_process_lifecycle_sink(process)
@@ -1024,7 +1065,11 @@ class OverlayProcessManager:
             "lifecycle_event",
             phase=self._current_phase,
             event_type=event_type,
-            failure_reason=safe_failure_reason(event.get("failure_reason")) if event.get("failure_reason") is not None else None,
+            failure_reason=(
+                safe_failure_reason(event.get("failure_reason"))
+                if event.get("failure_reason") is not None
+                else None
+            ),
             startup_phase=None,
         )
         if event_type == "overlay_trace":
@@ -1183,7 +1228,11 @@ class OverlayProcessManager:
             if status_projection != self._last_owner_status_projection:
                 self._last_owner_status_projection = status_projection
                 logger.log(
-                    logging.WARNING if event.get("classification") in {"terminal_failed", "pose_unavailable"} else logging.INFO,
+                    (
+                        logging.WARNING
+                        if event.get("classification") in {"terminal_failed", "pose_unavailable"}
+                        else logging.INFO
+                    ),
                     "[OverlayProcess] Presentation: overlay_instance_id=%s "
                     "runtime_generation=1 classification=%s revision=%s "
                     "primary_failure_reason=%s cleanup_failure_reason=%s "
@@ -1224,7 +1273,9 @@ class OverlayProcessManager:
             if wire_instance is not None and wire_instance != self.overlay_instance_id:
                 return "ignored"
             wire_generation = event.get("runtime_generation")
-            if wire_generation is not None and (type(wire_generation) is not int or wire_generation != 1):
+            if wire_generation is not None and (
+                type(wire_generation) is not int or wire_generation != 1
+            ):
                 return "ignored"
             if not trusted_process_event:
                 return "ignored"
@@ -1354,7 +1405,6 @@ class OverlayProcessManager:
                 "desktop_renderer",
                 **validated,
             )
-
 
     def _maybe_mark_desktop_cleanup_complete(self) -> None:
         if self._desktop_cleanup_complete or not self._shutdown_acknowledged:
@@ -1616,7 +1666,8 @@ class OverlayProcessManager:
                 self._shutdown_graceful_request = "failed"
                 self._record_process(
                     "graceful_shutdown_request_failed",
-                    cleanup_stage="cleanup", **safe_exception_fields(exc),
+                    cleanup_stage="cleanup",
+                    **safe_exception_fields(exc),
                 )
 
         self._record_process(
@@ -1672,7 +1723,8 @@ class OverlayProcessManager:
                         exit_code=self._last_exit_code,
                     )
                     self._shutdown_graceful_completed = (
-                        self._shutdown_complete_acknowledged and self._last_exit_code == 0
+                        self._shutdown_complete_acknowledged
+                        and self._last_exit_code == 0
                         and self._shutdown_terminal_cause is None
                     )
                     self._maybe_mark_desktop_cleanup_complete()
@@ -1784,7 +1836,12 @@ class OverlayProcessManager:
             failure_reason,
             fields={
                 **(safe_exception_fields(exception) if exception is not None else {}),
-                **({"winerror": self.startup_failure_evidence["win32_error"]} if self.startup_failure_evidence and type(self.startup_failure_evidence.get("win32_error")) is int else {}),
+                **(
+                    {"winerror": self.startup_failure_evidence["win32_error"]}
+                    if self.startup_failure_evidence
+                    and type(self.startup_failure_evidence.get("win32_error")) is int
+                    else {}
+                ),
             },
         )
         failure_reason = self.failure_reason or failure_reason
@@ -1994,7 +2051,8 @@ class OverlayProcessManager:
         except Exception as exc:
             self._shutdown_reader_cleanup = "failed"
             diagnostics = self._emit_failure(
-                "overlay_reader_cleanup_failed", stage="reader_cleanup",
+                "overlay_reader_cleanup_failed",
+                stage="reader_cleanup",
                 fields={"cleanup_stage": "reader_cleanup", **safe_exception_fields(exc)},
                 cause=self._primary_diagnostics,
             )
@@ -2020,7 +2078,9 @@ class OverlayProcessManager:
             if event.get("overlay_instance_id") not in (None, self.overlay_instance_id):
                 return
             wire_generation = event.get("runtime_generation")
-            if wire_generation is not None and (type(wire_generation) is not int or wire_generation != 1):
+            if wire_generation is not None and (
+                type(wire_generation) is not int or wire_generation != 1
+            ):
                 return
             safe_event = {
                 key: event[key]
@@ -2075,29 +2135,75 @@ class OverlayProcessManager:
         )
 
     def _emit_failure(
-        self, code: str, *, stage: str, fields: dict[str, object],
+        self,
+        code: str,
+        *,
+        stage: str,
+        fields: dict[str, object],
         cause: ErrorDiagnostics | None = None,
     ) -> ErrorDiagnostics:
         diagnostics = ErrorDiagnostics(
-            component="overlay_process", operation="process_lifecycle", code=code,
-            category="lifecycle", visibility="basic", content_policy="metadata_only",
-            status_code=None, retry_after_ms=None,
-            fields={key: value for key, value in {"overlay_instance_id": self.overlay_instance_id, **fields}.items() if value is not None},
+            component="overlay_process",
+            operation="process_lifecycle",
+            code=code,
+            category="lifecycle",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={
+                key: value
+                for key, value in {
+                    "overlay_instance_id": self.overlay_instance_id,
+                    **fields,
+                }.items()
+                if value is not None
+            },
             generation=self._trace_generation,
-            operation_id=cause.operation_id if cause is not None else self.operation_id if stage == "startup" or self._current_phase == "startup" else None,
-            request_id=cause.request_id if cause is not None else self.request_id if stage == "startup" or self._current_phase == "startup" else None,
+            operation_id=(
+                cause.operation_id
+                if cause is not None
+                else (
+                    self.operation_id
+                    if stage == "startup" or self._current_phase == "startup"
+                    else None
+                )
+            ),
+            request_id=(
+                cause.request_id
+                if cause is not None
+                else (
+                    self.request_id
+                    if stage == "startup" or self._current_phase == "startup"
+                    else None
+                )
+            ),
             cause_id=cause.diagnostic_id if cause else None,
         )
         emit_failure(
-            logger, diagnostics, stage=stage,
-            severity="info" if code == "stopped" else "warning" if code == "native_diagnostic_loss" else "error",
-            disposition="cancelled" if code == "stopped" else "degraded" if code == "native_diagnostic_loss" else "failed",
+            logger,
+            diagnostics,
+            stage=stage,
+            severity=(
+                "info"
+                if code == "stopped"
+                else "warning" if code == "native_diagnostic_loss" else "error"
+            ),
+            disposition=(
+                "cancelled"
+                if code == "stopped"
+                else "degraded" if code == "native_diagnostic_loss" else "failed"
+            ),
         )
         return diagnostics
 
     def _record_native_status(self, event: dict[str, object]) -> None:
         primary = event.get("primary_failure_reason")
-        if primary is None and "primary_failure_reason" not in event and event.get("type") in {"startup_error", "runtime_error"}:
+        if (
+            primary is None
+            and "primary_failure_reason" not in event
+            and event.get("type") in {"startup_error", "runtime_error"}
+        ):
             primary = event.get("failure_reason")
         cleanup = event.get("cleanup_failure_reason")
         if primary is not None and self.native_primary_failure_reason is None:
@@ -2112,7 +2218,12 @@ class OverlayProcessManager:
             if type(value) is int and 0 <= value < (1 << 63):
                 setattr(self, attribute, value)
         evidence = event.get("evidence_state")
-        if isinstance(evidence, str) and evidence in {"retained", "incomplete", "unavailable", "unknown"}:
+        if isinstance(evidence, str) and evidence in {
+            "retained",
+            "incomplete",
+            "unavailable",
+            "unknown",
+        }:
             self.native_evidence_state = evidence
         elif primary is not None or cleanup is not None:
             self.native_evidence_state = "retained"
@@ -2122,7 +2233,20 @@ class OverlayProcessManager:
             "evidence_state": self.native_evidence_state,
             "diagnostic_dropped": self.native_diagnostic_dropped,
             "reliable_delivery_failures": self.native_reliable_delivery_failures,
-            **{key: event[key] for key in ("exception_class", "cause_class_1", "cause_class_2", "cause_class_3", "cause_class_4", "errno", "winerror", "cleanup_stage") if key in event},
+            **{
+                key: event[key]
+                for key in (
+                    "exception_class",
+                    "cause_class_1",
+                    "cause_class_2",
+                    "cause_class_3",
+                    "cause_class_4",
+                    "errno",
+                    "winerror",
+                    "cleanup_stage",
+                )
+                if key in event
+            },
         }
         status_key = tuple(fields.values()) + (event.get("rejected_records"),)
         if status_key == self._last_native_status:
@@ -2131,24 +2255,42 @@ class OverlayProcessManager:
         self._record_process("native_status", **fields)
         if self.native_primary_failure_reason is not None and self._primary_diagnostics is None:
             self._primary_diagnostics = self._emit_failure(
-                self.native_primary_failure_reason, stage="native_terminal", fields=fields,
+                self.native_primary_failure_reason,
+                stage="native_terminal",
+                fields=fields,
             )
-        if self.native_cleanup_failure_reason is not None and self._native_cleanup_diagnostics is None:
+        if (
+            self.native_cleanup_failure_reason is not None
+            and self._native_cleanup_diagnostics is None
+        ):
             self._native_cleanup_diagnostics = self._emit_failure(
-                self.native_cleanup_failure_reason, stage="cleanup", fields=fields,
+                self.native_cleanup_failure_reason,
+                stage="cleanup",
+                fields=fields,
                 cause=self._primary_diagnostics,
             )
             if self._primary_diagnostics is None:
                 self._primary_diagnostics = self._native_cleanup_diagnostics
-        loss = (self.native_diagnostic_dropped, self.native_reliable_delivery_failures, event.get("rejected_records"))
-        if loss != self._last_native_loss and any(type(value) is int and value > 0 for value in loss):
+        loss = (
+            self.native_diagnostic_dropped,
+            self.native_reliable_delivery_failures,
+            event.get("rejected_records"),
+        )
+        if loss != self._last_native_loss and any(
+            type(value) is int and value > 0 for value in loss
+        ):
             first_loss = self._last_native_loss is None
             self._last_native_loss = loss
             self.native_evidence_state = "incomplete"
             if first_loss:
                 self._emit_failure(
-                    "native_diagnostic_loss", stage="native_diagnostic_delivery",
-                    fields={**fields, "rejected_records": event.get("rejected_records"), "evidence_state": "incomplete"},
+                    "native_diagnostic_loss",
+                    stage="native_diagnostic_delivery",
+                    fields={
+                        **fields,
+                        "rejected_records": event.get("rejected_records"),
+                        "evidence_state": "incomplete",
+                    },
                     cause=self._primary_diagnostics,
                 )
 

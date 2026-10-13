@@ -19,12 +19,17 @@ def _failures(caplog: pytest.LogCaptureFixture) -> list[dict[str, object]]:
         if failure is None:
             continue
         diagnostics, severity, disposition, stage, exception = failure
-        failures.append(normalize_diagnostic(
-            diagnostics, instance_id=None, severity=severity,
-            disposition=disposition, stage=stage, exception=exception,
-        ))
+        failures.append(
+            normalize_diagnostic(
+                diagnostics,
+                instance_id=None,
+                severity=severity,
+                disposition=disposition,
+                stage=stage,
+                exception=exception,
+            )
+        )
     return failures
-
 
 
 class FakeRuntimeLogging:
@@ -258,7 +263,9 @@ def test_queued_messages_do_not_expire_behind_long_pagination() -> None:
     assert sender.sent == ["ab", "cd", "ef", "gh", "ij", "ok"]
 
 
-def test_failed_page_is_dropped_without_retrying_or_blocking_later_pages(caplog: pytest.LogCaptureFixture) -> None:
+def test_failed_page_is_dropped_without_retrying_or_blocking_later_pages(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     clock = FakeClock()
     sender = SelectivelyFailingSender(fail_texts={"fghij"})
     runtime_logging = FakeRuntimeLogging()
@@ -304,7 +311,9 @@ def test_failed_page_is_dropped_without_retrying_or_blocking_later_pages(caplog:
     assert failure["severity"] == "warning"
 
 
-def test_send_immediate_failure_returns_false_and_logs_basic_warning(caplog: pytest.LogCaptureFixture) -> None:
+def test_send_immediate_failure_returns_false_and_logs_basic_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     clock = FakeClock()
     sender = FailingSender()
     runtime_logging = FakeRuntimeLogging()
@@ -319,14 +328,20 @@ def test_send_immediate_failure_returns_false_and_logs_basic_warning(caplog: pyt
     assert sent is False
     assert diagnostics is not None
     failure = normalize_diagnostic(
-        diagnostics, instance_id=None, severity="warning", disposition="degraded", stage="chatbox_page",
+        diagnostics,
+        instance_id=None,
+        severity="warning",
+        disposition="degraded",
+        stage="chatbox_page",
     )
     assert failure["code"] == "osc_local_send_failed"
     assert failure["fields"]["exception_class"] == "OSError"
     assert failure["severity"] == "warning"
 
 
-def test_typing_indicator_is_forwarded_and_failure_is_basic_log(caplog: pytest.LogCaptureFixture) -> None:
+def test_typing_indicator_is_forwarded_and_failure_is_basic_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     clock = FakeClock()
     sender = FakeSender()
     paginator = ChatboxPaginator(sender=sender, clock=clock)

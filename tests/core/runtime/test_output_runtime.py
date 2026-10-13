@@ -2310,11 +2310,16 @@ async def test_optional_observer_loss_does_not_change_local_publication_outcome(
         raise OSError(5, "forbidden-observer-body")
 
     chatbox = RecordingChatbox()
-    owner = _output_runtime_class()(chatbox=chatbox, routing_observer=observer, diagnostics_capacity=1)
+    owner = _output_runtime_class()(
+        chatbox=chatbox, routing_observer=observer, diagnostics_capacity=1
+    )
     publication_id = uuid4()
     result = await owner.publish_chatbox(
-        publication_id=publication_id, channel="self",
-        transcript_text="synthetic private text", translation_text=None, include_source=True,
+        publication_id=publication_id,
+        channel="self",
+        transcript_text="synthetic private text",
+        translation_text=None,
+        include_source=True,
     )
     assert result.decision.decision == "published"
     assert chatbox.messages[0].utterance_id == publication_id

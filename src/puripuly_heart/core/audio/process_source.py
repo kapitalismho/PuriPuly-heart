@@ -259,7 +259,8 @@ class ProcessAudioCaptureSource:
                 ).diagnostics,
                 component="capture.peer",
                 code=(
-                    "capture.peer.target_exited" if reason == "target_exited"
+                    "capture.peer.target_exited"
+                    if reason == "target_exited"
                     else "capture.peer.source_failure"
                 ),
             )
@@ -278,10 +279,13 @@ class ProcessAudioCaptureSource:
                     exc, provider="stt", channel="peer", operation="cleanup"
                 ).diagnostics
                 diagnostics = replace(
-                    diagnostics, component="capture.peer", code="capture.peer.cleanup_failed",
+                    diagnostics,
+                    component="capture.peer",
+                    code="capture.peer.cleanup_failed",
                     cause_id=(
                         self._terminal_diagnostics.diagnostic_id
-                        if self._terminal_diagnostics is not None else None
+                        if self._terminal_diagnostics is not None
+                        else None
                     ),
                     fields={**diagnostics.fields, "cleanup_confirmed": False},
                 )

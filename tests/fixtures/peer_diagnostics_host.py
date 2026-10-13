@@ -23,7 +23,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--ready-file", type=Path, required=True)
-    parser.add_argument("--failure-stage", choices=("provider_build", "provider_warmup"), required=True)
+    parser.add_argument(
+        "--failure-stage", choices=("provider_build", "provider_warmup"), required=True
+    )
     parser.add_argument("--failure-gate", type=Path, required=True)
     args = parser.parse_args()
 
@@ -55,8 +57,10 @@ def main() -> int:
             raise ConnectionError("PRIVATE_PEER_ADMISSION_CREATION")
         provider = await create_provider(self, request, **kwargs)
         if armed:
+
             async def fail_warmup(**identity):
                 raise TimeoutError("PRIVATE_PEER_ADMISSION_WARMUP")
+
             provider.backend_prepare = fail_warmup
         return provider
 
@@ -79,9 +83,15 @@ def main() -> int:
     PeerApplicationOwner.__init__ = initialize_peer_application
     SharedSTTProviderFactory.create = create
     PeerCaptureSessionOwner.__init__ = initialize_peer_capture
-    return application_main([
-        "run-headless", "--config", str(args.config), "--ready-file", str(args.ready_file),
-    ])
+    return application_main(
+        [
+            "run-headless",
+            "--config",
+            str(args.config),
+            "--ready-file",
+            str(args.ready_file),
+        ]
+    )
 
 
 if __name__ == "__main__":

@@ -90,7 +90,9 @@ def _unknown_peer_runtime_convergence(_settings: object) -> bool | None:
 class ProviderRuntimeConvergenceError(RuntimeError):
     code = "stt_runtime_apply_not_converged"
 
-    def __init__(self, message: str, *, failure_diagnostics: ErrorDiagnostics | None = None) -> None:
+    def __init__(
+        self, message: str, *, failure_diagnostics: ErrorDiagnostics | None = None
+    ) -> None:
         self.failure_diagnostics = failure_diagnostics
         super().__init__(message)
 
@@ -306,17 +308,19 @@ def _settings_mutation_diagnostics(
             "phase": (
                 "settings_save"
                 if code == "settings_save_failed"
-                else operation
-                if operation
-                in {
-                    "rollback",
-                    "commit_notification",
-                    "failure_notification",
-                    "compensate_local_asr",
-                    "resync_committed_runtime",
-                    "restore_memory",
-                }
-                else "runtime_apply"
+                else (
+                    operation
+                    if operation
+                    in {
+                        "rollback",
+                        "commit_notification",
+                        "failure_notification",
+                        "compensate_local_asr",
+                        "resync_committed_runtime",
+                        "restore_memory",
+                    }
+                    else "runtime_apply"
+                )
             ),
             **(safe_exception_fields(exception) if exception is not None else {}),
         },

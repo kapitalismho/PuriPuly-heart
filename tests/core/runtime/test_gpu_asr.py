@@ -180,17 +180,20 @@ class FakeGpuWorkerFactory:
         self.modes: list[GpuWorkerMode] = []
 
     async def start(
-        self, *, mode: GpuWorkerMode,
-        operation_id: str | None = None, request_id: str | None = None,
+        self,
+        *,
+        mode: GpuWorkerMode,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> FakeGpuWorkerClient:
         self.modes.append(mode)
         return self.clients.pop(0)
+
     async def close_pending_startups(self) -> None:
         return None
 
     def startup_cleanup_snapshot(self) -> dict[str, object]:
         return {"pending_startups": 0, "close_complete": True, "cleanup_failures": []}
-
 
 
 async def _activate(
@@ -1495,7 +1498,9 @@ async def test_membership_owner_is_idempotent_and_only_last_owner_cancels_work()
 
 @pytest.mark.parametrize("recovery", ["retry", "close"])
 async def test_activation_primary_survives_temporary_cleanup_debt(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
     recovery: str,
 ) -> None:
     denied = True
@@ -1519,13 +1524,18 @@ async def test_activation_primary_survives_temporary_cleanup_debt(
     diagnostics = []
     runtime = SharedGpuASRRuntime(process_factory=factory, diagnostic_sink=diagnostics.append)
     from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+
     operation_id, request_id = uuid4().hex, uuid4().hex
     try:
         with pytest.raises(GpuASRManualRetryRequired) as caught:
             await runtime.activate_channel(
-                "self", owner=_GPU_OWNERS["self"], model_path=tmp_path / "model.gguf",
-                model_id="qwen-gpu", device_id=DEVICE.device_id,
-                operation_id=operation_id, request_id=request_id,
+                "self",
+                owner=_GPU_OWNERS["self"],
+                model_path=tmp_path / "model.gguf",
+                model_id="qwen-gpu",
+                device_id=DEVICE.device_id,
+                operation_id=operation_id,
+                request_id=request_id,
             )
         assert caught.value.code == "out_of_memory"
         assert caught.value.__cause__ is primary
@@ -1538,11 +1548,14 @@ async def test_activation_primary_survives_temporary_cleanup_debt(
         assert runtime.last_failure_code == "out_of_memory"
         assert runtime.startup_cleanup_snapshot["pending_temporary_directories"] == 1
         assert runtime.startup_cleanup_snapshot["temporary_cleanup_diagnostic_id"] is not None
-        assert [event.fields["failure"] for event in diagnostics if event.kind == "activation_failed"] == ["out_of_memory"]
+        assert [
+            event.fields["failure"] for event in diagnostics if event.kind == "activation_failed"
+        ] == ["out_of_memory"]
         assert failed_client.is_closed
         secondary = next(
             getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
-            for record in caplog.records if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
             and getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0].diagnostic_id
             == runtime.startup_cleanup_snapshot["temporary_cleanup_diagnostic_id"]
         )

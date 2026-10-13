@@ -671,7 +671,10 @@ class ScopedRecognitionEngine:
                 self._stream_recovery = recovery
                 self._recovery_backoff_pending = True
             else:
-                self._notify_terminal_failure(self._episode_cause or self._failure_diagnostics(None, "provider_recovery_exhausted", "receive"))
+                self._notify_terminal_failure(
+                    self._episode_cause
+                    or self._failure_diagnostics(None, "provider_recovery_exhausted", "receive")
+                )
         return False
 
     async def handle_owned_vad_event(self, owned: object) -> None:
@@ -725,13 +728,20 @@ class ScopedRecognitionEngine:
         terminal = replace(
             terminal,
             failure_diagnostics=recognition_failure_diagnostics(
-                None, provider=owned.segment.settings.provider_id, channel=self.channel,
-                operation="turn_terminal", reason=reason, identity=identity,
+                None,
+                provider=owned.segment.settings.provider_id,
+                channel=self.channel,
+                operation="turn_terminal",
+                reason=reason,
+                identity=identity,
             ),
         )
         emit_failure(
-            logger, terminal.failure_diagnostics, severity="warning",
-            disposition="degraded", stage="turn_terminal",
+            logger,
+            terminal.failure_diagnostics,
+            severity="warning",
+            disposition="degraded",
+            stage="turn_terminal",
         )
         _log_recognition_terminal(
             identity,
@@ -787,8 +797,12 @@ class ScopedRecognitionEngine:
     ) -> None:
         self._authority_generation += 1
         if reason in {
-            "cancelled", "closed", "stopped", "toggle_off",
-            "stream_input_ownership_changed", "source_discontinuity",
+            "cancelled",
+            "closed",
+            "stopped",
+            "toggle_off",
+            "stream_input_ownership_changed",
+            "source_discontinuity",
         }:
             self._episode_cause = None
         self._stream_recovery = None
@@ -822,7 +836,10 @@ class ScopedRecognitionEngine:
                 self._retire_current_session()
 
     async def warmup(
-        self, *, operation_id: str | None = None, request_id: str | None = None,
+        self,
+        *,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> None:
         if self._closed or self._closing:
             raise RuntimeError("scoped recognition engine is closed")
@@ -830,7 +847,8 @@ class ScopedRecognitionEngine:
         if prepare is not None:
             result = (
                 prepare(operation_id=operation_id, request_id=request_id)
-                if operation_id is not None or request_id is not None else prepare()
+                if operation_id is not None or request_id is not None
+                else prepare()
             )
             if inspect.isawaitable(result):
                 await result
@@ -1317,8 +1335,11 @@ class ScopedRecognitionEngine:
                     session = task.result()
                 except PermanentSTTScopedSessionError as exc:
                     self._episode_cause = recognition_failure_diagnostics(
-                        exc, provider=settings.provider_id, channel=self.channel,
-                        operation="readiness", reason="provider_not_ready",
+                        exc,
+                        provider=settings.provider_id,
+                        channel=self.channel,
+                        operation="readiness",
+                        reason="provider_not_ready",
                     )
                     self._episode_cause = replace(
                         self._episode_cause,
@@ -1355,16 +1376,22 @@ class ScopedRecognitionEngine:
                     return
             if self._episode_cause is None and last_error is not None:
                 self._episode_cause = recognition_failure_diagnostics(
-                    last_error, provider=settings.provider_id, channel=self.channel,
-                    operation="readiness", reason="provider_not_ready",
+                    last_error,
+                    provider=settings.provider_id,
+                    channel=self.channel,
+                    operation="readiness",
+                    reason="provider_not_ready",
                 )
                 self._episode_cause = replace(
                     self._episode_cause,
                     fields={**self._episode_cause.fields, "provider_epoch_id": epoch_id},
                 )
                 emit_failure(
-                    logger, self._episode_cause, severity="warning",
-                    disposition="degraded", stage="readiness",
+                    logger,
+                    self._episode_cause,
+                    severity="warning",
+                    disposition="degraded",
+                    stage="readiness",
                 )
             if self._episode_failures < watchdogs.connect_attempts:
                 delay = min(
@@ -1455,11 +1482,17 @@ class ScopedRecognitionEngine:
                     )
                     if idle_failure:
                         native = self._failure_diagnostics(
-                            event.failure_diagnostics, event.reason or "provider_epoch_ended", "receive"
+                            event.failure_diagnostics,
+                            event.reason or "provider_epoch_ended",
+                            "receive",
                         )
                         self._episode_cause = self._episode_cause or native
                         emit_failure(
-                            logger, native, severity="warning", disposition="degraded", stage="receive"
+                            logger,
+                            native,
+                            severity="warning",
+                            disposition="degraded",
+                            stage="receive",
                         )
                     if (
                         idle_failure
@@ -1472,10 +1505,16 @@ class ScopedRecognitionEngine:
                             if self._episode_failures < self._session_watchdogs.connect_attempts:
                                 self._recovery_backoff_pending = True
                             else:
-                                self._notify_terminal_failure(self._episode_cause or self._failure_diagnostics(None, event.reason, "receive"))
+                                self._notify_terminal_failure(
+                                    self._episode_cause
+                                    or self._failure_diagnostics(None, event.reason, "receive")
+                                )
                         else:
                             self._episode_failures = self._session_watchdogs.connect_attempts
-                            self._notify_terminal_failure(self._episode_cause or self._failure_diagnostics(None, event.reason, "receive"))
+                            self._notify_terminal_failure(
+                                self._episode_cause
+                                or self._failure_diagnostics(None, event.reason, "receive")
+                            )
                     self._ended_provider_epoch_id = epoch_id
                     self._session_retirement_requested = True
                     for turn in tuple(self._turns.values()):
@@ -1558,7 +1597,8 @@ class ScopedRecognitionEngine:
                                 epoch_id,
                             )
                         await self._end_current_session(
-                            reason="provider_event_stream_failed", failed=True,
+                            reason="provider_event_stream_failed",
+                            failed=True,
                             failure_diagnostics=self._failure_diagnostics(
                                 exc, "provider_event_stream_failed", "receive"
                             ),
@@ -1585,12 +1625,16 @@ class ScopedRecognitionEngine:
                             self._recovery_backoff_pending = True
                         else:
                             self._notify_terminal_failure(
-                                self._failure_diagnostics(exc, "provider_event_stream_failed", "receive")
+                                self._failure_diagnostics(
+                                    exc, "provider_event_stream_failed", "receive"
+                                )
                             )
                     else:
                         self._episode_failures = self._session_watchdogs.connect_attempts
                         self._notify_terminal_failure(
-                            self._failure_diagnostics(exc, "provider_event_stream_failed", "receive")
+                            self._failure_diagnostics(
+                                exc, "provider_event_stream_failed", "receive"
+                            )
                         )
                 for turn in active:
                     self._set_turn_failure(
@@ -1666,7 +1710,9 @@ class ScopedRecognitionEngine:
         if task not in done:
             if self._has_write_authority(session, turn):
                 self._set_turn_failure(
-                    turn, f"provider_{operation}_timeout", failure_retryable=True,
+                    turn,
+                    f"provider_{operation}_timeout",
+                    failure_retryable=True,
                     operation=operation,
                 )
                 if turn.settings.provider_id == "soniox" or turn.independent_recognition:
@@ -1731,7 +1777,11 @@ class ScopedRecognitionEngine:
         if turn.independent_recognition:
             turn.terminal_ready.set_result(
                 STTProviderInputTerminal(
-                    turn.identity, "failed", self.channel, reason, "retire",
+                    turn.identity,
+                    "failed",
+                    self.channel,
+                    reason,
+                    "retire",
                     failure_diagnostics=diagnostics,
                 )
             )
@@ -1828,13 +1878,21 @@ class ScopedRecognitionEngine:
         if terminal.outcome in ("final", "empty", "submitted"):
             if self._episode_cause is not None:
                 recovered = recognition_failure_diagnostics(
-                    None, provider=turn.settings.provider_id, channel=self.channel,
-                    operation="recovery", reason="recovered", identity=turn.identity,
+                    None,
+                    provider=turn.settings.provider_id,
+                    channel=self.channel,
+                    operation="recovery",
+                    reason="recovered",
+                    identity=turn.identity,
                 )
                 emit_failure(
                     logger,
-                    replace(recovered, code="stt.recovered", cause_id=self._episode_cause.diagnostic_id),
-                    severity="info", disposition="recovered", stage="recovery",
+                    replace(
+                        recovered, code="stt.recovered", cause_id=self._episode_cause.diagnostic_id
+                    ),
+                    severity="info",
+                    disposition="recovered",
+                    stage="recovery",
                 )
                 self._episode_cause = None
             self._episode_failures = 0
@@ -1892,10 +1950,12 @@ class ScopedRecognitionEngine:
             ):
                 diagnostics = recognition_failure_diagnostics(
                     terminal.failure_diagnostics,
-                    provider=turn.settings.provider_id, channel=self.channel,
+                    provider=turn.settings.provider_id,
+                    channel=self.channel,
                     operation=(
                         terminal.failure_diagnostics.operation
-                        if terminal.failure_diagnostics is not None else "turn_terminal"
+                        if terminal.failure_diagnostics is not None
+                        else "turn_terminal"
                     ),
                     reason=terminal.failure_reason or terminal.outcome,
                     identity=turn.identity,
@@ -1906,27 +1966,38 @@ class ScopedRecognitionEngine:
                     diagnostics,
                     cause_id=(
                         first_cause.diagnostic_id
-                        if first_cause is not None and first_cause.diagnostic_id != diagnostics.diagnostic_id
+                        if first_cause is not None
+                        and first_cause.diagnostic_id != diagnostics.diagnostic_id
                         else diagnostics.cause_id
                     ),
                     fields={
-                        **diagnostics.fields, "outcome": terminal.outcome,
+                        **diagnostics.fields,
+                        "outcome": terminal.outcome,
                         "recovery_pending": terminal.recovery_pending,
                         "attempts": self._episode_failures,
                     },
                 )
                 terminal = replace(terminal, failure_diagnostics=diagnostics)
                 emit_failure(
-                    logger, diagnostics,
+                    logger,
+                    diagnostics,
                     severity=(
-                        "info" if terminal.failure_reason == "stream_input_ownership_changed"
-                        else "warning" if terminal.recovery_pending or terminal.outcome == "cancelled"
-                        else "error"
+                        "info"
+                        if terminal.failure_reason == "stream_input_ownership_changed"
+                        else (
+                            "warning"
+                            if terminal.recovery_pending or terminal.outcome == "cancelled"
+                            else "error"
+                        )
                     ),
                     disposition=(
-                        "superseded" if terminal.failure_reason == "stream_input_ownership_changed"
-                        else "cancelled" if terminal.outcome == "cancelled"
-                        else "degraded" if terminal.outcome == "degraded" else "failed"
+                        "superseded"
+                        if terminal.failure_reason == "stream_input_ownership_changed"
+                        else (
+                            "cancelled"
+                            if terminal.outcome == "cancelled"
+                            else "degraded" if terminal.outcome == "degraded" else "failed"
+                        )
                     ),
                     stage=diagnostics.operation,
                 )
@@ -1955,9 +2026,7 @@ class ScopedRecognitionEngine:
                 and not terminal.recovery_pending
                 and turn.authority_generation == self._authority_generation
             ):
-                self._notify_terminal_failure(
-                    terminal.failure_diagnostics
-                )
+                self._notify_terminal_failure(terminal.failure_diagnostics)
         if self._session_retirement_requested and not self._turns:
             self._retire_current_session(turn.watchdogs)
         self._schedule_lifetime_check()
@@ -2091,7 +2160,10 @@ class ScopedRecognitionEngine:
             and recovery is None
             and self._episode_failures >= watchdogs.connect_attempts
         ):
-            self._notify_terminal_failure(self._episode_cause or self._failure_diagnostics(None, "provider_recovery_exhausted", "receive"))
+            self._notify_terminal_failure(
+                self._episode_cause
+                or self._failure_diagnostics(None, "provider_recovery_exhausted", "receive")
+            )
 
     def _schedule_lifetime_check(self) -> None:
         opened_at = self._session_opened_at_s
@@ -2147,12 +2219,13 @@ class ScopedRecognitionEngine:
         if session is None:
             return
         if failed:
-            failure_diagnostics = self._failure_diagnostics(
-                failure_diagnostics, reason, "receive"
-            )
+            failure_diagnostics = self._failure_diagnostics(failure_diagnostics, reason, "receive")
             self._episode_cause = self._episode_cause or failure_diagnostics
             emit_failure(
-                logger, failure_diagnostics, severity="warning", disposition="degraded",
+                logger,
+                failure_diagnostics,
+                severity="warning",
+                disposition="degraded",
                 stage="receive",
             )
         turns = tuple(
@@ -2282,11 +2355,19 @@ class ScopedRecognitionEngine:
                     await result
             except Exception as exc:
                 diagnostics = recognition_failure_diagnostics(
-                    exc, provider=str(self._session_scope[0]) if self._session_scope else "stt",
-                    channel=self.channel, operation="event_loop", reason="provider_event_delivery_failed",
+                    exc,
+                    provider=str(self._session_scope[0]) if self._session_scope else "stt",
+                    channel=self.channel,
+                    operation="event_loop",
+                    reason="provider_event_delivery_failed",
                     identity=(
                         event.identity
-                        if isinstance(event, STTProviderTurnTerminal | STTProviderTurnUpdate | STTProviderInputTerminal)
+                        if isinstance(
+                            event,
+                            STTProviderTurnTerminal
+                            | STTProviderTurnUpdate
+                            | STTProviderInputTerminal,
+                        )
                         else None
                     ),
                 )
@@ -2426,7 +2507,9 @@ class ScopedRecognitionEngine:
                 cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
                 fields={**diagnostics.fields, "cleanup_confirmed": False},
             ),
-            severity="warning", disposition="degraded", stage="cleanup",
+            severity="warning",
+            disposition="degraded",
+            stage="cleanup",
         )
 
     def _observe_cleanup_task(self, task: asyncio.Future[object]) -> None:
@@ -2451,10 +2534,16 @@ class ScopedRecognitionEngine:
         )
         return replace(
             diagnostics,
-            generation=stream.activation_generation if stream is not None else diagnostics.generation,
+            generation=(
+                stream.activation_generation if stream is not None else diagnostics.generation
+            ),
             fields={
                 **diagnostics.fields,
-                **({"provider_epoch_id": self._provider_epoch_id} if self._provider_epoch_id else {}),
+                **(
+                    {"provider_epoch_id": self._provider_epoch_id}
+                    if self._provider_epoch_id
+                    else {}
+                ),
                 **({"capture_epoch": stream.capture_epoch} if stream is not None else {}),
             },
         )
@@ -2463,7 +2552,8 @@ class ScopedRecognitionEngine:
         if self._terminal_failure_notified:
             return
         diagnostics = (
-            failure if isinstance(failure, ErrorDiagnostics)
+            failure
+            if isinstance(failure, ErrorDiagnostics)
             else self._failure_diagnostics(failure, "provider_recovery_exhausted", "readiness")
         )
         first_cause = self._episode_cause or diagnostics
@@ -2473,20 +2563,29 @@ class ScopedRecognitionEngine:
         emit_failure(
             logger,
             replace(
-                exhausted, cause_id=first_cause.diagnostic_id,
-                category=first_cause.category, status_code=first_cause.status_code,
+                exhausted,
+                cause_id=first_cause.diagnostic_id,
+                category=first_cause.category,
+                status_code=first_cause.status_code,
                 channel=diagnostics.channel or first_cause.channel,
                 turn_id=diagnostics.turn_id,
-                generation=diagnostics.generation if diagnostics.generation is not None else first_cause.generation,
+                generation=(
+                    diagnostics.generation
+                    if diagnostics.generation is not None
+                    else first_cause.generation
+                ),
                 operation_id=diagnostics.operation_id,
                 request_id=diagnostics.request_id,
                 fields={
                     **exhausted.fields,
                     **{
-                        key: value for key, value in diagnostics.fields.items()
-                        if key in {"provider", "provider_epoch_id", "provider_turn_id", "capture_epoch"}
+                        key: value
+                        for key, value in diagnostics.fields.items()
+                        if key
+                        in {"provider", "provider_epoch_id", "provider_turn_id", "capture_epoch"}
                     },
-                    "attempts": self._episode_failures, "outcome": "failed",
+                    "attempts": self._episode_failures,
+                    "outcome": "failed",
                 },
             ),
             stage="recovery",
@@ -2511,21 +2610,31 @@ class ScopedRecognitionEngine:
             self._record_delivery_failure(exception)
 
     def _record_delivery_failure(
-        self, exception: BaseException, identity: STTProviderTurnIdentity | None = None,
+        self,
+        exception: BaseException,
+        identity: STTProviderTurnIdentity | None = None,
     ) -> None:
         diagnostics = self._failure_diagnostics(
             exception, "provider_event_delivery_failed", "event_loop"
         )
         if identity is not None:
             diagnostics = recognition_failure_diagnostics(
-                diagnostics, provider=str(self._session_scope[0]) if self._session_scope else "stt",
-                channel=self.channel, operation="event_loop",
-                reason="provider_event_delivery_failed", identity=identity,
+                diagnostics,
+                provider=str(self._session_scope[0]) if self._session_scope else "stt",
+                channel=self.channel,
+                operation="event_loop",
+                reason="provider_event_delivery_failed",
+                identity=identity,
             )
         emit_failure(
-            logger, replace(
-                diagnostics, cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None
-            ), severity="warning", disposition="degraded", stage="event_loop",
+            logger,
+            replace(
+                diagnostics,
+                cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
+            ),
+            severity="warning",
+            disposition="degraded",
+            stage="event_loop",
         )
 
     def _normalization_diagnostic(self, diagnostic: STTNormalizationDiagnostic) -> None:

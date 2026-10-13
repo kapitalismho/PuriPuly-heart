@@ -185,7 +185,11 @@ class OutputRouter:
                 publication_id=publication_id,
                 publication_kind=publication_kind,
                 reason=_DESTINATION_PUBLISH_FAILED_REASON,
-                metadata={**metadata, "error_type": safe_exception_fields(exc)["exception_class"], **safe_exception_fields(exc)},
+                metadata={
+                    **metadata,
+                    "error_type": safe_exception_fields(exc)["exception_class"],
+                    **safe_exception_fields(exc),
+                },
             )
         return await self._record_decision(
             status=OUTPUT_ROUTING_DECISION_PUBLISHED,
@@ -209,15 +213,36 @@ class OutputRouter:
         diagnostics = None
         if reason == _DESTINATION_PUBLISH_FAILED_REASON:
             diagnostics = ErrorDiagnostics(
-                component="output_runtime", operation="publish", code=reason,
-                category="lifecycle", visibility="basic", content_policy="metadata_only",
-                status_code=None, retry_after_ms=None,
+                component="output_runtime",
+                operation="publish",
+                code=reason,
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
                 fields={
-                    "destination": route, "publication_id": publication_id,
+                    "destination": route,
+                    "publication_id": publication_id,
                     "publication_kind": publication_kind,
-                    **{key: value for key, value in metadata.items() if key in {"exception_class", "errno", "winerror", "cause_class_1", "cause_class_2", "cause_class_3", "cause_class_4"}},
+                    **{
+                        key: value
+                        for key, value in metadata.items()
+                        if key
+                        in {
+                            "exception_class",
+                            "errno",
+                            "winerror",
+                            "cause_class_1",
+                            "cause_class_2",
+                            "cause_class_3",
+                            "cause_class_4",
+                        }
+                    },
                 },
-                channel=metadata.get("channel") if metadata.get("channel") in {"self", "peer"} else None,
+                channel=(
+                    metadata.get("channel") if metadata.get("channel") in {"self", "peer"} else None
+                ),
             )
             emit_failure(logger, diagnostics, disposition="degraded", stage="destination_delivery")
         decision = OutputRoutingDecision(
@@ -238,13 +263,21 @@ class OutputRouter:
                     emit_failure(
                         logger,
                         ErrorDiagnostics(
-                            component="output_runtime", operation="observe", code="output_observer_failed",
-                            category="lifecycle", visibility="diagnostic_only", content_policy="metadata_only",
-                            status_code=None, retry_after_ms=None,
+                            component="output_runtime",
+                            operation="observe",
+                            code="output_observer_failed",
+                            category="lifecycle",
+                            visibility="diagnostic_only",
+                            content_policy="metadata_only",
+                            status_code=None,
+                            retry_after_ms=None,
                             fields={"destination": route, "publication_id": publication_id},
                             cause_id=diagnostics.diagnostic_id if diagnostics else None,
                         ),
-                        severity="warning", disposition="degraded", stage="routing_observer", exception=exc,
+                        severity="warning",
+                        disposition="degraded",
+                        stage="routing_observer",
+                        exception=exc,
                     )
                 continue
         return decision

@@ -1343,8 +1343,11 @@ async def test_auth_login_keeps_other_existing_outcomes(
 
 
 @pytest.mark.asyncio
-async def test_settings_failure_is_joinable_after_event_retention_and_state_inspection(offline, monkeypatch):
+async def test_settings_failure_is_joinable_after_event_retention_and_state_inspection(
+    offline, monkeypatch
+):
     from uuid import uuid4
+
     monkeypatch.setenv("LOCALAPPDATA", str(offline.parent / "isolated-diagnostics-data"))
     app = compose_headless_application(offline)
     try:
@@ -1352,11 +1355,15 @@ async def test_settings_failure_is_joinable_after_event_retention_and_state_insp
         control = app.control()
         control.bind_instance(str(uuid4()))
         before = await control.query("settings.current", {})
+
         def denied(_self, *_args):
             raise PermissionError(13, "FORBIDDEN_SETTINGS_EXCEPTION_SENTINEL")
+
         monkeypatch.setattr(type(control.settings.persistence), "persist", denied)
         accepted = await control.submit(
-            "settings.apply", {"changes": {"locale": "ja"}}, request_id=uuid4().hex,
+            "settings.apply",
+            {"changes": {"locale": "ja"}},
+            request_id=uuid4().hex,
         )
         receipt = await control.wait(accepted["operation_id"], timeout=5)
         assert receipt["status"] == "persistence_failed"
@@ -1365,7 +1372,9 @@ async def test_settings_failure_is_joinable_after_event_retention_and_state_insp
         assert cause["operation_id"] == receipt["operation_id"]
         assert cause["instance_id"] == receipt["instance_id"]
         assert (await control.query("settings.current", {}))["revision"] == before["revision"]
-        retained = await control.query("diagnostics.history", {"operation_id": receipt["operation_id"]})
+        retained = await control.query(
+            "diagnostics.history", {"operation_id": receipt["operation_id"]}
+        )
         assert any(item["diagnostic_id"] == cause["diagnostic_id"] for item in retained["records"])
         stream = control.subscribe(topics=["logs", "operation"], after=0)
         async with asyncio.timeout(5):
@@ -1375,7 +1384,11 @@ async def test_settings_failure_is_joinable_after_event_retention_and_state_insp
                     assert event["diagnostic"] == cause
                     break
         await stream.aclose()
-        operation_event = next(item for item in control.events.history if item["topic"] == "operation" and item["operation_id"] == receipt["operation_id"])
+        operation_event = next(
+            item
+            for item in control.events.history
+            if item["topic"] == "operation" and item["operation_id"] == receipt["operation_id"]
+        )
         assert operation_event["diagnostic_id"] == cause["diagnostic_id"]
         assert "FORBIDDEN" not in json.dumps(retained)
     finally:
@@ -1384,26 +1397,38 @@ async def test_settings_failure_is_joinable_after_event_retention_and_state_insp
 
 @pytest.mark.parametrize("exception_type", [ValueError, TypeError, KeyError])
 @pytest.mark.asyncio
-async def test_execution_defects_are_not_argument_rejections_and_keep_safe_causes(offline, monkeypatch, exception_type):
+async def test_execution_defects_are_not_argument_rejections_and_keep_safe_causes(
+    offline, monkeypatch, exception_type
+):
     from uuid import uuid4
+
     monkeypatch.setenv("LOCALAPPDATA", str(offline.parent / "isolated-control-errors"))
     app = compose_headless_application(offline)
     try:
         await app.start()
         control = app.control()
         control.bind_instance(str(uuid4()))
-        invalid = await control.submit("translation.set", {"enabled": "wrong"}, request_id=uuid4().hex)
+        invalid = await control.submit(
+            "translation.set", {"enabled": "wrong"}, request_id=uuid4().hex
+        )
         rejected = await control.wait(invalid["operation_id"], timeout=5)
         assert rejected["status"] == "rejected" and rejected["error"]["code"] == "invalid_arguments"
+
         async def broken(_self, _command, _arguments, **_kwargs):
             try:
                 raise PermissionError(13, "FORBIDDEN_NATIVE_SENTINEL")
             except PermissionError as native:
                 raise exception_type("FORBIDDEN_INTERNAL_SENTINEL") from native
+
         monkeypatch.setattr(type(control), "_dispatch", broken)
-        accepted = await control.submit("translation.set", {"enabled": False}, request_id=uuid4().hex)
+        accepted = await control.submit(
+            "translation.set", {"enabled": False}, request_id=uuid4().hex
+        )
         receipt = await control.wait(accepted["operation_id"], timeout=5)
-        assert receipt["status"] == "failed" and receipt["error"]["code"] == "application_operation_failed"
+        assert (
+            receipt["status"] == "failed"
+            and receipt["error"]["code"] == "application_operation_failed"
+        )
         record = receipt["diagnostics"]
         assert record["operation_id"] == receipt["operation_id"]
         assert record["stage"] == "dispatch" and record["category"] == "unknown"
@@ -1411,17 +1436,22 @@ async def test_execution_defects_are_not_argument_rejections_and_keep_safe_cause
         assert record["fields"]["cause_class_1"] == "PermissionError"
         assert record["fields"]["errno"] == 13
         assert "FORBIDDEN" not in json.dumps(receipt)
-        assert (await control.query("diagnostics.history", {"diagnostic_id": record["diagnostic_id"]}))["records"] == [record]
+        assert (
+            await control.query("diagnostics.history", {"diagnostic_id": record["diagnostic_id"]})
+        )["records"] == [record]
     finally:
         await app.stop()
 
 
 @pytest.mark.asyncio
-async def test_runtime_error_report_crosses_composed_event_bridge_with_source_identity(offline, monkeypatch):
+async def test_runtime_error_report_crosses_composed_event_bridge_with_source_identity(
+    offline, monkeypatch
+):
     from uuid import uuid4
 
     from puripuly_heart.core.messages import ErrorDiagnostics, UserErrorReport, UserMessageRef
     from puripuly_heart.domain.events import UIEvent, UIEventType
+
     monkeypatch.setenv("LOCALAPPDATA", str(offline.parent / "isolated-report-bridge"))
     app = compose_headless_application(offline)
     try:
@@ -1430,18 +1460,27 @@ async def test_runtime_error_report_crosses_composed_event_bridge_with_source_id
         control.bind_instance(str(uuid4()))
         turn = uuid4()
         cause = ErrorDiagnostics(
-            component="provider.stt", operation="receive", code="provider_receive_failed",
-            category="network", visibility="basic", content_policy="metadata_only",
-            status_code=503, retry_after_ms=None,
+            component="provider.stt",
+            operation="receive",
+            code="provider_receive_failed",
+            category="network",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=503,
+            retry_after_ms=None,
             fields={"message": "FORBIDDEN_PROVIDER_BODY_SENTINEL", "provider": "soniox"},
-            channel="self", turn_id=str(turn), generation=5,
+            channel="self",
+            turn_id=str(turn),
+            generation=5,
         )
         report = UserErrorReport(UserMessageRef("stt.failure", {}, "error"), cause)
         stream = control.subscribe(topics=["error"], after=control.events.sequence)
         pending = asyncio.create_task(anext(stream))
         await asyncio.sleep(0)
         await control.pipeline.ui_events.put(
-            UIEvent(UIEventType.ERROR, payload=report, channel="self", source="stt", utterance_id=turn)
+            UIEvent(
+                UIEventType.ERROR, payload=report, channel="self", source="stt", utterance_id=turn
+            )
         )
         event = await asyncio.wait_for(pending, 5)
         await stream.aclose()
@@ -1452,7 +1491,9 @@ async def test_runtime_error_report_crosses_composed_event_bridge_with_source_id
         assert record["operation_id"] is None
         assert record["detail"]["state"] == "rejected"
         assert "FORBIDDEN" not in json.dumps(event)
-        assert (await control.query("diagnostics.history", {"diagnostic_id": cause.diagnostic_id}))["records"] == [record]
+        assert (await control.query("diagnostics.history", {"diagnostic_id": cause.diagnostic_id}))[
+            "records"
+        ] == [record]
     finally:
         await app.stop()
 
@@ -1462,9 +1503,18 @@ def test_native_manual_admission_preserves_ids_without_output_ack():
 
     from puripuly_heart.app.services.application_control import ApplicationControlOwner
     from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
+
     turn, child = uuid4(), uuid4()
-    result = ApplicationControlOwner._text_admission_data(TextSubmissionAdmission("admitted", turn, (child,)))
-    assert result == {"status": "applied", "admission": "admitted", "turn_id": str(turn), "child_turn_ids": [str(child)], "output_delivery": "unobserved"}
+    result = ApplicationControlOwner._text_admission_data(
+        TextSubmissionAdmission("admitted", turn, (child,))
+    )
+    assert result == {
+        "status": "applied",
+        "admission": "admitted",
+        "turn_id": str(turn),
+        "child_turn_ids": [str(child)],
+        "output_delivery": "unobserved",
+    }
     rejected = ApplicationControlOwner._text_admission_data(None)
     assert rejected["status"] == "rejected" and rejected["turn_id"] is None
     with pytest.raises(TypeError):
@@ -1474,12 +1524,29 @@ def test_native_manual_admission_preserves_ids_without_output_ack():
 def test_unknown_account_observation_preserves_owning_diagnostic():
     from puripuly_heart.app.services.application_control import _chatgpt_status
     from puripuly_heart.core.messages import ErrorDiagnostics
-    cause = ErrorDiagnostics(component="chatgpt_account", operation="read", code="chatgpt_secret_store_failed", category="auth", visibility="basic", content_policy="metadata_only", status_code=None, retry_after_ms=None, fields={})
+
+    cause = ErrorDiagnostics(
+        component="chatgpt_account",
+        operation="read",
+        code="chatgpt_secret_store_failed",
+        category="auth",
+        visibility="basic",
+        content_policy="metadata_only",
+        status_code=None,
+        retry_after_ms=None,
+        fields={},
+    )
     observed = []
+
     def retain(diagnostic, **_):
         observed.append(diagnostic)
         return {"diagnostic_id": diagnostic.diagnostic_id}
-    app = SimpleNamespace(chatgpt_account_snapshot=lambda: SimpleNamespace(signed_in=None, in_progress=False, diagnostics=cause))
+
+    app = SimpleNamespace(
+        chatgpt_account_snapshot=lambda: SimpleNamespace(
+            signed_in=None, in_progress=False, diagnostics=cause
+        )
+    )
     result = _chatgpt_status(app, retain)
     assert result["signed_in"] is None and result["sign_in_required"] is None
     assert result["diagnostic_id"] == cause.diagnostic_id and observed == [cause]
@@ -1497,6 +1564,7 @@ async def test_real_peer_fault_queries_project_safe_original_cause(offline):
         PeerCaptureSessionState,
         PeerCaptureTargetIntent,
     )
+
     app = compose_headless_application(offline)
     try:
         await app.start()
@@ -1504,19 +1572,34 @@ async def test_real_peer_fault_queries_project_safe_original_cause(offline):
         control.bind_instance(str(uuid4()))
         owner = control.pipeline.current.peer_capture
         config = PeerCaptureSessionConfig(
-            provider_id="soniox", provider_signature=("soniox",), runtime_signature=("soniox",),
-            capture_signature=("fixture",), capture_target=PeerCaptureTargetIntent(kind="default_output_device"),
+            provider_id="soniox",
+            provider_signature=("soniox",),
+            runtime_signature=("soniox",),
+            capture_signature=("fixture",),
+            capture_target=PeerCaptureTargetIntent(kind="default_output_device"),
             language=PeerCaptureLanguageFacts(source_mode="manual", source_language="en"),
-            target_sample_rate_hz=16000, vad_speech_threshold=0.4, vad_hangover_ms=500, vad_pre_roll_ms=500,
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.4,
+            vad_hangover_ms=500,
+            vad_pre_roll_ms=500,
         )
         cause = ErrorDiagnostics(
-            component="capture.peer", operation="receive", code="capture.peer.provider_failed",
-            category="network", visibility="diagnostic_only", content_policy="metadata_only",
-            status_code=999, retry_after_ms=-1, fields={"errno": 13, "body": "PRIVATE_PEER_FIELD_SENTINEL"},
-            channel="PRIVATE_PEER_CHANNEL_SENTINEL", generation=-1,
+            component="capture.peer",
+            operation="receive",
+            code="capture.peer.provider_failed",
+            category="network",
+            visibility="diagnostic_only",
+            content_policy="metadata_only",
+            status_code=999,
+            retry_after_ms=-1,
+            fields={"errno": 13, "body": "PRIVATE_PEER_FIELD_SENTINEL"},
+            channel="PRIVATE_PEER_CHANNEL_SENTINEL",
+            generation=-1,
         )
         await owner._fault_current_generation(
-            owner.snapshot.generation, config=config, reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+            owner.snapshot.generation,
+            config=config,
+            reason=PeerCaptureFailureReason.PROVIDER_FAILED,
             exception=cause,
         )
         assert owner.snapshot.state is PeerCaptureSessionState.FAULTED
@@ -1525,7 +1608,9 @@ async def test_real_peer_fault_queries_project_safe_original_cause(offline):
             result = await control.query(query, {})
             text = json.dumps(result)
             assert cause.diagnostic_id in text and "PRIVATE_PEER" not in text
-        retained = (await control.query("diagnostics.history", {"diagnostic_id": cause.diagnostic_id}))["records"][0]
+        retained = (
+            await control.query("diagnostics.history", {"diagnostic_id": cause.diagnostic_id})
+        )["records"][0]
         assert retained["code"] == cause.code
         assert retained["channel"] is None and retained["generation"] is None
         assert retained["status_code"] is None and retained["retry_after_ms"] is None
@@ -1542,22 +1627,43 @@ async def test_real_peer_fault_queries_project_safe_original_cause(offline):
 def test_transaction_receipt_reports_owner_secondary_omissions():
     from puripuly_heart.app.services.application_control import ApplicationControlOwner
     from puripuly_heart.core.messages import ErrorDiagnostics, TransactionResult
+
     causes = tuple(
-        ErrorDiagnostics(component="settings_repository", operation="save", code="settings_save_failed",
-                         category="transaction", visibility="diagnostic_only", content_policy="metadata_only",
-                         status_code=None, retry_after_ms=None, fields={})
+        ErrorDiagnostics(
+            component="settings_repository",
+            operation="save",
+            code="settings_save_failed",
+            category="transaction",
+            visibility="diagnostic_only",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={},
+        )
         for _ in range(6)
     )
-    transaction = TransactionResult("settings_commit_failed", None, causes[0], secondary_diagnostics=causes, secondary_omitted_count=2)
-    owner = SimpleNamespace(_retain_diagnostic=lambda diagnostic, **_: {"diagnostic_id": diagnostic.diagnostic_id})
+    transaction = TransactionResult(
+        "settings_commit_failed",
+        None,
+        causes[0],
+        secondary_diagnostics=causes,
+        secondary_omitted_count=2,
+    )
+    owner = SimpleNamespace(
+        _retain_diagnostic=lambda diagnostic, **_: {"diagnostic_id": diagnostic.diagnostic_id}
+    )
     receipt = ApplicationControlOwner._transaction_receipt(owner, transaction, "persistence_failed")
-    assert [item["diagnostic_id"] for item in receipt["secondary_diagnostics"]] == [cause.diagnostic_id for cause in causes[:4]]
+    assert [item["diagnostic_id"] for item in receipt["secondary_diagnostics"]] == [
+        cause.diagnostic_id for cause in causes[:4]
+    ]
     assert receipt["secondary_omitted_count"] == 4 and receipt["secondary_truncated"] is True
 
 
 @pytest.mark.parametrize("carrier", ["provider_convergence", "self_runtime", "legacy_diagnostics"])
 @pytest.mark.asyncio
-async def test_execution_receipt_preserves_approved_native_failure_carrier(offline, monkeypatch, carrier):
+async def test_execution_receipt_preserves_approved_native_failure_carrier(
+    offline, monkeypatch, carrier
+):
     from uuid import uuid4
 
     from puripuly_heart.app.services.capture.self_capture_application import (
@@ -1567,6 +1673,7 @@ async def test_execution_receipt_preserves_approved_native_failure_carrier(offli
         ProviderRuntimeConvergenceError,
     )
     from puripuly_heart.core.messages import ErrorDiagnostics
+
     app = compose_headless_application(offline)
     request_id = uuid4().hex
     native = []
@@ -1574,30 +1681,50 @@ async def test_execution_receipt_preserves_approved_native_failure_carrier(offli
         await app.start()
         control = app.control()
         control.bind_instance(str(uuid4()))
+
         async def fail_dispatch(_self, _command, _arguments, *, operation_id):
             cause = ErrorDiagnostics(
-                component="capture.peer", operation="provider_build", code="capture.peer.provider_failed",
-                category="lifecycle", visibility="diagnostic_only", content_policy="metadata_only",
-                status_code=None, retry_after_ms=None, fields={"errno": 13},
-                channel="peer", generation=1, operation_id=operation_id, request_id=request_id,
+                component="capture.peer",
+                operation="provider_build",
+                code="capture.peer.provider_failed",
+                category="lifecycle",
+                visibility="diagnostic_only",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={"errno": 13},
+                channel="peer",
+                generation=1,
+                operation_id=operation_id,
+                request_id=request_id,
             )
             native.append(cause)
             control._retain_diagnostic(cause, disposition="failed")
             if carrier == "provider_convergence":
-                error = ProviderRuntimeConvergenceError("PRIVATE_WRAPPER_MARKER", failure_diagnostics=cause)
+                error = ProviderRuntimeConvergenceError(
+                    "PRIVATE_WRAPPER_MARKER", failure_diagnostics=cause
+                )
                 error.diagnostics = replace(cause, diagnostic_id=uuid4().hex)
             elif carrier == "self_runtime":
-                error = SelfCaptureRuntimeApplyError("PRIVATE_WRAPPER_MARKER", failure_diagnostics=cause)
+                error = SelfCaptureRuntimeApplyError(
+                    "PRIVATE_WRAPPER_MARKER", failure_diagnostics=cause
+                )
             else:
                 error = RuntimeError("PRIVATE_WRAPPER_MARKER")
                 error.failure_diagnostics = "PRIVATE_NON_TYPED_MARKER"
                 error.diagnostics = cause
             raise error
+
         monkeypatch.setattr(type(control), "_dispatch", fail_dispatch)
-        admitted = await control.submit("translation.set", {"enabled": False}, request_id=request_id)
+        admitted = await control.submit(
+            "translation.set", {"enabled": False}, request_id=request_id
+        )
         receipt = await control.wait(admitted["operation_id"], timeout=5)
         cause = native[0]
-        assert receipt["status"] == "failed" and receipt["error"]["code"] == "application_operation_failed"
+        assert (
+            receipt["status"] == "failed"
+            and receipt["error"]["code"] == "application_operation_failed"
+        )
         assert receipt["cause_diagnostics"]["diagnostic_id"] == cause.diagnostic_id
         assert receipt["diagnostics"]["cause_id"] == cause.diagnostic_id
         assert receipt["diagnostics"]["diagnostic_id"] != cause.diagnostic_id
@@ -1605,7 +1732,9 @@ async def test_execution_receipt_preserves_approved_native_failure_carrier(offli
         assert receipt["cause_diagnostics"]["request_id"] == request_id
         assert receipt["cause_diagnostics"]["category"] == "lifecycle"
         assert "PRIVATE_" not in json.dumps(receipt)
-        records = (await control.query("diagnostics.history", {"operation_id": admitted["operation_id"]}))["records"]
+        records = (
+            await control.query("diagnostics.history", {"operation_id": admitted["operation_id"]})
+        )["records"]
         assert receipt["cause_diagnostics"] in records and receipt["diagnostics"] in records
     finally:
         await app.stop()

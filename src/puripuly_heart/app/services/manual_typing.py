@@ -153,9 +153,9 @@ def _record_manual_typing_failure(
     diagnostics = ErrorDiagnostics(
         component="manual_typing",
         operation=operation,
-        code="manual_submission_failed"
-        if operation == "manual_submit"
-        else "manual_typing_degraded",
+        code=(
+            "manual_submission_failed" if operation == "manual_submit" else "manual_typing_degraded"
+        ),
         category="lifecycle",
         visibility="basic",
         content_policy="metadata_only",

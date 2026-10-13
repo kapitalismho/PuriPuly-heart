@@ -308,9 +308,12 @@ async def test_httpx_deepseek_client_logs_safe_request_failure(
                 target_language="en",
             )
     assert exc_info.value.status_code == 503
-    assert provider_failure_report(
-        exc_info.value, provider="deepseek", operation="translate"
-    ).diagnostics.category == "service_unavailable"
+    assert (
+        provider_failure_report(
+            exc_info.value, provider="deepseek", operation="translate"
+        ).diagnostics.category
+        == "service_unavailable"
+    )
 
     rendered_logs = "\n".join(caplog.messages)
     assert raw_detail not in rendered_logs
@@ -350,9 +353,12 @@ async def test_httpx_deepseek_client_non_200_keeps_status_without_body(
 
     rendered_error = str(exc_info.value)
     assert exc_info.value.status_code == 400
-    assert provider_failure_report(
-        exc_info.value, provider="deepseek", operation="translate"
-    ).diagnostics.category == "invalid_response"
+    assert (
+        provider_failure_report(
+            exc_info.value, provider="deepseek", operation="translate"
+        ).diagnostics.category
+        == "invalid_response"
+    )
     assert response_text not in rendered_error or not response_text
     assert "top level detail" not in rendered_error
     assert "nested detail" not in rendered_error
@@ -366,11 +372,7 @@ async def test_httpx_deepseek_client_non_200_body_is_not_collected(
 ) -> None:
     secret = "deepseek-api-key-123"
     full_payload_tail = "TAIL_SHOULD_NOT_APPEAR"
-    raw_text = (
-        f"response body token={secret} Bearer {secret} "
-        + "x" * 300
-        + full_payload_tail
-    )
+    raw_text = f"response body token={secret} Bearer {secret} " + "x" * 300 + full_payload_tail
     fake_client = FakeAsyncClient(response_status=502, response_data={}, response_text=raw_text)
     monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
 
@@ -392,9 +394,12 @@ async def test_httpx_deepseek_client_non_200_body_is_not_collected(
     assert "request body text" not in rendered
     assert full_payload_tail not in rendered
     assert exc_info.value.status_code == 502
-    assert provider_failure_report(
-        exc_info.value, provider="deepseek", operation="translate"
-    ).diagnostics.category == "service_unavailable"
+    assert (
+        provider_failure_report(
+            exc_info.value, provider="deepseek", operation="translate"
+        ).diagnostics.category
+        == "service_unavailable"
+    )
 
 
 @pytest.mark.asyncio

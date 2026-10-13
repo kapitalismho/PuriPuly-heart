@@ -449,17 +449,18 @@ class OutputRuntime:
             "owner_history_capacity": self.diagnostics_capacity,
             "owner_history_evictions": self._diagnostic_history_evictions,
             "observer": (
-                "unavailable" if self.routing_observer is None
+                "unavailable"
+                if self.routing_observer is None
                 else "degraded" if self._observer_failure_count else "available"
             ),
             "observer_failure_count": self._observer_failure_count,
             "observer_failure_diagnostic_id": (
                 self._observer_failure_diagnostics.diagnostic_id
-                if self._observer_failure_diagnostics is not None else None
+                if self._observer_failure_diagnostics is not None
+                else None
             ),
             "last_observer_failure_type": self._last_observer_failure_type,
         }
-
 
     async def start(self, *, auto_flush_chatbox: bool = False) -> None:
         if self._state == "closed":
@@ -814,7 +815,11 @@ class OutputRuntime:
                 publication_id=str(disclosure_uuid),
                 publication_kind=PUBLICATION_KIND_SYSTEM_DISCLOSURE,
                 reason="destination_publish_failed",
-                metadata={"channel": "system", "error_type": safe_exception_fields(exc)["exception_class"], **safe_exception_fields(exc)},
+                metadata={
+                    "channel": "system",
+                    "error_type": safe_exception_fields(exc)["exception_class"],
+                    **safe_exception_fields(exc),
+                },
             )
         self._remember_delivered_publication(publication_key)
         return self._observe_result(
@@ -883,7 +888,11 @@ class OutputRuntime:
             origin = current_diagnostic_operation()
             diagnostics = replace(
                 diagnostics,
-                fields={**diagnostics.fields, "publication_id": str(disclosure_uuid), "destination": OUTPUT_ROUTE_SYSTEM_DISCLOSURE_CHATBOX},
+                fields={
+                    **diagnostics.fields,
+                    "publication_id": str(disclosure_uuid),
+                    "destination": OUTPUT_ROUTE_SYSTEM_DISCLOSURE_CHATBOX,
+                },
                 operation_id=diagnostics.operation_id or origin["operation_id"],
                 request_id=diagnostics.request_id or origin["request_id"],
             )
@@ -1612,7 +1621,8 @@ class OutputRuntime:
         error_type: str | None = None,
     ) -> OutputPublicationResult:
         metadata: dict[str, str | int | float | bool | None] = {
-            "channel": event.channel, **self._event_identity_metadata(event),
+            "channel": event.channel,
+            **self._event_identity_metadata(event),
         }
         if error_type is not None:
             metadata["error_type"] = error_type
@@ -1727,7 +1737,11 @@ class OutputRuntime:
         return {
             "operation_id": event.operation_id,
             "request_id": event.request_id,
-            "utterance_id": str(event.parent_utterance_id or event.utterance_id) if event.utterance_id is not None else None,
+            "utterance_id": (
+                str(event.parent_utterance_id or event.utterance_id)
+                if event.utterance_id is not None
+                else None
+            ),
             "turn_generation": event.turn_generation,
         }
 
@@ -1852,9 +1866,15 @@ class OutputRuntime:
         emit_failure(
             logger,
             ErrorDiagnostics(
-                component="output_runtime", operation="close", code="output_cleanup_failed",
-                category="lifecycle", visibility="basic", content_policy="metadata_only",
-                status_code=None, retry_after_ms=None, fields={"close_complete": False},
+                component="output_runtime",
+                operation="close",
+                code="output_cleanup_failed",
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={"close_complete": False},
             ),
             stage=stage,
             exception=exception,
@@ -2128,7 +2148,9 @@ class OutputRuntime:
         diagnostics: ErrorDiagnostics | None = None,
     ) -> OutputRoutingDecision:
         if diagnostics is None and reason in {
-            "destination_publish_failed", "destination_write_timeout", "output_overload",
+            "destination_publish_failed",
+            "destination_write_timeout",
+            "output_overload",
             "output_identity_capacity_exhausted",
         }:
             fields = {
@@ -2136,17 +2158,32 @@ class OutputRuntime:
                 "publication_id": metadata.get("utterance_id", publication_id),
                 "publication_kind": publication_kind,
             }
-            for key in ("exception_class", "cause_class_1", "cause_class_2", "cause_class_3", "cause_class_4", "errno", "winerror"):
+            for key in (
+                "exception_class",
+                "cause_class_1",
+                "cause_class_2",
+                "cause_class_3",
+                "cause_class_4",
+                "errno",
+                "winerror",
+            ):
                 if key in metadata:
                     fields[key] = metadata[key]
             if "exception_class" not in fields and "error_type" in metadata:
                 fields["exception_class"] = metadata["error_type"]
             diagnostics = ErrorDiagnostics(
-                component="output_runtime", operation="publish", code=reason,
+                component="output_runtime",
+                operation="publish",
+                code=reason,
                 category="timeout" if reason == "destination_write_timeout" else "lifecycle",
-                visibility="basic", content_policy="metadata_only",
-                status_code=None, retry_after_ms=None, fields=fields,
-                channel=metadata.get("channel") if metadata.get("channel") in {"self", "peer"} else None,
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields=fields,
+                channel=(
+                    metadata.get("channel") if metadata.get("channel") in {"self", "peer"} else None
+                ),
                 generation=metadata.get("publication_generation", metadata.get("turn_generation")),
                 operation_id=metadata.get("operation_id"),
                 request_id=metadata.get("request_id"),
@@ -2174,15 +2211,27 @@ class OutputRuntime:
                 self._last_observer_failure_type = safe_exception_fields(exc)["exception_class"]
                 if self._observer_failure_count == 1:
                     self._observer_failure_diagnostics = ErrorDiagnostics(
-                        component="output_runtime", operation="observe", code="output_observer_failed",
-                        category="lifecycle", visibility="diagnostic_only", content_policy="metadata_only",
-                        status_code=None, retry_after_ms=None,
-                        fields={"destination": route, "publication_id": metadata.get("utterance_id", publication_id), "count": self._observer_failure_count},
+                        component="output_runtime",
+                        operation="observe",
+                        code="output_observer_failed",
+                        category="lifecycle",
+                        visibility="diagnostic_only",
+                        content_policy="metadata_only",
+                        status_code=None,
+                        retry_after_ms=None,
+                        fields={
+                            "destination": route,
+                            "publication_id": metadata.get("utterance_id", publication_id),
+                            "count": self._observer_failure_count,
+                        },
                         cause_id=diagnostics.diagnostic_id if diagnostics else None,
                     )
                     emit_failure(
-                        logger, self._observer_failure_diagnostics,
-                        severity="warning", disposition="degraded", stage="routing_observer",
+                        logger,
+                        self._observer_failure_diagnostics,
+                        severity="warning",
+                        disposition="degraded",
+                        stage="routing_observer",
                         exception=exc,
                     )
         return decision

@@ -157,8 +157,6 @@ def _position_of(events: list[str], marker: str) -> int:
     return events.index(marker)
 
 
-
-
 @pytest.mark.asyncio
 async def test_runtime_shutdown_graph_preserves_order_and_logging_last_after_failure() -> None:
     runtime = RecordingShutdownRuntime()
@@ -292,7 +290,6 @@ async def test_runtime_shutdown_graph_preserves_order_and_logging_last_after_fai
     assert LIFECYCLE_SHUTDOWN_PHASE_ORDER[-1] == SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS
 
 
-
 def _real_startup_logging_owner(tmp_path) -> tuple[
     ApplicationRuntimeLoggingOwner,
     RuntimeLoggingService,
@@ -316,8 +313,6 @@ def _real_startup_logging_owner(tmp_path) -> tuple[
         fallback_logger=logging.getLogger("test.startup-boundary-fallback"),
     )
     return owner, service, session
-
-
 
 
 @pytest.mark.asyncio
@@ -382,7 +377,6 @@ async def test_startup_terminal_canonicalizes_unsafe_exception_class_after_loggi
     assert primary[0]["disposition"] == "failed"
     assert "Räw/Boundary Error" not in json.dumps(records, ensure_ascii=False)
     assert "original startup failure" not in json.dumps(records)
-
 
 
 @pytest.mark.asyncio

@@ -783,9 +783,13 @@ async def test_translate_and_enqueue_logs_managed_auth_diagnostics() -> None:
         stt=None,
         llm=ManagedAuthFailingLLM(
             diagnostics=ManagedOpenRouterReleaseError(
-                operation="issue", code="trial_unavailable", error_class="retryable",
-                subcode="broker_backoff", retry_after_ms=9000,
-                message="broker is temporarily unavailable", http_status=503,
+                operation="issue",
+                code="trial_unavailable",
+                error_class="retryable",
+                subcode="broker_backoff",
+                retry_after_ms=9000,
+                message="broker is temporarily unavailable",
+                http_status=503,
             ).to_diagnostics()
         ),
         osc=RecordingOscQueue(),

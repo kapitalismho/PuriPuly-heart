@@ -102,7 +102,9 @@ def _extract_message_content(content: object) -> str:
         stripped = content.strip()
         if stripped:
             return stripped
-        raise LLMResponseError("Local LLM response contained empty message content", provider="local_llm")
+        raise LLMResponseError(
+            "Local LLM response contained empty message content", provider="local_llm"
+        )
     if isinstance(content, list):
         parts: list[str] = []
         for item in content:
@@ -112,7 +114,9 @@ def _extract_message_content(content: object) -> str:
                     parts.append(text.strip())
         if parts:
             return "\n".join(parts)
-    raise LLMResponseError("Local LLM response did not contain message content", provider="local_llm")
+    raise LLMResponseError(
+        "Local LLM response did not contain message content", provider="local_llm"
+    )
 
 
 def _has_length_finish_reason(data: object) -> bool:
@@ -260,29 +264,38 @@ class HttpxLocalOpenAIClient:
 
         if response.status_code != 200:
             raise LLMResponseError(
-                "Local LLM request failed", provider="local_llm",
+                "Local LLM request failed",
+                provider="local_llm",
                 status_code=response.status_code,
             )
 
         try:
             data = response.json()
         except Exception as exc:
-            raise LLMResponseError("Local LLM response was not valid JSON", provider="local_llm") from exc
+            raise LLMResponseError(
+                "Local LLM response was not valid JSON", provider="local_llm"
+            ) from exc
         if not isinstance(data, dict):
             raise LLMResponseError("Local LLM response was not a JSON object", provider="local_llm")
         if observation is not None:
             observation.record_openai_response(data)
         choices = data.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise LLMResponseError("Local LLM response did not contain choices", provider="local_llm")
+            raise LLMResponseError(
+                "Local LLM response did not contain choices", provider="local_llm"
+            )
         if _has_length_finish_reason(data):
-            raise LLMResponseError("Local LLM response was truncated by max_tokens limit", provider="local_llm")
+            raise LLMResponseError(
+                "Local LLM response was truncated by max_tokens limit", provider="local_llm"
+            )
         first = choices[0]
         if not isinstance(first, dict):
             raise LLMResponseError("Local LLM response choice was malformed", provider="local_llm")
         message = first.get("message")
         if not isinstance(message, dict):
-            raise LLMResponseError("Local LLM response did not contain message", provider="local_llm")
+            raise LLMResponseError(
+                "Local LLM response did not contain message", provider="local_llm"
+            )
         return _extract_message_content(message.get("content"))
 
     async def close(self) -> None:
@@ -399,6 +412,8 @@ class LocalOpenAICompatibleLLMProvider:
                 try:
                     await client.close()
                 except Exception as exc:
-                    record_probe_cleanup_failure(exc, provider="local_llm", primary_failure=primary_failure)
+                    record_probe_cleanup_failure(
+                        exc, provider="local_llm", primary_failure=primary_failure
+                    )
                     if primary_failure is None:
                         raise

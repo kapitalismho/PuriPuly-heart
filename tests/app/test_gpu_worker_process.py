@@ -336,7 +336,8 @@ async def test_startup_cause_survives_failed_cleanup_and_factory_retries_cleanup
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows file-sharing cleanup contract")
 @pytest.mark.skipif(os.getenv("INTEGRATION") != "1", reason="requires real owned child")
 async def test_real_worker_activation_failure_retains_locked_audio_directory_until_close(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     import ctypes
     from ctypes import wintypes
@@ -353,14 +354,21 @@ async def test_real_worker_activation_failure_retains_locked_audio_directory_unt
     )
 
     for name in tuple(os.environ):
-        if any(part in name.upper() for part in ("API_KEY", "AUTH_TOKEN", "ACCESS_TOKEN", "CREDENTIAL")):
+        if any(
+            part in name.upper() for part in ("API_KEY", "AUTH_TOKEN", "ACCESS_TOKEN", "CREDENTIAL")
+        ):
             monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("FAKE_GPU_WORKER_ACTIVATION_FAILURE", "1")
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     create_file = kernel32.CreateFileW
     create_file.argtypes = [
-        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
-        wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
     ]
     create_file.restype = wintypes.HANDLE
     close_handle = kernel32.CloseHandle
@@ -387,11 +395,17 @@ async def test_real_worker_activation_failure_retains_locked_audio_directory_unt
     children: list[tuple[object, float]] = []
 
     async def track_start(
-        factory: DefaultGpuWorkerProcessFactory, *, mode: str,
-        operation_id: str | None = None, request_id: str | None = None,
+        factory: DefaultGpuWorkerProcessFactory,
+        *,
+        mode: str,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> object:
         child = await original_start(
-            factory, mode=mode, operation_id=operation_id, request_id=request_id,
+            factory,
+            mode=mode,
+            operation_id=operation_id,
+            request_id=request_id,
         )
         children.append((child, psutil.Process(child.pid).create_time()))
         return child
@@ -402,11 +416,18 @@ async def test_real_worker_activation_failure_retains_locked_audio_directory_unt
     operation_id, request_id = uuid4().hex, uuid4().hex
     try:
         with pytest.raises(GpuASRManualRetryRequired) as caught:
-            await asyncio.wait_for(runtime.activate_channel(
-                "self", owner=object(), model_path=Path("synthetic-unused-model.gguf"),
-                model_id="qwen-gpu", device_id="vulkan:0",
-                operation_id=operation_id, request_id=request_id,
-            ), timeout=5)
+            await asyncio.wait_for(
+                runtime.activate_channel(
+                    "self",
+                    owner=object(),
+                    model_path=Path("synthetic-unused-model.gguf"),
+                    model_id="qwen-gpu",
+                    device_id="vulkan:0",
+                    operation_id=operation_id,
+                    request_id=request_id,
+                ),
+                timeout=5,
+            )
         assert caught.value.code == "out_of_memory"
         assert isinstance(caught.value.__cause__, GpuWorkerRequestError)
         primary = caught.value.failure_diagnostics
@@ -418,7 +439,8 @@ async def test_real_worker_activation_failure_retains_locked_audio_directory_unt
         assert owned_paths[0].exists()
         secondary = next(
             getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
-            for record in caplog.records if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
             and getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0].diagnostic_id
             == runtime.startup_cleanup_snapshot["temporary_cleanup_diagnostic_id"]
         )
@@ -446,7 +468,8 @@ async def test_real_worker_activation_failure_retains_locked_audio_directory_unt
 
 
 async def test_first_real_startup_failure_is_retained_with_explicit_admission_identity(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from uuid import uuid4
 
@@ -460,11 +483,18 @@ async def test_first_real_startup_failure_is_retained_with_explicit_admission_id
     runtime = SharedGpuASRRuntime(process_factory=_factory())
     try:
         with pytest.raises(GpuASRManualRetryRequired) as caught:
-            await asyncio.wait_for(runtime.activate_channel(
-                "self", owner=object(), model_path=tmp_path / "unused-model.gguf",
-                model_id="qwen-gpu", device_id="vulkan:0",
-                operation_id=operation_id, request_id=request_id,
-            ), timeout=5)
+            await asyncio.wait_for(
+                runtime.activate_channel(
+                    "self",
+                    owner=object(),
+                    model_path=tmp_path / "unused-model.gguf",
+                    model_id="qwen-gpu",
+                    device_id="vulkan:0",
+                    operation_id=operation_id,
+                    request_id=request_id,
+                ),
+                timeout=5,
+            )
         primary = caught.value.failure_diagnostics
         assert primary is not None
         retained = service.diagnostic_history({"operation_id": operation_id})["records"]

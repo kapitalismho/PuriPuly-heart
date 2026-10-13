@@ -21,7 +21,9 @@ from tests.core.runtime.test_self_capture_session import build_owner, config
 @pytest.mark.asyncio
 @pytest.mark.parametrize("active", [False, True])
 @pytest.mark.parametrize("stage", ["provider_build", "provider_warmup"])
-async def test_provider_admission_first_retention_has_exact_command_identity(monkeypatch, active, stage):
+async def test_provider_admission_first_retention_has_exact_command_identity(
+    monkeypatch, active, stage
+):
     from puripuly_heart.core.runtime import local_asr_provider_runtime, self_capture
 
     class Factory(FakeProviderFactory):
@@ -34,8 +36,10 @@ async def test_provider_admission_first_retention_has_exact_command_identity(mon
                 request, gpu_runtime=gpu_runtime, on_terminal_failure=on_terminal_failure
             )
             if self.armed:
+
                 async def fail_warmup():
                     raise TimeoutError("PRIVATE_PROVIDER_WARMUP")
+
                 provider.warmup = fail_warmup
             return provider
 
@@ -48,8 +52,10 @@ async def test_provider_admission_first_retention_has_exact_command_identity(mon
 
     capture, *_ = build_owner(provider=SelfCaptureProviderAdapter(runtime, Reset()))
     capture._provider_request_factory = lambda current, warmup: ProviderRuntimeBuildRequest(
-        config=_resolved_config("self", "soniox"), warmup=stage == "provider_warmup",
-        provider_signature=current.provider_signature, runtime_signature=current.runtime_signature,
+        config=_resolved_config("self", "soniox"),
+        warmup=stage == "provider_warmup",
+        provider_signature=current.provider_signature,
+        runtime_signature=current.runtime_signature,
     )
     instance, operation, request = uuid4().hex, uuid4().hex, uuid4().hex
     history = DiagnosticHistory()

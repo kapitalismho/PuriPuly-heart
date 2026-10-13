@@ -162,7 +162,11 @@ class FakeGpuRuntime:
         self.worker_pid = None
         self.last_failure_code = None
         self.configured_device_id = None
-        self.startup_cleanup_snapshot = {"pending_startups": 0, "close_complete": True, "cleanup_failures": []}
+        self.startup_cleanup_snapshot = {
+            "pending_startups": 0,
+            "close_complete": True,
+            "cleanup_failures": [],
+        }
         self.discovery_calls = 0
         self.activation_calls: list[tuple[str, str]] = []
         self.retry_calls = 0

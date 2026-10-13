@@ -79,8 +79,7 @@ class AuthenticatedSessionHealth:
             return False
         return (
             type(payload.get("runtime_generation")) is int
-            and
-            payload.get("contract_version") == contract_version
+            and payload.get("contract_version") == contract_version
             and payload.get("overlay_instance_id") == self.overlay_instance_id
             and payload.get("runtime_generation") == self.runtime_generation
         )

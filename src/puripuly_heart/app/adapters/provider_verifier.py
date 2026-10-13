@@ -60,8 +60,6 @@ def _optional_context_bool(request: ProviderVerificationRequest, key: str) -> bo
     return bool(value) if isinstance(value, bool) else False
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class ProviderVerifierAdapter(ProviderVerifierPort):
     async def verify_api_key(

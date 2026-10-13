@@ -808,21 +808,31 @@ class TranslationRequestOwner:
     @staticmethod
     def _record_stale_provider_completion(request: TranslationProcessRequest) -> ErrorDiagnostics:
         diagnostics = ErrorDiagnostics(
-            component="translation.turn", operation="provider_generation",
-            code="translation.stale_provider_completion", category="lifecycle",
-            visibility="basic", content_policy="metadata_only",
-            status_code=None, retry_after_ms=None,
-            channel=request.channel, turn_id=str(request.utterance_id),
+            component="translation.turn",
+            operation="provider_generation",
+            code="translation.stale_provider_completion",
+            category="lifecycle",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            channel=request.channel,
+            turn_id=str(request.utterance_id),
             generation=request.turn_generation,
-            operation_id=request.operation_id, request_id=request.request_id,
+            operation_id=request.operation_id,
+            request_id=request.request_id,
             fields={
                 "parent_utterance_id": str(request.parent_utterance_id),
-                "target_index": request.target_index, "outcome": "failed",
+                "target_index": request.target_index,
+                "outcome": "failed",
             },
         )
         emit_failure(
-            logging.getLogger(__name__), diagnostics,
-            severity="info", disposition="superseded", stage="provider_generation",
+            logging.getLogger(__name__),
+            diagnostics,
+            severity="info",
+            disposition="superseded",
+            stage="provider_generation",
         )
         return diagnostics
 

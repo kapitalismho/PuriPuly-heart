@@ -43,17 +43,23 @@ def _session_diagnostics(
         component="chatgpt_session",
         operation=phase,
         code=code if code.startswith("chatgpt_") else f"chatgpt_{code}",
-        category="network"
-        if code in {"refresh_network_error", "chatgpt_refresh_network_error"}
-        else "auth"
-        if isinstance(exception, ChatGptAuthError)
-        else "timeout"
-        if isinstance(exception, (TimeoutError, httpx.TimeoutException))
-        else "network"
-        if isinstance(exception, httpx.HTTPError)
-        else "transaction"
-        if isinstance(exception, OSError)
-        else "unknown",
+        category=(
+            "network"
+            if code in {"refresh_network_error", "chatgpt_refresh_network_error"}
+            else (
+                "auth"
+                if isinstance(exception, ChatGptAuthError)
+                else (
+                    "timeout"
+                    if isinstance(exception, (TimeoutError, httpx.TimeoutException))
+                    else (
+                        "network"
+                        if isinstance(exception, httpx.HTTPError)
+                        else "transaction" if isinstance(exception, OSError) else "unknown"
+                    )
+                )
+            )
+        ),
         visibility="basic",
         content_policy="metadata_only",
         status_code=status_code,
@@ -78,7 +84,9 @@ class ChatGptSessionSignOutResult:
         excess = max(0, len(self.secondary_diagnostics) - 4)
         if excess:
             object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
-            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
+            object.__setattr__(
+                self, "secondary_omitted_count", self.secondary_omitted_count + excess
+            )
 
 
 CHATGPT_REFRESH_TOKEN_SECRET: Final = "chatgpt_refresh_token"

@@ -24,12 +24,7 @@ class OpenAIResponseError(LLMResponseError):
     diagnostic_provider = "openai"
 
     def __init__(self, status_code: int) -> None:
-        super().__init__(
-            "OpenAI request failed", provider="openai", status_code=status_code
-        )
-
-
-
+        super().__init__("OpenAI request failed", provider="openai", status_code=status_code)
 
 
 def _build_system_prompt(
@@ -300,7 +295,7 @@ class HttpxOpenAIClient:
         )
         if response.status_code != 200:
             error = OpenAIResponseError(response.status_code)
-            
+
             raise error
 
         try:
@@ -308,7 +303,9 @@ class HttpxOpenAIClient:
         except ValueError as exc:
             raise LLMResponseError("OpenAI response was not valid JSON", provider="openai") from exc
         if not isinstance(data, dict):
-            raise LLMResponseError("OpenAI response did not contain a valid payload", provider="openai")
+            raise LLMResponseError(
+                "OpenAI response did not contain a valid payload", provider="openai"
+            )
         if observation is not None:
             observation.record_openai_response(data)
         self._last_reasoning_tokens = _reasoning_token_count(data)
@@ -316,13 +313,19 @@ class HttpxOpenAIClient:
         if not isinstance(choices, list) or not choices:
             raise LLMResponseError("OpenAI response did not contain choices", provider="openai")
         if _has_length_finish_reason(data):
-            raise LLMResponseError("OpenAI response was truncated by max_completion_tokens limit", provider="openai")
+            raise LLMResponseError(
+                "OpenAI response was truncated by max_completion_tokens limit", provider="openai"
+            )
         first_choice = choices[0]
         if not isinstance(first_choice, dict):
-            raise LLMResponseError("OpenAI response did not contain a valid choice", provider="openai")
+            raise LLMResponseError(
+                "OpenAI response did not contain a valid choice", provider="openai"
+            )
         message = first_choice.get("message")
         if not isinstance(message, dict):
-            raise LLMResponseError("OpenAI response did not contain message content", provider="openai")
+            raise LLMResponseError(
+                "OpenAI response did not contain message content", provider="openai"
+            )
         return _extract_message_content(message.get("content"))
 
     async def close(self) -> None:

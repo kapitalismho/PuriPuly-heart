@@ -81,7 +81,9 @@ async def test_qq_failure_survives_dialog_close_log_page_reopen_and_file_drain(t
         assert rendered
         records = logging_service.diagnostic_history({})["records"]
         primary = [
-            record for record in records if record["diagnostic_id"] == result.diagnostics.diagnostic_id
+            record
+            for record in records
+            if record["diagnostic_id"] == result.diagnostics.diagnostic_id
         ]
         assert len(primary) == 1
         assert primary[0]["status_code"] == 401

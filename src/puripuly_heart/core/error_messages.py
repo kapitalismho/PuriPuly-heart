@@ -147,7 +147,9 @@ def stt_failure_report(
                 params={
                     "category": exc.category,
                     "operation": exc.operation or "unknown",
-                    "provider": _diagnostic_provider(None, str(exc.fields.get("provider", provider))),
+                    "provider": _diagnostic_provider(
+                        None, str(exc.fields.get("provider", provider))
+                    ),
                 },
                 severity=SEVERITY_ERROR,
             ),
@@ -328,7 +330,9 @@ def _failure_report(
     operation: str,
     extra_fields: Mapping[str, DiagnosticFieldValue],
 ) -> UserErrorReport:
-    preserved = exc if isinstance(exc, ErrorDiagnostics) else getattr(exc, "failure_diagnostics", None)
+    preserved = (
+        exc if isinstance(exc, ErrorDiagnostics) else getattr(exc, "failure_diagnostics", None)
+    )
     if preserved is None:
         preserved = getattr(exc, "diagnostics", None)
     if isinstance(preserved, ErrorDiagnostics):
@@ -336,15 +340,24 @@ def _failure_report(
             status = preserved.status_code or _status_code(exc)
             category = (
                 _classify_failure(exc, status_code=status)
-                if preserved.category == DIAGNOSTIC_CATEGORY_UNKNOWN else preserved.category
+                if preserved.category == DIAGNOSTIC_CATEGORY_UNKNOWN
+                else preserved.category
             )
             preserved = replace(
                 preserved,
-                status_code=status, category=category,
-                code=f"{surface}.{category}"
-                if preserved.code == f"{surface}.unknown" and category != DIAGNOSTIC_CATEGORY_UNKNOWN
-                else preserved.code,
-                fields={**preserved.fields, **safe_exception_fields(exc), **safe_transport_fields(exc)},
+                status_code=status,
+                category=category,
+                code=(
+                    f"{surface}.{category}"
+                    if preserved.code == f"{surface}.unknown"
+                    and category != DIAGNOSTIC_CATEGORY_UNKNOWN
+                    else preserved.code
+                ),
+                fields={
+                    **preserved.fields,
+                    **safe_exception_fields(exc),
+                    **safe_transport_fields(exc),
+                },
             )
         preserved = sanitize_diagnostics(preserved)
         provider_label = _diagnostic_provider(None, str(preserved.fields.get("provider", provider)))
@@ -358,7 +371,9 @@ def _failure_report(
                 params={
                     "category": preserved.category,
                     "operation": preserved.operation or "unknown",
-                    "provider": _diagnostic_provider(None, str(preserved.fields.get("provider", provider))),
+                    "provider": _diagnostic_provider(
+                        None, str(preserved.fields.get("provider", provider))
+                    ),
                 },
                 severity=SEVERITY_ERROR,
             ),
@@ -450,17 +465,19 @@ def _failure_report(
             },
             severity=SEVERITY_ERROR,
         ),
-        diagnostics=sanitize_diagnostics(ErrorDiagnostics(
-            component=component,
-            operation=operation_label,
-            code=f"{surface}.{category}",
-            category=category,
-            visibility=DIAGNOSTIC_VISIBILITY_BASIC,
-            content_policy=CONTENT_POLICY_METADATA_ONLY,
-            status_code=status_code,
-            retry_after_ms=retry_after_ms,
-            fields=fields,
-        )),
+        diagnostics=sanitize_diagnostics(
+            ErrorDiagnostics(
+                component=component,
+                operation=operation_label,
+                code=f"{surface}.{category}",
+                category=category,
+                visibility=DIAGNOSTIC_VISIBILITY_BASIC,
+                content_policy=CONTENT_POLICY_METADATA_ONLY,
+                status_code=status_code,
+                retry_after_ms=retry_after_ms,
+                fields=fields,
+            )
+        ),
     )
 
 
@@ -525,7 +542,8 @@ def _classify_failure(
     status_code: int | None,
 ) -> DiagnosticCategory:
     explicit_categories = tuple(
-        category for item in _exception_chain(exc)
+        category
+        for item in _exception_chain(exc)
         if isinstance(category := getattr(item, "diagnostic_category", None), str)
         and category in DIAGNOSTIC_CATEGORIES
         and category != DIAGNOSTIC_CATEGORY_UNKNOWN

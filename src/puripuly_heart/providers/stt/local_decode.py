@@ -322,8 +322,13 @@ class LocalDecodeCoordinator:
                 callback_exc, provider="local_asr", channel="unknown", operation="decode"
             ).diagnostics
             emit_failure(
-                logger, replace(secondary, code="stt.decode_callback_failed", cause_id=primary.diagnostic_id),
-                severity="warning", disposition="degraded", stage="decode",
+                logger,
+                replace(
+                    secondary, code="stt.decode_callback_failed", cause_id=primary.diagnostic_id
+                ),
+                severity="warning",
+                disposition="degraded",
+                stage="decode",
             )
 
     def _update_backlog_warning(self) -> None:
@@ -347,6 +352,10 @@ class LocalDecodeCoordinator:
         except Exception as exc:
             emit_failure(
                 logger,
-                stt_failure_report(exc, provider="local_asr", channel="unknown", operation="decode").diagnostics,
-                severity="warning", disposition="degraded", stage="decode",
+                stt_failure_report(
+                    exc, provider="local_asr", channel="unknown", operation="decode"
+                ).diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="decode",
             )

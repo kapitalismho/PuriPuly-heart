@@ -1241,7 +1241,9 @@ def test_session_runtime_logging_preserves_text_when_observability_construction_
 
     try:
         runtime_logging.emit_basic("legacy text survives construction failure")
-        runtime_logging.observe_provider_operation(provider="openrouter", operation="translate", outcome="success")
+        runtime_logging.observe_provider_operation(
+            provider="openrouter", operation="translate", outcome="success"
+        )
 
         assert stream.getvalue().splitlines() == ["legacy text survives construction failure"]
         assert runner.awaitables == []
@@ -1260,7 +1262,9 @@ def test_session_runtime_logging_preserves_text_when_observability_cleanup_fails
 
     try:
         runtime_logging.emit_basic("legacy text survives cleanup failure")
-        runtime_logging.observe_provider_operation(provider="openrouter", operation="translate", outcome="success")
+        runtime_logging.observe_provider_operation(
+            provider="openrouter", operation="translate", outcome="success"
+        )
 
         assert stream.getvalue().splitlines() == ["legacy text survives cleanup failure"]
         assert runner.awaitables == [sink.awaitable]

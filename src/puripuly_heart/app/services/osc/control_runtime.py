@@ -213,11 +213,20 @@ class OscControlIntegrationOwner:
                 {
                     "diagnostic_id": self._publication_failure.diagnostic_id,
                     "code": self._publication_failure.code,
-                    "local_send_completed": self._publication_failure.fields.get("local_send_completed"),
-                    "local_send_requested": self._publication_failure.fields.get("local_send_requested"),
-                    "disposition": "partial" if self._publication_failure.fields.get("local_send_completed", 0) else "failed",
+                    "local_send_completed": self._publication_failure.fields.get(
+                        "local_send_completed"
+                    ),
+                    "local_send_requested": self._publication_failure.fields.get(
+                        "local_send_requested"
+                    ),
+                    "disposition": (
+                        "partial"
+                        if self._publication_failure.fields.get("local_send_completed", 0)
+                        else "failed"
+                    ),
                 }
-                if self._publication_failure is not None else None
+                if self._publication_failure is not None
+                else None
             ),
             "local_availability": availability,
             "remote_delivery": "unacknowledged",
@@ -365,14 +374,21 @@ class OscControlIntegrationOwner:
             emit_failure(
                 logger,
                 ErrorDiagnostics(
-                    component="osc_control", operation="discovery", code="oscquery_unavailable",
-                    category="network", visibility="basic", content_policy="metadata_only",
-                    status_code=None, retry_after_ms=None,
+                    component="osc_control",
+                    operation="discovery",
+                    code="oscquery_unavailable",
+                    category="network",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
                     fields={"remote_delivery": "unacknowledged"},
                     generation=resync_generation,
                     **self._resync_operation_identity,
                 ),
-                severity="warning", disposition="degraded", stage="automatic_discovery",
+                severity="warning",
+                disposition="degraded",
+                stage="automatic_discovery",
                 exception=exc,
             )
             await self._receiver_owner.ensure_receiver()
@@ -529,7 +545,9 @@ class OscControlIntegrationOwner:
         try:
             published = publisher.start(self._state_provider())
         except Exception as exc:
-            self._record_publication_failure("startup_state", exc, origin=self._resync_operation_identity)
+            self._record_publication_failure(
+                "startup_state", exc, origin=self._resync_operation_identity
+            )
             return
         self._mark_resync_ready(generation)
         self._record_publication_success("startup_state", published)
@@ -584,7 +602,11 @@ class OscControlIntegrationOwner:
             else:
                 published = publisher.start(state)
         except Exception as exc:
-            self._record_publication_failure("snapshot_state", exc, origin=self._resync_operation_identity if generation is not None else None)
+            self._record_publication_failure(
+                "snapshot_state",
+                exc,
+                origin=self._resync_operation_identity if generation is not None else None,
+            )
             return
         self._mark_resync_ready(generation)
         self._record_publication_success("snapshot_state", published)
@@ -599,9 +621,15 @@ class OscControlIntegrationOwner:
                 local_send_requested=exception.requested,
             )
         diagnostics = ErrorDiagnostics(
-            component="osc_control", operation="publish_state", code="osc_state_send_failed",
-            category="network", visibility="basic", content_policy="metadata_only",
-            status_code=None, retry_after_ms=None, fields=fields,
+            component="osc_control",
+            operation="publish_state",
+            code="osc_state_send_failed",
+            category="network",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields=fields,
             generation=self._resync_generation,
             **(current_diagnostic_operation() if origin is None else origin),
         )
@@ -609,7 +637,8 @@ class OscControlIntegrationOwner:
             self._publication_failure = diagnostics
             self._publication_pending = (
                 set(exception.pending_parameters)
-                if isinstance(exception, OscStatePublicationError) else None
+                if isinstance(exception, OscStatePublicationError)
+                else None
             )
         elif self._publication_pending is not None:
             if isinstance(exception, OscStatePublicationError):
@@ -620,7 +649,9 @@ class OscControlIntegrationOwner:
         emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage=stage)
 
     def _record_publication_success(
-        self, stage: str, published: tuple[OscPublishedValue, ...],
+        self,
+        stage: str,
+        published: tuple[OscPublishedValue, ...],
     ) -> None:
         failure = self._publication_failure
         if failure is None or not published:
@@ -636,12 +667,23 @@ class OscControlIntegrationOwner:
         self._publication_pending = None
         completed = len(published)
         diagnostics = ErrorDiagnostics(
-            component="osc_control", operation="publish_state", code="osc_state_send_recovered",
-            category="network", visibility="basic", content_policy="metadata_only",
-            status_code=None, retry_after_ms=None,
-            fields={"local_send_completed": completed, "local_send_requested": completed, "remote_delivery": "unacknowledged"},
-            generation=self._resync_generation, cause_id=failure.diagnostic_id,
-            operation_id=failure.operation_id, request_id=failure.request_id,
+            component="osc_control",
+            operation="publish_state",
+            code="osc_state_send_recovered",
+            category="network",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={
+                "local_send_completed": completed,
+                "local_send_requested": completed,
+                "remote_delivery": "unacknowledged",
+            },
+            generation=self._resync_generation,
+            cause_id=failure.diagnostic_id,
+            operation_id=failure.operation_id,
+            request_id=failure.request_id,
         )
         emit_failure(logger, diagnostics, severity="info", disposition="recovered", stage=stage)
 

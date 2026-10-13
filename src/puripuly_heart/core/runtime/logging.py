@@ -73,6 +73,7 @@ def _deliver_record(logger: logging.Logger, record: logging.LogRecord) -> bool:
 
 class RuntimeLoggingAdapterPort(Protocol):
     log_file: Path
+
     def configure_diagnostics(self, *, instance_id: str | None = None, event_sink=None) -> None: ...
 
     def diagnostic_history(self, arguments: dict) -> dict: ...
@@ -80,11 +81,14 @@ class RuntimeLoggingAdapterPort(Protocol):
     def diagnostic_health(self) -> dict: ...
 
     def emit_failure(
-        self, diagnostics: ErrorDiagnostics, *, severity: str = "error",
-        disposition: str = "failed", stage: str | None = None,
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
         exception: BaseException | None = None,
     ) -> dict: ...
-
 
     def attach_realtime_sink(self, sink: RealtimeLogSink) -> None: ...
 
@@ -215,13 +219,20 @@ class RuntimeLoggingService:
         return self._session.diagnostic_health()
 
     def emit_failure(
-        self, diagnostics: ErrorDiagnostics, *, severity: str = "error",
-        disposition: str = "failed", stage: str | None = None,
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
         exception: BaseException | None = None,
     ) -> dict:
         return self._session.emit_failure(
-            diagnostics, severity=severity, disposition=disposition,
-            stage=stage, exception=exception,
+            diagnostics,
+            severity=severity,
+            disposition=disposition,
+            stage=stage,
+            exception=exception,
         )
 
     def record_output_routing_decision(self, decision) -> None:
@@ -277,11 +288,18 @@ class RuntimeLoggingService:
             if rendered is None:
                 self._session.emit_failure(
                     ErrorDiagnostics(
-                        component="runtime_logging", operation="emit",
-                        code="diagnostic_builder_failed", category="lifecycle",
-                        visibility="diagnostic_only", content_policy="metadata_only",
-                        status_code=None, retry_after_ms=None, fields={},
-                    ), stage="diagnostic", exception=exc,
+                        component="runtime_logging",
+                        operation="emit",
+                        code="diagnostic_builder_failed",
+                        category="lifecycle",
+                        visibility="diagnostic_only",
+                        content_policy="metadata_only",
+                        status_code=None,
+                        retry_after_ms=None,
+                        fields={},
+                    ),
+                    stage="diagnostic",
+                    exception=exc,
                 )
                 return False
             return self._emit_delivery_fallback(rendered, level=level, live=False)

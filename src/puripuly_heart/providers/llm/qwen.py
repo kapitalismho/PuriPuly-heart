@@ -19,9 +19,6 @@ _QWEN_COMPATIBLE_MODELS = frozenset({"qwen3.5-flash", "qwen3.5-plus", "qwen3.8-f
 _QWEN_PROBE_MODEL = "qwen3.8-flash"
 
 
-
-
-
 def _build_system_prompt(
     *,
     system_prompt: str,
@@ -52,7 +49,9 @@ def _extract_message_content(content: object) -> str:
         result = content.strip()
         if result:
             return result
-        raise LLMResponseError("DashScope response contained empty message content", provider="qwen")
+        raise LLMResponseError(
+            "DashScope response contained empty message content", provider="qwen"
+        )
 
     if isinstance(content, list):
         parts: list[str] = []
@@ -176,7 +175,9 @@ class QwenLLMProvider:
                         },
                     )
                     if response.status_code != 200:
-                        record_probe_failure(None, provider="qwen", status_code=response.status_code)
+                        record_probe_failure(
+                            None, provider="qwen", status_code=response.status_code
+                        )
                     return response.status_code == 200
             except Exception as exc:
                 record_probe_failure(exc, provider="qwen")
@@ -198,7 +199,9 @@ class QwenLLMProvider:
                             session=session,
                         )
                     if response.status_code != 200:
-                        record_probe_failure(None, provider="qwen", status_code=response.status_code)
+                        record_probe_failure(
+                            None, provider="qwen", status_code=response.status_code
+                        )
                     return response.status_code == 200
                 except Exception as exc:
                     record_probe_failure(exc, provider="qwen")
@@ -300,9 +303,10 @@ class DashScopeQwenClient:
                         json=compatible_body,
                     )
                 if response.status_code != 200:
-                    
+
                     raise LLMResponseError(
-                        "DashScope compatible-mode request failed", provider="qwen",
+                        "DashScope compatible-mode request failed",
+                        provider="qwen",
                         status_code=response.status_code,
                     )
                 try:
@@ -317,12 +321,18 @@ class DashScopeQwenClient:
                     observation.record_openai_response(data)
                 choices = data.get("choices", [])
                 if not isinstance(choices, list) or not choices:
-                    raise LLMResponseError("DashScope response did not contain choices", provider="qwen")
+                    raise LLMResponseError(
+                        "DashScope response did not contain choices", provider="qwen"
+                    )
                 if not isinstance(choices[0], dict):
-                    raise LLMResponseError("DashScope response choice was malformed", provider="qwen")
+                    raise LLMResponseError(
+                        "DashScope response choice was malformed", provider="qwen"
+                    )
                 message = choices[0].get("message", {})
                 if not isinstance(message, dict):
-                    raise LLMResponseError("DashScope response message was malformed", provider="qwen")
+                    raise LLMResponseError(
+                        "DashScope response message was malformed", provider="qwen"
+                    )
                 result = _extract_message_content(message.get("content"))
 
                 return result
@@ -367,9 +377,10 @@ class DashScopeQwenClient:
             output = getattr(response, "output", None)
             if not output:
                 status = getattr(response, "status_code", None)
-                
+
                 raise LLMResponseError(
-                    "DashScope response did not contain output", provider="qwen",
+                    "DashScope response did not contain output",
+                    provider="qwen",
                     status_code=status if type(status) is int else None,
                 )
             choice = output.get("choices", [{}])[0]

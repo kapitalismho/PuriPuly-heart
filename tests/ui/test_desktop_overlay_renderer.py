@@ -3952,12 +3952,13 @@ async def test_desktop_overlay_retained_surface_shrinks_lanes_only_until_new_cap
         )
         assert (primary.size, secondary.size) == pytest.approx((32.8, 20))
         assert (primary.value, secondary.value) == ("Hello", "訳")
-        assert (model.primary_regions[0].height, model.secondary_regions[0].height) == region_heights
+        assert (
+            model.primary_regions[0].height,
+            model.secondary_regions[0].height,
+        ) == region_heights
 
         await window.dispatch_snapshot(
-            OverlayPresentationSnapshot(
-                revision=6, blocks=[replace(short_block, appearance_seq=2)]
-            )
+            OverlayPresentationSnapshot(revision=6, blocks=[replace(short_block, appearance_seq=2)])
         )
         assert (primary.size, secondary.size) == (41, 25)
         assert window._retained_caption_surface is model
@@ -4021,7 +4022,9 @@ async def test_desktop_overlay_runtime_and_local_preview_match_stateless_auto_sh
             assert retained_text.size == stateless_text.size == pytest.approx(line.font_size)
             assert retained_text.style.size == stateless_text.style.size
             expected_height = (
-                plan.primary_region_height if line.slot == "primary" else plan.secondary_region_height
+                plan.primary_region_height
+                if line.slot == "primary"
+                else plan.secondary_region_height
             )
             assert region.height == pytest.approx(expected_height)
         assert [line.font_size for line in plan.lines] == pytest.approx([32.8, 20])
@@ -5736,7 +5739,9 @@ async def test_desktop_overlay_window_start_failure_reports_window_configuration
     assert bridge_event["failure_reason"] == expected["failure_reason"]
     assert bridge_event["exception_class"] == "RuntimeError"
     assert bridge_event["overlay_instance_id"] == "desktop-overlay-test"
-    assert any(event.get("failure_reason") == "window_configuration_failed" for event in sink.events)
+    assert any(
+        event.get("failure_reason") == "window_configuration_failed" for event in sink.events
+    )
     assert sink.events[-1] == {
         "type": "shutdown_complete",
         "overlay_instance_id": "desktop-overlay-test",
@@ -6392,8 +6397,11 @@ async def test_desktop_shutdown_retains_failed_window_and_retries_independent_re
     port = RecordingRendererDiagnosticPort()
     monitor = ClosableFakeParentMonitor()
     renderer = desktop_overlay.DesktopOverlayRenderer(
-        _manifest(), window=window, lifecycle_sink=sink,
-        diagnostic_port=port, parent_monitor=monitor,
+        _manifest(),
+        window=window,
+        lifecycle_sink=sink,
+        diagnostic_port=port,
+        parent_monitor=monitor,
     )
     await renderer.shutdown()
     assert port.closed
@@ -6423,7 +6431,9 @@ async def test_desktop_runtime_window_failure_preserves_safe_cause(boundary: str
 
     sink = RecordingLifecycleSink()
     renderer = desktop_overlay.DesktopOverlayRenderer(
-        _manifest(), window=FailedWindow(), lifecycle_sink=sink,
+        _manifest(),
+        window=FailedWindow(),
+        lifecycle_sink=sink,
         parent_monitor=FakeParentMonitor(),
     )
     try:

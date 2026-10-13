@@ -310,10 +310,15 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
         retire = outcome in ("failed", "cancelled")
         diagnostics = (
             recognition_failure_diagnostics(
-                exception, provider="custom", channel=self._event_projection.channel or "unknown",
-                operation="receive", reason=failure_reason or outcome, identity=identity,
+                exception,
+                provider="custom",
+                channel=self._event_projection.channel or "unknown",
+                operation="receive",
+                reason=failure_reason or outcome,
+                identity=identity,
             )
-            if outcome in {"failed", "degraded", "expired"} else None
+            if outcome in {"failed", "degraded", "expired"}
+            else None
         )
         self._event_projection.terminal(
             STTProviderTurnTerminal(
@@ -670,10 +675,15 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
             timeout_task.cancel()
         diagnostics = (
             recognition_failure_diagnostics(
-                exception, provider="custom", channel=self._event_projection.channel or "unknown",
-                operation="receive", reason=failure_reason or outcome, identity=identity,
+                exception,
+                provider="custom",
+                channel=self._event_projection.channel or "unknown",
+                operation="receive",
+                reason=failure_reason or outcome,
+                identity=identity,
             )
-            if outcome in {"failed", "degraded", "expired"} else None
+            if outcome in {"failed", "degraded", "expired"}
+            else None
         )
         self._event_projection.terminal(
             STTProviderTurnTerminal(

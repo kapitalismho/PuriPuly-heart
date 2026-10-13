@@ -43,14 +43,12 @@ _KNOWN_PROCESS_EVENT_TYPES = (
     | frozenset({"overlay_event", "shutdown_ack"})
 )
 
+
 class OverlayReaderCleanupError(RuntimeError):
-    def __init__(
-        self, *, unresolved_count: int, failures: tuple[dict[str, object], ...]
-    ) -> None:
+    def __init__(self, *, unresolved_count: int, failures: tuple[dict[str, object], ...]) -> None:
         super().__init__("overlay child reader cleanup failed")
         self.unresolved_count = unresolved_count
         self.failures = failures
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,7 +94,11 @@ class _BoundedProcessEventQueue:
                     for field_name in ("primary_failure_reason", "cleanup_failure_reason"):
                         if existing.get(field_name) is None and event.get(field_name) is not None:
                             existing[field_name] = event[field_name]
-                    for field_name in ("diagnostic_dropped", "reliable_delivery_failures", "rejected_records"):
+                    for field_name in (
+                        "diagnostic_dropped",
+                        "reliable_delivery_failures",
+                        "rejected_records",
+                    ):
                         value = event.get(field_name)
                         if type(value) is int:
                             existing[field_name] = max(value, existing.get(field_name, 0))
@@ -305,13 +307,20 @@ class _AsyncioOverlayProcess:
                     if self._events.dropped_diagnostics > dropped_before:
                         sink = self._lifecycle_sink
                         if sink is not None:
-                            sink("native_diagnostic_loss", {"diagnostic_dropped": self._events.dropped_diagnostics})
+                            sink(
+                                "native_diagnostic_loss",
+                                {"diagnostic_dropped": self._events.dropped_diagnostics},
+                            )
                     if not accepted:
                         payload = event.get("payload")
                         payload_event = (
                             str(payload.get("event", "")) if isinstance(payload, dict) else ""
                         )
-                        if payload_event not in {"window_bounds_changed", "interaction_mode_changed", "reset_to_bottom_center_requested"}:
+                        if payload_event not in {
+                            "window_bounds_changed",
+                            "interaction_mode_changed",
+                            "reset_to_bottom_center_requested",
+                        }:
                             payload_event = "unclassified"
                         sink = self._lifecycle_sink
                         if sink is not None:
@@ -360,11 +369,18 @@ class _AsyncioOverlayProcess:
             and isinstance(payload.get("type"), str)
             and payload["type"] in _KNOWN_PROCESS_EVENT_TYPES
         ):
-            if payload["type"] in {"startup_error", "runtime_error", "owner_status", "shutdown_complete", "shutdown_ack"}:
+            if payload["type"] in {
+                "startup_error",
+                "runtime_error",
+                "owner_status",
+                "shutdown_complete",
+                "shutdown_ack",
+            }:
                 wire_instance = payload.get("overlay_instance_id")
                 wire_generation = payload.get("runtime_generation")
                 if (
-                    self.overlay_instance_id is not None and wire_instance is not None
+                    self.overlay_instance_id is not None
+                    and wire_instance is not None
                     and wire_instance != self.overlay_instance_id
                     or wire_generation is not None
                     and (type(wire_generation) is not int or wire_generation != 1)
@@ -460,5 +476,9 @@ class _AsyncioOverlayProcess:
         if sink is not None:
             sink(
                 "process_readers_finished",
-                {"cancelled_count": cancelled_count, "diagnostic_dropped": self._events.dropped_diagnostics, "rejected_records": self._events.rejected_controls},
+                {
+                    "cancelled_count": cancelled_count,
+                    "diagnostic_dropped": self._events.dropped_diagnostics,
+                    "rejected_records": self._events.rejected_controls,
+                },
             )

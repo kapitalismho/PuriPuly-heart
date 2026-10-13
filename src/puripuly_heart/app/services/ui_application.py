@@ -324,13 +324,13 @@ class UiApplicationBoundary:
             else None
         )
         return {
-            "observation_succeeded": snapshot.get("process_observation_succeeded")
-            if snapshot
-            else None,
+            "observation_succeeded": (
+                snapshot.get("process_observation_succeeded") if snapshot else None
+            ),
             "process_present": snapshot.get("process_present") if snapshot else None,
-            "observation_diagnostic_id": snapshot.get("observation_diagnostic_id")
-            if snapshot
-            else None,
+            "observation_diagnostic_id": (
+                snapshot.get("observation_diagnostic_id") if snapshot else None
+            ),
         }
 
     async def wait_overlay_transition(self) -> dict[str, object]:

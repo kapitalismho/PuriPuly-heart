@@ -36,8 +36,10 @@ async def test_peer_admission_retains_initiating_command_and_exact_native_cause(
                 request, gpu_runtime=gpu_runtime, on_terminal_failure=on_terminal_failure
             )
             if self.armed:
+
                 async def fail_warmup():
                     raise TimeoutError("PRIVATE_PEER_PROVIDER_WARMUP")
+
                 provider.warmup = fail_warmup
             return provider
 
@@ -102,7 +104,10 @@ async def test_peer_admission_retains_initiating_command_and_exact_native_cause(
             assert recovered.generation == generation_before
             assert recovered.effective_active
             assert recovered.failure_diagnostics is None
-            assert history.query({"operation_id": operation})["records"][0]["diagnostic_id"] == native["diagnostic_id"]
+            assert (
+                history.query({"operation_id": operation})["records"][0]["diagnostic_id"]
+                == native["diagnostic_id"]
+            )
         else:
             assert snapshot.state is PeerCaptureSessionState.FAULTED
             assert not snapshot.effective_active

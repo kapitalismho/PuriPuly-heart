@@ -717,7 +717,8 @@ async def test_cancelled_spawn_keeps_handle_and_fails_close(
 
 @pytest.mark.asyncio
 async def test_owner_bounds_failed_kill_retains_cause_and_later_close_recovers(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     class FailedKillProcess(FakeProcess):
         def terminate(self) -> None:
@@ -729,9 +730,13 @@ async def test_owner_bounds_failed_kill_retains_cause_and_later_close_recovers(
     process = FailedKillProcess(terminate_exits=False, kill_exits=False)
     pid_file = _pid_file(tmp_path)
     owner = FletDesktopViewProcessOwner(
-        graceful_timeout_s=0.0, terminate_timeout_s=0.0,
-        process_job=FakeProcessJob(), close_requester=FakeCloseRequester(),
-        trace_sink=lambda _event, _fields: (_ for _ in ()).throw(ValueError("SYNTHETIC_PRIVATE_OBSERVER_TOKEN")),
+        graceful_timeout_s=0.0,
+        terminate_timeout_s=0.0,
+        process_job=FakeProcessJob(),
+        close_requester=FakeCloseRequester(),
+        trace_sink=lambda _event, _fields: (_ for _ in ()).throw(
+            ValueError("SYNTHETIC_PRIVATE_OBSERVER_TOKEN")
+        ),
     )
     await owner.attach(process, str(pid_file))
     with pytest.raises(RuntimeError) as caught:
@@ -752,8 +757,10 @@ async def test_owner_bounds_failed_kill_retains_cause_and_later_close_recovers(
 @pytest.mark.asyncio
 async def test_owner_retains_cancelled_inflight_startup_without_false_close() -> None:
     owner = FletDesktopViewProcessOwner(
-        graceful_timeout_s=0.0, terminate_timeout_s=0.0,
-        process_job=FakeProcessJob(), close_requester=FakeCloseRequester(),
+        graceful_timeout_s=0.0,
+        terminate_timeout_s=0.0,
+        process_job=FakeProcessJob(),
+        close_requester=FakeCloseRequester(),
     )
     assert await owner.begin_launch()
     with pytest.raises(RuntimeError, match="launch cleanup failed"):

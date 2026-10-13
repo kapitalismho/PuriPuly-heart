@@ -932,7 +932,9 @@ async def test_go_away_without_positive_grace_retires_immediately(
             message = persisted.getMessage()
             assert "private-" not in message
             assert record.exc_info is None
-            diagnostics, severity, disposition, stage, _ = getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            diagnostics, severity, disposition, stage, _ = getattr(
+                record, DIAGNOSTIC_RECORD_ATTRIBUTE
+            )
             assert diagnostics.fields["recognition_cause"] == terminal.failure_reason
             assert diagnostics.fields["message_kind"] == "go_away"
             assert (severity, disposition, stage) == ("info", "degraded", "receive")

@@ -224,8 +224,6 @@ class _ValidatedDiagnosticProjection:
     text: str
 
 
-
-
 class _DiagnosticIngressHandler(logging.Handler):
     def __init__(self, owner: SessionRuntimeLoggingService) -> None:
         super().__init__(logging.NOTSET)
@@ -242,13 +240,14 @@ class _DiagnosticIngressHandler(logging.Handler):
                 if not isinstance(diagnostics, ErrorDiagnostics):
                     raise TypeError
                 self.owner.emit_failure(
-                    diagnostics, severity=severity, disposition=disposition, stage=stage,
+                    diagnostics,
+                    severity=severity,
+                    disposition=disposition,
+                    stage=stage,
                     exception=exception,
                 )
             except Exception:
                 self.owner._diagnostic_history.rejected_records += 1
-
-
 
 
 def _is_metadata_only_text(message: str) -> bool:
@@ -259,15 +258,66 @@ def _is_metadata_only_text(message: str) -> bool:
     prefix = _METADATA_PREFIX_RE.match(message)
     if prefix is None:
         return False
-    tags = re.findall(r"\[([A-Za-z][A-Za-z0-9_-]*)\]", message[:prefix.end()])
-    if any(tag not in {"Lifecycle", "Startup", "Shutdown", "Logging", "STT", "LLM", "Provider", "Translation", "Output", "OSC", "ASR", "Capture", "GPU", "Overlay", "Native", "DesktopOverlay", "Settings", "QQAuth", "Auth", "UI", "Context", "Conversation", "SelfCapture", "PeerCapture", "LocalASR", "Soniox"} for tag in tags):
+    tags = re.findall(r"\[([A-Za-z][A-Za-z0-9_-]*)\]", message[: prefix.end()])
+    if any(
+        tag
+        not in {
+            "Lifecycle",
+            "Startup",
+            "Shutdown",
+            "Logging",
+            "STT",
+            "LLM",
+            "Provider",
+            "Translation",
+            "Output",
+            "OSC",
+            "ASR",
+            "Capture",
+            "GPU",
+            "Overlay",
+            "Native",
+            "DesktopOverlay",
+            "Settings",
+            "QQAuth",
+            "Auth",
+            "UI",
+            "Context",
+            "Conversation",
+            "SelfCapture",
+            "PeerCapture",
+            "LocalASR",
+            "Soniox",
+        }
+        for tag in tags
+    ):
         return False
-    tokens = message[prefix.end():].split()
+    tokens = message[prefix.end() :].split()
     if not tokens or len(tokens) > 33:
         return False
     event = tokens[0]
     known_stage, _ = sanitize_diagnostic_fields({"phase": event})
-    if event not in {"boundary", "untrusted_record_redacted", "diagnostic_delivery_failed", "oversized_record_rejected", "logging_close", "logging_delivery_terminal", "coordinator_terminal", "callback_failed", "stall", "runtime_state", "await_graph", "failed", "turn_end", "session_fault"} and not known_stage and not is_supported_diagnostic_code(event, frozenset()):
+    if (
+        event
+        not in {
+            "boundary",
+            "untrusted_record_redacted",
+            "diagnostic_delivery_failed",
+            "oversized_record_rejected",
+            "logging_close",
+            "logging_delivery_terminal",
+            "coordinator_terminal",
+            "callback_failed",
+            "stall",
+            "runtime_state",
+            "await_graph",
+            "failed",
+            "turn_end",
+            "session_fault",
+        }
+        and not known_stage
+        and not is_supported_diagnostic_code(event, frozenset())
+    ):
         return False
     for token in tokens[1:]:
         if _METADATA_FIELD_RE.fullmatch(token) is None:
@@ -278,30 +328,73 @@ def _is_metadata_only_text(message: str) -> bool:
             "failure_code": stt_startup_failure_code,
             "failure_type": stt_startup_failure_type,
         }.get(key)
-        if validator is not None and (value in {"none", "unclassified"} or validator(value) == value):
+        if validator is not None and (
+            value in {"none", "unclassified"} or validator(value) == value
+        ):
             continue
         if tags == ["Soniox"] and event in {"turn_end", "session_fault"}:
-            if key in {"epoch", "turn", "utterance_id"} and (value == "none" or re.fullmatch(r"[0-9a-fA-F-]{32,36}", value)):
+            if key in {"epoch", "turn", "utterance_id"} and (
+                value == "none" or re.fullmatch(r"[0-9a-fA-F-]{32,36}", value)
+            ):
                 continue
-            if key in {"server_error_code", "ws_close_code"} and (value in {"none", "unclassified"} or (value.isdecimal() and len(value) <= 10)):
+            if key in {"server_error_code", "ws_close_code"} and (
+                value in {"none", "unclassified"} or (value.isdecimal() and len(value) <= 10)
+            ):
                 continue
-            if key in {"session_age_ms", "finalize_queue_ms", "since_finalize_requested_ms", "since_finalize_written_ms", "last_rx_age_ms"} and (value == "none" or re.fullmatch(r"[0-9]{1,20}(?:\.[0-9]{1,3})?", value)):
+            if key in {
+                "session_age_ms",
+                "finalize_queue_ms",
+                "since_finalize_requested_ms",
+                "since_finalize_written_ms",
+                "last_rx_age_ms",
+            } and (value == "none" or re.fullmatch(r"[0-9]{1,20}(?:\.[0-9]{1,3})?", value)):
                 continue
-            if key in {"diarization", "finalize_requested", "finalize_written", "fin_received", "fin_accepted"} and value in {"true", "false"}:
+            if key in {
+                "diarization",
+                "finalize_requested",
+                "finalize_written",
+                "fin_received",
+                "fin_accepted",
+            } and value in {"true", "false"}:
                 continue
-            if key == "exception_type" and (value in {"none", "unclassified"} or stt_startup_failure_type(value) == value):
+            if key == "exception_type" and (
+                value in {"none", "unclassified"} or stt_startup_failure_type(value) == value
+            ):
                 continue
             if key == "protocol_detail" and value == "none":
                 continue
-            if key == "reason" and value in {"none", "soniox_request_failed", "soniox_transport_failed", "soniox_protocol_failed", "soniox_task_failed", "final", "empty", "cancelled"}:
+            if key == "reason" and value in {
+                "none",
+                "soniox_request_failed",
+                "soniox_transport_failed",
+                "soniox_protocol_failed",
+                "soniox_task_failed",
+                "final",
+                "empty",
+                "cancelled",
+            }:
                 continue
-            if key == "trigger" and value in {"provider_error", "receive_failed", "protocol_failed", "seal", "abort", "finished", "task_cancelled", "local_stop", "local_close"}:
+            if key == "trigger" and value in {
+                "provider_error",
+                "receive_failed",
+                "protocol_failed",
+                "seal",
+                "abort",
+                "finished",
+                "task_cancelled",
+                "local_stop",
+                "local_close",
+            }:
                 continue
         if key in {"logger_sha256", "message_sha256"} and re.fullmatch(r"[0-9a-f]{16}", value):
             continue
         if key == "level" and value in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
             continue
-        if key in {"message_len", "character_count", "file_cap_bytes"} and value.isdecimal() and len(value) <= 20:
+        if (
+            key in {"message_len", "character_count", "file_cap_bytes"}
+            and value.isdecimal()
+            and len(value) <= 20
+        ):
             continue
         fields, rejected = sanitize_diagnostic_fields({key: value})
         if not rejected:
@@ -465,9 +558,15 @@ class _BatchingRotatingFileHandler(RotatingFileHandler):
             self.delivery_failures += len(records)
             if self.failure_diagnostics is None:
                 self.failure_diagnostics = ErrorDiagnostics(
-                    component="runtime_logging", operation="write", code="log_file_delivery_failed",
-                    category="transaction", visibility="basic", content_policy="metadata_only",
-                    status_code=None, retry_after_ms=None, fields=safe_exception_fields(exc),
+                    component="runtime_logging",
+                    operation="write",
+                    code="log_file_delivery_failed",
+                    category="transaction",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields=safe_exception_fields(exc),
                 )
                 if self.failure_sink is not None:
                     try:
@@ -587,9 +686,15 @@ class _BoundedQueueHandler(QueueHandler):
             self.enqueued_records += 1
         if (not accepted or evicted) and self.failure_diagnostics is None:
             self.failure_diagnostics = ErrorDiagnostics(
-                component="runtime_logging", operation="enqueue", code="log_queue_overflow",
-                category="lifecycle", visibility="basic", content_policy="metadata_only",
-                status_code=None, retry_after_ms=None, fields={"queue_capacity": self.queue.maxsize},
+                component="runtime_logging",
+                operation="enqueue",
+                code="log_queue_overflow",
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={"queue_capacity": self.queue.maxsize},
             )
             if self.failure_sink is not None:
                 try:
@@ -880,7 +985,6 @@ class SessionRuntimeLoggingService:
                 if handler.failure_diagnostics is not None:
                     self._record_delivery_failure(handler.failure_diagnostics)
 
-
         file_output_handler = (
             getattr(self._sinks, "file_queue_handler", None) or self._sinks.file_handler
         )
@@ -899,8 +1003,11 @@ class SessionRuntimeLoggingService:
     @property
     def log_file(self) -> Path:
         return self._sinks.log_file
+
     def configure_diagnostics(
-        self, *, instance_id: str | None = None,
+        self,
+        *,
+        instance_id: str | None = None,
         event_sink: Callable[[dict], None] | None = None,
     ) -> None:
         if instance_id is not None:
@@ -933,7 +1040,9 @@ class SessionRuntimeLoggingService:
             loop.call_soon_threadsafe(self._drain_diagnostic_events)
         except RuntimeError:
             with self._diagnostic_event_lock:
-                self._diagnostic_history.subscriber_delivery_failures += len(self._pending_diagnostic_events)
+                self._diagnostic_history.subscriber_delivery_failures += len(
+                    self._pending_diagnostic_events
+                )
                 self._pending_diagnostic_events.clear()
                 self._diagnostic_delivery_scheduled = False
 
@@ -952,21 +1061,34 @@ class SessionRuntimeLoggingService:
             except Exception:
                 self._diagnostic_history.subscriber_delivery_failures += 1
 
-
     def diagnostic_health(self) -> dict:
         health = self._diagnostic_history.health()
         queue_handler = self._sinks.file_queue_handler
         file_handler = self._sinks.file_handler
         listener = self._sinks.file_queue_listener
         file_queue = self._sinks.file_queue
-        failures = int(getattr(file_handler, "delivery_failures", 0)) + int(getattr(listener, "delivery_failures", 0))
-        dropped = int(getattr(queue_handler, "dropped_records", 0)) + int(getattr(listener, "shutdown_drops", 0)) + self._sinks.abandoned_records
+        failures = int(getattr(file_handler, "delivery_failures", 0)) + int(
+            getattr(listener, "delivery_failures", 0)
+        )
+        dropped = (
+            int(getattr(queue_handler, "dropped_records", 0))
+            + int(getattr(listener, "shutdown_drops", 0))
+            + self._sinks.abandoned_records
+        )
         thread = getattr(listener, "_thread", None)
         pending = int(file_queue.unfinished_tasks) if file_queue is not None else 0
         last_progress = getattr(file_handler, "last_progress_at", None)
-        age_ms = max(0, int((time.monotonic() - last_progress) * 1000)) if last_progress is not None else None
+        age_ms = (
+            max(0, int((time.monotonic() - last_progress) * 1000))
+            if last_progress is not None
+            else None
+        )
         pending_since = getattr(file_queue, "pending_since", None)
-        pending_age_ms = max(0, int((time.monotonic() - pending_since) * 1000)) if pending_since is not None else None
+        pending_age_ms = (
+            max(0, int((time.monotonic() - pending_since) * 1000))
+            if pending_since is not None
+            else None
+        )
         written = getattr(file_handler, "written_records", None)
         cleanup_failures = len(getattr(listener, "cleanup_failures", ()))
         health["basic"] = {
@@ -976,63 +1098,143 @@ class SessionRuntimeLoggingService:
         health["history"]["subscriber_dispatch_pending"] = len(self._pending_diagnostic_events)
         health["history"]["subscriber_dispatch_capacity"] = self._pending_diagnostic_events.maxlen
         health["file"] = {
-            "availability": "closed" if self._closed else "closing" if self._sinks._closed else "failed" if failures else "stalled" if pending and age_ms is not None and pending_age_ms is not None and min(age_ms, pending_age_ms) >= 2000 else "pending" if pending else "active" if written is not None else "unknown",
+            "availability": (
+                "closed"
+                if self._closed
+                else (
+                    "closing"
+                    if self._sinks._closed
+                    else (
+                        "failed"
+                        if failures
+                        else (
+                            "stalled"
+                            if pending
+                            and age_ms is not None
+                            and pending_age_ms is not None
+                            and min(age_ms, pending_age_ms) >= 2000
+                            else (
+                                "pending"
+                                if pending
+                                else "active" if written is not None else "unknown"
+                            )
+                        )
+                    )
+                )
+            ),
             "queue_capacity": getattr(file_queue, "maxsize", None),
             "queue_pending": pending,
             "enqueued_records": getattr(queue_handler, "enqueued_records", None),
             "written_records": written,
-            "delivery_failures": failures, "dropped_records": dropped,
-            "oversized_rejected": int(getattr(queue_handler, "oversized_records", 0)) + int(getattr(file_handler, "oversized_records", 0)),
+            "delivery_failures": failures,
+            "dropped_records": dropped,
+            "oversized_rejected": int(getattr(queue_handler, "oversized_records", 0))
+            + int(getattr(file_handler, "oversized_records", 0)),
             "writer_alive": thread.is_alive() if thread is not None else None,
-            "shutdown_complete": bool(listener.cleanup_complete and not cleanup_failures) if listener is not None else None,
+            "shutdown_complete": (
+                bool(listener.cleanup_complete and not cleanup_failures)
+                if listener is not None
+                else None
+            ),
             "shutdown_attempt_complete": getattr(listener, "cleanup_complete", None),
             "cleanup_failures": cleanup_failures,
             "last_progress_age_ms": age_ms,
             "pending_episode_age_ms": pending_age_ms,
-            "delivery_diagnostic_id": getattr(getattr(file_handler, "failure_diagnostics", None), "diagnostic_id", None),
-            "loss_diagnostic_id": getattr(getattr(queue_handler, "failure_diagnostics", None), "diagnostic_id", None),
-            "failure_notification_failures": int(getattr(file_handler, "failure_notification_failures", 0)) + int(getattr(queue_handler, "failure_notification_failures", 0)),
-            "persistence": "incomplete" if failures or dropped or cleanup_failures else "pending" if pending else "unknown" if written is None else "written_not_durable",
+            "delivery_diagnostic_id": getattr(
+                getattr(file_handler, "failure_diagnostics", None), "diagnostic_id", None
+            ),
+            "loss_diagnostic_id": getattr(
+                getattr(queue_handler, "failure_diagnostics", None), "diagnostic_id", None
+            ),
+            "failure_notification_failures": int(
+                getattr(file_handler, "failure_notification_failures", 0)
+            )
+            + int(getattr(queue_handler, "failure_notification_failures", 0)),
+            "persistence": (
+                "incomplete"
+                if failures or dropped or cleanup_failures
+                else (
+                    "pending"
+                    if pending
+                    else "unknown" if written is None else "written_not_durable"
+                )
+            ),
             "durable": False,
         }
         return health
 
     def emit_failure(
-        self, diagnostics: ErrorDiagnostics, *, severity: str = "error",
-        disposition: str = "failed", stage: str | None = None,
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
         exception: BaseException | None = None,
     ) -> dict:
         return self._emit_failure(
-            diagnostics, severity=severity, disposition=disposition, stage=stage, exception=exception,
+            diagnostics,
+            severity=severity,
+            disposition=disposition,
+            stage=stage,
+            exception=exception,
         )
 
     def _record_delivery_failure(self, diagnostics: ErrorDiagnostics) -> None:
         self._emit_failure(
-            diagnostics, severity="warning", disposition="degraded",
-            stage="file_delivery" if diagnostics.code == "log_file_delivery_failed" else "queue_overflow",
+            diagnostics,
+            severity="warning",
+            disposition="degraded",
+            stage=(
+                "file_delivery"
+                if diagnostics.code == "log_file_delivery_failed"
+                else "queue_overflow"
+            ),
             project_file=False,
         )
 
     def _emit_failure(
-        self, diagnostics: ErrorDiagnostics, *, severity: str, disposition: str,
-        stage: str | None = None, exception: BaseException | None = None, project_file: bool = True,
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str,
+        disposition: str,
+        stage: str | None = None,
+        exception: BaseException | None = None,
+        project_file: bool = True,
     ) -> dict:
         record, fresh = self._diagnostic_history.retain(
-            diagnostics, severity=severity, disposition=disposition, stage=stage, exception=exception,
+            diagnostics,
+            severity=severity,
+            disposition=disposition,
+            stage=stage,
+            exception=exception,
             file_evidence="unknown" if project_file else "unavailable",
         )
         if not fresh:
             return record
         encoded = json.dumps(record, separators=(",", ":"))
-        self._publish_diagnostic({
-            "topic": "logs", "level": record["severity"], "kind": "failure",
-            "diagnostic": json.loads(encoded),
-        })
-        level = {"info": logging.INFO, "warning": logging.WARNING}.get(record["severity"], logging.ERROR)
+        self._publish_diagnostic(
+            {
+                "topic": "logs",
+                "level": record["severity"],
+                "kind": "failure",
+                "diagnostic": json.loads(encoded),
+            }
+        )
+        level = {"info": logging.INFO, "warning": logging.WARNING}.get(
+            record["severity"], logging.ERROR
+        )
         # File-only detailed metadata, factual Basic summary derived from the same record.
         if project_file:
             file_record = self._session_logger.makeRecord(
-                self._session_logger.name, level, "", 0, "[Failure] structured_failure", (), None,
+                self._session_logger.name,
+                level,
+                "",
+                0,
+                "[Failure] structured_failure",
+                (),
+                None,
                 extra={DIAGNOSTIC_PROJECTION_ATTRIBUTE: _ValidatedDiagnosticProjection(encoded)},
             )
             try:
@@ -1042,9 +1244,17 @@ class SessionRuntimeLoggingService:
             except Exception:
                 self._diagnostic_history.file_projection_failures += 1
         if diagnostics.visibility == DIAGNOSTIC_VISIBILITY_BASIC:
-            summary = f"[Failure] {record['component']}: {record['code']} ({record['disposition']})."
+            summary = (
+                f"[Failure] {record['component']}: {record['code']} ({record['disposition']})."
+            )
             basic_record = self._session_logger.makeRecord(
-                self._session_logger.name, level, "", 0, summary, (), None,
+                self._session_logger.name,
+                level,
+                "",
+                0,
+                summary,
+                (),
+                None,
                 extra={_LIVE_AUDIENCE_ATTR: _LIVE_AUDIENCE_BASIC},
             )
             for handler in (self._sinks.stream_handler, self._ui_handler):
@@ -1052,7 +1262,6 @@ class SessionRuntimeLoggingService:
                     with contextlib.suppress(Exception):
                         handler.handle(basic_record)
         return record
-
 
     def configure_structured_observability(
         self,
@@ -1223,7 +1432,8 @@ class SessionRuntimeLoggingService:
             return
         if diagnostics is not None:
             self.emit_failure(
-                diagnostics, severity=severity,
+                diagnostics,
+                severity=severity,
                 disposition="failed" if outcome == "failure" else "degraded",
                 stage=operation,
             )
@@ -1423,7 +1633,6 @@ class SessionRuntimeLoggingService:
                 f"cause=unclassified exception_type={type(exc).__name__}",
                 level=logging.ERROR,
             )
-
 
     def _dispatch_observability(
         self,
@@ -1682,8 +1891,6 @@ def _redact_observability_fields_for_sink(
     if result.diagnostics is None:
         return {}
     return result.diagnostics.fields
-
-
 
 
 def _format_output_routing_decision(decision: OutputRoutingDecision) -> str:

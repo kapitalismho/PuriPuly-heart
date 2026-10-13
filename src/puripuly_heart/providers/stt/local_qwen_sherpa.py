@@ -505,12 +505,17 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 epoch_disposition="retire" if should_retire else "reuse",
                 failure_diagnostics=(
                     recognition_failure_diagnostics(
-                        exception, provider=self.backend.provider_id,
-                        channel=self._event_projection.channel or self.backend.stream_label or "unknown",
-                        operation="decode", reason=failure_reason or "local_decode_failed",
+                        exception,
+                        provider=self.backend.provider_id,
+                        channel=self._event_projection.channel
+                        or self.backend.stream_label
+                        or "unknown",
+                        operation="decode",
+                        reason=failure_reason or "local_decode_failed",
                         identity=identity,
                     )
-                    if outcome in {"failed", "expired", "degraded"} else None
+                    if outcome in {"failed", "expired", "degraded"}
+                    else None
                 ),
             )
         )

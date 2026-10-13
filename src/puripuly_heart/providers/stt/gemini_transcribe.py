@@ -241,8 +241,6 @@ def _transport_failure_fields(exc: BaseException | None) -> tuple[str, int | str
     return exception_class, api_code, api_status, message_kind
 
 
-
-
 @dataclass(slots=True)
 class GeminiTranscribeSTTBackend(STTBackend):
     """Gemini 3.5 Transcribe Live STT Backend using the official google-genai SDK."""
@@ -513,8 +511,10 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         if isinstance(exception, asyncio.CancelledError):
             return
         diagnostics = recognition_failure_diagnostics(
-            exception, provider="gemini_transcribe",
-            channel=self._event_projection.channel, operation="readiness",
+            exception,
+            provider="gemini_transcribe",
+            channel=self._event_projection.channel,
+            operation="readiness",
             reason="provider_not_ready",
         )
         self._failure_diagnostics = diagnostics
@@ -525,16 +525,26 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
             await awaitable
         except Exception as exc:
             diagnostics = recognition_failure_diagnostics(
-                exc, provider="gemini_transcribe",
+                exc,
+                provider="gemini_transcribe",
                 channel=self._stream.channel if self._stream else self._event_projection.channel,
-                operation="cleanup", reason="provider_cleanup_failed",
+                operation="cleanup",
+                reason="provider_cleanup_failed",
             )
             emit_failure(
-                logger, replace(
+                logger,
+                replace(
                     diagnostics,
-                    cause_id=self._failure_diagnostics.diagnostic_id if self._failure_diagnostics else None,
+                    cause_id=(
+                        self._failure_diagnostics.diagnostic_id
+                        if self._failure_diagnostics
+                        else None
+                    ),
                     fields={**diagnostics.fields, "cleanup_confirmed": False},
-                ), severity="warning", disposition="degraded", stage="cleanup",
+                ),
+                severity="warning",
+                disposition="degraded",
+                stage="cleanup",
             )
 
     async def _release_client_resources(self) -> None:
@@ -725,7 +735,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 return
             self._resolve_write(getattr(item, "completion", None), error)
 
-
     def _scoped_transport_failure(
         self,
         reason: str,
@@ -739,55 +748,90 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         self._protocol_failed = True
         request, self._scoped_request = self._scoped_request, None
         diagnostics = recognition_failure_diagnostics(
-            exception, provider="gemini_transcribe",
-            channel=request.channel if request is not None else (
-                self._stream.channel if self._stream is not None
-                else self._event_projection.channel or "unknown"
+            exception,
+            provider="gemini_transcribe",
+            channel=(
+                request.channel
+                if request is not None
+                else (
+                    self._stream.channel
+                    if self._stream is not None
+                    else self._event_projection.channel or "unknown"
+                )
             ),
-            operation="write" if reason == "gemini_write_failed" else "receive", reason=reason,
+            operation="write" if reason == "gemini_write_failed" else "receive",
+            reason=reason,
             identity=request.identity if request is not None else None,
         )
         _exception_class, api_code, api_status, message_kind = _transport_failure_fields(exception)
         native_fields = {
-            **diagnostics.fields, "api_status": api_status,
+            **diagnostics.fields,
+            "api_status": api_status,
             "message_kind": "go_away" if reason == "gemini_go_away" else message_kind,
             "provider_epoch_id": self._event_projection.provider_epoch_id,
         }
         if type(api_code) is int:
             native_fields["api_code"] = api_code
-        status_code = api_code if type(api_code) is int and 100 <= api_code <= 599 else diagnostics.status_code
+        status_code = (
+            api_code
+            if type(api_code) is int and 100 <= api_code <= 599
+            else diagnostics.status_code
+        )
         if exception is not None:
             category = {
-                "INVALID_ARGUMENT": "invalid_response", "DEADLINE_EXCEEDED": "timeout",
-                "UNAUTHENTICATED": "auth", "PERMISSION_DENIED": "auth",
-                "RESOURCE_EXHAUSTED": "rate_limit", "UNAVAILABLE": "service_unavailable",
-                "INTERNAL": "service_unavailable", "DATA_LOSS": "invalid_response",
+                "INVALID_ARGUMENT": "invalid_response",
+                "DEADLINE_EXCEEDED": "timeout",
+                "UNAUTHENTICATED": "auth",
+                "PERMISSION_DENIED": "auth",
+                "RESOURCE_EXHAUSTED": "rate_limit",
+                "UNAVAILABLE": "service_unavailable",
+                "INTERNAL": "service_unavailable",
+                "DATA_LOSS": "invalid_response",
             }.get(api_status, diagnostics.category)
             if category == "unknown" and status_code is not None:
                 category = (
-                    "auth" if status_code in {401, 403} else
-                    "rate_limit" if status_code == 429 else
-                    "timeout" if status_code == 408 else
-                    "service_unavailable" if status_code >= 500 else
-                    "invalid_response" if status_code >= 400 else category
+                    "auth"
+                    if status_code in {401, 403}
+                    else (
+                        "rate_limit"
+                        if status_code == 429
+                        else (
+                            "timeout"
+                            if status_code == 408
+                            else (
+                                "service_unavailable"
+                                if status_code >= 500
+                                else "invalid_response" if status_code >= 400 else category
+                            )
+                        )
+                    )
                 )
             diagnostics = replace(diagnostics, category=category, status_code=status_code)
         diagnostics = replace(
-            diagnostics, fields=native_fields,
-            generation=diagnostics.generation if request is not None else (
-                self._stream.activation_generation if self._stream is not None else None
+            diagnostics,
+            fields=native_fields,
+            generation=(
+                diagnostics.generation
+                if request is not None
+                else (self._stream.activation_generation if self._stream is not None else None)
             ),
         )
         self._failure_diagnostics = diagnostics
         emit_failure(
-            logger, diagnostics, stage=diagnostics.operation,
+            logger,
+            diagnostics,
+            stage=diagnostics.operation,
             severity="info" if reason == "gemini_go_away" else "error",
             disposition="degraded" if reason == "gemini_go_away" else "failed",
         )
         if request is not None:
             self._event_projection.terminal(
                 STTProviderInputTerminal(
-                    request.identity, "failed", request.channel, reason, "retire",
+                    request.identity,
+                    "failed",
+                    request.channel,
+                    reason,
+                    "retire",
                     failure_diagnostics=diagnostics,
                 )
             )

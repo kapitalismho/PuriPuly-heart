@@ -54,22 +54,26 @@ class SettingsTransactionResultOwner:
         disposition = (
             "degraded"
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
-            else "cancelled"
-            if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED
-            else "recovered"
-            if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-            else "failed"
+            else (
+                "cancelled"
+                if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED
+                else (
+                    "recovered"
+                    if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+                    else "failed"
+                )
+            )
         )
         if result.diagnostics is not None:
             emit_failure(
                 logger,
                 result.diagnostics,
                 disposition=disposition,
-                severity="info"
-                if disposition == "recovered"
-                else "warning"
-                if disposition != "failed"
-                else "error",
+                severity=(
+                    "info"
+                    if disposition == "recovered"
+                    else "warning" if disposition != "failed" else "error"
+                ),
             )
         for secondary in result.secondary_diagnostics:
             emit_failure(logger, secondary, disposition="degraded", severity="warning")

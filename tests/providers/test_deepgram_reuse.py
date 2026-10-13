@@ -396,22 +396,24 @@ class _InstalledSdkWire:
 
 
 def _installed_callback_payload(channel, *, finalize=False):
-    return json.dumps({
-        "type": "Results",
-        "channel_index": [0, 1],
-        "duration": 0.1,
-        "start": 0.0,
-        "is_final": True,
-        "speech_final": False,
-        "channel": channel,
-        "from_finalize": finalize,
-        "metadata": {
-            "request_id": uuid4().hex,
-            "model_info": {"name": "nova-3", "version": "1", "arch": "nova"},
-            "model_uuid": uuid4().hex,
-        },
-        "private_detail": "PRIVATE_DEEPGRAM_PAYLOAD",
-    })
+    return json.dumps(
+        {
+            "type": "Results",
+            "channel_index": [0, 1],
+            "duration": 0.1,
+            "start": 0.0,
+            "is_final": True,
+            "speech_final": False,
+            "channel": channel,
+            "from_finalize": finalize,
+            "metadata": {
+                "request_id": uuid4().hex,
+                "model_info": {"name": "nova-3", "version": "1", "arch": "nova"},
+                "model_uuid": uuid4().hex,
+            },
+            "private_detail": "PRIVATE_DEEPGRAM_PAYLOAD",
+        }
+    )
 
 
 async def _installed_callback_session(monkeypatch, *, channel="self"):
@@ -459,7 +461,9 @@ async def _installed_callback_session(monkeypatch, *, channel="self"):
         initial,
         channel=channel,
         identity=replace(
-            initial.identity, provider_epoch_id=epoch, provider_turn_id=uuid4().hex,
+            initial.identity,
+            provider_epoch_id=epoch,
+            provider_turn_id=uuid4().hex,
         ),
     )
     return session, wire, observations, request
@@ -475,16 +479,25 @@ async def test_installed_sdk_malformed_callback_fails_scoped_turn_and_epoch(
     monkeypatch, malformed, partial
 ):
     session, wire, observations, request = await _installed_callback_session(
-        monkeypatch, channel="peer",
+        monkeypatch,
+        channel="peer",
     )
     try:
         await session.begin_turn(request)
         if partial:
-            wire.messages.put_nowait(_installed_callback_payload({
-                "alternatives": [{
-                    "transcript": "PRIVATE_TRANSCRIPT", "confidence": 1.0, "words": [],
-                }],
-            }))
+            wire.messages.put_nowait(
+                _installed_callback_payload(
+                    {
+                        "alternatives": [
+                            {
+                                "transcript": "PRIVATE_TRANSCRIPT",
+                                "confidence": 1.0,
+                                "words": [],
+                            }
+                        ],
+                    }
+                )
+            )
             update = await _next(session)
             assert isinstance(update, STTProviderTurnUpdate)
             assert update.identity == request.identity
@@ -493,9 +506,11 @@ async def test_installed_sdk_malformed_callback_fails_scoped_turn_and_epoch(
         payload = {
             "missing_channel": _installed_callback_payload(None),
             "missing_alternatives": _installed_callback_payload({}),
-            "invalid_transcript": _installed_callback_payload({
-                "alternatives": [{"transcript": 42, "confidence": 1.0, "words": []}],
-            }),
+            "invalid_transcript": _installed_callback_payload(
+                {
+                    "alternatives": [{"transcript": 42, "confidence": 1.0, "words": []}],
+                }
+            ),
             "invalid_json": '{"type":"Results","private_detail":"PRIVATE_BROKEN_JSON"',
         }[malformed]
         wire.messages.put_nowait(payload)
@@ -531,7 +546,10 @@ async def test_installed_sdk_malformed_callback_fails_scoped_turn_and_epoch(
             assert isinstance(observations["causes"][0], ValueError | TypeError)
             assert observations["callbacks"][-1] == "ListenV1ResultsEvent"
         safe = normalize_diagnostic(
-            diagnostics, instance_id=uuid4().hex, severity="error", disposition="failed",
+            diagnostics,
+            instance_id=uuid4().hex,
+            severity="error",
+            disposition="failed",
             stage="protocol",
         )
         assert safe["diagnostic_id"] == diagnostics.diagnostic_id
@@ -555,13 +573,21 @@ async def test_installed_sdk_valid_callbacks_preserve_empty_and_cancellation_sem
             await _seal(session, request)
         payload = {
             "empty_no_ack": _installed_callback_payload({"alternatives": []}),
-            "whitespace": _installed_callback_payload({
-                "alternatives": [{"transcript": "  ", "confidence": 1.0, "words": []}],
-            }),
-            "metadata": json.dumps({
-                "type": "Metadata", "request_id": uuid4().hex, "sha256": "0" * 64,
-                "created": "2026-01-01T00:00:00Z", "duration": 0.0, "channels": 1.0,
-            }),
+            "whitespace": _installed_callback_payload(
+                {
+                    "alternatives": [{"transcript": "  ", "confidence": 1.0, "words": []}],
+                }
+            ),
+            "metadata": json.dumps(
+                {
+                    "type": "Metadata",
+                    "request_id": uuid4().hex,
+                    "sha256": "0" * 64,
+                    "created": "2026-01-01T00:00:00Z",
+                    "duration": 0.0,
+                    "channels": 1.0,
+                }
+            ),
             "empty_ack": _installed_callback_payload({"alternatives": []}, finalize=True),
         }[control]
         wire.messages.put_nowait(payload)

@@ -597,8 +597,11 @@ class SelfCaptureSessionOwner:
             has_loop_task=self._loop_task is not None,
             cleanup_debt=len(self._retired_sources),
             closed=self._closed,
-            failure_diagnostics=self._primary_failure[1]
-            if self._failure_reason is not None and self._primary_failure is not None else None,
+            failure_diagnostics=(
+                self._primary_failure[1]
+                if self._failure_reason is not None and self._primary_failure is not None
+                else None
+            ),
         )
 
     @property
@@ -859,13 +862,17 @@ class SelfCaptureSessionOwner:
         return self.snapshot
 
     def _provider_build_request(
-        self, config: SelfCaptureSessionConfig, warmup: bool, generation: int,
+        self,
+        config: SelfCaptureSessionConfig,
+        warmup: bool,
+        generation: int,
     ) -> object:
         request = self._provider_request_factory(config, warmup)
         operation = self._generation_operation
         if isinstance(request, ProviderRuntimeBuildRequest):
             return replace(
-                request, **(operation[1] if operation is not None and operation[0] == generation else {})
+                request,
+                **(operation[1] if operation is not None and operation[0] == generation else {}),
             )
         return request
 
@@ -1202,7 +1209,9 @@ class SelfCaptureSessionOwner:
             self._notify_state_changed()
             try:
                 result = await self._provider.replace(
-                    self._provider_build_request(config, config.local_cpu or config.local_gpu, generation),
+                    self._provider_build_request(
+                        config, config.local_cpu or config.local_gpu, generation
+                    ),
                     start=False,
                     on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                         exc,
@@ -1883,15 +1892,20 @@ class SelfCaptureSessionOwner:
                 native = exception
             if native is None:
                 native = stt_failure_report(
-                    exception, provider=self._config.provider_id if self._config else "stt",
-                    operation=stage, channel="self",
+                    exception,
+                    provider=self._config.provider_id if self._config else "stt",
+                    operation=stage,
+                    channel="self",
                 ).diagnostics
                 native = replace(
-                    native, component="capture.self", operation=stage,
+                    native,
+                    component="capture.self",
+                    operation=stage,
                     code=f"capture.self.{reason.value if reason is not None else 'unknown'}",
                     generation=generation,
                     fields={
-                        **native.fields, "observed_state": self._state.value,
+                        **native.fields,
+                        "observed_state": self._state.value,
                         **({"warmup_usable": True} if stage == "provider_warmup" else {}),
                     },
                 )
@@ -1909,7 +1923,9 @@ class SelfCaptureSessionOwner:
                 self._primary_failure = (generation, native)
             failure_diagnostics = native
             emit_failure(
-                logger, native, stage=stage,
+                logger,
+                native,
+                stage=stage,
                 severity="warning" if disposition == "degraded" else "error",
                 disposition=disposition,
             )

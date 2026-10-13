@@ -353,7 +353,9 @@ class SecretSettingsTransaction:
                     *getattr(self.settings_repository, "secondary_diagnostics", ()),
                     *((notification,) if notification is not None else ()),
                 ),
-                secondary_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
+                secondary_omitted_count=getattr(
+                    self.settings_repository, "secondary_omitted_count", 0
+                ),
             )
 
         return await self._restore_after_settings_commit_failure(
@@ -555,18 +557,20 @@ def _provider_verification_failed_result(
     return TransactionResult(
         status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
         message=message,
-        diagnostics=sanitize_diagnostics(diagnostics)
-        if diagnostics is not None
-        else ErrorDiagnostics(
-            component="secret_settings_transaction",
-            operation="verify_provider_secret",
-            code=code,
-            category=DIAGNOSTIC_CATEGORY_TRANSACTION,
-            visibility=DIAGNOSTIC_VISIBILITY_BASIC,
-            content_policy=CONTENT_POLICY_METADATA_ONLY,
-            status_code=None,
-            retry_after_ms=None,
-            fields=fields,
+        diagnostics=(
+            sanitize_diagnostics(diagnostics)
+            if diagnostics is not None
+            else ErrorDiagnostics(
+                component="secret_settings_transaction",
+                operation="verify_provider_secret",
+                code=code,
+                category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                visibility=DIAGNOSTIC_VISIBILITY_BASIC,
+                content_policy=CONTENT_POLICY_METADATA_ONLY,
+                status_code=None,
+                retry_after_ms=None,
+                fields=fields,
+            )
         ),
     )
 

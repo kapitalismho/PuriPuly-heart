@@ -527,11 +527,15 @@ def compose_test_ui_application_boundary(
         ),
         osc_state_publisher=osc_state_publisher,
     )
-    boundary.attach_control(cast(
-        ApplicationControl, SimpleNamespace(
-            instance_id="00000000-0000-0000-0000-000000000231",
-            _resource_lock=asyncio.Lock(), _lock=asyncio.Lock(),
-            lock_owned_by_current_task=lambda: False,
+    boundary.attach_control(
+        cast(
+            ApplicationControl,
+            SimpleNamespace(
+                instance_id="00000000-0000-0000-0000-000000000231",
+                _resource_lock=asyncio.Lock(),
+                _lock=asyncio.Lock(),
+                lock_owned_by_current_task=lambda: False,
+            ),
         )
-    ))
+    )
     return boundary

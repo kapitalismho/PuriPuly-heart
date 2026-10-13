@@ -88,10 +88,15 @@ for raw in reader:
         )
     elif request_type == "activate":
         if os.environ.get("FAKE_GPU_WORKER_ACTIVATION_FAILURE") == "1":
-            send({
-                "type": "response", "request_id": request_id,
-                "status": "failed", "error_code": "out_of_memory", "payload": {},
-            })
+            send(
+                {
+                    "type": "response",
+                    "request_id": request_id,
+                    "status": "failed",
+                    "error_code": "out_of_memory",
+                    "payload": {},
+                }
+            )
             continue
         send(
             {

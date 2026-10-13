@@ -58,7 +58,10 @@ class RecordingRuntime:
         self.snapshot = _snapshot()
         self.calls: list[tuple[object, ...]] = []
         self.replace_result = SimpleNamespace(
-            status="applied", failure_code=None, failure_type=None, failure_stage=None,
+            status="applied",
+            failure_code=None,
+            failure_type=None,
+            failure_stage=None,
             failure_diagnostics=None,
         )
         self.handoff_result = SimpleNamespace(

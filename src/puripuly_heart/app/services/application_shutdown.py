@@ -327,9 +327,11 @@ class ApplicationShutdownCoordinator:
                 diagnostics = ErrorDiagnostics(
                     component="application_shutdown",
                     operation=callback.phase,
-                    code="application_shutdown_timeout"
-                    if isinstance(exc, TimeoutError)
-                    else "application_shutdown_failed",
+                    code=(
+                        "application_shutdown_timeout"
+                        if isinstance(exc, TimeoutError)
+                        else "application_shutdown_failed"
+                    ),
                     category="lifecycle",
                     visibility="basic",
                     content_policy="metadata_only",

@@ -26,9 +26,6 @@ def _normalize_qwen_model(value: object) -> str:
     return "qwen3.8-flash" if normalized == "qwen3.5-plus" else normalized
 
 
-
-
-
 def _build_system_prompt(
     *,
     system_prompt: str,
@@ -59,7 +56,9 @@ def _extract_message_content(content: object) -> str:
         result = content.strip()
         if result:
             return result
-        raise LLMResponseError("DashScope response contained empty message content", provider="qwen")
+        raise LLMResponseError(
+            "DashScope response contained empty message content", provider="qwen"
+        )
 
     if isinstance(content, list):
         parts: list[str] = []
@@ -301,16 +300,19 @@ class HttpxQwenClient:
             json=request_body,
         )
         if response.status_code != 200:
-            
+
             raise LLMResponseError(
-                "DashScope compatible-mode request failed", provider="qwen",
+                "DashScope compatible-mode request failed",
+                provider="qwen",
                 status_code=response.status_code,
             )
 
         try:
             data = response.json()
         except ValueError as exc:
-            raise LLMResponseError("DashScope response was not valid JSON", provider="qwen") from exc
+            raise LLMResponseError(
+                "DashScope response was not valid JSON", provider="qwen"
+            ) from exc
         if not isinstance(data, dict):
             raise LLMResponseError("DashScope response was not an object", provider="qwen")
         if observation is not None:

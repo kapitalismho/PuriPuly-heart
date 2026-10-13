@@ -261,7 +261,9 @@ async def test_event_bridge_reports_started_only_after_run_loop_entry() -> None:
 
 
 @pytest.mark.asyncio
-async def test_event_bridge_failure_log_identifies_event_without_payload(caplog: pytest.LogCaptureFixture) -> None:
+async def test_event_bridge_failure_log_identifies_event_without_payload(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     app = DummyApp()
     queue: asyncio.Queue[UIEvent] = asyncio.Queue()
     runtime_logging = RuntimeLoggingCapture()
@@ -287,10 +289,16 @@ async def test_event_bridge_failure_log_identifies_event_without_payload(caplog:
     from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE, normalize_diagnostic
 
     failures = [getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE, None) for record in caplog.records]
-    diagnostics, severity, disposition, stage, exception = next(value for value in failures if value is not None)
+    diagnostics, severity, disposition, stage, exception = next(
+        value for value in failures if value is not None
+    )
     projection = normalize_diagnostic(
-        diagnostics, instance_id=None, severity=severity,
-        disposition=disposition, stage=stage, exception=exception,
+        diagnostics,
+        instance_id=None,
+        severity=severity,
+        disposition=disposition,
+        stage=stage,
+        exception=exception,
     )
     assert projection["code"] == "destination_publish_failed"
     assert projection["fields"]["destination"] == "dashboard"

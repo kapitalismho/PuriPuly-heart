@@ -433,8 +433,10 @@ class _GenerationGuardedVadSink:
                 if self.failure_diagnostics is None:
                     self.failure_diagnostics = replace(
                         stt_failure_report(
-                            exc, provider=ledger.settings.provider_id if ledger else "stt",
-                            channel="peer", operation="vad",
+                            exc,
+                            provider=ledger.settings.provider_id if ledger else "stt",
+                            channel="peer",
+                            operation="vad",
                         ).diagnostics,
                         generation=self.capture_generation.value,
                         turn_id=str(queued.segment_id) if queued.segment_id is not None else None,
@@ -1482,23 +1484,28 @@ class PeerCaptureSessionOwner:
                     if native is None:
                         native = replace(
                             stt_failure_report(
-                                None, provider=config.provider_id, channel="peer",
+                                None,
+                                provider=config.provider_id,
+                                channel="peer",
                                 operation="provider_handoff",
                             ).diagnostics,
-                            generation=generation, **provider_operation,
+                            generation=generation,
+                            **provider_operation,
                         )
                         emit_failure(logger, native, stage=native.operation)
                     async with self._lock:
                         if self._generation == generation and self._desired_active:
-                            self._emit_failure(PeerCaptureDiagnostic(
-                                event=PeerCaptureDiagnosticEvent.FAILURE,
-                                generation=generation,
-                                state=self._state,
-                                provider_id=config.provider_id,
-                                reason=PeerCaptureFailureReason.PROVIDER_FAILED,
-                                capture_kind=config.capture_target.kind,
-                                failure_diagnostics=native,
-                            ))
+                            self._emit_failure(
+                                PeerCaptureDiagnostic(
+                                    event=PeerCaptureDiagnosticEvent.FAILURE,
+                                    generation=generation,
+                                    state=self._state,
+                                    provider_id=config.provider_id,
+                                    reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                                    capture_kind=config.capture_target.kind,
+                                    failure_diagnostics=native,
+                                )
+                            )
                     raise _PeerCaptureProviderHandoffFailed(native)
                 raise _PeerCaptureProviderHandoffFailed(result.failure_diagnostics)
             pending_failure = self._pending_provider_failures.pop(attachment_token, None)
@@ -1685,7 +1692,9 @@ class PeerCaptureSessionOwner:
                         exception=result.failure_diagnostics,
                     )
                     self._emit_local_asr_diagnostic(
-                        config, outcome="failed", load_started_at=load_started_at,
+                        config,
+                        outcome="failed",
+                        load_started_at=load_started_at,
                         failure_type=result.reason,
                     )
                     return
@@ -1807,7 +1816,8 @@ class PeerCaptureSessionOwner:
                 stt_failure_report(
                     exc, provider="stt", channel="peer", operation="source_read"
                 ).diagnostics,
-                component="capture.peer", generation=capture_generation.value,
+                component="capture.peer",
+                generation=capture_generation.value,
                 code="capture.peer.peer_runtime_failed",
             )
             if (
@@ -1817,7 +1827,9 @@ class PeerCaptureSessionOwner:
                 primary = replace(primary, **self._generation_operation[1])
             current = capture_generation.value == self._generation and not self._closed
             emit_failure(
-                logger, primary, stage=primary.operation,
+                logger,
+                primary,
+                stage=primary.operation,
                 severity="error" if current else "info",
                 disposition="failed" if current else "superseded",
             )
@@ -1828,7 +1840,9 @@ class PeerCaptureSessionOwner:
                 if cleanup_exc is not exc:
                     cleanup_failures.append(cleanup_exc)
                     self._log_loop_exception(
-                        "cleanup_failed", cleanup_exc, generation=capture_generation.value,
+                        "cleanup_failed",
+                        cleanup_exc,
+                        generation=capture_generation.value,
                         cause_diagnostics=primary,
                     )
             try:
@@ -1841,7 +1855,9 @@ class PeerCaptureSessionOwner:
             except Exception as cleanup_exc:
                 cleanup_failures.append(cleanup_exc)
                 self._log_loop_exception(
-                    "cleanup_failed", cleanup_exc, generation=capture_generation.value,
+                    "cleanup_failed",
+                    cleanup_exc,
+                    generation=capture_generation.value,
                     cause_diagnostics=primary,
                 )
             if cleanup_failures:
@@ -1981,14 +1997,17 @@ class PeerCaptureSessionOwner:
                 PeerCaptureFailureReason.CLEANUP_FAILED: "cleanup",
             }.get(reason, "readiness")
             native = (
-                exception if isinstance(exception, ErrorDiagnostics)
+                exception
+                if isinstance(exception, ErrorDiagnostics)
                 else stt_failure_report(
                     exception, provider=config.provider_id, channel="peer", operation=stage
                 ).diagnostics
             )
             if not isinstance(exception, ErrorDiagnostics):
                 native = replace(
-                    native, component="capture.peer", generation=generation,
+                    native,
+                    component="capture.peer",
+                    generation=generation,
                     code=f"capture.peer.{reason.value}",
                 )
             if (
@@ -2015,10 +2034,15 @@ class PeerCaptureSessionOwner:
                 self._retry_required_capture_target = config.capture_target
             self._last_failure = diagnostic
             if (
-                not failure_observed and diagnostic is not None
+                not failure_observed
+                and diagnostic is not None
                 and diagnostic.failure_diagnostics is not None
             ):
-                emit_failure(logger, diagnostic.failure_diagnostics, stage=diagnostic.failure_diagnostics.operation)
+                emit_failure(
+                    logger,
+                    diagnostic.failure_diagnostics,
+                    stage=diagnostic.failure_diagnostics.operation,
+                )
             self._generation += 1
             teardown_generation = self._generation
             self._desired_active = False
@@ -2029,7 +2053,8 @@ class PeerCaptureSessionOwner:
                 failures.append(exc)
         if detached_source is not None:
             await self._attempt_cleanup(
-                failures, lambda: self._close_if_possible(detached_source),
+                failures,
+                lambda: self._close_if_possible(detached_source),
                 retain_on_failure=lambda: self._retain_retired_source(detached_source),
             )
         try:
@@ -2039,7 +2064,9 @@ class PeerCaptureSessionOwner:
                     target_state=PeerCaptureSessionState.FAULTED,
                     generation=teardown_generation,
                     release_mode="abort",
-                    primary_failure=diagnostic.failure_diagnostics if diagnostic is not None else None,
+                    primary_failure=(
+                        diagnostic.failure_diagnostics if diagnostic is not None else None
+                    ),
                 ),
             )
         finally:
@@ -2051,7 +2078,9 @@ class PeerCaptureSessionOwner:
         if diagnostic is not None:
             for failure in failures:
                 self._log_loop_exception(
-                    "cleanup_failed", failure, generation=generation,
+                    "cleanup_failed",
+                    failure,
+                    generation=generation,
                     cause_diagnostics=diagnostic.failure_diagnostics,
                 )
         self._raise_cleanup_failures("peer runtime fault cleanup failed", failures)
@@ -2132,7 +2161,9 @@ class PeerCaptureSessionOwner:
                 self._notify_state_changed()
         for failure in failures:
             self._log_loop_exception(
-                "cleanup_failed", failure, generation=generation,
+                "cleanup_failed",
+                failure,
+                generation=generation,
                 cause_diagnostics=primary_failure,
             )
         self._raise_cleanup_failures("peer owned runtime teardown failed", failures)
@@ -2229,19 +2260,25 @@ class PeerCaptureSessionOwner:
                 )
             return
         diagnostics = stt_failure_report(
-            exc, provider="stt", channel="peer",
+            exc,
+            provider="stt",
+            channel="peer",
             operation="cleanup" if event == "cleanup_failed" else "source_read",
         ).diagnostics
         diagnostics = replace(
-            diagnostics, component="capture.peer", generation=generation,
+            diagnostics,
+            component="capture.peer",
+            generation=generation,
             code=(
                 "capture.peer.cleanup_failed"
-                if event == "cleanup_failed" else "capture.peer.peer_runtime_failed"
+                if event == "cleanup_failed"
+                else "capture.peer.peer_runtime_failed"
             ),
             cause_id=cause_diagnostics.diagnostic_id if cause_diagnostics is not None else None,
         )
         emit_failure(
-            logger, diagnostics,
+            logger,
+            diagnostics,
             severity="warning" if event == "cleanup_failed" else "error",
             disposition="degraded" if event == "cleanup_failed" else "failed",
             stage=diagnostics.operation,

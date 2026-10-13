@@ -1433,8 +1433,11 @@ async def test_qq_compensation_retains_owning_commit_identity_and_native_seconda
             self.persist_calls += 1
             if self.persist_calls == 2:
                 raise CanonicalSettingsPersistenceError(
-                    "save_failed", "safe failure", diagnostics=primary,
-                    secondary_diagnostics=upstream, secondary_omitted_count=known_omitted,
+                    "save_failed",
+                    "safe failure",
+                    diagnostics=primary,
+                    secondary_diagnostics=upstream,
+                    secondary_omitted_count=known_omitted,
                 )
             if self.persist_calls == 3:
                 raise OSError(errno.ENOSPC, RAW_QQ_CREDENTIAL)
@@ -1455,9 +1458,9 @@ async def test_qq_compensation_retains_owning_commit_identity_and_native_seconda
     assert result.diagnostics.fields["compensation_succeeded"] is False
     assert len(result.secondary_diagnostics) == min(4, upstream_count + 2)
     assert result.secondary_omitted_count == known_omitted + max(0, upstream_count + 2 - 4)
-    assert tuple(cause.diagnostic_id for cause in result.secondary_diagnostics[:upstream_count]) == (
-        tuple(cause.diagnostic_id for cause in upstream)
-    )
+    assert tuple(
+        cause.diagnostic_id for cause in result.secondary_diagnostics[:upstream_count]
+    ) == (tuple(cause.diagnostic_id for cause in upstream))
     retained_compensation = result.secondary_diagnostics[upstream_count:]
     assert all(cause.cause_id == primary.diagnostic_id for cause in result.secondary_diagnostics)
     if retained_compensation:

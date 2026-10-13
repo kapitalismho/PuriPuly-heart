@@ -38,28 +38,34 @@ class SettingsPersistenceError:
         excess = max(0, len(self.secondary_diagnostics) - 4)
         if excess:
             object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
-            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
+            object.__setattr__(
+                self, "secondary_omitted_count", self.secondary_omitted_count + excess
+            )
         if self.diagnostics is None:
             object.__setattr__(
                 self,
                 "diagnostics",
                 ErrorDiagnostics(
                     component="settings_repository",
-                    operation="save"
-                    if self.stage == SettingsPersistenceStatus.SAVE_FAILED
-                    else "load",
-                    code="settings_save_failed"
-                    if self.stage == SettingsPersistenceStatus.SAVE_FAILED
-                    else f"settings_{self.stage.value}",
+                    operation=(
+                        "save" if self.stage == SettingsPersistenceStatus.SAVE_FAILED else "load"
+                    ),
+                    code=(
+                        "settings_save_failed"
+                        if self.stage == SettingsPersistenceStatus.SAVE_FAILED
+                        else f"settings_{self.stage.value}"
+                    ),
                     category="transaction",
                     visibility="basic",
                     content_policy="metadata_only",
                     status_code=None,
                     retry_after_ms=None,
                     fields={
-                        "phase": "settings_save"
-                        if self.stage == SettingsPersistenceStatus.SAVE_FAILED
-                        else self.stage.value,
+                        "phase": (
+                            "settings_save"
+                            if self.stage == SettingsPersistenceStatus.SAVE_FAILED
+                            else self.stage.value
+                        ),
                     },
                 ),
             )
@@ -505,18 +511,22 @@ def safe_persistence_error(
         diagnostics=ErrorDiagnostics(
             component="settings_repository",
             operation="save" if status == SettingsPersistenceStatus.SAVE_FAILED else "load",
-            code="settings_save_failed"
-            if status == SettingsPersistenceStatus.SAVE_FAILED
-            else f"settings_{status.value}",
+            code=(
+                "settings_save_failed"
+                if status == SettingsPersistenceStatus.SAVE_FAILED
+                else f"settings_{status.value}"
+            ),
             category="transaction",
             visibility="basic",
             content_policy="metadata_only",
             status_code=None,
             retry_after_ms=None,
             fields={
-                "phase": phase or "settings_save"
-                if status == SettingsPersistenceStatus.SAVE_FAILED
-                else status.value,
+                "phase": (
+                    phase or "settings_save"
+                    if status == SettingsPersistenceStatus.SAVE_FAILED
+                    else status.value
+                ),
                 **fields,
             },
         ),

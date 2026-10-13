@@ -179,7 +179,8 @@ def recognition_failure_diagnostics(
                 if native_code not in {"none", "unclassified"}:
                     fields["native_classification"] = native_code
                     category = (
-                        "timeout" if native_code in {"heartbeat_timeout", "channel_cancel_timeout"}
+                        "timeout"
+                        if native_code in {"heartbeat_timeout", "channel_cancel_timeout"}
                         else "lifecycle"
                     )
                 break
@@ -201,7 +202,9 @@ def recognition_failure_diagnostics(
         channel=channel if channel in {"self", "peer"} else None,
         turn_id=str(identity.segment.segment_id) if identity is not None else diagnostics.turn_id,
         generation=(
-            identity.segment.activation_generation if identity is not None else diagnostics.generation
+            identity.segment.activation_generation
+            if identity is not None
+            else diagnostics.generation
         ),
         fields=fields,
     )

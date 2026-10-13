@@ -229,9 +229,12 @@ class SharedGpuASRRuntime:
         snapshot["pending_temporary_directories"] = len(self._temporary_cleanup_debt)
         snapshot["temporary_cleanup_diagnostic_id"] = (
             self._temporary_cleanup_diagnostics.diagnostic_id
-            if self._temporary_cleanup_diagnostics is not None else None
+            if self._temporary_cleanup_diagnostics is not None
+            else None
         )
-        snapshot["close_complete"] = bool(snapshot.get("close_complete")) and not self._temporary_cleanup_debt
+        snapshot["close_complete"] = (
+            bool(snapshot.get("close_complete")) and not self._temporary_cleanup_debt
+        )
         return snapshot
 
     @property
@@ -246,10 +249,13 @@ class SharedGpuASRRuntime:
             primary: BaseException | None = None
             try:
                 client = await self._process_factory.start(
-                    mode="discovery", **current_diagnostic_operation(),
+                    mode="discovery",
+                    **current_diagnostic_operation(),
                 )
                 task = start_lifecycle_task(
-                    self._scope, client.discover(), name=f"discovery-{uuid4().hex}",
+                    self._scope,
+                    client.discover(),
+                    name=f"discovery-{uuid4().hex}",
                 )
                 done, _pending = await asyncio.wait({task}, timeout=self._discovery_pending_seconds)
                 if not done:
@@ -313,7 +319,8 @@ class SharedGpuASRRuntime:
                 )
             if self._state == GpuASRRuntimeState.STOPPED:
                 task = self._begin_activation_locked(
-                    config, {"operation_id": operation_id, "request_id": request_id},
+                    config,
+                    {"operation_id": operation_id, "request_id": request_id},
                 )
             elif self._state == GpuASRRuntimeState.STARTING and self._activation_task is not None:
                 task = self._activation_task
@@ -498,7 +505,11 @@ class SharedGpuASRRuntime:
                     await self._close_unowned_client(client)
                 except Exception as exc:
                     terminal = False
-                    stop_error = ExceptionGroup("GPU independent cleanup failed", [stop_error, exc]) if stop_error else exc
+                    stop_error = (
+                        ExceptionGroup("GPU independent cleanup failed", [stop_error, exc])
+                        if stop_error
+                        else exc
+                    )
                 else:
                     self._retired_clients.remove(client)
             if terminal:
@@ -518,7 +529,8 @@ class SharedGpuASRRuntime:
                 terminal = False
                 stop_error = (
                     ExceptionGroup("GPU shutdown and startup cleanup failed", [stop_error, exc])
-                    if stop_error is not None else exc
+                    if stop_error is not None
+                    else exc
                 )
                 self._state = GpuASRRuntimeState.FAILED
                 if self._last_failure_code is None:
@@ -540,7 +552,9 @@ class SharedGpuASRRuntime:
     ) -> asyncio.Task[_ActivationOutcome]:
         self._retired_clients = [client for client in self._retired_clients if not client.is_closed]
         if self._retired_clients or self._temporary_cleanup_debt:
-            raise GpuASRManualRetryRequired("worker_cleanup_failed", self._activation_failure_diagnostics)
+            raise GpuASRManualRetryRequired(
+                "worker_cleanup_failed", self._activation_failure_diagnostics
+            )
         self._state = GpuASRRuntimeState.STARTING
         self._last_failure_code = None
         self._activation_failure_diagnostics = None
@@ -564,7 +578,8 @@ class SharedGpuASRRuntime:
         if outcome.activation is not None:
             return outcome.activation
         raise GpuASRManualRetryRequired(
-            outcome.failure_code or "manual_retry_required", outcome.failure_diagnostics,
+            outcome.failure_code or "manual_retry_required",
+            outcome.failure_diagnostics,
         ) from outcome.failure
 
     async def _run_activation(
@@ -596,25 +611,40 @@ class SharedGpuASRRuntime:
             primary = getattr(exc, "failure_diagnostics", None)
             if not isinstance(primary, ErrorDiagnostics):
                 primary = ErrorDiagnostics(
-                    component="gpu_worker", operation="process_lifecycle",
-                    code="worker_startup_cancelled" if isinstance(exc, asyncio.CancelledError) else "worker_activation_failed",
-                    category="lifecycle", visibility="basic", content_policy="metadata_only",
-                    status_code=None, retry_after_ms=None,
+                    component="gpu_worker",
+                    operation="process_lifecycle",
+                    code=(
+                        "worker_startup_cancelled"
+                        if isinstance(exc, asyncio.CancelledError)
+                        else "worker_activation_failed"
+                    ),
+                    category="lifecycle",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
                     fields={
                         "native_classification": stt_startup_failure_code(_failure_code(exc)),
                         **safe_exception_fields(exc),
                     },
-                    generation=generation, **origin,
+                    generation=generation,
+                    **origin,
                 )
                 emit_failure(
-                    logger, primary, stage="activation",
+                    logger,
+                    primary,
+                    stage="activation",
                     severity="info" if isinstance(exc, asyncio.CancelledError) else "error",
-                    disposition="cancelled" if isinstance(exc, asyncio.CancelledError) else "failed",
+                    disposition=(
+                        "cancelled" if isinstance(exc, asyncio.CancelledError) else "failed"
+                    ),
                 )
             if event_task is not None:
                 event_task.cancel()
-            if client is not None and not client.is_closed and (
-                self._client is not client or generation == self._generation
+            if (
+                client is not None
+                and not client.is_closed
+                and (self._client is not client or generation == self._generation)
             ):
                 try:
                     await self._close_unowned_client(client)
@@ -629,7 +659,9 @@ class SharedGpuASRRuntime:
             async with self._lock:
                 if generation != self._generation:
                     return _ActivationOutcome(
-                        failure_code=failure_code, failure=exc, failure_diagnostics=primary,
+                        failure_code=failure_code,
+                        failure=exc,
+                        failure_diagnostics=primary,
                     )
                 self._activation_task = None
                 if self._client is client and (client is None or client.is_closed):
@@ -647,7 +679,9 @@ class SharedGpuASRRuntime:
                 },
             )
             return _ActivationOutcome(
-                failure_code=failure_code, failure=exc, failure_diagnostics=primary,
+                failure_code=failure_code,
+                failure=exc,
+                failure_diagnostics=primary,
             )
         async with self._lock:
             if (
@@ -710,8 +744,10 @@ class SharedGpuASRRuntime:
             self._retired_clients.append(client)
 
     async def _cleanup_activation_directory(
-        self, directory: tempfile.TemporaryDirectory[str],
-        cause: ErrorDiagnostics | None, generation: int,
+        self,
+        directory: tempfile.TemporaryDirectory[str],
+        cause: ErrorDiagnostics | None,
+        generation: int,
     ) -> None:
         debt = (directory, cause, generation)
         async with self._lock:
@@ -725,23 +761,36 @@ class SharedGpuASRRuntime:
                 self._temporary_cleanup_debt.remove(debt)
 
     def _record_temporary_cleanup_failure(
-        self, exception: Exception, cause: ErrorDiagnostics | None, generation: int,
+        self,
+        exception: Exception,
+        cause: ErrorDiagnostics | None,
+        generation: int,
     ) -> None:
         diagnostics = ErrorDiagnostics(
-            component="gpu_worker", operation="process_lifecycle", code="worker_cleanup_failed",
-            category="lifecycle", visibility="basic", content_policy="metadata_only",
-            status_code=None, retry_after_ms=None,
+            component="gpu_worker",
+            operation="process_lifecycle",
+            code="worker_cleanup_failed",
+            category="lifecycle",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
             fields={
-                "cleanup_stage": "cleanup", "cleanup_complete": False,
-                "count": len(self._temporary_cleanup_debt), **safe_exception_fields(exception),
+                "cleanup_stage": "cleanup",
+                "cleanup_complete": False,
+                "count": len(self._temporary_cleanup_debt),
+                **safe_exception_fields(exception),
             },
-            generation=generation, cause_id=cause.diagnostic_id if cause is not None else None,
+            generation=generation,
+            cause_id=cause.diagnostic_id if cause is not None else None,
             operation_id=cause.operation_id if cause is not None else None,
             request_id=cause.request_id if cause is not None else None,
         )
         if self._temporary_cleanup_diagnostics is None:
             self._temporary_cleanup_diagnostics = diagnostics
-        emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage="temp_cleanup")
+        emit_failure(
+            logger, diagnostics, severity="warning", disposition="degraded", stage="temp_cleanup"
+        )
 
     async def _reap_pending_work(
         self,

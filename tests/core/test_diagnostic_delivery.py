@@ -20,7 +20,17 @@ from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService, co
 
 
 def failure(**changes):
-    values = dict(component="settings_repository", operation="save", code="settings_save_failed", category="transaction", visibility="basic", content_policy="metadata_only", status_code=None, retry_after_ms=None, fields={"errno": 13})
+    values = dict(
+        component="settings_repository",
+        operation="save",
+        code="settings_save_failed",
+        category="transaction",
+        visibility="basic",
+        content_policy="metadata_only",
+        status_code=None,
+        retry_after_ms=None,
+        fields={"errno": 13},
+    )
     values.update(changes)
     return ErrorDiagnostics(**values)
 
@@ -46,9 +56,16 @@ def test_root_typed_ingress_matches_history_file_and_basic_once(tmp_path):
     root, sinks, service, basic = logging_service(tmp_path)
     events = []
     service.configure_diagnostics(event_sink=events.append)
-    original = failure(operation_id=uuid4().hex, fields={"message": "FORBIDDEN_DIAGNOSTIC_SENTINEL", "errno": 13})
+    original = failure(
+        operation_id=uuid4().hex, fields={"message": "FORBIDDEN_DIAGNOSTIC_SENTINEL", "errno": 13}
+    )
     try:
-        emit_failure(root, original, stage="settings_save", exception=PermissionError(13, "FORBIDDEN_EXCEPTION_SENTINEL"))
+        emit_failure(
+            root,
+            original,
+            stage="settings_save",
+            exception=PermissionError(13, "FORBIDDEN_EXCEPTION_SENTINEL"),
+        )
         service.emit_failure(original, stage="settings_save")
         records = service.diagnostic_history({})["records"]
         assert len(records) == len(events) == 1
@@ -63,7 +80,11 @@ def test_root_typed_ingress_matches_history_file_and_basic_once(tmp_path):
         finish(root, sinks, service)
     text = sinks.log_file.read_text(encoding="utf-8")
     assert text.count(original.diagnostic_id) == 1
-    selected = [json.loads(line.partition("[Failure] ")[2]) for line in text.splitlines() if "[Failure] {" in line]
+    selected = [
+        json.loads(line.partition("[Failure] ")[2])
+        for line in text.splitlines()
+        if "[Failure] {" in line
+    ]
     assert selected == records
     assert "FORBIDDEN" not in text
 
@@ -71,9 +92,16 @@ def test_root_typed_ingress_matches_history_file_and_basic_once(tmp_path):
 def test_untyped_exception_and_forged_child_projection_remain_fail_closed(tmp_path):
     root, sinks, service, _ = logging_service(tmp_path)
     try:
-        root.error("FORBIDDEN_FREEFORM_SENTINEL", exc_info=(ValueError, ValueError("FORBIDDEN_CHAIN_SENTINEL"), None), extra={DIAGNOSTIC_PROJECTION_ATTRIBUTE: {"message": "FORBIDDEN_CHILD_SENTINEL"}})
+        root.error(
+            "FORBIDDEN_FREEFORM_SENTINEL",
+            exc_info=(ValueError, ValueError("FORBIDDEN_CHAIN_SENTINEL"), None),
+            extra={DIAGNOSTIC_PROJECTION_ATTRIBUTE: {"message": "FORBIDDEN_CHILD_SENTINEL"}},
+        )
         assert service.diagnostic_history({})["records"] == []
-        root.error("FORBIDDEN_INVALID_RECORD_SENTINEL", extra={DIAGNOSTIC_RECORD_ATTRIBUTE: {"arbitrary_child": "FORBIDDEN"}})
+        root.error(
+            "FORBIDDEN_INVALID_RECORD_SENTINEL",
+            extra={DIAGNOSTIC_RECORD_ATTRIBUTE: {"arbitrary_child": "FORBIDDEN"}},
+        )
         assert service.diagnostic_health()["history"]["rejected_records"] == 1
     finally:
         finish(root, sinks, service)
@@ -85,21 +113,28 @@ def test_untyped_exception_and_forged_child_projection_remain_fail_closed(tmp_pa
 def test_failed_file_destination_does_not_destroy_live_health_or_retention(tmp_path, monkeypatch):
     root, sinks, service, _ = logging_service(tmp_path)
     delivered = threading.Event()
+
     def denied(_pending):
         delivered.set()
         raise PermissionError(13, "FORBIDDEN_FILE_SENTINEL")
+
     monkeypatch.setattr(sinks.file_handler, "_write_pending", denied)
     try:
         record = service.emit_failure(failure())
         assert delivered.wait(2)
         deadline = time.monotonic() + 2
-        while not service.diagnostic_health()["file"]["delivery_failures"] and time.monotonic() < deadline:
+        while (
+            not service.diagnostic_health()["file"]["delivery_failures"]
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.01)
         health = service.diagnostic_health()
         assert health["file"]["availability"] == "failed"
         assert health["file"]["delivery_failures"] > 0
         assert health["file"]["persistence"] == "incomplete"
-        assert service.diagnostic_history({"diagnostic_id": record["diagnostic_id"]})["records"] == [record]
+        assert service.diagnostic_history({"diagnostic_id": record["diagnostic_id"]})[
+            "records"
+        ] == [record]
         cause_id = health["file"]["delivery_diagnostic_id"]
         cause = service.diagnostic_history({"diagnostic_id": cause_id})["records"][0]
         assert cause["code"] == "log_file_delivery_failed"
@@ -119,10 +154,12 @@ def test_stalled_writer_overflow_is_nonblocking_and_shutdown_loss_is_visible(tmp
     entered = threading.Event()
     release = threading.Event()
     original = sinks.file_handler._write_pending
+
     def slow(pending):
         entered.set()
         release.wait(10)
         original(pending)
+
     monkeypatch.setattr(sinks.file_handler, "_write_pending", slow)
     try:
         service.emit_failure(failure())
@@ -153,9 +190,11 @@ def test_stalled_writer_overflow_is_nonblocking_and_shutdown_loss_is_visible(tmp
 async def test_threaded_producer_and_failed_subscriber_keep_independent_history(tmp_path):
     root, sinks, service, _ = logging_service(tmp_path)
     delivered = asyncio.Event()
+
     def broken(_event):
         delivered.set()
         raise RuntimeError("FORBIDDEN_CONSUMER_SENTINEL")
+
     service.configure_diagnostics(event_sink=broken)
     try:
         result = await asyncio.to_thread(service.emit_failure, failure())
@@ -168,13 +207,16 @@ async def test_threaded_producer_and_failed_subscriber_keep_independent_history(
 
 def test_throwing_lazy_builder_retains_original_safe_cause_once(tmp_path):
     from puripuly_heart.core.runtime.logging import RuntimeLoggingService
+
     root, sinks, session, _ = logging_service(tmp_path)
     owner = RuntimeLoggingService(session_service=session)
     calls = 0
+
     def builder():
         nonlocal calls
         calls += 1
         raise PermissionError(13, "PRIVATE_BUILDER_EXCEPTION_MARKER")
+
     try:
         assert owner.emit_diagnostic_lazy(builder) is False
         assert calls == 1

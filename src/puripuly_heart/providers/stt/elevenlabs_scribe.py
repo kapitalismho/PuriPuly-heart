@@ -81,8 +81,6 @@ def scribe_keyterms(terms: Sequence[str]) -> tuple[str, ...]:
     return tuple(normalized)
 
 
-
-
 async def verify_scribe_realtime_connection(
     api_key: str,
     *,
@@ -161,26 +159,38 @@ async def verify_scribe_realtime_connection(
                 "Scribe realtime verification failed: connection closed before session start"
             )
         data = outcome[1]
-        event_type = data.get("message_type") or data.get("type") if isinstance(data, dict) else None
+        event_type = (
+            data.get("message_type") or data.get("type") if isinstance(data, dict) else None
+        )
         reason = {
-            "auth_error": "scribe_auth_error", "quota_exceeded": "scribe_quota_exceeded",
+            "auth_error": "scribe_auth_error",
+            "quota_exceeded": "scribe_quota_exceeded",
             "rate_limited": "scribe_rate_limited",
         }.get(event_type, "scribe_error")
         failure = RuntimeError("Scribe realtime verification failed")
         failure.failure_diagnostics = recognition_failure_diagnostics(
-            None, provider="elevenlabs_scribe", channel=None, operation="probe", reason=reason,
+            None,
+            provider="elevenlabs_scribe",
+            channel=None,
+            operation="probe",
+            reason=reason,
         )
         primary_failure = failure.failure_diagnostics
         raise failure
     except Exception as exc:
         primary_failure = recognition_failure_diagnostics(
-            exc, provider="elevenlabs_scribe", channel=None, operation="probe",
+            exc,
+            provider="elevenlabs_scribe",
+            channel=None,
+            operation="probe",
             reason="provider_not_ready",
         )
         primary_failure = replace(
-            primary_failure, **current_diagnostic_operation(),
+            primary_failure,
+            **current_diagnostic_operation(),
             fields={
-                **primary_failure.fields, "verification_scope": "key_probe",
+                **primary_failure.fields,
+                "verification_scope": "key_probe",
                 "recognition_readiness": "unobserved",
             },
         )
@@ -194,15 +204,23 @@ async def verify_scribe_realtime_connection(
                 await result
         except Exception as exc:
             diagnostics = recognition_failure_diagnostics(
-                exc, provider="elevenlabs_scribe", channel=None, operation="cleanup",
+                exc,
+                provider="elevenlabs_scribe",
+                channel=None,
+                operation="cleanup",
                 reason="provider_cleanup_failed",
             )
             emit_failure(
-                logger, replace(
-                    diagnostics, **current_diagnostic_operation(),
+                logger,
+                replace(
+                    diagnostics,
+                    **current_diagnostic_operation(),
                     cause_id=primary_failure.diagnostic_id if primary_failure else None,
                     fields={**diagnostics.fields, "cleanup_confirmed": False},
-                ), severity="warning", disposition="degraded", stage="cleanup",
+                ),
+                severity="warning",
+                disposition="degraded",
+                stage="cleanup",
             )
 
 
@@ -538,9 +556,12 @@ class _ElevenLabsScribeSession(STTBackendSession):
         identity = self._event_projection.active_identity
         provider_turn_id = identity.provider_turn_id if identity is not None else None
         diagnostics = recognition_failure_diagnostics(
-            exception, provider="elevenlabs_scribe",
-            channel=self._event_projection.channel or "unknown", operation="receive",
-            reason=reason, identity=identity,
+            exception,
+            provider="elevenlabs_scribe",
+            channel=self._event_projection.channel or "unknown",
+            operation="receive",
+            reason=reason,
+            identity=identity,
         )
         if identity is not None:
             self._event_projection.terminal(
@@ -590,7 +611,9 @@ class _ElevenLabsScribeSession(STTBackendSession):
                 try:
                     await self._connection.send({"audio_base_64": ""})
                 except Exception as exc:
-                    self._scoped_transport_failure("scribe_keepalive_failed", orderly=False, exception=exc)
+                    self._scoped_transport_failure(
+                        "scribe_keepalive_failed", orderly=False, exception=exc
+                    )
                     self._end_connection_stream()
                     return
                 self._last_send_at = time.monotonic()

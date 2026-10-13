@@ -35,7 +35,6 @@ class RecordingOscReceiver:
         self.stop_calls += 1
 
 
-
 @pytest.mark.asyncio
 async def test_production_receiver_composition_constructs_adapter_once(
     monkeypatch: pytest.MonkeyPatch,

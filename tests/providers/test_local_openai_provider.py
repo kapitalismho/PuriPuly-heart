@@ -27,6 +27,7 @@ def _native_error_text(error: BaseException) -> str:
         assert report.diagnostics.status_code == error.status_code
     return format_error_report_for_log(report)
 
+
 APP_RESERVED_KEYS = (
     "model",
     "messages",

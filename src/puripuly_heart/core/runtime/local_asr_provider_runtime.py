@@ -400,9 +400,11 @@ class LocalASRProviderRuntimeOwner:
                 )
             channel = request.channel
             previous_provider_id = self._provider_ids[channel]
-            provider, failure_code, failure_type, failure_stage, failure_diagnostics = await self._build_provider(
-                request,
-                on_terminal_failure=on_terminal_failure,
+            provider, failure_code, failure_type, failure_stage, failure_diagnostics = (
+                await self._build_provider(
+                    request,
+                    on_terminal_failure=on_terminal_failure,
+                )
             )
             if provider is None:
                 return self._failed_result(
@@ -545,9 +547,11 @@ class LocalASRProviderRuntimeOwner:
                 )
             channel = request.channel
             previous_provider_id = self._provider_ids[channel]
-            provider, failure_code, failure_type, failure_stage, failure_diagnostics = await self._build_provider(
-                request,
-                on_terminal_failure=on_terminal_failure,
+            provider, failure_code, failure_type, failure_stage, failure_diagnostics = (
+                await self._build_provider(
+                    request,
+                    on_terminal_failure=on_terminal_failure,
+                )
             )
             if provider is None:
                 return self._failed_result(
@@ -690,7 +694,10 @@ class LocalASRProviderRuntimeOwner:
         await self._publish_state()
 
     async def warmup_channel(
-        self, channel: ProviderRuntimeChannel, *, operation_id: str | None = None,
+        self,
+        channel: ProviderRuntimeChannel,
+        *,
+        operation_id: str | None = None,
         request_id: str | None = None,
     ) -> None:
         self._require_open("warm provider channel")
@@ -715,21 +722,28 @@ class LocalASRProviderRuntimeOwner:
                     self._channel_phases[channel] = previous_phase
                 diagnostics = replace(
                     recognition_failure_diagnostics(
-                        exc, provider=self._provider_ids[channel] or "stt",
-                        channel=channel, operation="provider_warmup",
+                        exc,
+                        provider=self._provider_ids[channel] or "stt",
+                        channel=channel,
+                        operation="provider_warmup",
                         reason="provider_not_ready",
                     ),
                     generation=generation,
-                    operation_id=operation_id, request_id=request_id,
+                    operation_id=operation_id,
+                    request_id=request_id,
                 )
                 diagnostics = replace(
-                    diagnostics, fields={
-                        **diagnostics.fields, "warmup_usable": True if current else None,
+                    diagnostics,
+                    fields={
+                        **diagnostics.fields,
+                        "warmup_usable": True if current else None,
                         "observed_state": previous_phase,
                     },
                 )
                 emit_failure(
-                    logger, diagnostics, severity="warning" if current else "info",
+                    logger,
+                    diagnostics,
+                    severity="warning" if current else "info",
                     disposition="degraded" if current else "superseded",
                     stage="provider_warmup",
                 )
@@ -1267,7 +1281,9 @@ class LocalASRProviderRuntimeOwner:
                 previous_phase if self._handles[channel].provider is not None else "failed"
             )
             failure_diagnostics = await self._emit_provider_failure(
-                event=failure_stage, request=request, exc=exc,
+                event=failure_stage,
+                request=request,
+                exc=exc,
             )
             if provider is not None:
                 try:
@@ -1311,24 +1327,34 @@ class LocalASRProviderRuntimeOwner:
     ) -> ErrorDiagnostics:
         cancelled = isinstance(exception, asyncio.CancelledError)
         diagnostics = recognition_failure_diagnostics(
-            exception, provider=self._provider_ids[channel] or "stt", channel=channel,
-            operation=stage, reason="cancelled" if cancelled else "provider_not_ready",
+            exception,
+            provider=self._provider_ids[channel] or "stt",
+            channel=channel,
+            operation=stage,
+            reason="cancelled" if cancelled else "provider_not_ready",
         )
         diagnostics = replace(diagnostics, generation=self._handles[channel].generation)
         emit_failure(
-            logger, diagnostics, stage=stage,
+            logger,
+            diagnostics,
+            stage=stage,
             severity="info" if cancelled else "error",
             disposition="cancelled" if cancelled else "failed",
         )
         return diagnostics
 
     def _record_cleanup_failure(
-        self, channel: ProviderRuntimeChannel, exception: BaseException,
-        *, primary_failure: ErrorDiagnostics | None = None,
+        self,
+        channel: ProviderRuntimeChannel,
+        exception: BaseException,
+        *,
+        primary_failure: ErrorDiagnostics | None = None,
     ) -> None:
         native = stt_failure_report(
-            exception, provider=self._provider_ids[channel] or "stt",
-            channel=channel, operation="cleanup",
+            exception,
+            provider=self._provider_ids[channel] or "stt",
+            channel=channel,
+            operation="cleanup",
         ).diagnostics
         diagnostics = replace(
             native,
@@ -1337,7 +1363,11 @@ class LocalASRProviderRuntimeOwner:
             fields={**native.fields, "cleanup_confirmed": False},
         )
         emit_failure(
-            logger, diagnostics, severity="warning", disposition="degraded", stage="cleanup",
+            logger,
+            diagnostics,
+            severity="warning",
+            disposition="degraded",
+            stage="cleanup",
             exception=exception,
         )
 
@@ -1443,11 +1473,15 @@ class LocalASRProviderRuntimeOwner:
     ) -> ErrorDiagnostics:
         diagnostics = replace(
             recognition_failure_diagnostics(
-                exc, provider=request.provider_id, channel=request.channel, operation=event,
+                exc,
+                provider=request.provider_id,
+                channel=request.channel,
+                operation=event,
                 reason="provider_not_ready",
             ),
             generation=self._handles[request.channel].generation,
-            operation_id=request.operation_id, request_id=request.request_id,
+            operation_id=request.operation_id,
+            request_id=request.request_id,
         )
         emit_failure(logger, diagnostics, stage=event)
         await self._emit_diagnostic(
@@ -1475,16 +1509,22 @@ class LocalASRProviderRuntimeOwner:
         except Exception as exc:
             diagnostics = replace(
                 stt_failure_report(
-                    exc, provider=diagnostic.provider_id or "stt",
-                    channel=diagnostic.channel, operation="diagnostic_delivery",
+                    exc,
+                    provider=diagnostic.provider_id or "stt",
+                    channel=diagnostic.channel,
+                    operation="diagnostic_delivery",
                 ).diagnostics,
                 cause_id=(
                     diagnostic.failure_diagnostics.diagnostic_id
-                    if diagnostic.failure_diagnostics is not None else None
+                    if diagnostic.failure_diagnostics is not None
+                    else None
                 ),
             )
             emit_failure(
-                logger, diagnostics, severity="warning", disposition="degraded",
+                logger,
+                diagnostics,
+                severity="warning",
+                disposition="degraded",
                 stage="diagnostic_delivery",
             )
             self._diagnostics.append(

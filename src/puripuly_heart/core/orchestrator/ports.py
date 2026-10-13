@@ -12,8 +12,12 @@ class TranslationRuntimeLoggingPort(Protocol):
     def emit_basic(self, message: str, *, level: int = ...) -> None: ...
 
     def emit_failure(
-        self, diagnostics: ErrorDiagnostics, *, severity: str = "error",
-        disposition: str = "failed", stage: str | None = None,
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
         exception: BaseException | None = None,
     ) -> dict: ...
 

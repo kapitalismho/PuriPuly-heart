@@ -40,8 +40,6 @@ class FakeAsyncQwenClient(AsyncQwenClient):
         self.closed = True
 
 
-
-
 @pytest.mark.asyncio
 async def test_async_qwen_provider_uses_injected_client():
     fake = FakeAsyncQwenClient()
@@ -137,7 +135,3 @@ async def test_async_qwen_verify_api_key_uses_model_and_base_url(monkeypatch):
     body = seen["json"]
     assert body["model"] == "qwen3.8-flash"
     assert body["enable_thinking"] is False
-
-
-
-

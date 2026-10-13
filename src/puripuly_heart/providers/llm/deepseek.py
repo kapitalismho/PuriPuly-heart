@@ -18,9 +18,6 @@ from puripuly_heart.providers.llm.messages import build_translation_user_message
 logger = logging.getLogger(__name__)
 
 
-
-
-
 def _build_system_prompt(
     *,
     system_prompt: str,
@@ -50,7 +47,9 @@ def _extract_message_content(content: object) -> str:
         result = content.strip()
         if result:
             return result
-        raise LLMResponseError("DeepSeek response contained empty message content", provider="deepseek")
+        raise LLMResponseError(
+            "DeepSeek response contained empty message content", provider="deepseek"
+        )
 
     if isinstance(content, list):
         parts: list[str] = []
@@ -172,7 +171,9 @@ class DeepSeekLLMProvider:
                     },
                 )
                 if response.status_code != 200:
-                    record_probe_failure(None, provider="deepseek", status_code=response.status_code)
+                    record_probe_failure(
+                        None, provider="deepseek", status_code=response.status_code
+                    )
                 return response.status_code == 200
         except Exception as exc:
             record_probe_failure(exc, provider="deepseek")
@@ -270,7 +271,7 @@ class HttpxDeepSeekClient:
             json=request_body,
         )
         if response.status_code != 200:
-            
+
             raise LLMResponseError(
                 "DeepSeek request failed", provider="deepseek", status_code=response.status_code
             )
@@ -278,7 +279,9 @@ class HttpxDeepSeekClient:
         try:
             data = response.json()
         except ValueError as exc:
-            raise LLMResponseError("DeepSeek response was not valid JSON", provider="deepseek") from exc
+            raise LLMResponseError(
+                "DeepSeek response was not valid JSON", provider="deepseek"
+            ) from exc
         if not isinstance(data, dict):
             raise LLMResponseError("DeepSeek response was not an object", provider="deepseek")
         if observation is not None:
@@ -287,7 +290,9 @@ class HttpxDeepSeekClient:
         if not isinstance(choices, list) or not choices:
             raise LLMResponseError("DeepSeek response did not contain choices", provider="deepseek")
         if _has_length_finish_reason(data):
-            raise LLMResponseError("DeepSeek response was truncated by max_tokens limit", provider="deepseek")
+            raise LLMResponseError(
+                "DeepSeek response was truncated by max_tokens limit", provider="deepseek"
+            )
 
         if not isinstance(choices[0], dict):
             raise LLMResponseError("DeepSeek response choice was malformed", provider="deepseek")

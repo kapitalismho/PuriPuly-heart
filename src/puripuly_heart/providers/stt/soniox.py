@@ -255,30 +255,45 @@ class SonioxRealtimeSTTBackend(STTBackend):
                         data = json.loads(message)
                     except json.JSONDecodeError as exc:
                         exc.failure_diagnostics = recognition_failure_diagnostics(
-                            exc, provider="soniox", channel=None, operation="probe",
+                            exc,
+                            provider="soniox",
+                            channel=None,
+                            operation="probe",
                             reason="soniox_protocol_ambiguity",
                         )
                         raise
                     if not isinstance(data, dict):
                         error = TypeError("Soniox verification response was not an object")
                         error.failure_diagnostics = recognition_failure_diagnostics(
-                            error, provider="soniox", channel=None, operation="probe",
+                            error,
+                            provider="soniox",
+                            channel=None,
+                            operation="probe",
                             reason="soniox_protocol_ambiguity",
                         )
                         raise error
                     if "error" in data or "error_code" in data or "error_type" in data:
                         code = _safe_code(data.get("error_code"), maximum=999999)
                         diagnostics = recognition_failure_diagnostics(
-                            None, provider="soniox", channel=None, operation="probe",
+                            None,
+                            provider="soniox",
+                            channel=None,
+                            operation="probe",
                             reason="soniox_request_failed",
                         )
                         if type(code) is int:
                             diagnostics = replace(
-                                diagnostics, status_code=code if 100 <= code <= 599 else None,
+                                diagnostics,
+                                status_code=code if 100 <= code <= 599 else None,
                                 category={
-                                    401: "auth", 403: "auth", 408: "timeout", 429: "rate_limit",
-                                    500: "service_unavailable", 502: "service_unavailable",
-                                    503: "service_unavailable", 504: "service_unavailable",
+                                    401: "auth",
+                                    403: "auth",
+                                    408: "timeout",
+                                    429: "rate_limit",
+                                    500: "service_unavailable",
+                                    502: "service_unavailable",
+                                    503: "service_unavailable",
+                                    504: "service_unavailable",
                                 }.get(code, "unknown"),
                                 fields={**diagnostics.fields, "provider_code": code},
                             )
@@ -921,9 +936,12 @@ class _SonioxSession(STTBackendSession):
         )
         provider_turn_id = identity.provider_turn_id if identity is not None else None
         diagnostics = recognition_failure_diagnostics(
-            exception, provider="soniox", channel=self._event_projection.channel or "unknown",
+            exception,
+            provider="soniox",
+            channel=self._event_projection.channel or "unknown",
             operation="protocol" if trigger == "protocol_error" else "receive",
-            reason=reason, identity=identity,
+            reason=reason,
+            identity=identity,
         )
         if type(server_error_code) is int:
             diagnostics = replace(
@@ -931,9 +949,14 @@ class _SonioxSession(STTBackendSession):
                 status_code=server_error_code if 100 <= server_error_code <= 599 else None,
                 fields={**diagnostics.fields, "provider_code": server_error_code},
                 category={
-                    401: "auth", 403: "auth", 408: "timeout", 429: "rate_limit",
-                    500: "service_unavailable", 502: "service_unavailable",
-                    503: "service_unavailable", 504: "service_unavailable",
+                    401: "auth",
+                    403: "auth",
+                    408: "timeout",
+                    429: "rate_limit",
+                    500: "service_unavailable",
+                    502: "service_unavailable",
+                    503: "service_unavailable",
+                    504: "service_unavailable",
                 }.get(server_error_code, "unknown"),
             )
         self._failure_diagnostics = diagnostics

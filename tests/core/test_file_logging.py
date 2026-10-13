@@ -70,9 +70,15 @@ def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared
     service.emit_basic("basic line")
     diagnostics = [
         ErrorDiagnostics(
-            component="provider.llm", operation="translate", code=code,
-            category="network", visibility="diagnostic_only", content_policy="metadata_only",
-            status_code=None, retry_after_ms=None, fields={},
+            component="provider.llm",
+            operation="translate",
+            code=code,
+            category="network",
+            visibility="diagnostic_only",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={},
         )
         for code in ("provider.network", "provider.timeout")
     ]
@@ -84,8 +90,14 @@ def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared
     assert "root arbitrary prose" not in content
     assert "untrusted_record_redacted" in content
     assert "basic line" in content
-    records = [json.loads(line.partition("[Failure] ")[2]) for line in content.splitlines() if line.startswith("[Failure] {")]
-    assert [record["diagnostic_id"] for record in records] == [diagnostic.diagnostic_id for diagnostic in diagnostics]
+    records = [
+        json.loads(line.partition("[Failure] ")[2])
+        for line in content.splitlines()
+        if line.startswith("[Failure] {")
+    ]
+    assert [record["diagnostic_id"] for record in records] == [
+        diagnostic.diagnostic_id for diagnostic in diagnostics
+    ]
     assert [record["code"] for record in records] == ["provider.network", "provider.timeout"]
     assert sink.lines == ["basic line"]
 

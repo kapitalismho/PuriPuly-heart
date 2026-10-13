@@ -216,19 +216,24 @@ class FletDesktopViewProcessOwner:
             "pending_startups": self._in_flight_launches,
             "pending_processes": int(self._process is not None) + len(self._rejected_cleanup_debt),
             "cleanup_complete": (
-                self._close_task is not None and self._close_task.done()
-                and not self._close_task.cancelled() and self._close_task.exception() is None
-                and self._process is None and not self._rejected_cleanup_debt
+                self._close_task is not None
+                and self._close_task.done()
+                and not self._close_task.cancelled()
+                and self._close_task.exception() is None
+                and self._process is None
+                and not self._rejected_cleanup_debt
                 and self._in_flight_launches == 0
             ),
             "diagnostic_id": (
                 self._terminal_cleanup_diagnostics.diagnostic_id
-                if self._terminal_cleanup_diagnostics is not None else None
+                if self._terminal_cleanup_diagnostics is not None
+                else None
             ),
             "observer_failure_count": self._observer_failure_count,
             "observer_failure_diagnostic_id": (
                 self._observer_failure_diagnostics.diagnostic_id
-                if self._observer_failure_diagnostics is not None else None
+                if self._observer_failure_diagnostics is not None
+                else None
             ),
         }
 
@@ -307,9 +312,12 @@ class FletDesktopViewProcessOwner:
             if self._close_task is None or (
                 self._close_task.done()
                 and (
-                    self._process is not None or self._pid_file is not None
-                    or self._in_flight_launches or self._rejected_cleanup_debt
-                    or self._close_task.cancelled() or self._close_task.exception() is not None
+                    self._process is not None
+                    or self._pid_file is not None
+                    or self._in_flight_launches
+                    or self._rejected_cleanup_debt
+                    or self._close_task.cancelled()
+                    or self._close_task.exception() is not None
                 )
             ):
                 self._close_operation = current_diagnostic_operation()
@@ -332,9 +340,13 @@ class FletDesktopViewProcessOwner:
             if process is not None:
                 if not exit_confirmed:
                     self._request_graceful_close(generation, process)
-                    exit_confirmed = await self._wait_for_process_exit(process, self._graceful_timeout_s, generation)
+                    exit_confirmed = await self._wait_for_process_exit(
+                        process, self._graceful_timeout_s, generation
+                    )
                 if not exit_confirmed:
-                    self._emit("graceful_close_timeout", generation=generation, pid=self._pid(process))
+                    self._emit(
+                        "graceful_close_timeout", generation=generation, pid=self._pid(process)
+                    )
                     self._emit("terminate_requested", generation=generation, pid=self._pid(process))
                     try:
                         process.terminate()
@@ -342,8 +354,15 @@ class FletDesktopViewProcessOwner:
                         pass
                     except Exception as exc:
                         self._failure("terminate_failed", "process_terminate", exc)
-                        self._emit("terminate_failed", generation=generation, pid=self._pid(process), **safe_exception_fields(exc))
-                    exit_confirmed = await self._wait_for_process_exit(process, self._terminate_timeout_s, generation)
+                        self._emit(
+                            "terminate_failed",
+                            generation=generation,
+                            pid=self._pid(process),
+                            **safe_exception_fields(exc),
+                        )
+                    exit_confirmed = await self._wait_for_process_exit(
+                        process, self._terminate_timeout_s, generation
+                    )
                 if not exit_confirmed:
                     self._emit("kill_requested", generation=generation, pid=self._pid(process))
                     try:
@@ -352,16 +371,28 @@ class FletDesktopViewProcessOwner:
                         pass
                     except Exception as exc:
                         self._failure("kill_failed", "process_terminate", exc)
-                        self._emit("kill_failed", generation=generation, pid=self._pid(process), **safe_exception_fields(exc))
+                        self._emit(
+                            "kill_failed",
+                            generation=generation,
+                            pid=self._pid(process),
+                            **safe_exception_fields(exc),
+                        )
                     try:
                         self._process_job.close()
                     except Exception as exc:
                         self._failure("job_close_failed", "process_terminate", exc)
                     exit_confirmed = await self._wait_for_process_exit(
-                        process, max(0.1, self._terminate_timeout_s), generation,
+                        process,
+                        max(0.1, self._terminate_timeout_s),
+                        generation,
                     )
                 if exit_confirmed:
-                    self._emit("process_exited", generation=generation, pid=self._pid(process), returncode=process.returncode)
+                    self._emit(
+                        "process_exited",
+                        generation=generation,
+                        pid=self._pid(process),
+                        returncode=process.returncode,
+                    )
         finally:
             if self._in_flight_launches:
                 try:
@@ -388,25 +419,55 @@ class FletDesktopViewProcessOwner:
                     self._process = None
                     self._pid_file = None
                     self._endpoint_identity = None
-            incomplete = not exit_confirmed or not pid_file_removed or bool(self._in_flight_launches or self._rejected_cleanup_debt)
+            incomplete = (
+                not exit_confirmed
+                or not pid_file_removed
+                or bool(self._in_flight_launches or self._rejected_cleanup_debt)
+            )
             if incomplete:
                 self._emit(
-                    "cleanup_incomplete", generation=generation, pid=self._pid(process),
-                    process_exited=exit_confirmed, pid_file_retained=not pid_file_removed,
-                    launch_cleanup_failed=bool(self._in_flight_launches or self._rejected_cleanup_debt),
+                    "cleanup_incomplete",
+                    generation=generation,
+                    pid=self._pid(process),
+                    process_exited=exit_confirmed,
+                    pid_file_retained=not pid_file_removed,
+                    launch_cleanup_failed=bool(
+                        self._in_flight_launches or self._rejected_cleanup_debt
+                    ),
                 )
         if incomplete:
-            message = "Flet desktop view process did not exit" if not exit_confirmed else "Flet desktop view PID file cleanup failed" if not pid_file_removed else "Flet desktop view launch cleanup failed"
-            self._terminal_cleanup_diagnostics = self._failure(
-                "cleanup_failed", "cleanup", self._primary_cleanup_exception,
-                severity="error", disposition="failed",
-                fields={"cleanup_complete": False, "pending_startups": self._in_flight_launches, "count": len(self._rejected_cleanup_debt)},
+            message = (
+                "Flet desktop view process did not exit"
+                if not exit_confirmed
+                else (
+                    "Flet desktop view PID file cleanup failed"
+                    if not pid_file_removed
+                    else "Flet desktop view launch cleanup failed"
+                )
             )
-            raise FletDesktopCleanupError(message, self._terminal_cleanup_diagnostics) from self._primary_cleanup_exception
+            self._terminal_cleanup_diagnostics = self._failure(
+                "cleanup_failed",
+                "cleanup",
+                self._primary_cleanup_exception,
+                severity="error",
+                disposition="failed",
+                fields={
+                    "cleanup_complete": False,
+                    "pending_startups": self._in_flight_launches,
+                    "count": len(self._rejected_cleanup_debt),
+                },
+            )
+            raise FletDesktopCleanupError(
+                message, self._terminal_cleanup_diagnostics
+            ) from self._primary_cleanup_exception
         if self._terminal_cleanup_diagnostics is not None:
             self._failure(
-                "cleanup_recovered", "cleanup", severity="info", disposition="recovered",
-                cause=self._terminal_cleanup_diagnostics, fields={"cleanup_complete": True},
+                "cleanup_recovered",
+                "cleanup",
+                severity="info",
+                disposition="recovered",
+                cause=self._terminal_cleanup_diagnostics,
+                fields={"cleanup_complete": True},
             )
 
     def _request_graceful_close(
@@ -448,13 +509,17 @@ class FletDesktopViewProcessOwner:
             )
 
     async def reap_rejected_process(
-        self, process: FletDesktopViewProcess, pid_file: str | None,
+        self,
+        process: FletDesktopViewProcess,
+        pid_file: str | None,
     ) -> None:
         async with self._reap_lock:
             await self._reap_rejected_process_once(process, pid_file)
 
     async def _reap_rejected_process_once(
-        self, process: FletDesktopViewProcess, pid_file: str | None,
+        self,
+        process: FletDesktopViewProcess,
+        pid_file: str | None,
     ) -> None:
         if not any(owned is process for owned, _ in self._rejected_cleanup_debt):
             self._rejected_cleanup_debt.append((process, pid_file))
@@ -471,7 +536,9 @@ class FletDesktopViewProcessOwner:
             except Exception as exc:
                 self._failure("rejected_cleanup_failed", "process_terminate", exc)
             exited = await self._wait_for_process_exit(
-                process, max(0.1, self._terminate_timeout_s), generation,
+                process,
+                max(0.1, self._terminate_timeout_s),
+                generation,
             )
         if exited and self._remove_pid_file(pid_file, generation):
             self._rejected_cleanup_debt = [
@@ -480,12 +547,16 @@ class FletDesktopViewProcessOwner:
             return
         self._accepting = False
         self._terminal_cleanup_diagnostics = self._failure(
-            "rejected_cleanup_failed", "cleanup", self._primary_cleanup_exception,
-            severity="error", disposition="failed",
+            "rejected_cleanup_failed",
+            "cleanup",
+            self._primary_cleanup_exception,
+            severity="error",
+            disposition="failed",
             fields={"cleanup_complete": False, "count": len(self._rejected_cleanup_debt)},
         )
         raise FletDesktopCleanupError(
-            "Rejected Flet desktop view cleanup incomplete", self._terminal_cleanup_diagnostics,
+            "Rejected Flet desktop view cleanup incomplete",
+            self._terminal_cleanup_diagnostics,
         ) from self._primary_cleanup_exception
 
     async def _wait_for_process_exit(
@@ -559,23 +630,51 @@ class FletDesktopViewProcessOwner:
             self._observer_failure_count += 1
             if self._observer_failure_diagnostics is None:
                 self._observer_failure_diagnostics = ErrorDiagnostics(
-                    component="overlay_process", operation="observe", code="output_observer_failed",
-                    category="lifecycle", visibility="diagnostic_only", content_policy="metadata_only",
-                    status_code=None, retry_after_ms=None, fields={"count": self._observer_failure_count},
+                    component="overlay_process",
+                    operation="observe",
+                    code="output_observer_failed",
+                    category="lifecycle",
+                    visibility="diagnostic_only",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={"count": self._observer_failure_count},
                 )
-                emit_failure(logger, self._observer_failure_diagnostics, severity="warning", disposition="degraded", stage="routing_observer", exception=exc)
+                emit_failure(
+                    logger,
+                    self._observer_failure_diagnostics,
+                    severity="warning",
+                    disposition="degraded",
+                    stage="routing_observer",
+                    exception=exc,
+                )
 
     def _failure(
-        self, event: str, stage: str, exception: BaseException | None = None, *,
-        severity: str = "warning", disposition: str = "degraded",
-        fields: dict[str, object] | None = None, cause: ErrorDiagnostics | None = None,
+        self,
+        event: str,
+        stage: str,
+        exception: BaseException | None = None,
+        *,
+        severity: str = "warning",
+        disposition: str = "degraded",
+        fields: dict[str, object] | None = None,
+        cause: ErrorDiagnostics | None = None,
     ) -> ErrorDiagnostics:
         diagnostics = ErrorDiagnostics(
-            component="overlay_process", operation="process_lifecycle", code=f"desktop_view_{event}",
-            category="lifecycle", visibility="basic", content_policy="metadata_only",
-            status_code=None, retry_after_ms=None,
+            component="overlay_process",
+            operation="process_lifecycle",
+            code=f"desktop_view_{event}",
+            category="lifecycle",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
             fields=fields or {},
-            cause_id=(cause or self._primary_cleanup_diagnostics).diagnostic_id if cause or self._primary_cleanup_diagnostics else None,
+            cause_id=(
+                (cause or self._primary_cleanup_diagnostics).diagnostic_id
+                if cause or self._primary_cleanup_diagnostics
+                else None
+            ),
             generation=self._generation,
             operation_id=self._close_operation.get("operation_id"),
             request_id=self._close_operation.get("request_id"),
@@ -583,7 +682,14 @@ class FletDesktopViewProcessOwner:
         if self._primary_cleanup_diagnostics is None and disposition != "recovered":
             self._primary_cleanup_diagnostics = diagnostics
             self._primary_cleanup_exception = exception
-        emit_failure(logger, diagnostics, severity=severity, disposition=disposition, stage=stage, exception=exception)
+        emit_failure(
+            logger,
+            diagnostics,
+            severity=severity,
+            disposition=disposition,
+            stage=stage,
+            exception=exception,
+        )
         return diagnostics
 
 
@@ -683,7 +789,11 @@ def patch_hidden_view_launcher(
             pid_file = None
             return result
         except BaseException:
-            if process is not None and not attached and not process_owner.retains_process_cleanup(process):
+            if (
+                process is not None
+                and not attached
+                and not process_owner.retains_process_cleanup(process)
+            ):
                 try:
                     await process_owner.reap_rejected_process(process, pid_file)
                 except FletDesktopCleanupError:

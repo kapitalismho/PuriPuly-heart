@@ -138,7 +138,9 @@ class SelfTranslationChannelOwner:
     _scoped_publication_text: dict[STTProviderTurnIdentity, str] = field(default_factory=dict)
     _scoped_endpoint_publication_ids: dict[UUID, UUID] = field(default_factory=dict)
     _retired_local_vad_ids: OrderedDict[UUID, None] = field(default_factory=OrderedDict)
-    _scoped_terminal_reports: OrderedDict[STTProviderTurnIdentity, None] = field(default_factory=OrderedDict)
+    _scoped_terminal_reports: OrderedDict[STTProviderTurnIdentity, None] = field(
+        default_factory=OrderedDict
+    )
     _task_scope: LifecycleScope = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -539,9 +541,13 @@ class SelfTranslationChannelOwner:
                 report = self.diagnostics.record_stt_turn_failure(
                     SttTurnFailureDiagnostic(
                         exception=None,
-                        failure_diagnostics=event.failure_diagnostics or recognition_failure_diagnostics(
-                            None, provider=str(scope_provider), channel="self",
-                            operation="turn_terminal", reason=event.failure_reason or event.outcome,
+                        failure_diagnostics=event.failure_diagnostics
+                        or recognition_failure_diagnostics(
+                            None,
+                            provider=str(scope_provider),
+                            channel="self",
+                            operation="turn_terminal",
+                            reason=event.failure_reason or event.outcome,
                             identity=event.identity,
                         ),
                         provider=scope_provider,

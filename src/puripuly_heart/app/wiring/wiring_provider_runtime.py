@@ -230,8 +230,12 @@ class ProviderRuntimeEffects:
             ),
             self_stt_desired=bool(self_owner is not None and self_owner.snapshot.desired_active),
             peer_stt_desired=self.peer_desired(settings),
-            self_failure_diagnostics=self_owner.snapshot.failure_diagnostics if self_owner is not None else None,
-            peer_failure_diagnostics=peer_owner.snapshot.failure_diagnostics if peer_owner is not None else None,
+            self_failure_diagnostics=(
+                self_owner.snapshot.failure_diagnostics if self_owner is not None else None
+            ),
+            peer_failure_diagnostics=(
+                peer_owner.snapshot.failure_diagnostics if peer_owner is not None else None
+            ),
         )
 
     def self_runtime_convergence(self, settings: object) -> bool | None:

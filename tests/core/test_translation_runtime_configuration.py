@@ -34,7 +34,7 @@ class FakeOsc:
         self.messages.append(message)
 
     def send_immediate(self, _text: str) -> tuple[bool, None]:
-        
+
         return True, None
 
     def send_typing(self, _is_typing: bool) -> None:

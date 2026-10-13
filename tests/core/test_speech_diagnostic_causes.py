@@ -49,18 +49,24 @@ def test_builtin_timeout_is_classified_without_its_message() -> None:
     assert PRIVATE_DETAIL not in format_error_report_for_log(report)
 
 
-@pytest.mark.parametrize("status, category", [(401, "auth"), (429, "rate_limit"), (503, "service_unavailable")])
+@pytest.mark.parametrize(
+    "status, category", [(401, "auth"), (429, "rate_limit"), (503, "service_unavailable")]
+)
 def test_managed_conversion_preserves_native_status_cause_and_identity(status, category) -> None:
     failure = ManagedOpenRouterReleaseError(
-        code="broker_error", error_class="retryable", message=PRIVATE_DETAIL,
-        operation="issue", http_status=status,
+        code="broker_error",
+        error_class="retryable",
+        message=PRIVATE_DETAIL,
+        operation="issue",
+        http_status=status,
     )
     native = failure.failure_diagnostics
     assert native is not None
     native_id = native.diagnostic_id
     diagnostics = failure.to_diagnostics()
     wrapper = ManagedOpenRouterUserFacingError(
-        message_key="managed_release.retry", diagnostics=diagnostics,
+        message_key="managed_release.retry",
+        diagnostics=diagnostics,
     )
     report = provider_failure_report(wrapper, provider="openrouter", operation="translate")
 

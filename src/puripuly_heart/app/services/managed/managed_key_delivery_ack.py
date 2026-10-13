@@ -49,7 +49,9 @@ class ManagedKeyDeliveryAckServiceResult:
         excess = max(0, len(self.secondary_diagnostics) - 4)
         if excess:
             object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
-            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
+            object.__setattr__(
+                self, "secondary_omitted_count", self.secondary_omitted_count + excess
+            )
 
 
 class ManagedKeyDeliveryAckTokenStoreError(Exception):
@@ -276,9 +278,11 @@ class ManagedKeyDeliveryAckService:
                                     operation="restore_delivery_ack_token",
                                     code="delivery_ack_token_restore_failed",
                                     fields={"source": source},
-                                    cause=restore_result.diagnostics
-                                    if restore_result is not None
-                                    else None,
+                                    cause=(
+                                        restore_result.diagnostics
+                                        if restore_result is not None
+                                        else None
+                                    ),
                                 ),
                                 cause_id=primary.diagnostic_id,
                             ),

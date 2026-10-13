@@ -267,9 +267,11 @@ class _DeepgramSDKSession(STTBackendSession):
             authority = "authoritative"
         if outcome in {"failed", "degraded"} and failure_diagnostics is None:
             failure_diagnostics = recognition_failure_diagnostics(
-                None, provider="deepgram",
+                None,
+                provider="deepgram",
                 channel=self._event_projection.channel or self.stream_label or "unknown",
-                operation="seal", reason=degraded_reason or "deepgram_transport_error",
+                operation="seal",
+                reason=degraded_reason or "deepgram_transport_error",
                 identity=identity,
             )
         self._event_projection.terminal(
@@ -290,17 +292,21 @@ class _DeepgramSDKSession(STTBackendSession):
     def _scoped_transport_end(
         self, orderly: bool, reason: str, exception: BaseException | None = None
     ) -> None:
-        diagnostics = None if orderly else recognition_failure_diagnostics(
-            exception,
-            provider="deepgram",
-            channel=self._event_projection.channel or self.stream_label or "unknown",
-            operation={
-                "deepgram_protocol_failed": "protocol",
-                "deepgram_write_failed": "send",
-                "deepgram_keepalive_failed": "send",
-            }.get(reason, "receive"),
-            reason=reason,
-            identity=self._event_projection.active_identity,
+        diagnostics = (
+            None
+            if orderly
+            else recognition_failure_diagnostics(
+                exception,
+                provider="deepgram",
+                channel=self._event_projection.channel or self.stream_label or "unknown",
+                operation={
+                    "deepgram_protocol_failed": "protocol",
+                    "deepgram_write_failed": "send",
+                    "deepgram_keepalive_failed": "send",
+                }.get(reason, "receive"),
+                reason=reason,
+                identity=self._event_projection.active_identity,
+            )
         )
         identity = self._event_projection.active_identity
         provider_turn_id = identity.provider_turn_id if identity is not None else None
@@ -402,8 +408,11 @@ class _DeepgramSDKSession(STTBackendSession):
                         self._report_error(exc)
                         self._scoped_transport_end(
                             False,
-                            "deepgram_protocol_failed" if isinstance(exc, json.JSONDecodeError)
-                            else "deepgram_transport_error",
+                            (
+                                "deepgram_protocol_failed"
+                                if isinstance(exc, json.JSONDecodeError)
+                                else "deepgram_transport_error"
+                            ),
                             exc,
                         )
                         self._stopped = True
@@ -467,8 +476,13 @@ class _DeepgramSDKSession(STTBackendSession):
         except Exception as exc:
             self._report_error(exc)
             self._scoped_transport_end(
-                False, "deepgram_protocol_failed" if isinstance(exc, ValueError | TypeError)
-                else "deepgram_transport_error", exc,
+                False,
+                (
+                    "deepgram_protocol_failed"
+                    if isinstance(exc, ValueError | TypeError)
+                    else "deepgram_transport_error"
+                ),
+                exc,
             )
 
     async def _send_loop(self, connection: Any) -> None:
@@ -622,8 +636,12 @@ class _DeepgramSDKSession(STTBackendSession):
                     degraded_reason="deepgram_close_stream_failed",
                     empty_is_success=False,
                     failure_diagnostics=recognition_failure_diagnostics(
-                        exc, provider="deepgram", channel=self.stream_label or "self",
-                        operation="seal", reason="deepgram_close_stream_failed", identity=identity,
+                        exc,
+                        provider="deepgram",
+                        channel=self.stream_label or "self",
+                        operation="seal",
+                        reason="deepgram_close_stream_failed",
+                        identity=identity,
                     ),
                 )
             return

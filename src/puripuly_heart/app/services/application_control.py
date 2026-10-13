@@ -353,14 +353,18 @@ def _known_secret(application: UiApplicationBoundary, name: str) -> str:
     return name
 
 
-def _json(value: object, *, diagnostic_projector: Callable[[ErrorDiagnostics], dict] | None = None) -> object:
+def _json(
+    value: object, *, diagnostic_projector: Callable[[ErrorDiagnostics], dict] | None = None
+) -> object:
     from dataclasses import fields, is_dataclass
     from enum import Enum
 
     if isinstance(value, ErrorDiagnostics):
         if diagnostic_projector is not None:
             return diagnostic_projector(value)
-        return normalize_diagnostic(value, instance_id=None, severity="error", disposition="unknown")
+        return normalize_diagnostic(
+            value, instance_id=None, severity="error", disposition="unknown"
+        )
     if isinstance(value, Enum):
         return value.value
     if is_dataclass(value):
@@ -369,7 +373,9 @@ def _json(value: object, *, diagnostic_projector: Callable[[ErrorDiagnostics], d
             for item in fields(value)
         }
     if isinstance(value, Mapping):
-        return {str(k): _json(v, diagnostic_projector=diagnostic_projector) for k, v in value.items()}
+        return {
+            str(k): _json(v, diagnostic_projector=diagnostic_projector) for k, v in value.items()
+        }
     if isinstance(value, (tuple, list, set, frozenset)):
         return [_json(v, diagnostic_projector=diagnostic_projector) for v in value]
     if isinstance(value, (str, bool, int, float)) or value is None:
@@ -566,7 +572,12 @@ class ApplicationControlOwner:
         }
 
     def _snapshot_json(self, value: object) -> object:
-        return _json(value, diagnostic_projector=lambda diagnostic: self._retain_diagnostic(diagnostic, disposition="unknown"))
+        return _json(
+            value,
+            diagnostic_projector=lambda diagnostic: self._retain_diagnostic(
+                diagnostic, disposition="unknown"
+            ),
+        )
 
     def _channels(self) -> dict:
         canonical = self.application.compatibility_settings()
@@ -1051,9 +1062,12 @@ class ApplicationControlOwner:
         cleanup = snapshot.startup_cleanup
         if not isinstance(cleanup, Mapping):
             data["startup_cleanup"] = {
-                "availability": "unavailable", "pending_startups": None,
-                "close_complete": None, "cleanup_failures": [],
-                "pending_temporary_directories": None, "temporary_cleanup_diagnostic_id": None,
+                "availability": "unavailable",
+                "pending_startups": None,
+                "close_complete": None,
+                "cleanup_failures": [],
+                "pending_temporary_directories": None,
+                "temporary_cleanup_diagnostic_id": None,
             }
             return data
         pending = cleanup.get("pending_startups")
@@ -1071,10 +1085,12 @@ class ApplicationControlOwner:
                     rejected += 1
         else:
             rejected += 1
-        temporary, removed = sanitize_diagnostic_fields({
-            "pending_temporary_directories": cleanup.get("pending_temporary_directories"),
-            "temporary_cleanup_diagnostic_id": cleanup.get("temporary_cleanup_diagnostic_id"),
-        })
+        temporary, removed = sanitize_diagnostic_fields(
+            {
+                "pending_temporary_directories": cleanup.get("pending_temporary_directories"),
+                "temporary_cleanup_diagnostic_id": cleanup.get("temporary_cleanup_diagnostic_id"),
+            }
+        )
         rejected += removed
         data["startup_cleanup"] = {
             "availability": "observed",
@@ -1103,7 +1119,9 @@ class ApplicationControlOwner:
             "last_observer_failure_type": source["last_observer_failure_type"],
         }
         if result["last_observer_failure_type"] is not None:
-            fields, rejected = sanitize_diagnostic_fields({"exception_class": result["last_observer_failure_type"]})
+            fields, rejected = sanitize_diagnostic_fields(
+                {"exception_class": result["last_observer_failure_type"]}
+            )
             result["last_observer_failure_type"] = fields.get("exception_class", "unclassified")
             result["detail_rejected"] = rejected
         return result
@@ -1227,12 +1245,15 @@ class ApplicationControlOwner:
             if result.snapshot is None or result.diagnostics is not None:
                 diagnostic = (
                     self._retain_diagnostic(result.diagnostics, disposition="failed")
-                    if result.diagnostics is not None else None
+                    if result.diagnostics is not None
+                    else None
                 )
                 return {
                     **base,
                     "status": "failed",
-                    "error": {"code": diagnostic["code"] if diagnostic else "secret_store_unavailable"},
+                    "error": {
+                        "code": diagnostic["code"] if diagnostic else "secret_store_unavailable"
+                    },
                     "diagnostics": diagnostic,
                 }
             return {
@@ -1323,19 +1344,25 @@ class ApplicationControlOwner:
 
         if admission is None:
             return {
-                "status": "rejected", "error": {"code": "text_admission_unavailable"},
-                "admission": "unavailable", "turn_id": None, "child_turn_ids": [],
+                "status": "rejected",
+                "error": {"code": "text_admission_unavailable"},
+                "admission": "unavailable",
+                "turn_id": None,
+                "child_turn_ids": [],
                 "output_delivery": "unobserved",
             }
         if not isinstance(admission, TextSubmissionAdmission):
             raise TypeError("text admission requires an owned typed result")
-        if admission.status not in {"admitted", "rejected"} or not isinstance(admission.turn_id, UUID):
+        if admission.status not in {"admitted", "rejected"} or not isinstance(
+            admission.turn_id, UUID
+        ):
             raise TypeError("text admission identity is invalid")
         if not all(isinstance(turn_id, UUID) for turn_id in admission.child_turn_ids):
             raise TypeError("text admission child identity is invalid")
         result = {
             "status": "applied" if admission.status == "admitted" else "rejected",
-            "admission": admission.status, "turn_id": str(admission.turn_id),
+            "admission": admission.status,
+            "turn_id": str(admission.turn_id),
             "child_turn_ids": [str(turn_id) for turn_id in admission.child_turn_ids],
             "output_delivery": "unobserved",
         }
@@ -1344,17 +1371,30 @@ class ApplicationControlOwner:
         return result
 
     def _retain_diagnostic(
-        self, diagnostics: ErrorDiagnostics, *, disposition: str, stage: str | None = None,
-        exception: BaseException | None = None, severity: str = "error",
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        disposition: str,
+        stage: str | None = None,
+        exception: BaseException | None = None,
+        severity: str = "error",
     ) -> dict:
         runtime_logging = getattr(self.application, "_runtime_logging", None)
         if runtime_logging is not None:
             return runtime_logging.emit_failure(
-                diagnostics, disposition=disposition, stage=stage, exception=exception, severity=severity,
+                diagnostics,
+                disposition=disposition,
+                stage=stage,
+                exception=exception,
+                severity=severity,
             )
         return normalize_diagnostic(
-            diagnostics, instance_id=self.instance_id, severity=severity,
-            disposition=disposition, stage=stage, exception=exception,
+            diagnostics,
+            instance_id=self.instance_id,
+            severity=severity,
+            disposition=disposition,
+            stage=stage,
+            exception=exception,
         )
 
     def _notify_presentation(self, receipt: dict, primary: dict | None = None) -> None:
@@ -1362,15 +1402,23 @@ class ApplicationControlOwner:
             self.sync_ui()
         except Exception as exc:
             diagnostics = ErrorDiagnostics(
-                component="application_notification", operation="snapshot_notification",
-                code="presentation_sync_failed", category="lifecycle",
-                visibility=DIAGNOSTIC_VISIBILITY_BASIC, content_policy=CONTENT_POLICY_METADATA_ONLY,
-                status_code=None, retry_after_ms=None, fields={"notification_delivered": False},
+                component="application_notification",
+                operation="snapshot_notification",
+                code="presentation_sync_failed",
+                category="lifecycle",
+                visibility=DIAGNOSTIC_VISIBILITY_BASIC,
+                content_policy=CONTENT_POLICY_METADATA_ONLY,
+                status_code=None,
+                retry_after_ms=None,
+                fields={"notification_delivered": False},
                 cause_id=primary["diagnostic_id"] if primary is not None else None,
             )
             evidence = self._retain_diagnostic(
-                diagnostics, disposition="degraded", severity="warning",
-                stage="dashboard_notification", exception=exc,
+                diagnostics,
+                disposition="degraded",
+                severity="warning",
+                stage="dashboard_notification",
+                exception=exc,
             )
             secondary = receipt.setdefault("secondary_diagnostics", [])
             if len(secondary) < 4:
@@ -1378,11 +1426,14 @@ class ApplicationControlOwner:
             else:
                 receipt["secondary_truncated"] = True
                 receipt["secondary_omitted_count"] = receipt.get("secondary_omitted_count", 0) + 1
-            self.events.publish({
-                "topic": "error", "operation_id": evidence["operation_id"],
-                "code": evidence["code"], "diagnostic_id": evidence["diagnostic_id"],
-            })
-
+            self.events.publish(
+                {
+                    "topic": "error",
+                    "operation_id": evidence["operation_id"],
+                    "code": evidence["code"],
+                    "diagnostic_id": evidence["diagnostic_id"],
+                }
+            )
 
     def _transaction_receipt(self, transaction: TransactionResult, status: str) -> dict:
         data = {
@@ -1392,13 +1443,16 @@ class ApplicationControlOwner:
         }
         if transaction.diagnostics is not None:
             data["diagnostics"] = self._retain_diagnostic(
-                transaction.diagnostics, disposition="degraded" if status == "degraded" else "failed",
+                transaction.diagnostics,
+                disposition="degraded" if status == "degraded" else "failed",
             )
         data["secondary_diagnostics"] = [
             self._retain_diagnostic(diagnostic, disposition="degraded")
             for diagnostic in transaction.secondary_diagnostics[:4]
         ]
-        data["secondary_omitted_count"] = transaction.secondary_omitted_count + max(0, len(transaction.secondary_diagnostics) - 4)
+        data["secondary_omitted_count"] = transaction.secondary_omitted_count + max(
+            0, len(transaction.secondary_diagnostics) - 4
+        )
         data["secondary_truncated"] = data["secondary_omitted_count"] > 0
         return data
 
@@ -1493,7 +1547,9 @@ class ApplicationControlOwner:
                         "overlay.position.reset",
                     }:
                         status = _transaction_status(transaction)
-                        operation.receipt["transaction"] = self._transaction_receipt(transaction, status)
+                        operation.receipt["transaction"] = self._transaction_receipt(
+                            transaction, status
+                        )
                     elif result is False:
                         status = "failed"
                     elif isinstance(result, dict) and "status" in result:
@@ -1518,7 +1574,9 @@ class ApplicationControlOwner:
                         operation.receipt.update({k: v for k, v in result.items() if k != "status"})
                         if "status" in result and result["status"] != "applied":
                             operation.receipt["status"] = result["status"]
-                    if command in {"settings.apply", "provider.apply"} and operation.receipt["status"] in {"applied", "degraded"}:
+                    if command in {"settings.apply", "provider.apply"} and operation.receipt[
+                        "status"
+                    ] in {"applied", "degraded"}:
                         self._notify_presentation(
                             operation.receipt,
                             (operation.receipt.get("transaction") or {}).get("diagnostics"),
@@ -1532,7 +1590,8 @@ class ApplicationControlOwner:
             )
         except InvalidArgumentsError:
             operation.receipt.update(
-                status="rejected", error={"code": "invalid_arguments", "type": "InvalidArgumentsError"}
+                status="rejected",
+                error={"code": "invalid_arguments", "type": "InvalidArgumentsError"},
             )
         except Exception as exc:
             source = vars(exc).get("failure_diagnostics")
@@ -1540,26 +1599,41 @@ class ApplicationControlOwner:
                 source = vars(exc).get("diagnostics")
             owning_cause = (
                 self._retain_diagnostic(source, disposition="failed")
-                if isinstance(source, ErrorDiagnostics) else None
+                if isinstance(source, ErrorDiagnostics)
+                else None
             )
             if owning_cause is not None:
                 operation.receipt["cause_diagnostics"] = owning_cause
             diagnostics = ErrorDiagnostics(
-                component="application_control", operation=command,
-                code="application_operation_failed", category="unknown",
-                visibility="diagnostic_only" if owning_cause is not None else DIAGNOSTIC_VISIBILITY_BASIC,
+                component="application_control",
+                operation=command,
+                code="application_operation_failed",
+                category="unknown",
+                visibility=(
+                    "diagnostic_only" if owning_cause is not None else DIAGNOSTIC_VISIBILITY_BASIC
+                ),
                 content_policy=CONTENT_POLICY_METADATA_ONLY,
-                status_code=None, retry_after_ms=None, fields={},
-                operation_id=operation_id, request_id=operation.receipt["request_id"],
+                status_code=None,
+                retry_after_ms=None,
+                fields={},
+                operation_id=operation_id,
+                request_id=operation.receipt["request_id"],
                 cause_id=owning_cause["diagnostic_id"] if owning_cause is not None else None,
             )
             diagnostic = self._retain_diagnostic(
-                diagnostics, disposition="failed", stage="dispatch", exception=exc,
+                diagnostics,
+                disposition="failed",
+                stage="dispatch",
+                exception=exc,
             )
             operation.receipt.update(
                 status="failed",
-                error={"code": "application_operation_failed", "type": diagnostic["fields"].get("exception_class", "unclassified")},
-                diagnostics=diagnostic, diagnostic_id=diagnostic["diagnostic_id"],
+                error={
+                    "code": "application_operation_failed",
+                    "type": diagnostic["fields"].get("exception_class", "unclassified"),
+                },
+                diagnostics=diagnostic,
+                diagnostic_id=diagnostic["diagnostic_id"],
             )
         finally:
             if (
@@ -1615,7 +1689,9 @@ class ApplicationControlOwner:
                     "terminal": operation.receipt["terminal"],
                     "revision": self._current_revision(),
                     "diagnostic_id": operation.receipt.get("diagnostic_id")
-                    or (operation.receipt.get("transaction", {}).get("diagnostics") or {}).get("diagnostic_id"),
+                    or (operation.receipt.get("transaction", {}).get("diagnostics") or {}).get(
+                        "diagnostic_id"
+                    ),
                     "turn_id": operation.receipt.get("turn_id"),
                     "child_turn_ids": operation.receipt.get("child_turn_ids", []),
                 }
@@ -1685,7 +1761,9 @@ class ApplicationControlOwner:
                     await app.accept_peer_translation_eula_and_enable()
                     current = getattr(self.results, "current", None)
                     if current is not None and current is not before:
-                        consent_transaction = self._transaction_receipt(current, _transaction_status(current))
+                        consent_transaction = self._transaction_receipt(
+                            current, _transaction_status(current)
+                        )
                         consent_status = _transaction_status(current)
                         if consent_status in {"persistence_failed", "failed"}:
                             return {
@@ -2003,7 +2081,9 @@ class ApplicationControlOwner:
                     return {
                         "status": _transaction_status(result),
                         "calibration": _json(value),
-                        "transaction": self._transaction_receipt(result, _transaction_status(result)),
+                        "transaction": self._transaction_receipt(
+                            result, _transaction_status(result)
+                        ),
                     }
                 return {"status": "applied", "calibration": _json(value)}
             if action == "cancel":
@@ -2053,7 +2133,8 @@ class ApplicationControlOwner:
                 )
                 primary = (
                     self._retain_diagnostic(connect.diagnostics, disposition="failed")
-                    if connect.diagnostics is not None else None
+                    if connect.diagnostics is not None
+                    else None
                 )
                 evidence = {
                     "diagnostics": primary,
@@ -2062,8 +2143,10 @@ class ApplicationControlOwner:
                         self._retain_diagnostic(item, disposition="degraded")
                         for item in connect.secondary_diagnostics[:4]
                     ],
-                    "secondary_omitted_count": connect.secondary_omitted_count + max(0, len(connect.secondary_diagnostics) - 4),
-                    "secondary_truncated": connect.secondary_omitted_count > 0 or len(connect.secondary_diagnostics) > 4,
+                    "secondary_omitted_count": connect.secondary_omitted_count
+                    + max(0, len(connect.secondary_diagnostics) - 4),
+                    "secondary_truncated": connect.secondary_omitted_count > 0
+                    or len(connect.secondary_diagnostics) > 4,
                 }
                 self._notify_presentation(evidence, primary)
                 if connect.succeeded:
@@ -2108,7 +2191,9 @@ class ApplicationControlOwner:
                 )
             else:
                 if "referral_id" in args:
-                    raise InvalidArgumentsError("referral_id is not valid for OpenRouter authorization")
+                    raise InvalidArgumentsError(
+                        "referral_id is not valid for OpenRouter authorization"
+                    )
                 target = app.build_managed_openrouter_byok_target()
                 if target is None:
                     from puripuly_heart.app.ports.settings_view import OpenRouterPkceTarget
@@ -2131,7 +2216,11 @@ class ApplicationControlOwner:
                 )
         transaction = getattr(self.results, "current", None)
         transaction_data = (
-            {"transaction": self._transaction_receipt(transaction, _transaction_status(transaction))}
+            {
+                "transaction": self._transaction_receipt(
+                    transaction, _transaction_status(transaction)
+                )
+            }
             if transaction is not None and transaction is not before
             else {}
         )
@@ -2181,23 +2270,32 @@ class ApplicationControlOwner:
             diagnostics = signed_out.diagnostics
             status = "applied" if signed_out.local_credentials_removed is True else "failed"
             diagnostic = (
-                self._retain_diagnostic(diagnostics, disposition="failed" if status == "failed" else "degraded")
-                if diagnostics is not None else None
+                self._retain_diagnostic(
+                    diagnostics, disposition="failed" if status == "failed" else "degraded"
+                )
+                if diagnostics is not None
+                else None
             )
             result = {
                 "status": status,
                 "provider": provider,
                 "local_credentials_removed": signed_out.local_credentials_removed,
                 "remote_revoked": signed_out.remote_revoked,
-                "scope": "remote_revoked" if signed_out.remote_revoked else "local_only" if signed_out.local_credentials_removed is True else "unknown",
+                "scope": (
+                    "remote_revoked"
+                    if signed_out.remote_revoked
+                    else "local_only" if signed_out.local_credentials_removed is True else "unknown"
+                ),
                 "diagnostics": diagnostic,
                 "diagnostic_id": diagnostic["diagnostic_id"] if diagnostic is not None else None,
                 "secondary_diagnostics": [
                     self._retain_diagnostic(item, disposition="degraded")
                     for item in signed_out.secondary_diagnostics[:4]
                 ],
-                "secondary_omitted_count": signed_out.secondary_omitted_count + max(0, len(signed_out.secondary_diagnostics) - 4),
-                "secondary_truncated": signed_out.secondary_omitted_count > 0 or len(signed_out.secondary_diagnostics) > 4,
+                "secondary_omitted_count": signed_out.secondary_omitted_count
+                + max(0, len(signed_out.secondary_diagnostics) - 4),
+                "secondary_truncated": signed_out.secondary_omitted_count > 0
+                or len(signed_out.secondary_diagnostics) > 4,
             }
             self._notify_presentation(result, diagnostic)
             return result
@@ -2239,7 +2337,12 @@ class ApplicationControlOwner:
             transaction = getattr(self.results, "current", None)
             if transaction is not None and transaction is not before:
                 status = _transaction_status(transaction)
-                result = {"status": status, "transaction": self._transaction_receipt(transaction, _transaction_status(transaction))}
+                result = {
+                    "status": status,
+                    "transaction": self._transaction_receipt(
+                        transaction, _transaction_status(transaction)
+                    ),
+                }
             else:
                 result = {"status": "applied" if succeeded else "failed"}
             result.update(provider=provider, scope="local_only")
@@ -2345,7 +2448,9 @@ class ApplicationControlOwner:
             )
             connection = changes["translation.connection"]
             if connection not in {item.value for item in supported_translation_connections(model)}:
-                raise InvalidArgumentsError("unsupported translation model and connection combination")
+                raise InvalidArgumentsError(
+                    "unsupported translation model and connection combination"
+                )
 
     async def _apply_fields(self, args: dict) -> object:
         changes = args.get("changes", args)
@@ -2423,7 +2528,9 @@ class ApplicationControlOwner:
                 else:
                     connection = selection.connection
                 if connection not in supported_translation_connections(model):
-                    raise InvalidArgumentsError("unsupported translation model and connection combination")
+                    raise InvalidArgumentsError(
+                        "unsupported translation model and connection combination"
+                    )
                 history = dict(selection.connection_history)
                 updates = ()
                 if key == "translation.connection_history":
@@ -2434,7 +2541,9 @@ class ApplicationControlOwner:
                         if historic_connection not in supported_translation_connections(
                             historic_model
                         ):
-                            raise InvalidArgumentsError("unsupported translation connection history")
+                            raise InvalidArgumentsError(
+                                "unsupported translation connection history"
+                            )
                     history.update(updates)
                 elif key in {"translation.model", "translation.connection"}:
                     updates = ((model, connection),)
@@ -2634,7 +2743,9 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
     if command == "provider.apply":
         if "channel" in args:
             if args.keys() != {"channel", "provider"}:
-                raise InvalidArgumentsError("channel provider selection requires channel and provider only")
+                raise InvalidArgumentsError(
+                    "channel provider selection requires channel and provider only"
+                )
             if type(args["channel"]) is not str or args["channel"] not in {
                 "self",
                 "peer",
@@ -2779,11 +2890,20 @@ def _validate_auth_login_args(args: dict, provider: str) -> None:
 def _chatgpt_status(application: object, retain: Callable[..., dict]) -> dict:
     snapshot_provider = getattr(application, "chatgpt_account_snapshot", None)
     if not callable(snapshot_provider):
-        return {"signed_in": None, "in_progress": None, "sign_in_required": None, "availability": "unavailable"}
+        return {
+            "signed_in": None,
+            "in_progress": None,
+            "sign_in_required": None,
+            "availability": "unavailable",
+        }
     snapshot = snapshot_provider()
     required = getattr(application, "chatgpt_sign_in_required", None)
     diagnostics = snapshot.diagnostics
-    evidence = retain(diagnostics, disposition="degraded", severity="warning") if diagnostics is not None else None
+    evidence = (
+        retain(diagnostics, disposition="degraded", severity="warning")
+        if diagnostics is not None
+        else None
+    )
     return {
         "signed_in": snapshot.signed_in,
         "in_progress": snapshot.in_progress,
@@ -3038,5 +3158,3 @@ def _transaction_status(result: TransactionResult) -> str:
     if status.startswith("settings_commit_failed") or status == "secret_write_failed":
         return "persistence_failed"
     return "failed"
-
-

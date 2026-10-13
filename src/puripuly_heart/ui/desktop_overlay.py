@@ -1049,7 +1049,9 @@ class FletDesktopRendererWindow:
                 try:
                     await invoke_control_method(window, "destroy")
                 except Exception as secondary:
-                    raise ExceptionGroup("desktop window cleanup failed", [primary, secondary]) from primary
+                    raise ExceptionGroup(
+                        "desktop window cleanup failed", [primary, secondary]
+                    ) from primary
 
         process_owner = self._view_process_owner
         try:
@@ -1077,7 +1079,9 @@ class FletDesktopRendererWindow:
                     except TimeoutError:
                         task.cancel()
                         results = await asyncio.gather(task, return_exceptions=True)
-                        failures.extend(result for result in results if isinstance(result, Exception))
+                        failures.extend(
+                            result for result in results if isinstance(result, Exception)
+                        )
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -3002,7 +3006,10 @@ class DesktopOverlayRenderer:
             )
             if local_cleanup_complete:
                 await self._emit_lifecycle(
-                    {"type": "shutdown_complete", "overlay_instance_id": self.manifest.overlay_instance_id}
+                    {
+                        "type": "shutdown_complete",
+                        "overlay_instance_id": self.manifest.overlay_instance_id,
+                    }
                 )
             else:
                 await self._emit_cleanup_failure()
@@ -3019,18 +3026,23 @@ class DesktopOverlayRenderer:
     def _note_cleanup_failure(self, stage: str, exception: Exception) -> None:
         if self._cleanup_failure_reason is None:
             self._cleanup_failure_reason = "shutdown_cleanup_failed"
-            self._cleanup_failure_fields = {"cleanup_stage": stage, **safe_exception_fields(exception)}
+            self._cleanup_failure_fields = {
+                "cleanup_stage": stage,
+                **safe_exception_fields(exception),
+            }
 
     async def _emit_cleanup_failure(self) -> None:
-        await self._emit_lifecycle({
-            "type": "runtime_error",
-            "overlay_instance_id": self.manifest.overlay_instance_id,
-            "failure_reason": self._primary_failure_reason or "shutdown_cleanup_failed",
-            "primary_failure_reason": self._primary_failure_reason,
-            "cleanup_failure_reason": self._cleanup_failure_reason,
-            "evidence_state": "incomplete",
-            **self._cleanup_failure_fields,
-        })
+        await self._emit_lifecycle(
+            {
+                "type": "runtime_error",
+                "overlay_instance_id": self.manifest.overlay_instance_id,
+                "failure_reason": self._primary_failure_reason or "shutdown_cleanup_failed",
+                "primary_failure_reason": self._primary_failure_reason,
+                "cleanup_failure_reason": self._cleanup_failure_reason,
+                "evidence_state": "incomplete",
+                **self._cleanup_failure_fields,
+            }
+        )
 
     async def _connect_bridge(self) -> Any:
         timeout_s = max(0.1, self.manifest.startup_deadline_ms / 1000.0)
@@ -3397,16 +3409,25 @@ class DesktopOverlayRenderer:
             except TimeoutError:
                 continue
 
-    async def _emit_runtime_error(self, failure_reason: str, exception: Exception | None = None) -> None:
+    async def _emit_runtime_error(
+        self, failure_reason: str, exception: Exception | None = None
+    ) -> None:
         self._primary_failure_reason = self._primary_failure_reason or failure_reason
-        await self._emit_lifecycle({
-            "type": "runtime_error", "failure_reason": failure_reason,
-            "overlay_instance_id": self.manifest.overlay_instance_id,
-            **(safe_exception_fields(exception) if exception is not None else {}),
-        })
+        await self._emit_lifecycle(
+            {
+                "type": "runtime_error",
+                "failure_reason": failure_reason,
+                "overlay_instance_id": self.manifest.overlay_instance_id,
+                **(safe_exception_fields(exception) if exception is not None else {}),
+            }
+        )
 
     async def _emit_lifecycle(self, event: dict[str, object]) -> None:
-        safe_event = project_child_failure(event) if event.get("type") in {"startup_error", "runtime_error"} else _redact_event(event)
+        safe_event = (
+            project_child_failure(event)
+            if event.get("type") in {"startup_error", "runtime_error"}
+            else _redact_event(event)
+        )
         websocket = self._websocket
         if websocket is not None:
             try:
@@ -3446,10 +3467,13 @@ async def _run_renderer_async(config_path: Path) -> int:
     try:
         manifest = load_renderer_manifest(config_path)
     except DesktopOverlayStartupError as exc:
-        await sink.emit({
-            "type": "startup_error", "failure_reason": exc.failure_reason,
-            **safe_exception_fields(exc),
-        })
+        await sink.emit(
+            {
+                "type": "startup_error",
+                "failure_reason": exc.failure_reason,
+                **safe_exception_fields(exc),
+            }
+        )
         return _STARTUP_FAILURE_EXIT_CODE
     renderer = DesktopOverlayRenderer(manifest, lifecycle_sink=sink)
     return await renderer.run()
@@ -3589,8 +3613,6 @@ def _parse_runtime_control_payload(message: dict[str, object]) -> dict[str, obje
     if not isinstance(command, str) or not command:
         return None
     return dict(payload)
-
-
 
 
 def _redact_event(event: dict[str, object]) -> dict[str, object]:

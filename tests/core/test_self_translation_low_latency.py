@@ -342,7 +342,7 @@ class FakeOscQueue:
         pass
 
     def send_immediate(self, text: str) -> tuple[bool, None]:
-        
+
         return True, None
 
     def process_due(self) -> None:

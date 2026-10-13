@@ -490,7 +490,9 @@ class ChatboxPaginator:
         )
 
     def _emit_send_failure(self, *, mode: str, exc: OSError) -> None:
-        self._emit_local_send_failure("chatbox_page", exc, message=self._active_message if mode == "queued" else None)
+        self._emit_local_send_failure(
+            "chatbox_page", exc, message=self._active_message if mode == "queued" else None
+        )
 
     def _emit_local_send_failure(
         self, stage: str, exception: OSError, *, message: OSCMessage | None = None
@@ -503,13 +505,23 @@ class ChatboxPaginator:
         exception: OSError, *, message: OSCMessage | None = None
     ) -> ErrorDiagnostics:
         active = message
-        fields = {"destination": "self_chatbox", "remote_delivery": "unacknowledged", **safe_exception_fields(exception)}
+        fields = {
+            "destination": "self_chatbox",
+            "remote_delivery": "unacknowledged",
+            **safe_exception_fields(exception),
+        }
         if active is not None:
             fields["publication_id"] = str(active.utterance_id)
         return ErrorDiagnostics(
-            component="osc_control", operation="publish", code="osc_local_send_failed",
-            category="network", visibility="basic", content_policy="metadata_only",
-            status_code=None, retry_after_ms=None, fields=fields,
+            component="osc_control",
+            operation="publish",
+            code="osc_local_send_failed",
+            category="network",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields=fields,
             channel="self" if active is not None else None,
             turn_id=str(active.utterance_id) if active is not None else None,
             generation=active.turn_generation if active is not None else None,

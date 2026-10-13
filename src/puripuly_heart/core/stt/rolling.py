@@ -195,7 +195,9 @@ class RollingSTTBackend(STTBackend):
     _states: dict[STTProviderName, RollingProviderState | None] = field(
         init=False, default_factory=dict, repr=False
     )
-    _last_failures: dict[STTProviderName, ErrorDiagnostics] = field(init=False, default_factory=dict, repr=False)
+    _last_failures: dict[STTProviderName, ErrorDiagnostics] = field(
+        init=False, default_factory=dict, repr=False
+    )
     _fallback_cause: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
@@ -356,9 +358,12 @@ class RollingSTTBackend(STTBackend):
         diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         kind = definition.classifier()(exc)
-        diagnostics = diagnostics or stt_failure_report(
-            exc, provider=definition.name.value, channel=None, operation="receive"
-        ).diagnostics
+        diagnostics = (
+            diagnostics
+            or stt_failure_report(
+                exc, provider=definition.name.value, channel=None, operation="receive"
+            ).diagnostics
+        )
         diagnostics = replace(
             diagnostics,
             fields={
@@ -385,13 +390,21 @@ class RollingSTTBackend(STTBackend):
             self._last_failures[definition.name] = event.failure_diagnostics
         elif event.outcome in {"final", "empty"} and self._fallback_cause is not None:
             recovered = recognition_failure_diagnostics(
-                None, provider=definition.name.value,
+                None,
+                provider=definition.name.value,
                 channel=channel,
-                operation="recovery", reason="recovered", identity=event.identity,
+                operation="recovery",
+                reason="recovered",
+                identity=event.identity,
             )
             emit_failure(
-                logger, replace(recovered, code="stt.recovered", cause_id=self._fallback_cause.diagnostic_id),
-                severity="info", disposition="recovered", stage="recovery",
+                logger,
+                replace(
+                    recovered, code="stt.recovered", cause_id=self._fallback_cause.diagnostic_id
+                ),
+                severity="info",
+                disposition="recovered",
+                stage="recovery",
             )
             self._fallback_cause = None
 
@@ -402,11 +415,10 @@ class _RollingSession(STTBackendSession):
 
     definition: RollingProviderDefinition
     inner: STTBackendSession
-    on_session_error: Callable[
-        [RollingProviderDefinition, BaseException, ErrorDiagnostics], None
-    ]
+    on_session_error: Callable[[RollingProviderDefinition, BaseException, ErrorDiagnostics], None]
     on_terminal_observed: Callable[
-        [RollingProviderDefinition, STTProviderTurnTerminal | STTProviderInputTerminal, str | None], None
+        [RollingProviderDefinition, STTProviderTurnTerminal | STTProviderInputTerminal, str | None],
+        None,
     ]
     _channel: str | None = None
     _outer_stream: RecognitionStreamIdentity | None = field(default=None, init=False)
@@ -416,18 +428,24 @@ class _RollingSession(STTBackendSession):
     )
 
     def _record_session_error(
-        self, exception: BaseException, identity: STTProviderTurnIdentity | None = None,
+        self,
+        exception: BaseException,
+        identity: STTProviderTurnIdentity | None = None,
         stream: RecognitionStreamIdentity | None = None,
     ) -> None:
         diagnostics = recognition_failure_diagnostics(
-            exception, provider=self.definition.name.value,
-            channel=self._channel, operation="receive",
-            reason="provider_event_stream_failed", identity=identity,
+            exception,
+            provider=self.definition.name.value,
+            channel=self._channel,
+            operation="receive",
+            reason="provider_event_stream_failed",
+            identity=identity,
         )
         stream = stream or self._outer_stream
         if stream is not None:
             diagnostics = replace(
-                diagnostics, generation=stream.activation_generation,
+                diagnostics,
+                generation=stream.activation_generation,
                 fields={**diagnostics.fields, "provider_epoch_id": stream.provider_epoch_id},
             )
         self.on_session_error(self.definition, exception, diagnostics)
@@ -585,13 +603,19 @@ class _RollingSession(STTBackendSession):
         try:
             async for event in self._scoped_inner().turn_events():
                 if isinstance(event, STTProviderTurnTerminal | STTProviderInputTerminal):
-                    if event.outcome in {"failed", "degraded"} and event.failure_diagnostics is None:
+                    if (
+                        event.outcome in {"failed", "degraded"}
+                        and event.failure_diagnostics is None
+                    ):
                         event = replace(
                             event,
                             failure_diagnostics=recognition_failure_diagnostics(
-                                None, provider=self.definition.name.value,
-                                channel=self._channel or "unknown", operation="turn_terminal",
-                                reason=event.failure_reason or event.outcome, identity=event.identity,
+                                None,
+                                provider=self.definition.name.value,
+                                channel=self._channel or "unknown",
+                                operation="turn_terminal",
+                                reason=event.failure_reason or event.outcome,
+                                identity=event.identity,
                             ),
                         )
                     self.on_terminal_observed(self.definition, event, self._channel)

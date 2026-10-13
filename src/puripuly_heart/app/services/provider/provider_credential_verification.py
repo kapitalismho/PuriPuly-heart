@@ -181,8 +181,6 @@ class ProviderCredentialVerificationOwner:
         )
 
 
-
-
 @dataclass(slots=True)
 class ProviderCredentialVerificationInteractionOwner:
     verification_owner: ProviderCredentialVerificationOwner

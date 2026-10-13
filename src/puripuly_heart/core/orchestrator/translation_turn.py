@@ -643,7 +643,9 @@ class TranslationTurnLifecycleOwner:
                         self._parent_tasks[parent_id] = parent_task
         except (Exception, asyncio.CancelledError) as exc:
             if not isinstance(exc, asyncio.CancelledError):
-                self._record_parent_failure(parent, exc, "translation.parent_admission_failed", "admission")
+                self._record_parent_failure(
+                    parent, exc, "translation.parent_admission_failed", "admission"
+                )
             if not parent.closed:
                 self._cancelling_parent_ids.add(parent_id)
                 await self._terminalize_parent_remaining(
@@ -661,11 +663,16 @@ class TranslationTurnLifecycleOwner:
         except Exception as exc:
             diagnostics = replace(
                 provider_failure_report(exc, provider="llm", operation="rejection").diagnostics,
-                component="translation.turn", code="translation.parent_rejection_failed",
-                channel=request.transcript.channel, turn_id=str(request.transcript.utterance_id),
-                operation_id=request.operation_id, request_id=request.request_id,
+                component="translation.turn",
+                code="translation.parent_rejection_failed",
+                channel=request.transcript.channel,
+                turn_id=str(request.transcript.utterance_id),
+                operation_id=request.operation_id,
+                request_id=request.request_id,
             )
-            emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage="rejection")
+            emit_failure(
+                logger, diagnostics, severity="warning", disposition="degraded", stage="rejection"
+            )
 
     async def submit_parent(
         self,
@@ -958,7 +965,9 @@ class TranslationTurnLifecycleOwner:
             await self._terminalize_parent_remaining(parent, "cancelled")
             raise
         except Exception as exc:
-            self._record_parent_failure(parent, exc, "translation.parent_execution_failed", "parent_execution")
+            self._record_parent_failure(
+                parent, exc, "translation.parent_execution_failed", "parent_execution"
+            )
             await self._terminalize_parent_remaining(parent, "failed")
         finally:
             if speech_slot:
@@ -1150,9 +1159,10 @@ class TranslationTurnLifecycleOwner:
                 raise
             except Exception as exc:
                 result = TranslationTurnProcessResult(
-                    "failed", failure_diagnostics=self._record_child_failure(
+                    "failed",
+                    failure_diagnostics=self._record_child_failure(
                         child, exc, "translation.child_execution_failed"
-                    )
+                    ),
                 )
             if self.is_child_cancellation_requested(child):
                 raise asyncio.CancelledError
@@ -1229,9 +1239,10 @@ class TranslationTurnLifecycleOwner:
                 raise
             except Exception as exc:
                 result = TranslationTurnProcessResult(
-                    "failed", failure_diagnostics=self._record_child_failure(
+                    "failed",
+                    failure_diagnostics=self._record_child_failure(
                         child, exc, "translation.output_submission_failed", stage="output_submit"
-                    )
+                    ),
                 )
         await self._terminalize_child(child, result.outcome)
         return result
@@ -1255,66 +1266,99 @@ class TranslationTurnLifecycleOwner:
             )
         except TimeoutError as exc:
             return TranslationTurnProcessResult(
-                "failed", failure_diagnostics=self._record_child_failure(child, exc, "translation.child_timeout")
+                "failed",
+                failure_diagnostics=self._record_child_failure(
+                    child, exc, "translation.child_timeout"
+                ),
             )
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             return TranslationTurnProcessResult(
-                "failed", failure_diagnostics=self._record_child_failure(
+                "failed",
+                failure_diagnostics=self._record_child_failure(
                     child, exc, "translation.child_execution_failed"
-                )
+                ),
             )
         if isinstance(result, str):
             return TranslationTurnProcessResult(result)
         return result
 
     def _record_child_failure(
-        self, child: TranslationTurnChild, exception: Exception, code: str,
-        *, stage: str = "child_execution", secondary: bool = False,
+        self,
+        child: TranslationTurnChild,
+        exception: Exception,
+        code: str,
+        *,
+        stage: str = "child_execution",
+        secondary: bool = False,
     ) -> ErrorDiagnostics:
         native = provider_failure_report(exception, provider="llm", operation=stage).diagnostics
         preserved = isinstance(getattr(exception, "failure_diagnostics", None), ErrorDiagnostics)
         parent = self._parents.get(child.parent_utterance_id)
         diagnostics = replace(
-            native, component=native.component if preserved else "translation.turn",
-            code=native.code if preserved else code, channel=child.channel,
-            turn_id=str(child.utterance_id), generation=child.turn_generation,
-            operation_id=child.operation_id, request_id=child.request_id,
-            cause_id=parent.failure_diagnostics.diagnostic_id
-            if secondary and parent is not None and parent.failure_diagnostics is not None else native.cause_id,
+            native,
+            component=native.component if preserved else "translation.turn",
+            code=native.code if preserved else code,
+            channel=child.channel,
+            turn_id=str(child.utterance_id),
+            generation=child.turn_generation,
+            operation_id=child.operation_id,
+            request_id=child.request_id,
+            cause_id=(
+                parent.failure_diagnostics.diagnostic_id
+                if secondary and parent is not None and parent.failure_diagnostics is not None
+                else native.cause_id
+            ),
             fields={
-                **native.fields, "parent_utterance_id": str(child.parent_utterance_id),
+                **native.fields,
+                "parent_utterance_id": str(child.parent_utterance_id),
                 "target_index": child.target_index,
             },
         )
         if parent is not None and not secondary:
             parent.failure_diagnostics = parent.failure_diagnostics or diagnostics
         emit_failure(
-            logger, diagnostics, stage=stage,
+            logger,
+            diagnostics,
+            stage=stage,
             severity="warning" if secondary else "error",
             disposition="degraded" if secondary else "failed",
         )
         return diagnostics
 
     def _record_parent_failure(
-        self, parent: _TranslationTurnParent, exception: Exception, code: str, stage: str,
-        *, secondary: bool = False,
+        self,
+        parent: _TranslationTurnParent,
+        exception: Exception,
+        code: str,
+        stage: str,
+        *,
+        secondary: bool = False,
     ) -> None:
         child = parent.children[0] if parent.children else None
         native = provider_failure_report(exception, provider="llm", operation=stage).diagnostics
         diagnostics = replace(
-            native, component="translation.turn", code=code, channel=parent.channel,
-            turn_id=str(parent.parent_utterance_id), generation=parent.turn_generation,
+            native,
+            component="translation.turn",
+            code=code,
+            channel=parent.channel,
+            turn_id=str(parent.parent_utterance_id),
+            generation=parent.turn_generation,
             operation_id=child.operation_id if child is not None else None,
             request_id=child.request_id if child is not None else None,
-            cause_id=parent.failure_diagnostics.diagnostic_id
-            if secondary and parent.failure_diagnostics is not None else native.cause_id,
+            cause_id=(
+                parent.failure_diagnostics.diagnostic_id
+                if secondary and parent.failure_diagnostics is not None
+                else native.cause_id
+            ),
         )
         if not secondary:
             parent.failure_diagnostics = parent.failure_diagnostics or diagnostics
         emit_failure(
-            logger, diagnostics, stage=stage,
+            logger,
+            diagnostics,
+            stage=stage,
             severity="warning" if secondary else "error",
             disposition="degraded" if secondary else "failed",
         )
@@ -1463,11 +1507,21 @@ class TranslationTurnLifecycleOwner:
             )
         except Exception as exc:
             diagnostics = replace(
-                provider_failure_report(exc, provider="llm", operation="turn_generation").diagnostics,
-                component="translation.turn", code="translation.turn_generation_observer_failed",
-                channel=channel, generation=self._channel_turn_generations[channel],
+                provider_failure_report(
+                    exc, provider="llm", operation="turn_generation"
+                ).diagnostics,
+                component="translation.turn",
+                code="translation.turn_generation_observer_failed",
+                channel=channel,
+                generation=self._channel_turn_generations[channel],
             )
-            emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage="turn_generation")
+            emit_failure(
+                logger,
+                diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="turn_generation",
+            )
 
     def child_output_was_submitted(self, child_utterance_id: UUID) -> bool:
         return child_utterance_id in self._output_submitted_child_ids
@@ -1512,7 +1566,11 @@ class TranslationTurnLifecycleOwner:
             await self.on_child_terminal(child, outcome)
         except Exception as exc:
             self._record_child_failure(
-                child, exc, "translation.child_retirement_failed", stage="retirement", secondary=True
+                child,
+                exc,
+                "translation.child_retirement_failed",
+                stage="retirement",
+                secondary=True,
             )
         finally:
             self._output_submitted_child_ids.discard(child.utterance_id)
@@ -1560,7 +1618,11 @@ class TranslationTurnLifecycleOwner:
                 await self.on_parent_closed(parent.parent_utterance_id)
             except Exception as exc:
                 self._record_parent_failure(
-                    parent, exc, "translation.parent_retirement_failed", "retirement", secondary=True
+                    parent,
+                    exc,
+                    "translation.parent_retirement_failed",
+                    "retirement",
+                    secondary=True,
                 )
         finally:
             parent.semantic_done_event.set()

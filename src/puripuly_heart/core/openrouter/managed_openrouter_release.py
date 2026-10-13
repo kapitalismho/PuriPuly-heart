@@ -276,7 +276,8 @@ class ManagedOpenRouterReleaseError(Exception):
     def __post_init__(self) -> None:
         if self.failure_diagnostics is None:
             object.__setattr__(
-                self, "failure_diagnostics",
+                self,
+                "failure_diagnostics",
                 provider_failure_report(
                     self, provider="openrouter", operation="provider_build"
                 ).diagnostics,
@@ -1899,7 +1900,8 @@ class ManagedOpenRouterLLMProvider(LLMProvider):
                         provider_failure_report(
                             None, provider="openrouter", operation="provider_build"
                         ).diagnostics,
-                        category="invalid_response", code="provider.invalid_response",
+                        category="invalid_response",
+                        code="provider.invalid_response",
                     ),
                 )
             if result.behavior != ManagedOpenRouterReleaseBehavior.READY or not result.api_key:

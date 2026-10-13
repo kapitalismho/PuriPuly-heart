@@ -33,12 +33,13 @@ class RecordingRuntimeLogging:
 
     def configure_diagnostics(self, **_kwargs) -> None:
         return None
+
     def emit_failure(self, diagnostics, **kwargs) -> dict:
         from puripuly_heart.core.diagnostics import normalize_diagnostic
+
         record = normalize_diagnostic(diagnostics, instance_id=None, **kwargs)
         self.failures.append(record)
         return record
-
 
     def emit_basic(self, message: str, *, level: int) -> None:
         self.basic.append((level, message))
@@ -370,10 +371,12 @@ def test_conversation_failure_reports_type_without_private_payload(caplog) -> No
     def reject(**kwargs) -> None:
         raise ValueError("private source and provider secret")
 
-    owner.install_service(SimpleNamespace(
-        configure_diagnostics=lambda **_kwargs: None,
-        record_conversation_observation=reject,
-    ))
+    owner.install_service(
+        SimpleNamespace(
+            configure_diagnostics=lambda **_kwargs: None,
+            record_conversation_observation=reject,
+        )
+    )
     owner.record_conversation_observation(
         utterance_id="failed-turn",
         speaker_channel="self",

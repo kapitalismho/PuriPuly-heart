@@ -512,9 +512,9 @@ class ProviderApplicationOwner:
                             *result.secondary_diagnostics,
                             replace(
                                 secondary,
-                                cause_id=result.diagnostics.diagnostic_id
-                                if result.diagnostics
-                                else None,
+                                cause_id=(
+                                    result.diagnostics.diagnostic_id if result.diagnostics else None
+                                ),
                             ),
                         ),
                     )
@@ -722,9 +722,11 @@ class ProviderApplicationOwner:
                     *failure_result.secondary_diagnostics,
                     replace(
                         secondary,
-                        cause_id=failure_result.diagnostics.diagnostic_id
-                        if failure_result.diagnostics is not None
-                        else None,
+                        cause_id=(
+                            failure_result.diagnostics.diagnostic_id
+                            if failure_result.diagnostics is not None
+                            else None
+                        ),
                     ),
                     *((restoration_failure,) if restoration_failure is not None else ()),
                 ),

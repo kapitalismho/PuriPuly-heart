@@ -1356,7 +1356,8 @@ async def test_off_transition_drains_an_admitted_dashboard_command() -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("loopback", [False, True])
 async def test_failed_cached_full_resync_requires_observed_obligation_completion(
-    caplog: pytest.LogCaptureFixture, loopback: bool,
+    caplog: pytest.LogCaptureFixture,
+    loopback: bool,
 ) -> None:
     import logging
     import socket
@@ -1385,12 +1386,17 @@ async def test_failed_cached_full_resync_requires_observed_obligation_completion
     state = OscCanonicalState()
     sender = ResyncSender()
     integration = _integration(
-        AppSettingsVNext(), FakeReceiverOwner(), sender, FakeService(None),
+        AppSettingsVNext(),
+        FakeReceiverOwner(),
+        sender,
+        FakeService(None),
         state_provider=lambda: state,
     )
     caplog.set_level(logging.INFO, logger=control_runtime_module.__name__)
     try:
-        await integration.configure_connection(mode="manual", send_port=send_port, receive_port=9051)
+        await integration.configure_connection(
+            mode="manual", send_port=send_port, receive_port=9051
+        )
         sender.failed_parameter = "PuriPuly_Translator"
         integration._publish_full()
         failure = integration.output_snapshot()["state_publication"]
@@ -1407,14 +1413,16 @@ async def test_failed_cached_full_resync_requires_observed_obligation_completion
         assert integration.output_snapshot()["state_publication"] == failure
         assert not any(
             getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0].code == "osc_state_send_recovered"
-            for record in caplog.records if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
         )
 
         integration._publish_full()
         assert integration.output_snapshot()["state_publication"] is None
         recovery = next(
             getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
-            for record in caplog.records if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
             and getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0].code == "osc_state_send_recovered"
         )
         assert recovery.cause_id == failure["diagnostic_id"]

@@ -317,7 +317,10 @@ class LocalASRProviderRuntimePort(Protocol):
     async def start_channel(self, channel: ProviderRuntimeChannel) -> None: ...
 
     async def warmup_channel(
-        self, channel: ProviderRuntimeChannel, *, operation_id: str | None = None,
+        self,
+        channel: ProviderRuntimeChannel,
+        *,
+        operation_id: str | None = None,
         request_id: str | None = None,
     ) -> None: ...
 

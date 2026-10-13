@@ -20,13 +20,16 @@ from tests.core.runtime.test_self_capture_session import RecordingProvider, buil
 
 
 def native_records(caplog):
-    return [getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE) for record in caplog.records
-            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)]
+    return [
+        getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+        for record in caplog.records
+        if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+    ]
 
 
 @pytest.mark.asyncio
 async def test_failed_build_warmup_retains_first_cause_and_cleanup_debt(caplog) -> None:
-    primary = GpuWorkerRequestError('heartbeat_timeout', {'raw_payload': 'PRIVATE_NATIVE_BODY'})
+    primary = GpuWorkerRequestError("heartbeat_timeout", {"raw_payload": "PRIVATE_NATIVE_BODY"})
 
     class Candidate(FakeProvider):
         async def warmup(self):
@@ -35,12 +38,16 @@ async def test_failed_build_warmup_retains_first_cause_and_cleanup_debt(caplog) 
         async def close(self):
             self.close_calls += 1
             if self.close_calls == 1:
-                raise OSError('PRIVATE_SECONDARY_CLEANUP')
+                raise OSError("PRIVATE_SECONDARY_CLEANUP")
 
     class Factory(FakeProviderFactory):
         async def create(self, request, *, gpu_runtime, on_terminal_failure=None):
-            candidate = Candidate(request.provider_id, gpu_runtime=gpu_runtime,
-                                  channel=request.channel, gpu_device_id=request.gpu_device_id)
+            candidate = Candidate(
+                request.provider_id,
+                gpu_runtime=gpu_runtime,
+                channel=request.channel,
+                gpu_device_id=request.gpu_device_id,
+            )
             self.providers.append(candidate)
             return candidate
 
@@ -48,20 +55,24 @@ async def test_failed_build_warmup_retains_first_cause_and_cleanup_debt(caplog) 
     caplog.set_level(logging.WARNING)
     try:
         result = await owner.replace_provider(
-            ProviderRuntimeBuildRequest(config=_resolved_config('self', 'soniox'), warmup=True),
+            ProviderRuntimeBuildRequest(config=_resolved_config("self", "soniox"), warmup=True),
             start=True,
         )
-        assert result.status == 'failed'
-        assert result.failure_code == 'heartbeat_timeout'
-        assert result.failure_diagnostics.category == 'timeout'
-        assert result.failure_diagnostics.fields['native_classification'] == 'heartbeat_timeout'
+        assert result.status == "failed"
+        assert result.failure_code == "heartbeat_timeout"
+        assert result.failure_diagnostics.category == "timeout"
+        assert result.failure_diagnostics.fields["native_classification"] == "heartbeat_timeout"
         records = native_records(caplog)
-        secondary = [item for item, _, disposition, _, _ in records
-                     if disposition == 'degraded' and item.cause_id == result.failure_diagnostics.diagnostic_id]
+        secondary = [
+            item
+            for item, _, disposition, _, _ in records
+            if disposition == "degraded"
+            and item.cause_id == result.failure_diagnostics.diagnostic_id
+        ]
         assert len(secondary) == 1
-        assert secondary[0].fields['cleanup_confirmed'] is False
-        assert owner._pending_candidates['self'] is factory.providers[0]
-        assert 'PRIVATE_' not in repr([item for item, *_ in records])
+        assert secondary[0].fields["cleanup_confirmed"] is False
+        assert owner._pending_candidates["self"] is factory.providers[0]
+        assert "PRIVATE_" not in repr([item for item, *_ in records])
     finally:
         await owner.close()
 
@@ -70,28 +81,38 @@ async def test_failed_build_warmup_retains_first_cause_and_cleanup_debt(caplog) 
 async def test_attached_warmup_failure_preserves_actual_phase_and_retryability(caplog) -> None:
     class Candidate(FakeProvider):
         async def warmup(self):
-            raise GpuWorkerRequestError('heartbeat_timeout', {})
+            raise GpuWorkerRequestError("heartbeat_timeout", {})
 
     class Factory(FakeProviderFactory):
         async def create(self, request, *, gpu_runtime, on_terminal_failure=None):
-            candidate = Candidate(request.provider_id, gpu_runtime=gpu_runtime,
-                                  channel=request.channel, gpu_device_id=request.gpu_device_id)
+            candidate = Candidate(
+                request.provider_id,
+                gpu_runtime=gpu_runtime,
+                channel=request.channel,
+                gpu_device_id=request.gpu_device_id,
+            )
             self.providers.append(candidate)
             return candidate
 
     owner, _, _, _ = _owner(provider_factory=Factory())
     caplog.set_level(logging.WARNING)
     try:
-        await owner.replace_provider(ProviderRuntimeBuildRequest(config=_resolved_config('self')), start=True)
-        generation = owner.snapshot.channel_for('self').generation
+        await owner.replace_provider(
+            ProviderRuntimeBuildRequest(config=_resolved_config("self")), start=True
+        )
+        generation = owner.snapshot.channel_for("self").generation
         with pytest.raises(GpuWorkerRequestError):
-            await owner.warmup_channel('self')
-        assert owner.snapshot.channel_for('self').phase == 'running'
-        assert owner.snapshot.channel_for('self').generation == generation
-        assert owner.snapshot.channel_for('self').provider_live is True
+            await owner.warmup_channel("self")
+        assert owner.snapshot.channel_for("self").phase == "running"
+        assert owner.snapshot.channel_for("self").generation == generation
+        assert owner.snapshot.channel_for("self").provider_live is True
         records = native_records(caplog)
-        assert any(item.fields.get('warmup_usable') is True and disposition == 'degraded'
-                   and item.category == 'timeout' for item, _, disposition, _, _ in records)
+        assert any(
+            item.fields.get("warmup_usable") is True
+            and disposition == "degraded"
+            and item.category == "timeout"
+            for item, _, disposition, _, _ in records
+        )
     finally:
         await owner.close()
 
@@ -100,7 +121,7 @@ async def test_attached_warmup_failure_preserves_actual_phase_and_retryability(c
 async def test_self_capture_failed_warmup_keeps_actual_capture_running() -> None:
     class Provider(RecordingProvider):
         async def warmup(self, *, operation_id=None, request_id=None):
-            raise TimeoutError('PRIVATE_WARMUP_DETAIL')
+            raise TimeoutError("PRIVATE_WARMUP_DETAIL")
 
     diagnostics = []
     owner, _, _, sources, _, _ = build_owner(provider=Provider(), diagnostics=diagnostics)
@@ -111,10 +132,10 @@ async def test_self_capture_failed_warmup_keeps_actual_capture_running() -> None
         assert owner.snapshot.state is SelfCaptureSessionState.RUNNING
         assert owner.snapshot.effective_active is True
         assert sources[0].close_calls == 0
-        failures = [item for item in diagnostics if item.event.value == 'failure']
+        failures = [item for item in diagnostics if item.event.value == "failure"]
         assert failures
-        assert failures[-1].failure_diagnostics.category == 'timeout'
-        assert 'PRIVATE_' not in repr(failures[-1].failure_diagnostics)
+        assert failures[-1].failure_diagnostics.category == "timeout"
+        assert "PRIVATE_" not in repr(failures[-1].failure_diagnostics)
     finally:
         await owner.close()
 
@@ -148,7 +169,9 @@ async def test_local_probe_primary_status_survives_secondary_close(monkeypatch, 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("primary_stage", ["admission", "child_creation", "child_execution"])
-async def test_translation_callbacks_retain_primary_and_link_retirement(primary_stage, caplog) -> None:
+async def test_translation_callbacks_retain_primary_and_link_retirement(
+    primary_stage, caplog
+) -> None:
     from uuid import uuid4
 
     from puripuly_heart.core.orchestrator.translation_turn import TranslationTurnLifecycleOwner
@@ -182,28 +205,40 @@ async def test_translation_callbacks_retain_primary_and_link_retirement(primary_
             raise ConnectionError("PRIVATE_ADMISSION_FAILURE")
 
     owner = TranslationTurnLifecycleOwner(
-        on_child_created=child_created, on_child_started=child_started,
-        process_child=process_child, on_child_terminal=child_terminal,
-        on_parent_closed=parent_closed, on_parent_rejected=parent_rejected,
+        on_child_created=child_created,
+        on_child_started=child_started,
+        process_child=process_child,
+        on_child_terminal=child_terminal,
+        on_parent_closed=parent_closed,
+        on_parent_rejected=parent_rejected,
         on_parent_admitted=parent_admitted,
     )
     try:
         request = replace(
             _request(parent_id=parent_id, turn_kind="manual"),
-            operation_id=operation_id, request_id=request_id,
+            operation_id=operation_id,
+            request_id=request_id,
         )
         admitted_ids = await owner.submit(request, wait_for_parent=True)
         assert admitted_ids
         assert owner.is_parent_closed(parent_id)
         records = native_records(caplog)
-        primary = next(item for item, _, disposition, stage, _ in records
-                       if disposition == "failed" and stage == primary_stage)
-        retirements = [item for item, _, disposition, stage, _ in records
-                       if disposition == "degraded" and stage == "retirement"]
+        primary = next(
+            item
+            for item, _, disposition, stage, _ in records
+            if disposition == "failed" and stage == primary_stage
+        )
+        retirements = [
+            item
+            for item, _, disposition, stage, _ in records
+            if disposition == "degraded" and stage == "retirement"
+        ]
         assert len(retirements) == 2
         assert all(item.cause_id == primary.diagnostic_id for item in retirements)
-        assert all(item.operation_id == operation_id and item.request_id == request_id
-                   for item, *_ in records)
+        assert all(
+            item.operation_id == operation_id and item.request_id == request_id
+            for item, *_ in records
+        )
         assert "PRIVATE_" not in repr([item for item, *_ in records])
     finally:
         await owner.close()

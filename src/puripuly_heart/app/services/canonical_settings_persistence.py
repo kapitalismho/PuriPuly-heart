@@ -332,7 +332,9 @@ class SettingsOwner:
                 else ()
             )
             self.persistence_secondary_omitted_count = (
-                exc.secondary_omitted_count if isinstance(exc, CanonicalSettingsPersistenceError) else 0
+                exc.secondary_omitted_count
+                if isinstance(exc, CanonicalSettingsPersistenceError)
+                else 0
             )
             raise
         if different_thread:

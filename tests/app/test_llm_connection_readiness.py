@@ -203,9 +203,7 @@ async def test_off_keeps_one_socket_while_surplus_close_is_blocked() -> None:
         await _applied(owner)
         closing = [asyncio.create_task(socket.close_started.wait()) for socket in sockets]
         try:
-            await asyncio.wait_for(
-                asyncio.wait(closing, return_when=asyncio.FIRST_COMPLETED), 1
-            )
+            await asyncio.wait_for(asyncio.wait(closing, return_when=asyncio.FIRST_COMPLETED), 1)
         finally:
             for task in closing:
                 task.cancel()
@@ -347,9 +345,7 @@ async def test_close_prevents_later_startup_without_closing_provider_runtime() -
     provider = ChatGptPlanLLMProvider(
         session=_Session(), connector=server.connect, prepared_connections=2, max_connections=2
     )
-    replacement = ChatGptPlanLLMProvider(
-        session=_Session(), connector=replacement_server.connect
-    )
+    replacement = ChatGptPlanLLMProvider(session=_Session(), connector=replacement_server.connect)
     current = [provider]
     owner = LlmConnectionReadinessOwner(
         llm_provider=lambda: current[0], translation_enabled=lambda: True

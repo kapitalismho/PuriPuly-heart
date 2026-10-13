@@ -46,6 +46,7 @@ class OscPublishedValue:
     def address(self) -> str:
         return f"{OSC_PARAMETER_ADDRESS_PREFIX}{self.parameter}"
 
+
 class OscStatePublicationError(RuntimeError):
     """A failed local send with the successful prefix retained in the cache."""
 
@@ -64,7 +65,6 @@ class OscStatePublicationError(RuntimeError):
         self.parameter = parameter
         self.completed_parameters = completed_parameters
         self.pending_parameters = pending_parameters
-
 
 
 class OscStatePublisher:
@@ -149,6 +149,7 @@ class OscStatePublisher:
     def _send(self, item: OscPublishedValue) -> None:
         self._sender.send_message(item.address, item.value)
         self._last_published[item.parameter] = item.value
+
     def _send_batch(self, items: tuple[OscPublishedValue, ...]) -> None:
         for completed, item in enumerate(items):
             try:
@@ -161,7 +162,6 @@ class OscStatePublisher:
                     completed_parameters=tuple(value.parameter for value in items[:completed]),
                     pending_parameters=tuple(value.parameter for value in items[completed:]),
                 ) from exc
-
 
     def _require_state(self) -> OscCanonicalState:
         if self._state_provider is None:

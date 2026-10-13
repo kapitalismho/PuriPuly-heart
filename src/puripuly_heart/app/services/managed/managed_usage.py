@@ -407,9 +407,9 @@ class ManagedUsageOwner:
                 status_code=None,
                 retry_after_ms=None,
                 fields={"phase": "auth_notification", **safe_exception_fields(exc)},
-                cause_id=diagnostics.diagnostic_id
-                if isinstance(diagnostics, ErrorDiagnostics)
-                else None,
+                cause_id=(
+                    diagnostics.diagnostic_id if isinstance(diagnostics, ErrorDiagnostics) else None
+                ),
             )
             emit_failure(
                 logging.getLogger(__name__), secondary, severity="warning", disposition="degraded"

@@ -115,8 +115,11 @@ class GpuWorkerClientPort(Protocol):
 
 class GpuWorkerProcessFactoryPort(Protocol):
     async def start(
-        self, *, mode: GpuWorkerMode,
-        operation_id: str | None = None, request_id: str | None = None,
+        self,
+        *,
+        mode: GpuWorkerMode,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> GpuWorkerClientPort: ...
     async def close_pending_startups(self) -> None: ...
 

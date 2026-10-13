@@ -99,9 +99,6 @@ def _retry_after_ms(response: httpx.Response) -> int | None:
     return None
 
 
-
-
-
 def _build_system_prompt(
     *,
     system_prompt: str,
@@ -132,7 +129,9 @@ def _extract_message_content(content: object) -> str:
         result = content.strip()
         if result:
             return result
-        raise LLMResponseError("OpenRouter response contained empty message content", provider="openrouter")
+        raise LLMResponseError(
+            "OpenRouter response contained empty message content", provider="openrouter"
+        )
 
     if isinstance(content, list):
         parts: list[str] = []
@@ -144,7 +143,9 @@ def _extract_message_content(content: object) -> str:
         if parts:
             return "\n".join(parts)
 
-    raise LLMResponseError("OpenRouter response did not contain message content", provider="openrouter")
+    raise LLMResponseError(
+        "OpenRouter response did not contain message content", provider="openrouter"
+    )
 
 
 def _has_length_finish_reason(data: object) -> bool:
@@ -546,29 +547,41 @@ class HttpxOpenRouterClient:
                 limit_reason=reason,
                 retry_after_ms=_retry_after_ms(response),
             )
-            
+
             raise error
 
         try:
             data = response.json()
         except ValueError as exc:
-            raise LLMResponseError("OpenRouter response was not valid JSON", provider="openrouter") from exc
+            raise LLMResponseError(
+                "OpenRouter response was not valid JSON", provider="openrouter"
+            ) from exc
         if not isinstance(data, dict):
-            raise LLMResponseError("OpenRouter response did not contain a valid payload", provider="openrouter")
+            raise LLMResponseError(
+                "OpenRouter response did not contain a valid payload", provider="openrouter"
+            )
         if observation is not None:
             observation.record_openai_response(data)
         self._last_reasoning_tokens = _reasoning_token_count(data)
         choices = data.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise LLMResponseError("OpenRouter response did not contain choices", provider="openrouter")
+            raise LLMResponseError(
+                "OpenRouter response did not contain choices", provider="openrouter"
+            )
         if _has_length_finish_reason(data):
-            raise LLMResponseError("OpenRouter response was truncated by max_tokens limit", provider="openrouter")
+            raise LLMResponseError(
+                "OpenRouter response was truncated by max_tokens limit", provider="openrouter"
+            )
         first_choice = choices[0]
         if not isinstance(first_choice, dict):
-            raise LLMResponseError("OpenRouter response did not contain a valid choice", provider="openrouter")
+            raise LLMResponseError(
+                "OpenRouter response did not contain a valid choice", provider="openrouter"
+            )
         message = first_choice.get("message")
         if not isinstance(message, dict):
-            raise LLMResponseError("OpenRouter response did not contain message content", provider="openrouter")
+            raise LLMResponseError(
+                "OpenRouter response did not contain message content", provider="openrouter"
+            )
         return _extract_message_content(message.get("content"))
 
     async def close(self) -> None:

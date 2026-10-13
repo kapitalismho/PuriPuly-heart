@@ -242,9 +242,9 @@ class ManagedAuthOwner:
                 "auth_notification",
                 exc,
                 "managed_auth_notification_failed",
-                cause_id=result.diagnostics.diagnostic_id
-                if result.diagnostics is not None
-                else None,
+                cause_id=(
+                    result.diagnostics.diagnostic_id if result.diagnostics is not None else None
+                ),
                 disposition="degraded",
             )
 

@@ -110,7 +110,9 @@ def build_parser() -> argparse.ArgumentParser:
     logs = sub.add_parser("logs", help="Follow bounded, content-redacted application logs")
     logs_sub = logs.add_subparsers(dest="action", required=True)
     log_follow = logs_sub.add_parser("follow")
-    log_follow.add_argument("--level", choices=("debug", "info", "warning", "error"), default="warning")
+    log_follow.add_argument(
+        "--level", choices=("debug", "info", "warning", "error"), default="warning"
+    )
     log_follow.add_argument("--after", type=int, help="Replay after an event sequence")
     log_follow.add_argument("--instance-id", help="Originating host identity for replay cursor")
     secret = sub.add_parser("secrets", help="Set a secret without exposing it in process arguments")
@@ -874,9 +876,13 @@ def main(argv: list[str] | None = None) -> int:
     except (ControlTransportError, ValueError, OSError, json.JSONDecodeError) as exc:
         code = exc.code if isinstance(exc, ControlTransportError) else "invalid_input"
         message = (
-            str(exc) if isinstance(exc, ControlTransportError)
-            else "Local input or control resource could not be accessed" if isinstance(exc, OSError)
-            else "Invalid local input or arguments"
+            str(exc)
+            if isinstance(exc, ControlTransportError)
+            else (
+                "Local input or control resource could not be accessed"
+                if isinstance(exc, OSError)
+                else "Invalid local input or arguments"
+            )
         )
         print(
             json.dumps(

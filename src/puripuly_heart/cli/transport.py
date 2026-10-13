@@ -200,14 +200,20 @@ class ControlServer:
                 if cursor_instance_id is not None and (
                     not isinstance(cursor_instance_id, str) or len(cursor_instance_id) > 64
                 ):
-                    raise ControlTransportError("malformed_request", "Invalid cursor instance identity")
+                    raise ControlTransportError(
+                        "malformed_request", "Invalid cursor instance identity"
+                    )
                 subscription: AsyncIterator[dict[str, Any]] = self.control.subscribe(
                     topics=topics,
                     channel=channel,
                     include_transcripts=arguments.get("include_transcripts", False),
                     include_translations=arguments.get("include_translations", False),
                     after=arguments.get("after"),
-                    **({"cursor_instance_id": cursor_instance_id} if cursor_instance_id is not None else {}),
+                    **(
+                        {"cursor_instance_id": cursor_instance_id}
+                        if cursor_instance_id is not None
+                        else {}
+                    ),
                 )
                 await self._send(
                     writer,
@@ -220,14 +226,19 @@ class ControlServer:
                 )
                 self._finish_dispatch()
                 dispatching = False
-                disconnected = asyncio.create_task(reader.read(1), name="control:subscriber-disconnect")
+                disconnected = asyncio.create_task(
+                    reader.read(1), name="control:subscriber-disconnect"
+                )
                 pending_event = None
                 async with aclosing(subscription):
                     try:
                         while not self._closing:
-                            pending_event = asyncio.create_task(anext(subscription), name="control:subscriber-event")
+                            pending_event = asyncio.create_task(
+                                anext(subscription), name="control:subscriber-event"
+                            )
                             completed, _ = await asyncio.wait(
-                                (pending_event, disconnected), return_when=asyncio.FIRST_COMPLETED,
+                                (pending_event, disconnected),
+                                return_when=asyncio.FIRST_COMPLETED,
                             )
                             if disconnected in completed:
                                 pending_event.cancel()
@@ -251,7 +262,8 @@ class ControlServer:
                         if pending_event is not None:
                             pending_event.cancel()
                         await asyncio.gather(
-                            disconnected, *([pending_event] if pending_event is not None else []),
+                            disconnected,
+                            *([pending_event] if pending_event is not None else []),
                             return_exceptions=True,
                         )
                 return
@@ -285,7 +297,9 @@ class ControlServer:
                 "Operation identity is unknown or expired in this application instance",
             )
         except self._argument_errors:
-            await self._send_error(writer, request_id, "invalid_arguments", "Control arguments are invalid")
+            await self._send_error(
+                writer, request_id, "invalid_arguments", "Control arguments are invalid"
+            )
         except Exception:
             await self._send_error(
                 writer, request_id, "operation_error", "Control request could not complete"

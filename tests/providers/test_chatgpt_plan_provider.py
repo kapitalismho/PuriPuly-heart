@@ -209,7 +209,9 @@ async def test_standby_admits_immediately_while_active_expansion_is_blocked() ->
         assert execution.attempt_count == 1
         assert len(server.sockets) == 1
         assert server.requests == []
-        assert (await asyncio.wait_for(execution.translate_attempt(0), timeout=1)).text == "immediate"
+        assert (
+            await asyncio.wait_for(execution.translate_attempt(0), timeout=1)
+        ).text == "immediate"
         await execution.close()
         gate.set()
         await _wait_for_idle(provider, 6)

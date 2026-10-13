@@ -51,8 +51,6 @@ def test_observability_contracts_are_import_safe_protocol_sinks() -> None:
         _assert_protocol_method_is_async(sink, method_name)
 
 
-
-
 def test_structured_observability_events_use_safe_message_contracts() -> None:
     observability = importlib.import_module("puripuly_heart.core.observability")
     diagnostic = messages.ErrorDiagnostics(

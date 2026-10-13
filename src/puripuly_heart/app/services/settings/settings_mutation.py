@@ -225,7 +225,9 @@ class SettingsMutationService:
                 secondary_diagnostics=getattr(
                     self.settings_repository, "secondary_diagnostics", ()
                 ),
-                secondary_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
+                secondary_omitted_count=getattr(
+                    self.settings_repository, "secondary_omitted_count", 0
+                ),
             )
 
         snapshot = commit_result.snapshot
@@ -264,9 +266,11 @@ class SettingsMutationService:
                         runtime_result, correlation_id=request.correlation_id
                     )
                 except Exception as exc:
-                    secondary.append(_phase_diagnostics(
-                        "runtime_result_notification_failed", "runtime_notification", exc
-                    ))
+                    secondary.append(
+                        _phase_diagnostics(
+                            "runtime_result_notification_failed", "runtime_notification", exc
+                        )
+                    )
             transaction_result = TransactionResult(
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED,
                 message=None,
@@ -305,8 +309,10 @@ class SettingsMutationService:
                 )
 
         return replace(
-            transaction_result, secondary_diagnostics=tuple(secondary),
-            secondary_omitted_count=secondary_omitted_count + runtime_result.secondary_omitted_count,
+            transaction_result,
+            secondary_diagnostics=tuple(secondary),
+            secondary_omitted_count=secondary_omitted_count
+            + runtime_result.secondary_omitted_count,
         )
 
 

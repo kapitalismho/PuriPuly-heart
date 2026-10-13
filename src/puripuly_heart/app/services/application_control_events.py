@@ -55,7 +55,23 @@ class ControlEvents:
         item: dict = {
             "topic": kind,
             "channel": event.channel if event.channel in (None, "self", "peer") else None,
-            "source": event.source if event.source in {"capture", "translation", "osc", "stt", "llm", "self", "peer", "runtime", "manual", "provider"} else "unknown",
+            "source": (
+                event.source
+                if event.source
+                in {
+                    "capture",
+                    "translation",
+                    "osc",
+                    "stt",
+                    "llm",
+                    "self",
+                    "peer",
+                    "runtime",
+                    "manual",
+                    "provider",
+                }
+                else "unknown"
+            ),
         }
         if event.type == UIEventType.ERROR:
             item["error"] = {"code": "runtime_error"}
@@ -66,7 +82,9 @@ class ControlEvents:
                 if diagnostics.turn_id is None and isinstance(event.utterance_id, UUID):
                     diagnostics = replace(diagnostics, turn_id=str(event.utterance_id))
                 diagnostic = self.diagnostic_recorder(
-                    diagnostics, severity=payload.message.severity, disposition="failed",
+                    diagnostics,
+                    severity=payload.message.severity,
+                    disposition="failed",
                 )
                 item["error"]["code"] = diagnostic["code"]
                 item["error"]["diagnostics"] = diagnostic
@@ -112,8 +130,11 @@ class ControlEvents:
         if foreign or (after is not None and after > self.sequence):
             self.subscriber_gaps += 1
             yield {
-                "sequence": self.sequence, "instance_id": self.instance_id, "topic": "gap",
-                "after": after, "reason": "foreign_instance" if foreign else "invalid_cursor",
+                "sequence": self.sequence,
+                "instance_id": self.instance_id,
+                "topic": "gap",
+                "after": after,
+                "reason": "foreign_instance" if foreign else "invalid_cursor",
                 "snapshot_required": True,
             }
             cursor = self.sequence

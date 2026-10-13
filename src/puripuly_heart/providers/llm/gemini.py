@@ -54,9 +54,6 @@ def _model_entry_matches(entry: object, requested_model: str) -> bool:
     return False
 
 
-
-
-
 class GeminiClient(Protocol):
     async def translate(
         self,
@@ -164,7 +161,9 @@ class GeminiLLMProvider:
             try:
                 await _close_owned_client(client, http_options)
             except Exception as exc:
-                record_probe_cleanup_failure(exc, provider="gemini", primary_failure=primary_failure)
+                record_probe_cleanup_failure(
+                    exc, provider="gemini", primary_failure=primary_failure
+                )
                 if primary_failure is None:
                     raise
 
@@ -269,7 +268,7 @@ class GoogleGenaiGeminiClient:
             result = str(response.text).strip()
 
             return result
-        
+
         raise LLMResponseError("Gemini response did not contain text", provider="gemini")
 
     async def close(self) -> None:

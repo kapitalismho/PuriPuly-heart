@@ -11,8 +11,12 @@ class ApplicationRuntimeLoggingPort(Protocol):
     def bind_instance(self, instance_id: str) -> None: ...
 
     def emit_failure(
-        self, diagnostics: ErrorDiagnostics, *, severity: str = "error",
-        disposition: str = "failed", stage: str | None = None,
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
         exception: BaseException | None = None,
     ) -> dict: ...
 

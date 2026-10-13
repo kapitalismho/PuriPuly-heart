@@ -827,8 +827,12 @@ class ChatGptPlanLLMProvider(LLMProvider):
             ).diagnostics
         if operation != "translate":
             emit_failure(
-                logger, exc.failure_diagnostics, severity="warning", disposition="degraded",
-                stage="provider_build", exception=exc,
+                logger,
+                exc.failure_diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="provider_build",
+                exception=exc,
             )
 
 

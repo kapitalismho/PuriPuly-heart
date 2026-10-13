@@ -66,7 +66,10 @@ class LocalGpuSTTBackend(STTBackend):
         self._lock = asyncio.Lock()
 
     async def prepare(
-        self, *, operation_id: str | None = None, request_id: str | None = None,
+        self,
+        *,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> None:
         async with self._lock:
             if self._closed or self._closing:
@@ -83,7 +86,8 @@ class LocalGpuSTTBackend(STTBackend):
                     model_path=self.model_path,
                     model_id=self.model_id,
                     device_id=self.device_id,
-                    operation_id=operation_id, request_id=request_id,
+                    operation_id=operation_id,
+                    request_id=request_id,
                 )
                 self._active = True
 
@@ -248,11 +252,15 @@ class _LocalGpuSTTSession(STTBackendSession):
                 epoch_disposition="retire" if retire else "reuse",
                 failure_diagnostics=(
                     recognition_failure_diagnostics(
-                        exception, provider="local_qwen_gpu", channel=self.backend.channel,
-                        operation="decode", reason=failure_reason or "local_decode_failed",
+                        exception,
+                        provider="local_qwen_gpu",
+                        channel=self.backend.channel,
+                        operation="decode",
+                        reason=failure_reason or "local_decode_failed",
                         identity=identity,
                     )
-                    if outcome in {"failed", "expired", "degraded"} else None
+                    if outcome in {"failed", "expired", "degraded"}
+                    else None
                 ),
             )
         )

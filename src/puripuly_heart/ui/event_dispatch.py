@@ -389,14 +389,23 @@ class UIEventBridge:
         emit_failure(
             logger,
             ErrorDiagnostics(
-                component="output_runtime", operation="publish", code="destination_publish_failed",
-                category="lifecycle", visibility="basic", content_policy="metadata_only",
-                status_code=None, retry_after_ms=None, fields=fields,
-                channel=event.channel, turn_id=str(event.utterance_id) if event.utterance_id else None,
+                component="output_runtime",
+                operation="publish",
+                code="destination_publish_failed",
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields=fields,
+                channel=event.channel,
+                turn_id=str(event.utterance_id) if event.utterance_id else None,
                 operation_id=event.operation_id,
                 request_id=event.request_id,
             ),
-            disposition="degraded", stage="ui_event_delivery", exception=exception,
+            disposition="degraded",
+            stage="ui_event_delivery",
+            exception=exception,
         )
 
     async def wait_started(self) -> None:

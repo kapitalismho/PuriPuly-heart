@@ -75,13 +75,20 @@ class ApplicationRuntimeLoggingOwner:
         return self._metadata_service().diagnostic_health()
 
     def emit_failure(
-        self, diagnostics: ErrorDiagnostics, *, severity: str = "error",
-        disposition: str = "failed", stage: str | None = None,
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
         exception: BaseException | None = None,
     ) -> dict:
         return self._metadata_service().emit_failure(
-            diagnostics, severity=severity, disposition=disposition,
-            stage=stage, exception=exception,
+            diagnostics,
+            severity=severity,
+            disposition=disposition,
+            stage=stage,
+            exception=exception,
         )
 
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
@@ -106,20 +113,35 @@ class ApplicationRuntimeLoggingOwner:
 
     def _emit_exception(self, exception: BaseException, *, level: int) -> bool:
         diagnostics = ErrorDiagnostics(
-            component="application_runtime_logging", operation="emit",
-            code="unclassified_failure", category="unknown", visibility="diagnostic_only",
-            content_policy="metadata_only", status_code=None, retry_after_ms=None, fields={},
+            component="application_runtime_logging",
+            operation="emit",
+            code="unclassified_failure",
+            category="unknown",
+            visibility="diagnostic_only",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={},
         )
         try:
             self.emit_failure(
                 diagnostics,
-                severity="error" if level >= logging.ERROR else "warning" if level >= logging.WARNING else "info",
-                disposition="unknown", stage="diagnostic", exception=exception,
+                severity=(
+                    "error"
+                    if level >= logging.ERROR
+                    else "warning" if level >= logging.WARNING else "info"
+                ),
+                disposition="unknown",
+                stage="diagnostic",
+                exception=exception,
             )
             return True
         except Exception:
             return emit_safe_fallback_log(
-                self.fallback_logger, "[Logging] diagnostic_unavailable", level=level, live=False,
+                self.fallback_logger,
+                "[Logging] diagnostic_unavailable",
+                level=level,
+                live=False,
             )
 
     def emit_diagnostic(
@@ -230,12 +252,18 @@ class ApplicationRuntimeLoggingOwner:
 
     def emit_startup_diagnostic(self, diagnostic: ApplicationStartupDiagnostic) -> None:
         if diagnostic.diagnostics is not None:
-            owning = replace(diagnostic.diagnostics, fields={
-                **diagnostic.diagnostics.fields, "attempt_id": diagnostic.attempt_id,
-                "process_id": diagnostic.process_id, "monotonic_ns": diagnostic.monotonic_ns,
-            })
+            owning = replace(
+                diagnostic.diagnostics,
+                fields={
+                    **diagnostic.diagnostics.fields,
+                    "attempt_id": diagnostic.attempt_id,
+                    "process_id": diagnostic.process_id,
+                    "monotonic_ns": diagnostic.monotonic_ns,
+                },
+            )
             self.emit_failure(
-                owning, severity="info" if diagnostic.outcome == "cancelled" else "error",
+                owning,
+                severity="info" if diagnostic.outcome == "cancelled" else "error",
                 disposition="cancelled" if diagnostic.outcome == "cancelled" else "failed",
             )
             return

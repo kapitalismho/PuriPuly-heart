@@ -106,7 +106,8 @@ async def test_manual_noncredential_http_failures_reach_ui_and_safe_metadata(
     assert controller.last_verified_hash == ""
     assert messages == [("snackbar.verification_failed", f"error.openrouter_auth.{reason}")]
     failures = [
-        record._puripuly_heart_failure[0] for record in caplog.records
+        record._puripuly_heart_failure[0]
+        for record in caplog.records
         if hasattr(record, "_puripuly_heart_failure")
     ]
     assert failures
@@ -441,7 +442,8 @@ async def test_tls_codes_survive_real_auth_normalization_and_persisted_log_owner
     service.configure_diagnostics(instance_id=uuid4().hex)
     owner = ApplicationRuntimeLoggingOwner(
         presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
-        service_factory=lambda: service, fallback_logger=root,
+        service_factory=lambda: service,
+        fallback_logger=root,
     )
     try:
         for code in (20, 62):
@@ -450,8 +452,11 @@ async def test_tls_codes_survive_real_auth_normalization_and_persisted_log_owner
             failure = httpx.ConnectError(UNSAFE)
             failure.__cause__ = cause
             failure.connection_diagnostics = {
-                "transport": "https", "tls_source": "windows",
-                "proxy_source": "direct", "tls_backend": "native", "proxy_url": UNSAFE,
+                "transport": "https",
+                "tls_source": "windows",
+                "proxy_source": "direct",
+                "tls_backend": "native",
+                "proxy_url": UNSAFE,
             }
 
             def fail(**_kwargs: object) -> None:
